@@ -249,7 +249,7 @@ export function Series() {
                     const backgroundImageUrl = backdropUrl || fallbackUrl;
 
                     return backgroundImageUrl ? (
-                        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, backgroundImage: `url(${backgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(6px)', opacity: 0.5, pointerEvents: 'none' }}></div>
+                        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, backgroundImage: `url(${backgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(3px)', opacity: 0.5, pointerEvents: 'none' }}></div>
                     ) : null;
                 })()}
                 <div style={{ position: 'relative', zIndex: 10, padding: '32px', height: '100%', display: 'flex', flexDirection: 'column' }}>
