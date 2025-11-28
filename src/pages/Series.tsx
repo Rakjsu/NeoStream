@@ -160,12 +160,24 @@ export function Series() {
 
             if (result.success) {
                 const { url, username, password } = result.credentials;
-                // Use selected season and episode for the stream URL
-                const streamUrl = `${url}/series/${username}/${password}/${seriesItem.series_id}.${selectedSeason}.${selectedEpisode}.m3u8`;
+
+                // Get the specific episode data from seriesInfo
+                const episode = seriesInfo?.episodes?.[selectedSeason]?.find(
+                    (ep: any) => ep.episode_num === selectedEpisode
+                );
+
+                if (!episode) {
+                    throw new Error(`Episode ${selectedEpisode} of season ${selectedSeason} not found`);
+                }
+
+                // Use episode ID and container extension from API
+                const streamUrl = `${url}/series/${username}/${password}/${episode.id}.${episode.container_extension}`;
+                console.log('🎬 Building series stream URL:', streamUrl);
                 return streamUrl;
             }
             throw new Error('Credenciais não encontradas');
         } catch (error) {
+            console.error('❌ Error building series stream URL:', error);
             throw error;
         }
     };
