@@ -163,7 +163,7 @@ export function Series() {
 
                 // Get the specific episode data from seriesInfo
                 const episode = seriesInfo?.episodes?.[selectedSeason]?.find(
-                    (ep: any) => ep.episode_num === selectedEpisode
+                    (ep: any) => Number(ep.episode_num) === Number(selectedEpisode)
                 );
 
                 if (!episode) {
