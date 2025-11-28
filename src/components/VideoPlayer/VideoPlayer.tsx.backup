@@ -1,0 +1,224 @@
+import React, { useState, useEffect } from 'react';
+import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaCompress, FaCog, FaSpinner } from 'react-icons/fa';
+import { useVideoPlayer } from '../../hooks/useVideoPlayer';
+import { useHls } from '../../hooks/useHls';
+import { formatTime, percentage } from '../../utils/videoHelpers';
+import './VideoPlayer.css';
+
+export interface VideoPlayerProps {
+    src: string;
+    title?: string;
+    poster?: string;
+    onClose?: () => void;
+    autoPlay?: boolean;
+}
+
+export function VideoPlayer({ src, title, poster, onClose, autoPlay = false }: VideoPlayerProps) {
+    const { videoRef, state, controls } = useVideoPlayer();
+    useHls({ src, videoRef });
+
+    const [showControls, setShowControls] = useState(true);
+    const [seeking, setSeeking] = useState(false);
+    const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
+
+    let hideControlsTimeout: NodeJS.Timeout;
+
+    // Auto-hide controls after 3s
+    const resetHideControlsTimer = () => {
+        setShowControls(true);
+        clearTimeout(hideControlsTimeout);
+        hideControlsTimeout = setTimeout(() => {
+            if (state.playing && !seeking) {
+                setShowControls(false);
+            }
+        }, 3000);
+    };
+
+    useEffect(() => {
+        resetHideControlsTimer();
+        return () => clearTimeout(hideControlsTimeout);
+    }, [state.playing, seeking]);
+
+    // Auto play if requested
+    useEffect(() => {
+        if (autoPlay && videoRef.current) {
+            videoRef.current.play();
+        }
+    }, [autoPlay]);
+
+    // Progress bar handlers
+    const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        const clickPosition = (e.clientX - rect.left) / rect.width;
+        controls.seek(clickPosition * state.duration);
+    };
+
+    const handleProgressMouseDown = (e: React.MouseEvent) => {
+        setSeeking(true);
+        handleProgressBarClick(e);
+    };
+
+    const handleProgressMouseMove = (e: React.MouseEvent) => {
+        if (seeking) {
+            handleProgressBarClick(e);
+        }
+    };
+
+    const handleProgressMouseUp = () => {
+        setSeeking(false);
+    };
+
+    // Volume slider handlers
+    const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        controls.setVolume(parseFloat(e.target.value));
+    };
+
+    // Playback speed options
+    {/* Title */ }
+    {
+        title && showControls && (
+            <div className="video-player-title">{title}</div>
+        )
+    }
+
+    {/* Video Element */ }
+    <video
+        ref={videoRef}
+        className="video-player-video"
+        poster={poster}
+        onClick={controls.togglePlay}
+        style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            objectFit: 'contain',
+            zIndex: 1
+        }}
+    />
+
+    {/* Loading Spinner */ }
+    {
+        state.loading && (
+            <div className="video-player-loading">
+                <FaSpinner className="spinner" />
+            </div>
+        )
+    }
+
+    {/* Error Message */ }
+    {
+        state.error && (
+            <div className="video-player-error">
+                <p style={{ fontSize: '18px', marginBottom: '8px' }}>⚠️ Erro ao carregar vídeo</p>
+                <p style={{ fontSize: '14px', opacity: 0.8 }}>Verifique se as credenciais do servidor IPTV estão configuradas corretamente.</p>
+                <p style={{ fontSize: '12px', marginTop: '12px', opacity: 0.6 }}>
+                    Edite os arquivos VOD.tsx ou Series.tsx e substitua YOUR_SERVER_URL, YOUR_USERNAME e YOUR_PASSWORD.
+                </p>
+                <button onClick={onClose} style={{ marginTop: '16px' }}>Fechar</button>
+            </div>
+        )
+    }
+
+    {/* Controls */ }
+    <div className={`video-player-controls ${showControls ? 'visible' : 'hidden'}`}>
+        {/* Progress Bar */}
+        <div
+            className="progress-container"
+            onClick={handleProgressBarClick}
+            onMouseDown={handleProgressMouseDown}
+            onMouseMove={handleProgressMouseMove}
+            onMouseUp={handleProgressMouseUp}
+            onMouseLeave={handleProgressMouseUp}
+        >
+            <div className="progress-bar">
+                <div className="progress-buffered" style={{ width: `${bufferedPercent}%` }} />
+                <div className="progress-played" style={{ width: `${currentTimePercent}%` }}>
+                    <div className="progress-handle" />
+                </div>
+            </div>
+        </div>
+
+        {/* Control Buttons */}
+        <div className="controls-row">
+            {/* Left Side */}
+            <div className="controls-left">
+                {/* Play/Pause */}
+                <button className="control-btn" onClick={controls.togglePlay}>
+                    {state.playing ? <FaPause /> : <FaPlay />}
+                </button>
+
+                {/* Volume */}
+                <div
+                    className="volume-control"
+                    onMouseEnter={() => setShowVolumeSlider(true)}
+                    onMouseLeave={() => setShowVolumeSlider(false)}
+                >
+                    <button className="control-btn" onClick={controls.toggleMute}>
+                        {state.muted || state.volume === 0 ? <FaVolumeMute /> : <FaVolumeUp />}
+                    </button>
+                    {showVolumeSlider && (
+                        <input
+                            type="range"
+                            className="volume-slider"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={state.muted ? 0 : state.volume}
+                            onChange={handleVolumeChange}
+                        />
+                    )}
+                </div>
+
+                {/* Time Display */}
+                <span className="time-display">
+                    {formatTime(state.currentTime)} / {formatTime(state.duration)}
+                </span>
+            </div>
+
+            {/* Right Side */}
+            <div className="controls-right">
+                {/* Settings */}
+                <div className="settings-menu-container">
+                    <button
+                        className="control-btn"
+                        onClick={() => setShowSettings(!showSettings)}
+                    >
+                        <FaCog />
+                    </button>
+
+                    {showSettings && (
+                        <div className="settings-menu">
+                            <div className="settings-section">
+                                <span className="settings-label">Velocidade</span>
+                                <div className="settings-options">
+                                    {playbackRates.map(rate => (
+                                        <button
+                                            key={rate}
+                                            className={`settings-option ${state.playbackRate === rate ? 'active' : ''}`}
+                                            onClick={() => {
+                                                controls.setPlaybackRate(rate);
+                                                setShowSettings(false);
+                                            }}
+                                        >
+                                            {rate}x
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Fullscreen */}
+                <button className="control-btn" onClick={controls.toggleFullscreen}>
+                    {state.fullscreen ? <FaCompress /> : <FaExpand />}
+                </button>
+            </div>
+        </div>
+    </div>
+        </div >
+    );
+}

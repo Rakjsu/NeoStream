@@ -1,0 +1,16 @@
+{
+    "login": {
+        "title": "Entrar no IPTV",
+        "url": "URL do Servidor",
+        "username": "Usuário",
+        "password": "Senha",
+        "submit": "Entrar",
+        "error": "Falha no login"
+    },
+    "dashboard": {
+        "live": "TV Ao Vivo",
+        "vod": "Filmes",
+        "series": "Séries",
+        "settings": "Configurações"
+    }
+}

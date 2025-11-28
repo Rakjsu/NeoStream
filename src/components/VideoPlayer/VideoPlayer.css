@@ -1,0 +1,334 @@
+/* Container */
+.video-player-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Video - Centralizado e preenchendo tela toda */
+.video-fullwidth {
+    position: absolute !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    object-fit: cover !important;
+    display: block !important;
+    cursor: pointer;
+}
+
+/* Close Button */
+.video-player-close {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.video-player-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+/* Title */
+.video-player-title {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 90;
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9);
+    max-width: 60%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Loading Spinner */
+.video-player-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 50;
+}
+
+.spinner {
+    font-size: 48px;
+    color: #3b82f6;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Error Message */
+.video-player-error {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 50;
+    background: rgba(220, 38, 38, 0.9);
+    padding: 24px;
+    border-radius: 12px;
+    text-align: center;
+    color: white;
+}
+
+.video-player-error button {
+    margin-top: 12px;
+    padding: 8px 16px;
+    background: white;
+    color: #dc2626;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+/* Controls Container */
+.video-player-controls {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 80;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.6), transparent);
+    padding: 60px 20px 20px;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.video-player-controls.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.video-player-controls.hidden {
+    opacity: 0;
+    transform: translateY(20px);
+    pointer-events: none;
+}
+
+/* Progress Bar */
+.progress-container {
+    margin-bottom: 16px;
+    padding: 8px 0;
+    cursor: pointer;
+}
+
+.progress-bar {
+    position: relative;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-container:hover .progress-bar {
+    height: 8px;
+}
+
+.progress-buffered {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.5);
+    transition: width 0.2s ease;
+}
+
+.progress-played {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: #3b82f6;
+    transition: width 0.1s ease;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.progress-handle {
+    width: 14px;
+    height: 14px;
+    background: white;
+    border-radius: 50%;
+    transform: translateX(50%);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.progress-container:hover .progress-handle {
+    opacity: 1;
+}
+
+/* Control Buttons Row */
+.controls-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.controls-left,
+.controls-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.control-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.control-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
+.control-btn:active {
+    transform: scale(0.95);
+}
+
+/* Volume Control */
+.volume-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.volume-slider {
+    width: 0;
+    opacity: 0;
+    transition: all 0.3s ease;
+    appearance: none;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
+    outline: none;
+}
+
+.volume-control:hover .volume-slider {
+    width: 80px;
+    opacity: 1;
+}
+
+.volume-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: white;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.volume-slider::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: white;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+/* Time Display */
+.time-display {
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    user-select: none;
+}
+
+/* Settings Menu */
+.settings-menu-container {
+    position: relative;
+}
+
+.settings-menu {
+    position: absolute;
+    bottom: 50px;
+    right: 0;
+    background: rgba(28, 28, 28, 0.95);
+    border-radius: 8px;
+    padding: 8px;
+    min-width: 200px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.settings-section {
+    padding: 8px;
+}
+
+.settings-label {
+    display: block;
+    color: #9ca3af;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.settings-options {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+}
+
+.settings-option {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    padding: 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.settings-option:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.settings-option.active {
+    background: #3b82f6;
+}

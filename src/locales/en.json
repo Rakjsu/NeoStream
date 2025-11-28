@@ -1,0 +1,16 @@
+{
+    "login": {
+        "title": "Login to IPTV",
+        "url": "Server URL",
+        "username": "Username",
+        "password": "Password",
+        "submit": "Login",
+        "error": "Login failed"
+    },
+    "dashboard": {
+        "live": "Live TV",
+        "vod": "Movies",
+        "series": "Series",
+        "settings": "Settings"
+    }
+}

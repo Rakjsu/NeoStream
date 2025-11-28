@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Basic debugging styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #1f2937;
+    color: white;
+    font-family: system-ui, -apple-system, sans-serif;
+}
+
+#root {
+    min-height: 100vh;
+}
