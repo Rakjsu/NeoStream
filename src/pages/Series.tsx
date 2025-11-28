@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { formatGenres, type TMDBSeriesDetails, fetchEpisodeDetails } from '../services/tmdb';
+import { formatGenres, type TMDBSeriesDetails, fetchEpisodeDetails, getBackdropUrl } from '../services/tmdb';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 
 interface Series {
@@ -242,9 +242,16 @@ export function Series() {
                 .watch-button.clicked{animation:buttonClick 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)}
             `}</style>
             <div style={{ position: 'relative', height: '100vh', overflow: 'hidden' }}>
-                {selectedSeries && (selectedSeries.cover || selectedSeries.stream_icon) && (
-                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, backgroundImage: `url(${selectedSeries.cover || fixImageUrl(selectedSeries.stream_icon)})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(6px)', opacity: 0.5, pointerEvents: 'none' }}></div>
-                )}
+                {selectedSeries && (() => {
+                    // Priority: TMDB backdrop (high quality) > IPTV cover > IPTV stream_icon
+                    const backdropUrl = tmdbData?.backdrop_path ? getBackdropUrl(tmdbData.backdrop_path) : null;
+                    const fallbackUrl = selectedSeries.cover || fixImageUrl(selectedSeries.stream_icon);
+                    const backgroundImageUrl = backdropUrl || fallbackUrl;
+
+                    return backgroundImageUrl ? (
+                        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, backgroundImage: `url(${backgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(6px)', opacity: 0.5, pointerEvents: 'none' }}></div>
+                    ) : null;
+                })()}
                 <div style={{ position: 'relative', zIndex: 10, padding: '32px', height: '100%', display: 'flex', flexDirection: 'column' }}>
                     {selectedSeries && (
                         <div style={{ padding: '0 0 24px 0', marginBottom: '24px', flexShrink: 0 }}>

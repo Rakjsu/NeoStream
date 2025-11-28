@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { formatGenres, type TMDBMovieDetails } from '../services/tmdb';
+import { formatGenres, type TMDBMovieDetails, getBackdropUrl } from '../services/tmdb';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 
 interface VODStream {
@@ -144,9 +144,16 @@ export function VOD() {
                 .watch-button.clicked{animation:buttonClick 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)}
             `}</style>
             <div style={{ position: 'relative', height: '100vh', overflow: 'hidden' }}>
-                {selectedMovie && (selectedMovie.cover || selectedMovie.stream_icon) && (
-                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, backgroundImage: `url(${selectedMovie.cover || fixImageUrl(selectedMovie.stream_icon)})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(6px)', opacity: 0.5, pointerEvents: 'none' }}></div>
-                )}
+                {selectedMovie && (() => {
+                    // Priority: TMDB backdrop (high quality) > IPTV cover > IPTV stream_icon
+                    const backdropUrl = tmdbData?.backdrop_path ? getBackdropUrl(tmdbData.backdrop_path) : null;
+                    const fallbackUrl = selectedMovie.cover || fixImageUrl(selectedMovie.stream_icon);
+                    const backgroundImageUrl = backdropUrl || fallbackUrl;
+
+                    return backgroundImageUrl ? (
+                        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, backgroundImage: `url(${backgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(6px)', opacity: 0.5, pointerEvents: 'none' }}></div>
+                    ) : null;
+                })()}
                 <div style={{ position: 'relative', zIndex: 10, padding: '32px', height: '100%', display: 'flex', flexDirection: 'column' }}>
                     {selectedMovie && (
                         <div style={{ padding: '0 0 24px 0', marginBottom: '24px', flexShrink: 0 }}>

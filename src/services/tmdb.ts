@@ -1,6 +1,18 @@
 // TMDB API Service
 const TMDB_API_KEY = '9d8ec8b10e9b4acd85853c44b29bd83a';
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
+
+/**
+ * Get high-quality backdrop image URL from TMDB
+ * @param backdropPath - The backdrop path from TMDB API
+ * @param size - Image size (default: 'original' for highest quality)
+ * @returns Full URL to backdrop image or null
+ */
+export function getBackdropUrl(backdropPath: string | null, size: string = 'original'): string | null {
+    if (!backdropPath) return null;
+    return `${TMDB_IMAGE_BASE_URL}/${size}${backdropPath}`;
+}
 
 export interface TMDBMovieDetails {
     genres: { id: number; name: string }[];
@@ -8,6 +20,7 @@ export interface TMDBMovieDetails {
     title: string;
     release_date: string;
     vote_average: number;
+    backdrop_path: string | null;
 }
 
 export interface TMDBSeriesDetails {
@@ -16,6 +29,7 @@ export interface TMDBSeriesDetails {
     name: string;
     first_air_date: string;
     vote_average: number;
+    backdrop_path: string | null;
 }
 
 export interface TMDBEpisodeDetails {
