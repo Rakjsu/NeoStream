@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { formatGenres, type TMDBSeriesDetails } from '../services/tmdb';
+import { formatGenres, type TMDBSeriesDetails, fetchEpisodeDetails } from '../services/tmdb';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 
 interface Series {
@@ -36,6 +36,8 @@ export function Series() {
     const [selectedSeason, setSelectedSeason] = useState<number>(1);
     const [selectedEpisode, setSelectedEpisode] = useState<number>(1);
     const [seriesInfo, setSeriesInfo] = useState<any>(null);
+    // Cache for TMDB episode names: key is "seriesId-season-episode"
+    const [tmdbEpisodeCache, setTmdbEpisodeCache] = useState<Map<string, string>>(new Map());
 
     useEffect(() => { fetchSeries(); }, []);
 
@@ -84,17 +86,33 @@ export function Series() {
         setPlayingSeries(seriesItem);
     };
 
-    // Extract clean episode title and format as "Episódio X - Episode Name"
-    const getEpisodeTitle = (fullTitle: string, episodeNum: number): string => {
-        if (!fullTitle) return `Episódio ${episodeNum}`;
 
-        // Remove common prefixes like series name and season/episode codes
-        let cleanTitle = fullTitle;
+    // Check if episode title from IPTV API is meaningful
+    const isValidEpisodeTitle = (cleanTitle: string): boolean => {
+        if (!cleanTitle || cleanTitle.length === 0) return false;
+        if (cleanTitle.match(/^\d+$/)) return false; // Just a number
+        if (cleanTitle.match(/^(Episódio|Capítulo|Ep\.?|Episode|Chapter)\s*\d+$/i)) return false;
+        return true;
+    };
+
+    // Extract clean episode title and format as "Episódio X - Episode Name"
+    // Uses TMDB as fallback when IPTV title is not meaningful
+    const getEpisodeTitle = (fullTitle: string, episodeNum: number, season: number = selectedSeason): string => {
+        // Try to get from cache first (for TMDB fallback)
+        const cacheKey = selectedSeries?.tmdb_id
+            ? `${selectedSeries.tmdb_id}-${season}-${episodeNum}`
+            : null;
+
+        if (cacheKey && tmdbEpisodeCache.has(cacheKey)) {
+            const cachedName = tmdbEpisodeCache.get(cacheKey)!;
+            return `Episódio ${episodeNum} - ${cachedName}`;
+        }
+
+        // Try to clean the IPTV title
+        let cleanTitle = fullTitle || '';
 
         // Split by " - " and get the last meaningful part
-        const parts = fullTitle.split(' - ');
-
-        // If we have multiple parts, the last part is usually the episode name
+        const parts = cleanTitle.split(' - ');
         if (parts.length > 1) {
             cleanTitle = parts[parts.length - 1].trim();
         }
@@ -109,12 +127,30 @@ export function Series() {
             .replace(/^Chapter\s+\d+\s*/i, '')       // Remove "Chapter X"
             .trim();
 
-        // If after cleaning we have a meaningful title, use it
-        if (cleanTitle && cleanTitle.length > 0 && !cleanTitle.match(/^\d+$/)) {
+        // If we have a valid title from IPTV, use it
+        if (isValidEpisodeTitle(cleanTitle)) {
             return `Episódio ${episodeNum} - ${cleanTitle}`;
         }
 
-        // Otherwise just return the episode number
+        // If IPTV title is not good and we have TMDB ID, try to fetch from TMDB
+        if (selectedSeries?.tmdb_id && cacheKey) {
+            // Trigger async fetch (won't block rendering)
+            fetchEpisodeDetails(selectedSeries.tmdb_id, season, episodeNum)
+                .then(episodeData => {
+                    if (episodeData && episodeData.name) {
+                        setTmdbEpisodeCache(prev => {
+                            const newCache = new Map(prev);
+                            newCache.set(cacheKey, episodeData.name);
+                            return newCache;
+                        });
+                    }
+                })
+                .catch(() => {
+                    // Silently fail - will just show episode number
+                });
+        }
+
+        // Return just the episode number as fallback
         return `Episódio ${episodeNum}`;
     };
 

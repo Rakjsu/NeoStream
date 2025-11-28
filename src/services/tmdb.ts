@@ -18,6 +18,14 @@ export interface TMDBSeriesDetails {
     vote_average: number;
 }
 
+export interface TMDBEpisodeDetails {
+    name: string;
+    overview: string;
+    episode_number: number;
+    season_number: number;
+    air_date: string;
+}
+
 export async function fetchMovieDetails(tmdbId: string): Promise<TMDBMovieDetails | null> {
     if (!tmdbId) return null;
     try {
@@ -93,3 +101,29 @@ export async function searchSeriesByName(seriesName: string, year?: string): Pro
         return null;
     }
 }
+
+/**
+ * Fetch episode details from TMDB
+ * @param tmdbSeriesId - TMDB series ID
+ * @param seasonNumber - Season number
+ * @param episodeNumber - Episode number
+ * @returns Episode details or null if not found
+ */
+export async function fetchEpisodeDetails(
+    tmdbSeriesId: string,
+    seasonNumber: number,
+    episodeNumber: number
+): Promise<TMDBEpisodeDetails | null> {
+    if (!tmdbSeriesId) return null;
+    try {
+        const response = await fetch(
+            `${TMDB_BASE_URL}/tv/${tmdbSeriesId}/season/${seasonNumber}/episode/${episodeNumber}?api_key=${TMDB_API_KEY}&language=pt-BR`
+        );
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching episode details:', error);
+        return null;
+    }
+}
+
