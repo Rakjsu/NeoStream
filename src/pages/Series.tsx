@@ -440,7 +440,13 @@ export function Series() {
                     }
                     canGoPrevious={selectedEpisode > 1 || selectedSeason > 1}
                     currentEpisode={selectedEpisode}
-                    customTitle={`${playingSeries.name} - ep${String(selectedEpisode).padStart(2, '0')}`}
+                    customTitle={(() => {
+                        const currentEp = seriesInfo?.episodes?.[selectedSeason]?.find(
+                            (ep: any) => Number(ep.episode_num) === selectedEpisode
+                        );
+                        const episodeName = currentEp ? getEpisodeTitle(currentEp.title, selectedEpisode, selectedSeason) : `Episódio ${selectedEpisode}`;
+                        return `${playingSeries.name} - ${episodeName}`;
+                    })()}
                 />
             )
             }
