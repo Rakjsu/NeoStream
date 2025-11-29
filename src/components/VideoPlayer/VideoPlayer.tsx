@@ -137,15 +137,18 @@ export function VideoPlayer({
                 </button>
             )}
 
-            <div style={{
-                position: 'absolute',
-                inset: 0,
-                overflow: 'hidden',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: '#000'
-            }}>
+            <div
+                style={{
+                    position: 'absolute',
+                    inset: 0,
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: '#000'
+                }}
+                onMouseMove={resetHideControlsTimer}
+            >
                 <video
                     ref={videoRef}
                     className="video-fullwidth"
