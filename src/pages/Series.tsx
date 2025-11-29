@@ -383,6 +383,40 @@ export function Series() {
                                         <span style={{ fontSize: '20px' }}>▶</span>
                                         Assistir
                                     </button>
+
+                                    <button
+                                        onClick={() => {
+                                            if (watchLaterService.has(String(selectedSeries.series_id), 'series')) {
+                                                watchLaterService.remove(String(selectedSeries.series_id), 'series');
+                                            } else {
+                                                watchLaterService.add({
+                                                    id: String(selectedSeries.series_id),
+                                                    type: 'series',
+                                                    name: selectedSeries.name,
+                                                    cover: selectedSeries.cover || selectedSeries.stream_icon
+                                                });
+                                            }
+                                            setRefresh(r => r + 1);
+                                        }}
+                                        style={{
+                                            padding: '14px 32px',
+                                            backgroundColor: watchLaterService.has(String(selectedSeries.series_id), 'series') ? '#10b981' : 'rgba(255, 255, 255, 0.1)',
+                                            color: 'white',
+                                            fontSize: '16px',
+                                            fontWeight: '700',
+                                            borderRadius: '8px',
+                                            border: '2px solid rgba(255, 255, 255, 0.2)',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '10px',
+                                            transition: 'all 0.2s'
+                                        }}>
+                                        <span style={{ fontSize: '20px' }}>
+                                            {watchLaterService.has(String(selectedSeries.series_id), 'series') ? '✓' : '+'}
+                                        </span>
+                                        {watchLaterService.has(String(selectedSeries.series_id), 'series') ? 'Salvo' : 'Assistir Depois'}
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -392,42 +426,6 @@ export function Series() {
                             {filteredSeries.map((s) => (
                                 <div key={s.series_id} className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-95" onClick={() => setSelectedSeries(s)}>
                                     <div className="relative overflow-hidden bg-gray-900 shadow-xl" style={{ borderRadius: '16px', border: selectedSeries?.series_id === s.series_id ? '3px solid #3b82f6' : '3px solid transparent' }}>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (watchLaterService.has(String(s.series_id), 'series')) {
-                                                    watchLaterService.remove(String(s.series_id), 'series');
-                                                } else {
-                                                    watchLaterService.add({
-                                                        id: String(s.series_id),
-                                                        type: 'series',
-                                                        name: s.name,
-                                                        cover: s.cover || s.stream_icon
-                                                    });
-                                                }
-                                                setRefresh(r => r + 1);
-                                            }}
-                                            style={{
-                                                position: 'absolute',
-                                                top: '8px',
-                                                right: '8px',
-                                                zIndex: 10,
-                                                background: 'rgba(0, 0, 0, 0.7)',
-                                                border: 'none',
-                                                borderRadius: '50%',
-                                                width: '36px',
-                                                height: '36px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s'
-                                            }}
-                                        >
-                                            <span style={{ fontSize: '20px' }}>
-                                                {watchLaterService.has(String(s.series_id), 'series') ? '🔖' : '📌'}
-                                            </span>
-                                        </button>
                                         <div className="aspect-[2/3]">
                                             {(s.cover || s.stream_icon) && !brokenImages.has(s.series_id) ? (
                                                 <img src={fixImageUrl(s.cover || s.stream_icon)} alt={s.name} className="w-full h-full object-cover" style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }} onError={() => handleImageError(s.series_id)} />
