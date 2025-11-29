@@ -5,9 +5,23 @@ interface AsyncVideoPlayerProps {
     movie: any;
     buildStreamUrl: (movie: any) => Promise<string>;
     onClose: () => void;
+    onNextEpisode?: () => void;
+    onPreviousEpisode?: () => void;
+    canGoNext?: boolean;
+    canGoPrevious?: boolean;
+    currentEpisode?: number;
 }
 
-function AsyncVideoPlayer({ movie, buildStreamUrl, onClose }: AsyncVideoPlayerProps) {
+function AsyncVideoPlayer({
+    movie,
+    buildStreamUrl,
+    onClose,
+    onNextEpisode,
+    onPreviousEpisode,
+    canGoNext,
+    canGoPrevious,
+    currentEpisode
+}: AsyncVideoPlayerProps) {
     const [streamUrl, setStreamUrl] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [isAnimating, setIsAnimating] = useState(true);
@@ -83,6 +97,10 @@ function AsyncVideoPlayer({ movie, buildStreamUrl, onClose }: AsyncVideoPlayerPr
                         poster={movie.cover || movie.stream_icon}
                         onClose={onClose}
                         autoPlay={true}
+                        onNextEpisode={onNextEpisode}
+                        onPreviousEpisode={onPreviousEpisode}
+                        canGoNext={canGoNext}
+                        canGoPrevious={canGoPrevious}
                     />
                 </div>
             </div>

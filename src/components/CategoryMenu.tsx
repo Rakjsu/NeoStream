@@ -61,7 +61,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                     position: 'absolute',
                     top: '32px',
                     left: '32px',
-                    zIndex: 1001,
+                    zIndex: 90,
                     width: '48px',
                     height: '48px',
                     backgroundColor: 'rgba(37, 99, 235, 0.9)',
@@ -86,7 +86,18 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                     e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.4)';
                 }}
             >
-                {isOpen ? '✕' : '📁'}
+                {isOpen ? (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                ) : (
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                        <line x1="3" y1="6" x2="21" y2="6" />
+                        <line x1="3" y1="12" x2="21" y2="12" />
+                        <line x1="3" y1="18" x2="21" y2="18" />
+                    </svg>
+                )}
             </button>
 
             {/* Backdrop */}

@@ -27,11 +27,10 @@ export function AnimatedSearchBar({ value, onChange, placeholder = "Buscar..." }
     return (
         <>
             <style>{`
-                @keyframes scaleGlow {
-                    0% { transform: scale(1); }
-                    50% { transform: scale(1.1); box-shadow: 0 0 20px rgba(59, 130, 246, 0.6); }
-                    100% { transform: scale(1); }
-                }
+            @keyframes scaleGlow {
+                0%, 100% { transform: scale(1); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4); }
+                50% { transform: scale(1.1); box-shadow: 0 0 20px rgba(59, 130, 246, 0.6); }
+            }
                 .search-icon:hover {
                     animation: scaleGlow 0.6s ease-in-out;
                 }
