@@ -76,7 +76,7 @@ export function VideoPlayer({ src, title, poster, onClose, autoPlay = false }: V
     const bufferedPercent = percentage(state.buffered, state.duration);
 
     return (
-        <div className="video-player-container">
+        <div className="video-player-container" onMouseMove={resetHideControlsTimer}>
             {onClose && (
                 <button className="video-player-close" onClick={onClose}>✕</button>
             )}
