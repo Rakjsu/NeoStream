@@ -426,6 +426,24 @@ export function Series() {
                             {filteredSeries.map((s) => (
                                 <div key={s.series_id} className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-95" onClick={() => setSelectedSeries(s)}>
                                     <div className="relative overflow-hidden bg-gray-900 shadow-xl" style={{ borderRadius: '16px', border: selectedSeries?.series_id === s.series_id ? '3px solid #3b82f6' : '3px solid transparent' }}>
+                                        {watchLaterService.has(String(s.series_id), 'series') && (
+                                            <div style={{
+                                                position: 'absolute',
+                                                top: '8px',
+                                                right: '8px',
+                                                zIndex: 10,
+                                                background: '#10b981',
+                                                borderRadius: '50%',
+                                                width: '32px',
+                                                height: '32px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.5)'
+                                            }}>
+                                                <span style={{ fontSize: '18px' }}>🔖</span>
+                                            </div>
+                                        )}
                                         <div className="aspect-[2/3]">
                                             {(s.cover || s.stream_icon) && !brokenImages.has(s.series_id) ? (
                                                 <img src={fixImageUrl(s.cover || s.stream_icon)} alt={s.name} className="w-full h-full object-cover" style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }} onError={() => handleImageError(s.series_id)} />
