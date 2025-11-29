@@ -6,6 +6,7 @@ import { LiveTV } from './pages/LiveTV';
 import { VOD } from './pages/VOD';
 import { Series } from './pages/Series';
 import { Settings } from './pages/Settings';
+import { WatchLater } from './pages/WatchLater';
 import { useState, useEffect } from 'react';
 
 function App() {
@@ -49,6 +50,7 @@ function App() {
           <Route path="live" element={<LiveTV />} />
           <Route path="vod" element={<VOD />} />
           <Route path="series" element={<Series />} />
+          <Route path="watch-later" element={<WatchLater />} />
           <Route path="settings" element={<Settings />} />
         </Route>
         <Route

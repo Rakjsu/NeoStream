@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Tv, Film, PlaySquare, Settings, LogOut } from 'lucide-react';
+import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark } from 'lucide-react';
 import { clsx } from 'clsx';
 
 export function Sidebar() {
@@ -10,6 +10,7 @@ export function Sidebar() {
         { icon: Tv, label: 'Live TV', path: '/dashboard/live' },
         { icon: Film, label: 'Movies', path: '/dashboard/vod' },
         { icon: PlaySquare, label: 'Series', path: '/dashboard/series' },
+        { icon: Bookmark, label: 'Assistir Depois', path: '/dashboard/watch-later' },
         { icon: Settings, label: 'Settings', path: '/dashboard/settings' },
     ];
 
