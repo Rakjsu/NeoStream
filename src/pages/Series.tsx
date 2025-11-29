@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { formatGenres, type TMDBSeriesDetails, fetchEpisodeDetails, getBackdropUrl } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
@@ -43,6 +43,9 @@ export function Series() {
     // Cache for TMDB episode names: key is "seriesId-season-episode"
     const [tmdbEpisodeCache, setTmdbEpisodeCache] = useState<Map<string, string>>(new Map());
     const [, setRefresh] = useState(0);
+    const [visibleCount, setVisibleCount] = useState(36); // 4 rows × 9 columns
+    const ITEMS_PER_PAGE = 36;
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => { fetchSeries(); }, []);
 
@@ -68,6 +71,32 @@ export function Series() {
         const matchesCategory = !selectedCategory || selectedCategory === '' || s.category_id === selectedCategory;
         return matchesSearch && matchesCategory;
     });
+
+
+
+    // Lazy loading scroll listener
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const handleScroll = () => {
+            const { scrollTop, scrollHeight, clientHeight } = container;
+
+            // Load more when 80% scrolled
+            if (scrollTop + clientHeight >= scrollHeight * 0.8 && visibleCount < filteredSeries.length) {
+                setVisibleCount(prev => Math.min(prev + ITEMS_PER_PAGE, filteredSeries.length));
+            }
+        };
+
+        container.addEventListener('scroll', handleScroll);
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, [filteredSeries.length, visibleCount, ITEMS_PER_PAGE]);
+
+    // Reset visible count when search/filter changes
+    useEffect(() => {
+        setVisibleCount(ITEMS_PER_PAGE);
+    }, [searchQuery, selectedCategory]);
+
     const handleImageError = (seriesId: number) => setBrokenImages(prev => new Set(prev).add(seriesId));
     const fixImageUrl = (url: string): string => url && url.startsWith('http') ? url : `https://${url}`;
 
@@ -421,9 +450,9 @@ export function Series() {
                             </div>
                         </div>
                     )}
-                    <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px' }}>
+                    <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', paddingRight: '4px' }}>
                         <div className="grid grid-cols-9 gap-[32px] px-[32px]">
-                            {filteredSeries.map((s) => (
+                            {filteredSeries.slice(0, visibleCount).map((s) => (
                                 <div key={s.series_id} className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-95" onClick={() => setSelectedSeries(s)}>
                                     <div className="relative overflow-hidden bg-gray-900 shadow-xl" style={{ borderRadius: '16px', border: selectedSeries?.series_id === s.series_id ? '3px solid #3b82f6' : '3px solid transparent' }}>
                                         {watchLaterService.has(String(s.series_id), 'series') && (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { formatGenres, type TMDBMovieDetails, getBackdropUrl } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
@@ -40,6 +40,9 @@ export function VOD() {
     const [loadingTmdb, setLoadingTmdb] = useState(false);
     const [playingMovie, setPlayingMovie] = useState<VODStream | null>(null);
     const [, setRefresh] = useState(0);
+    const [visibleCount, setVisibleCount] = useState(36); // 4 rows × 9 columns
+    const ITEMS_PER_PAGE = 36;
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => { fetchStreams(); }, []);
 
@@ -61,6 +64,30 @@ export function VOD() {
     };
 
     const filteredStreams = streams.filter(stream => stream.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    // Lazy loading scroll listener
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const handleScroll = () => {
+            const { scrollTop, scrollHeight, clientHeight } = container;
+
+            // Load more when 80% scrolled
+            if (scrollTop + clientHeight >= scrollHeight * 0.8 && visibleCount < filteredStreams.length) {
+                setVisibleCount(prev => Math.min(prev + ITEMS_PER_PAGE, filteredStreams.length));
+            }
+        };
+
+        container.addEventListener('scroll', handleScroll);
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, [filteredStreams.length, visibleCount, ITEMS_PER_PAGE]);
+
+    // Reset visible count when search changes
+    useEffect(() => {
+        setVisibleCount(ITEMS_PER_PAGE);
+    }, [searchQuery, ITEMS_PER_PAGE]);
+
     const handleImageError = (streamId: number) => setBrokenImages(prev => new Set(prev).add(streamId));
     const fixImageUrl = (url: string): string => url && url.startsWith('http') ? url : `https://${url}`;
 
@@ -258,12 +285,12 @@ export function VOD() {
                             </div>
                         </div>
                     )}
-                    <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingRight: '8px' }}>
+                    <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingRight: '8px' }}>
                         {filteredStreams.length === 0 ? (
                             <div className="text-center text-gray-400 py-12"><p className="text-lg">Nenhum filme encontrado</p></div>
                         ) : (
                             <div className="grid grid-cols-9 gap-[32px] px-[32px]">
-                                {filteredStreams.map((stream) => (
+                                {filteredStreams.slice(0, visibleCount).map((stream) => (
                                     <div key={stream.stream_id} className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-95" onClick={() => setSelectedMovie(stream)}>
                                         <div className="relative overflow-hidden bg-gray-900 shadow-xl" style={{ borderRadius: '16px', border: selectedMovie?.stream_id === stream.stream_id ? '3px solid #3b82f6' : '3px solid transparent' }}>
                                             {watchLaterService.has(String(stream.stream_id), 'movie') && (
