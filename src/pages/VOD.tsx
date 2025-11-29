@@ -313,7 +313,7 @@ export function VOD() {
                                             )}
                                             <div className="aspect-[2/3]">
                                                 {stream.stream_icon && !brokenImages.has(stream.stream_id) ? (
-                                                    <img src={fixImageUrl(stream.stream_icon)} alt={stream.name} className="w-full h-full object-cover" style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }} onError={() => handleImageError(stream.stream_id)} />
+                                                    <img loading="lazy" src={fixImageUrl(stream.stream_icon)} alt={stream.name} className="w-full h-full object-cover" style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }} onError={() => handleImageError(stream.stream_id)} />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center bg-gray-700" style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}><span className="text-5xl">🎬</span></div>
                                                 )}

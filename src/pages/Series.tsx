@@ -475,7 +475,7 @@ export function Series() {
                                         )}
                                         <div className="aspect-[2/3]">
                                             {(s.cover || s.stream_icon) && !brokenImages.has(s.series_id) ? (
-                                                <img src={fixImageUrl(s.cover || s.stream_icon)} alt={s.name} className="w-full h-full object-cover" style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }} onError={() => handleImageError(s.series_id)} />
+                                                <img loading="lazy" src={fixImageUrl(s.cover || s.stream_icon)} alt={s.name} className="w-full h-full object-cover" style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }} onError={() => handleImageError(s.series_id)} />
                                             ) : (
                                                 <div className="w-full h-full flex items-center justify-center bg-gray-700" style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}><span className="text-5xl">📺</span></div>
                                             )}
