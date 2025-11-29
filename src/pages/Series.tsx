@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { formatGenres, type TMDBSeriesDetails, fetchEpisodeDetails, getBackdropUrl } from '../services/tmdb';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
+import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 
 interface Series {
     num: number;
@@ -27,7 +28,7 @@ export function Series() {
     const [series, setSeries] = useState<Series[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [searchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
     const [brokenImages, setBrokenImages] = useState<Set<number>>(new Set());
     const [selectedSeries, setSelectedSeries] = useState<Series | null>(null);
     const [tmdbData, setTmdbData] = useState<TMDBSeriesDetails | null>(null);
@@ -264,6 +265,11 @@ export function Series() {
                         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, backgroundImage: `url(${backgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(3px)', opacity: 0.5, pointerEvents: 'none' }}></div>
                     ) : null;
                 })()}
+                <AnimatedSearchBar
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    placeholder="Buscar séries..."
+                />
                 <div style={{ position: 'relative', zIndex: 10, padding: '32px', height: '100%', display: 'flex', flexDirection: 'column' }}>
                     {selectedSeries && (
                         <div style={{ padding: '0 0 24px 0', marginBottom: '24px', flexShrink: 0 }}>

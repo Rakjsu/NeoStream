@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { formatGenres, type TMDBMovieDetails, getBackdropUrl } from '../services/tmdb';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
+import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 
 interface VODStream {
     num: number;
@@ -31,7 +32,7 @@ export function VOD() {
     const [streams, setStreams] = useState<VODStream[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [searchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
     const [brokenImages, setBrokenImages] = useState<Set<number>>(new Set());
     const [selectedMovie, setSelectedMovie] = useState<VODStream | null>(null);
     const [tmdbData, setTmdbData] = useState<TMDBMovieDetails | null>(null);
@@ -154,6 +155,11 @@ export function VOD() {
                         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, backgroundImage: `url(${backgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(3px)', opacity: 0.5, pointerEvents: 'none' }}></div>
                     ) : null;
                 })()}
+                <AnimatedSearchBar
+                    value={searchQuery}
+                    onChange={setSearchQuery}
+                    placeholder="Buscar filmes..."
+                />
                 <div style={{ position: 'relative', zIndex: 10, padding: '32px', height: '100%', display: 'flex', flexDirection: 'column' }}>
                     {selectedMovie && (
                         <div style={{ padding: '0 0 24px 0', marginBottom: '24px', flexShrink: 0 }}>
