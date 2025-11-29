@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { formatGenres, type TMDBSeriesDetails, fetchEpisodeDetails, getBackdropUrl } from '../services/tmdb';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
+import { CategoryMenu } from '../components/CategoryMenu';
 
 interface Series {
     num: number;
@@ -29,6 +30,7 @@ export function Series() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [brokenImages, setBrokenImages] = useState<Set<number>>(new Set());
     const [selectedSeries, setSelectedSeries] = useState<Series | null>(null);
     const [tmdbData, setTmdbData] = useState<TMDBSeriesDetails | null>(null);
@@ -59,7 +61,11 @@ export function Series() {
         }
     };
 
-    const filteredSeries = series.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filteredSeries = series.filter(s => {
+        const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = !selectedCategory || selectedCategory === '' || s.category_id === selectedCategory;
+        return matchesSearch && matchesCategory;
+    });
     const handleImageError = (seriesId: number) => setBrokenImages(prev => new Set(prev).add(seriesId));
     const fixImageUrl = (url: string): string => url && url.startsWith('http') ? url : `https://${url}`;
 
@@ -269,6 +275,10 @@ export function Series() {
                     value={searchQuery}
                     onChange={setSearchQuery}
                     placeholder="Buscar séries..."
+                />
+                <CategoryMenu
+                    onSelectCategory={setSelectedCategory}
+                    selectedCategory={selectedCategory}
                 />
                 <div style={{ position: 'relative', zIndex: 10, padding: '32px', height: '100%', display: 'flex', flexDirection: 'column' }}>
                     {selectedSeries && (
