@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { formatGenres, type TMDBMovieDetails, getBackdropUrl } from '../services/tmdb';
+import { watchLaterService } from '../services/watchLater';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 
@@ -38,6 +39,7 @@ export function VOD() {
     const [tmdbData, setTmdbData] = useState<TMDBMovieDetails | null>(null);
     const [loadingTmdb, setLoadingTmdb] = useState(false);
     const [playingMovie, setPlayingMovie] = useState<VODStream | null>(null);
+    const [, setRefresh] = useState(0);
 
     useEffect(() => { fetchStreams(); }, []);
 
@@ -216,6 +218,41 @@ export function VOD() {
                                             overflow: 'hidden'
                                         }}>
                                         ▶ Assistir Agora
+                                    </button>
+
+                                    <button
+                                        onClick={() => {
+                                            if (watchLaterService.has(String(selectedMovie.stream_id), 'movie')) {
+                                                watchLaterService.remove(String(selectedMovie.stream_id), 'movie');
+                                            } else {
+                                                watchLaterService.add({
+                                                    id: String(selectedMovie.stream_id),
+                                                    type: 'movie',
+                                                    name: selectedMovie.name,
+                                                    cover: selectedMovie.cover || selectedMovie.stream_icon
+                                                });
+                                            }
+                                            setRefresh(r => r + 1);
+                                        }}
+                                        style={{
+                                            padding: '16px 48px',
+                                            backgroundColor: watchLaterService.has(String(selectedMovie.stream_id), 'movie') ? '#10b981' : 'rgba(255, 255, 255, 0.1)',
+                                            color: 'white',
+                                            fontSize: '20px',
+                                            fontWeight: '700',
+                                            borderRadius: '12px',
+                                            border: '2px solid rgba(255, 255, 255, 0.2)',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '12px',
+                                            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.3)',
+                                            transition: 'all 0.2s'
+                                        }}>
+                                        <span style={{ fontSize: '24px' }}>
+                                            {watchLaterService.has(String(selectedMovie.stream_id), 'movie') ? '✓' : '+'}
+                                        </span>
+                                        {watchLaterService.has(String(selectedMovie.stream_id), 'movie') ? 'Salvo' : 'Assistir Depois'}
                                     </button>
                                 </div>
                             </div>
