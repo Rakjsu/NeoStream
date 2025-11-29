@@ -65,6 +65,18 @@ export function VideoPlayer({
         }
     }, [autoPlay]);
 
+    // Add mousemove listener when in fullscreen
+    useEffect(() => {
+        if (!state.fullscreen) return;
+
+        const handleFullscreenMouseMove = () => {
+            resetHideControlsTimer();
+        };
+
+        document.addEventListener('mousemove', handleFullscreenMouseMove);
+        return () => document.removeEventListener('mousemove', handleFullscreenMouseMove);
+    }, [state.fullscreen]);
+
     const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const clickPosition = (e.clientX - rect.left) / rect.width;
