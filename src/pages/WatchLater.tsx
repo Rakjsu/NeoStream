@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { watchLaterService, WatchLaterItem } from '../services/watchLater';
+import { watchLaterService, type WatchLaterItem } from '../services/watchLater';
 
 export function WatchLater() {
     const [items, setItems] = useState<WatchLaterItem[]>([]);
