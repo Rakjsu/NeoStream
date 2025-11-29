@@ -7,13 +7,24 @@ import { VOD } from './pages/VOD';
 import { Series } from './pages/Series';
 import { Settings } from './pages/Settings';
 import { WatchLater } from './pages/WatchLater';
+import { ProfileSelector } from './pages/ProfileSelector';
+import { profileService } from './services/profileService';
 import { useState, useEffect } from 'react';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [profileSelected, setProfileSelected] = useState(false);
 
   useEffect(() => {
+    // Initialize profile service (migrate old data if needed)
+    profileService.initialize();
+
+    // Check if there's an active profile
+    const activeProfile = profileService.getActiveProfile();
+    setProfileSelected(!!activeProfile);
+
+    // Then check auth
     checkAuth();
   }, []);
 
@@ -29,12 +40,21 @@ function App() {
     }
   };
 
+  const handleProfileSelected = () => {
+    setProfileSelected(true);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0c0c0cff' }}>
         <div className="text-white text-xl">Carregando...</div>
       </div>
     );
+  }
+
+  // If authenticated but no profile selected, show ProfileSelector
+  if (isAuthenticated && !profileSelected) {
+    return <ProfileSelector onProfileSelected={handleProfileSelected} />;
   }
 
   return (
