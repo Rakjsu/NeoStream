@@ -27,6 +27,7 @@ function AsyncVideoPlayer({
     const [isAnimating, setIsAnimating] = useState(true);
 
     useEffect(() => {
+        setLoading(true);
         buildStreamUrl(movie)
             .then(url => {
                 setStreamUrl(url);
@@ -36,7 +37,7 @@ function AsyncVideoPlayer({
                 console.error('Error building stream URL:', error);
                 setLoading(false);
             });
-    }, [movie, buildStreamUrl]);
+    }, [movie, buildStreamUrl, currentEpisode]);
 
     // Disable animation after it completes
     useEffect(() => {
