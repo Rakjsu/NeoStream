@@ -10,6 +10,7 @@ interface AsyncVideoPlayerProps {
     canGoNext?: boolean;
     canGoPrevious?: boolean;
     currentEpisode?: number;
+    customTitle?: string;
 }
 
 function AsyncVideoPlayer({
@@ -20,7 +21,8 @@ function AsyncVideoPlayer({
     onPreviousEpisode,
     canGoNext,
     canGoPrevious,
-    currentEpisode
+    currentEpisode,
+    customTitle
 }: AsyncVideoPlayerProps) {
     const [streamUrl, setStreamUrl] = useState<string>('');
     const [loading, setLoading] = useState(true);
@@ -94,7 +96,7 @@ function AsyncVideoPlayer({
                 <div style={playerStyle}>
                     <VideoPlayer
                         src={streamUrl}
-                        title={movie.name}
+                        title={customTitle || movie.name}
                         poster={movie.cover || movie.stream_icon}
                         onClose={onClose}
                         autoPlay={true}

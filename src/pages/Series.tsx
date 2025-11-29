@@ -439,6 +439,8 @@ export function Series() {
                         !!seriesInfo?.episodes?.[selectedSeason + 1]
                     }
                     canGoPrevious={selectedEpisode > 1 || selectedSeason > 1}
+                    currentEpisode={selectedEpisode}
+                    customTitle={`${playingSeries.name} - ep${String(selectedEpisode).padStart(2, '0')}`}
                 />
             )
             }
