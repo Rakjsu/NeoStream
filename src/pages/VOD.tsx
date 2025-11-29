@@ -105,7 +105,7 @@ export function VOD() {
     if (loading) return (
         <div className="p-8">
             <h1 className="text-3xl font-bold text-white mb-6">Filmes</h1>
-            <div className="grid grid-cols-7 gap-[32px] px-[32px]">
+            <div className="grid grid-cols-9 gap-[32px] px-[32px]">
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map((i) => (
                     <div key={i} className="animate-pulse">
                         <div className="aspect-[2/3] bg-gray-700 rounded-t-lg mb-0"></div>
@@ -219,7 +219,7 @@ export function VOD() {
                         {filteredStreams.length === 0 ? (
                             <div className="text-center text-gray-400 py-12"><p className="text-lg">Nenhum filme encontrado</p></div>
                         ) : (
-                            <div className="grid grid-cols-7 gap-[32px] px-[32px]">
+                            <div className="grid grid-cols-9 gap-[32px] px-[32px]">
                                 {filteredStreams.map((stream) => (
                                     <div key={stream.stream_id} className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-95" onClick={() => setSelectedMovie(stream)}>
                                         <div className="relative overflow-hidden bg-gray-900 shadow-xl" style={{ borderRadius: '16px', border: selectedMovie?.stream_id === stream.stream_id ? '3px solid #3b82f6' : '3px solid transparent' }}>
