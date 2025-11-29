@@ -11,9 +11,23 @@ export interface VideoPlayerProps {
     poster?: string;
     onClose?: () => void;
     autoPlay?: boolean;
+    onNextEpisode?: () => void;
+    onPreviousEpisode?: () => void;
+    canGoNext?: boolean;
+    canGoPrevious?: boolean;
 }
 
-export function VideoPlayer({ src, title, poster, onClose, autoPlay = false }: VideoPlayerProps) {
+export function VideoPlayer({
+    src,
+    title,
+    poster,
+    onClose,
+    autoPlay = false,
+    onNextEpisode,
+    onPreviousEpisode,
+    canGoNext,
+    canGoPrevious
+}: VideoPlayerProps) {
     const { videoRef, state, controls } = useVideoPlayer();
     useHls({ src, videoRef });
 
@@ -89,6 +103,38 @@ export function VideoPlayer({ src, title, poster, onClose, autoPlay = false }: V
 
             {title && showControls && (
                 <div className="video-player-title">{title}</div>
+            )}
+
+            {/* Skip Intro Button - Show during first 90 seconds */}
+            {state.currentTime < 90 && state.currentTime > 0 && showControls && (
+                <button
+                    onClick={() => controls.seek(90)}
+                    style={{
+                        position: 'absolute',
+                        bottom: '100px',
+                        right: '20px',
+                        zIndex: 85,
+                        padding: '12px 20px',
+                        backgroundColor: 'rgba(37, 99, 235, 0.95)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '15px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5)',
+                        backdropFilter: 'blur(10px)',
+                        transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                    <img src="/skip-intro-icon.png" alt="Skip" style={{ width: '20px', height: '20px' }} />
+                    Pular Abertura
+                </button>
             )}
 
             <div style={{
@@ -206,6 +252,26 @@ export function VideoPlayer({ src, title, poster, onClose, autoPlay = false }: V
                                 </div>
                             )}
                         </div>
+
+                        {/* Episode Navigation - Only show for series */}
+                        {(onNextEpisode || onPreviousEpisode) && (
+                            <>
+                                {canGoPrevious && onPreviousEpisode && (
+                                    <button className="control-btn" onClick={onPreviousEpisode} title="Episódio Anterior">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                                            <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
+                                        </svg>
+                                    </button>
+                                )}
+                                {canGoNext && onNextEpisode && (
+                                    <button className="control-btn" onClick={onNextEpisode} title="Próximo Episódio">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
+                                            <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
+                                        </svg>
+                                    </button>
+                                )}
+                            </>
+                        )}
 
                         <button className="control-btn" onClick={controls.toggleFullscreen}>
                             {state.fullscreen ? <FaCompress /> : <FaExpand />}

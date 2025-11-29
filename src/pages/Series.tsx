@@ -413,6 +413,32 @@ export function Series() {
                     movie={playingSeries}
                     buildStreamUrl={buildSeriesStreamUrl}
                     onClose={() => setPlayingSeries(null)}
+                    onNextEpisode={() => {
+                        const episodes = seriesInfo?.episodes?.[selectedSeason];
+                        if (episodes && selectedEpisode < episodes.length) {
+                            setSelectedEpisode(selectedEpisode + 1);
+                        } else if (seriesInfo?.episodes?.[selectedSeason + 1]) {
+                            setSelectedSeason(selectedSeason + 1);
+                            setSelectedEpisode(1);
+                        }
+                    }}
+                    onPreviousEpisode={() => {
+                        if (selectedEpisode > 1) {
+                            setSelectedEpisode(selectedEpisode - 1);
+                        } else if (selectedSeason > 1) {
+                            const prevSeasonEpisodes = seriesInfo?.episodes?.[selectedSeason - 1];
+                            if (prevSeasonEpisodes) {
+                                setSelectedSeason(selectedSeason - 1);
+                                setSelectedEpisode(prevSeasonEpisodes.length);
+                            }
+                        }
+                    }}
+                    canGoNext={
+                        (seriesInfo?.episodes?.[selectedSeason] &&
+                            selectedEpisode < seriesInfo.episodes[selectedSeason].length) ||
+                        !!seriesInfo?.episodes?.[selectedSeason + 1]
+                    }
+                    canGoPrevious={selectedEpisode > 1 || selectedSeason > 1}
                 />
             )
             }
