@@ -22,12 +22,14 @@ export function VideoPlayer({ src, title, poster, onClose, autoPlay = false }: V
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
 
-    let hideControlsTimeout: ReturnType<typeof setTimeout>;
+    const hideControlsTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>();
 
     const resetHideControlsTimer = () => {
         setShowControls(true);
-        clearTimeout(hideControlsTimeout);
-        hideControlsTimeout = setTimeout(() => {
+        if (hideControlsTimeoutRef.current) {
+            clearTimeout(hideControlsTimeoutRef.current);
+        }
+        hideControlsTimeoutRef.current = setTimeout(() => {
             if (state.playing && !seeking) {
                 setShowControls(false);
             }
@@ -36,7 +38,11 @@ export function VideoPlayer({ src, title, poster, onClose, autoPlay = false }: V
 
     useEffect(() => {
         resetHideControlsTimer();
-        return () => clearTimeout(hideControlsTimeout);
+        return () => {
+            if (hideControlsTimeoutRef.current) {
+                clearTimeout(hideControlsTimeoutRef.current);
+            }
+        };
     }, [state.playing, seeking]);
 
     useEffect(() => {
