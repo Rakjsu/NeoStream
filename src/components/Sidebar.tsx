@@ -1,6 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark, User } from 'lucide-react';
-import { clsx } from 'clsx';
+import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark } from 'lucide-react';
 import { profileService } from '../services/profileService';
 import { useState } from 'react';
 
@@ -29,9 +28,16 @@ export function Sidebar() {
         <div className="bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 border-r border-gray-800/50 flex flex-col h-screen shadow-2xl" style={{ minWidth: '80px', maxWidth: '80px', width: '80px' }}>
             {/* Header/Logo */}
             <div className="flex items-center justify-center bg-gradient-to-br from-blue-600/10 to-purple-600/10" style={{ padding: '20px 0' }}>
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/50 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
-                    <Tv className="w-7 h-7 text-white relative z-10" />
+                <div className="relative">
+                    {/* Custom Logo SVG - Play with equalizer bars */}
+                    <svg width="48" height="48" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        {/* Play triangle outline */}
+                        <path d="M 10,10 L 10,90 L 90,50 Z" fill="none" stroke="white" strokeWidth="6" strokeLinejoin="round" />
+                        {/* Equalizer bars */}
+                        <rect x="35" y="35" width="6" height="30" fill="white" rx="3" />
+                        <rect x="45" y="25" width="6" height="50" fill="white" rx="3" />
+                        <rect x="55" y="40" width="6" height="20" fill="white" rx="3" />
+                    </svg>
                 </div>
             </div>
 
@@ -43,23 +49,24 @@ export function Sidebar() {
                         <button
                             key={item.path}
                             onClick={() => navigate(item.path)}
-                            className="flex items-center justify-center transition-all duration-300 group relative"
+                            className="flex items-center justify-center transition-all duration-200 group relative active:scale-90"
                             style={{
                                 width: '48px',
                                 height: '48px',
                                 background: 'transparent',
                                 border: 'none',
-                                padding: 0
+                                padding: 0,
+                                cursor: 'pointer'
                             }}
                         >
-                            {/* Icon - Always White */}
+                            {/* Icon - White or Yellow when active */}
                             <item.icon
-                                className="transition-all duration-300 relative z-10"
+                                className="transition-all duration-200 relative z-10"
                                 style={{
                                     width: '24px',
                                     height: '24px',
-                                    color: isActive ? '#ffffff' : '#ffffff',
-                                    stroke: '#ffffff'
+                                    color: isActive ? '#fbbf24' : '#ffffff',
+                                    stroke: isActive ? '#fbbf24' : '#ffffff'
                                 }}
                                 onMouseEnter={(e) => {
                                     if (!isActive) {
@@ -79,7 +86,7 @@ export function Sidebar() {
 
                             {/* Active indicator */}
                             {isActive && (
-                                <div className="absolute bg-white rounded-full animate-pulse" style={{ bottom: '4px', right: '4px', width: '6px', height: '6px' }}></div>
+                                <div className="absolute bg-yellow-400 rounded-full animate-pulse" style={{ bottom: '4px', right: '4px', width: '6px', height: '6px' }}></div>
                             )}
                         </button>
                     );
@@ -96,7 +103,14 @@ export function Sidebar() {
                             ) : activeProfile.avatar ? (
                                 <span className="text-2xl">{activeProfile.avatar}</span>
                             ) : (
-                                <User className="text-white" style={{ width: '24px', height: '24px', stroke: '#ffffff' }} />
+                                <svg width="32" height="32" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                    {/* Circle outline */}
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="white" strokeWidth="4" />
+                                    {/* Head circle */}
+                                    <circle cx="50" cy="35" r="15" fill="white" />
+                                    {/* Body/shoulders */}
+                                    <path d="M 25,75 Q 25,55 50,55 Q 75,55 75,75" fill="white" stroke="white" strokeWidth="2" />
+                                </svg>
                             )}
                         </div>
                         <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900"></div>
@@ -108,11 +122,18 @@ export function Sidebar() {
             <div className="flex items-center justify-center" style={{ padding: '16px 0', borderTop: '1px solid rgba(55, 65, 81, 0.3)' }}>
                 <button
                     onClick={handleLogout}
-                    className="flex items-center justify-center transition-all duration-300"
-                    style={{ width: '48px', height: '48px' }}
+                    className="flex items-center justify-center transition-all duration-200 active:scale-90"
+                    style={{
+                        width: '48px',
+                        height: '48px',
+                        background: 'transparent',
+                        border: 'none',
+                        padding: 0,
+                        cursor: 'pointer'
+                    }}
                 >
                     <LogOut
-                        className="transition-all duration-300"
+                        className="transition-all duration-200"
                         style={{ width: '24px', height: '24px', color: '#ffffff', stroke: '#ffffff' }}
                         onMouseEnter={(e) => {
                             e.currentTarget.style.color = '#ef4444';
