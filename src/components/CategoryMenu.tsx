@@ -57,6 +57,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
             {/* Toggle Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
+                className="transition-all duration-200 active:scale-90"
                 style={{
                     position: 'absolute',
                     top: '20px',
@@ -64,7 +65,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                     zIndex: 90,
                     width: '48px',
                     height: '48px',
-                    backgroundColor: 'rgba(37, 99, 235, 0.9)',
+                    background: 'transparent',
                     border: 'none',
                     borderRadius: '8px',
                     cursor: 'pointer',
@@ -72,32 +73,43 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '20px',
-                    color: 'white',
-                    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)',
-                    transition: 'all 0.3s ease',
-                    backdropFilter: 'blur(10px)'
-                }}
-                onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.1)';
-                    e.currentTarget.style.boxShadow = '0 6px 20px rgba(37, 99, 235, 0.6)';
-                }}
-                onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.4)';
+                    padding: 0
                 }}
             >
-                {isOpen ? (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                ) : (
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-                        <line x1="3" y1="6" x2="21" y2="6" />
-                        <line x1="3" y1="12" x2="21" y2="12" />
-                        <line x1="3" y1="18" x2="21" y2="18" />
-                    </svg>
-                )}
+                <svg
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    className="transition-all duration-200"
+                    style={{ color: '#ffffff', stroke: '#ffffff' }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.color = '#ef4444';
+                        e.currentTarget.style.stroke = '#ef4444';
+                        e.currentTarget.style.transform = 'scale(1.25)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.color = '#ffffff';
+                        e.currentTarget.style.stroke = '#ffffff';
+                        e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                >
+                    {isOpen ? (
+                        <>
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </>
+                    ) : (
+                        <>
+                            <line x1="3" y1="6" x2="21" y2="6" />
+                            <line x1="3" y1="12" x2="21" y2="12" />
+                            <line x1="3" y1="18" x2="21" y2="18" />
+                        </>
+                    )}
+                </svg>
             </button>
 
             {/* Backdrop */}
