@@ -44,7 +44,9 @@
     "autoprefixer": "^10.4.22",
     "concurrently": "^9.2.1",
     "electron": "^39.2.3",
-    "electron-builder": "^26.0.12",
+    "electron-builder": "^24.13.3",
+    "electron-installer-windows": "^3.0.0",
+    "electron-winstaller": "^5.4.0",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
@@ -61,30 +63,18 @@
   "build": {
     "appId": "com.rakjsu.neostream",
     "productName": "NeoStream IPTV",
-    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "artifactName": "${productName}-${version}.${ext}",
     "directories": {
-      "output": "release/${version}"
+      "output": "release"
     },
     "files": [
-      "dist/**/*",
-      "dist-electron/**/*",
-      "node_modules/**/*",
+      "dist",
+      "dist-electron",
+      "node_modules",
       "package.json"
     ],
-    "publish": {
-      "provider": "github",
-      "owner": "Rakjsu",
-      "repo": "NeoStream"
-    },
     "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
+      "target": "nsis",
       "publisherName": "Rakjsu"
     },
     "nsis": {
@@ -93,20 +83,6 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "NeoStream IPTV"
-    },
-    "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
-      "category": "public.app-category.entertainment"
-    },
-    "linux": {
-      "target": [
-        "AppImage",
-        "deb"
-      ],
-      "category": "AudioVideo"
     }
   }
 }
