@@ -92,7 +92,7 @@ export const updateService = {
         window.ipcRenderer.on('update:checking', handler);
 
         // Return cleanup function
-        return () => window.ipcRenderer.removeListener('update:checking', handler);
+        return () => window.ipcRenderer.off('update:checking', handler);
     },
 
     /**
@@ -102,7 +102,7 @@ export const updateService = {
         const handler = (_: any, info: UpdateInfo) => callback(info);
         window.ipcRenderer.on('update:available', handler);
 
-        return () => window.ipcRenderer.removeListener('update:available', handler);
+        return () => window.ipcRenderer.off('update:available', handler);
     },
 
     /**
@@ -112,7 +112,7 @@ export const updateService = {
         const handler = () => callback();
         window.ipcRenderer.on('update:not-available', handler);
 
-        return () => window.ipcRenderer.removeListener('update:not-available', handler);
+        return () => window.ipcRenderer.off('update:not-available', handler);
     },
 
     /**
@@ -122,7 +122,7 @@ export const updateService = {
         const handler = (_: any, progress: DownloadProgress) => callback(progress);
         window.ipcRenderer.on('update:download-progress', handler);
 
-        return () => window.ipcRenderer.removeListener('update:download-progress', handler);
+        return () => window.ipcRenderer.off('update:download-progress', handler);
     },
 
     /**
@@ -132,7 +132,7 @@ export const updateService = {
         const handler = (_: any, info: UpdateInfo) => callback(info);
         window.ipcRenderer.on('update:downloaded', handler);
 
-        return () => window.ipcRenderer.removeListener('update:downloaded', handler);
+        return () => window.ipcRenderer.off('update:downloaded', handler);
     },
 
     /**
@@ -142,6 +142,6 @@ export const updateService = {
         const handler = (_: any, error: Error) => callback(error);
         window.ipcRenderer.on('update:error', handler);
 
-        return () => window.ipcRenderer.removeListener('update:error', handler);
+        return () => window.ipcRenderer.off('update:error', handler);
     }
 };
