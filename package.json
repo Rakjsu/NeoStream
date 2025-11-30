@@ -1,12 +1,18 @@
 {
-  "name": "iptv-app",
+  "name": "neostream-iptv",
+  "productName": "NeoStream IPTV",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Advanced IPTV player with auto-update support",
+  "author": "Rakjsu",
   "main": "dist-electron/main.js",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build && electron-builder",
+    "build:win": "tsc -b && vite build && electron-builder --win",
+    "build:mac": "tsc -b && vite build && electron-builder --mac",
+    "build:linux": "tsc -b && vite build && electron-builder --linux",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -50,5 +56,60 @@
     "vite-plugin-electron": "^0.29.0",
     "vite-plugin-electron-renderer": "^0.14.6",
     "wait-on": "^9.0.3"
+  },
+  "build": {
+    "appId": "com.rakjsu.neostream",
+    "productName": "NeoStream IPTV",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "release/${version}"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "Rakjsu",
+      "repo": "NeoStream"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        }
+      ],
+      "icon": "public/icon.ico",
+      "publisherName": "Rakjsu"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NeoStream IPTV"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.entertainment",
+      "icon": "public/icon.icns"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "AudioVideo",
+      "icon": "public/icon.png"
+    }
   }
 }

@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { setupIpcHandlers } from './ipcHandlers'
+import { initializeAutoUpdater } from './autoUpdater'
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url)
@@ -60,4 +61,11 @@ app.on('activate', () => {
     }
 })
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+    createWindow()
+
+    // Initialize auto-updater after window is created
+    if (win) {
+        initializeAutoUpdater(win)
+    }
+})
