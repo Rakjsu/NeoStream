@@ -41,16 +41,114 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
         }
     };
 
+    const getCategoryIcon = (categoryName: string): JSX.Element => {
+        const name = categoryName.toLowerCase();
+        const size = 18;
+
+        // Ação
+        if (name.includes('ação') || name.includes('action')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>;
+        if (name.includes('aventura') || name.includes('adventure')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="3 11 22 2 13 21 11 13 3 11" /></svg>;
+
+        // Drama & Romance
+        if (name.includes('drama')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="7" /><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" /></svg>;
+        if (name.includes('romance') || name.includes('romantic')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>;
+
+        // Comédia
+        if (name.includes('comédia') || name.includes('comedy') || name.includes('humor')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg>;
+
+        // Terror & Suspense
+        if (name.includes('terror') || name.includes('horror')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 10h.01M15 10h.01M12 2a8 8 0 0 0-8 8v4a8 8 0 0 0 16 0v-4a8 8 0 0 0-8-8z" /><path d="M8 14s1.5 1 4 1 4-1 4-1" /></svg>;
+        if (name.includes('suspense') || name.includes('thriller')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>;
+        if (name.includes('mistério') || name.includes('mystery')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>;
+
+        // Ficção Científica & Fantasia
+        if (name.includes('ficção') || name.includes('sci-fi') || name.includes('science')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>;
+        if (name.includes('fantasia') || name.includes('fantasy')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 2 L12 8 L8 2 L4 8 L12 22 L20 8 Z" /></svg>;
+
+        // Animação & Infantil
+        if (name.includes('animação') || name.includes('animation') || name.includes('desenho')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" /></svg>;
+        if (name.includes('infantil') || name.includes('kids') || name.includes('criança')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>;
+        if (name.includes('anime')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></svg>;
+
+        // Documentários
+        if (name.includes('documentário') || name.includes('documentary')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 8-6 4 6 4V8Z" /><rect width="14" height="12" x="2" y="6" rx="2" ry="2" /></svg>;
+        if (name.includes('natureza') || name.includes('nature')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" /></svg>;
+
+        // Crime & Policial
+        if (name.includes('crime') || name.includes('policial') || name.includes('detective')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>;
+        if (name.includes('gangster') || name.includes('máfia')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>;
+
+        // Guerra & Militar
+        if (name.includes('guerra') || name.includes('war') || name.includes('militar')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="16 16 12 2 8 16" /><line x1="12" y1="22" x2="12" y2="16" /><line x1="8" y1="16" x2="16" y2="16" /></svg>;
+
+        // Esportes
+        if (name.includes('esporte') || name.includes('sport')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /><path d="M2 12h20" /></svg>;
+
+        // Música & Musical
+        if (name.includes('música') || name.includes('music') || name.includes('musical')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>;
+
+        // Família
+        if (name.includes('família') || name.includes('family')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>;
+
+        // Western
+        if (name.includes('western') || name.includes('faroeste')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2 L4 7 L4 22 L20 22 L20 7 Z" /><path d="M12 2 L12 22" /></svg>;
+
+        // Épico & História
+        if (name.includes('épico') || name.includes('epic')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>;
+        if (name.includes('história') || name.includes('historical') || name.includes('period')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg>;
+
+        // Reality & Talk Show
+        if (name.includes('reality')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2" /><polyline points="17 2 12 7 7 2" /></svg>;
+        if (name.includes('talk') || name.includes('show')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="7" width="20" height="15" rx="2" ry="2" /><polyline points="17 2 12 7 7 2" /></svg>;
+
+        // Teen & Novela
+        if (name.includes('teen') || name.includes('adolescent')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>;
+        if (name.includes('novela') || name.includes('soap')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>;
+
+        // Biografia
+        if (name.includes('biografia') || name.includes('biography')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /><circle cx="12" cy="8" r="2" /><path d="M15 13a3 3 0 1 0-6 0" /></svg>;
+
+        // Default
+        return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>;
+    };
+
     return (
         <>
             <style>{`
                 @keyframes slideIn {
-                    from { transform: translateX(-100%); }
-                    to { transform: translateX(0); }
+                    from { 
+                        transform: translateX(-100%);
+                        opacity: 0;
+                    }
+                    to { 
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
                 }
-                @keyframes slideOut {
-                    from { transform: translateX(0); }
-                    to { transform: translateX(-100%); }
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes shimmer {
+                    0% { background-position: -1000px 0; }
+                    100% { background-position: 1000px 0; }
+                }
+                .category-item {
+                    position: relative;
+                    overflow: hidden;
+                }
+                .category-item::before {
+                    content: '';
+                    position: absolute;
+                    top: 0;
+                    left: -100%;
+                    width: 100%;
+                    height: 100%;
+                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+                    transition: left 0.5s ease;
+                }
+                .category-item:hover::before {
+                    left: 100%;
                 }
             `}</style>
 
@@ -119,9 +217,10 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                     style={{
                         position: 'fixed',
                         inset: 0,
-                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        background: 'radial-gradient(circle at center, rgba(0,0,0,0.6), rgba(0,0,0,0.8))',
                         zIndex: 999,
-                        backdropFilter: 'blur(2px)'
+                        backdropFilter: 'blur(8px)',
+                        animation: 'fadeIn 0.3s ease'
                     }}
                 />
             )}
@@ -133,125 +232,250 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                     top: 0,
                     left: 0,
                     bottom: 0,
-                    width: '300px',
-                    backgroundColor: 'rgba(17, 24, 39, 0.98)',
+                    width: '380px',
+                    background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.98) 0%, rgba(30, 41, 59, 0.98) 100%)',
                     zIndex: 1000,
                     transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
-                    transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                    boxShadow: isOpen ? '4px 0 24px rgba(0, 0, 0, 0.5)' : 'none',
+                    transition: 'transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+                    boxShadow: isOpen ? '8px 0 32px rgba(0, 0, 0, 0.6), 0 0 80px rgba(59, 130, 246, 0.1)' : 'none',
                     display: 'flex',
                     flexDirection: 'column',
-                    backdropFilter: 'blur(10px)'
+                    backdropFilter: 'blur(20px)',
+                    borderRight: '1px solid rgba(59, 130, 246, 0.2)',
+                    animation: isOpen ? 'slideIn 0.4s ease' : 'none'
                 }}
             >
-                {/* Header */}
+                {/* Header with gradient */}
                 <div style={{
-                    padding: '24px',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                    padding: '32px 24px',
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 100%)',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                    position: 'relative',
+                    overflow: 'hidden'
                 }}>
-                    <h2 style={{
-                        margin: 0,
-                        color: 'white',
-                        fontSize: '20px',
-                        fontWeight: 'bold'
-                    }}>
-                        Categorias
-                    </h2>
+                    {/* Animated background */}
+                    <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.03), transparent)',
+                        animation: 'shimmer 3s infinite',
+                        backgroundSize: '1000px 100%'
+                    }}></div>
+
+                    <div style={{ position: 'relative', zIndex: 1 }}>
+                        <h2 style={{
+                            margin: 0,
+                            background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            fontSize: '28px',
+                            fontWeight: '800',
+                            letterSpacing: '-0.5px',
+                            marginBottom: '8px'
+                        }}>
+                            Categorias
+                        </h2>
+                        <p style={{
+                            margin: 0,
+                            color: 'rgba(255, 255, 255, 0.6)',
+                            fontSize: '14px',
+                            fontWeight: '500'
+                        }}>
+                            Explore por gênero
+                        </p>
+                    </div>
                 </div>
 
-                {/* Categories List */}
+                {/* Categories List with scrollbar styling */}
                 <div style={{
                     flex: 1,
                     overflowY: 'auto',
-                    padding: '12px'
+                    padding: '16px',
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: 'rgba(59, 130, 246, 0.5) transparent'
                 }}>
                     {loading && (
                         <div style={{
-                            padding: '24px',
-                            textAlign: 'center',
-                            color: '#9ca3af'
+                            padding: '48px 24px',
+                            textAlign: 'center'
                         }}>
-                            Carregando...
+                            <div style={{
+                                width: '48px',
+                                height: '48px',
+                                margin: '0 auto 16px',
+                                borderRadius: '50%',
+                                border: '3px solid rgba(59, 130, 246, 0.2)',
+                                borderTopColor: '#3b82f6',
+                                animation: 'spin 1s linear infinite'
+                            }}></div>
+                            <p style={{
+                                color: 'rgba(255, 255, 255, 0.6)',
+                                fontSize: '14px',
+                                fontWeight: '500'
+                            }}>
+                                Carregando categorias...
+                            </p>
                         </div>
                     )}
 
-                    {/* All Categories Option */}
+                    {/* All Categories Option - Premium */}
                     <button
                         onClick={() => {
                             onSelectCategory('');
                             setIsOpen(false);
                         }}
+                        className="category-item"
                         style={{
                             width: '100%',
-                            padding: '12px 16px',
-                            backgroundColor: selectedCategory === '' || selectedCategory === null
-                                ? 'rgba(37, 99, 235, 0.2)'
-                                : 'transparent',
+                            padding: '16px 20px',
+                            background: selectedCategory === '' || selectedCategory === null
+                                ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(147, 51, 234, 0.25) 100%)'
+                                : 'rgba(255, 255, 255, 0.03)',
                             border: selectedCategory === '' || selectedCategory === null
-                                ? '1px solid rgba(37, 99, 235, 0.5)'
-                                : '1px solid transparent',
-                            borderRadius: '8px',
+                                ? '2px solid rgba(59, 130, 246, 0.5)'
+                                : '2px solid rgba(255, 255, 255, 0.05)',
+                            borderRadius: '12px',
                             color: 'white',
                             fontSize: '15px',
+                            fontWeight: selectedCategory === '' || selectedCategory === null ? '600' : '500',
                             textAlign: 'left',
                             cursor: 'pointer',
-                            marginBottom: '8px',
-                            transition: 'all 0.2s ease'
+                            marginBottom: '12px',
+                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            boxShadow: selectedCategory === '' || selectedCategory === null
+                                ? '0 4px 16px rgba(59, 130, 246, 0.3)'
+                                : 'none'
                         }}
                         onMouseEnter={(e) => {
                             if (selectedCategory !== '' && selectedCategory !== null) {
-                                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                                e.currentTarget.style.transform = 'translateX(8px) scale(1.02)';
+                                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
                             }
                         }}
                         onMouseLeave={(e) => {
                             if (selectedCategory !== '' && selectedCategory !== null) {
-                                e.currentTarget.style.backgroundColor = 'transparent';
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                                e.currentTarget.style.transform = 'translateX(0) scale(1)';
+                                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
                             }
                         }}
                     >
-                        📺 Todas as Séries
+                        <div style={{
+                            width: '40px',
+                            height: '40px',
+                            borderRadius: '10px',
+                            background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '20px'
+                        }}>
+                            📺
+                        </div>
+                        <span style={{ flex: 1 }}>Todas as Séries</span>
+                        {(selectedCategory === '' || selectedCategory === null) && (
+                            <div style={{
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                background: '#3b82f6',
+                                boxShadow: '0 0 12px rgba(59, 130, 246, 0.8)'
+                            }}></div>
+                        )}
                     </button>
 
-                    {categories.map((category) => (
+                    {/* Category Items - Premium Cards */}
+                    {categories.map((category, index) => (
                         <button
                             key={category.category_id}
                             onClick={() => {
                                 onSelectCategory(category.category_id);
                                 setIsOpen(false);
                             }}
+                            className="category-item"
                             style={{
                                 width: '100%',
-                                padding: '12px 16px',
-                                backgroundColor: selectedCategory === category.category_id
-                                    ? 'rgba(37, 99, 235, 0.2)'
-                                    : 'transparent',
+                                padding: '16px 20px',
+                                background: selectedCategory === category.category_id
+                                    ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(147, 51, 234, 0.25) 100%)'
+                                    : 'rgba(255, 255, 255, 0.03)',
                                 border: selectedCategory === category.category_id
-                                    ? '1px solid rgba(37, 99, 235, 0.5)'
-                                    : '1px solid transparent',
-                                borderRadius: '8px',
+                                    ? '2px solid rgba(59, 130, 246, 0.5)'
+                                    : '2px solid rgba(255, 255, 255, 0.05)',
+                                borderRadius: '12px',
                                 color: 'white',
                                 fontSize: '15px',
+                                fontWeight: selectedCategory === category.category_id ? '600' : '500',
                                 textAlign: 'left',
                                 cursor: 'pointer',
-                                marginBottom: '8px',
-                                transition: 'all 0.2s ease'
+                                marginBottom: '12px',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '12px',
+                                opacity: 0,
+                                animation: `fadeIn 0.4s ease ${index * 0.05}s forwards`,
+                                boxShadow: selectedCategory === category.category_id
+                                    ? '0 4px 16px rgba(59, 130, 246, 0.3)'
+                                    : 'none'
                             }}
                             onMouseEnter={(e) => {
                                 if (selectedCategory !== category.category_id) {
-                                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                                    e.currentTarget.style.transform = 'translateX(8px) scale(1.02)';
+                                    e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
                                 }
                             }}
                             onMouseLeave={(e) => {
                                 if (selectedCategory !== category.category_id) {
-                                    e.currentTarget.style.backgroundColor = 'transparent';
+                                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                                    e.currentTarget.style.transform = 'translateX(0) scale(1)';
+                                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
                                 }
                             }}
                         >
-                            📁 {category.category_name}
+                            <div style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '10px',
+                                background: selectedCategory === category.category_id
+                                    ? 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)'
+                                    : 'rgba(255, 255, 255, 0.1)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '18px',
+                                transition: 'all 0.3s ease'
+                            }}>
+                                {getCategoryIcon(category.category_name)}
+                            </div>
+                            <span style={{ flex: 1 }}>{category.category_name}</span>
+                            {selectedCategory === category.category_id && (
+                                <div style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    background: '#3b82f6',
+                                    boxShadow: '0 0 12px rgba(59, 130, 246, 0.8)'
+                                }}></div>
+                            )}
                         </button>
                     ))}
                 </div>
             </div>
+
+            <style>{`
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
         </>
     );
 }
