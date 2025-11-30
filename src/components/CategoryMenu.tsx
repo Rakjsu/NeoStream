@@ -144,6 +144,15 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
         // Dorama / Asian Drama (asian fan icon)
         if (name.includes('dorama') || name.includes('drama asiático') || name.includes('asian drama') || name.includes('k-drama') || name.includes('kdrama') || name.includes('korean')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z" /><path d="M12 6v6l4 2" /></svg>;
 
+        // Netflix
+        if (name.includes('netflix')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M5 2v20l6.5-7V22l6.5-7.5V2h-3v10L9 19.5V2z" /></svg>;
+
+        // Amazon Prime Video
+        if (name.includes('amazon') || name.includes('prime')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9 9 0 0 1 9.95 20M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" /><line x1="2" x2="2.01" y1="20" y2="20" /></svg>;
+
+        // Disney Plus
+        if (name.includes('disney')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" /></svg>;
+
         // Default
         return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>;
     };
@@ -215,15 +224,20 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                     height="24"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="white"
                     strokeWidth="2.5"
                     strokeLinecap="round"
                     className="transition-all duration-200"
-                    style={{ color: '#ffffff', stroke: '#ffffff' }}
+                    style={{
+                        color: isOpen ? '#ffffff' : '#ffffff',
+                        stroke: isOpen ? '#ffffff' : '#ffffff',
+                        transform: 'scale(1)'
+                    }}
                     onMouseEnter={(e) => {
-                        e.currentTarget.style.color = '#ef4444';
-                        e.currentTarget.style.stroke = '#ef4444';
-                        e.currentTarget.style.transform = 'scale(1.25)';
+                        if (!isOpen) {
+                            e.currentTarget.style.color = '#ef4444';
+                            e.currentTarget.style.stroke = '#ef4444';
+                            e.currentTarget.style.transform = 'scale(1.25)';
+                        }
                     }}
                     onMouseLeave={(e) => {
                         e.currentTarget.style.color = '#ffffff';
@@ -300,6 +314,43 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                         animation: 'shimmer 3s infinite',
                         backgroundSize: '1000px 100%'
                     }}></div>
+
+                    {/* Close Button X */}
+                    <button
+                        onClick={() => setIsOpen(false)}
+                        className="transition-all duration-200"
+                        style={{
+                            position: 'absolute',
+                            top: '16px',
+                            right: '16px',
+                            zIndex: 2,
+                            width: '36px',
+                            height: '36px',
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.3s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                            e.currentTarget.style.borderColor = '#ef4444';
+                            e.currentTarget.style.transform = 'scale(1.1)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                            e.currentTarget.style.transform = 'scale(1)';
+                        }}
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                    </button>
 
                     <div style={{ position: 'relative', zIndex: 1 }}>
                         <h2 style={{
