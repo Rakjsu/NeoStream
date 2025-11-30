@@ -8,6 +8,10 @@ import lookeLogo from '../assets/logos/looke.png';
 import paramountLogo from '../assets/logos/paramount.png';
 import discoveryLogo from '../assets/logos/discovery.png';
 import marvelLogo from '../assets/logos/marvel.png';
+import appleTvLogo from '../assets/logos/apple-tv.png';
+import maxLogo from '../assets/logos/max.png';
+import crunchyrollLogo from '../assets/logos/crunchyroll.png';
+import discoveryPlusLogo from '../assets/logos/discovery-plus.png';
 
 interface CategoryMenuProps {
     onSelectCategory: (categoryId: string) => void;
@@ -167,6 +171,14 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
         if (name.includes('discovery')) return <img src={discoveryLogo} alt="Discovery" style={{ width: size, height: size, objectFit: 'contain' }} />;
 
         if (name.includes('marvel')) return <img src={marvelLogo} alt="Marvel" style={{ width: size, height: size, objectFit: 'contain' }} />;
+
+        if (name.includes('apple tv') || name.includes('appletv')) return <img src={appleTvLogo} alt="Apple TV" style={{ width: size, height: size, objectFit: 'contain' }} />;
+
+        if (name.includes('max') || name.includes('hbo max')) return <img src={maxLogo} alt="Max" style={{ width: size, height: size, objectFit: 'contain' }} />;
+
+        if (name.includes('crunchyroll')) return <img src={crunchyrollLogo} alt="Crunchyroll" style={{ width: size, height: size, objectFit: 'contain' }} />;
+
+        if (name.includes('discovery+') || name.includes('discovery plus')) return <img src={discoveryPlusLogo} alt="Discovery+" style={{ width: size, height: size, objectFit: 'contain' }} />;
 
         // Default
         return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>;
