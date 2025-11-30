@@ -359,13 +359,13 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                             width: '100%',
                             padding: '16px 20px',
                             background: selectedCategory === '' || selectedCategory === null
-                                ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(147, 51, 234, 0.25) 100%)'
+                                ? 'rgba(251, 191, 36, 0.15)'
                                 : 'rgba(255, 255, 255, 0.03)',
                             border: selectedCategory === '' || selectedCategory === null
-                                ? '2px solid rgba(59, 130, 246, 0.5)'
+                                ? '2px solid #fbbf24'
                                 : '2px solid rgba(255, 255, 255, 0.05)',
                             borderRadius: '12px',
-                            color: 'white',
+                            color: selectedCategory === '' || selectedCategory === null ? '#fbbf24' : 'white',
                             fontSize: '15px',
                             fontWeight: selectedCategory === '' || selectedCategory === null ? '600' : '500',
                             textAlign: 'left',
@@ -376,14 +376,17 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                             alignItems: 'center',
                             gap: '12px',
                             boxShadow: selectedCategory === '' || selectedCategory === null
-                                ? '0 4px 16px rgba(59, 130, 246, 0.3)'
+                                ? '0 4px 16px rgba(251, 191, 36, 0.4)'
                                 : 'none'
                         }}
                         onMouseEnter={(e) => {
                             if (selectedCategory !== '' && selectedCategory !== null) {
-                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
                                 e.currentTarget.style.transform = 'translateX(8px) scale(1.02)';
-                                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+                                e.currentTarget.style.borderColor = '#ef4444';
+                                e.currentTarget.style.color = '#ef4444';
+                                const iconDiv = e.currentTarget.querySelector('div');
+                                if (iconDiv) iconDiv.style.background = 'rgba(239, 68, 68, 0.2)';
                             }
                         }}
                         onMouseLeave={(e) => {
@@ -391,6 +394,9 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                                 e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
                                 e.currentTarget.style.transform = 'translateX(0) scale(1)';
                                 e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
+                                e.currentTarget.style.color = 'white';
+                                const iconDiv = e.currentTarget.querySelector('div');
+                                if (iconDiv) iconDiv.style.background = 'rgba(255, 255, 255, 0.1)';
                             }
                         }}
                     >
@@ -398,11 +404,14 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                             width: '40px',
                             height: '40px',
                             borderRadius: '10px',
-                            background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                            background: selectedCategory === '' || selectedCategory === null
+                                ? 'rgba(251, 191, 36, 0.2)'
+                                : 'rgba(255, 255, 255, 0.1)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: '20px'
+                            fontSize: '20px',
+                            transition: 'all 0.3s ease'
                         }}>
                             📺
                         </div>
@@ -412,8 +421,8 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                                 width: '8px',
                                 height: '8px',
                                 borderRadius: '50%',
-                                background: '#3b82f6',
-                                boxShadow: '0 0 12px rgba(59, 130, 246, 0.8)'
+                                background: '#fbbf24',
+                                boxShadow: '0 0 12px rgba(251, 191, 36, 0.8)'
                             }}></div>
                         )}
                     </button>
@@ -431,13 +440,13 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                                 width: '100%',
                                 padding: '16px 20px',
                                 background: selectedCategory === category.category_id
-                                    ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(147, 51, 234, 0.25) 100%)'
+                                    ? 'rgba(251, 191, 36, 0.15)'
                                     : 'rgba(255, 255, 255, 0.03)',
                                 border: selectedCategory === category.category_id
-                                    ? '2px solid rgba(59, 130, 246, 0.5)'
+                                    ? '2px solid #fbbf24'
                                     : '2px solid rgba(255, 255, 255, 0.05)',
                                 borderRadius: '12px',
-                                color: 'white',
+                                color: selectedCategory === category.category_id ? '#fbbf24' : 'white',
                                 fontSize: '15px',
                                 fontWeight: selectedCategory === category.category_id ? '600' : '500',
                                 textAlign: 'left',
@@ -450,14 +459,17 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                                 opacity: 0,
                                 animation: `fadeIn 0.4s ease ${index * 0.05}s forwards`,
                                 boxShadow: selectedCategory === category.category_id
-                                    ? '0 4px 16px rgba(59, 130, 246, 0.3)'
+                                    ? '0 4px 16px rgba(251, 191, 36, 0.4)'
                                     : 'none'
                             }}
                             onMouseEnter={(e) => {
                                 if (selectedCategory !== category.category_id) {
-                                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
                                     e.currentTarget.style.transform = 'translateX(8px) scale(1.02)';
-                                    e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+                                    e.currentTarget.style.borderColor = '#ef4444';
+                                    e.currentTarget.style.color = '#ef4444';
+                                    const iconDiv = e.currentTarget.querySelector('div');
+                                    if (iconDiv) iconDiv.style.background = 'rgba(239, 68, 68, 0.2)';
                                 }
                             }}
                             onMouseLeave={(e) => {
@@ -465,6 +477,9 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                                     e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
                                     e.currentTarget.style.transform = 'translateX(0) scale(1)';
                                     e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
+                                    e.currentTarget.style.color = 'white';
+                                    const iconDiv = e.currentTarget.querySelector('div');
+                                    if (iconDiv) iconDiv.style.background = 'rgba(255, 255, 255, 0.1)';
                                 }
                             }}
                         >
@@ -473,7 +488,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                                 height: '40px',
                                 borderRadius: '10px',
                                 background: selectedCategory === category.category_id
-                                    ? 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)'
+                                    ? 'rgba(251, 191, 36, 0.2)'
                                     : 'rgba(255, 255, 255, 0.1)',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -489,8 +504,8 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                                     width: '8px',
                                     height: '8px',
                                     borderRadius: '50%',
-                                    background: '#3b82f6',
-                                    boxShadow: '0 0 12px rgba(59, 130, 246, 0.8)'
+                                    background: '#fbbf24',
+                                    boxShadow: '0 0 12px rgba(251, 191, 36, 0.8)'
                                 }}></div>
                             )}
                         </button>
