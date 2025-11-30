@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark } from 'lucide-react';
+import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark, User } from 'lucide-react';
 import { clsx } from 'clsx';
 import { profileService } from '../services/profileService';
 import { useState } from 'react';
@@ -43,29 +43,38 @@ export function Sidebar() {
                         <button
                             key={item.path}
                             onClick={() => navigate(item.path)}
-                            className={clsx(
-                                "flex items-center justify-center transition-all duration-300 group relative",
-                                isActive ? "" : "hover:scale-110"
-                            )}
+                            className="flex items-center justify-center transition-all duration-300 group relative"
                             style={{
                                 width: '48px',
                                 height: '48px',
-                                borderRadius: '12px',
-                                background: isActive ? `linear-gradient(135deg, var(--tw-gradient-stops))` : 'transparent'
+                                background: 'transparent',
+                                border: 'none',
+                                padding: 0
                             }}
                         >
-                            {/* Gradient overlay on hover */}
-                            {!isActive && (
-                                <div className={`absolute inset-0 bg-gradient-to-r ${item.color} opacity-0 group-hover:opacity-20 transition-opacity duration-300`} style={{ borderRadius: '12px' }}></div>
-                            )}
-
-                            {/* Icon - NO BACKGROUND */}
+                            {/* Icon - Always White */}
                             <item.icon
-                                className={clsx(
-                                    "transition-all duration-300 relative z-10",
-                                    isActive ? "text-white" : "text-gray-400 group-hover:text-white"
-                                )}
-                                style={{ width: '24px', height: '24px' }}
+                                className="transition-all duration-300 relative z-10"
+                                style={{
+                                    width: '24px',
+                                    height: '24px',
+                                    color: isActive ? '#ffffff' : '#ffffff',
+                                    stroke: '#ffffff'
+                                }}
+                                onMouseEnter={(e) => {
+                                    if (!isActive) {
+                                        e.currentTarget.style.color = '#ef4444';
+                                        e.currentTarget.style.stroke = '#ef4444';
+                                        e.currentTarget.style.transform = 'scale(1.25)';
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!isActive) {
+                                        e.currentTarget.style.color = '#ffffff';
+                                        e.currentTarget.style.stroke = '#ffffff';
+                                        e.currentTarget.style.transform = 'scale(1)';
+                                    }
+                                }}
                             />
 
                             {/* Active indicator */}
@@ -80,12 +89,14 @@ export function Sidebar() {
             {/* Profile Section */}
             {activeProfile && (
                 <div className="flex items-center justify-center" style={{ padding: '12px 0', marginBottom: '16px' }}>
-                    <div className="relative">
-                        <div className="w-12 h-12 rounded-full overflow-hidden bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center border-2 border-gray-700/50">
+                    <div className="relative cursor-pointer transition-transform duration-300 hover:scale-110">
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: '#000000' }}>
                             {isImageAvatar ? (
-                                <img src={activeProfile.avatar} alt={activeProfile.name} className="w-full h-full object-cover" />
-                            ) : (
+                                <img src={activeProfile.avatar} alt={activeProfile.name} className="w-full h-full object-cover rounded-full" />
+                            ) : activeProfile.avatar ? (
                                 <span className="text-2xl">{activeProfile.avatar}</span>
+                            ) : (
+                                <User className="text-white" style={{ width: '24px', height: '24px', stroke: '#ffffff' }} />
                             )}
                         </div>
                         <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900"></div>
@@ -97,10 +108,23 @@ export function Sidebar() {
             <div className="flex items-center justify-center" style={{ padding: '16px 0', borderTop: '1px solid rgba(55, 65, 81, 0.3)' }}>
                 <button
                     onClick={handleLogout}
-                    className="flex items-center justify-center rounded-xl bg-gradient-to-r from-red-600/10 to-pink-600/10 border border-red-500/20 text-red-400 hover:from-red-600/20 hover:to-pink-600/20 hover:border-red-500/40 hover:text-red-300 hover:scale-110 transition-all duration-300 group"
+                    className="flex items-center justify-center transition-all duration-300"
                     style={{ width: '48px', height: '48px' }}
                 >
-                    <LogOut className="w-5 h-5" />
+                    <LogOut
+                        className="transition-all duration-300"
+                        style={{ width: '24px', height: '24px', color: '#ffffff', stroke: '#ffffff' }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.color = '#ef4444';
+                            e.currentTarget.style.stroke = '#ef4444';
+                            e.currentTarget.style.transform = 'scale(1.25)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.color = '#ffffff';
+                            e.currentTarget.style.stroke = '#ffffff';
+                            e.currentTarget.style.transform = 'scale(1)';
+                        }}
+                    />
                 </button>
             </div>
         </div>
