@@ -1,4 +1,4 @@
-import { Profile, ProfilesData, CreateProfileData, UpdateProfileData } from '../types/profile';
+import type { Profile, ProfilesData, CreateProfileData, UpdateProfileData } from '../types/profile';
 
 const STORAGE_KEY = 'neostream_profiles';
 const MAX_PROFILES = 5;

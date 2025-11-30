@@ -26,14 +26,14 @@ export function Sidebar() {
     const isImageAvatar = activeProfile?.avatar.startsWith('data:image') || activeProfile?.avatar.startsWith('http');
 
     return (
-        <div className="w-40 lg:w-[320px] bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 border-r border-gray-800/50 flex flex-col h-screen transition-all duration-300 shadow-2xl">
+        <div className="w-80 bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 border-r border-gray-800/50 flex flex-col h-screen shadow-2xl" style={{ minWidth: '320px', maxWidth: '320px' }}>
             {/* Header/Logo */}
-            <div className="p-8 flex items-center justify-center lg:justify-start gap-4 border-b border-gray-800/50 bg-gradient-to-br from-blue-600/10 to-purple-600/10">
+            <div className="p-8 flex items-center gap-4 border-b border-gray-800/50 bg-gradient-to-br from-blue-600/10 to-purple-600/10">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/50 shrink-0 relative overflow-hidden">
                     <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
                     <Tv className="w-7 h-7 text-white relative z-10" />
                 </div>
-                <div className="hidden lg:block">
+                <div>
                     <h1 className="font-bold text-2xl bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                         NeoStream
                     </h1>
@@ -55,7 +55,7 @@ export function Sidebar() {
                             </div>
                             <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-900"></div>
                         </div>
-                        <div className="hidden lg:block flex-1 min-w-0">
+                        <div className="flex-1 min-w-0">
                             <p className="text-sm text-gray-400 font-medium">Bem-vindo</p>
                             <h3 className="font-semibold text-white truncate text-lg">{activeProfile.name}</h3>
                         </div>
@@ -64,7 +64,7 @@ export function Sidebar() {
             )}
 
             {/* Navigation */}
-            <nav className="flex-1 p-4 lg:p-6 space-y-2 overflow-y-auto mt-4">
+            <nav className="flex-1 p-6 space-y-2 overflow-y-auto mt-4">
                 {menuItems.map((item) => {
                     const isActive = location.pathname.startsWith(item.path);
                     return (
@@ -74,12 +74,9 @@ export function Sidebar() {
                             className={clsx(
                                 "w-full flex items-center gap-4 p-4 rounded-2xl transition-all duration-300 group relative overflow-hidden",
                                 isActive
-                                    ? "bg-gradient-to-r shadow-lg shadow-blue-600/30 scale-[1.02]"
+                                    ? `bg-gradient-to-r ${item.color} shadow-lg shadow-blue-600/30 scale-[1.02]`
                                     : "text-gray-400 hover:bg-gray-800/50 hover:text-white hover:scale-[1.02]"
                             )}
-                            style={isActive ? {
-                                backgroundImage: `linear-gradient(135deg, ${item.color.split(' ')[0].replace('from-', 'var(--tw-gradient-from)')}, ${item.color.split(' ')[2].replace('to-', 'var(--tw-gradient-to)')})`
-                            } : undefined}
                         >
                             {/* Gradient overlay on hover */}
                             {!isActive && (
@@ -101,7 +98,7 @@ export function Sidebar() {
 
                             {/* Label */}
                             <span className={clsx(
-                                "font-semibold text-base hidden lg:block relative z-10 transition-all duration-300",
+                                "font-semibold text-base relative z-10 transition-all duration-300",
                                 isActive ? "text-white" : "text-gray-400 group-hover:text-white"
                             )}>
                                 {item.label}
@@ -109,7 +106,7 @@ export function Sidebar() {
 
                             {/* Active indicator */}
                             {isActive && (
-                                <div className="absolute right-4 w-2 h-2 bg-white rounded-full animate-pulse hidden lg:block"></div>
+                                <div className="absolute right-4 w-2 h-2 bg-white rounded-full animate-pulse"></div>
                             )}
                         </button>
                     );
@@ -117,7 +114,7 @@ export function Sidebar() {
             </nav>
 
             {/* Logout Button */}
-            <div className="p-4 lg:p-6 border-t border-gray-800/50 bg-gradient-to-t from-gray-950/50">
+            <div className="p-6 border-t border-gray-800/50 bg-gradient-to-t from-gray-950/50">
                 <button
                     onClick={handleLogout}
                     className="w-full flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-red-600/10 to-pink-600/10 border border-red-500/20 text-red-400 hover:from-red-600/20 hover:to-pink-600/20 hover:border-red-500/40 hover:text-red-300 hover:scale-[1.02] transition-all duration-300 group"
@@ -125,7 +122,7 @@ export function Sidebar() {
                     <div className="w-11 h-11 rounded-xl bg-red-500/10 group-hover:bg-red-500/20 flex items-center justify-center shrink-0 transition-all duration-300">
                         <LogOut className="w-6 h-6" />
                     </div>
-                    <span className="font-semibold text-base hidden lg:block">Sair</span>
+                    <span className="font-semibold text-base">Sair</span>
                 </button>
             </div>
         </div>
