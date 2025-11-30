@@ -98,28 +98,28 @@ export function Sidebar() {
                 <div className="flex items-center justify-center" style={{ padding: '12px 0', marginBottom: '16px' }}>
                     <div className="relative cursor-pointer transition-transform duration-300 hover:scale-110">
                         <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: '#000000' }}>
-                            {isImageAvatar ? (
-                                <img src={activeProfile.avatar} alt={activeProfile.name} className="w-full h-full object-cover rounded-full" />
-                            ) : activeProfile.avatar ? (
-                                <span className="text-2xl">{activeProfile.avatar}</span>
-                            ) : (
-                                <svg width="32" height="32" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                                    {/* Circle outline */}
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="white" strokeWidth="4" />
-                                    {/* Head circle */}
-                                    <circle cx="50" cy="35" r="15" fill="white" />
-                                    {/* Body/shoulders */}
-                                    <path d="M 25,75 Q 25,55 50,55 Q 75,55 75,75" fill="white" stroke="white" strokeWidth="2" />
-                                </svg>
-                            )}
+                            {/* Always show cyan icon - comment out to use avatar */}
+                            <svg width="36" height="36" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                {/* Outer circle */}
+                                <circle cx="50" cy="50" r="46" fill="none" stroke="#06b6d4" strokeWidth="8" />
+                                {/* Head circle (outline only) */}
+                                <circle cx="50" cy="35" r="12" fill="none" stroke="#06b6d4" strokeWidth="8" />
+                                {/* Body/torso (outline) */}
+                                <path
+                                    d="M 23,80 C 23,65 32,58 50,58 C 68,58 77,65 77,80"
+                                    fill="none"
+                                    stroke="#06b6d4"
+                                    strokeWidth="8"
+                                    strokeLinecap="round"
+                                />
+                            </svg>
                         </div>
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900"></div>
                     </div>
                 </div>
             )}
 
             {/* Logout Button */}
-            <div className="flex items-center justify-center" style={{ padding: '16px 0', borderTop: '1px solid rgba(55, 65, 81, 0.3)' }}>
+            <div className="flex items-center justify-center" style={{ padding: '16px 0' }}>
                 <button
                     onClick={handleLogout}
                     className="flex items-center justify-center transition-all duration-200 active:scale-90"
