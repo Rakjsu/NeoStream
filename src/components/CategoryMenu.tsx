@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import netflixLogo from '../assets/logos/netflix.png';
 import brasilParaleloLogo from '../assets/logos/brasil-paralelo.png';
-import disneyLogo from '../assets/logos/disney.png';
+import disneyLogo from '../assets/logos/disney-new.png';
 import amazonPrimeLogo from '../assets/logos/amazon-prime.png';
 import globoplayLogo from '../assets/logos/globoplay.jpg';
 import lookeLogo from '../assets/logos/looke.png';
