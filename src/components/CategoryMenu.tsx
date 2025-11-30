@@ -186,6 +186,9 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
 
         if (name.includes('dorama') || name.includes('k-drama') || name.includes('kdrama') || name.includes('korean')) return <img src={doramaLogo} alt="Dorama" style={{ width: size, height: size, objectFit: 'contain' }} />;
 
+        // Turcas / Turkish (crescent moon and star)
+        if (name.includes('turcas') || name.includes('turca') || name.includes('turkish') || name.includes('turkey')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /><circle cx="17" cy="8" r="1.5" /></svg>;
+
         // Default
         return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>;
     };
