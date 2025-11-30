@@ -11,6 +11,9 @@ import marvelLogo from '../assets/logos/marvel.png';
 import appleTvLogo from '../assets/logos/apple-tv.png';
 import maxLogo from '../assets/logos/max.png';
 import crunchyrollLogo from '../assets/logos/crunchyroll.png';
+import adultoLogo from '../assets/logos/adulto.png';
+import diversosLogo from '../assets/logos/diversos.png';
+import doramaLogo from '../assets/logos/dorama.png';
 
 interface CategoryMenuProps {
     onSelectCategory: (categoryId: string) => void;
@@ -176,6 +179,12 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
         if (name.includes('max') || name.includes('hbo max')) return <img src={maxLogo} alt="Max" style={{ width: size, height: size, objectFit: 'contain' }} />;
 
         if (name.includes('crunchyroll')) return <img src={crunchyrollLogo} alt="Crunchyroll" style={{ width: size, height: size, objectFit: 'contain' }} />;
+
+        if (name.includes('adulto') || name.includes('adult')) return <img src={adultoLogo} alt="Adulto" style={{ width: size, height: size, objectFit: 'contain' }} />;
+
+        if (name.includes('diversos') || name.includes('various')) return <img src={diversosLogo} alt="Diversos" style={{ width: size, height: size, objectFit: 'contain' }} />;
+
+        if (name.includes('dorama') || name.includes('k-drama') || name.includes('kdrama') || name.includes('korean')) return <img src={doramaLogo} alt="Dorama" style={{ width: size, height: size, objectFit: 'contain' }} />;
 
         // Default
         return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>;
