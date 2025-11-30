@@ -1,4 +1,8 @@
 import { useState, useEffect } from 'react';
+import netflixLogo from '../assets/logos/netflix.png';
+import brasilParaleloLogo from '../assets/logos/brasil-paralelo.png';
+import disneyLogo from '../assets/logos/disney.png';
+import amazonPrimeLogo from '../assets/logos/amazon-prime.png';
 
 interface CategoryMenuProps {
     onSelectCategory: (categoryId: string) => void;
@@ -141,20 +145,13 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
         // Lançamento / New Release (sparkle/star icon)
         if (name.includes('lançamento') || name.includes('lancamento') || name.includes('novo') || name.includes('new') || name.includes('estreia') || name.includes('release')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v18M3 12h18M6.34 6.34l11.32 11.32M17.66 6.34L6.34 17.66" /><circle cx="12" cy="12" r="3" fill="currentColor" /></svg>;
 
-        // Dorama / Asian Drama (asian fan icon)
-        if (name.includes('dorama') || name.includes('drama asiático') || name.includes('asian drama') || name.includes('k-drama') || name.includes('kdrama') || name.includes('korean')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z" /><path d="M12 6v6l4 2" /></svg>;
+        if (name.includes('netflix')) return <img src={netflixLogo} alt="Netflix" style={{ width: size, height: size, objectFit: 'contain' }} />;
 
-        // Netflix (red N logo)
-        if (name.includes('netflix')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M5 2L8.5 12L5 22H8L11.5 12L8 2H5ZM11.5 2L15 12L11.5 22H14.5L18 12L14.5 2H11.5Z" /></svg>;
+        if (name.includes('brasil paralelo') || name.includes('bp')) return <img src={brasilParaleloLogo} alt="Brasil Paralelo" style={{ width: size, height: size, objectFit: 'contain' }} />;
 
-        // Brasil Paralelo (BP diamond/eye logo)
-        if (name.includes('brasil paralelo') || name.includes('bp')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L4 12L12 22L20 12L12 2ZM12 8C13.1 8 14 8.9 14 10C14 11.1 13.1 12 12 12C10.9 12 10 11.1 10 10C10 8.9 10.9 8 12 8Z" /><ellipse cx="12" cy="12" rx="8" ry="3" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>;
+        if (name.includes('disney')) return <img src={disneyLogo} alt="Disney" style={{ width: size, height: size, objectFit: 'contain' }} />;
 
-        // Disney Plus (Disney+ logo)
-        if (name.includes('disney')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M5 5C5 3.9 5.9 3 7 3H9C10.1 3 11 3.9 11 5V19C11 20.1 10.1 21 9 21H7C5.9 21 5 20.1 5 19V5Z" /><path d="M13 8C13 6.9 13.9 6 15 6H17C18.1 6 19 6.9 19 8V16C19 17.1 18.1 18 17 18H15C13.9 18 13 17.1 13 16V8Z" /></svg>;
-
-        // Amazon Prime Video (prime video logo)
-        if (name.includes('amazon') || name.includes('prime')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M2 12C2 9.8 2.9 7.7 4.5 6.2L6 7.7C4.8 8.9 4 10.4 4 12C4 15.3 6.7 18 10 18H14C17.3 18 20 15.3 20 12C20 10.4 19.2 8.9 18 7.7L19.5 6.2C21.1 7.7 22 9.8 22 12C22 16.4 18.4 20 14 20H10C5.6 20 2 16.4 2 12Z" /><path d="M7 12L12 7L17 12H14V16H10V12H7Z" /></svg>;
+        if (name.includes('amazon')) return <img src={amazonPrimeLogo} alt="Amazon Prime" style={{ width: size, height: size, objectFit: 'contain' }} />;
 
         // Default
         return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>;
