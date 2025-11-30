@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark, User } from 'lucide-react';
+import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark } from 'lucide-react';
 import { clsx } from 'clsx';
 import { profileService } from '../services/profileService';
 import { useState } from 'react';
@@ -26,7 +26,7 @@ export function Sidebar() {
     const isImageAvatar = activeProfile?.avatar.startsWith('data:image') || activeProfile?.avatar.startsWith('http');
 
     return (
-        <div className="w-80 bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 border-r border-gray-800/50 flex flex-col h-screen shadow-2xl" style={{ minWidth: '320px', maxWidth: '320px' }}>
+        <div className="w-40 bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 border-r border-gray-800/50 flex flex-col h-screen shadow-2xl" style={{ minWidth: '160px', maxWidth: '160px' }}>
             {/* Header/Logo */}
             <div className="p-8 flex items-center gap-4 border-b border-gray-800/50 bg-gradient-to-br from-blue-600/10 to-purple-600/10">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/50 shrink-0 relative overflow-hidden">
@@ -41,27 +41,7 @@ export function Sidebar() {
                 </div>
             </div>
 
-            {/* Profile Section */}
-            {activeProfile && (
-                <div className="p-6 mx-4 mt-6 rounded-2xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/50 backdrop-blur-sm">
-                    <div className="flex items-center gap-4">
-                        <div className="relative">
-                            <div className="w-14 h-14 rounded-xl overflow-hidden bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center border-2 border-gray-700/50">
-                                {isImageAvatar ? (
-                                    <img src={activeProfile.avatar} alt={activeProfile.name} className="w-full h-full object-cover" />
-                                ) : (
-                                    <span className="text-3xl">{activeProfile.avatar}</span>
-                                )}
-                            </div>
-                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-gray-900"></div>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm text-gray-400 font-medium">Bem-vindo</p>
-                            <h3 className="font-semibold text-white truncate text-lg">{activeProfile.name}</h3>
-                        </div>
-                    </div>
-                </div>
-            )}
+
 
             {/* Navigation */}
             <nav className="flex-1 p-6 space-y-2 overflow-y-auto mt-4">
@@ -112,6 +92,28 @@ export function Sidebar() {
                     );
                 })}
             </nav>
+
+            {/* Profile Section */}
+            {activeProfile && (
+                <div className="p-3 mx-3 mb-3 rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 border border-gray-700/50">
+                    <div className="flex items-center gap-3">
+                        <div className="relative">
+                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center border-2 border-gray-700/50">
+                                {isImageAvatar ? (
+                                    <img src={activeProfile.avatar} alt={activeProfile.name} className="w-full h-full object-cover" />
+                                ) : (
+                                    <span className="text-xl">{activeProfile.avatar}</span>
+                                )}
+                            </div>
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-900"></div>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs text-gray-500 font-medium">Perfil</p>
+                            <h3 className="font-semibold text-white truncate text-sm">{activeProfile.name}</h3>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Logout Button */}
             <div className="p-6 border-t border-gray-800/50 bg-gradient-to-t from-gray-950/50">
