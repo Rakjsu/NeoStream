@@ -59,8 +59,8 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                 onClick={() => setIsOpen(!isOpen)}
                 style={{
                     position: 'absolute',
-                    top: '32px',
-                    left: '32px',
+                    top: '20px',
+                    left: '2px',
                     zIndex: 90,
                     width: '48px',
                     height: '48px',
