@@ -315,7 +315,7 @@ export function Series() {
                     {selectedSeries && (
                         <div style={{ padding: '0 0 24px 0', marginBottom: '24px', flexShrink: 0 }}>
                             <div style={{ maxWidth: '900px' }}>
-                                <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                                <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', marginLeft: '48px' }}>
                                     {loadingTmdb ? (
                                         <span style={{ backgroundColor: 'rgba(31, 41, 55, 0.8)', color: '#9ca3af', padding: '6px 14px', borderRadius: '6px', fontSize: '14px', fontWeight: '600', fontStyle: 'italic', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' }}>Carregando...</span>
                                     ) : tmdbData && tmdbData.first_air_date ? (
