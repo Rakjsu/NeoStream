@@ -12,7 +12,7 @@ import appleTvLogo from '../assets/logos/apple-tv.png';
 import maxLogo from '../assets/logos/max.png';
 import crunchyrollLogo from '../assets/logos/crunchyroll.png';
 import adultoLogo from '../assets/logos/adulto.png';
-import diversosLogo from '../assets/logos/diversos.png';
+import diversoLogo from '../assets/logos/diverso.png';
 import doramaLogo from '../assets/logos/dorama.png';
 
 interface CategoryMenuProps {
@@ -182,7 +182,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
 
         if (name.includes('adulto') || name.includes('adult')) return <img src={adultoLogo} alt="Adulto" style={{ width: size, height: size, objectFit: 'contain' }} />;
 
-        if (name.includes('diversos') || name.includes('various')) return <img src={diversosLogo} alt="Diversos" style={{ width: size, height: size, objectFit: 'contain' }} />;
+        if (name.includes('diverso') || name.includes('diverso')) return <img src={diversoLogo} alt="Diverso" style={{ width: size, height: size, objectFit: 'contain' }} />;
 
         if (name.includes('dorama') || name.includes('k-drama') || name.includes('kdrama') || name.includes('korean')) return <img src={doramaLogo} alt="Dorama" style={{ width: size, height: size, objectFit: 'contain' }} />;
 
