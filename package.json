@@ -34,6 +34,7 @@
     "vidstack": "^1.12.13"
   },
   "devDependencies": {
+    "@electron/packager": "^19.0.1",
     "@eslint/js": "^9.39.1",
     "@tailwindcss/postcss": "^4.1.17",
     "@types/node": "^24.10.1",
@@ -80,12 +81,10 @@
         {
           "target": "nsis",
           "arch": [
-            "x64",
-            "ia32"
+            "x64"
           ]
         }
       ],
-      "icon": "public/icon.ico",
       "publisherName": "Rakjsu"
     },
     "nsis": {
@@ -100,16 +99,14 @@
         "dmg",
         "zip"
       ],
-      "category": "public.app-category.entertainment",
-      "icon": "public/icon.icns"
+      "category": "public.app-category.entertainment"
     },
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
-      "category": "AudioVideo",
-      "icon": "public/icon.png"
+      "category": "AudioVideo"
     }
   }
 }
