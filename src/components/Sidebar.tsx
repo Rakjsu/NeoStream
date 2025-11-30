@@ -26,7 +26,7 @@ export function Sidebar() {
     const isImageAvatar = activeProfile?.avatar.startsWith('data:image') || activeProfile?.avatar.startsWith('http');
 
     return (
-        <div className="w-40 bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 border-r border-gray-800/50 flex flex-col h-screen shadow-2xl" style={{ minWidth: '160px', maxWidth: '160px' }}>
+        <div className="bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 border-r border-gray-800/50 flex flex-col h-screen shadow-2xl" style={{ minWidth: '80px', maxWidth: '80px', width: '80px' }}>
             {/* Header/Logo */}
             <div className="p-8 flex items-center gap-4 border-b border-gray-800/50 bg-gradient-to-br from-blue-600/10 to-purple-600/10">
                 <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/50 shrink-0 relative overflow-hidden">
@@ -44,7 +44,7 @@ export function Sidebar() {
 
 
             {/* Navigation */}
-            <nav className="flex-1 p-6 space-y-2 overflow-y-auto mt-4">
+            <nav className="flex-1 p-3 space-y-1 overflow-y-auto mt-2">
                 {menuItems.map((item) => {
                     const isActive = location.pathname.startsWith(item.path);
                     return (
@@ -52,11 +52,17 @@ export function Sidebar() {
                             key={item.path}
                             onClick={() => navigate(item.path)}
                             className={clsx(
-                                "w-full flex items-center gap-4 p-4 rounded-2xl transition-all duration-300 group relative overflow-hidden",
+                                "w-full flex items-center transition-all duration-300 group relative overflow-hidden",
                                 isActive
-                                    ? `bg-gradient-to-r ${item.color} shadow-lg shadow-blue-600/30 scale-[1.02]`
-                                    : "text-gray-400 hover:bg-gray-800/50 hover:text-white hover:scale-[1.02]"
+                                    ? `bg-gradient-to-r ${item.color} shadow-md`
+                                    : "text-gray-400 hover:bg-gray-800/50 hover:text-white"
                             )}
+                            style={{
+                                padding: '6px',
+                                gap: '6px',
+                                borderRadius: '8px',
+                                fontSize: '11px'
+                            }}
                         >
                             {/* Gradient overlay on hover */}
                             {!isActive && (
@@ -65,28 +71,25 @@ export function Sidebar() {
 
                             {/* Icon container */}
                             <div className={clsx(
-                                "w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300 relative z-10",
+                                "rounded-xl flex items-center justify-center shrink-0 transition-all duration-300 relative z-10",
                                 isActive
                                     ? "bg-white/20 shadow-lg"
                                     : "bg-gray-800/50 group-hover:bg-gray-700/50"
-                            )}>
+                            )}
+                                style={{
+                                    width: '24px',
+                                    height: '24px'
+                                }}>
                                 <item.icon className={clsx(
-                                    "w-6 h-6 transition-all duration-300",
+                                    "transition-all duration-300",
                                     isActive ? "text-white" : "text-gray-400 group-hover:text-white"
-                                )} />
+                                )}
+                                    style={{ width: '14px', height: '14px' }} />
                             </div>
-
-                            {/* Label */}
-                            <span className={clsx(
-                                "font-semibold text-base relative z-10 transition-all duration-300",
-                                isActive ? "text-white" : "text-gray-400 group-hover:text-white"
-                            )}>
-                                {item.label}
-                            </span>
 
                             {/* Active indicator */}
                             {isActive && (
-                                <div className="absolute right-4 w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                                <div className="absolute bg-white rounded-full animate-pulse" style={{ right: '4px', width: '4px', height: '4px' }}></div>
                             )}
                         </button>
                     );
