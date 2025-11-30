@@ -3,6 +3,11 @@ import netflixLogo from '../assets/logos/netflix.png';
 import brasilParaleloLogo from '../assets/logos/brasil-paralelo.png';
 import disneyLogo from '../assets/logos/disney.png';
 import amazonPrimeLogo from '../assets/logos/amazon-prime.png';
+import globoplayLogo from '../assets/logos/globoplay.jpg';
+import lookeLogo from '../assets/logos/looke.png';
+import paramountLogo from '../assets/logos/paramount.png';
+import discoveryLogo from '../assets/logos/discovery.png';
+import marvelLogo from '../assets/logos/marvel.png';
 
 interface CategoryMenuProps {
     onSelectCategory: (categoryId: string) => void;
@@ -152,6 +157,16 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
         if (name.includes('disney')) return <img src={disneyLogo} alt="Disney" style={{ width: size, height: size, objectFit: 'contain' }} />;
 
         if (name.includes('amazon')) return <img src={amazonPrimeLogo} alt="Amazon Prime" style={{ width: size, height: size, objectFit: 'contain' }} />;
+
+        if (name.includes('globoplay') || name.includes('globo play')) return <img src={globoplayLogo} alt="Globoplay" style={{ width: size, height: size, objectFit: 'contain' }} />;
+
+        if (name.includes('looke')) return <img src={lookeLogo} alt="Looke" style={{ width: size, height: size, objectFit: 'contain' }} />;
+
+        if (name.includes('paramount')) return <img src={paramountLogo} alt="Paramount+" style={{ width: size, height: size, objectFit: 'contain' }} />;
+
+        if (name.includes('discovery')) return <img src={discoveryLogo} alt="Discovery" style={{ width: size, height: size, objectFit: 'contain' }} />;
+
+        if (name.includes('marvel')) return <img src={marvelLogo} alt="Marvel" style={{ width: size, height: size, objectFit: 'contain' }} />;
 
         // Default
         return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>;
