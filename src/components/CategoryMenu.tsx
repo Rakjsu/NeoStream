@@ -135,6 +135,15 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
         // Auto / Automotive
         if (name.includes('auto') || name.includes('carro') || name.includes('car')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" /><circle cx="7" cy="17" r="2" /><path d="M9 17h6" /><circle cx="17" cy="17" r="2" /></svg>;
 
+        // Legendado / Subtitled (CC icon)
+        if (name.includes('legendado') || name.includes('subtitle') || name.includes('caption')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="M7 15h4M13 15h4M7 11h2M13 11h2" /></svg>;
+
+        // Lançamento / New Release (sparkle/star icon)
+        if (name.includes('lançamento') || name.includes('lancamento') || name.includes('novo') || name.includes('new') || name.includes('estreia') || name.includes('release')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v18M3 12h18M6.34 6.34l11.32 11.32M17.66 6.34L6.34 17.66" /><circle cx="12" cy="12" r="3" fill="currentColor" /></svg>;
+
+        // Dorama / Asian Drama (asian fan icon)
+        if (name.includes('dorama') || name.includes('drama asiático') || name.includes('asian drama') || name.includes('k-drama') || name.includes('kdrama') || name.includes('korean')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2z" /><path d="M12 6v6l4 2" /></svg>;
+
         // Default
         return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>;
     };
