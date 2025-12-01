@@ -1,5 +1,4 @@
-import https from 'https'
-import http from 'http'
+import axios from 'axios'
 
 export interface XtreamAccount {
     username: string
@@ -23,51 +22,6 @@ export class XtreamClient {
         this.password = password
     }
 
-    private async httpRequest(urlString: string): Promise<any> {
-        return new Promise((resolve, reject) => {
-            const url = new URL(urlString);
-            const client = url.protocol === 'https:' ? https : http;
-
-            console.log('[XtreamClient] Making request to:', urlString.replace(this.password, '***'));
-
-            const req = client.get(urlString, (res) => {
-                let data = '';
-
-                console.log('[XtreamClient] Response status:', res.statusCode, res.statusMessage);
-
-                if (res.statusCode !== 200) {
-                    reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
-                    return;
-                }
-
-                res.on('data', (chunk) => {
-                    data += chunk;
-                });
-
-                res.on('end', () => {
-                    try {
-                        const parsed = JSON.parse(data);
-                        console.log('[XtreamClient] Response data:', parsed);
-                        resolve(parsed);
-                    } catch (error) {
-                        console.error('[XtreamClient] JSON parse error:', error);
-                        reject(new Error('Invalid JSON response'));
-                    }
-                });
-            });
-
-            req.on('error', (error) => {
-                console.error('[XtreamClient] Request error:', error);
-                reject(error);
-            });
-
-            req.setTimeout(15000, () => {
-                req.destroy();
-                reject(new Error('Request timeout'));
-            });
-        });
-    }
-
     private async makeRequest(action: string, params: Record<string, string> = {}) {
         const url = new URL(`${this.baseUrl}/player_api.php`)
         url.searchParams.append('username', this.username)
@@ -78,7 +32,16 @@ export class XtreamClient {
             url.searchParams.append(key, value)
         }
 
-        return this.httpRequest(url.toString());
+        const response = await axios.get(url.toString(), {
+            timeout: 15000,
+            validateStatus: () => true  // Don't throw on any status
+        })
+
+        if (response.status !== 200) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+        }
+
+        return response.data
     }
 
     async authenticate(): Promise<XtreamResponse> {
@@ -88,9 +51,21 @@ export class XtreamClient {
             url.searchParams.append('password', this.password);
 
             const fullUrl = url.toString();
-            console.log('[XtreamClient] Authenticating...');
+            console.log('[XtreamClient] Authenticating to:', fullUrl.replace(this.password, '***'));
 
-            const data = await this.httpRequest(fullUrl);
+            const response = await axios.get(fullUrl, {
+                timeout: 15000,
+                validateStatus: () => true  // Don't throw on any status
+            });
+
+            console.log('[XtreamClient] Response status:', response.status, response.statusText);
+            console.log('[XtreamClient] Response data:', response.data);
+
+            if (response.status !== 200) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = response.data;
 
             if (data.user_info && data.user_info.auth === 0) {
                 throw new Error('Usuário ou senha incorretos');
@@ -106,16 +81,21 @@ export class XtreamClient {
             console.error('[XtreamClient] Authentication error:', error);
 
             // Mensagens de erro mais específicas
-            if (error.code === 'ENOTFOUND') {
+            if (error.code === 'ENOTFOUND' || error.message?.includes('ENOTFOUND')) {
                 throw new Error(`Servidor não encontrado: ${this.baseUrl}\n\nVerifique se a URL está correta.`);
             }
 
-            if (error.code === 'ECONNREFUSED') {
+            if (error.code === 'ECONNREFUSED' || error.message?.includes('ECONNREFUSED')) {
                 throw new Error(`Conexão recusada: ${this.baseUrl}\n\nO servidor pode estar offline.`);
             }
 
-            if (error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
+            if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
                 throw new Error(`Tempo esgotado ao conectar em: ${this.baseUrl}\n\nO servidor demorou muito para responder.`);
+            }
+
+            // Erro de rede genérico
+            if (error.request && !error.response) {
+                throw new Error(`Falha na conexão com: ${this.baseUrl}\n\nVerifique sua internet e se o servidor está acessível.`);
             }
 
             throw error;
