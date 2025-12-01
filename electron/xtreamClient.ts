@@ -1,3 +1,6 @@
+import https from 'https'
+import http from 'http'
+
 export interface XtreamAccount {
     username: string
     password: string
@@ -20,7 +23,52 @@ export class XtreamClient {
         this.password = password
     }
 
-    private async fetch(action: string, params: Record<string, string> = {}) {
+    private async httpRequest(urlString: string): Promise<any> {
+        return new Promise((resolve, reject) => {
+            const url = new URL(urlString);
+            const client = url.protocol === 'https:' ? https : http;
+
+            console.log('[XtreamClient] Making request to:', urlString.replace(this.password, '***'));
+
+            const req = client.get(urlString, (res) => {
+                let data = '';
+
+                console.log('[XtreamClient] Response status:', res.statusCode, res.statusMessage);
+
+                if (res.statusCode !== 200) {
+                    reject(new Error(`HTTP ${res.statusCode}: ${res.statusMessage}`));
+                    return;
+                }
+
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
+
+                res.on('end', () => {
+                    try {
+                        const parsed = JSON.parse(data);
+                        console.log('[XtreamClient] Response data:', parsed);
+                        resolve(parsed);
+                    } catch (error) {
+                        console.error('[XtreamClient] JSON parse error:', error);
+                        reject(new Error('Invalid JSON response'));
+                    }
+                });
+            });
+
+            req.on('error', (error) => {
+                console.error('[XtreamClient] Request error:', error);
+                reject(error);
+            });
+
+            req.setTimeout(15000, () => {
+                req.destroy();
+                reject(new Error('Request timeout'));
+            });
+        });
+    }
+
+    private async makeRequest(action: string, params: Record<string, string> = {}) {
         const url = new URL(`${this.baseUrl}/player_api.php`)
         url.searchParams.append('username', this.username)
         url.searchParams.append('password', this.password)
@@ -30,11 +78,7 @@ export class XtreamClient {
             url.searchParams.append(key, value)
         }
 
-        const response = await fetch(url.toString())
-        if (!response.ok) {
-            throw new Error(`Xtream API Error: ${response.statusText}`)
-        }
-        return response.json()
+        return this.httpRequest(url.toString());
     }
 
     async authenticate(): Promise<XtreamResponse> {
@@ -44,25 +88,16 @@ export class XtreamClient {
             url.searchParams.append('password', this.password);
 
             const fullUrl = url.toString();
-            console.log('[XtreamClient] Authenticating to:', fullUrl.replace(this.password, '***'));
+            console.log('[XtreamClient] Authenticating...');
 
-            const response = await fetch(fullUrl);
-
-            console.log('[XtreamClient] Response status:', response.status, response.statusText);
-
-            if (!response.ok) {
-                throw new Error(`Authentication failed: ${response.status} ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            console.log('[XtreamClient] Response data:', data);
+            const data = await this.httpRequest(fullUrl);
 
             if (data.user_info && data.user_info.auth === 0) {
-                throw new Error('Authentication failed: Invalid credentials');
+                throw new Error('Usuário ou senha incorretos');
             }
 
             if (!data.user_info) {
-                throw new Error('Authentication failed: No user info in response');
+                throw new Error('Resposta inválida do servidor - sem informações de usuário');
             }
 
             console.log('[XtreamClient] Authentication successful');
@@ -70,9 +105,17 @@ export class XtreamClient {
         } catch (error: any) {
             console.error('[XtreamClient] Authentication error:', error);
 
-            // Melhorar mensagens de erro
-            if (error.message.includes('fetch')) {
-                throw new Error(`Não foi possível conectar ao servidor ${this.baseUrl}. Verifique se a URL está correta e o servidor está online.`);
+            // Mensagens de erro mais específicas
+            if (error.code === 'ENOTFOUND') {
+                throw new Error(`Servidor não encontrado: ${this.baseUrl}\n\nVerifique se a URL está correta.`);
+            }
+
+            if (error.code === 'ECONNREFUSED') {
+                throw new Error(`Conexão recusada: ${this.baseUrl}\n\nO servidor pode estar offline.`);
+            }
+
+            if (error.code === 'ETIMEDOUT' || error.message.includes('timeout')) {
+                throw new Error(`Tempo esgotado ao conectar em: ${this.baseUrl}\n\nO servidor demorou muito para responder.`);
             }
 
             throw error;
@@ -80,14 +123,14 @@ export class XtreamClient {
     }
 
     async getLiveStreams() {
-        return this.fetch('get_live_streams')
+        return this.makeRequest('get_live_streams')
     }
 
     async getVODStreams() {
-        return this.fetch('get_vod_streams')
+        return this.makeRequest('get_vod_streams')
     }
 
     async getSeries() {
-        return this.fetch('get_series')
+        return this.makeRequest('get_series')
     }
 }
