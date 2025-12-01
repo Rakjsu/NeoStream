@@ -26,17 +26,25 @@ export function ContinueWatching({ allSeries, onSeriesClick, fixImageUrl }: Cont
     const [continueWatching, setContinueWatching] = useState<SeriesWithProgress[]>([]);
 
     useEffect(() => {
+        console.log('🔍 [ContinueWatching] All series count:', allSeries.length);
+
         const progress = watchProgressService.getContinueWatching(allSeries);
+        console.log('🔍 [ContinueWatching] Progress results:', progress);
 
         const seriesWithProgress = progress.map(prog => {
             const series = allSeries.find(s => String(s.series_id) === prog.seriesId);
+            if (series) {
+                console.log(`🔍 [ContinueWatching] Matched series: ${series.name}, Progress: ${prog.percentage}%`);
+            }
             return series ? { series, progress: prog } : null;
         }).filter((item): item is SeriesWithProgress => item !== null);
 
+        console.log('🔍 [ContinueWatching] Final series with progress:', seriesWithProgress.length);
         setContinueWatching(seriesWithProgress);
     }, [allSeries]);
 
     if (continueWatching.length === 0) {
+        console.log('🔍 [ContinueWatching] No series to show, hiding section');
         return null; // Don't show section if no series in progress
     }
 
