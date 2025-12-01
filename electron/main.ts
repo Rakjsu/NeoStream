@@ -15,6 +15,10 @@ app.commandLine.appendSwitch('enable-zero-copy')
 app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,VaapiVideoEncoder') // Linux/Mac mostly, but good to have
 // Windows HEVC support relies on OS extensions, but we can try to force some flags if needed.
 
+// Network permissions - allow external requests
+app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors')
+app.commandLine.appendSwitch('ignore-certificate-errors')
+
 setupIpcHandlers()
 
 process.env.DIST = path.join(__dirname, '../dist')
