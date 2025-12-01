@@ -4,18 +4,17 @@ interface EpisodeProgress {
     episodeNumber: number;
     watchedAt: number; // timestamp
     completed: boolean;
+    currentTime?: number; // Video position in seconds
+    duration?: number; // Total video duration
 }
 
 interface SeriesProgress {
     seriesId: string;
     seriesName: string;
-    totalEpisodes: number;
-    watchedEpisodes: number;
-    percentage: number;
     lastWatchedSeason: number;
     lastWatchedEpisode: number;
     lastWatchedAt: number;
-    completed: boolean;
+    episodeCount: number; // Total episodes watched
 }
 
 class WatchProgressService {
@@ -55,12 +54,77 @@ class WatchProgressService {
         };
 
         if (existing >= 0) {
-            progress[existing] = newEntry;
+            progress[existing] = { ...progress[existing], ...newEntry };
         } else {
             progress.push(newEntry);
         }
 
         this.saveProgress(progress);
+        console.log(`✅ [WatchProgress] Marked S${seasonNumber}:E${episodeNumber} as watched for series ${seriesId}`);
+    }
+
+    // Save current video time for resume
+    saveVideoTime(
+        seriesId: string,
+        seasonNumber: number,
+        episodeNumber: number,
+        currentTime: number,
+        duration: number
+    ): void {
+        const progress = this.getProgress();
+        const existing = progress.findIndex(
+            (p) =>
+                p.seriesId === seriesId &&
+                p.seasonNumber === seasonNumber &&
+                p.episodeNumber === episodeNumber
+        );
+
+        const entry: EpisodeProgress = {
+            seriesId,
+            seasonNumber,
+            episodeNumber,
+            watchedAt: Date.now(),
+            completed: currentTime >= duration * 0.9, // 90% = completed
+            currentTime,
+            duration,
+        };
+
+        if (existing >= 0) {
+            progress[existing] = { ...progress[existing], ...entry };
+        } else {
+            progress.push(entry);
+        }
+
+        this.saveProgress(progress);
+    }
+
+    // Get saved video time for resume
+    getVideoTime(
+        seriesId: string,
+        seasonNumber: number,
+        episodeNumber: number
+    ): number | null {
+        const progress = this.getProgress();
+        const episode = progress.find(
+            (p) =>
+                p.seriesId === seriesId &&
+                p.seasonNumber === seasonNumber &&
+                p.episodeNumber === episodeNumber
+        );
+
+        if (episode?.currentTime && episode?.duration) {
+            // Don't resume if already completed or less than 10 seconds
+            if (episode.completed || episode.currentTime < 10) {
+                return null;
+            }
+            // Don't resume if within last 30 seconds (probably finished)
+            if (episode.duration - episode.currentTime < 30) {
+                return null;
+            }
+            return episode.currentTime;
+        }
+
+        return null;
     }
 
     // Check if episode is watched
@@ -79,10 +143,10 @@ class WatchProgressService {
         );
     }
 
-    // Get series progress with total episodes
-    getSeriesProgress(seriesId: string, totalEpisodes: number, seriesName: string): SeriesProgress | null {
+    // Get series progress WITHOUT needing total episodes
+    getSeriesProgress(seriesId: string, seriesName: string): SeriesProgress | null {
         const progress = this.getProgress();
-        const seriesEpisodes = progress.filter((p) => p.seriesId === seriesId && p.completed);
+        const seriesEpisodes = progress.filter((p) => p.seriesId === seriesId);
 
         if (seriesEpisodes.length === 0) {
             return null;
@@ -93,88 +157,33 @@ class WatchProgressService {
             return current.watchedAt > latest.watchedAt ? current : latest;
         });
 
-        const watchedCount = seriesEpisodes.length;
-        const percentage = Math.round((watchedCount / totalEpisodes) * 100);
-
         return {
             seriesId,
             seriesName,
-            totalEpisodes,
-            watchedEpisodes: watchedCount,
-            percentage,
             lastWatchedSeason: lastWatched.seasonNumber,
             lastWatchedEpisode: lastWatched.episodeNumber,
             lastWatchedAt: lastWatched.watchedAt,
-            completed: percentage >= 100,
+            episodeCount: seriesEpisodes.length,
         };
     }
 
-    // Get all series in progress (0% < x < 100%)
-    getContinueWatching(allSeries: any[]): SeriesProgress[] {
-        const inProgress: SeriesProgress[] = [];
+    // Get all series with ANY watch history (for Continue Watching)
+    getContinueWatching(): Map<string, SeriesProgress> {
+        const progress = this.getProgress();
+        const seriesMap = new Map<string, SeriesProgress>();
 
-        for (const series of allSeries) {
-            // Calculate total episodes from all seasons
-            const totalEpisodes = series.seasons?.reduce((sum: number, season: any) => {
-                return sum + (season.episode_count || 0);
-            }, 0) || 0;
-
-            if (totalEpisodes === 0) continue;
-
-            const progress = this.getSeriesProgress(series.series_id, totalEpisodes, series.name);
-
-            if (progress && progress.percentage > 0 && progress.percentage < 100) {
-                inProgress.push(progress);
-            }
-        }
-
-        // Sort by last watched (most recent first)
-        return inProgress.sort((a, b) => b.lastWatchedAt - a.lastWatchedAt);
-    }
-
-    // Get completed series (100%)
-    getCompletedSeries(allSeries: any[]): SeriesProgress[] {
-        const completed: SeriesProgress[] = [];
-
-        for (const series of allSeries) {
-            const totalEpisodes = series.seasons?.reduce((sum: number, season: any) => {
-                return sum + (season.episode_count || 0);
-            }, 0) || 0;
-
-            if (totalEpisodes === 0) continue;
-
-            const progress = this.getSeriesProgress(series.series_id, totalEpisodes, series.name);
-
-            if (progress && progress.percentage >= 100) {
-                completed.push(progress);
-            }
-        }
-
-        // Sort by last watched
-        return completed.sort((a, b) => b.lastWatchedAt - a.lastWatchedAt);
-    }
-
-    // Get next unwatched episode for a series
-    getNextEpisode(seriesId: string, seasons: any[]): {
-        seasonNumber: number;
-        episodeNumber: number;
-    } | null {
-        // Go through all seasons and episodes to find first unwatched
-        for (const season of seasons) {
-            const seasonNum = season.season_number;
-            const episodeCount = season.episode_count || 0;
-
-            for (let epNum = 1; epNum <= episodeCount; epNum++) {
-                if (!this.isEpisodeWatched(seriesId, seasonNum, epNum)) {
-                    return {
-                        seasonNumber: seasonNum,
-                        episodeNumber: epNum,
-                    };
+        // Group by series
+        progress.forEach(ep => {
+            if (!seriesMap.has(ep.seriesId)) {
+                const seriesProgress = this.getSeriesProgress(ep.seriesId, '');
+                if (seriesProgress) {
+                    seriesMap.set(ep.seriesId, seriesProgress);
                 }
             }
-        }
+        });
 
-        return null; // All episodes watched
+        console.log(`📊 [WatchProgress] Found ${seriesMap.size} series with watch history`);
+        return seriesMap;
     }
 
     // Clear progress for a series

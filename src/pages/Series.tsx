@@ -519,6 +519,9 @@ export function Series() {
                     movie={playingSeries}
                     buildStreamUrl={buildSeriesStreamUrl}
                     onClose={() => setPlayingSeries(null)}
+                    seriesId={String(playingSeries.series_id)}
+                    seasonNumber={selectedSeason}
+                    episodeNumber={selectedEpisode}
                     onNextEpisode={() => {
                         // Mark current episode as watched before moving to next
                         watchProgressService.markEpisodeWatched(

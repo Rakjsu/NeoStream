@@ -12,13 +12,10 @@ interface SeriesWithProgress {
     progress: {
         seriesId: string;
         seriesName: string;
-        totalEpisodes: number;
-        watchedEpisodes: number;
-        percentage: number;
         lastWatchedSeason: number;
         lastWatchedEpisode: number;
         lastWatchedAt: number;
-        completed: boolean;
+        episodeCount: number;
     };
 }
 
@@ -26,25 +23,33 @@ export function ContinueWatching({ allSeries, onSeriesClick, fixImageUrl }: Cont
     const [continueWatching, setContinueWatching] = useState<SeriesWithProgress[]>([]);
 
     useEffect(() => {
-        console.log('🔍 [ContinueWatching] All series count:', allSeries.length);
+        const progressMap = watchProgressService.getContinueWatching();
+        console.log(`🔍 [ContinueWatching] Watch history for ${progressMap.size} series`);
 
-        const progress = watchProgressService.getContinueWatching(allSeries);
-        console.log('🔍 [ContinueWatching] Progress results:', progress);
+        const seriesWithProgress: SeriesWithProgress[] = [];
 
-        const seriesWithProgress = progress.map(prog => {
-            const series = allSeries.find(s => String(s.series_id) === prog.seriesId);
+        progressMap.forEach((progress, seriesId) => {
+            const series = allSeries.find(s => String(s.series_id) === seriesId);
             if (series) {
-                console.log(`🔍 [ContinueWatching] Matched series: ${series.name}, Progress: ${prog.percentage}%`);
+                seriesWithProgress.push({
+                    series,
+                    progress: {
+                        ...progress,
+                        seriesName: series.name, // Use actual series name
+                    },
+                });
+                console.log(`✅ [ContinueWatching] ${series.name}: ${progress.episodeCount} episodes watched, last: S${progress.lastWatchedSeason}:E${progress.lastWatchedEpisode}`);
             }
-            return series ? { series, progress: prog } : null;
-        }).filter((item): item is SeriesWithProgress => item !== null);
+        });
 
-        console.log('🔍 [ContinueWatching] Final series with progress:', seriesWithProgress.length);
+        // Sort by last watched (most recent first)
+        seriesWithProgress.sort((a, b) => b.progress.lastWatchedAt - a.progress.lastWatchedAt);
+
+        console.log(`🔍 [ContinueWatching] Showing ${seriesWithProgress.length} series`);
         setContinueWatching(seriesWithProgress);
     }, [allSeries]);
 
     if (continueWatching.length === 0) {
-        console.log('🔍 [ContinueWatching] No series to show, hiding section');
         return null; // Don't show section if no series in progress
     }
 
@@ -79,9 +84,9 @@ export function ContinueWatching({ allSeries, onSeriesClick, fixImageUrl }: Cont
                                 }}
                             />
 
-                            {/* Progress percentage badge */}
+                            {/* Episode count badge */}
                             <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-sm px-2 py-1 rounded-md">
-                                <span className="text-white text-xs font-bold">{progress.percentage}%</span>
+                                <span className="text-white text-xs font-bold">{progress.episodeCount} eps</span>
                             </div>
 
                             {/* Hover overlay */}
@@ -96,23 +101,13 @@ export function ContinueWatching({ allSeries, onSeriesClick, fixImageUrl }: Cont
                                 {series.name}
                             </h3>
 
-                            {/* Progress Bar */}
-                            <div className="mb-2">
-                                <div className="w-full bg-gray-700 rounded-full h-1.5">
-                                    <div
-                                        className="bg-blue-500 h-1.5 rounded-full transition-all duration-500"
-                                        style={{ width: `${progress.percentage}%` }}
-                                    ></div>
-                                </div>
-                            </div>
-
                             {/* Episode Info */}
                             <div className="flex items-center justify-between text-xs">
-                                <span className="text-gray-400">
+                                <span className="text-blue-400 font-medium">
                                     S{progress.lastWatchedSeason}:E{progress.lastWatchedEpisode}
                                 </span>
                                 <span className="text-gray-500">
-                                    {progress.watchedEpisodes}/{progress.totalEpisodes} eps
+                                    {progress.episodeCount} assistidos
                                 </span>
                             </div>
                         </div>

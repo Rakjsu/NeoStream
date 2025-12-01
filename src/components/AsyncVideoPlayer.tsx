@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { VideoPlayer } from './VideoPlayer/VideoPlayer';
+import { watchProgressService } from '../services/watchProgressService';
 
 interface AsyncVideoPlayerProps {
     movie: any;
@@ -11,6 +12,10 @@ interface AsyncVideoPlayerProps {
     canGoPrevious?: boolean;
     currentEpisode?: number;
     customTitle?: string;
+    // For video resume tracking
+    seriesId?: string;
+    seasonNumber?: number;
+    episodeNumber?: number;
 }
 
 function AsyncVideoPlayer({
@@ -22,11 +27,15 @@ function AsyncVideoPlayer({
     canGoNext,
     canGoPrevious,
     currentEpisode,
-    customTitle
+    customTitle,
+    seriesId,
+    seasonNumber,
+    episodeNumber
 }: AsyncVideoPlayerProps) {
     const [streamUrl, setStreamUrl] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [isAnimating, setIsAnimating] = useState(true);
+    const [resumeTime, setResumeTime] = useState<number | null>(null);
 
     useEffect(() => {
         setLoading(true);
@@ -34,12 +43,25 @@ function AsyncVideoPlayer({
             .then(url => {
                 setStreamUrl(url);
                 setLoading(false);
+
+                // Load saved video time for resume
+                if (seriesId && seasonNumber !== undefined && episodeNumber !== undefined) {
+                    const savedTime = watchProgressService.getVideoTime(
+                        seriesId,
+                        seasonNumber,
+                        episodeNumber
+                    );
+                    if (savedTime) {
+                        console.log(`⏰ [VideoResume] Resuming S${seasonNumber}:E${episodeNumber} at ${Math.floor(savedTime)}s`);
+                        setResumeTime(savedTime);
+                    }
+                }
             })
             .catch((error) => {
                 console.error('Error building stream URL:', error);
                 setLoading(false);
             });
-    }, [movie, buildStreamUrl, currentEpisode]);
+    }, [movie, buildStreamUrl, currentEpisode, seriesId, seasonNumber, episodeNumber]);
 
     // Disable animation after it completes
     useEffect(() => {
@@ -104,6 +126,19 @@ function AsyncVideoPlayer({
                         onPreviousEpisode={onPreviousEpisode}
                         canGoNext={canGoNext}
                         canGoPrevious={canGoPrevious}
+                        resumeTime={resumeTime}
+                        onTimeUpdate={(currentTime, duration) => {
+                            // Save video progress every 5 seconds
+                            if (seriesId && seasonNumber !== undefined && episodeNumber !== undefined && currentTime % 5 < 0.5) {
+                                watchProgressService.saveVideoTime(
+                                    seriesId,
+                                    seasonNumber,
+                                    episodeNumber,
+                                    currentTime,
+                                    duration
+                                );
+                            }
+                        }}
                     />
                 </div>
             </div>
