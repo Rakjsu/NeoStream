@@ -102,7 +102,9 @@ export function Login() {
     const handlePlaylistNameSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         localStorage.setItem('playlistName', playlistName || 'Minha Playlist');
-        navigate('/dashboard');
+
+        // Force reload to reinitialize app with new auth state
+        window.location.href = '/dashboard';
     };
 
     const handleBack = () => {
