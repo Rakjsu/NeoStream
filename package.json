@@ -13,6 +13,7 @@
     "build:win": "tsc -b && vite build && electron-builder --win",
     "build:mac": "tsc -b && vite build && electron-builder --mac",
     "build:linux": "tsc -b && vite build && electron-builder --linux",
+    "package:win": "vite build && npx @electron/packager . \"NeoStream IPTV\" --platform=win32 --arch=x64 --out=release --overwrite --asar --executable-name=\"NeoStream IPTV\" --icon=public/app-icon.png",
     "lint": "eslint .",
     "preview": "vite preview"
   },

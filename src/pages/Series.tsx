@@ -5,6 +5,7 @@ import { watchProgressService } from '../services/watchProgressService';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import { CategoryMenu } from '../components/CategoryMenu';
+import { ContinueWatching } from '../components/ContinueWatching';
 
 interface Series {
     num: number;
@@ -69,6 +70,20 @@ export function Series() {
 
     const filteredSeries = series.filter(s => {
         const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
+
+        // Special category for completed series
+        if (selectedCategory === 'COMPLETED') {
+            // Calculate total episodes
+            const totalEpisodes = s.seasons?.reduce((sum: number, season: any) => {
+                return sum + (season.episode_count || 0);
+            }, 0) || 0;
+
+            if (totalEpisodes === 0) return false;
+
+            const progress = watchProgressService.getSeriesProgress(s.series_id, totalEpisodes, s.name);
+            return matchesSearch && progress && progress.percentage >= 100;
+        }
+
         const matchesCategory = !selectedCategory || selectedCategory === '' || s.category_id === selectedCategory;
         return matchesSearch && matchesCategory;
     });
@@ -452,6 +467,13 @@ export function Series() {
                         </div>
                     )}
                     <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', paddingRight: '4px' }}>
+                        {/* Continue Watching Section */}
+                        <ContinueWatching
+                            allSeries={series}
+                            onSeriesClick={(s) => setSelectedSeries(s)}
+                            fixImageUrl={fixImageUrl}
+                        />
+
                         <div className="grid grid-cols-9 gap-[32px] px-[32px]">
                             {filteredSeries.slice(0, visibleCount).map((s) => (
                                 <div key={s.series_id} className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-95" onClick={() => setSelectedSeries(s)}>
@@ -498,6 +520,13 @@ export function Series() {
                     buildStreamUrl={buildSeriesStreamUrl}
                     onClose={() => setPlayingSeries(null)}
                     onNextEpisode={() => {
+                        // Mark current episode as watched before moving to next
+                        watchProgressService.markEpisodeWatched(
+                            String(playingSeries.series_id),
+                            selectedSeason,
+                            selectedEpisode
+                        );
+
                         const episodes = seriesInfo?.episodes?.[selectedSeason];
                         if (episodes && selectedEpisode < episodes.length) {
                             setSelectedEpisode(selectedEpisode + 1);
