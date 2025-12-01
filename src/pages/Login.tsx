@@ -45,21 +45,55 @@ export function Login() {
         setError('');
 
         try {
+            console.log('Attempting login with:', { url: formData.url, username: formData.username });
+
             const result = await window.ipcRenderer.invoke('auth:login', {
                 url: formData.url,
                 username: formData.username,
                 password: formData.password
             });
 
+            console.log('Login result:', result);
+
             if (result.success) {
                 localStorage.setItem('includeTV', includeTV.toString());
                 localStorage.setItem('includeVOD', includeVOD.toString());
                 setStep('playlist-name');
             } else {
-                setError(result.error || 'Falha na autenticação');
+                // Mensagens de erro específicas
+                const errorMessage = result.error || 'Falha na autenticação';
+                console.error('Login failed:', errorMessage);
+
+                // Melhorar mensagem para erros comuns
+                if (errorMessage.includes('fetch') || errorMessage.includes('ENOTFOUND') || errorMessage.includes('ECONNREFUSED')) {
+                    setError('❌ Não foi possível conectar ao servidor. Verifique:\n• URL do servidor está correta\n• Servidor está online\n• Sua conexão com internet');
+                } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized') || errorMessage.includes('authentication')) {
+                    setError('❌ Usuário ou senha incorretos. Verifique suas credenciais.');
+                } else if (errorMessage.includes('timeout')) {
+                    setError('⏱️ Tempo esgotado. O servidor demorou muito para responder.');
+                } else {
+                    setError(`❌ Erro: ${errorMessage}`);
+                }
             }
         } catch (err: any) {
-            setError(err?.message || 'Erro de conexão com o servidor');
+            console.error('Login exception:', err);
+
+            // Log detalhado do erro
+            const errorDetails = {
+                message: err?.message,
+                name: err?.name,
+                stack: err?.stack
+            };
+            console.error('Error details:', errorDetails);
+
+            // Mensagem amigável para o usuário
+            if (err?.message?.includes('fetch')) {
+                setError('❌ Falha na conexão com o servidor.\n\nVerifique:\n• URL do servidor\n• Conexão com internet\n• Servidor está acessível');
+            } else if (err?.message?.includes('timeout')) {
+                setError('⏱️ Conexão expirou. O servidor não respondeu a tempo.');
+            } else {
+                setError(`❌ Erro inesperado: ${err?.message || 'Tente novamente'}\n\nSe o problema persistir, verifique as configurações.`);
+            }
         } finally {
             setLoading(false);
         }
@@ -91,7 +125,9 @@ export function Login() {
                 {step === 'credentials' && (
                     <form onSubmit={handleCredentialsSubmit} className="space-y-6 max-w-xs mx-auto">
                         {error && (
-                            <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-lg text-sm text-center">{error}</div>
+                            <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-lg text-sm text-left" style={{ whiteSpace: 'pre-line' }}>
+                                {error}
+                            </div>
                         )}
 
                         <div className="space-y-2">
