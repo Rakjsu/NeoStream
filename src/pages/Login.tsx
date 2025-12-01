@@ -14,9 +14,9 @@ export function Login() {
     const [counts, setCounts] = useState({ live: 0, vod: 0, series: 0 });
 
     const [formData, setFormData] = useState({
-        url: 'http://demo.example.com',
-        username: 'demo',
-        password: 'demo123'
+        url: '',
+        username: '',
+        password: ''
     });
 
     useEffect(() => {

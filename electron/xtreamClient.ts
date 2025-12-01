@@ -32,36 +32,11 @@ export class XtreamClient {
 
         const response = await fetch(url.toString())
         if (!response.ok) {
-            throw new Error(`Xtream API Error: ${response.statusText}`)
-        }
-        return response.json()
-    }
-
-    async authenticate(): Promise<XtreamResponse> {
-        const url = new URL(`${this.baseUrl}/player_api.php`)
-        url.searchParams.append('username', this.username)
-        url.searchParams.append('password', this.password)
-
-        const response = await fetch(url.toString())
-        if (!response.ok) {
-            throw new Error(`Authentication failed: ${response.statusText}`)
-        }
-        const data = await response.json()
-        if (data.user_info && data.user_info.auth === 0) {
-            throw new Error('Authentication failed: Invalid credentials')
-        }
-        return data
-    }
-
-    async getLiveStreams() {
-        return this.fetch('get_live_streams')
-    }
-
     async getVODStreams() {
-        return this.fetch('get_vod_streams')
-    }
+                return this.fetch('get_vod_streams')
+            }
 
     async getSeries() {
-        return this.fetch('get_series')
-    }
-}
+                return this.fetch('get_series')
+            }
+        }
