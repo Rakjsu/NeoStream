@@ -60,7 +60,6 @@ class WatchProgressService {
         }
 
         this.saveProgress(progress);
-        console.log(`✅ [WatchProgress] Marked S${seasonNumber}:E${episodeNumber} as watched for series ${seriesId}`);
     }
 
     // Save current video time for resume
@@ -182,7 +181,6 @@ class WatchProgressService {
             }
         });
 
-        console.log(`📊 [WatchProgress] Found ${seriesMap.size} series with watch history`);
         return seriesMap;
     }
 

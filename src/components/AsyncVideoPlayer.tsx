@@ -52,7 +52,6 @@ function AsyncVideoPlayer({
                         episodeNumber
                     );
                     if (savedTime) {
-                        console.log(`⏰ [VideoResume] Resuming S${seasonNumber}:E${episodeNumber} at ${Math.floor(savedTime)}s`);
                         setResumeTime(savedTime);
                     }
                 }
