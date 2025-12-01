@@ -161,17 +161,34 @@ export function Login() {
                             <div className="flex justify-center">
                                 <div className="flex items-center gap-3">
                                     <Play className="w-5 h-5 text-gray-500" />
-                                    <input type="text" required value={playlistName} onChange={(e) => setPlaylistName(e.target.value)} className="bg-gray-900 border border-gray-700 rounded-xl py-2.5 px-4 text-white text-center text-base focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" style={{ width: '320px' }} placeholder="Minha Playlist" autoFocus />
+                                    <input
+                                        type="text"
+                                        value={playlistName}
+                                        onChange={(e) => setPlaylistName(e.target.value)}
+                                        className="bg-gray-900 border border-gray-700 rounded-xl py-2.5 px-4 text-white text-center text-base focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                                        style={{ width: '320px' }}
+                                        placeholder="Minha Playlist"
+                                        autoFocus
+                                    />
                                 </div>
                             </div>
 
                             <div className="flex justify-center items-center pt-4" style={{ gap: '18px' }}>
-                                <button type="button" onClick={handleBack} className="hover:scale-105 hover:shadow-lg hover:bg-gray-700 active:scale-95 transition-all duration-200 flex items-center gap-2" style={{ backgroundColor: '#232427ff', color: 'white', borderRadius: '8px', padding: '13px 24px', fontSize: '16px', fontWeight: 500, border: 'none', cursor: 'pointer' }}>
+                                <button
+                                    type="button"
+                                    onClick={handleBack}
+                                    className="hover:scale-105 hover:shadow-lg hover:bg-gray-700 active:scale-95 transition-all duration-200 flex items-center gap-2"
+                                    style={{ backgroundColor: '#232427ff', color: 'white', borderRadius: '8px', padding: '13px 24px', fontSize: '16px', fontWeight: 500, border: 'none', cursor: 'pointer' }}
+                                >
                                     <ArrowLeft className="w-5 h-5" />
                                     Voltar
                                 </button>
 
-                                <button type="submit" className="bg-gray-200 text-gray-900 hover:bg-white hover:scale-105 hover:shadow-xl active:scale-95 transition-all duration-200 flex items-center gap-2" style={{ borderRadius: '8px', padding: '13px 24px', fontSize: '16px', fontWeight: 500, border: 'none', cursor: 'pointer' }}>
+                                <button
+                                    type="submit"
+                                    className="bg-gray-200 text-gray-900 hover:bg-white hover:scale-105 hover:shadow-xl active:scale-95 transition-all duration-200 flex items-center gap-2"
+                                    style={{ borderRadius: '8px', padding: '13px 24px', fontSize: '16px', fontWeight: 500, border: 'none', cursor: 'pointer' }}
+                                >
                                     <Play className="w-5 h-5" />
                                     Continuar
                                 </button>
