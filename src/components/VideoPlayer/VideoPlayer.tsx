@@ -72,9 +72,30 @@ export function VideoPlayer({
 
     // Resume from saved time
     useEffect(() => {
-        if (resumeTime && videoRef.current && videoRef.current.readyState >= 2) {
-            videoRef.current.currentTime = resumeTime;
+        if (!resumeTime || !videoRef.current) return;
+
+        const video = videoRef.current;
+
+        const setResumeTime = () => {
+            if (video && resumeTime) {
+                console.log(`Resuming playback at ${resumeTime} seconds`);
+                video.currentTime = resumeTime;
+            }
+        };
+
+        // If metadata is already loaded, set time immediately
+        if (video.readyState >= 2) {
+            setResumeTime();
+        } else {
+            // Otherwise, wait for metadata to load
+            video.addEventListener('loadedmetadata', setResumeTime);
+            video.addEventListener('canplay', setResumeTime, { once: true });
         }
+
+        return () => {
+            video.removeEventListener('loadedmetadata', setResumeTime);
+            video.removeEventListener('canplay', setResumeTime);
+        };
     }, [resumeTime, src]);
 
     // Time update tracker
