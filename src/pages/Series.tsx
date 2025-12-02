@@ -71,6 +71,12 @@ export function Series() {
     const filteredSeries = series.filter(s => {
         const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
 
+        // Special category for continue watching (series with progress)
+        if (selectedCategory === 'CONTINUE_WATCHING') {
+            const progressMap = watchProgressService.getContinueWatching();
+            return matchesSearch && progressMap.has(String(s.series_id));
+        }
+
         // Special category for completed series
         if (selectedCategory === 'COMPLETED') {
             // Calculate total episodes
@@ -108,9 +114,10 @@ export function Series() {
         return () => container.removeEventListener('scroll', handleScroll);
     }, [filteredSeries.length, visibleCount, ITEMS_PER_PAGE]);
 
-    // Reset visible count when search/filter changes
+    // Reset visible count and close details when search/filter changes
     useEffect(() => {
         setVisibleCount(ITEMS_PER_PAGE);
+        setSelectedSeries(null); // Close details when changing category or search
     }, [searchQuery, selectedCategory]);
 
     const handleImageError = (seriesId: number) => setBrokenImages(prev => new Set(prev).add(seriesId));
