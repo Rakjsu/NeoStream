@@ -156,7 +156,15 @@ export function Sidebar() {
                 {/* Profile Section */}
                 {activeProfile && (
                     <div className="flex items-center justify-center" style={{ padding: '12px 0', marginBottom: '16px' }}>
-                        <div className="relative cursor-pointer transition-transform duration-300 hover:scale-110">
+                        <div
+                            className="relative cursor-pointer transition-transform duration-300 hover:scale-110"
+                            onClick={() => {
+                                // Clear active profile to show ProfileSelector
+                                profileService.clearActiveProfile();
+                                window.location.reload(); // Reload to show ProfileSelector
+                            }}
+                            title="Trocar de perfil"
+                        >
                             <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: '#000000' }}>
                                 {/* Always show cyan icon - comment out to use avatar */}
                                 <svg width="36" height="36" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">

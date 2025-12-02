@@ -6,6 +6,7 @@ import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { ContinueWatching } from '../components/ContinueWatching';
+import { ResumeModal } from '../components/ResumeModal';
 
 interface Series {
     num: number;
@@ -49,6 +50,13 @@ export function Series() {
     const ITEMS_PER_PAGE = 36;
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+    // Resume modal state
+    const [showResumeModal, setShowResumeModal] = useState(false);
+    const [resumeModalData, setResumeModalData] = useState<{
+        currentTime: number;
+        duration: number;
+    } | null>(null);
+
     useEffect(() => { fetchSeries(); }, []);
 
     const fetchSeries = async () => {
@@ -77,17 +85,9 @@ export function Series() {
             return matchesSearch && progressMap.has(String(s.series_id));
         }
 
-        // Special category for completed series
+        // Special category for completed series (95% of any episode)
         if (selectedCategory === 'COMPLETED') {
-            // Calculate total episodes
-            const totalEpisodes = s.seasons?.reduce((sum: number, season: any) => {
-                return sum + (season.episode_count || 0);
-            }, 0) || 0;
-
-            if (totalEpisodes === 0) return false;
-
-            const progress = watchProgressService.getSeriesProgress(s.series_id, totalEpisodes, s.name);
-            return matchesSearch && progress && progress.percentage >= 100;
+            return matchesSearch && watchProgressService.isSeriesCompleted(String(s.series_id));
         }
 
         const matchesCategory = !selectedCategory || selectedCategory === '' || s.category_id === selectedCategory;
@@ -144,7 +144,24 @@ export function Series() {
     }, [selectedSeries]);
 
     const handlePlaySeries = (seriesItem: Series) => {
-        setPlayingSeries(seriesItem);
+        // Check if current episode has partial progress
+        const episodeProgress = watchProgressService.getEpisodeProgress(
+            String(seriesItem.series_id),
+            selectedSeason,
+            selectedEpisode
+        );
+
+        // If episode has progress and is not completed, show resume modal
+        if (episodeProgress && !episodeProgress.completed && episodeProgress.currentTime > 10) {
+            setResumeModalData({
+                currentTime: episodeProgress.currentTime,
+                duration: episodeProgress.duration
+            });
+            setShowResumeModal(true);
+        } else {
+            // No progress or already completed, play directly
+            setPlayingSeries(seriesItem);
+        }
     };
 
 
@@ -258,9 +275,18 @@ export function Series() {
                             console.log('📺 Temporadas disponíveis:', Object.keys(data.episodes || {}));
                             console.log('📺 Exemplo de episódio:', data.episodes?.[1]?.[0]); // Mostra estrutura do primeiro episódio
                             setSeriesInfo(data);
-                            // Reset to season 1 episode 1 when changing series
-                            setSelectedSeason(1);
-                            setSelectedEpisode(1);
+
+                            // Auto-select last watched episode or default to S1E1
+                            const lastWatched = watchProgressService.getLastWatchedEpisode(String(selectedSeries.series_id));
+                            if (lastWatched) {
+                                console.log(`📌 Auto-selecting last watched: S${lastWatched.season}E${lastWatched.episode}`);
+                                setSelectedSeason(lastWatched.season);
+                                setSelectedEpisode(lastWatched.episode);
+                            } else {
+                                console.log('📌 No watch history, defaulting to S1E1');
+                                setSelectedSeason(1);
+                                setSelectedEpisode(1);
+                            }
                         })
                         .catch(err => {
                             console.error('❌ Error fetching series info:', err);
@@ -567,6 +593,37 @@ export function Series() {
                 />
             )
             }
+
+            {/* Resume Modal */}
+            {showResumeModal && resumeModalData && selectedSeries && (
+                <ResumeModal
+                    seriesName={selectedSeries.name}
+                    seasonNumber={selectedSeason}
+                    episodeNumber={selectedEpisode}
+                    currentTime={resumeModalData.currentTime}
+                    duration={resumeModalData.duration}
+                    onResume={() => {
+                        // Resume from saved position
+                        setShowResumeModal(false);
+                        setPlayingSeries(selectedSeries);
+                    }}
+                    onRestart={() => {
+                        // Clear progress and start from beginning
+                        watchProgressService.clearEpisodeProgress(
+                            String(selectedSeries.series_id),
+                            selectedSeason,
+                            selectedEpisode
+                        );
+                        setShowResumeModal(false);
+                        setPlayingSeries(selectedSeries);
+                    }}
+                    onCancel={() => {
+                        // Just close the modal
+                        setShowResumeModal(false);
+                        setResumeModalData(null);
+                    }}
+                />
+            )}
         </>
     );
 }

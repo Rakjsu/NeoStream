@@ -51,8 +51,11 @@ function AsyncVideoPlayer({
                         seasonNumber,
                         episodeNumber
                     );
+                    console.log(`[AsyncVideoPlayer] Loaded resume time for S${seasonNumber}E${episodeNumber}:`, savedTime);
                     if (savedTime) {
                         setResumeTime(savedTime);
+                    } else {
+                        setResumeTime(null);
                     }
                 }
             })

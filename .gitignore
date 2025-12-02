@@ -28,3 +28,12 @@ dist-electron
 .env
 .env.local
 .env.*.local
+
+# Electron build artifacts
+release/
+*.exe
+*.app
+*.dmg
+*.zip
+*.tar.gz
+out/
