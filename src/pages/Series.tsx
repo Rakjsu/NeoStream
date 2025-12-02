@@ -85,17 +85,9 @@ export function Series() {
             return matchesSearch && progressMap.has(String(s.series_id));
         }
 
-        // Special category for completed series
+        // Special category for completed series (95% of any episode)
         if (selectedCategory === 'COMPLETED') {
-            // Calculate total episodes
-            const totalEpisodes = s.seasons?.reduce((sum: number, season: any) => {
-                return sum + (season.episode_count || 0);
-            }, 0) || 0;
-
-            if (totalEpisodes === 0) return false;
-
-            const progress = watchProgressService.getSeriesProgress(s.series_id, totalEpisodes, s.name);
-            return matchesSearch && progress && progress.percentage >= 100;
+            return matchesSearch && watchProgressService.isSeriesCompleted(String(s.series_id));
         }
 
         const matchesCategory = !selectedCategory || selectedCategory === '' || s.category_id === selectedCategory;

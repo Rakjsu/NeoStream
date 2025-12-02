@@ -283,6 +283,26 @@ class WatchProgressService {
         this.saveProgress(filtered);
     }
 
+    // Check if a series is completed (any episode >= 95% and marked as completed)
+    isSeriesCompleted(seriesId: string): boolean {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return false;
+
+        const progress = this.getProgress();
+        const seriesEpisodes = progress.filter(
+            (p) => p.seriesId === seriesId && p.profileId === activeProfile.id
+        );
+
+        if (seriesEpisodes.length === 0) return false;
+
+        // Check if any episode is >= 95% (likely the last one)
+        return seriesEpisodes.some((ep) => {
+            if (!ep.currentTime || !ep.duration) return false;
+            const progression = (ep.currentTime / ep.duration) * 100;
+            return progression >= 95 || ep.completed;
+        });
+    }
+
     // Clear progress for a series
     clearSeriesProgress(seriesId: string): void {
         const progress = this.getProgress();
