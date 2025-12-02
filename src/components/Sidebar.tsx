@@ -159,8 +159,9 @@ export function Sidebar() {
                         <div
                             className="relative cursor-pointer transition-transform duration-300 hover:scale-110"
                             onClick={() => {
-                                // Navigate to profile selector to change profiles
-                                navigate('/profile-selector');
+                                // Clear active profile to show ProfileSelector
+                                profileService.clearActiveProfile();
+                                window.location.reload(); // Reload to show ProfileSelector
                             }}
                             title="Trocar de perfil"
                         >

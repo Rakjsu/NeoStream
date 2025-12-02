@@ -20,7 +20,7 @@
     height: 100% !important;
     max-width: 100% !important;
     max-height: 100% !important;
-    object-fit: contain !important;
+    object-fit: cover !important;
     display: block !important;
     cursor: pointer;
 }
