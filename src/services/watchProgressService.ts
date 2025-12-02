@@ -1,7 +1,10 @@
+import { profileService } from './profileService';
+
 interface EpisodeProgress {
     seriesId: string;
     seasonNumber: number;
     episodeNumber: number;
+    profileId: string; // Track progress per profile
     watchedAt: number; // timestamp
     completed: boolean;
     currentTime?: number; // Video position in seconds
@@ -37,18 +40,23 @@ class WatchProgressService {
         seasonNumber: number,
         episodeNumber: number
     ): void {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return;
+
         const progress = this.getProgress();
         const existing = progress.findIndex(
             (p) =>
                 p.seriesId === seriesId &&
                 p.seasonNumber === seasonNumber &&
-                p.episodeNumber === episodeNumber
+                p.episodeNumber === episodeNumber &&
+                p.profileId === activeProfile.id
         );
 
         const newEntry: EpisodeProgress = {
             seriesId,
             seasonNumber,
             episodeNumber,
+            profileId: activeProfile.id,
             watchedAt: Date.now(),
             completed: true,
         };
@@ -70,18 +78,23 @@ class WatchProgressService {
         currentTime: number,
         duration: number
     ): void {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return;
+
         const progress = this.getProgress();
         const existing = progress.findIndex(
             (p) =>
                 p.seriesId === seriesId &&
                 p.seasonNumber === seasonNumber &&
-                p.episodeNumber === episodeNumber
+                p.episodeNumber === episodeNumber &&
+                p.profileId === activeProfile.id
         );
 
         const entry: EpisodeProgress = {
             seriesId,
             seasonNumber,
             episodeNumber,
+            profileId: activeProfile.id,
             watchedAt: Date.now(),
             completed: currentTime >= duration * 0.9, // 90% = completed
             currentTime,
@@ -103,12 +116,16 @@ class WatchProgressService {
         seasonNumber: number,
         episodeNumber: number
     ): number | null {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return null;
+
         const progress = this.getProgress();
         const episode = progress.find(
             (p) =>
                 p.seriesId === seriesId &&
                 p.seasonNumber === seasonNumber &&
-                p.episodeNumber === episodeNumber
+                p.episodeNumber === episodeNumber &&
+                p.profileId === activeProfile.id
         );
 
         if (episode?.currentTime && episode?.duration) {
@@ -132,20 +149,27 @@ class WatchProgressService {
         seasonNumber: number,
         episodeNumber: number
     ): boolean {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return false;
+
         const progress = this.getProgress();
         return progress.some(
             (p) =>
                 p.seriesId === seriesId &&
                 p.seasonNumber === seasonNumber &&
                 p.episodeNumber === episodeNumber &&
+                p.profileId === activeProfile.id &&
                 p.completed
         );
     }
 
     // Get series progress WITHOUT needing total episodes
     getSeriesProgress(seriesId: string, seriesName: string): SeriesProgress | null {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return null;
+
         const progress = this.getProgress();
-        const seriesEpisodes = progress.filter((p) => p.seriesId === seriesId);
+        const seriesEpisodes = progress.filter((p) => p.seriesId === seriesId && p.profileId === activeProfile.id);
 
         if (seriesEpisodes.length === 0) {
             return null;
@@ -168,12 +192,15 @@ class WatchProgressService {
 
     // Get all series with ANY watch history (for Continue Watching)
     getContinueWatching(): Map<string, SeriesProgress> {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return new Map();
+
         const progress = this.getProgress();
         const seriesMap = new Map<string, SeriesProgress>();
 
-        // Group by series
+        // Group by series - only for active profile
         progress.forEach(ep => {
-            if (!seriesMap.has(ep.seriesId)) {
+            if (ep.profileId === activeProfile.id && !seriesMap.has(ep.seriesId)) {
                 const seriesProgress = this.getSeriesProgress(ep.seriesId, '');
                 if (seriesProgress) {
                     seriesMap.set(ep.seriesId, seriesProgress);
@@ -182,6 +209,78 @@ class WatchProgressService {
         });
 
         return seriesMap;
+    }
+
+    // Get last watched episode for a series (for auto-selection)
+    getLastWatchedEpisode(seriesId: string): { season: number; episode: number } | null {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return null;
+
+        const progress = this.getProgress();
+        const seriesEpisodes = progress.filter(
+            (p) => p.seriesId === seriesId && p.profileId === activeProfile.id
+        );
+
+        if (seriesEpisodes.length === 0) return null;
+
+        // Find the most recently watched episode
+        const lastWatched = seriesEpisodes.reduce((latest, current) => {
+            return current.watchedAt > latest.watchedAt ? current : latest;
+        });
+
+        return {
+            season: lastWatched.seasonNumber,
+            episode: lastWatched.episodeNumber
+        };
+    }
+
+    // Get episode progress (for checking if partially watched)
+    getEpisodeProgress(
+        seriesId: string,
+        seasonNumber: number,
+        episodeNumber: number
+    ): { currentTime: number; duration: number; completed: boolean } | null {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return null;
+
+        const progress = this.getProgress();
+        const episode = progress.find(
+            (p) =>
+                p.seriesId === seriesId &&
+                p.seasonNumber === seasonNumber &&
+                p.episodeNumber === episodeNumber &&
+                p.profileId === activeProfile.id
+        );
+
+        if (!episode || !episode.currentTime || !episode.duration) {
+            return null;
+        }
+
+        return {
+            currentTime: episode.currentTime,
+            duration: episode.duration,
+            completed: episode.completed
+        };
+    }
+
+    // Clear progress for a specific episode (for "Start Over" functionality)
+    clearEpisodeProgress(
+        seriesId: string,
+        seasonNumber: number,
+        episodeNumber: number
+    ): void {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return;
+
+        const progress = this.getProgress();
+        const filtered = progress.filter(
+            (p) =>
+                !(p.seriesId === seriesId &&
+                    p.seasonNumber === seasonNumber &&
+                    p.episodeNumber === episodeNumber &&
+                    p.profileId === activeProfile.id)
+        );
+        this.saveProgress(filtered);
     }
 
     // Clear progress for a series
