@@ -467,12 +467,6 @@ export function Series() {
                         </div>
                     )}
                     <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', paddingRight: '4px' }}>
-                        {/* Continue Watching Section */}
-                        <ContinueWatching
-                            allSeries={series}
-                            onSeriesClick={(s) => setSelectedSeries(s)}
-                            fixImageUrl={fixImageUrl}
-                        />
 
                         <div className="grid grid-cols-9 gap-[32px] px-[32px]">
                             {filteredSeries.slice(0, visibleCount).map((s) => (
