@@ -54,12 +54,28 @@ export function VideoPlayer({
         }, 3000);
     };
 
+
     useEffect(() => {
         resetHideControlsTimer();
         return () => {
             if (hideControlsTimeoutRef.current) {
+                clearTimeout(hideControlsTimeoutRef.current);
             }
-        }, [resumeTime, src]);
+        };
+    }, [state.playing, seeking]);
+
+    useEffect(() => {
+        if (autoPlay && videoRef.current) {
+            videoRef.current.play();
+        }
+    }, [autoPlay]);
+
+    // Resume from saved time
+    useEffect(() => {
+        if (resumeTime && videoRef.current && videoRef.current.readyState >= 2) {
+            videoRef.current.currentTime = resumeTime;
+        }
+    }, [resumeTime, src]);
 
     // Time update tracker
     useEffect(() => {
