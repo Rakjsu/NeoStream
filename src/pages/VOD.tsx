@@ -3,6 +3,7 @@ import { formatGenres, type TMDBMovieDetails, getBackdropUrl } from '../services
 import { watchLaterService } from '../services/watchLater';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
+import { CategoryMenu } from '../components/CategoryMenu';
 
 interface VODStream {
     num: number;
@@ -31,6 +32,8 @@ interface VODStream {
 
 export function VOD() {
     const [streams, setStreams] = useState<VODStream[]>([]);
+    const [categories, setCategories] = useState<Array<{ category_id: string; category_name: string; parent_id: number }>>([]);
+    const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
@@ -44,7 +47,10 @@ export function VOD() {
     const ITEMS_PER_PAGE = 36;
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => { fetchStreams(); }, []);
+    useEffect(() => {
+        fetchStreams();
+        fetchCategories();
+    }, []);
 
     const fetchStreams = async () => {
         setLoading(true);
@@ -63,7 +69,34 @@ export function VOD() {
         }
     };
 
-    const filteredStreams = streams.filter(stream => stream.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    const fetchCategories = async () => {
+        try {
+            const result = await window.ipcRenderer.invoke('categories:get-vod');
+            if (result.success) {
+                setCategories(result.data || []);
+            }
+        } catch (err) {
+            console.error('Failed to load categories:', err);
+        }
+    };
+
+    const filteredStreams = streams.filter(stream => {
+        const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
+
+        // Category filtering
+        if (selectedCategory === 'continue-assistindo') {
+            const progress = watchProgressService.getProgress('movie', stream.stream_id.toString());
+            return matchesSearch && progress && progress.progress > 0 && progress.progress < 95;
+        }
+
+        if (selectedCategory === 'assistidos') {
+            const progress = watchProgressService.getProgress('movie', stream.stream_id.toString());
+            return matchesSearch && progress && progress.progress >= 95;
+        }
+
+        const matchesCategory = selectedCategory === 'all' || stream.category_id === selectedCategory;
+        return matchesSearch && matchesCategory;
+    });
 
     // Lazy loading scroll listener
     useEffect(() => {
@@ -83,10 +116,11 @@ export function VOD() {
         return () => container.removeEventListener('scroll', handleScroll);
     }, [filteredStreams.length, visibleCount, ITEMS_PER_PAGE]);
 
-    // Reset visible count when search changes
+    // Reset visible count when search or category changes
     useEffect(() => {
         setVisibleCount(ITEMS_PER_PAGE);
-    }, [searchQuery, ITEMS_PER_PAGE]);
+        setSelectedMovie(null);
+    }, [searchQuery, selectedCategory, ITEMS_PER_PAGE]);
 
     const handleImageError = (streamId: number) => setBrokenImages(prev => new Set(prev).add(streamId));
     const fixImageUrl = (url: string): string => url && url.startsWith('http') ? url : `https://${url}`;
@@ -188,6 +222,10 @@ export function VOD() {
                     value={searchQuery}
                     onChange={setSearchQuery}
                     placeholder="Buscar filmes..."
+                />
+                <CategoryMenu
+                    onSelectCategory={setSelectedCategory}
+                    selectedCategory={selectedCategory}
                 />
                 <div style={{ position: 'relative', zIndex: 10, padding: '32px', height: '100%', display: 'flex', flexDirection: 'column' }}>
                     {selectedMovie && (
