@@ -51,6 +51,49 @@ export function Sidebar() {
                     </div>
                 </div>
 
+                {/* Home Icon */}
+                <div style={{ padding: '0 0 16px 0', display: 'flex', justifyContent: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                    <button
+                        onClick={() => navigate('/dashboard/live')}
+                        className="flex items-center justify-center transition-all duration-200 active:scale-90"
+                        style={{
+                            width: '48px',
+                            height: '48px',
+                            background: 'transparent',
+                            border: 'none',
+                            padding: 0,
+                            cursor: 'pointer'
+                        }}
+                        title="Página Inicial"
+                    >
+                        <svg
+                            width="24"
+                            height="24"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="transition-all duration-200"
+                            style={{ color: '#ffffff', stroke: '#ffffff' }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.color = '#fbbf24';
+                                e.currentTarget.style.stroke = '#fbbf24';
+                                e.currentTarget.style.transform = 'scale(1.25)';
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.color = '#ffffff';
+                                e.currentTarget.style.stroke = '#ffffff';
+                                e.currentTarget.style.transform = 'scale(1)';
+                            }}
+                        >
+                            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                            <polyline points="9 22 9 12 15 12 15 22" />
+                        </svg>
+                    </button>
+                </div>
+
                 {/* Navigation */}
                 <nav className="flex-1 overflow-y-auto" style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                     {menuItems.map((item) => {
@@ -155,15 +198,13 @@ export function Sidebar() {
 
                 {/* Profile Section */}
                 {activeProfile && (
-                    <div className="flex items-center justify-center" style={{ padding: '12px 0', marginBottom: '16px' }}>
+                    <div className="flex items-center justify-center" style={{ padding: '12px 0', marginBottom: '16px', position: 'relative' }}>
                         <div
                             className="relative cursor-pointer transition-transform duration-300 hover:scale-110"
                             onClick={() => {
-                                // Clear active profile to show ProfileSelector
-                                profileService.clearActiveProfile();
-                                window.location.reload(); // Reload to show ProfileSelector
+                                navigate('/dashboard/settings');
                             }}
-                            title="Trocar de perfil"
+                            title="Configurações de Perfil"
                         >
                             <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: '#000000' }}>
                                 {/* Always show cyan icon - comment out to use avatar */}
