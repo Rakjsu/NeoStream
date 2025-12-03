@@ -73,74 +73,189 @@ export function WatchLater() {
                 Assistir Depois
             </h1>
 
-            <div className="grid grid-cols-9 gap-[32px]">
-                {items.map((item) => (
-                    <div key={`${item.type}-${item.id}`} className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-95">
-                        <div className="relative overflow-hidden bg-gray-900 shadow-xl" style={{ borderRadius: '16px', border: '3px solid transparent' }}>
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    removeItem(item.id, item.type);
-                                }}
-                                style={{
-                                    position: 'absolute',
-                                    top: '8px',
-                                    right: '8px',
-                                    zIndex: 10,
-                                    background: '#ef4444',
-                                    borderRadius: '50%',
-                                    width: '32px',
-                                    height: '32px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 2px 8px rgba(239, 68, 68, 0.5)',
-                                    transition: 'all 0.2s'
-                                }}
-                            >
-                                <span style={{ fontSize: '18px' }}>✕</span>
-                            </button>
+            {/* Movies Section */}
+            {items.filter(item => item.type === 'movie').length > 0 && (
+                <div style={{ marginBottom: '48px' }}>
+                    <h2 style={{
+                        fontSize: '24px',
+                        fontWeight: '600',
+                        color: 'white',
+                        marginBottom: '16px'
+                    }}>
+                        Filmes
+                    </h2>
+                    <div style={{
+                        display: 'flex',
+                        gap: '16px',
+                        overflowX: 'auto',
+                        overflowY: 'hidden',
+                        paddingBottom: '8px',
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: '#4b5563 #1f2937'
+                    }}>
+                        {items.filter(item => item.type === 'movie').map((item) => (
+                            <div key={`${item.type}-${item.id}`} style={{ minWidth: '200px', flexShrink: 0 }}>
+                                <div className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-95">
+                                    <div className="relative overflow-hidden bg-gray-900 shadow-xl" style={{ borderRadius: '16px', border: '3px solid transparent' }}>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                removeItem(item.id, item.type);
+                                            }}
+                                            style={{
+                                                position: 'absolute',
+                                                top: '8px',
+                                                right: '8px',
+                                                zIndex: 10,
+                                                background: '#ef4444',
+                                                borderRadius: '50%',
+                                                width: '32px',
+                                                height: '32px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.5)',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <span style={{ fontSize: '18px' }}>✕</span>
+                                        </button>
 
-                            <div className="aspect-[2/3]" onClick={() => handleItemClick(item)}>
-                                {item.cover ? (
-                                    <img
-                                        src={item.cover.startsWith('http') ? item.cover : `https://${item.cover}`}
-                                        alt={item.name}
-                                        className="w-full h-full object-cover"
-                                        style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}
-                                    />
-                                ) : (
-                                    <div
-                                        className="w-full h-full flex items-center justify-center bg-gray-700"
-                                        style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}
-                                    >
-                                        <span className="text-5xl">{item.type === 'series' ? '📺' : '🎬'}</span>
+                                        <div className="aspect-[2/3]" onClick={() => handleItemClick(item)}>
+                                            {item.cover ? (
+                                                <img
+                                                    src={item.cover.startsWith('http') ? item.cover : `https://${item.cover}`}
+                                                    alt={item.name}
+                                                    className="w-full h-full object-cover"
+                                                    style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}
+                                                />
+                                            ) : (
+                                                <div
+                                                    className="w-full h-full flex items-center justify-center bg-gray-700"
+                                                    style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}
+                                                >
+                                                    <span className="text-5xl">🎬</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div
+                                            style={{
+                                                background: 'linear-gradient(to top, #111827, rgba(31, 41, 55, 0.95), rgba(31, 41, 55, 0.8))',
+                                                borderBottomLeftRadius: '16px',
+                                                borderBottomRightRadius: '16px',
+                                                padding: '12px'
+                                            }}
+                                            onClick={() => handleItemClick(item)}
+                                        >
+                                            <h3 className="text-white text-sm font-semibold truncate group-hover:text-blue-400 transition-colors">
+                                                {item.name}
+                                            </h3>
+                                            <p style={{ color: '#6b7280', fontSize: '12px', marginTop: '4px' }}>
+                                                Filme
+                                            </p>
+                                        </div>
                                     </div>
-                                )}
+                                </div>
                             </div>
-
-                            <div
-                                style={{
-                                    background: 'linear-gradient(to top, #111827, rgba(31, 41, 55, 0.95), rgba(31, 41, 55, 0.8))',
-                                    borderBottomLeftRadius: '16px',
-                                    borderBottomRightRadius: '16px',
-                                    padding: '12px'
-                                }}
-                                onClick={() => handleItemClick(item)}
-                            >
-                                <h3 className="text-white text-sm font-semibold truncate group-hover:text-blue-400 transition-colors">
-                                    {item.name}
-                                </h3>
-                                <p style={{ color: '#6b7280', fontSize: '12px', marginTop: '4px' }}>
-                                    {item.type === 'series' ? 'Série' : 'Filme'}
-                                </p>
-                            </div>
-                        </div>
+                        ))}
                     </div>
-                ))}
-            </div>
+                </div>
+            )}
+
+            {/* Series Section */}
+            {items.filter(item => item.type === 'series').length > 0 && (
+                <div>
+                    <h2 style={{
+                        fontSize: '24px',
+                        fontWeight: '600',
+                        color: 'white',
+                        marginBottom: '16px'
+                    }}>
+                        Séries
+                    </h2>
+                    <div style={{
+                        display: 'flex',
+                        gap: '16px',
+                        overflowX: 'auto',
+                        overflowY: 'hidden',
+                        paddingBottom: '8px',
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: '#4b5563 #1f2937'
+                    }}>
+                        {items.filter(item => item.type === 'series').map((item) => (
+                            <div key={`${item.type}-${item.id}`} style={{ minWidth: '200px', flexShrink: 0 }}>
+                                <div className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-95">
+                                    <div className="relative overflow-hidden bg-gray-900 shadow-xl" style={{ borderRadius: '16px', border: '3px solid transparent' }}>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                removeItem(item.id, item.type);
+                                            }}
+                                            style={{
+                                                position: 'absolute',
+                                                top: '8px',
+                                                right: '8px',
+                                                zIndex: 10,
+                                                background: '#ef4444',
+                                                borderRadius: '50%',
+                                                width: '32px',
+                                                height: '32px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.5)',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <span style={{ fontSize: '18px' }}>✕</span>
+                                        </button>
+
+                                        <div className="aspect-[2/3]" onClick={() => handleItemClick(item)}>
+                                            {item.cover ? (
+                                                <img
+                                                    src={item.cover.startsWith('http') ? item.cover : `https://${item.cover}`}
+                                                    alt={item.name}
+                                                    className="w-full h-full object-cover"
+                                                    style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}
+                                                />
+                                            ) : (
+                                                <div
+                                                    className="w-full h-full flex items-center justify-center bg-gray-700"
+                                                    style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}
+                                                >
+                                                    <span className="text-5xl">📺</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div
+                                            style={{
+                                                background: 'linear-gradient(to top, #111827, rgba(31, 41, 55, 0.95), rgba(31, 41, 55, 0.8))',
+                                                borderBottomLeftRadius: '16px',
+                                                borderBottomRightRadius: '16px',
+                                                padding: '12px'
+                                            }}
+                                            onClick={() => handleItemClick(item)}
+                                        >
+                                            <h3 className="text-white text-sm font-semibold truncate group-hover:text-blue-400 transition-colors">
+                                                {item.name}
+                                            </h3>
+                                            <p style={{ color: '#6b7280', fontSize: '12px', marginTop: '4px' }}>
+                                                Série
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
