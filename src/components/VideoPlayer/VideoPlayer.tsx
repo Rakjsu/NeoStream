@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaCompress, FaCog, FaSpinner } from 'react-icons/fa';
 import { useVideoPlayer } from '../../hooks/useVideoPlayer';
 import { useHls } from '../../hooks/useHls';
@@ -39,6 +39,7 @@ export function VideoPlayer({
     const [seeking, setSeeking] = useState(false);
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     const hideControlsTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>();
 
@@ -62,7 +63,7 @@ export function VideoPlayer({
                 clearTimeout(hideControlsTimeoutRef.current);
             }
         };
-    }, [state.playing, seeking]);
+    }, [state.playing, seeking, state.fullscreen]); // Added fullscreen to dependencies
 
     useEffect(() => {
         if (autoPlay && videoRef.current) {
@@ -112,17 +113,32 @@ export function VideoPlayer({
         return () => videoRef.current?.removeEventListener('timeupdate', handleTimeUpdate);
     }, [onTimeUpdate]);
 
-    // Add mousemove listener when in fullscreen
+    // Add mousemove listener - works both in and out of fullscreen
     useEffect(() => {
-        if (!state.fullscreen) return;
+        const handleMouseMove = () => {
+            setShowControls(true);
 
-        const handleFullscreenMouseMove = () => {
-            resetHideControlsTimer();
+            if (hideControlsTimeoutRef.current) {
+                clearTimeout(hideControlsTimeoutRef.current);
+            }
+
+            hideControlsTimeoutRef.current = setTimeout(() => {
+                if (state.playing && !seeking) {
+                    setShowControls(false);
+                }
+            }, 3000);
         };
 
-        document.addEventListener('mousemove', handleFullscreenMouseMove);
-        return () => document.removeEventListener('mousemove', handleFullscreenMouseMove);
-    }, [state.fullscreen]);
+        // Always add listener to document for better coverage
+        document.addEventListener('mousemove', handleMouseMove);
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            if (hideControlsTimeoutRef.current) {
+                clearTimeout(hideControlsTimeoutRef.current);
+            }
+        };
+    }, [state.playing, seeking]);
 
     const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -155,7 +171,7 @@ export function VideoPlayer({
     const bufferedPercent = percentage(state.buffered, state.duration);
 
     return (
-        <div className="video-player-container" onMouseMove={resetHideControlsTimer}>
+        <div ref={containerRef} className="video-player-container" onMouseMove={resetHideControlsTimer}>
             {onClose && (
                 <button className="video-player-close" onClick={onClose}>✕</button>
             )}
@@ -335,7 +351,13 @@ export function VideoPlayer({
                             </>
                         )}
 
-                        <button className="control-btn" onClick={controls.toggleFullscreen}>
+                        <button className="control-btn" onClick={() => {
+                            if (!document.fullscreenElement) {
+                                containerRef.current?.requestFullscreen();
+                            } else {
+                                document.exitFullscreen();
+                            }
+                        }}>
                             {state.fullscreen ? <FaCompress /> : <FaExpand />}
                         </button>
                     </div>

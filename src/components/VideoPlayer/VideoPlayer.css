@@ -332,3 +332,25 @@
 .settings-option.active {
     background: #3b82f6;
 }
+
+/* Fullscreen specific styles - Maximum z-index to ensure controls appear above video */
+:fullscreen .video-player-controls,
+:-webkit-full-screen .video-player-controls,
+:-moz-full-screen .video-player-controls,
+:-ms-fullscreen .video-player-controls {
+    z-index: 2147483647 !important;
+}
+
+:fullscreen .video-player-close,
+:-webkit-full-screen .video-player-close,
+:-moz-full-screen .video-player-close,
+:-ms-fullscreen .video-player-close {
+    z-index: 2147483647 !important;
+}
+
+:fullscreen .video-player-title,
+:-webkit-full-screen .video-player-title,
+:-moz-full-screen .video-player-title,
+:-ms-fullscreen .video-player-title {
+    z-index: 2147483647 !important;
+}

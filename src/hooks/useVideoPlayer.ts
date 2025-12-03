@@ -95,8 +95,39 @@ export function useVideoPlayer() {
             }
         };
 
+
+
+        let fullscreenChangeTimeout: ReturnType<typeof setTimeout> | null = null;
+
+        const isInFullscreen = (): boolean => {
+            // Check multiple APIs for better compatibility
+            return !!(
+                document.fullscreenElement ||
+                (document as any).webkitFullscreenElement ||
+                (document as any).mozFullScreenElement ||
+                (document as any).msFullscreenElement
+            );
+        };
+
         const handleFullscreenChange = () => {
-            setState(prev => ({ ...prev, fullscreen: !!document.fullscreenElement }));
+            // Clear any pending timeout
+            if (fullscreenChangeTimeout) {
+                clearTimeout(fullscreenChangeTimeout);
+            }
+
+            // Debounce the state change
+            fullscreenChangeTimeout = setTimeout(() => {
+                const isFullscreen = isInFullscreen();
+                console.log('🔄 FS State:', isFullscreen);
+
+                setState(prev => {
+                    if (prev.fullscreen !== isFullscreen) {
+                        console.log(`✅ ${prev.fullscreen} → ${isFullscreen}`);
+                        return { ...prev, fullscreen: isFullscreen };
+                    }
+                    return prev;
+                });
+            }, 50);
         };
 
         video.addEventListener('play', handlePlay);
@@ -108,9 +139,14 @@ export function useVideoPlayer() {
         video.addEventListener('canplay', handleCanPlay);
         video.addEventListener('error', handleError);
         video.addEventListener('progress', handleProgress);
+
+        // Use only standard fullscreenchange to prevent duplicate events
         document.addEventListener('fullscreenchange', handleFullscreenChange);
 
         return () => {
+            if (fullscreenChangeTimeout) {
+                clearTimeout(fullscreenChangeTimeout);
+            }
             video.removeEventListener('play', handlePlay);
             video.removeEventListener('pause', handlePause);
             video.removeEventListener('timeupdate', handleTimeUpdate);
