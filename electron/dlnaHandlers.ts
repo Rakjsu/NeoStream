@@ -51,7 +51,7 @@ export function setupDLNAHandlers() {
 
                     // Filter for Media Renderers (TVs, speakers, etc.)
                     const deviceType = device.deviceType || device.type || '';
-                    const hasRenderer = deviceType.includes('MediaRenderer') || device Type.includes('MediaServer');
+                    const hasRenderer = deviceType.includes('MediaRenderer') || deviceType.includes('MediaServer');
                     const hasFriendlyName = !!device.friendlyName;
 
                     if (hasRenderer || hasFriendlyName) {
