@@ -26,8 +26,13 @@ export function Sidebar() {
     ];
 
     const handleLogout = async () => {
-        await window.ipcRenderer.invoke('auth:logout');
+        // Clear all local storage data
         localStorage.clear();
+        // Clear profile data
+        profileService.clearActiveProfile();
+        // Logout via IPC
+        await window.ipcRenderer.invoke('auth:logout');
+        // Navigate to welcome
         navigate('/welcome');
     };
 
