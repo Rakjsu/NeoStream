@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { setupIpcHandlers } from './ipcHandlers'
+import { setupDLNAHandlers } from './dlnaHandlers'
 import { initializeAutoUpdater } from './autoUpdater'
 
 // ES module equivalent of __dirname
@@ -20,6 +21,7 @@ app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors')
 app.commandLine.appendSwitch('ignore-certificate-errors')
 
 setupIpcHandlers()
+setupDLNAHandlers()
 
 process.env.DIST = path.join(__dirname, '../dist')
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public')
