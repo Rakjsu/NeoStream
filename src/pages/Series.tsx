@@ -7,6 +7,7 @@ import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { ContinueWatching } from '../components/ContinueWatching';
 import { ResumeModal } from '../components/ResumeModal';
+import { ProgressBar } from '../components/ProgressBar';
 
 interface Series {
     num: number;
@@ -586,36 +587,14 @@ export function Series() {
                                         </div>
                                         <div style={{ position: 'relative', background: 'linear-gradient(to top, #111827, rgba(31, 41, 55, 0.95), rgba(31, 41, 55, 0.8))', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px', paddingLeft: '12px', paddingRight: '12px', paddingTop: '12px', paddingBottom: '12px' }}>
                                             <h3 className="text-white text-sm font-semibold truncate group-hover:text-blue-400 transition-colors">{s.name}</h3>
-                                            {(() => {
-                                                const seriesProgress = watchProgressService.getSeriesProgress(String(s.series_id), s.name);
-                                                if (!seriesProgress) return null;
-
-                                                // Simple progress indicator based on whether series has any watch history
-                                                const isCompleted = watchProgressService.isSeriesCompleted(String(s.series_id));
-                                                const progressColor = isCompleted ? '#10b981' : '#3b82f6';
-
-                                                return (
-                                                    <div style={{
-                                                        position: 'absolute',
-                                                        bottom: 0,
-                                                        left: 0,
-                                                        right: 0,
-                                                        height: '4px',
-                                                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                                                        borderBottomLeftRadius: '16px',
-                                                        borderBottomRightRadius: '16px',
-                                                        overflow: 'hidden'
-                                                    }}>
-                                                        <div style={{
-                                                            height: '100%',
-                                                            width: '100%',
-                                                            backgroundColor: progressColor,
-                                                            boxShadow: `0 0 8px ${progressColor}`,
-                                                            transition: 'width 0.3s ease'
-                                                        }} />
-                                                    </div>
-                                                );
-                                            })()}
+                                            <ProgressBar
+                                                progress={(() => {
+                                                    const seriesProgress = watchProgressService.getSeriesProgress(String(s.series_id), s.name);
+                                                    if (!seriesProgress) return 0;
+                                                    return 100; // Simple indicator: has progress = 100%
+                                                })()}
+                                                completed={watchProgressService.isSeriesCompleted(String(s.series_id))}
+                                            />
                                         </div>
                                     </div>
                                 </div>
