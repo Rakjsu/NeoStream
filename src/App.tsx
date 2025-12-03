@@ -18,6 +18,9 @@ function App() {
   const [profileSelected, setProfileSelected] = useState(false);
 
   useEffect(() => {
+    // Force refresh content by clearing cache timestamp
+    localStorage.removeItem('contentLastFetch');
+
     // Initialize profile service (migrate old data if needed)
     profileService.initialize();
 

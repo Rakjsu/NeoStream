@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaCompress, FaCog, FaSpinner } from 'react-icons/fa';
+import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaCompress, FaCog, FaSpinner, FaChromecast } from 'react-icons/fa';
 import { useVideoPlayer } from '../../hooks/useVideoPlayer';
 import { useHls } from '../../hooks/useHls';
 import { formatTime, percentage } from '../../utils/videoHelpers';
@@ -350,6 +350,14 @@ export function VideoPlayer({
                                 )}
                             </>
                         )}
+
+                        <button
+                            className="control-btn"
+                            onClick={() => alert('Chromecast feature coming soon! 📺')}
+                            title="Cast to Chromecast"
+                        >
+                            <FaChromecast />
+                        </button>
 
                         <button className="control-btn" onClick={() => {
                             if (!document.fullscreenElement) {
