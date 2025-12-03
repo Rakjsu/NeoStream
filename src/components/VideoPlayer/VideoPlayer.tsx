@@ -359,18 +359,11 @@ export function VideoPlayer({
 
                         <button
                             className="control-btn"
-                            onClick={() => {
-                                if (chromecast.isCasting) {
-                                    chromecast.stopCasting();
-                                } else {
-                                    chromecast.setCurrentTime(state.currentTime);
-                                    chromecast.startCasting();
-                                }
-                            }}
-                            title={chromecast.isCasting ? "Parar casting" : "Cast to Chromecast"}
+                            onClick={() => setShowDeviceSelector(true)}
+                            title="Cast to Device"
                             style={{
                                 color: chromecast.isCasting ? '#2563eb' : 'white',
-                                opacity: chromecast.isAvailable ? 1 : 0.5
+                                opacity: 1
                             }}
                         >
                             <FaChromecast />
