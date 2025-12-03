@@ -3,6 +3,7 @@ import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaCompress, FaCog,
 import { useVideoPlayer } from '../../hooks/useVideoPlayer';
 import { useHls } from '../../hooks/useHls';
 import { useChromecast } from '../../hooks/useChromecast';
+import { CastDeviceSelector } from '../CastDeviceSelector';
 import { formatTime, percentage } from '../../utils/videoHelpers';
 import './VideoPlayer.css';
 
@@ -43,6 +44,7 @@ export function VideoPlayer({
     const [seeking, setSeeking] = useState(false);
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
+    const [showDeviceSelector, setShowDeviceSelector] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
     const hideControlsTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>();
@@ -386,6 +388,24 @@ export function VideoPlayer({
                     </div>
                 </div>
             </div>
+
+            {/* Device Selector Modal */}
+            {showDeviceSelector && (
+                <CastDeviceSelector
+                    videoUrl={src}
+                    videoTitle={title || 'Video'}
+                    onClose={() => setShowDeviceSelector(false)}
+                    onDeviceSelected={(device) => {
+                        console.log('Selected device:', device);
+                    }}
+                    chromecastAvailable={chromecast.isAvailable}
+                    chromecastCasting={chromecast.isCasting}
+                    onChromecastCast={() => {
+                        chromecast.setCurrentTime(state.currentTime);
+                        chromecast.startCasting();
+                    }}
+                />
+            )}
         </div>
     );
 }
