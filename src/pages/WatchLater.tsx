@@ -21,11 +21,14 @@ export function WatchLater() {
 
     const handleItemClick = (item: WatchLaterItem) => {
         if (item.type === 'series') {
-            navigate('/series');
+            // Navigate to series page with the series ID
+            navigate('/dashboard/series', { state: { scrollToSeries: item.id } });
         } else {
-            navigate('/vod');
+            // Navigate to VOD page with the movie ID
+            navigate('/dashboard/vod', { state: { scrollToMovie: item.id } });
         }
     };
+
 
     if (items.length === 0) {
         return (

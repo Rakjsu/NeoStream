@@ -19,6 +19,9 @@ export function AnimatedSearchBar({ value, onChange, placeholder = "Buscar..." }
     const handleToggle = () => {
         if (isExpanded && value === '') {
             setIsExpanded(false);
+        } else if (isExpanded && value !== '') {
+            // Clear search when clicking X
+            onChange('');
         } else {
             setIsExpanded(true);
         }
