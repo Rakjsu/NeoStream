@@ -35,33 +35,40 @@ export function setupDLNAHandlers() {
             // Discover UPnP/DLNA devices
             const devices = await new Promise((resolve) => {
                 const foundDevices: any[] = [];
+
+                // node-upnp is a constructor, not factory
+                const client = new upnp();
+
                 const timeout = setTimeout(() => {
                     console.log(`[DLNA] Discovery complete. Found ${foundDevices.length} devices`);
+                    if (client.destroy) client.destroy();
                     resolve(foundDevices);
                 }, 5000); // 5 second discovery timeout
 
-                const client = upnp.createClient();
-
                 client.on('device', (device: any) => {
-                    // Filter for Media Renderers (TVs, speakers, etc.)
-                    if (device.deviceType &&
-                        (device.deviceType.includes('MediaRenderer') ||
-                            device.deviceType.includes('MediaServer'))) {
+                    // Log ALL devices for debugging
+                    console.log('[DLNA] Device detected:', device);
 
-                        console.log('[DLNA] Found device:', {
-                            name: device.friendlyName,
-                            type: device.deviceType,
+                    // Filter for Media Renderers (TVs, speakers, etc.)
+                    const deviceType = device.deviceType || device.type || '';
+                    const hasRenderer = deviceType.includes('MediaRenderer') || device Type.includes('MediaServer');
+                    const hasFriendlyName = !!device.friendlyName;
+
+                    if (hasRenderer || hasFriendlyName) {
+                        console.log('[DLNA] Found compatible device:', {
+                            name: device.friendlyName || device.name,
+                            type: deviceType,
                             manufacturer: device.manufacturer
                         });
 
                         foundDevices.push({
-                            id: device.UDN || `dlna-${device.friendlyName}`,
-                            name: device.friendlyName || 'Unknown Device',
+                            id: device.UDN || device.usn || `dlna-${device.friendlyName}`,
+                            name: device.friendlyName || device.name || 'Unknown Device',
                             host: device.location ? new URL(device.location).hostname : '',
                             port: device.location ? new URL(device.location).port || 1900 : 1900,
-                            type: device.deviceType,
+                            type: deviceType,
                             manufacturer: device.manufacturer,
-                            model: device.modelName,
+                            model: device.modelName || device.model,
                             device: device // Store full device object
                         });
                     }
@@ -72,6 +79,7 @@ export function setupDLNAHandlers() {
                 });
 
                 // Start discovery
+                console.log('[DLNA] Searching for devices...');
                 client.search('ssdp:all');
             });
 
