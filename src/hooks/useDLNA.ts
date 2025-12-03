@@ -1,7 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
-
-// Note: node-upnp works in Node.js backend, not browser
-// For Electron, we'll need IPC communication
+import { useState, useCallback, useEffect } from 'react';
 
 export interface DLNADevice {
     id: string;
@@ -17,35 +14,51 @@ export function useDLNA(videoUrl: string, videoTitle: string) {
     const [isCasting, setIsCasting] = useState(false);
     const [currentDevice, setCurrentDevice] = useState<DLNADevice | null>(null);
 
-    // Discover DLNA devices via IPC
-    const discoverDevices = useCallback(async () => {
+    // Load saved devices
+    const loadDevices = useCallback(async () => {
         try {
-            // Request device discovery from main process
-            const result = await window.ipcRenderer.invoke('dlna:discover');
+            const result = await window.ipcRenderer.invoke('dlna:get-devices');
             if (result.success) {
                 const dlnaDevices: DLNADevice[] = result.devices.map((d: any) => ({
-                    id: d.id || `dlna-${d.name}`,
+                    id: d.id,
                     name: d.name,
                     type: 'dlna' as const,
                     host: d.host,
-                    port: d.port || 1900,
+                    port: d.port,
                     available: true
                 }));
                 setDevices(dlnaDevices);
             }
         } catch (error) {
-            console.error('❌ DLNA discovery error:', error);
+            console.error('❌ DLNA load error:', error);
         }
     }, []);
 
-    // Start discovery on mount
-    useEffect(() => {
-        discoverDevices();
+    // Add manual device
+    const addDevice = async (name: string, ip: string, port: number = 8080) => {
+        try {
+            const result = await window.ipcRenderer.invoke('dlna:add-device', {
+                name,
+                ip,
+                port
+            });
 
-        // Refresh every 30 seconds
-        const interval = setInterval(discoverDevices, 30000);
-        return () => clearInterval(interval);
-    }, [discoverDevices]);
+            if (result.success) {
+                console.log('✅ Device added:', result.device);
+                await loadDevices();
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error('❌ DLNA add device error:', error);
+            return false;
+        }
+    };
+
+    // Load devices on mount
+    useEffect(() => {
+        loadDevices();
+    }, [loadDevices]);
 
     const castToDevice = async (device: DLNADevice) => {
         try {
@@ -59,9 +72,12 @@ export function useDLNA(videoUrl: string, videoTitle: string) {
                 setIsCasting(true);
                 setCurrentDevice(device);
                 console.log('✅ Casting to DLNA device:', device.name);
+            } else {
+                alert(`Erro ao transmitir: ${result.error}`);
             }
         } catch (error) {
             console.error('❌ DLNA cast error:', error);
+            alert('Erro ao transmitir para o dispositivo');
         }
     };
 
@@ -79,12 +95,19 @@ export function useDLNA(videoUrl: string, videoTitle: string) {
         }
     };
 
+    // Dummy discover function for compatibility
+    const discoverDevices = async () => {
+        await loadDevices();
+    };
+
     return {
         devices,
         isCasting,
         currentDevice,
         discoverDevices,
         castToDevice,
-        stopCasting
+        stopCasting,
+        addDevice,
+        loadDevices
     };
 }
