@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaCompress, FaCog, FaSpinner, FaChromecast } from 'react-icons/fa';
 import { useVideoPlayer } from '../../hooks/useVideoPlayer';
 import { useHls } from '../../hooks/useHls';
+import { useChromecast } from '../../hooks/useChromecast';
 import { formatTime, percentage } from '../../utils/videoHelpers';
 import './VideoPlayer.css';
 
@@ -34,6 +35,9 @@ export function VideoPlayer({
 }: VideoPlayerProps) {
     const { videoRef, state, controls } = useVideoPlayer();
     useHls({ src, videoRef });
+
+    // Chromecast integration
+    const chromecast = useChromecast(src, title || 'Video');
 
     const [showControls, setShowControls] = useState(true);
     const [seeking, setSeeking] = useState(false);
@@ -353,8 +357,19 @@ export function VideoPlayer({
 
                         <button
                             className="control-btn"
-                            onClick={() => alert('Chromecast feature coming soon! 📺')}
-                            title="Cast to Chromecast"
+                            onClick={() => {
+                                if (chromecast.isCasting) {
+                                    chromecast.stopCasting();
+                                } else {
+                                    chromecast.setCurrentTime(state.currentTime);
+                                    chromecast.startCasting();
+                                }
+                            }}
+                            title={chromecast.isCasting ? "Parar casting" : "Cast to Chromecast"}
+                            style={{
+                                color: chromecast.isCasting ? '#2563eb' : 'white',
+                                opacity: chromecast.isAvailable ? 1 : 0.5
+                            }}
                         >
                             <FaChromecast />
                         </button>
