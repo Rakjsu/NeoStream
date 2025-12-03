@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FaTv, FaChromecast, FaApple, FaTimes, FaSync } from 'react-icons/fa';
 import { useDLNA, type DLNADevice } from '../hooks/useDLNA';
+import { useAirPlay, type AirPlayDevice } from '../hooks/useAirPlay';
 
 export interface CastDevice {
     id: string;
@@ -30,6 +31,7 @@ export function CastDeviceSelector({
     onChromecastCast
 }: CastDeviceSelectorProps) {
     const dlna = useDLNA(videoUrl, videoTitle);
+    const airplay = useAirPlay(videoUrl, videoTitle);
     const [allDevices, setAllDevices] = useState<CastDevice[]>([]);
 
     // Combine all devices from different protocols
@@ -58,8 +60,19 @@ export function CastDeviceSelector({
             });
         });
 
+        // Add AirPlay devices
+        airplay.devices.forEach(device => {
+            devices.push({
+                id: device.id,
+                name: device.name,
+                type: 'airplay',
+                available: device.available,
+                cast: () => airplay.castToDevice(device)
+            });
+        });
+
         setAllDevices(devices);
-    }, [chromecastAvailable, chromecastCasting, dlna.devices, onChromecastCast]);
+    }, [chromecastAvailable, chromecastCasting, dlna.devices, airplay.devices, onChromecastCast]);
 
     const getDeviceIcon = (type: string) => {
         switch (type) {
@@ -126,7 +139,10 @@ export function CastDeviceSelector({
                     </h2>
                     <div style={{ display: 'flex', gap: '12px' }}>
                         <button
-                            onClick={dlna.discoverDevices}
+                            onClick={() => {
+                                dlna.discoverDevices();
+                                airplay.discoverDevices();
+                            }}
                             style={{
                                 background: 'rgba(37, 99, 235, 0.2)',
                                 border: '1px solid rgba(37, 99, 235, 0.3)',
