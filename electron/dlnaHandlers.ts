@@ -2,6 +2,10 @@
 // Full implementation with node-upnp
 
 import { ipcMain } from 'electron';
+import { createRequire } from 'module';
+
+// Create require for CommonJS modules in ES module context
+const require = createRequire(import.meta.url);
 
 let upnp: any = null;
 let discoveredDevices: any[] = [];
