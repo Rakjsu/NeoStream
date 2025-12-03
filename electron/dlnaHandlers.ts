@@ -1,5 +1,5 @@
 // DLNA/UPnP IPC Handlers for Electron Main Process
-// Full implementation with node-upnp
+// Using peer-ssdp for better device discovery
 
 import { ipcMain } from 'electron';
 import { createRequire } from 'module';
@@ -7,95 +7,126 @@ import { createRequire } from 'module';
 // Create require for CommonJS modules in ES module context
 const require = createRequire(import.meta.url);
 
-let upnp: any = null;
+let ssdp: any = null;
 let discoveredDevices: any[] = [];
 
-// Initialize node-upnp
+// Initialize peer-ssdp
 try {
-    upnp = require('node-upnp');
-    console.log('[DLNA] node-upnp loaded successfully');
+    const { Peer } = require('peer-ssdp');
+    ssdp = new Peer();
+    console.log('[DLNA] peer-ssdp loaded successfully');
+
+    // Start listening for devices
+    ssdp.on('found', (device: any) => {
+        console.log('[DLNA] Device found via SSDP:', {
+            name: device.headers?.SERVER || device.headers?.['X-User-Agent'] || 'Unknown',
+            location: device.headers?.LOCATION,
+            usn: device.headers?.USN
+        });
+    });
+
+    ssdp.start();
 } catch (error) {
-    console.error('[DLNA] Failed to load node-upnp:', error);
+    console.error('[DLNA] Failed to load peer-ssdp:', error);
 }
 
 export function setupDLNAHandlers() {
     // Discover DLNA devices on network
     ipcMain.handle('dlna:discover', async () => {
         try {
-            console.log('[DLNA] Starting device discovery...');
+            console.log('[DLNA] Starting device discovery with peer-ssdp...');
 
-            if (!upnp) {
-                console.warn('[DLNA] node-upnp not available');
+            if (!ssdp) {
+                console.warn('[DLNA] SSDP not available');
                 return {
                     success: true,
                     devices: []
                 };
             }
 
-            // Discover UPnP/DLNA devices
-            const devices = await new Promise((resolve) => {
+            // Clear previous devices
+            discoveredDevices = [];
+
+            // Search for UPnP devices
+            return new Promise((resolve) => {
                 const foundDevices: any[] = [];
 
-                // node-upnp is a constructor, not factory
-                const client = new upnp();
+                const deviceListener = (headers: any, address: any) => {
+                    console.log('[DLNA] Device discovered:', {
+                        headers,
+                        address
+                    });
 
-                const timeout = setTimeout(() => {
-                    console.log(`[DLNA] Discovery complete. Found ${foundDevices.length} devices`);
-                    if (client.destroy) client.destroy();
-                    resolve(foundDevices);
-                }, 5000); // 5 second discovery timeout
+                    const location = headers.LOCATION || headers.location;
+                    if (!location) return;
 
-                client.on('device', (device: any) => {
-                    // Log ALL devices for debugging
-                    console.log('[DLNA] Device detected:', device);
+                    const name = headers.SERVER || headers['X-User-Agent'] || headers.server || 'Unknown Device';
+                    const usn = headers.USN || headers.usn;
 
-                    // Filter for Media Renderers (TVs, speakers, etc.)
-                    const deviceType = device.deviceType || device.type || '';
-                    const hasRenderer = deviceType.includes('MediaRenderer') || deviceType.includes('MediaServer');
-                    const hasFriendlyName = !!device.friendlyName;
+                    // Check if it's a media device
+                    const st = headers.ST || headers.st || '';
+                    const isMediaDevice = st.includes('MediaRenderer') ||
+                        st.includes('MediaServer') ||
+                        name.toLowerCase().includes('samsung') ||
+                        name.toLowerCase().includes('tv');
 
-                    if (hasRenderer || hasFriendlyName) {
+                    if (isMediaDevice || location) {
                         console.log('[DLNA] Found compatible device:', {
-                            name: device.friendlyName || device.name,
-                            type: deviceType,
-                            manufacturer: device.manufacturer
+                            name,
+                            location,
+                            type: st
                         });
 
-                        foundDevices.push({
-                            id: device.UDN || device.usn || `dlna-${device.friendlyName}`,
-                            name: device.friendlyName || device.name || 'Unknown Device',
-                            host: device.location ? new URL(device.location).hostname : '',
-                            port: device.location ? new URL(device.location).port || 1900 : 1900,
-                            type: deviceType,
-                            manufacturer: device.manufacturer,
-                            model: device.modelName || device.model,
-                            device: device // Store full device object
-                        });
+                        const device = {
+                            id: usn || `dlna-${Date.now()}`,
+                            name: name,
+                            host: location ? new URL(location).hostname : address.address,
+                            port: location ? new URL(location).port || 1900 : 1900,
+                            location: location,
+                            type: st,
+                            headers: headers
+                        };
+
+                        // Avoid duplicates
+                        if (!foundDevices.find(d => d.id === device.id)) {
+                            foundDevices.push(device);
+                        }
                     }
+                };
+
+                ssdp.on('found', deviceListener);
+
+                // Search for all SSDP devices
+                console.log('[DLNA] Searching for ssdp:all...');
+                ssdp.search({
+                    ST: 'ssdp:all'
                 });
 
-                client.on('error', (err: any) => {
-                    console.error('[DLNA] Discovery error:', err);
-                });
+                // Also search specifically for media renderers
+                setTimeout(() => {
+                    console.log('[DLNA] Searching for MediaRenderer...');
+                    ssdp.search({
+                        ST: 'urn:schemas-upnp-org:device:MediaRenderer:1'
+                    });
+                }, 1000);
 
-                // Start discovery
-                console.log('[DLNA] Searching for devices...');
-                client.search('ssdp:all');
+                // Complete after 6 seconds
+                setTimeout(() => {
+                    ssdp.removeListener('found', deviceListener);
+                    discoveredDevices = foundDevices;
+                    console.log(`[DLNA] Discovery complete. Found ${foundDevices.length} devices`);
+
+                    resolve({
+                        success: true,
+                        devices: foundDevices.map(d => ({
+                            id: d.id,
+                            name: d.name,
+                            host: d.host,
+                            port: d.port
+                        }))
+                    });
+                }, 6000);
             });
-
-            discoveredDevices = devices as any[];
-
-            return {
-                success: true,
-                devices: discoveredDevices.map(d => ({
-                    id: d.id,
-                    name: d.name,
-                    host: d.host,
-                    port: d.port,
-                    manufacturer: d.manufacturer,
-                    model: d.model
-                }))
-            };
         } catch (error: any) {
             console.error('[DLNA] Discovery error:', error);
             return {
@@ -111,10 +142,6 @@ export function setupDLNAHandlers() {
         try {
             console.log('[DLNA] Cast requested:', { deviceId, title });
 
-            if (!upnp) {
-                throw new Error('DLNA not available');
-            }
-
             const device = discoveredDevices.find(d => d.id === deviceId);
             if (!device) {
                 throw new Error('Device not found');
@@ -122,7 +149,7 @@ export function setupDLNAHandlers() {
 
             // Create media renderer client
             const MediaRendererClient = require('upnp-mediarenderer-client');
-            const client = new MediaRendererClient(device.device.location);
+            const client = new MediaRendererClient(device.location);
 
             // Load media
             const options = {
@@ -164,17 +191,13 @@ export function setupDLNAHandlers() {
         try {
             console.log('[DLNA] Stop requested:', deviceId);
 
-            if (!upnp) {
-                throw new Error('DLNA not available');
-            }
-
             const device = discoveredDevices.find(d => d.id === deviceId);
             if (!device) {
                 throw new Error('Device not found');
             }
 
             const MediaRendererClient = require('upnp-mediarenderer-client');
-            const client = new MediaRendererClient(device.device.location);
+            const client = new MediaRendererClient(device.location);
 
             await new Promise((resolve, reject) => {
                 client.stop((err: any) => {
@@ -200,5 +223,5 @@ export function setupDLNAHandlers() {
         }
     });
 
-    console.log('[DLNA] IPC Handlers initialized with node-upnp');
+    console.log('[DLNA] IPC Handlers initialized with peer-ssdp');
 }
