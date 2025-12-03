@@ -103,8 +103,8 @@ export function Login() {
         e.preventDefault();
         localStorage.setItem('playlistName', playlistName || 'Minha Playlist');
 
-        // Force reload to reinitialize app with new auth state
-        window.location.href = '/dashboard';
+        // Redirect to profile creation instead of dashboard
+        navigate('/profile-selector');
     };
 
     const handleBack = () => {

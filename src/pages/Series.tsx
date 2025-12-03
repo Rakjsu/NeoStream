@@ -25,7 +25,7 @@ interface Series {
     backdrop_path: string[];
     youtube_trailer: string;
     episode_run_time: string;
-    category_id: string;
+    category_id: string | string[]; // Support both single and multiple categories
     tmdb_id: string;
 }
 
@@ -57,6 +57,9 @@ export function Series() {
         duration: number;
     } | null>(null);
 
+    // Clear history confirmation
+    const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false);
+
     useEffect(() => { fetchSeries(); }, []);
 
     const fetchSeries = async () => {
@@ -76,6 +79,25 @@ export function Series() {
         }
     };
 
+    // Helper function to calculate series progress
+    const calculateSeriesProgress = (seriesId: string): { percentage: number; hasProgress: boolean } => {
+        const progressData = watchProgressService.getSeriesProgress(String(seriesId), '');
+        if (!progressData || !seriesInfo || seriesId !== String(selectedSeries?.series_id)) {
+            return { percentage: 0, hasProgress: false };
+        }
+
+        // Count total episodes available for the series
+        const totalEpisodes = seriesInfo?.episodes
+            ? Object.values(seriesInfo.episodes).reduce((sum: number, eps: any) => sum + eps.length, 0)
+            : 0;
+
+        if (totalEpisodes === 0) return { percentage: 0, hasProgress: false };
+
+        // Episode count is number of episodes watched
+        const percentage = Math.min(100, Math.round((progressData.episodeCount / totalEpisodes) * 100));
+        return { percentage, hasProgress: true };
+    };
+
     const filteredSeries = series.filter(s => {
         const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -90,7 +112,9 @@ export function Series() {
             return matchesSearch && watchProgressService.isSeriesCompleted(String(s.series_id));
         }
 
-        const matchesCategory = !selectedCategory || selectedCategory === '' || s.category_id === selectedCategory;
+        // Support both single category_id (string) and multiple categories (array)
+        const categories = Array.isArray(s.category_id) ? s.category_id : [s.category_id];
+        const matchesCategory = !selectedCategory || selectedCategory === '' || categories.includes(selectedCategory);
         return matchesSearch && matchesCategory;
     });
 
@@ -495,6 +519,36 @@ export function Series() {
                                         </span>
                                         {watchLaterService.has(String(selectedSeries.series_id), 'series') ? 'Salvo' : 'Assistir Depois'}
                                     </button>
+
+                                    {/* Clear History Button - Only show if series has watch history */}
+                                    {watchProgressService.getSeriesProgress(String(selectedSeries.series_id), selectedSeries.name) && (
+                                        <button
+                                            onClick={() => setShowClearHistoryConfirm(true)}
+                                            style={{
+                                                padding: '14px 32px',
+                                                backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                                                color: '#ef4444',
+                                                fontSize: '16px',
+                                                fontWeight: '700',
+                                                borderRadius: '8px',
+                                                border: '2px solid rgba(239, 68, 68, 0.5)',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '10px',
+                                                transition: 'all 0.2s'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.3)';
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
+                                            }}
+                                        >
+                                            <span style={{ fontSize: '20px' }}>🗑️</span>
+                                            Limpar Histórico
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -530,8 +584,38 @@ export function Series() {
                                                 <div className="w-full h-full flex items-center justify-center bg-gray-700" style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}><span className="text-5xl">📺</span></div>
                                             )}
                                         </div>
-                                        <div style={{ background: 'linear-gradient(to top, #111827, rgba(31, 41, 55, 0.95), rgba(31, 41, 55, 0.8))', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px', paddingLeft: '12px', paddingRight: '12px', paddingTop: '12px', paddingBottom: '12px' }}>
+                                        <div style={{ position: 'relative', background: 'linear-gradient(to top, #111827, rgba(31, 41, 55, 0.95), rgba(31, 41, 55, 0.8))', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px', paddingLeft: '12px', paddingRight: '12px', paddingTop: '12px', paddingBottom: '12px' }}>
                                             <h3 className="text-white text-sm font-semibold truncate group-hover:text-blue-400 transition-colors">{s.name}</h3>
+                                            {(() => {
+                                                const seriesProgress = watchProgressService.getSeriesProgress(String(s.series_id), s.name);
+                                                if (!seriesProgress) return null;
+
+                                                // Simple progress indicator based on whether series has any watch history
+                                                const isCompleted = watchProgressService.isSeriesCompleted(String(s.series_id));
+                                                const progressColor = isCompleted ? '#10b981' : '#3b82f6';
+
+                                                return (
+                                                    <div style={{
+                                                        position: 'absolute',
+                                                        bottom: 0,
+                                                        left: 0,
+                                                        right: 0,
+                                                        height: '4px',
+                                                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                                        borderBottomLeftRadius: '16px',
+                                                        borderBottomRightRadius: '16px',
+                                                        overflow: 'hidden'
+                                                    }}>
+                                                        <div style={{
+                                                            height: '100%',
+                                                            width: '100%',
+                                                            backgroundColor: progressColor,
+                                                            boxShadow: `0 0 8px ${progressColor}`,
+                                                            transition: 'width 0.3s ease'
+                                                        }} />
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
                                 </div>
@@ -623,6 +707,80 @@ export function Series() {
                         setResumeModalData(null);
                     }}
                 />
+            )}
+
+            {/* Clear History Confirmation Modal */}
+            {showClearHistoryConfirm && selectedSeries && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 9999
+                }}>
+                    <div style={{
+                        backgroundColor: '#1f2937',
+                        borderRadius: '16px',
+                        padding: '32px',
+                        maxWidth: '500px',
+                        width: '90%',
+                        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
+                    }}>
+                        <h2 style={{ color: 'white', fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>
+                            Limpar Histórico?
+                        </h2>
+                        <p style={{ color: '#9ca3af', marginBottom: '24px', lineHeight: '1.6' }}>
+                            Tem certeza que deseja limpar todo o histórico de visualização de <strong style={{ color: 'white' }}>{selectedSeries.name}</strong>? Esta ação não pode ser desfeita.
+                        </p>
+                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                            <button
+                                onClick={() => setShowClearHistoryConfirm(false)}
+                                style={{
+                                    padding: '12px 24px',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    fontSize: '16px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'}
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => {
+                                    watchProgressService.clearSeriesProgress(String(selectedSeries.series_id));
+                                    setShowClearHistoryConfirm(false);
+                                    setRefresh(r => r + 1); // Force re-render to update UI
+                                }}
+                                style={{
+                                    padding: '12px 24px',
+                                    backgroundColor: '#ef4444',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '8px',
+                                    fontSize: '16px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ef4444'}
+                            >
+                                Limpar Histórico
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </>
     );
