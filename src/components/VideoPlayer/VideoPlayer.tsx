@@ -182,40 +182,9 @@ export function VideoPlayer({
                 <button className="video-player-close" onClick={onClose}>✕</button>
             )}
 
+
             {title && showControls && (
                 <div className="video-player-title">{title}</div>
-            )}
-
-            {/* Skip Intro Button - Show during first 90 seconds */}
-            {state.currentTime < 90 && state.currentTime > 0 && showControls && (
-                <button
-                    onClick={() => controls.seek(90)}
-                    style={{
-                        position: 'absolute',
-                        bottom: '100px',
-                        right: '20px',
-                        zIndex: 85,
-                        padding: '12px 20px',
-                        backgroundColor: 'rgba(37, 99, 235, 0.95)',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '15px',
-                        fontWeight: '600',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5)',
-                        backdropFilter: 'blur(10px)',
-                        transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
-                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                >
-                    <img src="/skip-intro-icon.png" alt="Skip" style={{ width: '20px', height: '20px' }} />
-                    Pular Abertura
-                </button>
             )}
 
             <div
