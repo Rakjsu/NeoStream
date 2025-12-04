@@ -113,4 +113,16 @@ export class XtreamClient {
     async getSeries() {
         return this.makeRequest('get_series')
     }
+
+    async getLiveCategories() {
+        return this.makeRequest('get_live_categories')
+    }
+
+    async getVodCategories() {
+        return this.makeRequest('get_vod_categories')
+    }
+
+    async getSeriesCategories() {
+        return this.makeRequest('get_series_categories')
+    }
 }
