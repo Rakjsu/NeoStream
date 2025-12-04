@@ -213,17 +213,18 @@ export const epgService = {
     parseMeuGuiaHTML(html: string, channelId: string): EPGProgram[] {
         const programs: EPGProgram[] = [];
 
-        // Try multiple regex patterns for different HTML structures
-        // Pattern 1: Look for time and title in program divs
+        // Log a sample of HTML for debugging
+        console.log('[EPG] HTML sample:', html.substring(0, 500));
+
+        // meuguia.tv structure: time is in format HH:MM followed by program title
+        // Try to extract programs using various patterns
         const patterns = [
-            // Pattern for list items with time and title
-            /<li[^>]*>[\s\S]*?(\d{1,2}:\d{2})[\s\S]*?<[^>]*title[^>]*>([^<]+)/gi,
-            // Pattern for divs with time class and title
-            /<div[^>]*time[^>]*>[\s\S]*?(\d{1,2}:\d{2})[\s\S]*?<[^>]*>([^<]{3,})</gi,
-            // Pattern for spans with time and following title
-            /<span[^>]*>(\d{1,2}:\d{2})<\/span>[\s\S]*?<[^>]*>([^<]{3,})</gi,
-            // Pattern for anchor tags with time and title
-            /(\d{1,2}:\d{2})[\s\n\t]*([^\n<]{3,})/gi,
+            // Pattern: time followed by title on next lines
+            /(\d{1,2}:\d{2})\s*\n\s*\n\s*([^\n<]+)/g,
+            // Pattern: href with time and title
+            /\[(\d{1,2}:\d{2})\s*\n\s*([^\n\]]+)/g,
+            // Pattern: just time:title
+            /(\d{1,2}:\d{2})\s+([A-Za-zÀ-ú][^\n<]{2,50})/g,
         ];
 
         const today = new Date();
