@@ -27,6 +27,7 @@ export function LiveTV() {
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [brokenImages, setBrokenImages] = useState<Set<number>>(new Set());
+    const [selectedChannel, setSelectedChannel] = useState<LiveStream | null>(null);
     const [playingChannel, setPlayingChannel] = useState<LiveStream | null>(null);
 
     useEffect(() => {
@@ -141,6 +142,125 @@ export function LiveTV() {
                 type="live"
             />
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflowY: 'auto', paddingTop: '40px' }}>
+                {selectedChannel && (
+                    <div style={{
+                        padding: '24px 60px 24px 60px',
+                        marginBottom: '24px',
+                        background: 'linear-gradient(to bottom, rgba(17, 24, 39, 0.95), rgba(31, 41, 55, 0.9))',
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                        <div style={{ display: 'flex', gap: '32px', maxWidth: '1400px' }}>
+                            {/* Preview Player - Left Side */}
+                            <div style={{ width: '500px', flexShrink: 0 }}>
+                                <div style={{
+                                    width: '100%',
+                                    aspectRatio: '16/9',
+                                    background: '#000',
+                                    borderRadius: '12px',
+                                    overflow: 'hidden',
+                                    position: 'relative'
+                                }}>
+                                    <video
+                                        autoPlay
+                                        muted
+                                        playsInline
+                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                        onLoadStart={async (e) => {
+                                            const url = await buildLiveStreamUrl(selectedChannel);
+                                            e.currentTarget.src = url;
+                                        }}
+                                    />
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '12px',
+                                        right: '12px',
+                                        background: 'rgba(239, 68, 68, 0.9)',
+                                        padding: '4px 12px',
+                                        borderRadius: '6px',
+                                        fontSize: '12px',
+                                        fontWeight: '600',
+                                        color: 'white',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.5px'
+                                    }}>
+                                        🔴 AO VIVO
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Channel Info - Right Side */}
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                <h2 style={{
+                                    fontSize: '36px',
+                                    fontWeight: 'bold',
+                                    color: 'white',
+                                    marginBottom: '16px',
+                                    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)'
+                                }}>
+                                    {selectedChannel.name}
+                                </h2>
+
+                                <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+                                    <button
+                                        onClick={() => {
+                                            setPlayingChannel(selectedChannel);
+                                            setSelectedChannel(null);
+                                        }}
+                                        style={{
+                                            padding: '16px 48px',
+                                            backgroundColor: '#2563eb',
+                                            color: 'white',
+                                            fontWeight: 'bold',
+                                            fontSize: '17px',
+                                            borderRadius: '8px',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            transition: 'all 0.2s',
+                                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#1d4ed8';
+                                            e.currentTarget.style.transform = 'scale(1.05)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#2563eb';
+                                            e.currentTarget.style.transform = 'scale(1)';
+                                        }}
+                                    >
+                                        ▶ Assistir Tela Cheia
+                                    </button>
+
+                                    <button
+                                        onClick={() => setSelectedChannel(null)}
+                                        style={{
+                                            padding: '16px 32px',
+                                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                            color: 'white',
+                                            fontWeight: 'bold',
+                                            fontSize: '17px',
+                                            borderRadius: '8px',
+                                            border: '2px solid rgba(255, 255, 255, 0.2)',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                                        }}
+                                    >
+                                        Fechar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <div className="p-8" style={{ paddingLeft: '60px' }}>
 
                     {filteredStreams.length === 0 ? (
