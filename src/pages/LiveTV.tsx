@@ -482,55 +482,56 @@ export function LiveTV() {
                                 </div>
                             </div>
                         </div>
-                )}
-
-                        <div className="p-8" style={{ paddingLeft: '60px' }}>
-
-                            {filteredStreams.length === 0 ? (
-                                <div className="text-center text-gray-400 py-12">
-                                    <p className="text-lg">Nenhum canal encontrado</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-px">
-                                    {filteredStreams.map((stream) => (
-                                        <div
-                                            key={stream.stream_id}
-                                            onClick={() => setSelectedChannel(stream)}
-                                            className="bg-gray-800 hover:bg-gray-700 py-1 px-2 border-b border-gray-700/50 last:border-b-0 transition-colors cursor-pointer group flex items-center gap-2"
-                                            style={{ borderLeft: selectedChannel?.stream_id === stream.stream_id ? '3px solid #3b82f6' : 'none' }}
-                                        >
-                                            <div className="w-[56px] h-[56px] bg-gray-700 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
-                                                {stream.stream_icon && !brokenImages.has(stream.stream_id) ? (
-                                                    <img
-                                                        src={stream.stream_icon}
-                                                        alt=""
-                                                        className="w-full h-full object-contain"
-                                                        onError={() => handleImageError(stream.stream_id)}
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full bg-blue-500/30"></div>
-                                                )}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-gray-300 font-normal text-xs leading-tight group-hover:text-white transition-colors truncate">
-                                                    {stream.name}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
                     </div>
-
-                    {playingChannel && (
-                    <AsyncVideoPlayer
-                        movie={playingChannel as any}
-                        buildStreamUrl={buildLiveStreamUrl}
-                        onClose={() => setPlayingChannel(null)}
-                        customTitle={playingChannel.name}
-                    />
                 )}
+
+                <div className="p-8" style={{ paddingLeft: '60px' }}>
+
+                    {filteredStreams.length === 0 ? (
+                        <div className="text-center text-gray-400 py-12">
+                            <p className="text-lg">Nenhum canal encontrado</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-px">
+                            {filteredStreams.map((stream) => (
+                                <div
+                                    key={stream.stream_id}
+                                    onClick={() => setSelectedChannel(stream)}
+                                    className="bg-gray-800 hover:bg-gray-700 py-1 px-2 border-b border-gray-700/50 last:border-b-0 transition-colors cursor-pointer group flex items-center gap-2"
+                                    style={{ borderLeft: selectedChannel?.stream_id === stream.stream_id ? '3px solid #3b82f6' : 'none' }}
+                                >
+                                    <div className="w-[56px] h-[56px] bg-gray-700 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
+                                        {stream.stream_icon && !brokenImages.has(stream.stream_id) ? (
+                                            <img
+                                                src={stream.stream_icon}
+                                                alt=""
+                                                className="w-full h-full object-contain"
+                                                onError={() => handleImageError(stream.stream_id)}
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full bg-blue-500/30"></div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-gray-300 font-normal text-xs leading-tight group-hover:text-white transition-colors truncate">
+                                            {stream.name}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
-            );
+
+            {playingChannel && (
+                <AsyncVideoPlayer
+                    movie={playingChannel as any}
+                    buildStreamUrl={buildLiveStreamUrl}
+                    onClose={() => setPlayingChannel(null)}
+                    customTitle={playingChannel.name}
+                />
+            )}
+        </div>
+    );
 }
