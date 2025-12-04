@@ -59,7 +59,7 @@ export function Sidebar() {
                 {/* Home Icon */}
                 <div style={{ padding: '0 0 16px 0', display: 'flex', justifyContent: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
                     <button
-                        onClick={() => navigate('/dashboard/live')}
+                        onClick={() => navigate('/dashboard/home')}
                         className="flex items-center justify-center transition-all duration-200 active:scale-90"
                         style={{
                             width: '48px',

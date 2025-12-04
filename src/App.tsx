@@ -2,6 +2,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Welcome } from './pages/Welcome';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
+import { Home } from './pages/Home';
 import { LiveTV } from './pages/LiveTV';
 import { VOD } from './pages/VOD';
 import { Series } from './pages/Series';
@@ -69,7 +70,8 @@ function App() {
           path="/dashboard"
           element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />}
         >
-          <Route index element={<Navigate to="live" replace />} />
+          <Route index element={<Navigate to="home" replace />} />
+          <Route path="home" element={<Home />} />
           <Route path="live" element={<LiveTV />} />
           <Route path="vod" element={<VOD />} />
           <Route path="series" element={<Series />} />
