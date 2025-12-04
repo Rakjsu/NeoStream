@@ -384,6 +384,7 @@ export function Series() {
                 <CategoryMenu
                     onSelectCategory={setSelectedCategory}
                     selectedCategory={selectedCategory}
+                    type="series"
                 />
                 <div style={{ position: 'relative', zIndex: 10, padding: '32px', height: '100%', display: 'flex', flexDirection: 'column' }}>
                     {selectedSeries && (
