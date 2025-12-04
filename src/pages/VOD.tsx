@@ -34,7 +34,7 @@ interface VODStream {
 export function VOD() {
     const [streams, setStreams] = useState<VODStream[]>([]);
     const [categories, setCategories] = useState<Array<{ category_id: string; category_name: string; parent_id: number }>>([]);
-    const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [selectedCategory, setSelectedCategory] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
@@ -332,7 +332,7 @@ export function VOD() {
                         {filteredStreams.length === 0 ? (
                             <div className="text-center text-gray-400 py-12"><p className="text-lg">Nenhum filme encontrado</p></div>
                         ) : (
-                            <div className="grid grid-cols-9 gap-[32px] px-[32px]">
+                            <div className="grid grid-cols-9 gap-[32px]" style={{ paddingLeft: '100px', paddingRight: '32px' }}>
                                 {filteredStreams.slice(0, visibleCount).map((stream) => (
                                     <div key={stream.stream_id} className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-95" onClick={() => setSelectedMovie(stream)}>
                                         <div className="relative overflow-hidden bg-gray-900 shadow-xl" style={{ borderRadius: '16px', border: selectedMovie?.stream_id === stream.stream_id ? '3px solid #3b82f6' : '3px solid transparent' }}>
