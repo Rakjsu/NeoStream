@@ -75,7 +75,6 @@ function App() {
           <Route path="vod" element={<VOD />} />
           <Route path="series" element={<Series />} />
           <Route path="watch-later" element={<WatchLater />} />
-          <Route path="category-analyzer" element={<CategoryAnalyzer />} />
           <Route path="settings" element={<Settings />} />
         </Route>
         <Route
