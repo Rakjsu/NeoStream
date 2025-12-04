@@ -523,7 +523,7 @@ export function LiveTV() {
                         </div>
                     </div>
 
-            {playingChannel && (
+                    {playingChannel && (
                     <AsyncVideoPlayer
                         movie={playingChannel as any}
                         buildStreamUrl={buildLiveStreamUrl}
