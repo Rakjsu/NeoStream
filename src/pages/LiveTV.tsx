@@ -39,6 +39,37 @@ export function LiveTV() {
         fetchCategories();
     }, []);
 
+    // Fetch EPG when channel is selected
+    useEffect(() => {
+        if (!selectedChannel || !selectedChannel.epg_channel_id) {
+            setEpgData([]);
+            setCurrentProgram(null);
+            setUpcomingPrograms([]);
+            return;
+        }
+
+        let intervalId: number;
+
+        const fetchEPG = async () => {
+            const programs = await epgService.fetchChannelEPG(selectedChannel.epg_channel_id);
+            setEpgData(programs);
+
+            const current = epgService.getCurrentProgram(programs);
+            setCurrentProgram(current);
+
+            const upcoming = epgService.getUpcomingPrograms(programs, 3);
+            setUpcomingPrograms(upcoming);
+        };
+
+        fetchEPG();
+        // Refresh EPG every 60 seconds
+        intervalId = setInterval(fetchEPG, 60000);
+
+        return () => {
+            if (intervalId) clearInterval(intervalId);
+        };
+    }, [selectedChannel]);
+
     const fetchStreams = async () => {
         setLoading(true);
         setError('');
