@@ -182,10 +182,32 @@ export function LiveTV() {
                                                 try {
                                                     const url = await buildLiveStreamUrl(selectedChannel);
                                                     console.log('Loading preview URL:', url);
-                                                    videoEl.src = url;
-                                                    await videoEl.load();
-                                                    await videoEl.play();
-                                                    console.log('Preview playing');
+
+                                                    // Use hls.js for HLS streams
+                                                    if (url.includes('.m3u8')) {
+                                                        const Hls = (window as any).Hls;
+                                                        if (Hls && Hls.isSupported()) {
+                                                            const hls = new Hls({
+                                                                enableWorker: true,
+                                                                lowLatencyMode: false,
+                                                            });
+                                                            hls.loadSource(url);
+                                                            hls.attachMedia(videoEl);
+                                                            hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                                                                videoEl.play().catch(() => { });
+                                                                console.log('Preview playing with hls.js');
+                                                            });
+                                                        } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+                                                            // Native HLS support (Safari)
+                                                            videoEl.src = url;
+                                                            await videoEl.play();
+                                                            console.log('Preview playing natively');
+                                                        }
+                                                    } else {
+                                                        // Regular video
+                                                        videoEl.src = url;
+                                                        await videoEl.play();
+                                                    }
                                                 } catch (error) {
                                                     console.error('Preview load error:', error);
                                                 }
