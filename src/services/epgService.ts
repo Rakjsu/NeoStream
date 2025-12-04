@@ -18,6 +18,13 @@ export const epgService = {
             const url = `${credentials.serverUrl}/player_api.php?username=${credentials.username}&password=${credentials.password}&action=get_simple_data_table&stream_id=${epgChannelId}`;
 
             const response = await fetch(url);
+
+            // Check if response is JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                return []; // Server returned HTML or other non-JSON response
+            }
+
             const data = await response.json();
 
             if (!data.epg_listings) return [];
@@ -31,9 +38,8 @@ export const epgService = {
                 description: item.description || item.desc,
                 channel_id: epgChannelId
             }));
-        } catch (error) {
-            console.error('Failed to fetch EPG:', error);
-            return [];
+        } catch {
+            return []; // Silently fail - EPG not available
         }
     },
 

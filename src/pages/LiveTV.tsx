@@ -220,16 +220,13 @@ export function LiveTV() {
                                                 const loadVideo = async () => {
                                                     try {
                                                         const url = await buildLiveStreamUrl(selectedChannel);
-                                                        console.log('Loading preview URL:', url);
 
                                                         // Dynamically load hls.js if needed and not already loaded
                                                         if (url.includes('.m3u8') && !(window as any).Hls) {
-                                                            console.log('📦 Loading hls.js from CDN...');
                                                             await new Promise((resolve, reject) => {
                                                                 const script = document.createElement('script');
                                                                 script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
                                                                 script.onload = () => {
-                                                                    console.log('✅ hls.js loaded successfully');
                                                                     resolve(true);
                                                                 };
                                                                 script.onerror = () => reject(new Error('Failed to load hls.js'));
@@ -240,7 +237,6 @@ export function LiveTV() {
                                                         // Use hls.js for HLS streams
                                                         if (url.includes('.m3u8')) {
                                                             const Hls = (window as any).Hls;
-                                                            console.log('Hls available:', !!Hls, 'isSupported:', Hls ? Hls.isSupported() : 'N/A');
                                                             if (Hls && Hls.isSupported()) {
                                                                 const hls = new Hls({
                                                                     enableWorker: true,
@@ -252,18 +248,12 @@ export function LiveTV() {
                                                                 hls.loadSource(url);
                                                                 hls.attachMedia(videoEl);
                                                                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                                                                    console.log('✅ Manifest parsed, attempting play...');
-                                                                    videoEl.play().then(() => {
-                                                                        console.log('✅ Preview playing successfully!');
-                                                                    }).catch((err) => {
-                                                                        console.error('❌ Play failed:', err);
-                                                                    });
+                                                                    videoEl.play().catch(() => { });
                                                                 });
                                                             } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
                                                                 // Native HLS support (Safari)
                                                                 videoEl.src = url;
                                                                 await videoEl.play();
-                                                                console.log('Preview playing natively');
                                                             }
                                                         } else {
                                                             // Regular video
