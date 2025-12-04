@@ -120,5 +120,56 @@ export function setupIpcHandlers() {
         }
     })
 
+    // Get live TV categories
+    ipcMain.handle('categories:get-live', async () => {
+        try {
+            const auth = store.get('auth')
+            if (!auth.url || !auth.username || !auth.password) {
+                return { success: false, error: 'Not authenticated' }
+            }
+
+            const client = new XtreamClient(auth.url, auth.username, auth.password)
+            const categories = await client.getLiveCategories()
+
+            return { success: true, data: categories }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Get VOD categories
+    ipcMain.handle('categories:get-vod', async () => {
+        try {
+            const auth = store.get('auth')
+            if (!auth.url || !auth.username || !auth.password) {
+                return { success: false, error: 'Not authenticated' }
+            }
+
+            const client = new XtreamClient(auth.url, auth.username, auth.password)
+            const categories = await client.getVodCategories()
+
+            return { success: true, data: categories }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Get series categories  
+    ipcMain.handle('categories:get-series', async () => {
+        try {
+            const auth = store.get('auth')
+            if (!auth.url || !auth.username || !auth.password) {
+                return { success: false, error: 'Not authenticated' }
+            }
+
+            const client = new XtreamClient(auth.url, auth.username, auth.password)
+            const categories = await client.getSeriesCategories()
+
+            return { success: true, data: categories }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    })
+
     console.log('IPC Handlers initialized')
 }
