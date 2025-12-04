@@ -179,26 +179,25 @@ export function LiveTV() {
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflowY: 'auto', paddingTop: '40px' }}>
                 {selectedChannel && (
                     <div style={{
-                        padding: '24px 60px 24px 60px',
+                        padding: '24px 20px 24px 60px',
                         marginBottom: '24px',
                         background: 'linear-gradient(to bottom, rgba(17, 24, 39, 0.95), rgba(31, 41, 55, 0.9))',
                         borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
                     }}>
                         <h2 style={{
-                            fontSize: '36px',
+                            fontSize: '28px',
                             fontWeight: 'bold',
                             color: 'white',
-                            marginBottom: '24px',
-                            textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)',
-                            maxWidth: '1400px',
-                            margin: '0 auto 24px'
+                            marginBottom: '16px',
+                            textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)'
                         }}>
                             {selectedChannel.name}
                         </h2>
 
-                        <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', gap: '24px' }}>
+                        <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
                             {/* Preview Video Container */}
-                            <div style={{ flex: '1', minWidth: 0 }}>
+                            {/* Preview Video Container - Fixed width left side */}
+                            <div style={{ flex: '0 0 480px', minWidth: '480px' }}>
                                 <div style={{
                                     width: '100%',
                                     aspectRatio: '16/9',
@@ -206,7 +205,7 @@ export function LiveTV() {
                                     borderRadius: '12px',
                                     overflow: 'hidden',
                                     position: 'relative',
-                                    marginBottom: '20px'
+                                    marginBottom: '16px'
                                 }}>
                                     <video
                                         id="preview-video"
@@ -268,27 +267,45 @@ export function LiveTV() {
                                             }
                                         }}
                                     />
+                                    {/* Live Badge with glow animation */}
                                     <div style={{
                                         position: 'absolute',
                                         top: '12px',
                                         right: '12px',
-                                        background: 'rgba(239, 68, 68, 0.9)',
-                                        padding: '4px 12px',
-                                        borderRadius: '6px',
-                                        fontSize: '12px',
-                                        fontWeight: '600',
+                                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                        padding: '6px 14px',
+                                        borderRadius: '20px',
+                                        fontSize: '11px',
+                                        fontWeight: '700',
                                         color: 'white',
                                         textTransform: 'uppercase',
-                                        letterSpacing: '0.5px',
-                                        boxShadow: '0 2px 8px rgba(239, 68, 68, 0.5)',
-                                        animation: 'pulse 2s ease-in-out infinite'
+                                        letterSpacing: '1px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        animation: 'liveGlow 1.5s ease-in-out infinite'
                                     }}>
-                                        🔴 AO VIVO
+                                        <span style={{
+                                            width: '8px',
+                                            height: '8px',
+                                            background: 'white',
+                                            borderRadius: '50%',
+                                            animation: 'liveDot 1s ease-in-out infinite'
+                                        }} />
+                                        AO VIVO
                                     </div>
                                     <style>{`
-                                    @keyframes pulse {
-                                        0%, 100% { opacity: 1; }
-                                        50% { opacity: 0.7; }
+                                    @keyframes liveGlow {
+                                        0%, 100% { 
+                                            box-shadow: 0 0 10px rgba(239, 68, 68, 0.6), 0 0 20px rgba(239, 68, 68, 0.4), 0 0 30px rgba(239, 68, 68, 0.2);
+                                        }
+                                        50% { 
+                                            box-shadow: 0 0 15px rgba(239, 68, 68, 0.8), 0 0 30px rgba(239, 68, 68, 0.6), 0 0 45px rgba(239, 68, 68, 0.3);
+                                        }
+                                    }
+                                    @keyframes liveDot {
+                                        0%, 100% { opacity: 1; transform: scale(1); }
+                                        50% { opacity: 0.5; transform: scale(0.8); }
                                     }
                                 `}</style>
                                 </div>
@@ -352,13 +369,14 @@ export function LiveTV() {
                                 </div>
                             </div>
 
-                            {/* EPG Schedule Panel */}
+                            {/* EPG Schedule Panel - Expands to fill right side */}
                             <div style={{
-                                flex: '0 0 400px',
+                                flex: '1',
                                 background: 'rgba(17, 24, 39, 0.7)',
                                 borderRadius: '12px',
                                 padding: '20px',
-                                border: '1px solid rgba(255, 255, 255, 0.1)'
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                minHeight: '300px'
                             }}>
                                 <h3 style={{
                                     fontSize: '18px',
