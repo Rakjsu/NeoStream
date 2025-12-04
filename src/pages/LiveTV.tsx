@@ -150,169 +150,165 @@ export function LiveTV() {
                         borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
                     }}>
                         <div style={{ maxWidth: '800px' }}>
-                            {/* Preview Player - Left Side */}
-                            <div style={{ width: '500px', flexShrink: 0 }}>
+                            <h2 style={{
+                                fontSize: '36px',
+                                fontWeight: 'bold',
+                                color: 'white',
+                                marginBottom: '24px',
+                                textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)'
+                            }}>
+                                {selectedChannel.name}
+                            </h2>
+
+                            <div style={{
+                                width: '100%',
+                                aspectRatio: '16/9',
+                                background: '#000',
+                                borderRadius: '12px',
+                                overflow: 'hidden',
+                                position: 'relative',
+                                marginBottom: '20px'
+                            }}>
+                                <video
+                                    key={selectedChannel.stream_id}
+                                    autoPlay
+                                    muted
+                                    playsInline
+                                    controls={false}
+                                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                    ref={(video) => {
+                                        if (video && !video.src) {
+                                            buildLiveStreamUrl(selectedChannel).then(url => {
+                                                video.src = url;
+                                                video.play().catch(e => console.error('Autoplay error:', e));
+                                            });
+                                        }
+                                    }}
+                                />
                                 <div style={{
-                                    width: '100%',
-                                    aspectRatio: '16/9',
-                                    background: '#000',
-                                    borderRadius: '12px',
-                                    overflow: 'hidden',
-                                    position: 'relative'
-                                }}>
-                                    <video
-                                        key={selectedChannel.stream_id}
-                                        autoPlay
-                                        muted
-                                        playsInline
-                                        controls={false}
-                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                        ref={(video) => {
-                                            if (video && !video.src) {
-                                                buildLiveStreamUrl(selectedChannel).then(url => {
-                                                    video.src = url;
-                                                    video.play().catch(e => console.error('Autoplay error:', e));
-                                                });
-                                            }
-                                        }}
-                                    />
-                                    <div style={{
-                                        position: 'absolute',
-                                        top: '12px',
-                                        right: '12px',
-                                        background: 'rgba(239, 68, 68, 0.9)',
-                                        padding: '4px 12px',
-                                        borderRadius: '6px',
-                                        fontSize: '12px',
-                                        fontWeight: '600',
-                                        color: 'white',
-                                        textTransform: 'uppercase',
-                                        letterSpacing: '0.5px'
-                                    }}>
-                                        🔴 AO VIVO
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Channel Info - Right Side */}
-                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                <h2 style={{
-                                    fontSize: '36px',
-                                    fontWeight: 'bold',
+                                    position: 'absolute',
+                                    top: '12px',
+                                    right: '12px',
+                                    background: 'rgba(239, 68, 68, 0.9)',
+                                    padding: '4px 12px',
+                                    borderRadius: '6px',
+                                    fontSize: '12px',
+                                    fontWeight: '600',
                                     color: 'white',
-                                    marginBottom: '16px',
-                                    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)'
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px'
                                 }}>
-                                    {selectedChannel.name}
-                                </h2>
-
-                                <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                                    <button
-                                        onClick={() => {
-                                            setPlayingChannel(selectedChannel);
-                                            setSelectedChannel(null);
-                                        }}
-                                        style={{
-                                            padding: '16px 48px',
-                                            backgroundColor: '#2563eb',
-                                            color: 'white',
-                                            fontWeight: 'bold',
-                                            fontSize: '17px',
-                                            borderRadius: '8px',
-                                            border: 'none',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px',
-                                            transition: 'all 0.2s',
-                                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.backgroundColor = '#1d4ed8';
-                                            e.currentTarget.style.transform = 'scale(1.05)';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.backgroundColor = '#2563eb';
-                                            e.currentTarget.style.transform = 'scale(1)';
-                                        }}
-                                    >
-                                        ▶ Assistir Tela Cheia
-                                    </button>
-
-                                    <button
-                                        onClick={() => setSelectedChannel(null)}
-                                        style={{
-                                            padding: '16px 32px',
-                                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                                            color: 'white',
-                                            fontWeight: 'bold',
-                                            fontSize: '17px',
-                                            borderRadius: '8px',
-                                            border: '2px solid rgba(255, 255, 255, 0.2)',
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                                        }}
-                                    >
-                                        Fechar
-                                    </button>
+                                    🔴 AO VIVO
                                 </div>
                             </div>
-                        </div>
-                )}
 
-                        <div className="p-8" style={{ paddingLeft: '60px' }}>
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <button
+                                    onClick={() => {
+                                        setPlayingChannel(selectedChannel);
+                                        setSelectedChannel(null);
+                                    }}
+                                    style={{
+                                        padding: '16px 48px',
+                                        backgroundColor: '#2563eb',
+                                        color: 'white',
+                                        fontWeight: 'bold',
+                                        fontSize: '17px',
+                                        borderRadius: '8px',
+                                        border: 'none',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        transition: 'all 0.2s',
+                                        boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.backgroundColor = '#1d4ed8';
+                                        e.currentTarget.style.transform = 'scale(1.05)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.backgroundColor = '#2563eb';
+                                        e.currentTarget.style.transform = 'scale(1)';
+                                    }}
+                                >
+                                    ▶ Assistir Tela Cheia
+                                </button>
 
-                            {filteredStreams.length === 0 ? (
-                                <div className="text-center text-gray-400 py-12">
-                                    <p className="text-lg">Nenhum canal encontrado</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-px">
-                                    {filteredStreams.map((stream) => (
-                                        <div
-                                            key={stream.stream_id}
-                                            onClick={() => setSelectedChannel(stream)}
-                                            className="bg-gray-800 hover:bg-gray-700 py-1 px-2 border-b border-gray-700/50 last:border-b-0 transition-colors cursor-pointer group flex items-center gap-2"
-                                            style={{ borderLeft: selectedChannel?.stream_id === stream.stream_id ? '3px solid #3b82f6' : 'none' }}
-                                        >
-                                            <div className="w-[56px] h-[56px] bg-gray-700 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
-                                                {stream.stream_icon && !brokenImages.has(stream.stream_id) ? (
-                                                    <img
-                                                        src={stream.stream_icon}
-                                                        alt=""
-                                                        className="w-full h-full object-contain"
-                                                        onError={() => handleImageError(stream.stream_id)}
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full bg-blue-500/30"></div>
-                                                )}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-gray-300 font-normal text-xs leading-tight group-hover:text-white transition-colors truncate">
-                                                    {stream.name}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                                <button
+                                    onClick={() => setSelectedChannel(null)}
+                                    style={{
+                                        padding: '16px 32px',
+                                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                        color: 'white',
+                                        fontWeight: 'bold',
+                                        fontSize: '17px',
+                                        borderRadius: '8px',
+                                        border: '2px solid rgba(255, 255, 255, 0.2)',
+                                        cursor: 'pointer',
+                                        transition: 'all 0.2s'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                                    }}
+                                >
+                                    Fechar
+                                </button>
+                            </div>
                         </div>
                     </div>
+                )}
+
+                <div className="p-8" style={{ paddingLeft: '60px' }}>
+
+                    {filteredStreams.length === 0 ? (
+                        <div className="text-center text-gray-400 py-12">
+                            <p className="text-lg">Nenhum canal encontrado</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-px">
+                            {filteredStreams.map((stream) => (
+                                <div
+                                    key={stream.stream_id}
+                                    onClick={() => setSelectedChannel(stream)}
+                                    className="bg-gray-800 hover:bg-gray-700 py-1 px-2 border-b border-gray-700/50 last:border-b-0 transition-colors cursor-pointer group flex items-center gap-2"
+                                    style={{ borderLeft: selectedChannel?.stream_id === stream.stream_id ? '3px solid #3b82f6' : 'none' }}
+                                >
+                                    <div className="w-[56px] h-[56px] bg-gray-700 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
+                                        {stream.stream_icon && !brokenImages.has(stream.stream_id) ? (
+                                            <img
+                                                src={stream.stream_icon}
+                                                alt=""
+                                                className="w-full h-full object-contain"
+                                                onError={() => handleImageError(stream.stream_id)}
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full bg-blue-500/30"></div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-gray-300 font-normal text-xs leading-tight group-hover:text-white transition-colors truncate">
+                                            {stream.name}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
 
             {playingChannel && (
-                    <AsyncVideoPlayer
-                        movie={playingChannel as any}
-                        buildStreamUrl={buildLiveStreamUrl}
-                        onClose={() => setPlayingChannel(null)}
-                        customTitle={playingChannel.name}
-                    />
-                )}
-            </div>
-            );
+                <AsyncVideoPlayer
+                    movie={playingChannel as any}
+                    buildStreamUrl={buildLiveStreamUrl}
+                    onClose={() => setPlayingChannel(null)}
+                    customTitle={playingChannel.name}
+                />
+            )}
+        </div>
+    );
 }
