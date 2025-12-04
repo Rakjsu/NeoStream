@@ -293,127 +293,7 @@ export function LiveTV() {
                                 `}</style>
                                 </div>
 
-                                {/* EPG Schedule Panel */}
-                                <div style={{
-                                    flex: '0 0 400px',
-                                    background: 'rgba(17, 24, 39, 0.7)',
-                                    borderRadius: '12px',
-                                    padding: '20px',
-                                    border: '1px solid rgba(255, 255, 255, 0.1)'
-                                }}>
-                                    <h3 style={{
-                                        fontSize: '18px',
-                                        fontWeight: '600',
-                                        color: 'white',
-                                        marginBottom: '16px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px'
-                                    }}>
-                                        📺 Grade Horária
-                                    </h3>
-
-                                    {currentProgram ? (
-                                        <>
-                                            {/* Current Program */}
-                                            <div style={{
-                                                marginBottom: '20px',
-                                                padding: '16px',
-                                                background: 'rgba(59, 130, 246, 0.1)',
-                                                borderRadius: '8px',
-                                                border: '1px solid rgba(59, 130, 246, 0.3)'
-                                            }}>
-                                                <div style={{
-                                                    fontSize: '12px',
-                                                    color: 'rgba(147, 197, 253, 1)',
-                                                    marginBottom: '8px',
-                                                    fontWeight: '600'
-                                                }}>
-                                                    🔴 AGORA
-                                                </div>
-                                                <div style={{
-                                                    fontSize: '16px',
-                                                    color: 'white',
-                                                    fontWeight: '600',
-                                                    marginBottom: '8px'
-                                                }}>
-                                                    {currentProgram.title}
-                                                </div>
-                                                <div style={{
-                                                    fontSize: '12px',
-                                                    color: 'rgba(156, 163, 175, 1)',
-                                                    marginBottom: '8px'
-                                                }}>
-                                                    {epgService.formatTime(currentProgram.start)} - {epgService.formatTime(currentProgram.end)}
-                                                </div>
-                                                {/* Progress Bar */}
-                                                <div style={{
-                                                    width: '100%',
-                                                    height: '4px',
-                                                    background: 'rgba(255, 255, 255, 0.1)',
-                                                    borderRadius: '2px',
-                                                    overflow: 'hidden'
-                                                }}>
-                                                    <div style={{
-                                                        width: `${epgService.getProgramProgress(currentProgram)}%`,
-                                                        height: '100%',
-                                                        background: 'rgba(59, 130, 246, 1)',
-                                                        transition: 'width 1s ease'
-                                                    }} />
-                                                </div>
-                                            </div>
-
-                                            {/* Upcoming Programs */}
-                                            {upcomingPrograms.length > 0 && (
-                                                <div>
-                                                    <div style={{
-                                                        fontSize: '14px',
-                                                        color: 'rgba(156, 163, 175, 1)',
-                                                        marginBottom: '12px',
-                                                        fontWeight: '600'
-                                                    }}>
-                                                        Próximos Programas
-                                                    </div>
-                                                    {upcomingPrograms.map((program, index) => (
-                                                        <div key={program.id || index} style={{
-                                                            marginBottom: '12px',
-                                                            padding: '12px',
-                                                            background: 'rgba(255, 255, 255, 0.05)',
-                                                            borderRadius: '6px'
-                                                        }}>
-                                                            <div style={{
-                                                                fontSize: '14px',
-                                                                color: 'white',
-                                                                marginBottom: '4px'
-                                                            }}>
-                                                                {program.title}
-                                                            </div>
-                                                            <div style={{
-                                                                fontSize: '12px',
-                                                                color: 'rgba(156, 163, 175, 1)'
-                                                            }}>
-                                                                {epgService.formatTime(program.start)}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </>
-                                    ) : (
-                                        <div style={{
-                                            textAlign: 'center',
-                                            padding: '40px 20px',
-                                            color: 'rgba(156, 163, 175, 1)'
-                                        }}>
-                                            <div style={{ fontSize: '48px', marginBottom: '12px' }}>📺</div>
-                                            <div>Sem informações de programação</div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Buttons */}
-                            <div style={{ maxWidth: '1400px', margin: '20px auto 0' }}>
+                                {/* Buttons below preview */}
                                 <div style={{ display: 'flex', gap: '12px' }}>
                                     <button
                                         onClick={() => {
@@ -421,11 +301,11 @@ export function LiveTV() {
                                             setSelectedChannel(null);
                                         }}
                                         style={{
-                                            padding: '16px 48px',
+                                            padding: '12px 32px',
                                             backgroundColor: '#2563eb',
                                             color: 'white',
                                             fontWeight: 'bold',
-                                            fontSize: '17px',
+                                            fontSize: '15px',
                                             borderRadius: '8px',
                                             border: 'none',
                                             cursor: 'pointer',
@@ -437,24 +317,24 @@ export function LiveTV() {
                                         }}
                                         onMouseEnter={(e) => {
                                             e.currentTarget.style.backgroundColor = '#1d4ed8';
-                                            e.currentTarget.style.transform = 'scale(1.05)';
+                                            e.currentTarget.style.transform = 'scale(1.02)';
                                         }}
                                         onMouseLeave={(e) => {
                                             e.currentTarget.style.backgroundColor = '#2563eb';
                                             e.currentTarget.style.transform = 'scale(1)';
                                         }}
                                     >
-                                        ▶ Assistir Tela Cheia
+                                        ▶ Assistir
                                     </button>
 
                                     <button
                                         onClick={() => setSelectedChannel(null)}
                                         style={{
-                                            padding: '16px 32px',
+                                            padding: '12px 24px',
                                             backgroundColor: 'rgba(255, 255, 255, 0.1)',
                                             color: 'white',
                                             fontWeight: 'bold',
-                                            fontSize: '17px',
+                                            fontSize: '15px',
                                             borderRadius: '8px',
                                             border: '2px solid rgba(255, 255, 255, 0.2)',
                                             cursor: 'pointer',
@@ -470,6 +350,124 @@ export function LiveTV() {
                                         Fechar
                                     </button>
                                 </div>
+                            </div>
+
+                            {/* EPG Schedule Panel */}
+                            <div style={{
+                                flex: '0 0 400px',
+                                background: 'rgba(17, 24, 39, 0.7)',
+                                borderRadius: '12px',
+                                padding: '20px',
+                                border: '1px solid rgba(255, 255, 255, 0.1)'
+                            }}>
+                                <h3 style={{
+                                    fontSize: '18px',
+                                    fontWeight: '600',
+                                    color: 'white',
+                                    marginBottom: '16px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px'
+                                }}>
+                                    📺 Grade Horária
+                                </h3>
+
+                                {currentProgram ? (
+                                    <>
+                                        {/* Current Program */}
+                                        <div style={{
+                                            marginBottom: '20px',
+                                            padding: '16px',
+                                            background: 'rgba(59, 130, 246, 0.1)',
+                                            borderRadius: '8px',
+                                            border: '1px solid rgba(59, 130, 246, 0.3)'
+                                        }}>
+                                            <div style={{
+                                                fontSize: '12px',
+                                                color: 'rgba(147, 197, 253, 1)',
+                                                marginBottom: '8px',
+                                                fontWeight: '600'
+                                            }}>
+                                                🔴 AGORA
+                                            </div>
+                                            <div style={{
+                                                fontSize: '16px',
+                                                color: 'white',
+                                                fontWeight: '600',
+                                                marginBottom: '8px'
+                                            }}>
+                                                {currentProgram.title}
+                                            </div>
+                                            <div style={{
+                                                fontSize: '12px',
+                                                color: 'rgba(156, 163, 175, 1)',
+                                                marginBottom: '8px'
+                                            }}>
+                                                {epgService.formatTime(currentProgram.start)} - {epgService.formatTime(currentProgram.end)}
+                                            </div>
+                                            {/* Progress Bar */}
+                                            <div style={{
+                                                width: '100%',
+                                                height: '4px',
+                                                background: 'rgba(255, 255, 255, 0.1)',
+                                                borderRadius: '2px',
+                                                overflow: 'hidden'
+                                            }}>
+                                                <div style={{
+                                                    width: `${epgService.getProgramProgress(currentProgram)}%`,
+                                                    height: '100%',
+                                                    background: 'rgba(59, 130, 246, 1)',
+                                                    transition: 'width 1s ease'
+                                                }} />
+                                            </div>
+                                        </div>
+
+                                        {/* Upcoming Programs */}
+                                        {upcomingPrograms.length > 0 && (
+                                            <div>
+                                                <div style={{
+                                                    fontSize: '14px',
+                                                    color: 'rgba(156, 163, 175, 1)',
+                                                    marginBottom: '12px',
+                                                    fontWeight: '600'
+                                                }}>
+                                                    Próximos Programas
+                                                </div>
+                                                {upcomingPrograms.map((program, index) => (
+                                                    <div key={program.id || index} style={{
+                                                        marginBottom: '12px',
+                                                        padding: '12px',
+                                                        background: 'rgba(255, 255, 255, 0.05)',
+                                                        borderRadius: '6px'
+                                                    }}>
+                                                        <div style={{
+                                                            fontSize: '14px',
+                                                            color: 'white',
+                                                            marginBottom: '4px'
+                                                        }}>
+                                                            {program.title}
+                                                        </div>
+                                                        <div style={{
+                                                            fontSize: '12px',
+                                                            color: 'rgba(156, 163, 175, 1)'
+                                                        }}>
+                                                            {epgService.formatTime(program.start)}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div style={{
+                                        textAlign: 'center',
+                                        padding: '40px 20px',
+                                        color: 'rgba(156, 163, 175, 1)'
+                                    }}>
+                                        <div style={{ fontSize: '48px', marginBottom: '12px' }}>📺</div>
+                                        <div>Sem informações de programação</div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -514,14 +512,16 @@ export function LiveTV() {
                 </div>
             </div>
 
-            {playingChannel && (
-                <AsyncVideoPlayer
-                    movie={playingChannel as any}
-                    buildStreamUrl={buildLiveStreamUrl}
-                    onClose={() => setPlayingChannel(null)}
-                    customTitle={playingChannel.name}
-                />
-            )}
-        </div>
+            {
+                playingChannel && (
+                    <AsyncVideoPlayer
+                        movie={playingChannel as any}
+                        buildStreamUrl={buildLiveStreamUrl}
+                        onClose={() => setPlayingChannel(null)}
+                        customTitle={playingChannel.name}
+                    />
+                )
+            }
+        </div >
     );
 }
