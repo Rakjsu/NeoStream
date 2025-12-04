@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
+import { epgService } from '../services/epgService';
 
 interface LiveStream {
     num: number;
@@ -29,6 +30,9 @@ export function LiveTV() {
     const [brokenImages, setBrokenImages] = useState<Set<number>>(new Set());
     const [selectedChannel, setSelectedChannel] = useState<LiveStream | null>(null);
     const [playingChannel, setPlayingChannel] = useState<LiveStream | null>(null);
+    const [epgData, setEpgData] = useState<any[]>([]);
+    const [currentProgram, setCurrentProgram] = useState<any | null>(null);
+    const [upcomingPrograms, setUpcomingPrograms] = useState<any[]>([]);
 
     useEffect(() => {
         fetchStreams();
@@ -129,6 +133,37 @@ export function LiveTV() {
         );
     }
 
+    // Fetch EPG when channel is selected
+    useEffect(() => {
+        if (!selectedChannel || !selectedChannel.epg_channel_id) {
+            setEpgData([]);
+            setCurrentProgram(null);
+            setUpcomingPrograms([]);
+            return;
+        }
+
+        let intervalId: number;
+
+        const fetchEPG = async () => {
+            const programs = await epgService.fetchChannelEPG(selectedChannel.epg_channel_id);
+            setEpgData(programs);
+
+            const current = epgService.getCurrentProgram(programs);
+            setCurrentProgram(current);
+
+            const upcoming = epgService.getUpcomingPrograms(programs, 3);
+            setUpcomingPrograms(upcoming);
+        };
+
+        fetchEPG();
+        // Refresh EPG every 60 seconds
+        intervalId = setInterval(fetchEPG, 60000);
+
+        return () => {
+            if (intervalId) clearInterval(intervalId);
+        };
+    }, [selectedChannel]);
+
     return (
         <div style={{ position: 'relative', height: '100vh', overflow: 'hidden' }}>
             <AnimatedSearchBar
@@ -149,220 +184,353 @@ export function LiveTV() {
                         background: 'linear-gradient(to bottom, rgba(17, 24, 39, 0.95), rgba(31, 41, 55, 0.9))',
                         borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
                     }}>
-                        <div style={{ maxWidth: '800px' }}>
-                            <h2 style={{
-                                fontSize: '36px',
-                                fontWeight: 'bold',
-                                color: 'white',
-                                marginBottom: '24px',
-                                textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)'
-                            }}>
-                                {selectedChannel.name}
-                            </h2>
+                        <h2 style={{
+                            fontSize: '36px',
+                            fontWeight: 'bold',
+                            color: 'white',
+                            marginBottom: '24px',
+                            textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)',
+                            maxWidth: '1400px',
+                            margin: '0 auto 24px'
+                        }}>
+                            {selectedChannel.name}
+                        </h2>
 
-                            <div style={{
-                                width: '100%',
-                                aspectRatio: '16/9',
-                                background: '#000',
-                                borderRadius: '12px',
-                                overflow: 'hidden',
-                                position: 'relative',
-                                marginBottom: '20px'
-                            }}>
-                                <video
-                                    id="preview-video"
-                                    key={selectedChannel.stream_id}
-                                    autoPlay
-                                    muted
-                                    playsInline
-                                    style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                    ref={(videoEl) => {
-                                        if (videoEl) {
-                                            const loadVideo = async () => {
-                                                try {
-                                                    const url = await buildLiveStreamUrl(selectedChannel);
-                                                    console.log('Loading preview URL:', url);
+                        <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'flex', gap: '24px' }}>
+                            {/* Preview Video Container */}
+                            <div style={{ flex: '1', minWidth: 0 }}>
+                                <div style={{
+                                    width: '100%',
+                                    aspectRatio: '16/9',
+                                    background: '#000',
+                                    borderRadius: '12px',
+                                    overflow: 'hidden',
+                                    position: 'relative',
+                                    marginBottom: '20px'
+                                }}>
+                                    <video
+                                        id="preview-video"
+                                        key={selectedChannel.stream_id}
+                                        autoPlay
+                                        muted
+                                        playsInline
+                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                        ref={(videoEl) => {
+                                            if (videoEl) {
+                                                const loadVideo = async () => {
+                                                    try {
+                                                        const url = await buildLiveStreamUrl(selectedChannel);
+                                                        console.log('Loading preview URL:', url);
 
-                                                    // Dynamically load hls.js if needed and not already loaded
-                                                    if (url.includes('.m3u8') && !(window as any).Hls) {
-                                                        console.log('📦 Loading hls.js from CDN...');
-                                                        await new Promise((resolve, reject) => {
-                                                            const script = document.createElement('script');
-                                                            script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
-                                                            script.onload = () => {
-                                                                console.log('✅ hls.js loaded successfully');
-                                                                resolve(true);
-                                                            };
-                                                            script.onerror = () => reject(new Error('Failed to load hls.js'));
-                                                            document.head.appendChild(script);
-                                                        });
-                                                    }
-
-                                                    // Use hls.js for HLS streams
-                                                    if (url.includes('.m3u8')) {
-                                                        const Hls = (window as any).Hls;
-                                                        console.log('Hls available:', !!Hls, 'isSupported:', Hls ? Hls.isSupported() : 'N/A');
-                                                        if (Hls && Hls.isSupported()) {
-                                                            const hls = new Hls({
-                                                                enableWorker: true,
-                                                                lowLatencyMode: false,
+                                                        // Dynamically load hls.js if needed and not already loaded
+                                                        if (url.includes('.m3u8') && !(window as any).Hls) {
+                                                            console.log('📦 Loading hls.js from CDN...');
+                                                            await new Promise((resolve, reject) => {
+                                                                const script = document.createElement('script');
+                                                                script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
+                                                                script.onload = () => {
+                                                                    console.log('✅ hls.js loaded successfully');
+                                                                    resolve(true);
+                                                                };
+                                                                script.onerror = () => reject(new Error('Failed to load hls.js'));
+                                                                document.head.appendChild(script);
                                                             });
-                                                            hls.on((window as any).Hls.Events.ERROR, (event: any, data: any) => {
-                                                                console.error('HLS error:', data);
-                                                            });
-                                                            hls.loadSource(url);
-                                                            hls.attachMedia(videoEl);
-                                                            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                                                                console.log('✅ Manifest parsed, attempting play...');
-                                                                videoEl.play().then(() => {
-                                                                    console.log('✅ Preview playing successfully!');
-                                                                }).catch((err) => {
-                                                                    console.error('❌ Play failed:', err);
+                                                        }
+
+                                                        // Use hls.js for HLS streams
+                                                        if (url.includes('.m3u8')) {
+                                                            const Hls = (window as any).Hls;
+                                                            console.log('Hls available:', !!Hls, 'isSupported:', Hls ? Hls.isSupported() : 'N/A');
+                                                            if (Hls && Hls.isSupported()) {
+                                                                const hls = new Hls({
+                                                                    enableWorker: true,
+                                                                    lowLatencyMode: false,
                                                                 });
-                                                            });
-                                                        } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-                                                            // Native HLS support (Safari)
+                                                                hls.on((window as any).Hls.Events.ERROR, (event: any, data: any) => {
+                                                                    console.error('HLS error:', data);
+                                                                });
+                                                                hls.loadSource(url);
+                                                                hls.attachMedia(videoEl);
+                                                                hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                                                                    console.log('✅ Manifest parsed, attempting play...');
+                                                                    videoEl.play().then(() => {
+                                                                        console.log('✅ Preview playing successfully!');
+                                                                    }).catch((err) => {
+                                                                        console.error('❌ Play failed:', err);
+                                                                    });
+                                                                });
+                                                            } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+                                                                // Native HLS support (Safari)
+                                                                videoEl.src = url;
+                                                                await videoEl.play();
+                                                                console.log('Preview playing natively');
+                                                            }
+                                                        } else {
+                                                            // Regular video
                                                             videoEl.src = url;
                                                             await videoEl.play();
-                                                            console.log('Preview playing natively');
                                                         }
-                                                    } else {
-                                                        // Regular video
-                                                        videoEl.src = url;
-                                                        await videoEl.play();
+                                                    } catch (error) {
+                                                        console.error('Preview load error:', error);
                                                     }
-                                                } catch (error) {
-                                                    console.error('Preview load error:', error);
-                                                }
-                                            };
-                                            loadVideo();
-                                        }
-                                    }}
-                                />
-                                <div style={{
-                                    position: 'absolute',
-                                    top: '12px',
-                                    right: '12px',
-                                    background: 'rgba(239, 68, 68, 0.9)',
-                                    padding: '4px 12px',
-                                    borderRadius: '6px',
-                                    fontSize: '12px',
-                                    fontWeight: '600',
-                                    color: 'white',
-                                    textTransform: 'uppercase',
-                                    letterSpacing: '0.5px'
-                                }}>
-                                    🔴 AO VIVO
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                                <button
-                                    onClick={() => {
-                                        setPlayingChannel(selectedChannel);
-                                        setSelectedChannel(null);
-                                    }}
-                                    style={{
-                                        padding: '16px 48px',
-                                        backgroundColor: '#2563eb',
+                                                };
+                                                loadVideo();
+                                            }
+                                        }}
+                                    />
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '12px',
+                                        right: '12px',
+                                        background: 'rgba(239, 68, 68, 0.9)',
+                                        padding: '4px 12px',
+                                        borderRadius: '6px',
+                                        fontSize: '12px',
+                                        fontWeight: '600',
                                         color: 'white',
-                                        fontWeight: 'bold',
-                                        fontSize: '17px',
-                                        borderRadius: '8px',
-                                        border: 'none',
-                                        cursor: 'pointer',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.5px',
+                                        boxShadow: '0 2px 8px rgba(239, 68, 68, 0.5)',
+                                        animation: 'pulse 2s ease-in-out infinite'
+                                    }}>
+                                        🔴 AO VIVO
+                                    </div>
+                                    <style>{`
+                                    @keyframes pulse {
+                                        0%, 100% { opacity: 1; }
+                                        50% { opacity: 0.7; }
+                                    }
+                                `}</style>
+                                </div>
+
+                                {/* EPG Schedule Panel */}
+                                <div style={{
+                                    flex: '0 0 400px',
+                                    background: 'rgba(17, 24, 39, 0.7)',
+                                    borderRadius: '12px',
+                                    padding: '20px',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)'
+                                }}>
+                                    <h3 style={{
+                                        fontSize: '18px',
+                                        fontWeight: '600',
+                                        color: 'white',
+                                        marginBottom: '16px',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '8px',
-                                        transition: 'all 0.2s',
-                                        boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.backgroundColor = '#1d4ed8';
-                                        e.currentTarget.style.transform = 'scale(1.05)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.backgroundColor = '#2563eb';
-                                        e.currentTarget.style.transform = 'scale(1)';
-                                    }}
-                                >
-                                    ▶ Assistir Tela Cheia
-                                </button>
+                                        gap: '8px'
+                                    }}>
+                                        📺 Grade Horária
+                                    </h3>
 
-                                <button
-                                    onClick={() => setSelectedChannel(null)}
-                                    style={{
-                                        padding: '16px 32px',
-                                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                                        color: 'white',
-                                        fontWeight: 'bold',
-                                        fontSize: '17px',
-                                        borderRadius: '8px',
-                                        border: '2px solid rgba(255, 255, 255, 0.2)',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                                    }}
-                                >
-                                    Fechar
-                                </button>
+                                    {currentProgram ? (
+                                        <>
+                                            {/* Current Program */}
+                                            <div style={{
+                                                marginBottom: '20px',
+                                                padding: '16px',
+                                                background: 'rgba(59, 130, 246, 0.1)',
+                                                borderRadius: '8px',
+                                                border: '1px solid rgba(59, 130, 246, 0.3)'
+                                            }}>
+                                                <div style={{
+                                                    fontSize: '12px',
+                                                    color: 'rgba(147, 197, 253, 1)',
+                                                    marginBottom: '8px',
+                                                    fontWeight: '600'
+                                                }}>
+                                                    🔴 AGORA
+                                                </div>
+                                                <div style={{
+                                                    fontSize: '16px',
+                                                    color: 'white',
+                                                    fontWeight: '600',
+                                                    marginBottom: '8px'
+                                                }}>
+                                                    {currentProgram.title}
+                                                </div>
+                                                <div style={{
+                                                    fontSize: '12px',
+                                                    color: 'rgba(156, 163, 175, 1)',
+                                                    marginBottom: '8px'
+                                                }}>
+                                                    {epgService.formatTime(currentProgram.start)} - {epgService.formatTime(currentProgram.end)}
+                                                </div>
+                                                {/* Progress Bar */}
+                                                <div style={{
+                                                    width: '100%',
+                                                    height: '4px',
+                                                    background: 'rgba(255, 255, 255, 0.1)',
+                                                    borderRadius: '2px',
+                                                    overflow: 'hidden'
+                                                }}>
+                                                    <div style={{
+                                                        width: `${epgService.getProgramProgress(currentProgram)}%`,
+                                                        height: '100%',
+                                                        background: 'rgba(59, 130, 246, 1)',
+                                                        transition: 'width 1s ease'
+                                                    }} />
+                                                </div>
+                                            </div>
+
+                                            {/* Upcoming Programs */}
+                                            {upcomingPrograms.length > 0 && (
+                                                <div>
+                                                    <div style={{
+                                                        fontSize: '14px',
+                                                        color: 'rgba(156, 163, 175, 1)',
+                                                        marginBottom: '12px',
+                                                        fontWeight: '600'
+                                                    }}>
+                                                        Próximos Programas
+                                                    </div>
+                                                    {upcomingPrograms.map((program, index) => (
+                                                        <div key={program.id || index} style={{
+                                                            marginBottom: '12px',
+                                                            padding: '12px',
+                                                            background: 'rgba(255, 255, 255, 0.05)',
+                                                            borderRadius: '6px'
+                                                        }}>
+                                                            <div style={{
+                                                                fontSize: '14px',
+                                                                color: 'white',
+                                                                marginBottom: '4px'
+                                                            }}>
+                                                                {program.title}
+                                                            </div>
+                                                            <div style={{
+                                                                fontSize: '12px',
+                                                                color: 'rgba(156, 163, 175, 1)'
+                                                            }}>
+                                                                {epgService.formatTime(program.start)}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <div style={{
+                                            textAlign: 'center',
+                                            padding: '40px 20px',
+                                            color: 'rgba(156, 163, 175, 1)'
+                                        }}>
+                                            <div style={{ fontSize: '48px', marginBottom: '12px' }}>📺</div>
+                                            <div>Sem informações de programação</div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div style={{ maxWidth: '1400px', margin: '20px auto 0' }}>
+
+                                <div style={{ display: 'flex', gap: '12px' }}>
+                                    <button
+                                        onClick={() => {
+                                            setPlayingChannel(selectedChannel);
+                                            setSelectedChannel(null);
+                                        }}
+                                        style={{
+                                            padding: '16px 48px',
+                                            backgroundColor: '#2563eb',
+                                            color: 'white',
+                                            fontWeight: 'bold',
+                                            fontSize: '17px',
+                                            borderRadius: '8px',
+                                            border: 'none',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '8px',
+                                            transition: 'all 0.2s',
+                                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#1d4ed8';
+                                            e.currentTarget.style.transform = 'scale(1.05)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = '#2563eb';
+                                            e.currentTarget.style.transform = 'scale(1)';
+                                        }}
+                                    >
+                                        ▶ Assistir Tela Cheia
+                                    </button>
+
+                                    <button
+                                        onClick={() => setSelectedChannel(null)}
+                                        style={{
+                                            padding: '16px 32px',
+                                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                            color: 'white',
+                                            fontWeight: 'bold',
+                                            fontSize: '17px',
+                                            borderRadius: '8px',
+                                            border: '2px solid rgba(255, 255, 255, 0.2)',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                                        }}
+                                    >
+                                        Fechar
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
                 )}
 
-                <div className="p-8" style={{ paddingLeft: '60px' }}>
+                        <div className="p-8" style={{ paddingLeft: '60px' }}>
 
-                    {filteredStreams.length === 0 ? (
-                        <div className="text-center text-gray-400 py-12">
-                            <p className="text-lg">Nenhum canal encontrado</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-px">
-                            {filteredStreams.map((stream) => (
-                                <div
-                                    key={stream.stream_id}
-                                    onClick={() => setSelectedChannel(stream)}
-                                    className="bg-gray-800 hover:bg-gray-700 py-1 px-2 border-b border-gray-700/50 last:border-b-0 transition-colors cursor-pointer group flex items-center gap-2"
-                                    style={{ borderLeft: selectedChannel?.stream_id === stream.stream_id ? '3px solid #3b82f6' : 'none' }}
-                                >
-                                    <div className="w-[56px] h-[56px] bg-gray-700 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
-                                        {stream.stream_icon && !brokenImages.has(stream.stream_id) ? (
-                                            <img
-                                                src={stream.stream_icon}
-                                                alt=""
-                                                className="w-full h-full object-contain"
-                                                onError={() => handleImageError(stream.stream_id)}
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full bg-blue-500/30"></div>
-                                        )}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-gray-300 font-normal text-xs leading-tight group-hover:text-white transition-colors truncate">
-                                            {stream.name}
-                                        </p>
-                                    </div>
+                            {filteredStreams.length === 0 ? (
+                                <div className="text-center text-gray-400 py-12">
+                                    <p className="text-lg">Nenhum canal encontrado</p>
                                 </div>
-                            ))}
+                            ) : (
+                                <div className="space-y-px">
+                                    {filteredStreams.map((stream) => (
+                                        <div
+                                            key={stream.stream_id}
+                                            onClick={() => setSelectedChannel(stream)}
+                                            className="bg-gray-800 hover:bg-gray-700 py-1 px-2 border-b border-gray-700/50 last:border-b-0 transition-colors cursor-pointer group flex items-center gap-2"
+                                            style={{ borderLeft: selectedChannel?.stream_id === stream.stream_id ? '3px solid #3b82f6' : 'none' }}
+                                        >
+                                            <div className="w-[56px] h-[56px] bg-gray-700 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
+                                                {stream.stream_icon && !brokenImages.has(stream.stream_id) ? (
+                                                    <img
+                                                        src={stream.stream_icon}
+                                                        alt=""
+                                                        className="w-full h-full object-contain"
+                                                        onError={() => handleImageError(stream.stream_id)}
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full bg-blue-500/30"></div>
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-gray-300 font-normal text-xs leading-tight group-hover:text-white transition-colors truncate">
+                                                    {stream.name}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
-                    )}
-                </div>
-            </div>
+                    </div>
 
             {playingChannel && (
-                <AsyncVideoPlayer
-                    movie={playingChannel as any}
-                    buildStreamUrl={buildLiveStreamUrl}
-                    onClose={() => setPlayingChannel(null)}
-                    customTitle={playingChannel.name}
-                />
-            )}
-        </div>
-    );
+                    <AsyncVideoPlayer
+                        movie={playingChannel as any}
+                        buildStreamUrl={buildLiveStreamUrl}
+                        onClose={() => setPlayingChannel(null)}
+                        customTitle={playingChannel.name}
+                    />
+                )}
+            </div>
+            );
 }
