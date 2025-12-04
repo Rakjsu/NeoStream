@@ -378,6 +378,18 @@ export function VOD() {
                     movie={playingMovie}
                     buildStreamUrl={buildStreamUrl}
                     onClose={() => setPlayingMovie(null)}
+                    resumeTime={movieProgressService.getMoviePositionById(playingMovie.stream_id.toString())?.currentTime || null}
+                    onTimeUpdate={(currentTime, duration) => {
+                        // Save progress every 5 seconds
+                        if (Math.floor(currentTime) % 5 === 0) {
+                            movieProgressService.saveMovieTime(
+                                playingMovie.stream_id.toString(),
+                                playingMovie.name,
+                                currentTime,
+                                duration
+                            );
+                        }
+                    }}
                 />
             )
             }

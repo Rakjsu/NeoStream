@@ -16,6 +16,9 @@ interface AsyncVideoPlayerProps {
     seriesId?: string;
     seasonNumber?: number;
     episodeNumber?: number;
+    // For movie progress tracking
+    resumeTime?: number | null;
+    onTimeUpdate?: (currentTime: number, duration: number) => void;
 }
 
 function AsyncVideoPlayer({
@@ -30,7 +33,9 @@ function AsyncVideoPlayer({
     customTitle,
     seriesId,
     seasonNumber,
-    episodeNumber
+    episodeNumber,
+    resumeTime: externalResumeTime,
+    onTimeUpdate: externalOnTimeUpdate
 }: AsyncVideoPlayerProps) {
     const [streamUrl, setStreamUrl] = useState<string>('');
     const [loading, setLoading] = useState(true);
@@ -63,7 +68,12 @@ function AsyncVideoPlayer({
                 console.error('Error building stream URL:', error);
                 setLoading(false);
             });
-    }, [movie, buildStreamUrl, currentEpisode, seriesId, seasonNumber, episodeNumber]);
+
+        // Set external resume time if provided (for movies)
+        if (externalResumeTime !== undefined) {
+            setResumeTime(externalResumeTime);
+        }
+    }, [movie, buildStreamUrl, currentEpisode, seriesId, seasonNumber, episodeNumber, externalResumeTime]);
 
     // Disable animation after it completes
     useEffect(() => {
@@ -130,7 +140,12 @@ function AsyncVideoPlayer({
                         canGoPrevious={canGoPrevious}
                         resumeTime={resumeTime}
                         onTimeUpdate={(currentTime, duration) => {
-                            // Save video progress every 5 seconds
+                            // Call external onTimeUpdate if provided (for movies)
+                            if (externalOnTimeUpdate) {
+                                externalOnTimeUpdate(currentTime, duration);
+                            }
+
+                            // Save video progress for series every 5 seconds
                             if (seriesId && seasonNumber !== undefined && episodeNumber !== undefined && currentTime % 5 < 0.5) {
                                 watchProgressService.saveVideoTime(
                                     seriesId,
