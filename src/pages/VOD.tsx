@@ -4,6 +4,7 @@ import { watchLaterService } from '../services/watchLater';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import { CategoryMenu } from '../components/CategoryMenu';
+import { watchProgressService } from '../services/watchProgressService';
 
 interface VODStream {
     num: number;
