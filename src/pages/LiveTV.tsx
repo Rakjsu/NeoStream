@@ -272,8 +272,9 @@ export function LiveTV() {
                             {filteredStreams.map((stream) => (
                                 <div
                                     key={stream.stream_id}
-                                    onClick={() => setPlayingChannel(stream)}
+                                    onClick={() => setSelectedChannel(stream)}
                                     className="bg-gray-800 hover:bg-gray-700 py-1 px-2 border-b border-gray-700/50 last:border-b-0 transition-colors cursor-pointer group flex items-center gap-2"
+                                    style={{ borderLeft: selectedChannel?.stream_id === stream.stream_id ? '3px solid #3b82f6' : 'none' }}
                                 >
                                     <div className="w-[56px] h-[56px] bg-gray-700 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
                                         {stream.stream_icon && !brokenImages.has(stream.stream_id) ? (
