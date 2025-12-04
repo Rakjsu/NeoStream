@@ -183,6 +183,21 @@ export function LiveTV() {
                                                     const url = await buildLiveStreamUrl(selectedChannel);
                                                     console.log('Loading preview URL:', url);
 
+                                                    // Dynamically load hls.js if needed and not already loaded
+                                                    if (url.includes('.m3u8') && !(window as any).Hls) {
+                                                        console.log('📦 Loading hls.js from CDN...');
+                                                        await new Promise((resolve, reject) => {
+                                                            const script = document.createElement('script');
+                                                            script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
+                                                            script.onload = () => {
+                                                                console.log('✅ hls.js loaded successfully');
+                                                                resolve(true);
+                                                            };
+                                                            script.onerror = () => reject(new Error('Failed to load hls.js'));
+                                                            document.head.appendChild(script);
+                                                        });
+                                                    }
+
                                                     // Use hls.js for HLS streams
                                                     if (url.includes('.m3u8')) {
                                                         const Hls = (window as any).Hls;
