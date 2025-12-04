@@ -8,129 +8,46 @@ interface EPGProgram {
 }
 
 // Channel name mappings for meuguia.tv
-// Format: normalized channel name -> meuguia.tv URL slug (with spaces encoded as %20 or using exact name)
+// Only includes channels that work on meuguia.tv API
 const channelMappings: Record<string, string> = {
-    // TV Aberta
-    'globo': 'TV Globo',
-    'tv globo': 'TV Globo',
-    'globo sp': 'TV Globo',
-    'globo rj': 'TV Globo',
-    'globo brasilia': 'TV Globo',
-    'sbt': 'SBT',
-    'record': 'Record TV',
-    'band': 'Band',
-    'bandeirantes': 'Band',
-    'redetv': 'RedeTV!',
-    'rede tv': 'RedeTV!',
-    // HBO
+    // HBO channels (confirmed working)
     'hbo': 'HBO',
     'hbo max': 'HBO',
     'hbo 2': 'HBO 2',
     'hbo plus': 'HBO Plus',
     'hbo family': 'HBO Family',
     'hbo signature': 'HBO Signature',
-    // Telecine  
-    'telecine premium': 'Telecine Premium',
-    'telecine action': 'Telecine Action',
-    'telecine pipoca': 'Telecine Pipoca',
-    'telecine fun': 'Telecine Fun',
-    'telecine touch': 'Telecine Touch',
-    'telecine cult': 'Telecine Cult',
-    'telecine': 'Telecine Premium',
-    // News
-    'globonews': 'GloboNews',
-    'globo news': 'GloboNews',
-    'cnn': 'CNN Brasil',
-    'cnn brasil': 'CNN Brasil',
-    'band news': 'BandNews TV',
-    'record news': 'Record News',
-    // Sports
-    'sportv': 'SporTV',
-    'sportv 2': 'SporTV 2',
-    'sportv 3': 'SporTV 3',
-    'espn': 'ESPN',
-    'espn 2': 'ESPN 2',
-    'espn 3': 'ESPN 3',
-    'espn 4': 'ESPN 4',
-    'fox sports': 'Fox Sports',
-    'fox sports 2': 'Fox Sports 2',
-    'premiere': 'Premiere FC',
-    'combate': 'Combate',
-    // Documentaries
-    'discovery': 'Discovery Channel',
-    'discovery channel': 'Discovery Channel',
-    'discovery kids': 'Discovery Kids',
-    'animal planet': 'Animal Planet',
-    'history': 'History',
-    'history channel': 'History',
-    'nat geo': 'National Geographic',
-    'national geographic': 'National Geographic',
-    'natgeo': 'National Geographic',
-    // Kids
-    'cartoon': 'Cartoon Network',
-    'cartoon network': 'Cartoon Network',
-    'disney': 'Disney Channel',
-    'disney channel': 'Disney Channel',
-    'disney xd': 'Disney XD',
-    'disney junior': 'Disney Junior',
-    'nick': 'Nickelodeon',
-    'nickelodeon': 'Nickelodeon',
-    'nick jr': 'Nick Jr.',
-    'gloob': 'Gloob',
-    'gloobinho': 'Gloobinho',
-    'boomerang': 'Boomerang',
-    // Entertainment
-    'multishow': 'Multishow',
-    'gnt': 'GNT',
-    'viva': 'Viva',
-    'canal brasil': 'Canal Brasil',
-    'comedy central': 'Comedy Central',
-    'mtv': 'MTV',
-    'vh1': 'VH1',
-    'a&e': 'A&E',
-    'lifetime': 'Lifetime',
-    'tlc': 'TLC',
-    // Movies & Series
-    'warner': 'Warner Channel',
-    'warner channel': 'Warner Channel',
-    'tnt': 'TNT',
-    'tnt series': 'TNT Séries',
-    'space': 'SPACE',
-    'axn': 'AXN',
-    'sony': 'Sony Channel',
-    'sony channel': 'Sony Channel',
-    'fx': 'FX',
-    'paramount': 'Paramount Channel',
-    'paramount channel': 'Paramount Channel',
-    'universal': 'Universal TV',
-    'universal tv': 'Universal TV',
-    'megapix': 'Megapix',
-    'cinemax': 'Cinemax',
-    'tcm': 'TCM - Turner Classic',
+    // Others confirmed working
     'amc': 'AMC',
-    // Others
-    'off': 'OFF',
-    'canal off': 'OFF',
-    'arte1': 'Arte 1',
-    'bis': 'BIS',
-    'food network': 'Food Network',
-    'home & health': 'Discovery Home & Health',
-    'travel': 'Travel Box Brazil',
-    'woohoo': 'Woohoo',
+    'axn': 'AXN',
+    'cinemax': 'Cinemax',
+    'espn': 'ESPN',
+    'fx': 'FX',
+    'gnt': 'GNT',
+    'megapix': 'Megapix',
+    'mtv': 'MTV',
+    'multishow': 'Multishow',
+    'space': 'SPACE',
+    'tnt': 'TNT',
+    'universal': 'Universal TV',
+    'vh1': 'VH1',
+    'viva': 'Viva',
+    // Note: Telecine, Globo, SBT, etc. don't work with direct URLs
+    // They would need scraping from category pages
 };
 
 export const epgService = {
-    // Fetch EPG data - try meuguia.tv first (primary), then XC API (fallback)
+    // Fetch EPG data - try XC API first (reliable), then meuguia.tv (fallback for some channels)
     async fetchChannelEPG(epgChannelId: string, channelName?: string): Promise<EPGProgram[]> {
-        // Try meuguia.tv first (primary source for Brazilian channels)
+        // Try XC API first (IPTV provider)
+        const xcPrograms = await this.fetchFromXCAPI(epgChannelId);
+        if (xcPrograms.length > 0) return xcPrograms;
+
+        // Fallback to meuguia.tv for Brazilian channels
         if (channelName) {
             const meuguiaPrograms = await this.fetchFromMeuGuia(channelName);
             if (meuguiaPrograms.length > 0) return meuguiaPrograms;
         }
-
-        // Fallback to XC API (IPTV provider)
-        const xcPrograms = await this.fetchFromXCAPI(epgChannelId);
-        if (xcPrograms.length > 0) return xcPrograms;
 
         return [];
     },
@@ -180,11 +97,10 @@ export const epgService = {
                 .trim();
 
             // Sort mappings by key length (descending) to match longer keys first
-            // This ensures "telecine action" matches before "telecine"
             const sortedMappings = Object.entries(channelMappings)
                 .sort((a, b) => b[0].length - a[0].length);
 
-            // Find best match - check if normalized contains the key
+            // Find best match
             let slug = '';
             for (const [key, value] of sortedMappings) {
                 if (normalized.includes(key)) {
@@ -193,32 +109,15 @@ export const epgService = {
                 }
             }
 
-            console.log('[EPG] Channel:', channelName, '-> Normalized:', normalized, '-> Slug:', slug);
-
-            if (!slug) {
-                console.log('[EPG] No mapping found for channel');
-                return [];
-            }
+            if (!slug) return [];
 
             // Fetch via IPC (bypasses CORS)
-            console.log('[EPG] Fetching from meuguia.tv:', slug);
             const result = await window.ipcRenderer.invoke('epg:fetch-meuguia', slug);
-
-            if (!result.success) {
-                console.log('[EPG] IPC failed:', result.error);
-                return [];
-            }
-
-            console.log('[EPG] HTML received, length:', result.html?.length || 0);
-            if (!result.html) return [];
+            if (!result.success || !result.html) return [];
 
             // Parse the HTML to extract programs
-            const programs = this.parseMeuGuiaHTML(result.html, channelName);
-            console.log('[EPG] Parsed programs:', programs.length);
-
-            return programs;
-        } catch (e) {
-            console.error('[EPG] Error:', e);
+            return this.parseMeuGuiaHTML(result.html, channelName);
+        } catch {
             return [];
         }
     },
@@ -226,9 +125,6 @@ export const epgService = {
     // Parse meuguia.tv HTML
     parseMeuGuiaHTML(html: string, channelId: string): EPGProgram[] {
         const programs: EPGProgram[] = [];
-
-        // Log a sample of HTML for debugging (show more to find program data)
-        console.log('[EPG] HTML sample:', html.substring(3000, 6000));
 
         // meuguia.tv structure: time is in format HH:MM followed by program title
         // Try to extract programs using various patterns
