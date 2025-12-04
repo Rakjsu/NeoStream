@@ -51,7 +51,8 @@ export function LiveTV() {
         let intervalId: number;
 
         const fetchEPG = async () => {
-            const programs = await epgService.fetchChannelEPG(selectedChannel.epg_channel_id);
+            // Pass both EPG ID and channel name (for meuguia.tv fallback)
+            const programs = await epgService.fetchChannelEPG(selectedChannel.epg_channel_id, selectedChannel.name);
             setEpgData(programs);
 
             const current = epgService.getCurrentProgram(programs);

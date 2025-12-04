@@ -7,31 +7,144 @@ interface EPGProgram {
     channel_id: string;
 }
 
+// Channel name mappings for meuguia.tv
+const channelMappings: Record<string, string> = {
+    // Common variations -> meuguia.tv URL slug
+    'globo': 'TV-Globo',
+    'tv globo': 'TV-Globo',
+    'globo sp': 'TV-Globo',
+    'globo rj': 'TV-Globo',
+    'sbt': 'SBT',
+    'record': 'Record-TV',
+    'band': 'Band',
+    'bandeirantes': 'Band',
+    'redetv': 'RedeTV',
+    'rede tv': 'RedeTV',
+    'hbo': 'HBO',
+    'hbo max': 'HBO',
+    'hbo 2': 'HBO-2',
+    'hbo plus': 'HBO-Plus',
+    'hbo family': 'HBO-Family',
+    'hbo signature': 'HBO-Signature',
+    'telecine': 'Telecine-Premium',
+    'telecine premium': 'Telecine-Premium',
+    'telecine action': 'Telecine-Action',
+    'telecine pipoca': 'Telecine-Pipoca',
+    'telecine fun': 'Telecine-Fun',
+    'telecine touch': 'Telecine-Touch',
+    'telecine cult': 'Telecine-Cult',
+    'globonews': 'GloboNews',
+    'globo news': 'GloboNews',
+    'sportv': 'SporTV',
+    'sportv 2': 'SporTV-2',
+    'sportv 3': 'SporTV-3',
+    'espn': 'ESPN',
+    'espn 2': 'ESPN-2',
+    'espn 3': 'ESPN-3',
+    'espn 4': 'ESPN-4',
+    'fox sports': 'Fox-Sports',
+    'fox sports 2': 'Fox-Sports-2',
+    'discovery': 'Discovery-Channel',
+    'discovery channel': 'Discovery-Channel',
+    'discovery kids': 'Discovery-Kids',
+    'animal planet': 'Animal-Planet',
+    'history': 'History-Channel',
+    'history channel': 'History-Channel',
+    'nat geo': 'National-Geographic',
+    'national geographic': 'National-Geographic',
+    'natgeo': 'National-Geographic',
+    'cartoon': 'Cartoon-Network',
+    'cartoon network': 'Cartoon-Network',
+    'disney': 'Disney-Channel',
+    'disney channel': 'Disney-Channel',
+    'disney xd': 'Disney-XD',
+    'disney junior': 'Disney-Junior',
+    'nick': 'Nickelodeon',
+    'nickelodeon': 'Nickelodeon',
+    'nick jr': 'Nick-Jr',
+    'multishow': 'Multishow',
+    'gnt': 'GNT',
+    'viva': 'Viva',
+    'canal brasil': 'Canal-Brasil',
+    'arte1': 'Arte-1',
+    'bis': 'BIS',
+    'cnn': 'CNN-Brasil',
+    'cnn brasil': 'CNN-Brasil',
+    'band news': 'BandNews-TV',
+    'record news': 'Record-News',
+    'warner': 'Warner-Channel',
+    'warner channel': 'Warner-Channel',
+    'tnt': 'TNT',
+    'tnt series': 'TNT-Series',
+    'space': 'Space',
+    'i.sat': 'I.Sat',
+    'axn': 'AXN',
+    'sony': 'Sony-Channel',
+    'sony channel': 'Sony-Channel',
+    'fox': 'Fox-Channel',
+    'fx': 'FX',
+    'paramount': 'Paramount-Channel',
+    'paramount channel': 'Paramount-Channel',
+    'universal': 'Universal-TV',
+    'universal tv': 'Universal-TV',
+    'comedy central': 'Comedy-Central',
+    'mtv': 'MTV',
+    'vh1': 'VH1',
+    'a&e': 'AeE',
+    'lifetime': 'Lifetime',
+    'tlc': 'TLC',
+    'home & health': 'Home-e-Health',
+    'food network': 'Food-Network',
+    'travel': 'Travel-Box-Brazil',
+    'megapix': 'Megapix',
+    'max': 'Max-Prime',
+    'max prime': 'Max-Prime',
+    'premiere': 'Premiere-FC',
+    'combate': 'Combate',
+    'woohoo': 'Woohoo',
+    'gloob': 'Gloob',
+    'gloobinho': 'Gloobinho',
+    'off': 'OFF',
+    'canal off': 'OFF',
+    'boomerang': 'Boomerang',
+    'cidade alerta': 'Record-TV',
+    'cinemax': 'Cinemax',
+    'mgm': 'MGM'
+};
+
 export const epgService = {
-    // Fetch EPG data for a specific channel
-    async fetchChannelEPG(epgChannelId: string): Promise<EPGProgram[]> {
+    // Fetch EPG data - try XC API first, then meuguia.tv
+    async fetchChannelEPG(epgChannelId: string, channelName?: string): Promise<EPGProgram[]> {
+        // Try XC API first
+        const xcPrograms = await this.fetchFromXCAPI(epgChannelId);
+        if (xcPrograms.length > 0) return xcPrograms;
+
+        // Fallback to meuguia.tv if channel name is provided
+        if (channelName) {
+            return await this.fetchFromMeuGuia(channelName);
+        }
+
+        return [];
+    },
+
+    // Fetch from XC API
+    async fetchFromXCAPI(epgChannelId: string): Promise<EPGProgram[]> {
         try {
             const credentials = await window.ipcRenderer.invoke('auth:get-credentials');
             if (!credentials) return [];
 
-            // XC API EPG endpoint - use get_short_epg for current + next programs
             const url = `${credentials.serverUrl}/player_api.php?username=${credentials.username}&password=${credentials.password}&action=get_short_epg&stream_id=${epgChannelId}&limit=10`;
 
             const response = await fetch(url);
-
-            // Try to parse response as JSON
             const text = await response.text();
             if (!text || text.startsWith('<!') || text.startsWith('<')) {
-                return []; // Server returned HTML
+                return [];
             }
 
             const data = JSON.parse(text);
-
-            // Handle different response formats
             const listings = data.epg_listings || data.listings || data;
             if (!Array.isArray(listings)) return [];
 
-            // Parse and return programs
             return listings.map((item: any) => ({
                 id: item.id || `${item.start}-${item.title}`,
                 start: item.start || item.start_timestamp,
@@ -41,8 +154,91 @@ export const epgService = {
                 channel_id: epgChannelId
             }));
         } catch {
-            return []; // Silently fail - EPG not available
+            return [];
         }
+    },
+
+    // Fetch from meuguia.tv
+    async fetchFromMeuGuia(channelName: string): Promise<EPGProgram[]> {
+        try {
+            // Normalize channel name and find mapping
+            const normalized = channelName.toLowerCase().trim()
+                .replace(/\s+/g, ' ')
+                .replace(/hd$/i, '')
+                .replace(/fhd$/i, '')
+                .replace(/4k$/i, '')
+                .trim();
+
+            // Find best match
+            let slug = '';
+            for (const [key, value] of Object.entries(channelMappings)) {
+                if (normalized.includes(key) || key.includes(normalized)) {
+                    slug = value;
+                    break;
+                }
+            }
+
+            if (!slug) return [];
+
+            // Fetch from meuguia.tv
+            const response = await fetch(`https://meuguia.tv/programacao/canal/${slug}`);
+            const html = await response.text();
+
+            // Parse the HTML to extract programs
+            return this.parseMeuGuiaHTML(html, channelName);
+        } catch {
+            return [];
+        }
+    },
+
+    // Parse meuguia.tv HTML
+    parseMeuGuiaHTML(html: string, channelId: string): EPGProgram[] {
+        const programs: EPGProgram[] = [];
+
+        // Extract program entries using regex
+        const programRegex = /<div class="col[^"]*program[^"]*"[^>]*>[\s\S]*?<div class="time[^"]*">(\d{1,2}:\d{2})<\/div>[\s\S]*?<div class="title[^"]*">([^<]+)<\/div>/gi;
+
+        let match;
+        const today = new Date();
+        let lastHour = -1;
+        let dayOffset = 0;
+
+        while ((match = programRegex.exec(html)) !== null) {
+            const time = match[1];
+            const title = match[2].trim();
+
+            const [hours, minutes] = time.split(':').map(Number);
+
+            // Detect day change (if hour goes backwards)
+            if (hours < lastHour) {
+                dayOffset++;
+            }
+            lastHour = hours;
+
+            const startDate = new Date(today);
+            startDate.setDate(startDate.getDate() + dayOffset);
+            startDate.setHours(hours, minutes, 0, 0);
+
+            // Estimate end time as start of next program (1 hour default)
+            const endDate = new Date(startDate);
+            endDate.setHours(endDate.getHours() + 1);
+
+            programs.push({
+                id: `meuguia-${startDate.getTime()}`,
+                start: startDate.toISOString(),
+                end: endDate.toISOString(),
+                title: title,
+                description: '',
+                channel_id: channelId
+            });
+        }
+
+        // Fix end times based on next program start
+        for (let i = 0; i < programs.length - 1; i++) {
+            programs[i].end = programs[i + 1].start;
+        }
+
+        return programs;
     },
 
     // Get current program (based on current time)
