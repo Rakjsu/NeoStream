@@ -543,8 +543,8 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                         )}
                     </button>
 
-                    {/* Continue Watching - Special Category (Series and VOD only) */}
-                    {(type === 'series' || type === 'vod') && (
+                    {/* Continue Watching - Special Category (Series only) */}
+                    {type === 'series' && (
                         <button
                             onClick={() => {
                                 onSelectCategory('CONTINUE_WATCHING');
@@ -616,7 +616,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                         </button>
                     )}
 
-                    {/* Completed - Special Category (Series and VOD only) */}
+                    {/* Completed - Special Category (Series only) */}
                     {type === 'series' && (
                         <button
                             onClick={() => {
@@ -678,79 +678,6 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                             </div>
                             <span style={{ flex: 1 }}>Séries Finalizadas</span>
                             {selectedCategory === 'COMPLETED' && (
-                                <div style={{
-                                    width: '8px',
-                                    height: '8px',
-                                    borderRadius: '50%',
-                                    background: '#10b981',
-                                    boxShadow: '0 0 12px rgba(16, 185, 129, 0.8)'
-                                }}></div>
-                            )}
-                        </button>
-                    )}
-
-                    {/* Watched Movies - Special Category (VOD only) */}
-                    {type === 'vod' && (
-                        <button
-                            onClick={() => {
-                                onSelectCategory('WATCHED');
-                                setIsOpen(false);
-                            }}
-                            style={{
-                                width: '100%',
-                                padding: '16px 20px',
-                                background: selectedCategory === 'WATCHED'
-                                    ? 'rgba(16, 185, 129, 0.15)'
-                                    : 'rgba(255, 255, 255, 0.03)',
-                                border: selectedCategory === 'WATCHED'
-                                    ? '2px solid #10b981'
-                                    : '2px solid rgba(255, 255, 255, 0.05)',
-                                borderRadius: '12px',
-                                color: selectedCategory === 'WATCHED' ? '#10b981' : 'white',
-                                fontSize: '15px',
-                                fontWeight: selectedCategory === 'WATCHED' ? '600' : '500',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '14px',
-                                cursor: 'pointer',
-                                marginBottom: '16px',
-                                textAlign: 'left',
-                                transition: 'all 0.3s ease'
-                            }}
-                            onMouseEnter={(e) => {
-                                if (selectedCategory !== 'WATCHED') {
-                                    e.currentTarget.style.background = 'rgba(16, 185, 129, 0.08)';
-                                    e.currentTarget.style.transform = 'translateX(4px) scale(1.02)';
-                                    e.currentTarget.style.borderColor = '#10b981';
-                                    e.currentTarget.style.color = '#10b981';
-                                }
-                            }}
-                            onMouseLeave={(e) => {
-                                if (selectedCategory !== 'WATCHED') {
-                                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
-                                    e.currentTarget.style.transform = 'translateX(0) scale(1)';
-                                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
-                                    e.currentTarget.style.color = 'white';
-                                }
-                            }}
-                        >
-                            <div style={{
-                                width: '40px',
-                                height: '40px',
-                                borderRadius: '10px',
-                                background: selectedCategory === 'WATCHED'
-                                    ? 'rgba(16, 185, 129, 0.2)'
-                                    : 'rgba(255, 255, 255, 0.1)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '20px',
-                                transition: 'all 0.3s ease'
-                            }}>
-                                ✅
-                            </div>
-                            <span style={{ flex: 1 }}>Filmes Assistidos</span>
-                            {selectedCategory === 'WATCHED' && (
                                 <div style={{
                                     width: '8px',
                                     height: '8px',
