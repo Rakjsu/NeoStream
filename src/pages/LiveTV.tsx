@@ -170,6 +170,7 @@ export function LiveTV() {
                                 marginBottom: '20px'
                             }}>
                                 <video
+                                    id="preview-video"
                                     key={selectedChannel.stream_id}
                                     autoPlay
                                     muted
@@ -177,13 +178,19 @@ export function LiveTV() {
                                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                                     ref={(videoEl) => {
                                         if (videoEl) {
-                                            buildLiveStreamUrl(selectedChannel).then(url => {
-                                                if (videoEl.src !== url) {
+                                            const loadVideo = async () => {
+                                                try {
+                                                    const url = await buildLiveStreamUrl(selectedChannel);
+                                                    console.log('Loading preview URL:', url);
                                                     videoEl.src = url;
-                                                    videoEl.load();
-                                                    videoEl.play().catch(() => { });
+                                                    await videoEl.load();
+                                                    await videoEl.play();
+                                                    console.log('Preview playing');
+                                                } catch (error) {
+                                                    console.error('Preview load error:', error);
                                                 }
-                                            });
+                                            };
+                                            loadVideo();
                                         }
                                     }}
                                 />
