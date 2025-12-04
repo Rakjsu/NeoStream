@@ -422,8 +422,8 @@ export function LiveTV() {
                                 </div>
                             </div>
 
+                            {/* Buttons */}
                             <div style={{ maxWidth: '1400px', margin: '20px auto 0' }}>
-
                                 <div style={{ display: 'flex', gap: '12px' }}>
                                     <button
                                         onClick={() => {
