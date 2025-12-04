@@ -8,108 +8,115 @@ interface EPGProgram {
 }
 
 // Channel name mappings for meuguia.tv
+// Format: normalized channel name -> meuguia.tv URL slug (with spaces encoded as %20 or using exact name)
 const channelMappings: Record<string, string> = {
-    // Common variations -> meuguia.tv URL slug
-    'globo': 'TV-Globo',
-    'tv globo': 'TV-Globo',
-    'globo sp': 'TV-Globo',
-    'globo rj': 'TV-Globo',
+    // TV Aberta
+    'globo': 'TV Globo',
+    'tv globo': 'TV Globo',
+    'globo sp': 'TV Globo',
+    'globo rj': 'TV Globo',
+    'globo brasilia': 'TV Globo',
     'sbt': 'SBT',
-    'record': 'Record-TV',
+    'record': 'Record TV',
     'band': 'Band',
     'bandeirantes': 'Band',
-    'redetv': 'RedeTV',
-    'rede tv': 'RedeTV',
+    'redetv': 'RedeTV!',
+    'rede tv': 'RedeTV!',
+    // HBO
     'hbo': 'HBO',
     'hbo max': 'HBO',
-    'hbo 2': 'HBO-2',
-    'hbo plus': 'HBO-Plus',
-    'hbo family': 'HBO-Family',
-    'hbo signature': 'HBO-Signature',
-    'telecine': 'Telecine-Premium',
-    'telecine premium': 'Telecine-Premium',
-    'telecine action': 'Telecine-Action',
-    'telecine pipoca': 'Telecine-Pipoca',
-    'telecine fun': 'Telecine-Fun',
-    'telecine touch': 'Telecine-Touch',
-    'telecine cult': 'Telecine-Cult',
+    'hbo 2': 'HBO 2',
+    'hbo plus': 'HBO Plus',
+    'hbo family': 'HBO Family',
+    'hbo signature': 'HBO Signature',
+    // Telecine  
+    'telecine premium': 'Telecine Premium',
+    'telecine action': 'Telecine Action',
+    'telecine pipoca': 'Telecine Pipoca',
+    'telecine fun': 'Telecine Fun',
+    'telecine touch': 'Telecine Touch',
+    'telecine cult': 'Telecine Cult',
+    'telecine': 'Telecine Premium',
+    // News
     'globonews': 'GloboNews',
     'globo news': 'GloboNews',
+    'cnn': 'CNN Brasil',
+    'cnn brasil': 'CNN Brasil',
+    'band news': 'BandNews TV',
+    'record news': 'Record News',
+    // Sports
     'sportv': 'SporTV',
-    'sportv 2': 'SporTV-2',
-    'sportv 3': 'SporTV-3',
+    'sportv 2': 'SporTV 2',
+    'sportv 3': 'SporTV 3',
     'espn': 'ESPN',
-    'espn 2': 'ESPN-2',
-    'espn 3': 'ESPN-3',
-    'espn 4': 'ESPN-4',
-    'fox sports': 'Fox-Sports',
-    'fox sports 2': 'Fox-Sports-2',
-    'discovery': 'Discovery-Channel',
-    'discovery channel': 'Discovery-Channel',
-    'discovery kids': 'Discovery-Kids',
-    'animal planet': 'Animal-Planet',
-    'history': 'History-Channel',
-    'history channel': 'History-Channel',
-    'nat geo': 'National-Geographic',
-    'national geographic': 'National-Geographic',
-    'natgeo': 'National-Geographic',
-    'cartoon': 'Cartoon-Network',
-    'cartoon network': 'Cartoon-Network',
-    'disney': 'Disney-Channel',
-    'disney channel': 'Disney-Channel',
-    'disney xd': 'Disney-XD',
-    'disney junior': 'Disney-Junior',
+    'espn 2': 'ESPN 2',
+    'espn 3': 'ESPN 3',
+    'espn 4': 'ESPN 4',
+    'fox sports': 'Fox Sports',
+    'fox sports 2': 'Fox Sports 2',
+    'premiere': 'Premiere FC',
+    'combate': 'Combate',
+    // Documentaries
+    'discovery': 'Discovery Channel',
+    'discovery channel': 'Discovery Channel',
+    'discovery kids': 'Discovery Kids',
+    'animal planet': 'Animal Planet',
+    'history': 'History',
+    'history channel': 'History',
+    'nat geo': 'National Geographic',
+    'national geographic': 'National Geographic',
+    'natgeo': 'National Geographic',
+    // Kids
+    'cartoon': 'Cartoon Network',
+    'cartoon network': 'Cartoon Network',
+    'disney': 'Disney Channel',
+    'disney channel': 'Disney Channel',
+    'disney xd': 'Disney XD',
+    'disney junior': 'Disney Junior',
     'nick': 'Nickelodeon',
     'nickelodeon': 'Nickelodeon',
-    'nick jr': 'Nick-Jr',
+    'nick jr': 'Nick Jr.',
+    'gloob': 'Gloob',
+    'gloobinho': 'Gloobinho',
+    'boomerang': 'Boomerang',
+    // Entertainment
     'multishow': 'Multishow',
     'gnt': 'GNT',
     'viva': 'Viva',
-    'canal brasil': 'Canal-Brasil',
-    'arte1': 'Arte-1',
-    'bis': 'BIS',
-    'cnn': 'CNN-Brasil',
-    'cnn brasil': 'CNN-Brasil',
-    'band news': 'BandNews-TV',
-    'record news': 'Record-News',
-    'warner': 'Warner-Channel',
-    'warner channel': 'Warner-Channel',
-    'tnt': 'TNT',
-    'tnt series': 'TNT-Series',
-    'space': 'Space',
-    'i.sat': 'I.Sat',
-    'axn': 'AXN',
-    'sony': 'Sony-Channel',
-    'sony channel': 'Sony-Channel',
-    'fox': 'Fox-Channel',
-    'fx': 'FX',
-    'paramount': 'Paramount-Channel',
-    'paramount channel': 'Paramount-Channel',
-    'universal': 'Universal-TV',
-    'universal tv': 'Universal-TV',
-    'comedy central': 'Comedy-Central',
+    'canal brasil': 'Canal Brasil',
+    'comedy central': 'Comedy Central',
     'mtv': 'MTV',
     'vh1': 'VH1',
-    'a&e': 'AeE',
+    'a&e': 'A&E',
     'lifetime': 'Lifetime',
     'tlc': 'TLC',
-    'home & health': 'Home-e-Health',
-    'food network': 'Food-Network',
-    'travel': 'Travel-Box-Brazil',
+    // Movies & Series
+    'warner': 'Warner Channel',
+    'warner channel': 'Warner Channel',
+    'tnt': 'TNT',
+    'tnt series': 'TNT Séries',
+    'space': 'SPACE',
+    'axn': 'AXN',
+    'sony': 'Sony Channel',
+    'sony channel': 'Sony Channel',
+    'fx': 'FX',
+    'paramount': 'Paramount Channel',
+    'paramount channel': 'Paramount Channel',
+    'universal': 'Universal TV',
+    'universal tv': 'Universal TV',
     'megapix': 'Megapix',
-    'max': 'Max-Prime',
-    'max prime': 'Max-Prime',
-    'premiere': 'Premiere-FC',
-    'combate': 'Combate',
-    'woohoo': 'Woohoo',
-    'gloob': 'Gloob',
-    'gloobinho': 'Gloobinho',
+    'cinemax': 'Cinemax',
+    'tcm': 'TCM - Turner Classic',
+    'amc': 'AMC',
+    // Others
     'off': 'OFF',
     'canal off': 'OFF',
-    'boomerang': 'Boomerang',
-    'cidade alerta': 'Record-TV',
-    'cinemax': 'Cinemax',
-    'mgm': 'MGM'
+    'arte1': 'Arte 1',
+    'bis': 'BIS',
+    'food network': 'Food Network',
+    'home & health': 'Discovery Home & Health',
+    'travel': 'Travel Box Brazil',
+    'woohoo': 'Woohoo',
 };
 
 export const epgService = {
@@ -165,15 +172,22 @@ export const epgService = {
             // Normalize channel name and find mapping
             const normalized = channelName.toLowerCase().trim()
                 .replace(/\s+/g, ' ')
+                .replace(/\[.*?\]/g, '') // Remove [HD], [FHD], etc.
+                .replace(/\(.*?\)/g, '') // Remove (H265), etc.
                 .replace(/hd$/i, '')
                 .replace(/fhd$/i, '')
                 .replace(/4k$/i, '')
                 .trim();
 
-            // Find best match
+            // Sort mappings by key length (descending) to match longer keys first
+            // This ensures "telecine action" matches before "telecine"
+            const sortedMappings = Object.entries(channelMappings)
+                .sort((a, b) => b[0].length - a[0].length);
+
+            // Find best match - check if normalized contains the key
             let slug = '';
-            for (const [key, value] of Object.entries(channelMappings)) {
-                if (normalized.includes(key) || key.includes(normalized)) {
+            for (const [key, value] of sortedMappings) {
+                if (normalized.includes(key)) {
                     slug = value;
                     break;
                 }
@@ -213,8 +227,8 @@ export const epgService = {
     parseMeuGuiaHTML(html: string, channelId: string): EPGProgram[] {
         const programs: EPGProgram[] = [];
 
-        // Log a sample of HTML for debugging
-        console.log('[EPG] HTML sample:', html.substring(0, 500));
+        // Log a sample of HTML for debugging (show more to find program data)
+        console.log('[EPG] HTML sample:', html.substring(3000, 6000));
 
         // meuguia.tv structure: time is in format HH:MM followed by program title
         // Try to extract programs using various patterns

@@ -175,10 +175,16 @@ export function setupIpcHandlers() {
     ipcMain.handle('epg:fetch-meuguia', async (_, channelSlug: string) => {
         try {
             const fetch = (await import('node-fetch')).default
-            const response = await fetch(`https://meuguia.tv/programacao/canal/${channelSlug}`)
+            // URL encode the channel slug to handle spaces
+            const encodedSlug = encodeURIComponent(channelSlug)
+            const url = `https://meuguia.tv/programacao/canal/${encodedSlug}`
+            console.log('[EPG IPC] Fetching:', url)
+            const response = await fetch(url)
             const html = await response.text()
+            console.log('[EPG IPC] Response length:', html.length)
             return { success: true, html }
         } catch (error: any) {
+            console.error('[EPG IPC] Error:', error.message)
             return { success: false, error: error.message }
         }
     })
