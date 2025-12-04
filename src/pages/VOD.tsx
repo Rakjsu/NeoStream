@@ -4,6 +4,7 @@ import { watchLaterService } from '../services/watchLater';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import { CategoryMenu } from '../components/CategoryMenu';
+import { movieProgressService } from '../services/movieProgressService';
 
 interface VODStream {
     num: number;
@@ -84,7 +85,17 @@ export function VOD() {
     const filteredStreams = streams.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
 
-        // Category filtering
+        // Category filtering for movies
+        if (selectedCategory === 'CONTINUE_WATCHING') {
+            const moviesInProgress = movieProgressService.getMoviesInProgress();
+            return matchesSearch && moviesInProgress.includes(stream.stream_id.toString());
+        }
+
+        if (selectedCategory === 'WATCHED') {
+            const watchedMovies = movieProgressService.getWatchedMovies();
+            return matchesSearch && watchedMovies.includes(stream.stream_id.toString());
+        }
+
         // Note: Movie progress tracking not implemented yet
         // selectedCategory will be '' (empty) for "Todos os Filmes" or a category_id
         const matchesCategory = selectedCategory === '' || selectedCategory === null || stream.category_id === selectedCategory;
