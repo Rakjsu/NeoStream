@@ -186,16 +186,24 @@ export function LiveTV() {
                                                     // Use hls.js for HLS streams
                                                     if (url.includes('.m3u8')) {
                                                         const Hls = (window as any).Hls;
+                                                        console.log('Hls available:', !!Hls, 'isSupported:', Hls ? Hls.isSupported() : 'N/A');
                                                         if (Hls && Hls.isSupported()) {
                                                             const hls = new Hls({
                                                                 enableWorker: true,
                                                                 lowLatencyMode: false,
                                                             });
+                                                            hls.on((window as any).Hls.Events.ERROR, (event: any, data: any) => {
+                                                                console.error('HLS error:', data);
+                                                            });
                                                             hls.loadSource(url);
                                                             hls.attachMedia(videoEl);
                                                             hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                                                                videoEl.play().catch(() => { });
-                                                                console.log('Preview playing with hls.js');
+                                                                console.log('✅ Manifest parsed, attempting play...');
+                                                                videoEl.play().then(() => {
+                                                                    console.log('✅ Preview playing successfully!');
+                                                                }).catch((err) => {
+                                                                    console.error('❌ Play failed:', err);
+                                                                });
                                                             });
                                                         } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
                                                             // Native HLS support (Safari)
