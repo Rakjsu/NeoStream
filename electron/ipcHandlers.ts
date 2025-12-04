@@ -171,5 +171,17 @@ export function setupIpcHandlers() {
         }
     })
 
+    // Fetch EPG from meuguia.tv (bypasses CORS)
+    ipcMain.handle('epg:fetch-meuguia', async (_, channelSlug: string) => {
+        try {
+            const fetch = (await import('node-fetch')).default
+            const response = await fetch(`https://meuguia.tv/programacao/canal/${channelSlug}`)
+            const html = await response.text()
+            return { success: true, html }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    })
+
     console.log('IPC Handlers initialized')
 }

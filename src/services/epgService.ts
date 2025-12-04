@@ -113,16 +113,17 @@ const channelMappings: Record<string, string> = {
 };
 
 export const epgService = {
-    // Fetch EPG data - try XC API first, then meuguia.tv
+    // Fetch EPG data - try meuguia.tv first (primary), then XC API (fallback)
     async fetchChannelEPG(epgChannelId: string, channelName?: string): Promise<EPGProgram[]> {
-        // Try XC API first
+        // Try meuguia.tv first (primary source for Brazilian channels)
+        if (channelName) {
+            const meuguiaPrograms = await this.fetchFromMeuGuia(channelName);
+            if (meuguiaPrograms.length > 0) return meuguiaPrograms;
+        }
+
+        // Fallback to XC API (IPTV provider)
         const xcPrograms = await this.fetchFromXCAPI(epgChannelId);
         if (xcPrograms.length > 0) return xcPrograms;
-
-        // Fallback to meuguia.tv if channel name is provided
-        if (channelName) {
-            return await this.fetchFromMeuGuia(channelName);
-        }
 
         return [];
     },
@@ -158,7 +159,7 @@ export const epgService = {
         }
     },
 
-    // Fetch from meuguia.tv
+    // Fetch from meuguia.tv (via IPC to bypass CORS)
     async fetchFromMeuGuia(channelName: string): Promise<EPGProgram[]> {
         try {
             // Normalize channel name and find mapping
@@ -180,12 +181,12 @@ export const epgService = {
 
             if (!slug) return [];
 
-            // Fetch from meuguia.tv
-            const response = await fetch(`https://meuguia.tv/programacao/canal/${slug}`);
-            const html = await response.text();
+            // Fetch via IPC (bypasses CORS)
+            const result = await window.ipcRenderer.invoke('epg:fetch-meuguia', slug);
+            if (!result.success || !result.html) return [];
 
             // Parse the HTML to extract programs
-            return this.parseMeuGuiaHTML(html, channelName);
+            return this.parseMeuGuiaHTML(result.html, channelName);
         } catch {
             return [];
         }
