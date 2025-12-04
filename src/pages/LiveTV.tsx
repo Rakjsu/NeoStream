@@ -26,6 +26,7 @@ export function LiveTV() {
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [brokenImages, setBrokenImages] = useState<Set<number>>(new Set());
+    const [playingChannel, setPlayingChannel] = useState<LiveStream | null>(null);
 
     useEffect(() => {
         fetchStreams();
@@ -70,6 +71,24 @@ export function LiveTV() {
 
     const handleImageError = (streamId: number) => {
         setBrokenImages(prev => new Set(prev).add(streamId));
+    };
+
+
+    const buildLiveStreamUrl = async (channel: LiveStream): Promise<string> => {
+        try {
+            const result = await window.ipcRenderer.invoke('auth:get-credentials');
+
+            if (result.success) {
+                const { url, username, password } = result.credentials;
+                const streamUrl = `${url}/live/${username}/${password}/${channel.stream_id}.m3u8`;
+                return streamUrl;
+            }
+
+            throw new Error('Credenciais não encontradas');
+        } catch (error) {
+            console.error('❌ Error building live stream URL:', error);
+            throw error;
+        }
     };
 
     if (loading) {
@@ -130,6 +149,7 @@ export function LiveTV() {
                         {filteredStreams.map((stream) => (
                             <div
                                 key={stream.stream_id}
+                                onClick={() => setPlayingChannel(stream)}
                                 className="bg-gray-800 hover:bg-gray-700 py-1 px-2 border-b border-gray-700/50 last:border-b-0 transition-colors cursor-pointer group flex items-center gap-2"
                             >
                                 <div className="w-[56px] h-[56px] bg-gray-700 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -154,6 +174,15 @@ export function LiveTV() {
                     </div>
                 )}
             </div>
+
+            {playingChannel && (
+                <AsyncVideoPlayer
+                    movie={playingChannel as any}
+                    buildStreamUrl={buildLiveStreamUrl}
+                    onClose={() => setPlayingChannel(null)}
+                    customTitle={playingChannel.name}
+                />
+            )}
         </>
     );
 }
