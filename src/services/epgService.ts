@@ -14,28 +14,30 @@ export const epgService = {
             const credentials = await window.ipcRenderer.invoke('auth:get-credentials');
             if (!credentials) return [];
 
-            // XC API EPG endpoint format
-            const url = `${credentials.serverUrl}/player_api.php?username=${credentials.username}&password=${credentials.password}&action=get_simple_data_table&stream_id=${epgChannelId}`;
+            // XC API EPG endpoint - use get_short_epg for current + next programs
+            const url = `${credentials.serverUrl}/player_api.php?username=${credentials.username}&password=${credentials.password}&action=get_short_epg&stream_id=${epgChannelId}&limit=10`;
 
             const response = await fetch(url);
 
-            // Check if response is JSON
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                return []; // Server returned HTML or other non-JSON response
+            // Try to parse response as JSON
+            const text = await response.text();
+            if (!text || text.startsWith('<!') || text.startsWith('<')) {
+                return []; // Server returned HTML
             }
 
-            const data = await response.json();
+            const data = JSON.parse(text);
 
-            if (!data.epg_listings) return [];
+            // Handle different response formats
+            const listings = data.epg_listings || data.listings || data;
+            if (!Array.isArray(listings)) return [];
 
             // Parse and return programs
-            return data.epg_listings.map((item: any) => ({
+            return listings.map((item: any) => ({
                 id: item.id || `${item.start}-${item.title}`,
-                start: item.start,
-                end: item.stop,
-                title: item.title || 'No Title',
-                description: item.description || item.desc,
+                start: item.start || item.start_timestamp,
+                end: item.stop || item.end || item.stop_timestamp,
+                title: item.title ? atob(item.title) : (item.name || 'Sem título'),
+                description: item.description ? atob(item.description) : '',
                 channel_id: epgChannelId
             }));
         } catch {
