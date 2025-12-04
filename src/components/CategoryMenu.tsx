@@ -14,6 +14,10 @@ import crunchyrollLogo from '../assets/logos/crunchyroll.png';
 import adultoLogo from '../assets/logos/adulto.png';
 import diversoLogo from '../assets/logos/diverso.png';
 import doramaLogo from '../assets/logos/dorama.png';
+import cinemaLogo from '../assets/logos/cinema.png';
+import cinemaTvLogo from '../assets/logos/cinema_TV.png';
+import dcLogo from '../assets/logos/DC.png';
+import fourKLogo from '../assets/logos/4K.png';
 
 interface CategoryMenuProps {
     onSelectCategory: (categoryId: string) => void;
@@ -187,8 +191,21 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
 
         if (name.includes('dorama') || name.includes('k-drama') || name.includes('kdrama') || name.includes('korean')) return <img src={doramaLogo} alt="Dorama" style={{ width: size, height: size, objectFit: 'contain' }} />;
 
+        // Cinema logos
+        if (name.includes('cinema tv') || name.includes('cinematv')) return <img src={cinemaTvLogo} alt="Cinema TV" style={{ width: size, height: size, objectFit: 'contain' }} />;
+        if (name.includes('cinema')) return <img src={cinemaLogo} alt="Cinema" style={{ width: size, height: size, objectFit: 'contain' }} />;
+
+        // DC Comics
+        if (name.includes('dc comics') || name.includes('dc ') || name === 'dc') return <img src={dcLogo} alt="DC" style={{ width: size, height: size, objectFit: 'contain' }} />;
+
+        // 4K
+        if (name.includes('4k') || name.includes('ultra hd') || name.includes('uhd')) return <img src={fourKLogo} alt="4K" style={{ width: size, height: size, objectFit: 'contain' }} />;
+
         // Turcas / Turkish (crescent moon and star)
         if (name.includes('turcas') || name.includes('turca') || name.includes('turkish') || name.includes('turkey')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /><circle cx="17" cy="8" r="1.5" /></svg>;
+
+        // Religião / Religion (cross icon)
+        if (name.includes('religião') || name.includes('religiões') || name.includes('religioso') || name.includes('religiosa') || name.includes('religion') || name.includes('gospel') || name.includes('cristão') || name.includes('cristã') || name.includes('catholic') || name.includes('católico') || name.includes('evangélico') || name.includes('igreja')) return <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor"><path d="M11 2h2v8h8v2h-8v10h-2V12H3v-2h8V2z" /></svg>;
 
         // Default
         return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>;
