@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
+import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 
 interface LiveStream {
     num: number;
