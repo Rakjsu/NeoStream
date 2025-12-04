@@ -174,13 +174,16 @@ export function LiveTV() {
                                     autoPlay
                                     muted
                                     playsInline
-                                    controls={false}
                                     style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                    ref={(video) => {
-                                        if (video && !video.src) {
+                                    src=""
+                                    ref={(videoEl) => {
+                                        if (videoEl) {
                                             buildLiveStreamUrl(selectedChannel).then(url => {
-                                                video.src = url;
-                                                video.play().catch(e => console.error('Autoplay error:', e));
+                                                if (videoEl.src !== url) {
+                                                    videoEl.src = url;
+                                                    videoEl.load();
+                                                    videoEl.play().catch(() => { });
+                                                }
                                             });
                                         }
                                     }}
