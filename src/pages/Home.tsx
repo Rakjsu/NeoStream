@@ -15,8 +15,12 @@ export function Home() {
         const fetchCounts = async () => {
             try {
                 const result = await window.ipcRenderer.invoke('content:get-counts');
-                if (result.success) {
-                    setCounts(result.data);
+                if (result.success && result.data) {
+                    setCounts({
+                        live: result.data.live || 0,
+                        vod: result.data.vod || 0,
+                        series: result.data.series || 0
+                    });
                 }
             } catch (error) {
                 console.error('Failed to fetch counts:', error);

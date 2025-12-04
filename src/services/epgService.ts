@@ -179,15 +179,32 @@ export const epgService = {
                 }
             }
 
-            if (!slug) return [];
+            console.log('[EPG] Channel:', channelName, '-> Normalized:', normalized, '-> Slug:', slug);
+
+            if (!slug) {
+                console.log('[EPG] No mapping found for channel');
+                return [];
+            }
 
             // Fetch via IPC (bypasses CORS)
+            console.log('[EPG] Fetching from meuguia.tv:', slug);
             const result = await window.ipcRenderer.invoke('epg:fetch-meuguia', slug);
-            if (!result.success || !result.html) return [];
+
+            if (!result.success) {
+                console.log('[EPG] IPC failed:', result.error);
+                return [];
+            }
+
+            console.log('[EPG] HTML received, length:', result.html?.length || 0);
+            if (!result.html) return [];
 
             // Parse the HTML to extract programs
-            return this.parseMeuGuiaHTML(result.html, channelName);
-        } catch {
+            const programs = this.parseMeuGuiaHTML(result.html, channelName);
+            console.log('[EPG] Parsed programs:', programs.length);
+
+            return programs;
+        } catch (e) {
+            console.error('[EPG] Error:', e);
             return [];
         }
     },
@@ -196,43 +213,81 @@ export const epgService = {
     parseMeuGuiaHTML(html: string, channelId: string): EPGProgram[] {
         const programs: EPGProgram[] = [];
 
-        // Extract program entries using regex
-        const programRegex = /<div class="col[^"]*program[^"]*"[^>]*>[\s\S]*?<div class="time[^"]*">(\d{1,2}:\d{2})<\/div>[\s\S]*?<div class="title[^"]*">([^<]+)<\/div>/gi;
+        // Try multiple regex patterns for different HTML structures
+        // Pattern 1: Look for time and title in program divs
+        const patterns = [
+            // Pattern for list items with time and title
+            /<li[^>]*>[\s\S]*?(\d{1,2}:\d{2})[\s\S]*?<[^>]*title[^>]*>([^<]+)/gi,
+            // Pattern for divs with time class and title
+            /<div[^>]*time[^>]*>[\s\S]*?(\d{1,2}:\d{2})[\s\S]*?<[^>]*>([^<]{3,})</gi,
+            // Pattern for spans with time and following title
+            /<span[^>]*>(\d{1,2}:\d{2})<\/span>[\s\S]*?<[^>]*>([^<]{3,})</gi,
+            // Pattern for anchor tags with time and title
+            /(\d{1,2}:\d{2})[\s\n\t]*([^\n<]{3,})/gi,
+        ];
 
-        let match;
         const today = new Date();
-        let lastHour = -1;
-        let dayOffset = 0;
+        // Get Brazil timezone offset (UTC-3)
+        const brazilOffset = -3;
 
-        while ((match = programRegex.exec(html)) !== null) {
-            const time = match[1];
-            const title = match[2].trim();
+        for (const pattern of patterns) {
+            let match;
+            let lastHour = -1;
+            let dayOffset = 0;
 
-            const [hours, minutes] = time.split(':').map(Number);
+            while ((match = pattern.exec(html)) !== null) {
+                const time = match[1];
+                let title = match[2].trim();
 
-            // Detect day change (if hour goes backwards)
-            if (hours < lastHour) {
-                dayOffset++;
+                // Clean up title - remove extra whitespace and HTML entities
+                title = title
+                    .replace(/&amp;/g, '&')
+                    .replace(/&nbsp;/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+
+                // Skip if title is too short or looks like HTML
+                if (title.length < 3 || title.startsWith('<') || title.includes('class=')) continue;
+
+                const [hours, minutes] = time.split(':').map(Number);
+
+                // Detect day change (if hour goes backwards significantly)
+                if (lastHour !== -1 && hours < lastHour - 2) {
+                    dayOffset++;
+                }
+                lastHour = hours;
+
+                const startDate = new Date(today);
+                startDate.setDate(startDate.getDate() + dayOffset);
+                startDate.setHours(hours, minutes, 0, 0);
+
+                // Estimate end time as 1 hour default
+                const endDate = new Date(startDate);
+                endDate.setHours(endDate.getHours() + 1);
+
+                // Check for duplicates
+                const exists = programs.some(p =>
+                    p.title === title && new Date(p.start).getTime() === startDate.getTime()
+                );
+
+                if (!exists) {
+                    programs.push({
+                        id: `meuguia-${startDate.getTime()}-${title.substring(0, 10)}`,
+                        start: startDate.toISOString(),
+                        end: endDate.toISOString(),
+                        title: title,
+                        description: '',
+                        channel_id: channelId
+                    });
+                }
             }
-            lastHour = hours;
 
-            const startDate = new Date(today);
-            startDate.setDate(startDate.getDate() + dayOffset);
-            startDate.setHours(hours, minutes, 0, 0);
-
-            // Estimate end time as start of next program (1 hour default)
-            const endDate = new Date(startDate);
-            endDate.setHours(endDate.getHours() + 1);
-
-            programs.push({
-                id: `meuguia-${startDate.getTime()}`,
-                start: startDate.toISOString(),
-                end: endDate.toISOString(),
-                title: title,
-                description: '',
-                channel_id: channelId
-            });
+            // If we found programs with this pattern, stop trying others
+            if (programs.length > 0) break;
         }
+
+        // Sort programs by start time
+        programs.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 
         // Fix end times based on next program start
         for (let i = 0; i < programs.length - 1; i++) {
