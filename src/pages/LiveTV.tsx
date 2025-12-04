@@ -140,7 +140,7 @@ export function LiveTV() {
                 selectedCategory={selectedCategory}
                 type="live"
             />
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflowY: 'auto', paddingTop: '80px' }}>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflowY: 'auto', paddingTop: '40px' }}>
                 <div className="p-8" style={{ paddingLeft: '60px' }}>
 
                     {filteredStreams.length === 0 ? (
