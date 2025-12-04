@@ -84,12 +84,12 @@ export function VOD() {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
 
         // Category filtering
-        if (selectedCategory === 'continue-assistindo') {
+        if (selectedCategory === 'CONTINUE_WATCHING') {
             const progress = watchProgressService.getProgress('movie', stream.stream_id.toString());
             return matchesSearch && progress && progress.progress > 0 && progress.progress < 95;
         }
 
-        if (selectedCategory === 'assistidos') {
+        if (selectedCategory === 'WATCHED') {
             const progress = watchProgressService.getProgress('movie', stream.stream_id.toString());
             return matchesSearch && progress && progress.progress >= 95;
         }
