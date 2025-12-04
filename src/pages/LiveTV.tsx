@@ -138,6 +138,7 @@ export function LiveTV() {
             <CategoryMenu
                 onSelectCategory={setSelectedCategory}
                 selectedCategory={selectedCategory}
+                type="live"
             />
             <div className="p-8">
 

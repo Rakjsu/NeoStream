@@ -226,6 +226,7 @@ export function VOD() {
                 <CategoryMenu
                     onSelectCategory={setSelectedCategory}
                     selectedCategory={selectedCategory}
+                    type="vod"
                 />
                 <div style={{ position: 'relative', zIndex: 10, padding: '32px', height: '100%', display: 'flex', flexDirection: 'column' }}>
                     {selectedMovie && (

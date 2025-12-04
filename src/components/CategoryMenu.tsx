@@ -18,6 +18,7 @@ import doramaLogo from '../assets/logos/dorama.png';
 interface CategoryMenuProps {
     onSelectCategory: (categoryId: string) => void;
     selectedCategory: string | null;
+    type?: 'vod' | 'series' | 'live'; // Type of content
 }
 
 interface Category {
@@ -26,7 +27,7 @@ interface Category {
     parent_id: number;
 }
 
-export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMenuProps) {
+export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'series' }: CategoryMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(false);
@@ -40,14 +41,14 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
     const fetchCategories = async () => {
         setLoading(true);
         try {
-            const result = await window.ipcRenderer.invoke('auth:get-credentials');
+            // Use IPC handler based on type
+            let action = 'categories:get-series'; // default
+            if (type === 'vod') action = 'categories:get-vod';
+            else if (type === 'live') action = 'categories:get-live';
+
+            const result = await window.ipcRenderer.invoke(action);
             if (result.success) {
-                const { url, username, password } = result.credentials;
-                const response = await fetch(
-                    `${url}/player_api.php?username=${username}&password=${password}&action=get_series_categories`
-                );
-                const data = await response.json();
-                setCategories(data || []);
+                setCategories(result.data || []);
             }
         } catch (error) {
             console.error('Error fetching categories:', error);
@@ -511,7 +512,9 @@ export function CategoryMenu({ onSelectCategory, selectedCategory }: CategoryMen
                         }}>
                             📺
                         </div>
-                        <span style={{ flex: 1 }}>Todas as Séries</span>
+                        <span style={{ flex: 1 }}>
+                            {type === 'vod' ? 'Todos os Filmes' : type === 'live' ? 'Todos os Canais' : 'Todas as Séries'}
+                        </span>
                         {(selectedCategory === '' || selectedCategory === null) && (
                             <div style={{
                                 width: '8px',
