@@ -8,7 +8,6 @@ import { Series } from './pages/Series';
 import { Settings } from './pages/Settings';
 import { WatchLater } from './pages/WatchLater';
 import { ProfileSelector } from './pages/ProfileSelector';
-import { CategoryAnalyzer } from './components/CategoryAnalyzer';
 import { profileService } from './services/profileService';
 import { useState, useEffect } from 'react';
 
