@@ -19,7 +19,10 @@ interface LiveStream {
     tv_archive_duration: number;
 }
 
-const ITEMS_PER_PAGE = 48; // 6 rows × 8 columns approx
+// Channel card approximate dimensions
+const CARD_WIDTH = 200; // min-width of grid column
+const CARD_HEIGHT = 80; // approximate card height with gap
+const GRID_GAP = 16; // gap between cards
 
 // LiveTV Component - Icons: 6px - Updated 2025-11-26 00:29
 export function LiveTV() {
@@ -35,9 +38,40 @@ export function LiveTV() {
     const [_epgData, setEpgData] = useState<any[]>([]);
     const [currentProgram, setCurrentProgram] = useState<any | null>(null);
     const [upcomingPrograms, setUpcomingPrograms] = useState<any[]>([]);
-    const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+    const [visibleCount, setVisibleCount] = useState(0);
+    const [itemsPerPage, setItemsPerPage] = useState(48); // Default fallback
     const [progressTick, setProgressTick] = useState(0);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+    // Calculate items per page based on container dimensions
+    useEffect(() => {
+        const calculateItemsPerPage = () => {
+            const container = scrollContainerRef.current;
+            if (!container) return;
+
+            const containerWidth = container.clientWidth - 40; // Account for padding
+            const containerHeight = container.clientHeight;
+
+            // Calculate how many columns fit
+            const columns = Math.floor(containerWidth / (CARD_WIDTH + GRID_GAP));
+            // Calculate how many rows fit + 1 extra row for smooth scrolling
+            const rows = Math.ceil(containerHeight / (CARD_HEIGHT + GRID_GAP)) + 1;
+
+            const calculatedItems = Math.max(columns * rows, 12); // Minimum 12 items
+            setItemsPerPage(calculatedItems);
+
+            // Set initial visible count if not set
+            if (visibleCount === 0) {
+                setVisibleCount(calculatedItems);
+            }
+        };
+
+        calculateItemsPerPage();
+
+        // Recalculate on window resize
+        window.addEventListener('resize', calculateItemsPerPage);
+        return () => window.removeEventListener('resize', calculateItemsPerPage);
+    }, [visibleCount]);
 
     useEffect(() => {
         fetchStreams();
@@ -52,6 +86,7 @@ export function LiveTV() {
         }, 10000);
         return () => clearInterval(interval);
     }, [currentProgram]);
+
 
     // Fetch EPG when channel is selected
     useEffect(() => {
@@ -130,7 +165,7 @@ export function LiveTV() {
             const { scrollTop, scrollHeight, clientHeight } = container;
             // Load more when 80% scrolled
             if (scrollTop + clientHeight >= scrollHeight * 0.8 && visibleCount < filteredStreams.length) {
-                setVisibleCount(prev => Math.min(prev + ITEMS_PER_PAGE, filteredStreams.length));
+                setVisibleCount(prev => Math.min(prev + itemsPerPage, filteredStreams.length));
             }
         };
 
@@ -140,7 +175,7 @@ export function LiveTV() {
 
     // Reset visible count when search or category changes
     useEffect(() => {
-        setVisibleCount(ITEMS_PER_PAGE);
+        setVisibleCount(itemsPerPage);
         setSelectedChannel(null);
     }, [searchQuery, selectedCategory]);
 
