@@ -8,26 +8,57 @@ interface EPGProgram {
 }
 
 const channelMappings: Record<string, string> = {
+    // HBO channels
     'hbo': 'HBO',
     'hbo max': 'HBO',
-    'hbo 2': 'HBO 2',
-    'hbo plus': 'HBO Plus',
-    'hbo family': 'HBO Family',
-    'hbo signature': 'HBO Signature',
-    'amc': 'AMC',
-    'axn': 'AXN',
-    'cinemax': 'Cinemax',
-    'espn': 'ESPN',
-    'fx': 'FX',
-    'gnt': 'GNT',
-    'megapix': 'Megapix',
-    'mtv': 'MTV',
-    'multishow': 'Multishow',
-    'space': 'SPACE',
+    'hbo 2': 'HB2',
+    'hbo2': 'HB2',
+    'hbo plus': 'HPL',
+    'hbo family': 'HFA',
+    'hbo signature': 'HFE',
+    'hbo mundi': 'HMU',
+    'hbo xtreme': 'HXT',
+
+    // Telecine channels
+    'telecine premium': 'TC1',
+    'telecine action': 'TC2',
+    'telecine touch': 'TC3',
+    'telecine pipoca': 'TC4',
+    'telecine cult': 'TC5',
+    'telecine fun': 'TC6',
+
+    // Movie channels
+    'amc': 'MGM',
+    'canal brasil': 'CBR',
+    'cinemax': 'MNX',
+    'megapix': 'MPX',
+    'paramount channel': 'PAR',
+    'paramount': 'PAR',
+    'space': 'SPA',
+    'tcm': 'TCM',
+    'turner classic movies': 'TCM',
     'tnt': 'TNT',
-    'universal': 'Universal TV',
+    'tnt series': 'SER',
+
+    // Other channels
+    'axn': 'AXN',
+    'espn': 'ESPN',
+    'fx': 'FXC',
+    'gnt': 'GNT',
+    'mtv': 'MTV',
+    'multishow': 'MSH',
+    'universal': 'USA',
+    'universal tv': 'USA',
     'vh1': 'VH1',
-    'viva': 'Viva',
+    'viva': 'VIV',
+    'warner': 'WBR',
+    'warner channel': 'WBR',
+    'sony': 'SET',
+    'discovery': 'DSC',
+    'history': 'HIS',
+    'arte1': 'ART',
+    'curta!': 'CUR',
+    'a&e': 'AEH',
 };
 
 export const epgService = {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
@@ -19,6 +19,8 @@ interface LiveStream {
     tv_archive_duration: number;
 }
 
+const ITEMS_PER_PAGE = 48; // 6 rows × 8 columns approx
+
 // LiveTV Component - Icons: 6px - Updated 2025-11-26 00:29
 export function LiveTV() {
     const [streams, setStreams] = useState<LiveStream[]>([]);
@@ -33,6 +35,8 @@ export function LiveTV() {
     const [epgData, setEpgData] = useState<any[]>([]);
     const [currentProgram, setCurrentProgram] = useState<any | null>(null);
     const [upcomingPrograms, setUpcomingPrograms] = useState<any[]>([]);
+    const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         fetchStreams();
@@ -107,6 +111,29 @@ export function LiveTV() {
         return matchesSearch && matchesCategory;
     });
 
+    // Lazy loading scroll listener
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const handleScroll = () => {
+            const { scrollTop, scrollHeight, clientHeight } = container;
+            // Load more when 80% scrolled
+            if (scrollTop + clientHeight >= scrollHeight * 0.8 && visibleCount < filteredStreams.length) {
+                setVisibleCount(prev => Math.min(prev + ITEMS_PER_PAGE, filteredStreams.length));
+            }
+        };
+
+        container.addEventListener('scroll', handleScroll);
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, [filteredStreams.length, visibleCount]);
+
+    // Reset visible count when search or category changes
+    useEffect(() => {
+        setVisibleCount(ITEMS_PER_PAGE);
+        setSelectedChannel(null);
+    }, [searchQuery, selectedCategory]);
+
     const handleImageError = (streamId: number) => {
         setBrokenImages(prev => new Set(prev).add(streamId));
     };
@@ -177,7 +204,7 @@ export function LiveTV() {
                 selectedCategory={selectedCategory}
                 type="live"
             />
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflowY: 'auto', paddingTop: '40px' }}>
+            <div ref={scrollContainerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflowY: 'auto', paddingTop: '40px' }}>
                 {selectedChannel && (
                     <div style={{
                         padding: '24px 20px 24px 60px',
@@ -555,7 +582,7 @@ export function LiveTV() {
                         </div>
                     ) : (
                         <div className="channels-grid" style={{ animation: 'fadeInScale 0.5s ease-out' }}>
-                            {filteredStreams.map((stream) => (
+                            {filteredStreams.slice(0, visibleCount).map((stream) => (
                                 <div
                                     key={stream.stream_id}
                                     onClick={() => setSelectedChannel(stream)}
