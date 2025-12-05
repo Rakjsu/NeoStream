@@ -214,104 +214,231 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
     return (
         <>
             <style>{`
-                @keyframes slideIn {
-                    from { 
-                        transform: translateX(-100%);
+                /* Panel spring animation */
+                @keyframes panelSlideIn {
+                    0% { 
+                        transform: translateX(-100%) scale(0.95);
                         opacity: 0;
                     }
-                    to { 
-                        transform: translateX(0);
+                    60% { 
+                        transform: translateX(5%) scale(1.02);
+                        opacity: 1;
+                    }
+                    100% { 
+                        transform: translateX(0) scale(1);
                         opacity: 1;
                     }
                 }
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
+                
+                @keyframes panelSlideOut {
+                    from { 
+                        transform: translateX(0) scale(1);
+                        opacity: 1;
+                    }
+                    to { 
+                        transform: translateX(-100%) scale(0.95);
+                        opacity: 0;
+                    }
                 }
+                
+                /* Items stagger animation */
+                @keyframes itemFadeIn {
+                    from { 
+                        opacity: 0;
+                        transform: translateX(-20px);
+                    }
+                    to { 
+                        opacity: 1;
+                        transform: translateX(0);
+                    }
+                }
+                
+                /* Header shimmer */
                 @keyframes shimmer {
-                    0% { background-position: -1000px 0; }
-                    100% { background-position: 1000px 0; }
+                    0% { background-position: -200% 0; }
+                    100% { background-position: 200% 0; }
                 }
+                
+                /* Gradient border animation */
+                @keyframes borderGlow {
+                    0%, 100% { 
+                        background-position: 0% 50%;
+                        box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+                    }
+                    50% { 
+                        background-position: 100% 50%;
+                        box-shadow: 0 0 30px rgba(168, 85, 247, 0.4);
+                    }
+                }
+                
+                /* Pulse for selected item */
+                @keyframes selectedPulse {
+                    0%, 100% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.4); }
+                    50% { box-shadow: 0 0 35px rgba(251, 191, 36, 0.6); }
+                }
+                
+                /* Loading spinner */
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+                
+                /* Hamburger animation */
+                .hamburger-line {
+                    transition: all 0.3s cubic-bezier(0.68, -0.6, 0.32, 1.6);
+                    transform-origin: center;
+                }
+                
+                .hamburger-open .line-1 {
+                    transform: translateY(6px) rotate(45deg);
+                }
+                
+                .hamburger-open .line-2 {
+                    opacity: 0;
+                    transform: scaleX(0);
+                }
+                
+                .hamburger-open .line-3 {
+                    transform: translateY(-6px) rotate(-45deg);
+                }
+                
+                /* Category panel */
+                .category-panel {
+                    animation: panelSlideIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+                }
+                
+                .category-panel.closing {
+                    animation: panelSlideOut 0.3s ease-out forwards;
+                }
+                
+                /* Category item hover effects */
                 .category-item {
                     position: relative;
                     overflow: hidden;
+                    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
                 }
+                
                 .category-item::before {
                     content: '';
                     position: absolute;
-                    top: 0;
-                    left: -100%;
-                    width: 100%;
-                    height: 100%;
-                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-                    transition: left 0.5s ease;
+                    inset: 0;
+                    border-radius: 14px;
+                    padding: 2px;
+                    background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899, #6366f1);
+                    background-size: 300% 300%;
+                    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+                    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+                    -webkit-mask-composite: xor;
+                    mask-composite: exclude;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
                 }
+                
                 .category-item:hover::before {
-                    left: 100%;
+                    opacity: 1;
+                    animation: borderGlow 2s ease infinite;
+                }
+                
+                .category-item:hover {
+                    transform: translateX(8px) scale(1.02);
+                    background: rgba(99, 102, 241, 0.1) !important;
+                }
+                
+                .category-item.selected {
+                    animation: selectedPulse 2s ease-in-out infinite;
+                }
+                
+                /* Custom scrollbar */
+                .category-scroll::-webkit-scrollbar {
+                    width: 8px;
+                }
+                
+                .category-scroll::-webkit-scrollbar-track {
+                    background: rgba(0, 0, 0, 0.2);
+                    border-radius: 4px;
+                }
+                
+                .category-scroll::-webkit-scrollbar-thumb {
+                    background: linear-gradient(180deg, #6366f1, #a855f7);
+                    border-radius: 4px;
+                    border: 2px solid transparent;
+                    background-clip: content-box;
+                }
+                
+                .category-scroll::-webkit-scrollbar-thumb:hover {
+                    background: linear-gradient(180deg, #818cf8, #c084fc);
+                    background-clip: content-box;
+                }
+                
+                /* Toggle button glow */
+                .toggle-btn {
+                    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+                }
+                
+                .toggle-btn:hover {
+                    transform: scale(1.15);
+                    filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.6));
+                }
+                
+                .toggle-btn:active {
+                    transform: scale(0.9);
                 }
             `}</style>
 
-            {/* Toggle Button */}
+            {/* Toggle Button - Animated Hamburger */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="transition-all duration-200 active:scale-90"
+                className={`toggle-btn ${isOpen ? 'hamburger-open' : ''}`}
                 style={{
                     position: 'absolute',
                     top: '20px',
-                    left: '2px',
+                    left: '4px',
                     zIndex: 90,
                     width: '48px',
                     height: '48px',
-                    background: 'transparent',
+                    background: isOpen
+                        ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(168, 85, 247, 0.3) 100%)'
+                        : 'transparent',
                     border: 'none',
-                    borderRadius: '8px',
+                    borderRadius: '12px',
                     cursor: 'pointer',
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: '20px',
+                    gap: '4px',
                     padding: 0
                 }}
             >
-                <svg
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    className="transition-all duration-200"
+                <span
+                    className="hamburger-line line-1"
                     style={{
-                        color: isOpen ? '#ffffff' : '#ffffff',
-                        stroke: isOpen ? '#ffffff' : '#ffffff',
-                        transform: 'scale(1)'
+                        width: '22px',
+                        height: '2.5px',
+                        background: 'linear-gradient(90deg, #6366f1, #a855f7)',
+                        borderRadius: '2px',
+                        display: 'block'
                     }}
-                    onMouseEnter={(e) => {
-                        if (!isOpen) {
-                            e.currentTarget.style.color = '#ef4444';
-                            e.currentTarget.style.stroke = '#ef4444';
-                            e.currentTarget.style.transform = 'scale(1.25)';
-                        }
+                />
+                <span
+                    className="hamburger-line line-2"
+                    style={{
+                        width: '22px',
+                        height: '2.5px',
+                        background: 'linear-gradient(90deg, #a855f7, #ec4899)',
+                        borderRadius: '2px',
+                        display: 'block'
                     }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.color = '#ffffff';
-                        e.currentTarget.style.stroke = '#ffffff';
-                        e.currentTarget.style.transform = 'scale(1)';
+                />
+                <span
+                    className="hamburger-line line-3"
+                    style={{
+                        width: '22px',
+                        height: '2.5px',
+                        background: 'linear-gradient(90deg, #ec4899, #6366f1)',
+                        borderRadius: '2px',
+                        display: 'block'
                     }}
-                >
-                    {isOpen ? (
-                        <>
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                        </>
-                    ) : (
-                        <>
-                            <line x1="3" y1="6" x2="21" y2="6" />
-                            <line x1="3" y1="12" x2="21" y2="12" />
-                            <line x1="3" y1="18" x2="21" y2="18" />
-                        </>
-                    )}
-                </svg>
+                />
             </button>
 
             {/* Backdrop */}
@@ -331,22 +458,21 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
 
             {/* Menu Panel */}
             <div
+                className={`category-panel ${!isOpen ? 'closing' : ''}`}
                 style={{
                     position: 'fixed',
                     top: 0,
                     left: 0,
                     bottom: 0,
                     width: '380px',
-                    background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.98) 0%, rgba(30, 41, 59, 0.98) 100%)',
+                    background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.95) 100%)',
                     zIndex: 1000,
-                    transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
-                    transition: 'transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
-                    boxShadow: isOpen ? '8px 0 32px rgba(0, 0, 0, 0.6), 0 0 80px rgba(59, 130, 246, 0.1)' : 'none',
-                    display: 'flex',
+                    display: isOpen ? 'flex' : 'none',
                     flexDirection: 'column',
-                    backdropFilter: 'blur(20px)',
-                    borderRight: '1px solid rgba(59, 130, 246, 0.2)',
-                    animation: isOpen ? 'slideIn 0.4s ease' : 'none'
+                    backdropFilter: 'blur(24px)',
+                    borderRight: '2px solid',
+                    borderImage: 'linear-gradient(180deg, rgba(99, 102, 241, 0.5), rgba(168, 85, 247, 0.5), rgba(236, 72, 153, 0.3)) 1',
+                    boxShadow: '8px 0 40px rgba(0, 0, 0, 0.5), 0 0 100px rgba(99, 102, 241, 0.15)'
                 }}
             >
                 {/* Header with gradient */}
@@ -431,13 +557,16 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                 </div>
 
                 {/* Categories List with scrollbar styling */}
-                <div style={{
-                    flex: 1,
-                    overflowY: 'auto',
-                    padding: '16px',
-                    scrollbarWidth: 'thin',
-                    scrollbarColor: 'rgba(59, 130, 246, 0.5) transparent'
-                }}>
+                <div
+                    className="category-scroll"
+                    style={{
+                        flex: 1,
+                        overflowY: 'auto',
+                        padding: '16px',
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: 'rgba(99, 102, 241, 0.5) transparent'
+                    }}
+                >
                     {loading && (
                         <div style={{
                             padding: '48px 24px',
@@ -770,7 +899,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                                 onSelectCategory(category.category_id);
                                 setIsOpen(false);
                             }}
-                            className="category-item"
+                            className={`category-item ${selectedCategory === category.category_id ? 'selected' : ''}`}
                             style={{
                                 width: '100%',
                                 padding: '16px 20px',
@@ -780,22 +909,18 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                                 border: selectedCategory === category.category_id
                                     ? '2px solid #fbbf24'
                                     : '2px solid rgba(255, 255, 255, 0.05)',
-                                borderRadius: '12px',
+                                borderRadius: '14px',
                                 color: selectedCategory === category.category_id ? '#fbbf24' : 'white',
                                 fontSize: '15px',
                                 fontWeight: selectedCategory === category.category_id ? '600' : '500',
                                 textAlign: 'left',
                                 cursor: 'pointer',
                                 marginBottom: '12px',
-                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                                 display: 'flex',
                                 alignItems: 'center',
                                 gap: '12px',
                                 opacity: 0,
-                                animation: `fadeIn 0.4s ease ${index * 0.05}s forwards`,
-                                boxShadow: selectedCategory === category.category_id
-                                    ? '0 4px 16px rgba(251, 191, 36, 0.4)'
-                                    : 'none'
+                                animation: `itemFadeIn 0.4s ease ${index * 0.03}s forwards`,
                             }}
                             onMouseEnter={(e) => {
                                 if (selectedCategory !== category.category_id) {
