@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { formatGenres, type TMDBMovieDetails, getBackdropUrl } from '../services/tmdb';
+import { fetchMovieDetails, searchMovieByName, type TMDBMovieDetails, getBackdropUrl } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
@@ -152,7 +152,7 @@ export function VOD() {
 
     // Fetch TMDB data
     useEffect(() => {
-        if (!selectedMovie?.tmdb_id) {
+        if (!selectedMovie) {
             setTmdbData(null);
             return;
         }
@@ -160,8 +160,21 @@ export function VOD() {
         setLoadingTmdb(true);
         const fetchTmdb = async () => {
             try {
-                const tmdb = await import('../services/tmdb');
-                const data = await tmdb.getMovieDetails(parseInt(selectedMovie.tmdb_id));
+                let data: TMDBMovieDetails | null = null;
+
+                // Try by tmdb_id first
+                if (selectedMovie.tmdb_id) {
+                    data = await fetchMovieDetails(selectedMovie.tmdb_id);
+                }
+
+                // Fallback: search by name
+                if (!data) {
+                    // Extract year from movie name if present (e.g., "Movie Name (2023)")
+                    const yearMatch = selectedMovie.name.match(/\((\d{4})\)/);
+                    const year = yearMatch ? yearMatch[1] : undefined;
+                    data = await searchMovieByName(selectedMovie.name, year);
+                }
+
                 setTmdbData(data);
             } catch (err) {
                 console.error('Failed to fetch TMDB data:', err);
@@ -276,16 +289,11 @@ export function VOD() {
                                                     📅 {new Date(tmdbData.release_date).getFullYear()}
                                                 </span>
                                             )}
-                                            {tmdbData?.vote_average && (
+                                            {tmdbData?.vote_average ? (
                                                 <span className="badge rating-badge">
                                                     ⭐ {tmdbData.vote_average.toFixed(1)}
                                                 </span>
-                                            )}
-                                            {tmdbData?.runtime && (
-                                                <span className="badge runtime-badge">
-                                                    🕐 {Math.floor(tmdbData.runtime / 60)}h {tmdbData.runtime % 60}m
-                                                </span>
-                                            )}
+                                            ) : null}
                                         </>
                                     )}
                                 </div>
@@ -294,18 +302,22 @@ export function VOD() {
                                 <h1 className="movie-title">{selectedMovie.name}</h1>
 
                                 {/* Genres */}
-                                {!loadingTmdb && tmdbData?.genres && tmdbData.genres.length > 0 && (
+                                {loadingTmdb ? (
+                                    <p className="loading-text">Carregando gêneros...</p>
+                                ) : tmdbData?.genres && tmdbData.genres.length > 0 ? (
                                     <div className="genre-tags">
                                         {tmdbData.genres.slice(0, 4).map(genre => (
                                             <span key={genre.id} className="genre-tag">{genre.name}</span>
                                         ))}
                                     </div>
-                                )}
+                                ) : null}
 
                                 {/* Overview */}
-                                {!loadingTmdb && tmdbData?.overview && (
+                                {loadingTmdb ? (
+                                    <p className="loading-text">Carregando sinopse...</p>
+                                ) : tmdbData?.overview ? (
                                     <p className="movie-overview">{tmdbData.overview}</p>
-                                )}
+                                ) : null}
 
                                 {/* Action Buttons */}
                                 <div className="action-buttons">
