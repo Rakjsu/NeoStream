@@ -253,6 +253,13 @@ export function LiveTV() {
                                 0%, 100% { opacity: 1; transform: scale(1); }
                                 50% { opacity: 0.5; transform: scale(0.7); }
                             }
+                            @keyframes slideUp {
+                                from { opacity: 0; transform: translateY(20px); }
+                                to { opacity: 1; transform: translateY(0); }
+                            }
+                            .epg-program-item {
+                                animation: slideUp 0.4s ease-out forwards;
+                            }
                             .epg-item { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
                             .epg-item:hover { transform: translateX(8px); background: rgba(255, 255, 255, 0.1) !important; }
                             .preview-container { flex: 1; min-width: 0; }
@@ -526,14 +533,15 @@ export function LiveTV() {
                                                 {upcomingPrograms.map((program, index) => (
                                                     <div
                                                         key={program.id || index}
-                                                        className="epg-item"
+                                                        className="epg-item epg-program-item"
                                                         style={{
                                                             marginBottom: '10px',
                                                             padding: 'clamp(10px, 1.5vw, 14px) clamp(12px, 1.5vw, 16px)',
                                                             background: 'rgba(255, 255, 255, 0.03)',
                                                             borderRadius: '10px',
                                                             border: '1px solid rgba(255, 255, 255, 0.05)',
-                                                            cursor: 'pointer'
+                                                            cursor: 'pointer',
+                                                            animationDelay: `${index * 0.1}s`
                                                         }}
                                                     >
                                                         <div style={{ fontSize: 'clamp(12px, 1.2vw, 14px)', color: 'white', fontWeight: '500', marginBottom: '6px' }}>
