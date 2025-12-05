@@ -182,31 +182,76 @@ export function LiveTV() {
                     <div style={{
                         padding: '24px 20px 24px 60px',
                         marginBottom: '24px',
-                        background: 'linear-gradient(to bottom, rgba(17, 24, 39, 0.95), rgba(31, 41, 55, 0.9))',
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                        background: 'linear-gradient(135deg, rgba(17, 24, 39, 0.98) 0%, rgba(31, 41, 55, 0.95) 50%, rgba(17, 24, 39, 0.98) 100%)',
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+                        animation: 'slideDown 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                        backdropFilter: 'blur(20px)'
                     }}>
+                        <style>{`
+                            @keyframes slideDown {
+                                from { opacity: 0; transform: translateY(-20px); }
+                                to { opacity: 1; transform: translateY(0); }
+                            }
+                            @keyframes fadeInScale {
+                                from { opacity: 0; transform: scale(0.95); }
+                                to { opacity: 1; transform: scale(1); }
+                            }
+                            @keyframes shimmer {
+                                0% { background-position: -200% 0; }
+                                100% { background-position: 200% 0; }
+                            }
+                            @keyframes progressGlow {
+                                0%, 100% { box-shadow: 0 0 8px rgba(59, 130, 246, 0.5); }
+                                50% { box-shadow: 0 0 16px rgba(59, 130, 246, 0.8); }
+                            }
+                            @keyframes pulse {
+                                0%, 100% { opacity: 1; }
+                                50% { opacity: 0.6; }
+                            }
+                            @keyframes liveGlow {
+                                0%, 100% { box-shadow: 0 0 10px rgba(239, 68, 68, 0.6), 0 0 20px rgba(239, 68, 68, 0.4); }
+                                50% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.8), 0 0 40px rgba(239, 68, 68, 0.5); }
+                            }
+                            @keyframes liveDot {
+                                0%, 100% { opacity: 1; transform: scale(1); }
+                                50% { opacity: 0.5; transform: scale(0.7); }
+                            }
+                            .epg-item { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+                            .epg-item:hover { transform: translateX(8px); background: rgba(255, 255, 255, 0.1) !important; }
+                            .preview-container { flex: 1; min-width: 0; }
+                            .epg-container { flex: 1; min-width: 0; }
+                            @media (max-width: 1200px) {
+                                .preview-epg-wrapper { flex-direction: column !important; }
+                                .preview-container, .epg-container { flex: none !important; width: 100% !important; }
+                            }
+                        `}</style>
+
+                        {/* Channel Title */}
                         <h2 style={{
-                            fontSize: '28px',
-                            fontWeight: 'bold',
-                            color: 'white',
-                            marginBottom: '16px',
-                            textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)'
+                            fontSize: 'clamp(24px, 3vw, 32px)',
+                            fontWeight: '800',
+                            background: 'linear-gradient(135deg, #ffffff 0%, #94a3b8 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            marginBottom: '20px',
+                            letterSpacing: '-0.5px',
+                            animation: 'fadeInScale 0.5s ease-out'
                         }}>
                             {selectedChannel.name}
                         </h2>
 
-                        <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
-                            {/* Preview Video Container */}
-                            {/* Preview Video Container - Fixed width left side */}
-                            <div style={{ flex: '0 0 480px', minWidth: '480px' }}>
+                        <div className="preview-epg-wrapper" style={{ display: 'flex', gap: '24px', alignItems: 'flex-start' }}>
+                            {/* Preview Video Container - 50% */}
+                            <div className="preview-container" style={{ animation: 'fadeInScale 0.5s ease-out 0.1s both' }}>
                                 <div style={{
                                     width: '100%',
                                     aspectRatio: '16/9',
-                                    background: '#000',
-                                    borderRadius: '12px',
+                                    borderRadius: '16px',
                                     overflow: 'hidden',
                                     position: 'relative',
-                                    marginBottom: '16px'
+                                    marginBottom: '20px',
+                                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)'
                                 }}>
                                     <video
                                         id="preview-video"
@@ -214,49 +259,35 @@ export function LiveTV() {
                                         autoPlay
                                         muted
                                         playsInline
-                                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover', background: 'transparent' }}
                                         ref={(videoEl) => {
                                             if (videoEl) {
                                                 const loadVideo = async () => {
                                                     try {
                                                         const url = await buildLiveStreamUrl(selectedChannel);
-
-                                                        // Dynamically load hls.js if needed and not already loaded
                                                         if (url.includes('.m3u8') && !(window as any).Hls) {
                                                             await new Promise((resolve, reject) => {
                                                                 const script = document.createElement('script');
                                                                 script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
-                                                                script.onload = () => {
-                                                                    resolve(true);
-                                                                };
+                                                                script.onload = () => resolve(true);
                                                                 script.onerror = () => reject(new Error('Failed to load hls.js'));
                                                                 document.head.appendChild(script);
                                                             });
                                                         }
-
-                                                        // Use hls.js for HLS streams
                                                         if (url.includes('.m3u8')) {
                                                             const Hls = (window as any).Hls;
                                                             if (Hls && Hls.isSupported()) {
-                                                                const hls = new Hls({
-                                                                    enableWorker: true,
-                                                                    lowLatencyMode: false,
-                                                                });
-                                                                hls.on((window as any).Hls.Events.ERROR, (event: any, data: any) => {
-                                                                    console.error('HLS error:', data);
-                                                                });
+                                                                const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
                                                                 hls.loadSource(url);
                                                                 hls.attachMedia(videoEl);
                                                                 hls.on(Hls.Events.MANIFEST_PARSED, () => {
                                                                     videoEl.play().catch(() => { });
                                                                 });
                                                             } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-                                                                // Native HLS support (Safari)
                                                                 videoEl.src = url;
                                                                 await videoEl.play();
                                                             }
                                                         } else {
-                                                            // Regular video
                                                             videoEl.src = url;
                                                             await videoEl.play();
                                                         }
@@ -268,23 +299,23 @@ export function LiveTV() {
                                             }
                                         }}
                                     />
-                                    {/* Live Badge with glow animation */}
+                                    {/* Live Badge */}
                                     <div style={{
                                         position: 'absolute',
-                                        top: '12px',
-                                        right: '12px',
-                                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                                        padding: '6px 14px',
-                                        borderRadius: '20px',
+                                        top: '16px',
+                                        right: '16px',
+                                        background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+                                        padding: '8px 16px',
+                                        borderRadius: '24px',
                                         fontSize: '11px',
                                         fontWeight: '700',
                                         color: 'white',
                                         textTransform: 'uppercase',
-                                        letterSpacing: '1px',
+                                        letterSpacing: '1.5px',
                                         display: 'flex',
                                         alignItems: 'center',
-                                        gap: '6px',
-                                        animation: 'liveGlow 1.5s ease-in-out infinite'
+                                        gap: '8px',
+                                        animation: 'liveGlow 2s ease-in-out infinite'
                                     }}>
                                         <span style={{
                                             width: '8px',
@@ -295,100 +326,101 @@ export function LiveTV() {
                                         }} />
                                         AO VIVO
                                     </div>
-                                    <style>{`
-                                    @keyframes liveGlow {
-                                        0%, 100% { 
-                                            box-shadow: 0 0 10px rgba(239, 68, 68, 0.6), 0 0 20px rgba(239, 68, 68, 0.4), 0 0 30px rgba(239, 68, 68, 0.2);
-                                        }
-                                        50% { 
-                                            box-shadow: 0 0 15px rgba(239, 68, 68, 0.8), 0 0 30px rgba(239, 68, 68, 0.6), 0 0 45px rgba(239, 68, 68, 0.3);
-                                        }
-                                    }
-                                    @keyframes liveDot {
-                                        0%, 100% { opacity: 1; transform: scale(1); }
-                                        50% { opacity: 0.5; transform: scale(0.8); }
-                                    }
-                                `}</style>
                                 </div>
 
-                                {/* Buttons below preview */}
-                                <div style={{ display: 'flex', gap: '12px' }}>
+                                {/* Buttons */}
+                                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                                     <button
                                         onClick={() => {
                                             setPlayingChannel(selectedChannel);
                                             setSelectedChannel(null);
                                         }}
                                         style={{
-                                            padding: '12px 32px',
-                                            backgroundColor: '#2563eb',
+                                            flex: '1 1 auto',
+                                            minWidth: '150px',
+                                            padding: '14px 32px',
+                                            background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                                             color: 'white',
-                                            fontWeight: 'bold',
+                                            fontWeight: '700',
                                             fontSize: '15px',
-                                            borderRadius: '8px',
+                                            borderRadius: '12px',
                                             border: 'none',
                                             cursor: 'pointer',
                                             display: 'flex',
                                             alignItems: 'center',
-                                            gap: '8px',
-                                            transition: 'all 0.2s',
-                                            boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)'
+                                            justifyContent: 'center',
+                                            gap: '10px',
+                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                            boxShadow: '0 10px 30px -5px rgba(59, 130, 246, 0.5)'
                                         }}
                                         onMouseEnter={(e) => {
-                                            e.currentTarget.style.backgroundColor = '#1d4ed8';
-                                            e.currentTarget.style.transform = 'scale(1.02)';
+                                            e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
+                                            e.currentTarget.style.boxShadow = '0 15px 40px -5px rgba(59, 130, 246, 0.6)';
                                         }}
                                         onMouseLeave={(e) => {
-                                            e.currentTarget.style.backgroundColor = '#2563eb';
-                                            e.currentTarget.style.transform = 'scale(1)';
+                                            e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                                            e.currentTarget.style.boxShadow = '0 10px 30px -5px rgba(59, 130, 246, 0.5)';
                                         }}
                                     >
-                                        ▶ Assistir
+                                        <span style={{ fontSize: '18px' }}>▶</span> Assistir Agora
                                     </button>
 
                                     <button
                                         onClick={() => setSelectedChannel(null)}
                                         style={{
-                                            padding: '12px 24px',
-                                            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                                            color: 'white',
-                                            fontWeight: 'bold',
+                                            padding: '14px 24px',
+                                            background: 'rgba(255, 255, 255, 0.05)',
+                                            color: 'rgba(255, 255, 255, 0.9)',
+                                            fontWeight: '600',
                                             fontSize: '15px',
-                                            borderRadius: '8px',
-                                            border: '2px solid rgba(255, 255, 255, 0.2)',
+                                            borderRadius: '12px',
+                                            border: '1px solid rgba(255, 255, 255, 0.15)',
                                             cursor: 'pointer',
-                                            transition: 'all 0.2s'
+                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                            backdropFilter: 'blur(10px)'
                                         }}
                                         onMouseEnter={(e) => {
-                                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                                            e.currentTarget.style.transform = 'translateY(-2px)';
                                         }}
                                         onMouseLeave={(e) => {
-                                            e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                                            e.currentTarget.style.transform = 'translateY(0)';
                                         }}
                                     >
-                                        Fechar
+                                        ✕ Fechar
                                     </button>
                                 </div>
                             </div>
 
-                            {/* EPG Schedule Panel - Expands to fill right side */}
-                            <div style={{
-                                flex: '1',
-                                background: 'rgba(17, 24, 39, 0.7)',
-                                borderRadius: '12px',
-                                padding: '20px',
-                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                minHeight: '300px'
+                            {/* EPG Schedule Panel - 50% */}
+                            <div className="epg-container" style={{
+                                background: 'linear-gradient(145deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%)',
+                                borderRadius: '16px',
+                                padding: 'clamp(16px, 2vw, 24px)',
+                                border: '1px solid rgba(255, 255, 255, 0.08)',
+                                backdropFilter: 'blur(20px)',
+                                animation: 'fadeInScale 0.5s ease-out 0.2s both',
+                                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.4)',
+                                height: 'fit-content'
                             }}>
                                 <h3 style={{
-                                    fontSize: '18px',
-                                    fontWeight: '600',
+                                    fontSize: 'clamp(16px, 2vw, 18px)',
+                                    fontWeight: '700',
                                     color: 'white',
-                                    marginBottom: '16px',
+                                    marginBottom: '20px',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '8px'
+                                    gap: '10px'
                                 }}>
-                                    📺 Grade Horária
+                                    <span style={{
+                                        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                                        padding: '8px',
+                                        borderRadius: '10px',
+                                        display: 'flex',
+                                        boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)'
+                                    }}>📺</span>
+                                    Grade Horária
                                 </h3>
 
                                 {currentProgram ? (
@@ -396,47 +428,54 @@ export function LiveTV() {
                                         {/* Current Program */}
                                         <div style={{
                                             marginBottom: '20px',
-                                            padding: '16px',
-                                            background: 'rgba(59, 130, 246, 0.1)',
-                                            borderRadius: '8px',
-                                            border: '1px solid rgba(59, 130, 246, 0.3)'
+                                            padding: 'clamp(14px, 2vw, 20px)',
+                                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%)',
+                                            borderRadius: '14px',
+                                            border: '1px solid rgba(59, 130, 246, 0.25)',
+                                            position: 'relative',
+                                            overflow: 'hidden'
                                         }}>
                                             <div style={{
-                                                fontSize: '12px',
-                                                color: 'rgba(147, 197, 253, 1)',
-                                                marginBottom: '8px',
-                                                fontWeight: '600'
-                                            }}>
-                                                🔴 AGORA
+                                                position: 'absolute',
+                                                top: 0, left: 0, right: 0, bottom: 0,
+                                                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.03), transparent)',
+                                                backgroundSize: '200% 100%',
+                                                animation: 'shimmer 3s infinite',
+                                                pointerEvents: 'none'
+                                            }} />
+
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                                                <span style={{
+                                                    width: '10px',
+                                                    height: '10px',
+                                                    background: '#ef4444',
+                                                    borderRadius: '50%',
+                                                    animation: 'pulse 1.5s ease-in-out infinite',
+                                                    boxShadow: '0 0 10px rgba(239, 68, 68, 0.6)'
+                                                }} />
+                                                <span style={{ fontSize: '12px', color: '#93c5fd', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                                    AGORA
+                                                </span>
                                             </div>
-                                            <div style={{
-                                                fontSize: '16px',
-                                                color: 'white',
-                                                fontWeight: '600',
-                                                marginBottom: '8px'
-                                            }}>
+
+                                            <div style={{ fontSize: 'clamp(14px, 1.5vw, 18px)', color: 'white', fontWeight: '700', marginBottom: '8px', lineHeight: '1.4' }}>
                                                 {currentProgram.title}
                                             </div>
-                                            <div style={{
-                                                fontSize: '12px',
-                                                color: 'rgba(156, 163, 175, 1)',
-                                                marginBottom: '8px'
-                                            }}>
+
+                                            <div style={{ fontSize: '13px', color: 'rgba(148, 163, 184, 1)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span>🕐</span>
                                                 {epgService.formatTime(currentProgram.start)} - {epgService.formatTime(currentProgram.end)}
                                             </div>
+
                                             {/* Progress Bar */}
-                                            <div style={{
-                                                width: '100%',
-                                                height: '4px',
-                                                background: 'rgba(255, 255, 255, 0.1)',
-                                                borderRadius: '2px',
-                                                overflow: 'hidden'
-                                            }}>
+                                            <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden' }}>
                                                 <div style={{
                                                     width: `${epgService.getProgramProgress(currentProgram)}%`,
                                                     height: '100%',
-                                                    background: 'rgba(59, 130, 246, 1)',
-                                                    transition: 'width 1s ease'
+                                                    background: 'linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%)',
+                                                    borderRadius: '3px',
+                                                    transition: 'width 1s ease',
+                                                    animation: 'progressGlow 2s ease-in-out infinite'
                                                 }} />
                                             </div>
                                         </div>
@@ -444,32 +483,27 @@ export function LiveTV() {
                                         {/* Upcoming Programs */}
                                         {upcomingPrograms.length > 0 && (
                                             <div>
-                                                <div style={{
-                                                    fontSize: '14px',
-                                                    color: 'rgba(156, 163, 175, 1)',
-                                                    marginBottom: '12px',
-                                                    fontWeight: '600'
-                                                }}>
-                                                    Próximos Programas
+                                                <div style={{ fontSize: '13px', color: 'rgba(148, 163, 184, 1)', marginBottom: '14px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                                    A Seguir
                                                 </div>
                                                 {upcomingPrograms.map((program, index) => (
-                                                    <div key={program.id || index} style={{
-                                                        marginBottom: '12px',
-                                                        padding: '12px',
-                                                        background: 'rgba(255, 255, 255, 0.05)',
-                                                        borderRadius: '6px'
-                                                    }}>
-                                                        <div style={{
-                                                            fontSize: '14px',
-                                                            color: 'white',
-                                                            marginBottom: '4px'
-                                                        }}>
+                                                    <div
+                                                        key={program.id || index}
+                                                        className="epg-item"
+                                                        style={{
+                                                            marginBottom: '10px',
+                                                            padding: 'clamp(10px, 1.5vw, 14px) clamp(12px, 1.5vw, 16px)',
+                                                            background: 'rgba(255, 255, 255, 0.03)',
+                                                            borderRadius: '10px',
+                                                            border: '1px solid rgba(255, 255, 255, 0.05)',
+                                                            cursor: 'pointer'
+                                                        }}
+                                                    >
+                                                        <div style={{ fontSize: 'clamp(12px, 1.2vw, 14px)', color: 'white', fontWeight: '500', marginBottom: '6px' }}>
                                                             {program.title}
                                                         </div>
-                                                        <div style={{
-                                                            fontSize: '12px',
-                                                            color: 'rgba(156, 163, 175, 1)'
-                                                        }}>
+                                                        <div style={{ fontSize: '12px', color: 'rgba(148, 163, 184, 0.8)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                            <span style={{ opacity: 0.7 }}>🕐</span>
                                                             {epgService.formatTime(program.start)}
                                                         </div>
                                                     </div>
@@ -478,13 +512,9 @@ export function LiveTV() {
                                         )}
                                     </>
                                 ) : (
-                                    <div style={{
-                                        textAlign: 'center',
-                                        padding: '40px 20px',
-                                        color: 'rgba(156, 163, 175, 1)'
-                                    }}>
-                                        <div style={{ fontSize: '48px', marginBottom: '12px' }}>📺</div>
-                                        <div>Sem informações de programação</div>
+                                    <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(148, 163, 184, 0.8)' }}>
+                                        <div style={{ fontSize: '48px', marginBottom: '16px', filter: 'grayscale(0.3)' }}>📺</div>
+                                        <div style={{ fontWeight: '500' }}>Sem informações de programação</div>
                                     </div>
                                 )}
                             </div>
@@ -493,37 +523,115 @@ export function LiveTV() {
                 )}
 
                 <div className="p-8" style={{ paddingLeft: '60px' }}>
+                    <style>{`
+                        .channel-card {
+                            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                            transform-origin: center;
+                        }
+                        .channel-card:hover {
+                            transform: translateX(8px) scale(1.01);
+                            background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(55, 65, 81, 1) 100%) !important;
+                            border-color: rgba(59, 130, 246, 0.3) !important;
+                            box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.3);
+                        }
+                        .channel-card:hover .channel-logo { transform: scale(1.1); }
+                        .channel-logo { transition: transform 0.3s ease; }
+                        .channel-card:active { transform: translateX(8px) scale(0.98); }
+                        .channels-grid {
+                            display: grid;
+                            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                            gap: 12px;
+                        }
+                        @media (max-width: 768px) {
+                            .channels-grid { grid-template-columns: 1fr; }
+                        }
+                    `}</style>
 
                     {filteredStreams.length === 0 ? (
-                        <div className="text-center text-gray-400 py-12">
-                            <p className="text-lg">Nenhum canal encontrado</p>
+                        <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                            <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.5 }}>📺</div>
+                            <p style={{ fontSize: '18px', color: 'rgba(156, 163, 175, 1)', fontWeight: '500' }}>Nenhum canal encontrado</p>
+                            <p style={{ fontSize: '14px', color: 'rgba(107, 114, 128, 1)', marginTop: '8px' }}>Tente buscar por outro termo</p>
                         </div>
                     ) : (
-                        <div className="space-y-px">
-                            {filteredStreams.map((stream) => (
+                        <div className="channels-grid" style={{ animation: 'fadeInScale 0.5s ease-out' }}>
+                            {filteredStreams.map((stream, index) => (
                                 <div
                                     key={stream.stream_id}
                                     onClick={() => setSelectedChannel(stream)}
-                                    className="bg-gray-800 hover:bg-gray-700 py-1 px-2 border-b border-gray-700/50 last:border-b-0 transition-colors cursor-pointer group flex items-center gap-2"
-                                    style={{ borderLeft: selectedChannel?.stream_id === stream.stream_id ? '3px solid #3b82f6' : 'none' }}
+                                    className="channel-card"
+                                    style={{
+                                        background: selectedChannel?.stream_id === stream.stream_id
+                                            ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(55, 65, 81, 1) 100%)'
+                                            : 'linear-gradient(135deg, rgba(31, 41, 55, 0.8) 0%, rgba(55, 65, 81, 0.9) 100%)',
+                                        padding: '12px 16px',
+                                        borderRadius: '12px',
+                                        border: selectedChannel?.stream_id === stream.stream_id
+                                            ? '1px solid rgba(59, 130, 246, 0.5)'
+                                            : '1px solid rgba(255, 255, 255, 0.06)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '16px'
+                                    }}
                                 >
-                                    <div className="w-[56px] h-[56px] bg-gray-700 rounded flex items-center justify-center overflow-hidden flex-shrink-0">
+                                    <div
+                                        className="channel-logo"
+                                        style={{
+                                            width: '56px',
+                                            height: '56px',
+                                            background: 'linear-gradient(145deg, rgba(55, 65, 81, 1) 0%, rgba(31, 41, 55, 1) 100%)',
+                                            borderRadius: '10px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            overflow: 'hidden',
+                                            flexShrink: 0,
+                                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
+                                        }}
+                                    >
                                         {stream.stream_icon && !brokenImages.has(stream.stream_id) ? (
                                             <img
                                                 src={stream.stream_icon}
                                                 alt=""
-                                                className="w-full h-full object-contain"
+                                                style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '4px' }}
                                                 onError={() => handleImageError(stream.stream_id)}
                                             />
                                         ) : (
-                                            <div className="w-full h-full bg-blue-500/30"></div>
+                                            <div style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: '20px'
+                                            }}>📺</div>
                                         )}
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-gray-300 font-normal text-xs leading-tight group-hover:text-white transition-colors truncate">
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <p style={{
+                                            color: selectedChannel?.stream_id === stream.stream_id ? '#93c5fd' : 'rgba(229, 231, 235, 1)',
+                                            fontSize: '14px',
+                                            fontWeight: selectedChannel?.stream_id === stream.stream_id ? '600' : '500',
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            letterSpacing: '-0.2px'
+                                        }}>
                                             {stream.name}
                                         </p>
                                     </div>
+                                    {selectedChannel?.stream_id === stream.stream_id && (
+                                        <div style={{
+                                            width: '8px',
+                                            height: '8px',
+                                            background: '#3b82f6',
+                                            borderRadius: '50%',
+                                            boxShadow: '0 0 10px rgba(59, 130, 246, 0.6)',
+                                            animation: 'pulse 2s ease-in-out infinite'
+                                        }} />
+                                    )}
                                 </div>
                             ))}
                         </div>
