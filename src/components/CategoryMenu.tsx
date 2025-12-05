@@ -465,23 +465,23 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                     {/* All Categories Option - Premium */}
                     <button
                         onClick={() => {
-                            onSelectCategory('');
+                            onSelectCategory('all');
                             setIsOpen(false);
                         }}
                         className="category-item"
                         style={{
                             width: '100%',
                             padding: '16px 20px',
-                            background: selectedCategory === '' || selectedCategory === null
+                            background: selectedCategory === 'all' || selectedCategory === '' || selectedCategory === null
                                 ? 'rgba(251, 191, 36, 0.15)'
                                 : 'rgba(255, 255, 255, 0.03)',
-                            border: selectedCategory === '' || selectedCategory === null
+                            border: selectedCategory === 'all' || selectedCategory === '' || selectedCategory === null
                                 ? '2px solid #fbbf24'
                                 : '2px solid rgba(255, 255, 255, 0.05)',
                             borderRadius: '12px',
-                            color: selectedCategory === '' || selectedCategory === null ? '#fbbf24' : 'white',
+                            color: selectedCategory === 'all' || selectedCategory === '' || selectedCategory === null ? '#fbbf24' : 'white',
                             fontSize: '15px',
-                            fontWeight: selectedCategory === '' || selectedCategory === null ? '600' : '500',
+                            fontWeight: selectedCategory === 'all' || selectedCategory === '' || selectedCategory === null ? '600' : '500',
                             textAlign: 'left',
                             cursor: 'pointer',
                             marginBottom: '12px',
@@ -489,12 +489,12 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                             display: 'flex',
                             alignItems: 'center',
                             gap: '12px',
-                            boxShadow: selectedCategory === '' || selectedCategory === null
+                            boxShadow: selectedCategory === 'all' || selectedCategory === '' || selectedCategory === null
                                 ? '0 4px 16px rgba(251, 191, 36, 0.4)'
                                 : 'none'
                         }}
                         onMouseEnter={(e) => {
-                            if (selectedCategory !== '' && selectedCategory !== null) {
+                            if (selectedCategory !== 'all' && selectedCategory !== '' && selectedCategory !== null) {
                                 e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
                                 e.currentTarget.style.transform = 'translateX(8px) scale(1.02)';
                                 e.currentTarget.style.borderColor = '#ef4444';
@@ -504,7 +504,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                             }
                         }}
                         onMouseLeave={(e) => {
-                            if (selectedCategory !== '' && selectedCategory !== null) {
+                            if (selectedCategory !== 'all' && selectedCategory !== '' && selectedCategory !== null) {
                                 e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
                                 e.currentTarget.style.transform = 'translateX(0) scale(1)';
                                 e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.05)';
@@ -518,7 +518,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                             width: '40px',
                             height: '40px',
                             borderRadius: '10px',
-                            background: selectedCategory === '' || selectedCategory === null
+                            background: selectedCategory === 'all' || selectedCategory === '' || selectedCategory === null
                                 ? 'rgba(251, 191, 36, 0.2)'
                                 : 'rgba(255, 255, 255, 0.1)',
                             display: 'flex',
@@ -532,7 +532,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                         <span style={{ flex: 1 }}>
                             {type === 'vod' ? 'Todos os Filmes' : type === 'live' ? 'Todos os Canais' : 'Todas as Séries'}
                         </span>
-                        {(selectedCategory === '' || selectedCategory === null) && (
+                        {(selectedCategory === 'all' || selectedCategory === '' || selectedCategory === null) && (
                             <div style={{
                                 width: '8px',
                                 height: '8px',

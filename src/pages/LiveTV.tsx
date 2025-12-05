@@ -103,7 +103,7 @@ export function LiveTV() {
 
     const filteredStreams = streams.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesCategory = selectedCategory === 'all' || stream.category_id === selectedCategory;
+        const matchesCategory = !selectedCategory || selectedCategory === 'all' || stream.category_id === selectedCategory;
         return matchesSearch && matchesCategory;
     });
 
@@ -555,7 +555,7 @@ export function LiveTV() {
                         </div>
                     ) : (
                         <div className="channels-grid" style={{ animation: 'fadeInScale 0.5s ease-out' }}>
-                            {filteredStreams.map((stream, index) => (
+                            {filteredStreams.map((stream) => (
                                 <div
                                     key={stream.stream_id}
                                     onClick={() => setSelectedChannel(stream)}
