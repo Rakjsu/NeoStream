@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { formatGenres, type TMDBSeriesDetails, fetchEpisodeDetails, getBackdropUrl } from '../services/tmdb';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { formatGenres, type TMDBSeriesDetails, fetchEpisodeDetails, getBackdropUrl, searchSeriesByName } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
 import { watchProgressService } from '../services/watchProgressService';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
@@ -25,9 +25,12 @@ interface Series {
     backdrop_path: string[];
     youtube_trailer: string;
     episode_run_time: string;
-    category_id: string | string[]; // Support both single and multiple categories
+    category_id: string | string[];
     tmdb_id: string;
 }
+
+const CARD_MIN_WIDTH = 180;
+const CARD_GAP = 24;
 
 export function Series() {
     const [series, setSeries] = useState<Series[]>([]);
@@ -43,12 +46,12 @@ export function Series() {
     const [selectedSeason, setSelectedSeason] = useState<number>(1);
     const [selectedEpisode, setSelectedEpisode] = useState<number>(1);
     const [seriesInfo, setSeriesInfo] = useState<any>(null);
-    // Cache for TMDB episode names: key is "seriesId-season-episode"
     const [tmdbEpisodeCache, setTmdbEpisodeCache] = useState<Map<string, string>>(new Map());
     const [, setRefresh] = useState(0);
-    const [visibleCount, setVisibleCount] = useState(36); // 4 rows × 9 columns
-    const ITEMS_PER_PAGE = 36;
+    const [visibleCount, setVisibleCount] = useState(0);
+    const [itemsPerPage, setItemsPerPage] = useState(36);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const gridRef = useRef<HTMLDivElement>(null);
 
     // Resume modal state
     const [showResumeModal, setShowResumeModal] = useState(false);
@@ -59,6 +62,31 @@ export function Series() {
 
     // Clear history confirmation
     const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false);
+
+    // Dynamic grid calculation
+    useEffect(() => {
+        const calculateGrid = () => {
+            const container = scrollContainerRef.current;
+            if (!container) return;
+
+            const containerWidth = container.clientWidth - 64;
+            const containerHeight = container.clientHeight;
+
+            const cols = Math.max(2, Math.floor(containerWidth / (CARD_MIN_WIDTH + CARD_GAP)));
+            const rows = Math.ceil(containerHeight / 320) + 1;
+
+            const items = Math.max(cols * rows, 12);
+            setItemsPerPage(items);
+
+            if (visibleCount === 0) {
+                setVisibleCount(items);
+            }
+        };
+
+        calculateGrid();
+        window.addEventListener('resize', calculateGrid);
+        return () => window.removeEventListener('resize', calculateGrid);
+    }, [visibleCount]);
 
     useEffect(() => { fetchSeries(); }, []);
 
@@ -82,50 +110,46 @@ export function Series() {
     const filteredSeries = series.filter(s => {
         const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
 
-        // Special category for continue watching (series with progress)
         if (selectedCategory === 'CONTINUE_WATCHING') {
             const progressMap = watchProgressService.getContinueWatching();
             return matchesSearch && progressMap.has(String(s.series_id));
         }
 
-        // Special category for completed series (95% of any episode)
         if (selectedCategory === 'COMPLETED') {
             return matchesSearch && watchProgressService.isSeriesCompleted(String(s.series_id));
         }
 
-        // Support both single category_id (string) and multiple categories (array)
         const categories = Array.isArray(s.category_id) ? s.category_id : [s.category_id];
         const matchesCategory = !selectedCategory || selectedCategory === '' || categories.includes(selectedCategory);
         return matchesSearch && matchesCategory;
     });
 
-
-
-    // Lazy loading scroll listener
+    // Lazy loading scroll handler
     useEffect(() => {
         const container = scrollContainerRef.current;
         if (!container) return;
 
         const handleScroll = () => {
             const { scrollTop, scrollHeight, clientHeight } = container;
-
-            // Load more when 80% scrolled
-            if (scrollTop + clientHeight >= scrollHeight * 0.8 && visibleCount < filteredSeries.length) {
-                setVisibleCount(prev => Math.min(prev + ITEMS_PER_PAGE, filteredSeries.length));
+            if (scrollTop + clientHeight >= scrollHeight * 0.85 && visibleCount < filteredSeries.length) {
+                setVisibleCount(prev => Math.min(prev + itemsPerPage, filteredSeries.length));
             }
         };
 
         container.addEventListener('scroll', handleScroll);
         return () => container.removeEventListener('scroll', handleScroll);
-    }, [filteredSeries.length, visibleCount, ITEMS_PER_PAGE]);
+    }, [filteredSeries.length, visibleCount, itemsPerPage]);
 
-    // Reset visible count and close details when search/filter changes
+    // Reset on filter change
     useEffect(() => {
-        setVisibleCount(ITEMS_PER_PAGE);
-        setSelectedSeries(null); // Close details when changing category or search
-    }, [searchQuery, selectedCategory]);
+        setVisibleCount(itemsPerPage);
+        setSelectedSeries(null);
+    }, [searchQuery, selectedCategory, itemsPerPage]);
 
-    const handleImageError = (seriesId: number) => setBrokenImages(prev => new Set(prev).add(seriesId));
+    const handleImageError = useCallback((seriesId: number) => {
+        setBrokenImages(prev => new Set(prev).add(seriesId));
+    }, []);
+
     const fixImageUrl = (url: string): string => url && url.startsWith('http') ? url : `https://${url}`;
 
     const extractYearFromName = (name: string): string => {
@@ -133,130 +157,100 @@ export function Series() {
         return match ? match[1] : '';
     };
 
+    // Fetch TMDB data
     useEffect(() => {
-        if (selectedSeries) {
-            const year = extractYearFromName(selectedSeries.name);
-            setLoadingTmdb(true);
+        if (!selectedSeries) {
             setTmdbData(null);
-            import('../services/tmdb').then(({ searchSeriesByName }) => {
-                searchSeriesByName(selectedSeries.name, year)
-                    .then(data => { setTmdbData(data); setLoadingTmdb(false); })
-                    .catch(() => setLoadingTmdb(false));
-            });
-        } else {
-            setTmdbData(null);
+            return;
         }
+
+        const year = extractYearFromName(selectedSeries.name);
+        setLoadingTmdb(true);
+        setTmdbData(null);
+
+        searchSeriesByName(selectedSeries.name, year)
+            .then(data => { setTmdbData(data); setLoadingTmdb(false); })
+            .catch(() => setLoadingTmdb(false));
     }, [selectedSeries]);
 
     const handlePlaySeries = (seriesItem: Series) => {
-        // Check if current episode has partial progress
-        const episodeProgress = watchProgressService.getEpisodeProgress(
+        // Check for existing progress
+        const progress = watchProgressService.getEpisodeProgress(
             String(seriesItem.series_id),
             selectedSeason,
             selectedEpisode
         );
 
-        // If episode has progress and is not completed, show resume modal
-        if (episodeProgress && !episodeProgress.completed && episodeProgress.currentTime > 10) {
+        if (progress && progress.currentTime > 10 && progress.percentage < 95) {
+            // Has meaningful progress, show resume modal
             setResumeModalData({
-                currentTime: episodeProgress.currentTime,
-                duration: episodeProgress.duration
+                currentTime: progress.currentTime,
+                duration: progress.duration
             });
             setShowResumeModal(true);
         } else {
-            // No progress or already completed, play directly
+            // No progress or completed, play directly
             setPlayingSeries(seriesItem);
         }
     };
 
-
-    // Check if episode title from IPTV API is meaningful
+    // Episode title handling
     const isValidEpisodeTitle = (cleanTitle: string): boolean => {
-        if (!cleanTitle || cleanTitle.length === 0) return false;
-        if (cleanTitle.match(/^\d+$/)) return false; // Just a number
-        if (cleanTitle.match(/^(Episódio|Capítulo|Ep\.?|Episode|Chapter)\s*\d+$/i)) return false;
-        return true;
+        const genericPatterns = [
+            /^s\d+\s*e\d+$/i,
+            /^episode\s*\d+$/i,
+            /^ep\s*\d+$/i,
+            /^\d+$/,
+            /^temporada\s*\d+\s*episodio\s*\d+$/i
+        ];
+        return !genericPatterns.some(pattern => pattern.test(cleanTitle));
     };
 
-    // Extract clean episode title and format as "Episódio X - Episode Name"
-    // Uses TMDB as fallback when IPTV title is not meaningful
     const getEpisodeTitle = (fullTitle: string, episodeNum: number, season: number = selectedSeason): string => {
-        // Try to get from cache first (for TMDB fallback)
-        const cacheKey = selectedSeries?.tmdb_id
-            ? `${selectedSeries.tmdb_id}-${season}-${episodeNum}`
-            : null;
-
-        if (cacheKey && tmdbEpisodeCache.has(cacheKey)) {
-            const cachedName = tmdbEpisodeCache.get(cacheKey)!;
-            return `Episódio ${episodeNum} - ${cachedName}`;
-        }
-
-        // Try to clean the IPTV title
-        let cleanTitle = fullTitle || '';
-
-        // Split by " - " and get the last meaningful part
-        const parts = cleanTitle.split(' - ');
-        if (parts.length > 1) {
-            cleanTitle = parts[parts.length - 1].trim();
-        }
-
-        // Remove patterns like "S01E01", "Episódio 1", "Capítulo 1", "Ep1", etc.
-        cleanTitle = cleanTitle
-            .replace(/^S\d+E\d+\s*/i, '')           // Remove S01E01
-            .replace(/^Episódio\s+\d+\s*/i, '')      // Remove "Episódio X"
-            .replace(/^Capítulo\s+\d+\s*/i, '')      // Remove "Capítulo X"
-            .replace(/^Ep\.?\s*\d+\s*/i, '')         // Remove "Ep1" or "Ep. 1"
-            .replace(/^Episode\s+\d+\s*/i, '')       // Remove "Episode X"
-            .replace(/^Chapter\s+\d+\s*/i, '')       // Remove "Chapter X"
+        let cleanTitle = fullTitle
+            .replace(/^(.*?)[\s\-–—]*S\d+[\s\-:\.]*E\d+[\s\-:\.–—]*/i, '')
+            .replace(/\s*[\[\(]?S\d+[\s\.\-]*E\d+[\]\)]?\s*/gi, '')
+            .replace(/\s*-\s*Temporada\s*\d+\s*Epis[oó]dio\s*\d+\s*/gi, '')
+            .replace(/\s*Temp\s*\d+\s*Ep\s*\d+\s*/gi, '')
             .trim();
 
-        // If we have a valid title from IPTV, use it
-        if (isValidEpisodeTitle(cleanTitle)) {
+        if (cleanTitle && isValidEpisodeTitle(cleanTitle)) {
             return `Episódio ${episodeNum} - ${cleanTitle}`;
         }
 
-        // If IPTV title is not good and we have TMDB ID, try to fetch from TMDB
-        if (selectedSeries?.tmdb_id && cacheKey) {
-            // Trigger async fetch (won't block rendering)
-            fetchEpisodeDetails(selectedSeries.tmdb_id, season, episodeNum)
-                .then(episodeData => {
-                    if (episodeData && episodeData.name) {
-                        setTmdbEpisodeCache(prev => {
-                            const newCache = new Map(prev);
-                            newCache.set(cacheKey, episodeData.name);
-                            return newCache;
-                        });
-                    }
-                })
-                .catch(() => {
-                    // Silently fail - will just show episode number
-                });
+        // Check cache for TMDB title
+        const cacheKey = `${selectedSeries?.tmdb_id || selectedSeries?.series_id}-${season}-${episodeNum}`;
+        const cachedTitle = tmdbEpisodeCache.get(cacheKey);
+        if (cachedTitle) {
+            return `Episódio ${episodeNum} - ${cachedTitle}`;
         }
 
-        // Return just the episode number as fallback
+        // Fetch from TMDB if we have tmdb_id
+        if (selectedSeries?.tmdb_id && tmdbData) {
+            fetchEpisodeDetails(selectedSeries.tmdb_id, season, episodeNum)
+                .then(epDetails => {
+                    if (epDetails?.name) {
+                        setTmdbEpisodeCache(prev => new Map(prev).set(cacheKey, epDetails.name));
+                    }
+                })
+                .catch(() => { });
+        }
+
         return `Episódio ${episodeNum}`;
     };
 
     const buildSeriesStreamUrl = async (_seriesItem: Series): Promise<string> => {
         try {
-            const result = await window.ipcRenderer.invoke('auth:get-credentials');
+            const credResult = await window.ipcRenderer.invoke('auth:get-credentials');
+            if (credResult.success) {
+                const { url, username, password } = credResult.credentials;
+                const episodes = seriesInfo?.episodes?.[selectedSeason];
+                const episode = episodes?.find((ep: any) => Number(ep.episode_num) === selectedEpisode);
 
-            if (result.success) {
-                const { url, username, password } = result.credentials;
-
-                // Get the specific episode data from seriesInfo
-                const episode = seriesInfo?.episodes?.[selectedSeason]?.find(
-                    (ep: any) => Number(ep.episode_num) === Number(selectedEpisode)
-                );
-
-                if (!episode) {
-                    throw new Error(`Episode ${selectedEpisode} of season ${selectedSeason} not found`);
+                if (episode) {
+                    const ext = episode.container_extension || 'mp4';
+                    return `${url}/series/${username}/${password}/${episode.id}.${ext}`;
                 }
-
-                // Use episode ID and container extension from API
-                const streamUrl = `${url}/series/${username}/${password}/${episode.id}.${episode.container_extension}`;
-                console.log('🎬 Building series stream URL:', streamUrl);
-                return streamUrl;
             }
             throw new Error('Credenciais não encontradas');
         } catch (error) {
@@ -274,29 +268,17 @@ export function Series() {
                     fetch(`${url}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${selectedSeries.series_id}`)
                         .then(res => res.json())
                         .then(data => {
-                            console.log('📺 Series Info API Response:', data);
-                            console.log('📺 Seasons structure:', data.seasons);
-                            console.log('📺 Episodes (IPTV disponíveis):', data.episodes);
-                            console.log('📺 Temporadas disponíveis:', Object.keys(data.episodes || {}));
-                            console.log('📺 Exemplo de episódio:', data.episodes?.[1]?.[0]); // Mostra estrutura do primeiro episódio
                             setSeriesInfo(data);
-
-                            // Auto-select last watched episode or default to S1E1
                             const lastWatched = watchProgressService.getLastWatchedEpisode(String(selectedSeries.series_id));
                             if (lastWatched) {
-                                console.log(`📌 Auto-selecting last watched: S${lastWatched.season}E${lastWatched.episode}`);
                                 setSelectedSeason(lastWatched.season);
                                 setSelectedEpisode(lastWatched.episode);
                             } else {
-                                console.log('📌 No watch history, defaulting to S1E1');
                                 setSelectedSeason(1);
                                 setSelectedEpisode(1);
                             }
                         })
-                        .catch(err => {
-                            console.error('❌ Error fetching series info:', err);
-                            setSeriesInfo(null);
-                        });
+                        .catch(() => setSeriesInfo(null));
                 }
             });
         } else {
@@ -304,121 +286,128 @@ export function Series() {
         }
     }, [selectedSeries]);
 
+    // Loading State
     if (loading) return (
-        <div className="p-8">
-            <h1 className="text-3xl font-bold text-white mb-6">Séries</h1>
-            <div className="grid grid-cols-9 gap-[32px] px-[32px]">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map((i) => (
-                    <div key={i} className="animate-pulse">
-                        <div className="aspect-[2/3] bg-gray-700 rounded-t-lg mb-0"></div>
-                        <div className="bg-gray-700 rounded-b-lg p-2 h-16"></div>
-                    </div>
-                ))}
+        <div className="series-page">
+            <style>{seriesStyles}</style>
+            <div className="series-loading">
+                <div className="loading-grid">
+                    {Array.from({ length: 12 }).map((_, i) => (
+                        <div key={i} className="skeleton-card" style={{ animationDelay: `${i * 0.05}s` }}>
+                            <div className="skeleton-poster" />
+                            <div className="skeleton-title" />
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );
 
+    // Error State
     if (error) return (
-        <div className="p-8">
-            <h1 className="text-3xl font-bold text-white mb-6">Séries</h1>
-            <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-4 rounded-lg text-center">
-                <p className="font-medium mb-2">Erro ao carregar séries</p>
-                <p className="text-sm">{error}</p>
-                <button onClick={fetchSeries} className="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">Tentar novamente</button>
+        <div className="series-page">
+            <style>{seriesStyles}</style>
+            <div className="series-error">
+                <div className="error-icon">📺</div>
+                <h2>Erro ao carregar séries</h2>
+                <p>{error}</p>
+                <button onClick={fetchSeries} className="retry-btn">
+                    Tentar novamente
+                </button>
             </div>
         </div>
     );
+
+    const backdropUrl = selectedSeries ? (
+        tmdbData?.backdrop_path ? getBackdropUrl(tmdbData.backdrop_path) :
+            selectedSeries.cover || fixImageUrl(selectedSeries.stream_icon)
+    ) : null;
 
     return (
         <>
-            <style>{`
-                @keyframes pulse{0%{opacity:1}50%{opacity:.7}100%{opacity:1}}
-                @keyframes rotate{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-                @keyframes slideIn{from{transform:translateX(-10px);opacity:0}to{transform:translateX(0);opacity:1}}
-                @keyframes buttonClick{
-                    0%{transform:scale(1)}
-                    50%{transform:scale(0.95)}
-                    100%{transform:scale(1.05)}
-                }
-                .watch-button{transition:all .3s ease;animation:slideIn .5s ease-out}
-                .watch-button:hover{transform:scale(1.05)!important;box-shadow:0 8px 24px rgba(37,99,235,.5)!important}
-                .watch-button:active{transform:scale(.98)!important}
-                .watch-button.clicked{animation:buttonClick 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)}
-            `}</style>
-            <div style={{ position: 'relative', height: '100vh', overflow: 'hidden' }}>
-                {selectedSeries && (() => {
-                    // Priority: TMDB backdrop (high quality) > IPTV cover > IPTV stream_icon
-                    const backdropUrl = tmdbData?.backdrop_path ? getBackdropUrl(tmdbData.backdrop_path) : null;
-                    const fallbackUrl = selectedSeries.cover || fixImageUrl(selectedSeries.stream_icon);
-                    const backgroundImageUrl = backdropUrl || fallbackUrl;
+            <style>{seriesStyles}</style>
+            <div className="series-page">
+                {/* Dynamic Background */}
+                {backdropUrl && (
+                    <div
+                        className="series-backdrop"
+                        style={{ backgroundImage: `url(${backdropUrl})` }}
+                    />
+                )}
 
-                    return backgroundImageUrl ? (
-                        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, backgroundImage: `url(${backgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(3px)', opacity: 0.5, pointerEvents: 'none' }}></div>
-                    ) : null;
-                })()}
                 <AnimatedSearchBar
                     value={searchQuery}
                     onChange={setSearchQuery}
                     placeholder="Buscar séries..."
                 />
+
                 <CategoryMenu
                     onSelectCategory={setSelectedCategory}
                     selectedCategory={selectedCategory}
                     type="series"
                 />
-                <div style={{ position: 'relative', zIndex: 10, padding: '32px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+
+                <div className="series-content">
+                    {/* Series Details Panel */}
                     {selectedSeries && (
-                        <div style={{ padding: '0 0 24px 0', marginBottom: '24px', flexShrink: 0 }}>
-                            <div style={{ maxWidth: '900px' }}>
-                                <div style={{ display: 'flex', gap: '12px', marginBottom: '12px', marginLeft: '48px' }}>
+                        <div className="series-details-panel">
+                            <div className="details-content">
+                                {/* Meta Info */}
+                                <div className="meta-badges">
                                     {loadingTmdb ? (
-                                        <span style={{ backgroundColor: 'rgba(31, 41, 55, 0.8)', color: '#9ca3af', padding: '6px 14px', borderRadius: '6px', fontSize: '14px', fontWeight: '600', fontStyle: 'italic', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' }}>Carregando...</span>
-                                    ) : tmdbData && tmdbData.first_air_date ? (
-                                        <span style={{ backgroundColor: 'rgba(31, 41, 55, 0.8)', color: 'white', padding: '6px 14px', borderRadius: '6px', fontSize: '14px', fontWeight: '600', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' }}>{new Date(tmdbData.first_air_date).toLocaleDateString('pt-BR')}</span>
-                                    ) : null}
-                                    {loadingTmdb ? (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(234, 179, 8, 0.3)', padding: '6px 14px', borderRadius: '6px' }}>
-                                            <span style={{ fontSize: '16px' }}>⭐</span>
-                                            <span style={{ color: '#9ca3af', fontWeight: 'bold', fontSize: '14px', fontStyle: 'italic', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' }}>...</span>
-                                        </div>
-                                    ) : tmdbData && tmdbData.vote_average ? (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(234, 179, 8, 0.3)', padding: '6px 14px', borderRadius: '6px', animation: 'pulse 2s ease-in-out infinite' }}>
-                                            <span style={{ fontSize: '16px', animation: 'rotate 3s linear infinite' }}>⭐</span>
-                                            <span style={{ color: '#fbbf24', fontWeight: 'bold', fontSize: '14px', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' }}>{tmdbData.vote_average.toFixed(1)}</span>
-                                        </div>
-                                    ) : null}
+                                        <span className="badge shimmer">Carregando...</span>
+                                    ) : (
+                                        <>
+                                            {tmdbData?.first_air_date && (
+                                                <span className="badge date-badge">
+                                                    📅 {new Date(tmdbData.first_air_date).getFullYear()}
+                                                </span>
+                                            )}
+                                            {tmdbData?.vote_average ? (
+                                                <span className="badge rating-badge">
+                                                    ⭐ {tmdbData.vote_average.toFixed(1)}
+                                                </span>
+                                            ) : null}
+                                            {seriesInfo?.episodes && (
+                                                <span className="badge seasons-badge">
+                                                    📺 {Object.keys(seriesInfo.episodes).length} Temporadas
+                                                </span>
+                                            )}
+                                        </>
+                                    )}
                                 </div>
-                                <h2 style={{ fontSize: '56px', fontWeight: 'bold', color: 'white', marginBottom: '16px', lineHeight: 1.1, textShadow: '4px 4px 12px rgba(0, 0, 0, 0.95)' }}>{selectedSeries.name}</h2>
+
+                                {/* Title */}
+                                <h1 className="series-title">{selectedSeries.name}</h1>
+
+                                {/* Genres */}
                                 {loadingTmdb ? (
-                                    <p style={{ color: '#9ca3af', marginBottom: '16px', fontSize: '17px', fontStyle: 'italic', textShadow: '2px 2px 6px rgba(0, 0, 0, 0.9)' }}>Carregando gênero...</p>
-                                ) : tmdbData && tmdbData.genres && tmdbData.genres.length > 0 ? (
-                                    <p style={{ color: '#f3f4f6', marginBottom: '16px', fontSize: '17px', fontWeight: '500', textShadow: '2px 2px 6px rgba(0, 0, 0, 0.9)' }}>{formatGenres(tmdbData.genres)}</p>
+                                    <p className="loading-text">Carregando gêneros...</p>
+                                ) : tmdbData?.genres && tmdbData.genres.length > 0 ? (
+                                    <div className="genre-tags">
+                                        {tmdbData.genres.slice(0, 4).map(genre => (
+                                            <span key={genre.id} className="genre-tag">{genre.name}</span>
+                                        ))}
+                                    </div>
                                 ) : null}
+
+                                {/* Overview */}
                                 {loadingTmdb ? (
-                                    <p style={{ color: '#9ca3af', marginBottom: '28px', fontSize: '16px', fontStyle: 'italic', textShadow: '2px 2px 6px rgba(0, 0, 0, 0.9)' }}>Carregando sinopse...</p>
-                                ) : tmdbData && tmdbData.overview ? (
-                                    <p style={{ color: '#f9fafb', lineHeight: '1.8', marginBottom: '28px', fontSize: '16px', maxWidth: '650px', textShadow: '2px 2px 8px rgba(0, 0, 0, 0.95)' }}>{tmdbData.overview}</p>
+                                    <p className="loading-text">Carregando sinopse...</p>
+                                ) : tmdbData?.overview ? (
+                                    <p className="series-overview">{tmdbData.overview}</p>
                                 ) : null}
-                                <div style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
+
+                                {/* Episode Selection */}
+                                <div className="episode-selectors">
                                     <select
                                         value={selectedSeason}
                                         onChange={(e) => {
                                             setSelectedSeason(Number(e.target.value));
-                                            setSelectedEpisode(1); // Reset episode when changing season
+                                            setSelectedEpisode(1);
                                         }}
-                                        style={{
-                                            padding: '14px 20px',
-                                            backgroundColor: 'rgba(30, 30, 30, 0.9)',
-                                            color: 'white',
-                                            fontSize: '16px',
-                                            fontWeight: '600',
-                                            borderRadius: '8px',
-                                            border: '2px solid rgba(59, 130, 246, 0.5)',
-                                            cursor: 'pointer',
-                                            outline: 'none',
-                                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
-                                            minWidth: '140px'
-                                        }}>
+                                        className="episode-select"
+                                    >
                                         {seriesInfo?.episodes ? Object.keys(seriesInfo.episodes).sort((a, b) => Number(a) - Number(b)).map((season: string) => (
                                             <option key={season} value={season}>Temporada {season}</option>
                                         )) : <option value="1">Temporada 1</option>}
@@ -427,48 +416,28 @@ export function Series() {
                                     <select
                                         value={selectedEpisode}
                                         onChange={(e) => setSelectedEpisode(Number(e.target.value))}
-                                        style={{
-                                            padding: '14px 20px',
-                                            backgroundColor: 'rgba(30, 30, 30, 0.9)',
-                                            color: 'white',
-                                            fontSize: '16px',
-                                            fontWeight: '600',
-                                            borderRadius: '8px',
-                                            border: '2px solid rgba(59, 130, 246, 0.5)',
-                                            cursor: 'pointer',
-                                            outline: 'none',
-                                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
-                                            minWidth: '200px'
-                                        }}>
+                                        className="episode-select episode-dropdown"
+                                    >
                                         {seriesInfo?.episodes?.[selectedSeason] ? seriesInfo.episodes[selectedSeason].map((episode: any) => (
                                             <option key={episode.id} value={episode.episode_num}>
                                                 {getEpisodeTitle(episode.title, episode.episode_num)}
                                             </option>
                                         )) : <option value="1">Episódio 1</option>}
                                     </select>
+                                </div>
 
+                                {/* Action Buttons */}
+                                <div className="action-buttons">
                                     <button
+                                        className="btn btn-primary"
                                         onClick={() => handlePlaySeries(selectedSeries)}
-                                        className="watch-button"
-                                        style={{
-                                            padding: '14px 32px',
-                                            backgroundColor: '#2563eb',
-                                            color: 'white',
-                                            fontSize: '16px',
-                                            fontWeight: '700',
-                                            borderRadius: '8px',
-                                            border: 'none',
-                                            cursor: 'pointer',
-                                            boxShadow: '0 6px 16px rgba(37, 99, 235, 0.4)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '10px'
-                                        }}>
-                                        <span style={{ fontSize: '20px' }}>▶</span>
-                                        Assistir
+                                    >
+                                        <span className="btn-icon">▶</span>
+                                        <span>Assistir</span>
                                     </button>
 
                                     <button
+                                        className={`btn btn-secondary ${watchLaterService.has(String(selectedSeries.series_id), 'series') ? 'saved' : ''}`}
                                         onClick={() => {
                                             if (watchLaterService.has(String(selectedSeries.series_id), 'series')) {
                                                 watchLaterService.remove(String(selectedSeries.series_id), 'series');
@@ -482,109 +451,111 @@ export function Series() {
                                             }
                                             setRefresh(r => r + 1);
                                         }}
-                                        style={{
-                                            padding: '14px 32px',
-                                            backgroundColor: watchLaterService.has(String(selectedSeries.series_id), 'series') ? '#10b981' : 'rgba(255, 255, 255, 0.1)',
-                                            color: 'white',
-                                            fontSize: '16px',
-                                            fontWeight: '700',
-                                            borderRadius: '8px',
-                                            border: '2px solid rgba(255, 255, 255, 0.2)',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '10px',
-                                            transition: 'all 0.2s'
-                                        }}>
-                                        <span style={{ fontSize: '20px' }}>
+                                    >
+                                        <span className="btn-icon">
                                             {watchLaterService.has(String(selectedSeries.series_id), 'series') ? '✓' : '+'}
                                         </span>
-                                        {watchLaterService.has(String(selectedSeries.series_id), 'series') ? 'Salvo' : 'Assistir Depois'}
+                                        <span>{watchLaterService.has(String(selectedSeries.series_id), 'series') ? 'Salvo' : 'Minha Lista'}</span>
                                     </button>
 
-                                    {/* Clear History Button - Only show if series has watch history */}
                                     {watchProgressService.getSeriesProgress(String(selectedSeries.series_id), selectedSeries.name) && (
                                         <button
+                                            className="btn btn-danger"
                                             onClick={() => setShowClearHistoryConfirm(true)}
-                                            style={{
-                                                padding: '14px 32px',
-                                                backgroundColor: 'rgba(239, 68, 68, 0.2)',
-                                                color: '#ef4444',
-                                                fontSize: '16px',
-                                                fontWeight: '700',
-                                                borderRadius: '8px',
-                                                border: '2px solid rgba(239, 68, 68, 0.5)',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '10px',
-                                                transition: 'all 0.2s'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.3)';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.2)';
-                                            }}
                                         >
-                                            <span style={{ fontSize: '20px' }}>🗑️</span>
-                                            Limpar Histórico
+                                            <span className="btn-icon">🗑️</span>
+                                            <span>Limpar Histórico</span>
                                         </button>
                                     )}
+
+                                    <button
+                                        className="btn btn-close"
+                                        onClick={() => setSelectedSeries(null)}
+                                    >
+                                        ✕
+                                    </button>
                                 </div>
                             </div>
                         </div>
                     )}
-                    <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', paddingRight: '4px' }}>
 
-                        <div className="grid grid-cols-9 gap-[32px] px-[32px]">
-                            {filteredSeries.slice(0, visibleCount).map((s) => (
-                                <div key={s.series_id} className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-95" onClick={() => setSelectedSeries(s)}>
-                                    <div className="relative overflow-hidden bg-gray-900 shadow-xl" style={{ borderRadius: '16px', border: selectedSeries?.series_id === s.series_id ? '3px solid #3b82f6' : '3px solid transparent' }}>
-                                        {watchLaterService.has(String(s.series_id), 'series') && (
-                                            <div style={{
-                                                position: 'absolute',
-                                                top: '8px',
-                                                right: '8px',
-                                                zIndex: 10,
-                                                background: '#10b981',
-                                                borderRadius: '50%',
-                                                width: '32px',
-                                                height: '32px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.5)'
-                                            }}>
-                                                <span style={{ fontSize: '18px' }}>🔖</span>
+                    {/* Series Grid */}
+                    <div
+                        ref={scrollContainerRef}
+                        className={`series-scroll-container ${selectedSeries ? 'with-details' : ''}`}
+                    >
+                        {filteredSeries.length === 0 ? (
+                            <div className="empty-state">
+                                <div className="empty-icon">📺</div>
+                                <h3>Nenhuma série encontrada</h3>
+                                <p>Tente buscar por outro termo</p>
+                            </div>
+                        ) : (
+                            <div ref={gridRef} className="series-grid">
+                                {filteredSeries.slice(0, visibleCount).map((s, index) => {
+                                    const isSelected = selectedSeries?.series_id === s.series_id;
+                                    const isSaved = watchLaterService.has(String(s.series_id), 'series');
+                                    const hasProgress = watchProgressService.getSeriesProgress(String(s.series_id), s.name);
+                                    const isCompleted = watchProgressService.isSeriesCompleted(String(s.series_id));
+
+                                    return (
+                                        <div
+                                            key={s.series_id}
+                                            className={`series-card ${isSelected ? 'selected' : ''}`}
+                                            onClick={() => setSelectedSeries(s)}
+                                            style={{ animationDelay: `${(index % itemsPerPage) * 0.03}s` }}
+                                        >
+                                            {/* Poster */}
+                                            <div className="card-poster">
+                                                {(s.cover || s.stream_icon) && !brokenImages.has(s.series_id) ? (
+                                                    <img
+                                                        loading="lazy"
+                                                        src={fixImageUrl(s.cover || s.stream_icon)}
+                                                        alt={s.name}
+                                                        onError={() => handleImageError(s.series_id)}
+                                                    />
+                                                ) : (
+                                                    <div className="poster-fallback">
+                                                        <span>📺</span>
+                                                    </div>
+                                                )}
+
+                                                {/* Overlay */}
+                                                <div className="card-overlay">
+                                                    <div className="play-icon">▶</div>
+                                                </div>
+
+                                                {/* Saved Badge */}
+                                                {isSaved && (
+                                                    <div className="saved-badge">🔖</div>
+                                                )}
+
+                                                {/* Completed Badge */}
+                                                {isCompleted && (
+                                                    <div className="completed-badge">✓</div>
+                                                )}
                                             </div>
-                                        )}
-                                        <div className="aspect-[2/3]">
-                                            {(s.cover || s.stream_icon) && !brokenImages.has(s.series_id) ? (
-                                                <img loading="lazy" src={fixImageUrl(s.cover || s.stream_icon)} alt={s.name} className="w-full h-full object-cover" style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }} onError={() => handleImageError(s.series_id)} />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-gray-700" style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}><span className="text-5xl">📺</span></div>
-                                            )}
+
+                                            {/* Title & Progress */}
+                                            <div className="card-info">
+                                                <h4 className="card-title">{s.name}</h4>
+                                                {hasProgress && (
+                                                    <ProgressBar
+                                                        progress={100}
+                                                        completed={isCompleted}
+                                                    />
+                                                )}
+                                            </div>
                                         </div>
-                                        <div style={{ position: 'relative', background: 'linear-gradient(to top, #111827, rgba(31, 41, 55, 0.95), rgba(31, 41, 55, 0.8))', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px', paddingLeft: '12px', paddingRight: '12px', paddingTop: '12px', paddingBottom: '12px' }}>
-                                            <h3 className="text-white text-sm font-semibold truncate group-hover:text-blue-400 transition-colors">{s.name}</h3>
-                                            <ProgressBar
-                                                progress={(() => {
-                                                    const seriesProgress = watchProgressService.getSeriesProgress(String(s.series_id), s.name);
-                                                    if (!seriesProgress) return 0;
-                                                    return 100; // Simple indicator: has progress = 100%
-                                                })()}
-                                                completed={watchProgressService.isSeriesCompleted(String(s.series_id))}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
 
+            {/* Video Player */}
             {playingSeries && (
                 <AsyncVideoPlayer
                     movie={playingSeries}
@@ -594,7 +565,6 @@ export function Series() {
                     seasonNumber={selectedSeason}
                     episodeNumber={selectedEpisode}
                     onNextEpisode={() => {
-                        // Mark current episode as watched before moving to next
                         watchProgressService.markEpisodeWatched(
                             String(playingSeries.series_id),
                             selectedSeason,
@@ -635,8 +605,7 @@ export function Series() {
                         return `${playingSeries.name} - ${episodeName}`;
                     })()}
                 />
-            )
-            }
+            )}
 
             {/* Resume Modal */}
             {showResumeModal && resumeModalData && selectedSeries && (
@@ -647,12 +616,10 @@ export function Series() {
                     currentTime={resumeModalData.currentTime}
                     duration={resumeModalData.duration}
                     onResume={() => {
-                        // Resume from saved position
                         setShowResumeModal(false);
                         setPlayingSeries(selectedSeries);
                     }}
                     onRestart={() => {
-                        // Clear progress and start from beginning
                         watchProgressService.clearEpisodeProgress(
                             String(selectedSeries.series_id),
                             selectedSeason,
@@ -662,7 +629,6 @@ export function Series() {
                         setPlayingSeries(selectedSeries);
                     }}
                     onCancel={() => {
-                        // Just close the modal
                         setShowResumeModal(false);
                         setResumeModalData(null);
                     }}
@@ -671,70 +637,26 @@ export function Series() {
 
             {/* Clear History Confirmation Modal */}
             {showClearHistoryConfirm && selectedSeries && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 9999
-                }}>
-                    <div style={{
-                        backgroundColor: '#1f2937',
-                        borderRadius: '16px',
-                        padding: '32px',
-                        maxWidth: '500px',
-                        width: '90%',
-                        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)'
-                    }}>
-                        <h2 style={{ color: 'white', fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>
-                            Limpar Histórico?
-                        </h2>
-                        <p style={{ color: '#9ca3af', marginBottom: '24px', lineHeight: '1.6' }}>
-                            Tem certeza que deseja limpar todo o histórico de visualização de <strong style={{ color: 'white' }}>{selectedSeries.name}</strong>? Esta ação não pode ser desfeita.
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h2>Limpar Histórico?</h2>
+                        <p>
+                            Tem certeza que deseja limpar todo o histórico de visualização de <strong>{selectedSeries.name}</strong>? Esta ação não pode ser desfeita.
                         </p>
-                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                        <div className="modal-buttons">
                             <button
+                                className="btn btn-secondary"
                                 onClick={() => setShowClearHistoryConfirm(false)}
-                                style={{
-                                    padding: '12px 24px',
-                                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    fontSize: '16px',
-                                    fontWeight: '600',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'}
                             >
                                 Cancelar
                             </button>
                             <button
+                                className="btn btn-danger"
                                 onClick={() => {
                                     watchProgressService.clearSeriesProgress(String(selectedSeries.series_id));
                                     setShowClearHistoryConfirm(false);
-                                    setRefresh(r => r + 1); // Force re-render to update UI
+                                    setRefresh(r => r + 1);
                                 }}
-                                style={{
-                                    padding: '12px 24px',
-                                    backgroundColor: '#ef4444',
-                                    color: 'white',
-                                    border: 'none',
-                                    borderRadius: '8px',
-                                    fontSize: '16px',
-                                    fontWeight: '600',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ef4444'}
                             >
                                 Limpar Histórico
                             </button>
@@ -745,3 +667,668 @@ export function Series() {
         </>
     );
 }
+
+// CSS Styles
+const seriesStyles = `
+/* Page Container */
+.series-page {
+    position: relative;
+    height: 100vh;
+    overflow: hidden;
+    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+}
+
+/* Dynamic Backdrop */
+.series-backdrop {
+    position: fixed;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.25;
+    filter: blur(20px) saturate(1.2);
+    transform: scale(1.1);
+    transition: opacity 0.5s ease, background-image 0.8s ease;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Content Area */
+.series-content {
+    position: relative;
+    z-index: 10;
+    padding: 24px 32px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Series Details Panel */
+.series-details-panel {
+    flex-shrink: 0;
+    background: linear-gradient(135deg, rgba(15, 15, 26, 0.9) 0%, rgba(26, 26, 46, 0.85) 100%);
+    backdrop-filter: blur(24px);
+    border-radius: 24px;
+    border: 1px solid rgba(168, 85, 247, 0.2);
+    padding: 32px;
+    animation: slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+@keyframes slideDown {
+    from { 
+        opacity: 0; 
+        transform: translateY(-30px) scale(0.98);
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0) scale(1);
+    }
+}
+
+.details-content {
+    max-width: 900px;
+}
+
+/* Meta Badges */
+.meta-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.badge {
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    backdrop-filter: blur(10px);
+    animation: fadeInUp 0.3s ease;
+}
+
+.badge.shimmer {
+    background: linear-gradient(90deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.2), rgba(168, 85, 247, 0.2));
+    background-size: 200% 100%;
+    animation: shimmerBadge 1.5s ease infinite;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+@keyframes shimmerBadge {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.date-badge {
+    background: rgba(168, 85, 247, 0.2);
+    color: #c4b5fd;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.rating-badge {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.seasons-badge {
+    background: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Title */
+.series-title {
+    font-size: clamp(32px, 5vw, 56px);
+    font-weight: 800;
+    color: white;
+    margin-bottom: 12px;
+    line-height: 1.1;
+    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    letter-spacing: -0.02em;
+}
+
+/* Genre Tags */
+.genre-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.genre-tag {
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.8);
+    transition: all 0.2s ease;
+}
+
+.genre-tag:hover {
+    background: rgba(168, 85, 247, 0.2);
+    border-color: rgba(168, 85, 247, 0.4);
+}
+
+/* Overview */
+.series-overview {
+    font-size: 16px;
+    line-height: 1.8;
+    color: rgba(255, 255, 255, 0.85);
+    margin-bottom: 20px;
+    max-width: 700px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.loading-text {
+    color: rgba(255, 255, 255, 0.5);
+    font-style: italic;
+    margin-bottom: 12px;
+}
+
+/* Episode Selectors */
+.episode-selectors {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.episode-select {
+    padding: 12px 20px;
+    background: rgba(30, 30, 50, 0.9);
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 12px;
+    border: 2px solid rgba(168, 85, 247, 0.4);
+    cursor: pointer;
+    outline: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    min-width: 150px;
+    transition: all 0.2s ease;
+}
+
+.episode-select:hover {
+    border-color: rgba(168, 85, 247, 0.7);
+    background: rgba(40, 40, 60, 0.9);
+}
+
+.episode-select:focus {
+    border-color: #a855f7;
+    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2);
+}
+
+.episode-dropdown {
+    min-width: 250px;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+}
+
+.btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 24px;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.btn-icon {
+    font-size: 18px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+    color: white;
+    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.4);
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 12px 32px rgba(168, 85, 247, 0.5);
+}
+
+.btn-primary:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+}
+
+.btn-secondary.saved {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: #10b981;
+    color: #6ee7b7;
+}
+
+.btn-danger {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border: 2px solid rgba(239, 68, 68, 0.4);
+}
+
+.btn-danger:hover {
+    background: rgba(239, 68, 68, 0.3);
+    border-color: rgba(239, 68, 68, 0.6);
+}
+
+.btn-close {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 18px;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-close:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* Series Scroll Container */
+.series-scroll-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(168, 85, 247, 0.4) transparent;
+}
+
+.series-scroll-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.series-scroll-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.series-scroll-container::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #a855f7, #ec4899);
+    border-radius: 3px;
+}
+
+/* Series Grid - Responsive */
+.series-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 24px;
+    padding-bottom: 32px;
+}
+
+@media (max-width: 768px) {
+    .series-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .series-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+}
+
+/* Series Card */
+.series-card {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid transparent;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: cardFadeIn 0.4s ease backwards;
+}
+
+@keyframes cardFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.series-card:hover {
+    transform: translateY(-8px) scale(1.03);
+    border-color: rgba(168, 85, 247, 0.4);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4),
+                0 0 40px rgba(168, 85, 247, 0.15);
+}
+
+.series-card.selected {
+    border-color: #a855f7;
+    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.3),
+                0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* Card Poster */
+.card-poster {
+    position: relative;
+    aspect-ratio: 2 / 3;
+    overflow: hidden;
+    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
+}
+
+.card-poster img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+}
+
+.series-card:hover .card-poster img {
+    transform: scale(1.08);
+}
+
+.poster-fallback {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1e1e3f 0%, #0f0f1a 100%);
+    font-size: 48px;
+}
+
+/* Card Overlay */
+.card-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0.8) 0%,
+        transparent 50%,
+        transparent 100%
+    );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.series-card:hover .card-overlay {
+    opacity: 1;
+}
+
+.play-icon {
+    width: 60px;
+    height: 60px;
+    background: rgba(168, 85, 247, 0.9);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+    transform: scale(0);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.5);
+}
+
+.series-card:hover .play-icon {
+    transform: scale(1);
+}
+
+/* Saved Badge */
+.saved-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    animation: badgePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Completed Badge */
+.completed-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: white;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+}
+
+@keyframes badgePop {
+    from { transform: scale(0); }
+    to { transform: scale(1); }
+}
+
+/* Card Info */
+.card-info {
+    padding: 14px;
+    background: linear-gradient(to top, rgba(15, 15, 26, 0.98), rgba(26, 26, 46, 0.9));
+}
+
+.card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin: 0 0 8px 0;
+    transition: color 0.2s ease;
+}
+
+.series-card:hover .card-title {
+    color: #c4b5fd;
+}
+
+/* Empty State */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 60vh;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.empty-icon {
+    font-size: 80px;
+    margin-bottom: 24px;
+    opacity: 0.5;
+}
+
+.empty-state h3 {
+    font-size: 24px;
+    margin-bottom: 8px;
+    color: white;
+}
+
+.empty-state p {
+    font-size: 16px;
+}
+
+/* Loading State */
+.series-loading {
+    padding: 32px;
+}
+
+.loading-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 24px;
+}
+
+.skeleton-card {
+    animation: skeletonPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeletonPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.skeleton-poster {
+    aspect-ratio: 2 / 3;
+    background: linear-gradient(135deg, #2a2a4a 0%, #1a1a2e 100%);
+    border-radius: 16px 16px 0 0;
+}
+
+.skeleton-title {
+    height: 50px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #2a2a4a 100%);
+    border-radius: 0 0 16px 16px;
+}
+
+/* Error State */
+.series-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 80vh;
+    text-align: center;
+    padding: 32px;
+}
+
+.error-icon {
+    font-size: 80px;
+    margin-bottom: 24px;
+    opacity: 0.5;
+}
+
+.series-error h2 {
+    font-size: 28px;
+    color: #f87171;
+    margin-bottom: 12px;
+}
+
+.series-error p {
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 24px;
+}
+
+.retry-btn {
+    padding: 14px 32px;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+    font-weight: 600;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.retry-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4);
+}
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: fadeIn 0.2s ease;
+}
+
+.modal-content {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    border-radius: 20px;
+    padding: 32px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-content h2 {
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 16px;
+}
+
+.modal-content p {
+    color: #9ca3af;
+    margin-bottom: 24px;
+    line-height: 1.6;
+}
+
+.modal-content strong {
+    color: white;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+/* Helper animation */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+`;
