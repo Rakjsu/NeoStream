@@ -203,10 +203,14 @@ export const epgService = {
         return current || programs[0];
     },
 
-    getUpcomingPrograms(programs: EPGProgram[], count: number = 3): EPGProgram[] {
-        const now = new Date().getTime();
+    getUpcomingPrograms(programs: EPGProgram[], currentProgram: EPGProgram | null, count: number = 3): EPGProgram[] {
+        if (!currentProgram) return programs.slice(0, count);
+
+        const currentEnd = new Date(currentProgram.end).getTime();
+        const currentId = currentProgram.id;
+
         return programs
-            .filter(p => new Date(p.start).getTime() > now)
+            .filter(p => p.id !== currentId && new Date(p.start).getTime() >= currentEnd)
             .slice(0, count);
     },
 

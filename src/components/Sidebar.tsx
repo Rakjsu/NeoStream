@@ -151,52 +151,6 @@ export function Sidebar() {
                     })}
                 </nav>
 
-                {/* Dev Tools - Category Analyzer */}
-                <div style={{ padding: '16px 0', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <button
-                        onClick={() => navigate('/dashboard/category-analyzer')}
-                        className="flex items-center justify-center transition-all duration-200 active:scale-90"
-                        style={{
-                            width: '48px',
-                            height: '48px',
-                            background: 'transparent',
-                            border: 'none',
-                            padding: 0,
-                            cursor: 'pointer',
-                            margin: '0 auto'
-                        }}
-                        title="Analisador de Categorias"
-                    >
-                        {/* Ícone de lupa/análise */}
-                        <svg
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="transition-all duration-200"
-                            style={{ color: '#ffffff', stroke: '#ffffff' }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.color = '#3b82f6';
-                                e.currentTarget.style.stroke = '#3b82f6';
-                                e.currentTarget.style.transform = 'scale(1.25)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.color = '#ffffff';
-                                e.currentTarget.style.stroke = '#ffffff';
-                                e.currentTarget.style.transform = 'scale(1)';
-                            }}
-                        >
-                            <circle cx="11" cy="11" r="8" />
-                            <path d="m21 21-4.35-4.35" />
-                            <path d="M11 8v6" />
-                            <path d="M8 11h6" />
-                        </svg>
-                    </button>
-                </div>
 
                 {/* Update Notification Badge */}
                 <UpdateNotificationBadge onClick={handleUpdateBadgeClick} />

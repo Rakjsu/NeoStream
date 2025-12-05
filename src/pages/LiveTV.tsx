@@ -36,12 +36,22 @@ export function LiveTV() {
     const [currentProgram, setCurrentProgram] = useState<any | null>(null);
     const [upcomingPrograms, setUpcomingPrograms] = useState<any[]>([]);
     const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+    const [progressTick, setProgressTick] = useState(0);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         fetchStreams();
         fetchCategories();
     }, []);
+
+    // Update progress bar every 10 seconds
+    useEffect(() => {
+        if (!currentProgram) return;
+        const interval = setInterval(() => {
+            setProgressTick(t => t + 1);
+        }, 10000);
+        return () => clearInterval(interval);
+    }, [currentProgram]);
 
     // Fetch EPG when channel is selected
     useEffect(() => {
@@ -62,7 +72,7 @@ export function LiveTV() {
             const current = epgService.getCurrentProgram(programs);
             setCurrentProgram(current);
 
-            const upcoming = epgService.getUpcomingPrograms(programs, 3);
+            const upcoming = epgService.getUpcomingPrograms(programs, current, 3);
             setUpcomingPrograms(upcoming);
         };
 
@@ -495,7 +505,7 @@ export function LiveTV() {
                                             </div>
 
                                             {/* Progress Bar */}
-                                            <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                                            <div key={`progress-${progressTick}`} style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden' }}>
                                                 <div style={{
                                                     width: `${epgService.getProgramProgress(currentProgram)}%`,
                                                     height: '100%',
