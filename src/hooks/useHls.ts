@@ -3,7 +3,7 @@ import Hls from 'hls.js';
 
 interface UseHlsOptions {
     src: string;
-    videoRef: React.RefObject<HTMLVideoElement>;
+    videoRef: React.RefObject<HTMLVideoElement | null>;
 }
 
 export function useHls({ src, videoRef }: UseHlsOptions) {
@@ -36,7 +36,7 @@ export function useHls({ src, videoRef }: UseHlsOptions) {
                 console.log('✅ HLS manifest loaded, levels:', hls.levels.length);
             });
 
-            hls.on(Hls.Events.ERROR, (event, data) => {
+            hls.on(Hls.Events.ERROR, (_event, data) => {
                 if (data.fatal) {
                     console.error('❌ HLS fatal error:', data);
                     switch (data.type) {

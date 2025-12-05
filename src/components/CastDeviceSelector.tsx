@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FaTv, FaChromecast, FaApple, FaTimes } from 'react-icons/fa';
-import { useDLNA, type DLNADevice } from '../hooks/useDLNA';
-import { useAirPlay, type AirPlayDevice } from '../hooks/useAirPlay';
+import { useDLNA } from '../hooks/useDLNA';
+import { useAirPlay } from '../hooks/useAirPlay';
 
 export interface CastDevice {
     id: string;

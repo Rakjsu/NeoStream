@@ -47,7 +47,7 @@ export function VideoPlayer({
     const [showDeviceSelector, setShowDeviceSelector] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    const hideControlsTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>();
+    const hideControlsTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>(undefined);
 
     const resetHideControlsTimer = () => {
         setShowControls(true);

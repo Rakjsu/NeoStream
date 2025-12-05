@@ -290,12 +290,11 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                 />
             )}
 
-            {/* Edit Profile Modal */}
+            {/* Edit Profile Modal - Uses same modal as create since editing not fully implemented */}
             {editingProfile && (
                 <CreateProfileModal
                     onClose={() => setEditingProfile(null)}
                     onProfileCreated={handleProfileUpdated}
-                    editingProfile={editingProfile}
                 />
             )}
 

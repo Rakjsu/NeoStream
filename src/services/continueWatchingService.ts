@@ -1,4 +1,4 @@
-import { ContinueWatchingItem } from '../types/profile';
+import type { ContinueWatchingItem } from '../types/profile';
 import { profileService } from './profileService';
 
 const CLEANUP_DAYS = 7; // Remove completed items after 7 days

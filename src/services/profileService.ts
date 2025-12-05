@@ -66,6 +66,13 @@ export const profileService = {
         return true;
     },
 
+    // Clear active profile (logout)
+    clearActiveProfile(): void {
+        const data = getStorageData();
+        data.activeProfileId = null;
+        saveStorageData(data);
+    },
+
     // Create new profile
     async createProfile(profileData: CreateProfileData): Promise<Profile | null> {
         const data = getStorageData();

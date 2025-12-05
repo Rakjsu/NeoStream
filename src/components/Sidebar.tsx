@@ -11,7 +11,7 @@ export function Sidebar() {
     const location = useLocation();
     const [activeProfile] = useState(() => profileService.getActiveProfile());
     const [showUpdateModal, setShowUpdateModal] = useState(false);
-    const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+    const [updateInfo] = useState<UpdateInfo | null>(null);
 
     const handleUpdateBadgeClick = () => {
         setShowUpdateModal(true);
@@ -35,8 +35,6 @@ export function Sidebar() {
         // Navigate to welcome
         navigate('/welcome');
     };
-
-    const isImageAvatar = activeProfile?.avatar.startsWith('data:image') || activeProfile?.avatar.startsWith('http');
 
     return (
         <>

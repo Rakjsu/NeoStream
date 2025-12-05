@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 
+// Extend Window interface for Chromecast
 declare global {
     interface Window {
-        chrome?: any;
         __onGCastApiAvailable?: (isAvailable: boolean, reason?: string) => void;
     }
 }

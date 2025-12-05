@@ -33,7 +33,7 @@ interface VODStream {
 
 export function VOD() {
     const [streams, setStreams] = useState<VODStream[]>([]);
-    const [categories, setCategories] = useState<Array<{ category_id: string; category_name: string; parent_id: number }>>([]);
+    const [_categories, setCategories] = useState<Array<{ category_id: string; category_name: string; parent_id: number }>>([]);
     const [selectedCategory, setSelectedCategory] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');

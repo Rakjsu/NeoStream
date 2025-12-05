@@ -61,7 +61,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
         }
     };
 
-    const getCategoryIcon = (categoryName: string): JSX.Element => {
+    const getCategoryIcon = (categoryName: string): React.ReactElement => {
         const name = categoryName.toLowerCase();
         const size = 28;
 

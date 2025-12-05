@@ -5,7 +5,6 @@ import { watchProgressService } from '../services/watchProgressService';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import { CategoryMenu } from '../components/CategoryMenu';
-import { ContinueWatching } from '../components/ContinueWatching';
 import { ResumeModal } from '../components/ResumeModal';
 import { ProgressBar } from '../components/ProgressBar';
 
@@ -78,25 +77,6 @@ export function Series() {
         } finally {
             setLoading(false);
         }
-    };
-
-    // Helper function to calculate series progress
-    const calculateSeriesProgress = (seriesId: string): { percentage: number; hasProgress: boolean } => {
-        const progressData = watchProgressService.getSeriesProgress(String(seriesId), '');
-        if (!progressData || !seriesInfo || seriesId !== String(selectedSeries?.series_id)) {
-            return { percentage: 0, hasProgress: false };
-        }
-
-        // Count total episodes available for the series
-        const totalEpisodes = seriesInfo?.episodes
-            ? Object.values(seriesInfo.episodes).reduce((sum: number, eps: any) => sum + eps.length, 0)
-            : 0;
-
-        if (totalEpisodes === 0) return { percentage: 0, hasProgress: false };
-
-        // Episode count is number of episodes watched
-        const percentage = Math.min(100, Math.round((progressData.episodeCount / totalEpisodes) * 100));
-        return { percentage, hasProgress: true };
     };
 
     const filteredSeries = series.filter(s => {
@@ -257,7 +237,7 @@ export function Series() {
         return `Episódio ${episodeNum}`;
     };
 
-    const buildSeriesStreamUrl = async (seriesItem: Series): Promise<string> => {
+    const buildSeriesStreamUrl = async (_seriesItem: Series): Promise<string> => {
         try {
             const result = await window.ipcRenderer.invoke('auth:get-credentials');
 

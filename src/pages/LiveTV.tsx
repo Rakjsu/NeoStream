@@ -24,7 +24,7 @@ const ITEMS_PER_PAGE = 48; // 6 rows × 8 columns approx
 // LiveTV Component - Icons: 6px - Updated 2025-11-26 00:29
 export function LiveTV() {
     const [streams, setStreams] = useState<LiveStream[]>([]);
-    const [categories, setCategories] = useState<Array<{ category_id: string; category_name: string; parent_id: number }>>([]);
+    const [_categories, setCategories] = useState<Array<{ category_id: string; category_name: string; parent_id: number }>>([]);
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -32,7 +32,7 @@ export function LiveTV() {
     const [brokenImages, setBrokenImages] = useState<Set<number>>(new Set());
     const [selectedChannel, setSelectedChannel] = useState<LiveStream | null>(null);
     const [playingChannel, setPlayingChannel] = useState<LiveStream | null>(null);
-    const [epgData, setEpgData] = useState<any[]>([]);
+    const [_epgData, setEpgData] = useState<any[]>([]);
     const [currentProgram, setCurrentProgram] = useState<any | null>(null);
     const [upcomingPrograms, setUpcomingPrograms] = useState<any[]>([]);
     const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
