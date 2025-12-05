@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { formatGenres, type TMDBMovieDetails, getBackdropUrl } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
@@ -31,6 +31,10 @@ interface VODStream {
     tmdb_id: string;
 }
 
+// Dynamic card sizing based on container
+const CARD_MIN_WIDTH = 180;
+const CARD_GAP = 24;
+
 export function VOD() {
     const [streams, setStreams] = useState<VODStream[]>([]);
     const [_categories, setCategories] = useState<Array<{ category_id: string; category_name: string; parent_id: number }>>([]);
@@ -44,9 +48,35 @@ export function VOD() {
     const [loadingTmdb, setLoadingTmdb] = useState(false);
     const [playingMovie, setPlayingMovie] = useState<VODStream | null>(null);
     const [, setRefresh] = useState(0);
-    const [visibleCount, setVisibleCount] = useState(36); // 4 rows × 9 columns
-    const ITEMS_PER_PAGE = 36;
+    const [visibleCount, setVisibleCount] = useState(0);
+    const [itemsPerPage, setItemsPerPage] = useState(36);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const gridRef = useRef<HTMLDivElement>(null);
+
+    // Dynamic grid calculation
+    useEffect(() => {
+        const calculateGrid = () => {
+            const container = scrollContainerRef.current;
+            if (!container) return;
+
+            const containerWidth = container.clientWidth - 64; // account for padding
+            const containerHeight = container.clientHeight;
+
+            const cols = Math.max(2, Math.floor(containerWidth / (CARD_MIN_WIDTH + CARD_GAP)));
+            const rows = Math.ceil(containerHeight / 320) + 1; // card height ~280px + gap
+
+            const items = Math.max(cols * rows, 12);
+            setItemsPerPage(items);
+
+            if (visibleCount === 0) {
+                setVisibleCount(items);
+            }
+        };
+
+        calculateGrid();
+        window.addEventListener('resize', calculateGrid);
+        return () => window.removeEventListener('resize', calculateGrid);
+    }, [visibleCount]);
 
     useEffect(() => {
         fetchStreams();
@@ -81,11 +111,9 @@ export function VOD() {
         }
     };
 
-
     const filteredStreams = streams.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
 
-        // Category filtering for movies
         if (selectedCategory === 'CONTINUE_WATCHING') {
             const moviesInProgress = movieProgressService.getMoviesInProgress();
             return matchesSearch && moviesInProgress.includes(stream.stream_id.toString());
@@ -96,201 +124,201 @@ export function VOD() {
             return matchesSearch && watchedMovies.includes(stream.stream_id.toString());
         }
 
-        // Note: Movie progress tracking not implemented yet
-        // selectedCategory will be '' (empty) for "Todos os Filmes" or a category_id
-        const matchesCategory = selectedCategory === '' || selectedCategory === null || stream.category_id === selectedCategory;
+        const matchesCategory = !selectedCategory || selectedCategory === '' || stream.category_id === selectedCategory;
         return matchesSearch && matchesCategory;
     });
 
-    // Lazy loading scroll listener
+    // Lazy loading scroll handler
     useEffect(() => {
         const container = scrollContainerRef.current;
         if (!container) return;
 
         const handleScroll = () => {
             const { scrollTop, scrollHeight, clientHeight } = container;
-
-            // Load more when 80% scrolled
-            if (scrollTop + clientHeight >= scrollHeight * 0.8 && visibleCount < filteredStreams.length) {
-                setVisibleCount(prev => Math.min(prev + ITEMS_PER_PAGE, filteredStreams.length));
+            if (scrollTop + clientHeight >= scrollHeight * 0.85 && visibleCount < filteredStreams.length) {
+                setVisibleCount(prev => Math.min(prev + itemsPerPage, filteredStreams.length));
             }
         };
 
         container.addEventListener('scroll', handleScroll);
         return () => container.removeEventListener('scroll', handleScroll);
-    }, [filteredStreams.length, visibleCount, ITEMS_PER_PAGE]);
+    }, [filteredStreams.length, visibleCount, itemsPerPage]);
 
-    // Reset visible count when search or category changes
+    // Reset on filter change
     useEffect(() => {
-        setVisibleCount(ITEMS_PER_PAGE);
+        setVisibleCount(itemsPerPage);
         setSelectedMovie(null);
-    }, [searchQuery, selectedCategory, ITEMS_PER_PAGE]);
+    }, [searchQuery, selectedCategory, itemsPerPage]);
 
-    const handleImageError = (streamId: number) => setBrokenImages(prev => new Set(prev).add(streamId));
-    const fixImageUrl = (url: string): string => url && url.startsWith('http') ? url : `https://${url}`;
-
-    const extractYearFromName = (name: string): string => {
-        const match = name.match(/\((\d{4})\)/);
-        return match ? match[1] : '';
-    };
-
+    // Fetch TMDB data
     useEffect(() => {
-        if (selectedMovie) {
-            const year = extractYearFromName(selectedMovie.name);
-            setLoadingTmdb(true);
+        if (!selectedMovie?.tmdb_id) {
             setTmdbData(null);
-            import('../services/tmdb').then(({ searchMovieByName }) => {
-                searchMovieByName(selectedMovie.name, year)
-                    .then(data => { setTmdbData(data); setLoadingTmdb(false); })
-                    .catch(() => setLoadingTmdb(false));
-            });
-        } else {
-            setTmdbData(null);
+            return;
         }
+
+        setLoadingTmdb(true);
+        const fetchTmdb = async () => {
+            try {
+                const tmdb = await import('../services/tmdb');
+                const data = await tmdb.getMovieDetails(parseInt(selectedMovie.tmdb_id));
+                setTmdbData(data);
+            } catch (err) {
+                console.error('Failed to fetch TMDB data:', err);
+            } finally {
+                setLoadingTmdb(false);
+            }
+        };
+        fetchTmdb();
     }, [selectedMovie]);
 
-    const handlePlayMovie = (movie: VODStream) => {
-        setPlayingMovie(movie);
-    };
+    const handleImageError = useCallback((streamId: number) => {
+        setBrokenImages(prev => new Set(prev).add(streamId));
+    }, []);
+
+    const fixImageUrl = (url: string): string => url?.replace(/\/\/+/g, '/').replace(':/', '://') || '';
+
+    const handlePlayMovie = (movie: VODStream) => setPlayingMovie(movie);
 
     const buildStreamUrl = async (movie: VODStream): Promise<string> => {
         try {
-            const result = await window.ipcRenderer.invoke('auth:get-credentials');
-
-            if (result.success) {
-                const { url, username, password } = result.credentials;
-                const streamUrl = `${url}/movie/${username}/${password}/${movie.stream_id}.${movie.container_extension}`;
-                return streamUrl;
-            }
-
-            throw new Error('Credenciais não encontradas');
-        } catch (error) {
-            console.error('❌ Error building stream URL:', error);
-            throw error; // Re-throw instead of returning empty string
+            const result = await window.ipcRenderer.invoke('streams:get-vod-url', {
+                streamId: movie.stream_id,
+                container: movie.container_extension
+            });
+            return result.success ? result.url : '';
+        } catch (err) {
+            console.error('Failed to build stream URL:', err);
+            return '';
         }
     };
 
+    const getProgress = (movieId: number) => {
+        const progress = movieProgressService.getMoviePositionById(movieId.toString());
+        if (!progress || !progress.duration) return 0;
+        return Math.round((progress.currentTime / progress.duration) * 100);
+    };
+
+    // Loading State
     if (loading) return (
-        <div className="p-8">
-            <h1 className="text-3xl font-bold text-white mb-6">Filmes</h1>
-            <div className="grid grid-cols-9 gap-[32px] px-[32px]">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map((i) => (
-                    <div key={i} className="animate-pulse">
-                        <div className="aspect-[2/3] bg-gray-700 rounded-t-lg mb-0"></div>
-                        <div className="bg-gray-700 rounded-b-lg p-2 h-16"></div>
-                    </div>
-                ))}
+        <div className="vod-page">
+            <style>{vodStyles}</style>
+            <div className="vod-loading">
+                <div className="loading-grid">
+                    {Array.from({ length: 12 }).map((_, i) => (
+                        <div key={i} className="skeleton-card" style={{ animationDelay: `${i * 0.05}s` }}>
+                            <div className="skeleton-poster" />
+                            <div className="skeleton-title" />
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );
 
+    // Error State
     if (error) return (
-        <div className="p-8">
-            <h1 className="text-3xl font-bold text-white mb-6">Filmes</h1>
-            <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-4 rounded-lg text-center">
-                <p className="font-medium mb-2">Erro ao carregar filmes</p>
-                <p className="text-sm">{error}</p>
-                <button onClick={fetchStreams} className="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">Tentar novamente</button>
+        <div className="vod-page">
+            <style>{vodStyles}</style>
+            <div className="vod-error">
+                <div className="error-icon">🎬</div>
+                <h2>Erro ao carregar filmes</h2>
+                <p>{error}</p>
+                <button onClick={fetchStreams} className="retry-btn">
+                    Tentar novamente
+                </button>
             </div>
         </div>
     );
+
+    const backdropUrl = selectedMovie ? (
+        tmdbData?.backdrop_path ? getBackdropUrl(tmdbData.backdrop_path) :
+            selectedMovie.cover || fixImageUrl(selectedMovie.stream_icon)
+    ) : null;
 
     return (
         <>
-            <style>{`
-                @keyframes pulse{0%{opacity:1}50%{opacity:.7}100%{opacity:1}}
-                @keyframes rotate{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
-                @keyframes slideIn{from{transform:translateX(-10px);opacity:0}to{transform:translateX(0);opacity:1}}
-                @keyframes buttonClick{
-                    0%{transform:scale(1)}
-                    50%{transform:scale(0.95)}
-                    100%{transform:scale(1.05)}
-                }
-                .watch-button{transition:all .3s ease;animation:slideIn .5s ease-out}
-                .watch-button:hover{transform:scale(1.05)!important;box-shadow:0 8px 24px rgba(37,99,235,.5)!important}
-                .watch-button:active{transform:scale(.98)!important}
-                .watch-button.clicked{animation:buttonClick 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)}
-            `}</style>
-            <div style={{ position: 'relative', height: '100vh', overflow: 'hidden' }}>
-                {selectedMovie && (() => {
-                    // Priority: TMDB backdrop (high quality) > IPTV cover > IPTV stream_icon
-                    const backdropUrl = tmdbData?.backdrop_path ? getBackdropUrl(tmdbData.backdrop_path) : null;
-                    const fallbackUrl = selectedMovie.cover || fixImageUrl(selectedMovie.stream_icon);
-                    const backgroundImageUrl = backdropUrl || fallbackUrl;
+            <style>{vodStyles}</style>
+            <div className="vod-page">
+                {/* Dynamic Background */}
+                {backdropUrl && (
+                    <div
+                        className="vod-backdrop"
+                        style={{ backgroundImage: `url(${backdropUrl})` }}
+                    />
+                )}
 
-                    return backgroundImageUrl ? (
-                        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0, backgroundImage: `url(${backgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'blur(3px)', opacity: 0.5, pointerEvents: 'none' }}></div>
-                    ) : null;
-                })()}
                 <AnimatedSearchBar
                     value={searchQuery}
                     onChange={setSearchQuery}
                     placeholder="Buscar filmes..."
                 />
+
                 <CategoryMenu
                     onSelectCategory={setSelectedCategory}
                     selectedCategory={selectedCategory}
                     type="vod"
                 />
-                <div style={{ position: 'relative', zIndex: 10, padding: '32px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+
+                <div className="vod-content">
+                    {/* Movie Details Panel */}
                     {selectedMovie && (
-                        <div style={{ padding: '0 0 24px 0', marginBottom: '24px', flexShrink: 0 }}>
-                            <div style={{ maxWidth: '900px' }}>
-                                <div style={{ display: 'flex', gap: '12px', marginBottom: '12px' }}>
+                        <div className="movie-details-panel">
+                            <div className="details-content">
+                                {/* Meta Info */}
+                                <div className="meta-badges">
                                     {loadingTmdb ? (
-                                        <span style={{ backgroundColor: 'rgba(31, 41, 55, 0.8)', color: '#9ca3af', padding: '6px 14px', borderRadius: '6px', fontSize: '14px', fontWeight: '600', fontStyle: 'italic', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' }}>Carregando...</span>
-                                    ) : tmdbData && tmdbData.release_date ? (
-                                        <span style={{ backgroundColor: 'rgba(31, 41, 55, 0.8)', color: 'white', padding: '6px 14px', borderRadius: '6px', fontSize: '14px', fontWeight: '600', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' }}>{new Date(tmdbData.release_date).toLocaleDateString('pt-BR')}</span>
-                                    ) : null}
-                                    {loadingTmdb ? (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(234, 179, 8, 0.3)', padding: '6px 14px', borderRadius: '6px' }}>
-                                            <span style={{ fontSize: '16px' }}>⭐</span>
-                                            <span style={{ color: '#9ca3af', fontWeight: 'bold', fontSize: '14px', fontStyle: 'italic', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' }}>...</span>
-                                        </div>
-                                    ) : tmdbData && tmdbData.vote_average ? (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: 'rgba(234, 179, 8, 0.3)', padding: '6px 14px', borderRadius: '6px', animation: 'pulse 2s ease-in-out infinite' }}>
-                                            <span style={{ fontSize: '16px', animation: 'rotate 3s linear infinite' }}>⭐</span>
-                                            <span style={{ color: '#fbbf24', fontWeight: 'bold', fontSize: '14px', textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9)' }}>{tmdbData.vote_average.toFixed(1)}</span>
-                                        </div>
-                                    ) : null}
+                                        <span className="badge shimmer">Carregando...</span>
+                                    ) : (
+                                        <>
+                                            {tmdbData?.release_date && (
+                                                <span className="badge date-badge">
+                                                    📅 {new Date(tmdbData.release_date).getFullYear()}
+                                                </span>
+                                            )}
+                                            {tmdbData?.vote_average && (
+                                                <span className="badge rating-badge">
+                                                    ⭐ {tmdbData.vote_average.toFixed(1)}
+                                                </span>
+                                            )}
+                                            {tmdbData?.runtime && (
+                                                <span className="badge runtime-badge">
+                                                    🕐 {Math.floor(tmdbData.runtime / 60)}h {tmdbData.runtime % 60}m
+                                                </span>
+                                            )}
+                                        </>
+                                    )}
                                 </div>
-                                <h2 style={{ fontSize: '56px', fontWeight: 'bold', color: 'white', marginBottom: '16px', lineHeight: 1.1, textShadow: '4px 4px 12px rgba(0, 0, 0, 0.95)' }}>{selectedMovie.name}</h2>
-                                {loadingTmdb ? (
-                                    <p style={{ color: '#9ca3af', marginBottom: '16px', fontSize: '17px', fontStyle: 'italic', textShadow: '2px 2px 6px rgba(0, 0, 0, 0.9)' }}>Carregando gênero...</p>
-                                ) : tmdbData && tmdbData.genres && tmdbData.genres.length > 0 ? (
-                                    <p style={{ color: '#f3f4f6', marginBottom: '16px', fontSize: '17px', fontWeight: '500', textShadow: '2px 2px 6px rgba(0, 0, 0, 0.9)' }}>{formatGenres(tmdbData.genres)}</p>
-                                ) : null}
-                                {loadingTmdb ? (
-                                    <p style={{ color: '#9ca3af', marginBottom: '28px', fontSize: '16px', fontStyle: 'italic', textShadow: '2px 2px 6px rgba(0, 0, 0, 0.9)' }}>Carregando sinopse...</p>
-                                ) : tmdbData && tmdbData.overview ? (
-                                    <p style={{ color: '#f9fafb', lineHeight: '1.8', marginBottom: '28px', fontSize: '16px', maxWidth: '650px', textShadow: '2px 2px 8px rgba(0, 0, 0, 0.95)' }}>{tmdbData.overview}</p>
-                                ) : null}
-                                <div style={{ display: 'flex', gap: '14px' }}>
+
+                                {/* Title */}
+                                <h1 className="movie-title">{selectedMovie.name}</h1>
+
+                                {/* Genres */}
+                                {!loadingTmdb && tmdbData?.genres && tmdbData.genres.length > 0 && (
+                                    <div className="genre-tags">
+                                        {tmdbData.genres.slice(0, 4).map(genre => (
+                                            <span key={genre.id} className="genre-tag">{genre.name}</span>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Overview */}
+                                {!loadingTmdb && tmdbData?.overview && (
+                                    <p className="movie-overview">{tmdbData.overview}</p>
+                                )}
+
+                                {/* Action Buttons */}
+                                <div className="action-buttons">
                                     <button
-                                        className="watch-button"
-                                        onClick={(e) => {
-                                            e.currentTarget.classList.add('clicked');
-                                            setTimeout(() => e.currentTarget.classList.remove('clicked'), 600);
-                                            handlePlayMovie(selectedMovie);
-                                        }}
-                                        style={{
-                                            padding: '16px 48px',
-                                            backgroundColor: '#2563eb',
-                                            color: 'white',
-                                            fontWeight: 'bold',
-                                            fontSize: '17px',
-                                            borderRadius: '8px',
-                                            border: 'none',
-                                            cursor: 'pointer',
-                                            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.6)',
-                                            transition: 'all 0.2s ease',
-                                            position: 'relative',
-                                            overflow: 'hidden'
-                                        }}>
-                                        ▶ Assistir Agora
+                                        className="btn btn-primary"
+                                        onClick={() => handlePlayMovie(selectedMovie)}
+                                    >
+                                        <span className="btn-icon">▶</span>
+                                        <span>Assistir Agora</span>
                                     </button>
 
                                     <button
+                                        className={`btn btn-secondary ${watchLaterService.has(String(selectedMovie.stream_id), 'movie') ? 'saved' : ''}`}
                                         onClick={() => {
                                             if (watchLaterService.has(String(selectedMovie.stream_id), 'movie')) {
                                                 watchLaterService.remove(String(selectedMovie.stream_id), 'movie');
@@ -304,75 +332,99 @@ export function VOD() {
                                             }
                                             setRefresh(r => r + 1);
                                         }}
-                                        style={{
-                                            padding: '16px 48px',
-                                            backgroundColor: watchLaterService.has(String(selectedMovie.stream_id), 'movie') ? '#10b981' : 'rgba(255, 255, 255, 0.1)',
-                                            color: 'white',
-                                            fontSize: '20px',
-                                            fontWeight: '700',
-                                            borderRadius: '12px',
-                                            border: '2px solid rgba(255, 255, 255, 0.2)',
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '12px',
-                                            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.3)',
-                                            transition: 'all 0.2s'
-                                        }}>
-                                        <span style={{ fontSize: '24px' }}>
+                                    >
+                                        <span className="btn-icon">
                                             {watchLaterService.has(String(selectedMovie.stream_id), 'movie') ? '✓' : '+'}
                                         </span>
-                                        {watchLaterService.has(String(selectedMovie.stream_id), 'movie') ? 'Salvo' : 'Assistir Depois'}
+                                        <span>{watchLaterService.has(String(selectedMovie.stream_id), 'movie') ? 'Salvo' : 'Minha Lista'}</span>
+                                    </button>
+
+                                    <button
+                                        className="btn btn-close"
+                                        onClick={() => setSelectedMovie(null)}
+                                    >
+                                        ✕
                                     </button>
                                 </div>
                             </div>
                         </div>
                     )}
-                    <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingRight: '8px' }}>
+
+                    {/* Movies Grid */}
+                    <div
+                        ref={scrollContainerRef}
+                        className={`movies-scroll-container ${selectedMovie ? 'with-details' : ''}`}
+                    >
                         {filteredStreams.length === 0 ? (
-                            <div className="text-center text-gray-400 py-12"><p className="text-lg">Nenhum filme encontrado</p></div>
+                            <div className="empty-state">
+                                <div className="empty-icon">🎬</div>
+                                <h3>Nenhum filme encontrado</h3>
+                                <p>Tente buscar por outro termo</p>
+                            </div>
                         ) : (
-                            <div className="grid grid-cols-9 gap-[32px] px-[32px]">
-                                {filteredStreams.slice(0, visibleCount).map((stream) => (
-                                    <div key={stream.stream_id} className="group cursor-pointer transition-all duration-300 hover:scale-[1.02] active:scale-95" onClick={() => setSelectedMovie(stream)}>
-                                        <div className="relative overflow-hidden bg-gray-900 shadow-xl" style={{ borderRadius: '16px', border: selectedMovie?.stream_id === stream.stream_id ? '3px solid #3b82f6' : '3px solid transparent' }}>
-                                            {watchLaterService.has(String(stream.stream_id), 'movie') && (
-                                                <div style={{
-                                                    position: 'absolute',
-                                                    top: '8px',
-                                                    right: '8px',
-                                                    zIndex: 10,
-                                                    background: '#10b981',
-                                                    borderRadius: '50%',
-                                                    width: '32px',
-                                                    height: '32px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.5)'
-                                                }}>
-                                                    <span style={{ fontSize: '18px' }}>🔖</span>
-                                                </div>
-                                            )}
-                                            <div className="aspect-[2/3]">
+                            <div ref={gridRef} className="movies-grid">
+                                {filteredStreams.slice(0, visibleCount).map((stream, index) => {
+                                    const progress = getProgress(stream.stream_id);
+                                    const isSelected = selectedMovie?.stream_id === stream.stream_id;
+                                    const isSaved = watchLaterService.has(String(stream.stream_id), 'movie');
+
+                                    return (
+                                        <div
+                                            key={stream.stream_id}
+                                            className={`movie-card ${isSelected ? 'selected' : ''}`}
+                                            onClick={() => setSelectedMovie(stream)}
+                                            style={{ animationDelay: `${(index % itemsPerPage) * 0.03}s` }}
+                                        >
+                                            {/* Poster */}
+                                            <div className="card-poster">
                                                 {stream.stream_icon && !brokenImages.has(stream.stream_id) ? (
-                                                    <img loading="lazy" src={fixImageUrl(stream.stream_icon)} alt={stream.name} className="w-full h-full object-cover" style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }} onError={() => handleImageError(stream.stream_id)} />
+                                                    <img
+                                                        loading="lazy"
+                                                        src={fixImageUrl(stream.stream_icon)}
+                                                        alt={stream.name}
+                                                        onError={() => handleImageError(stream.stream_id)}
+                                                    />
                                                 ) : (
-                                                    <div className="w-full h-full flex items-center justify-center bg-gray-700" style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}><span className="text-5xl">🎬</span></div>
+                                                    <div className="poster-fallback">
+                                                        <span>🎬</span>
+                                                    </div>
+                                                )}
+
+                                                {/* Overlay */}
+                                                <div className="card-overlay">
+                                                    <div className="play-icon">▶</div>
+                                                </div>
+
+                                                {/* Saved Badge */}
+                                                {isSaved && (
+                                                    <div className="saved-badge">🔖</div>
+                                                )}
+
+                                                {/* Progress Bar */}
+                                                {progress > 0 && (
+                                                    <div className="progress-container">
+                                                        <div
+                                                            className="progress-bar"
+                                                            style={{ width: `${progress}%` }}
+                                                        />
+                                                    </div>
                                                 )}
                                             </div>
-                                            <div style={{ background: 'linear-gradient(to top, #111827, rgba(31, 41, 55, 0.95), rgba(31, 41, 55, 0.8))', borderBottomLeftRadius: '16px', borderBottomRightRadius: '16px', paddingLeft: '12px', paddingRight: '12px', paddingTop: '12px', paddingBottom: '12px' }}>
-                                                <h3 className="text-white text-sm font-semibold truncate group-hover:text-blue-400 transition-colors">{stream.name}</h3>
+
+                                            {/* Title */}
+                                            <div className="card-info">
+                                                <h4 className="card-title">{stream.name}</h4>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
                 </div>
-            </div >
+            </div>
 
+            {/* Video Player */}
             {playingMovie && (
                 <AsyncVideoPlayer
                     movie={playingMovie}
@@ -380,7 +432,6 @@ export function VOD() {
                     onClose={() => setPlayingMovie(null)}
                     resumeTime={movieProgressService.getMoviePositionById(playingMovie.stream_id.toString())?.currentTime || null}
                     onTimeUpdate={(currentTime, duration) => {
-                        // Save progress every 5 seconds
                         if (Math.floor(currentTime) % 5 === 0) {
                             movieProgressService.saveMovieTime(
                                 playingMovie.stream_id.toString(),
@@ -391,8 +442,567 @@ export function VOD() {
                         }
                     }}
                 />
-            )
-            }
+            )}
         </>
     );
 }
+
+// CSS Styles
+const vodStyles = `
+/* Page Container */
+.vod-page {
+    position: relative;
+    height: 100vh;
+    overflow: hidden;
+    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+}
+
+/* Dynamic Backdrop */
+.vod-backdrop {
+    position: fixed;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    opacity: 0.25;
+    filter: blur(20px) saturate(1.2);
+    transform: scale(1.1);
+    transition: opacity 0.5s ease, background-image 0.8s ease;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Content Area */
+.vod-content {
+    position: relative;
+    z-index: 10;
+    padding: 24px 32px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Movie Details Panel */
+.movie-details-panel {
+    flex-shrink: 0;
+    background: linear-gradient(135deg, rgba(15, 15, 26, 0.9) 0%, rgba(26, 26, 46, 0.85) 100%);
+    backdrop-filter: blur(24px);
+    border-radius: 24px;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    padding: 32px;
+    animation: slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+@keyframes slideDown {
+    from { 
+        opacity: 0; 
+        transform: translateY(-30px) scale(0.98);
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0) scale(1);
+    }
+}
+
+.details-content {
+    max-width: 900px;
+}
+
+/* Meta Badges */
+.meta-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.badge {
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    backdrop-filter: blur(10px);
+    animation: fadeInUp 0.3s ease;
+}
+
+.badge.shimmer {
+    background: linear-gradient(90deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2), rgba(99, 102, 241, 0.2));
+    background-size: 200% 100%;
+    animation: shimmerBadge 1.5s ease infinite;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+@keyframes shimmerBadge {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.date-badge {
+    background: rgba(99, 102, 241, 0.2);
+    color: #a5b4fc;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.rating-badge {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.runtime-badge {
+    background: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Title */
+.movie-title {
+    font-size: clamp(32px, 5vw, 56px);
+    font-weight: 800;
+    color: white;
+    margin-bottom: 12px;
+    line-height: 1.1;
+    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    letter-spacing: -0.02em;
+}
+
+/* Genre Tags */
+.genre-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.genre-tag {
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.8);
+    transition: all 0.2s ease;
+}
+
+.genre-tag:hover {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: rgba(99, 102, 241, 0.4);
+}
+
+/* Overview */
+.movie-overview {
+    font-size: 16px;
+    line-height: 1.8;
+    color: rgba(255, 255, 255, 0.85);
+    margin-bottom: 24px;
+    max-width: 700px;
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+}
+
+.btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 28px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 14px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.btn-icon {
+    font-size: 18px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 12px 32px rgba(99, 102, 241, 0.5);
+}
+
+.btn-primary:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+}
+
+.btn-secondary.saved {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: #10b981;
+    color: #6ee7b7;
+}
+
+.btn-close {
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 20px;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-close:hover {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* Movies Scroll Container */
+.movies-scroll-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(99, 102, 241, 0.4) transparent;
+}
+
+.movies-scroll-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.movies-scroll-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.movies-scroll-container::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #6366f1, #a855f7);
+    border-radius: 3px;
+}
+
+/* Movies Grid - Responsive */
+.movies-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 24px;
+    padding-bottom: 32px;
+}
+
+@media (max-width: 768px) {
+    .movies-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .movies-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+}
+
+/* Movie Card */
+.movie-card {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid transparent;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: cardFadeIn 0.4s ease backwards;
+}
+
+@keyframes cardFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.movie-card:hover {
+    transform: translateY(-8px) scale(1.03);
+    border-color: rgba(99, 102, 241, 0.4);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4),
+                0 0 40px rgba(99, 102, 241, 0.15);
+}
+
+.movie-card.selected {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3),
+                0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+/* Card Poster */
+.card-poster {
+    position: relative;
+    aspect-ratio: 2 / 3;
+    overflow: hidden;
+    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
+}
+
+.card-poster img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+}
+
+.movie-card:hover .card-poster img {
+    transform: scale(1.08);
+}
+
+.poster-fallback {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1e1e3f 0%, #0f0f1a 100%);
+    font-size: 48px;
+}
+
+/* Card Overlay */
+.card-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0.8) 0%,
+        transparent 50%,
+        transparent 100%
+    );
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.movie-card:hover .card-overlay {
+    opacity: 1;
+}
+
+.play-icon {
+    width: 60px;
+    height: 60px;
+    background: rgba(99, 102, 241, 0.9);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+    transform: scale(0);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.5);
+}
+
+.movie-card:hover .play-icon {
+    transform: scale(1);
+}
+
+/* Saved Badge */
+.saved-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    animation: badgePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes badgePop {
+    from { transform: scale(0); }
+    to { transform: scale(1); }
+}
+
+/* Progress Bar */
+.progress-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: rgba(0, 0, 0, 0.6);
+}
+
+.progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #6366f1, #a855f7);
+    transition: width 0.3s ease;
+}
+
+/* Card Info */
+.card-info {
+    padding: 14px;
+    background: linear-gradient(to top, rgba(15, 15, 26, 0.98), rgba(26, 26, 46, 0.9));
+}
+
+.card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin: 0;
+    transition: color 0.2s ease;
+}
+
+.movie-card:hover .card-title {
+    color: #a5b4fc;
+}
+
+/* Empty State */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 60vh;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.empty-icon {
+    font-size: 80px;
+    margin-bottom: 24px;
+    opacity: 0.5;
+}
+
+.empty-state h3 {
+    font-size: 24px;
+    margin-bottom: 8px;
+    color: white;
+}
+
+.empty-state p {
+    font-size: 16px;
+}
+
+/* Loading State */
+.vod-loading {
+    padding: 32px;
+}
+
+.loading-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 24px;
+}
+
+.skeleton-card {
+    animation: skeletonPulse 1.5s ease-in-out infinite;
+    animation-delay: var(--delay);
+}
+
+@keyframes skeletonPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.skeleton-poster {
+    aspect-ratio: 2 / 3;
+    background: linear-gradient(135deg, #2a2a4a 0%, #1a1a2e 100%);
+    border-radius: 16px 16px 0 0;
+}
+
+.skeleton-title {
+    height: 50px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #2a2a4a 100%);
+    border-radius: 0 0 16px 16px;
+}
+
+/* Error State */
+.vod-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 80vh;
+    text-align: center;
+    padding: 32px;
+}
+
+.error-icon {
+    font-size: 80px;
+    margin-bottom: 24px;
+    opacity: 0.5;
+}
+
+.vod-error h2 {
+    font-size: 28px;
+    color: #f87171;
+    margin-bottom: 12px;
+}
+
+.vod-error p {
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 24px;
+}
+
+.retry-btn {
+    padding: 14px 32px;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+    font-weight: 600;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.retry-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4);
+}
+
+/* Helper animation */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+`;
