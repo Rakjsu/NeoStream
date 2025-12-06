@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { watchProgressService, type SeriesProgress } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
 
@@ -14,6 +14,7 @@ interface SeriesData {
     cover: string;
     rating?: string;
     category_id?: string;
+    added?: number; // timestamp when added
 }
 
 interface MovieData {
@@ -23,6 +24,7 @@ interface MovieData {
     cover?: string;
     rating?: string;
     category_id?: string;
+    added?: number; // timestamp when added
 }
 
 interface ContinueWatchingItem {
@@ -44,6 +46,8 @@ export function Home() {
     const [recentMovies, setRecentMovies] = useState<MovieData[]>([]);
     const [allSeries, setAllSeries] = useState<SeriesData[]>([]);
     const [allMovies, setAllMovies] = useState<MovieData[]>([]);
+    const [recommendations, setRecommendations] = useState<(SeriesData | MovieData)[]>([]);
+    const [isVisible, setIsVisible] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -62,21 +66,33 @@ export function Home() {
                 const seriesResult = await window.ipcRenderer.invoke('streams:get-series');
                 if (seriesResult.success && seriesResult.data) {
                     setAllSeries(seriesResult.data);
-                    // Get most recent 30 series (assuming they come in order)
-                    setRecentSeries(seriesResult.data.slice(0, 30));
+                    // Sort by added date (or stream_id as fallback - higher = newer)
+                    const sortedSeries = [...seriesResult.data].sort((a: SeriesData, b: SeriesData) => {
+                        const aDate = a.added || a.series_id;
+                        const bDate = b.added || b.series_id;
+                        return bDate - aDate;
+                    });
+                    setRecentSeries(sortedSeries.slice(0, 30));
                 }
 
                 // Fetch movies data
                 const moviesResult = await window.ipcRenderer.invoke('streams:get-vod');
                 if (moviesResult.success && moviesResult.data) {
                     setAllMovies(moviesResult.data);
-                    // Get most recent 30 movies
-                    setRecentMovies(moviesResult.data.slice(0, 30));
+                    // Sort by added date (or stream_id as fallback - higher = newer)
+                    const sortedMovies = [...moviesResult.data].sort((a: MovieData, b: MovieData) => {
+                        const aDate = a.added || a.stream_id;
+                        const bDate = b.added || b.stream_id;
+                        return bDate - aDate;
+                    });
+                    setRecentMovies(sortedMovies.slice(0, 30));
                 }
             } catch (error) {
                 console.error('Failed to fetch data:', error);
             } finally {
                 setLoading(false);
+                // Trigger entry animation after a small delay
+                setTimeout(() => setIsVisible(true), 100);
             }
         };
 
@@ -140,6 +156,51 @@ export function Home() {
 
         setContinueWatching(items.slice(0, 30));
     }, [allSeries, allMovies]);
+
+    // Build recommendations based on watched categories
+    useEffect(() => {
+        if (continueWatching.length === 0 || (allSeries.length === 0 && allMovies.length === 0)) return;
+
+        // Get categories from what user is watching
+        const watchedCategoryIds = new Set<string>();
+        const watchedIds = new Set<string>();
+
+        continueWatching.forEach(item => {
+            watchedIds.add(item.id);
+            if (item.type === 'series') {
+                const series = allSeries.find(s => s.series_id.toString() === item.id);
+                if (series?.category_id) watchedCategoryIds.add(series.category_id);
+            } else {
+                const movie = allMovies.find(m => m.stream_id.toString() === item.id);
+                if (movie?.category_id) watchedCategoryIds.add(movie.category_id);
+            }
+        });
+
+        // Find recommendations from same categories (not already watched/in progress)
+        const recs: (SeriesData | MovieData)[] = [];
+
+        // Add series from watched categories
+        allSeries.forEach(series => {
+            if (series.category_id &&
+                watchedCategoryIds.has(series.category_id) &&
+                !watchedIds.has(series.series_id.toString())) {
+                recs.push(series);
+            }
+        });
+
+        // Add movies from watched categories
+        allMovies.forEach(movie => {
+            if (movie.category_id &&
+                watchedCategoryIds.has(movie.category_id) &&
+                !watchedIds.has(movie.stream_id.toString())) {
+                recs.push(movie);
+            }
+        });
+
+        // Shuffle and limit
+        const shuffled = recs.sort(() => Math.random() - 0.5);
+        setRecommendations(shuffled.slice(0, 30));
+    }, [continueWatching, allSeries, allMovies]);
 
     const formatTime = (date: Date) => {
         return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -379,30 +440,78 @@ export function Home() {
         );
     };
 
-    // Carousel Section component
-    const ContentSection = ({ title, items, type, showProgress = false }: {
+    // Carousel Section component with drag scroll
+    const ContentSection = ({ title, items, type, showProgress = false, sectionIndex = 0 }: {
         title: string;
         items: any[];
-        type: 'continue' | 'series' | 'movie';
+        type: 'continue' | 'series' | 'movie' | 'recommendations';
         showProgress?: boolean;
+        sectionIndex?: number;
     }) => {
         const [scrollPosition, setScrollPosition] = useState(0);
+        const containerRef = useRef<HTMLDivElement>(null);
+        const [isDragging, setIsDragging] = useState(false);
+        const [startX, setStartX] = useState(0);
+        const [scrollLeft, setScrollLeft] = useState(0);
 
         if (items.length === 0) return null;
 
         const scroll = (direction: 'left' | 'right') => {
-            const container = document.getElementById(`carousel-${type}`);
+            const container = containerRef.current;
             if (!container) return;
             const scrollAmount = 340; // ~2 cards
             const newPosition = direction === 'left'
-                ? Math.max(0, scrollPosition - scrollAmount)
-                : scrollPosition + scrollAmount;
+                ? Math.max(0, container.scrollLeft - scrollAmount)
+                : container.scrollLeft + scrollAmount;
             container.scrollTo({ left: newPosition, behavior: 'smooth' });
-            setScrollPosition(newPosition);
+        };
+
+        // Drag handlers
+        const handleMouseDown = (e: React.MouseEvent) => {
+            const container = containerRef.current;
+            if (!container) return;
+            setIsDragging(true);
+            setStartX(e.pageX - container.offsetLeft);
+            setScrollLeft(container.scrollLeft);
+            container.style.cursor = 'grabbing';
+        };
+
+        const handleMouseUp = () => {
+            setIsDragging(false);
+            if (containerRef.current) {
+                containerRef.current.style.cursor = 'grab';
+            }
+        };
+
+        const handleMouseMove = (e: React.MouseEvent) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            const container = containerRef.current;
+            if (!container) return;
+            const x = e.pageX - container.offsetLeft;
+            const walk = (x - startX) * 1.5; // Scroll speed multiplier
+            container.scrollLeft = scrollLeft - walk;
+        };
+
+        const handleMouseLeave = () => {
+            if (isDragging) {
+                setIsDragging(false);
+                if (containerRef.current) {
+                    containerRef.current.style.cursor = 'grab';
+                }
+            }
         };
 
         return (
-            <div style={{ marginBottom: 32, position: 'relative' }}>
+            <div
+                style={{
+                    marginBottom: 32,
+                    position: 'relative',
+                    opacity: isVisible ? 1 : 0,
+                    transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
+                    transition: `all 0.6s ease ${sectionIndex * 0.15}s`
+                }}
+            >
                 <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -475,7 +584,7 @@ export function Home() {
 
                 {/* Carousel container */}
                 <div
-                    id={`carousel-${type}`}
+                    ref={containerRef}
                     style={{
                         display: 'flex',
                         gap: 16,
@@ -483,23 +592,35 @@ export function Home() {
                         overflowY: 'visible',
                         paddingBottom: 16,
                         paddingTop: 8,
-                        scrollBehavior: 'smooth',
+                        scrollBehavior: isDragging ? 'auto' : 'smooth',
                         scrollbarWidth: 'none',
-                        msOverflowStyle: 'none'
+                        msOverflowStyle: 'none',
+                        cursor: 'grab',
+                        userSelect: 'none'
                     }}
                     onScroll={(e) => setScrollPosition(e.currentTarget.scrollLeft)}
+                    onMouseDown={handleMouseDown}
+                    onMouseUp={handleMouseUp}
+                    onMouseMove={handleMouseMove}
+                    onMouseLeave={handleMouseLeave}
                 >
-                    {items.slice(0, 30).map((item) => (
-                        <ContentCard
-                            key={type === 'continue' ? (item as ContinueWatchingItem).id :
-                                type === 'series' ? (item as SeriesData).series_id :
-                                    (item as MovieData).stream_id}
-                            item={item}
-                            type={type}
-                            showProgress={showProgress}
-                            rating={type === 'series' ? (item as SeriesData).rating : (item as MovieData).rating}
-                        />
-                    ))}
+                    {items.slice(0, 30).map((item) => {
+                        const isSeries = 'series_id' in item;
+                        const itemId = isSeries ? (item as SeriesData).series_id : (item as MovieData).stream_id;
+                        const cardType = type === 'recommendations'
+                            ? (isSeries ? 'series' : 'movie')
+                            : type === 'continue' ? type : type;
+
+                        return (
+                            <ContentCard
+                                key={type === 'continue' ? (item as ContinueWatchingItem).id : itemId}
+                                item={item}
+                                type={cardType as 'continue' | 'series' | 'movie'}
+                                showProgress={showProgress}
+                                rating={isSeries ? (item as SeriesData).rating : (item as MovieData).rating}
+                            />
+                        );
+                    })}
                 </div>
 
                 {/* Gradient fade edges */}
@@ -708,6 +829,15 @@ export function Home() {
                     items={continueWatching}
                     type="continue"
                     showProgress={true}
+                    sectionIndex={0}
+                />
+
+                {/* Recommendations Section */}
+                <ContentSection
+                    title="💡 Recomendados Para Você"
+                    items={recommendations}
+                    type="recommendations"
+                    sectionIndex={1}
                 />
 
                 {/* Recently Added Series */}
@@ -715,6 +845,7 @@ export function Home() {
                     title="🆕 Séries Adicionadas"
                     items={recentSeries}
                     type="series"
+                    sectionIndex={2}
                 />
 
                 {/* Recently Added Movies */}
@@ -722,6 +853,7 @@ export function Home() {
                     title="🎬 Filmes Adicionados"
                     items={recentMovies}
                     type="movie"
+                    sectionIndex={3}
                 />
 
                 {/* Quick Access */}
