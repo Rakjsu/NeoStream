@@ -62,16 +62,16 @@ export function Home() {
                 const seriesResult = await window.ipcRenderer.invoke('streams:get-series');
                 if (seriesResult.success && seriesResult.data) {
                     setAllSeries(seriesResult.data);
-                    // Get most recent 10 series (assuming they come in order)
-                    setRecentSeries(seriesResult.data.slice(0, 10));
+                    // Get most recent 30 series (assuming they come in order)
+                    setRecentSeries(seriesResult.data.slice(0, 30));
                 }
 
                 // Fetch movies data
                 const moviesResult = await window.ipcRenderer.invoke('streams:get-vod');
                 if (moviesResult.success && moviesResult.data) {
                     setAllMovies(moviesResult.data);
-                    // Get most recent 10 movies
-                    setRecentMovies(moviesResult.data.slice(0, 10));
+                    // Get most recent 30 movies
+                    setRecentMovies(moviesResult.data.slice(0, 30));
                 }
             } catch (error) {
                 console.error('Failed to fetch data:', error);
@@ -138,7 +138,7 @@ export function Home() {
             return bTime - aTime;
         });
 
-        setContinueWatching(items.slice(0, 10));
+        setContinueWatching(items.slice(0, 30));
     }, [allSeries, allMovies]);
 
     const formatTime = (date: Date) => {
@@ -489,7 +489,7 @@ export function Home() {
                     }}
                     onScroll={(e) => setScrollPosition(e.currentTarget.scrollLeft)}
                 >
-                    {items.slice(0, 15).map((item) => (
+                    {items.slice(0, 30).map((item) => (
                         <ContentCard
                             key={type === 'continue' ? (item as ContinueWatchingItem).id :
                                 type === 'series' ? (item as SeriesData).series_id :
