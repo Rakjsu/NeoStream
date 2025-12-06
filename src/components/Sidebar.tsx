@@ -156,26 +156,73 @@ export function Sidebar() {
                 {/* Profile Section */}
                 {activeProfile && (
                     <div className="flex items-center justify-center" style={{ padding: '12px 0', marginBottom: '16px', position: 'relative' }}>
+                        <style>{`
+                            @keyframes profileRingPulse {
+                                0%, 100% { opacity: 0.6; transform: scale(1); }
+                                50% { opacity: 1; transform: scale(1.1); }
+                            }
+                            @keyframes profileGlow {
+                                0%, 100% { box-shadow: 0 0 15px rgba(168, 85, 247, 0.3); }
+                                50% { box-shadow: 0 0 25px rgba(236, 72, 153, 0.5); }
+                            }
+                            .profile-btn {
+                                position: relative;
+                                cursor: pointer;
+                                transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+                            }
+                            .profile-btn:hover {
+                                transform: scale(1.15);
+                            }
+                            .profile-btn:hover .profile-ring {
+                                animation: profileRingPulse 1.5s ease-in-out infinite;
+                            }
+                            .profile-btn:hover .profile-inner {
+                                animation: profileGlow 2s ease-in-out infinite;
+                            }
+                            .profile-ring {
+                                position: absolute;
+                                inset: -4px;
+                                border-radius: 50%;
+                                background: linear-gradient(135deg, #a855f7, #ec4899, #a855f7);
+                                background-size: 200% 200%;
+                                z-index: 0;
+                            }
+                            .profile-inner {
+                                position: relative;
+                                z-index: 1;
+                                width: 48px;
+                                height: 48px;
+                                border-radius: 50%;
+                                background: linear-gradient(135deg, #1a1a2e, #0f0f1a);
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                            }
+                        `}</style>
                         <div
-                            className="relative cursor-pointer transition-transform duration-300 hover:scale-110"
+                            className="profile-btn"
                             onClick={() => {
                                 navigate('/dashboard/settings');
                             }}
                             title="Configurações de Perfil"
                         >
-                            <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ backgroundColor: '#000000' }}>
-                                {/* Always show cyan icon - comment out to use avatar */}
-                                <svg width="36" height="36" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                                    {/* Outer circle */}
-                                    <circle cx="50" cy="50" r="46" fill="none" stroke="#06b6d4" strokeWidth="8" />
-                                    {/* Head circle (outline only) */}
-                                    <circle cx="50" cy="35" r="12" fill="none" stroke="#06b6d4" strokeWidth="8" />
-                                    {/* Body/torso (outline) */}
+                            <div className="profile-ring" />
+                            <div className="profile-inner">
+                                <svg width="32" height="32" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                    <defs>
+                                        <linearGradient id="profileIconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                            <stop offset="0%" stopColor="#a855f7" />
+                                            <stop offset="100%" stopColor="#ec4899" />
+                                        </linearGradient>
+                                    </defs>
+                                    {/* Head circle */}
+                                    <circle cx="50" cy="35" r="14" fill="none" stroke="url(#profileIconGrad)" strokeWidth="6" />
+                                    {/* Body/torso */}
                                     <path
-                                        d="M 23,80 C 23,65 32,58 50,58 C 68,58 77,65 77,80"
+                                        d="M 20,85 C 20,65 30,55 50,55 C 70,55 80,65 80,85"
                                         fill="none"
-                                        stroke="#06b6d4"
-                                        strokeWidth="8"
+                                        stroke="url(#profileIconGrad)"
+                                        strokeWidth="6"
                                         strokeLinecap="round"
                                     />
                                 </svg>

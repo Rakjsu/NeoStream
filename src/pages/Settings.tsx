@@ -10,6 +10,8 @@ export function Settings() {
     });
     const [checking, setChecking] = useState(false);
     const [lastCheckDate, setLastCheckDate] = useState<string>('');
+    const [activeSection, setActiveSection] = useState<string>('updates');
+    const [saveAnimation, setSaveAnimation] = useState<string | null>(null);
 
     useEffect(() => {
         loadUpdateConfig();
@@ -29,6 +31,10 @@ export function Settings() {
         const newConfig = { ...updateConfig, [key]: value };
         setUpdateConfig(newConfig);
         await updateService.setConfig(newConfig);
+
+        // Show save animation
+        setSaveAnimation(key);
+        setTimeout(() => setSaveAnimation(null), 1500);
     };
 
     const handleCheckNow = async () => {
@@ -40,7 +46,7 @@ export function Settings() {
             } else {
                 alert('Você já está usando a versão mais recente!');
             }
-            await loadUpdateConfig(); // Reload to get updated lastCheck
+            await loadUpdateConfig();
         } catch (error) {
             alert('Erro ao verificar atualizações');
         } finally {
@@ -48,140 +54,753 @@ export function Settings() {
         }
     };
 
+    const sections = [
+        { id: 'updates', icon: '🔄', label: 'Atualizações', color: '#10b981' },
+        { id: 'appearance', icon: '🎨', label: 'Aparência', color: '#8b5cf6' },
+        { id: 'player', icon: '▶️', label: 'Player', color: '#3b82f6' },
+        { id: 'about', icon: 'ℹ️', label: 'Sobre', color: '#f59e0b' }
+    ];
+
     return (
-        <div className="p-8">
-            <h1 className="text-3xl font-bold text-white mb-6">Configurações</h1>
+        <>
+            <style>{settingsStyles}</style>
+            <div className="settings-page">
+                <div className="settings-backdrop" />
 
-            <div className="max-w-2xl space-y-6">
-                {/* Auto-Update Section */}
-                <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
-                    <div className="flex items-center gap-3 mb-4">
-                        <svg
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#10b981"
-                            strokeWidth="2"
-                        >
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                            <polyline points="7 10 12 15 17 10" />
-                            <line x1="12" y1="15" x2="12" y2="3" />
-                        </svg>
-                        <h2 className="text-xl font-bold text-white">Atualizações Automáticas</h2>
+                {/* Header */}
+                <header className="settings-header">
+                    <div className="header-icon">⚙️</div>
+                    <div>
+                        <h1>Configurações</h1>
+                        <p className="subtitle">Personalize sua experiência</p>
                     </div>
+                </header>
 
-                    <div className="space-y-4">
-                        {/* Check Frequency */}
-                        <div>
-                            <label className="block text-gray-300 mb-2">
-                                Verificar atualizações:
-                            </label>
-                            <select
-                                className="w-full bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600 focus:border-blue-500 focus:outline-none"
-                                value={updateConfig.checkFrequency}
-                                onChange={(e) => handleUpdateConfigChange('checkFrequency', e.target.value as UpdateConfig['checkFrequency'])}
+                <div className="settings-layout">
+                    {/* Sidebar Navigation */}
+                    <nav className="settings-nav">
+                        {sections.map((section, index) => (
+                            <button
+                                key={section.id}
+                                className={`nav-item ${activeSection === section.id ? 'active' : ''}`}
+                                onClick={() => setActiveSection(section.id)}
+                                style={{
+                                    animationDelay: `${index * 0.1}s`,
+                                    '--section-color': section.color
+                                } as React.CSSProperties}
                             >
-                                <option value="on-open">Ao abrir o app</option>
-                                <option value="1-day">A cada 1 dia</option>
-                                <option value="1-week">A cada 1 semana</option>
-                                <option value="1-month">A cada 1 mês</option>
-                            </select>
-                            <p className="text-gray-500 text-sm mt-1">
-                                Define com que frequência o app deve verificar por novas versões
-                            </p>
-                        </div>
+                                <span className="nav-icon">{section.icon}</span>
+                                <span className="nav-label">{section.label}</span>
+                            </button>
+                        ))}
+                    </nav>
 
-                        {/* Auto Install */}
-                        <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                                <span className="text-gray-300 block mb-1">
-                                    Instalar atualizações automaticamente
-                                </span>
-                                <p className="text-gray-500 text-sm">
-                                    Se ativado, as atualizações serão instaladas sem pedir confirmação. O app será reiniciado automaticamente.
-                                </p>
-                            </div>
-                            <label className="relative inline-flex items-center cursor-pointer ml-4">
-                                <input
-                                    type="checkbox"
-                                    className="sr-only peer"
-                                    checked={updateConfig.autoInstall}
-                                    onChange={(e) => handleUpdateConfigChange('autoInstall', e.target.checked)}
-                                />
-                                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                            </label>
-                        </div>
+                    {/* Content Area */}
+                    <div className="settings-content">
+                        {/* Updates Section */}
+                        {activeSection === 'updates' && (
+                            <div className="section-card">
+                                <div className="section-header">
+                                    <div className="section-icon" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>🔄</div>
+                                    <div>
+                                        <h2>Atualizações Automáticas</h2>
+                                        <p>Mantenha seu aplicativo sempre atualizado</p>
+                                    </div>
+                                </div>
 
-                        {/* Last Check Info */}
-                        {lastCheckDate && (
-                            <div className="pt-3 border-t border-gray-700">
-                                <p className="text-gray-400 text-sm">
-                                    Última verificação: <span className="text-gray-300">{lastCheckDate}</span>
-                                </p>
+                                <div className="settings-group">
+                                    {/* Check Frequency */}
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Verificar atualizações</label>
+                                            <p>Define com que frequência o app verifica por novas versões</p>
+                                        </div>
+                                        <select
+                                            className="setting-select"
+                                            value={updateConfig.checkFrequency}
+                                            onChange={(e) => handleUpdateConfigChange('checkFrequency', e.target.value as UpdateConfig['checkFrequency'])}
+                                        >
+                                            <option value="on-open">Ao abrir o app</option>
+                                            <option value="1-day">A cada 1 dia</option>
+                                            <option value="1-week">A cada 1 semana</option>
+                                            <option value="1-month">A cada 1 mês</option>
+                                        </select>
+                                    </div>
+
+                                    {/* Auto Install Toggle */}
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Instalar automaticamente</label>
+                                            <p>Atualizações serão instaladas sem pedir confirmação</p>
+                                        </div>
+                                        <label className="toggle-switch">
+                                            <input
+                                                type="checkbox"
+                                                checked={updateConfig.autoInstall}
+                                                onChange={(e) => handleUpdateConfigChange('autoInstall', e.target.checked)}
+                                            />
+                                            <span className="toggle-slider"></span>
+                                        </label>
+                                        {saveAnimation === 'autoInstall' && (
+                                            <span className="save-indicator">✓ Salvo</span>
+                                        )}
+                                    </div>
+
+                                    {/* Last Check */}
+                                    {lastCheckDate && (
+                                        <div className="last-check">
+                                            <span className="check-icon">🕐</span>
+                                            <span>Última verificação: <strong>{lastCheckDate}</strong></span>
+                                        </div>
+                                    )}
+
+                                    {/* Check Now Button */}
+                                    <button
+                                        className={`check-btn ${checking ? 'checking' : ''}`}
+                                        onClick={handleCheckNow}
+                                        disabled={checking}
+                                    >
+                                        {checking ? (
+                                            <>
+                                                <span className="spinner"></span>
+                                                <span>Verificando...</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span>🔍</span>
+                                                <span>Verificar Atualizações Agora</span>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
                         )}
 
-                        {/* Manual Check Button */}
-                        <button
-                            onClick={handleCheckNow}
-                            disabled={checking}
-                            className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
-                            {checking ? (
-                                <>
-                                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                    </svg>
-                                    Verificando...
-                                </>
-                            ) : (
-                                <>
-                                    🔍 Verificar Atualizações Agora
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </div>
+                        {/* Appearance Section */}
+                        {activeSection === 'appearance' && (
+                            <div className="section-card">
+                                <div className="section-header">
+                                    <div className="section-icon" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>🎨</div>
+                                    <div>
+                                        <h2>Aparência</h2>
+                                        <p>Personalize a interface do aplicativo</p>
+                                    </div>
+                                </div>
 
-                {/* Appearance Section */}
-                <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
-                    <h2 className="text-xl font-bold text-white mb-4">Aparência</h2>
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <span className="text-gray-300">Tema</span>
-                            <select className="bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600">
-                                <option>Escuro</option>
-                                <option>Claro</option>
-                            </select>
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-gray-300">Idioma</span>
-                            <select className="bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600">
-                                <option>English</option>
-                                <option>Português</option>
-                                <option>Español</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
+                                <div className="settings-group">
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Tema</label>
+                                            <p>Escolha o tema visual do aplicativo</p>
+                                        </div>
+                                        <select className="setting-select">
+                                            <option>🌙 Escuro</option>
+                                            <option>☀️ Claro</option>
+                                            <option>🖥️ Sistema</option>
+                                        </select>
+                                    </div>
 
-                {/* Player Section */}
-                <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
-                    <h2 className="text-xl font-bold text-white mb-4">Player</h2>
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <span className="text-gray-300">Auto-play próximo episódio</span>
-                            <input type="checkbox" className="w-6 h-6" defaultChecked />
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <span className="text-gray-300">Legendas</span>
-                            <input type="checkbox" className="w-6 h-6" />
-                        </div>
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Idioma</label>
+                                            <p>Idioma da interface</p>
+                                        </div>
+                                        <select className="setting-select">
+                                            <option>🇧🇷 Português</option>
+                                            <option>🇺🇸 English</option>
+                                            <option>🇪🇸 Español</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Animações</label>
+                                            <p>Ativar animações de transição</p>
+                                        </div>
+                                        <label className="toggle-switch">
+                                            <input type="checkbox" defaultChecked />
+                                            <span className="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Player Section */}
+                        {activeSection === 'player' && (
+                            <div className="section-card">
+                                <div className="section-header">
+                                    <div className="section-icon" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>▶️</div>
+                                    <div>
+                                        <h2>Configurações do Player</h2>
+                                        <p>Ajuste a reprodução de vídeo</p>
+                                    </div>
+                                </div>
+
+                                <div className="settings-group">
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Auto-play próximo episódio</label>
+                                            <p>Reproduzir automaticamente o próximo episódio</p>
+                                        </div>
+                                        <label className="toggle-switch">
+                                            <input type="checkbox" defaultChecked />
+                                            <span className="toggle-slider"></span>
+                                        </label>
+                                    </div>
+
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Legendas</label>
+                                            <p>Ativar legendas por padrão</p>
+                                        </div>
+                                        <label className="toggle-switch">
+                                            <input type="checkbox" />
+                                            <span className="toggle-slider"></span>
+                                        </label>
+                                    </div>
+
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Qualidade padrão</label>
+                                            <p>Qualidade preferencial de reprodução</p>
+                                        </div>
+                                        <select className="setting-select">
+                                            <option>Auto</option>
+                                            <option>1080p (Full HD)</option>
+                                            <option>720p (HD)</option>
+                                            <option>480p (SD)</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Pular intro automaticamente</label>
+                                            <p>Pular abertura de séries quando disponível</p>
+                                        </div>
+                                        <label className="toggle-switch">
+                                            <input type="checkbox" defaultChecked />
+                                            <span className="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* About Section */}
+                        {activeSection === 'about' && (
+                            <div className="section-card">
+                                <div className="section-header">
+                                    <div className="section-icon" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>ℹ️</div>
+                                    <div>
+                                        <h2>Sobre o Aplicativo</h2>
+                                        <p>Informações e créditos</p>
+                                    </div>
+                                </div>
+
+                                <div className="about-content">
+                                    <div className="app-logo">
+                                        <svg width="80" height="80" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                            <defs>
+                                                <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                                    <stop offset="0%" stopColor="#a855f7" />
+                                                    <stop offset="100%" stopColor="#ec4899" />
+                                                </linearGradient>
+                                            </defs>
+                                            <path d="M 10,10 L 10,90 L 90,50 Z" fill="none" stroke="url(#logoGrad)" strokeWidth="6" strokeLinejoin="round" />
+                                            <rect x="35" y="35" width="6" height="30" fill="url(#logoGrad)" rx="3" />
+                                            <rect x="45" y="25" width="6" height="50" fill="url(#logoGrad)" rx="3" />
+                                            <rect x="55" y="40" width="6" height="20" fill="url(#logoGrad)" rx="3" />
+                                        </svg>
+                                    </div>
+                                    <h3 className="app-name">NeoStream</h3>
+                                    <p className="app-version">Versão 1.0.0</p>
+                                    <p className="app-description">
+                                        Sua experiência de streaming completa com TV ao vivo, filmes e séries.
+                                    </p>
+                                    <div className="about-links">
+                                        <a href="#" className="about-link">📄 Termos de Uso</a>
+                                        <a href="#" className="about-link">🔒 Política de Privacidade</a>
+                                        <a href="#" className="about-link">💬 Suporte</a>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
-        </div>
+        </>
     );
 }
+
+// CSS Styles
+const settingsStyles = `
+/* Page Container */
+.settings-page {
+    position: relative;
+    min-height: 100vh;
+    padding: 32px;
+    overflow-x: hidden;
+    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+}
+
+/* Animated Backdrop */
+.settings-backdrop {
+    position: fixed;
+    inset: 0;
+    background: 
+        radial-gradient(ellipse at 30% 30%, rgba(168, 85, 247, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 70% 70%, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Header */
+.settings-header {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 40px;
+    animation: fadeInDown 0.5s ease;
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.header-icon {
+    font-size: 48px;
+    animation: spin 10s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.settings-header h1 {
+    font-size: 42px;
+    font-weight: 800;
+    color: white;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #fff 0%, #c4b5fd 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0;
+}
+
+.subtitle {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 14px;
+    margin-top: 4px;
+}
+
+/* Layout */
+.settings-layout {
+    position: relative;
+    z-index: 10;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 32px;
+    max-width: 1200px;
+}
+
+@media (max-width: 900px) {
+    .settings-layout {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Navigation */
+.settings-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    height: fit-content;
+}
+
+@media (max-width: 900px) {
+    .settings-nav {
+        flex-direction: row;
+        overflow-x: auto;
+        padding: 12px;
+    }
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 20px;
+    background: transparent;
+    border: none;
+    border-radius: 14px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    animation: slideIn 0.4s ease backwards;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.nav-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: white;
+}
+
+.nav-item.active {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.15));
+    color: white;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+.nav-icon {
+    font-size: 22px;
+}
+
+.nav-label {
+    white-space: nowrap;
+}
+
+/* Content Area */
+.settings-content {
+    flex: 1;
+}
+
+/* Section Card */
+.section-card {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 32px;
+    animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.section-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.section-header h2 {
+    font-size: 24px;
+    font-weight: 700;
+    color: white;
+    margin: 0 0 4px 0;
+}
+
+.section-header p {
+    color: rgba(255, 255, 255, 0.5);
+    margin: 0;
+    font-size: 14px;
+}
+
+/* Settings Group */
+.settings-group {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* Setting Item */
+.setting-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s ease;
+}
+
+.setting-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.setting-info {
+    flex: 1;
+}
+
+.setting-info label {
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    color: white;
+    margin-bottom: 4px;
+}
+
+.setting-info p {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.5);
+    margin: 0;
+}
+
+/* Select */
+.setting-select {
+    padding: 12px 20px;
+    background: rgba(30, 30, 50, 0.9);
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 12px;
+    border: 2px solid rgba(168, 85, 247, 0.3);
+    cursor: pointer;
+    outline: none;
+    min-width: 180px;
+    transition: all 0.2s ease;
+}
+
+.setting-select:hover {
+    border-color: rgba(168, 85, 247, 0.5);
+}
+
+.setting-select:focus {
+    border-color: #a855f7;
+    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2);
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 56px;
+    height: 30px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
+    transition: all 0.4s ease;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 22px;
+    width: 22px;
+    left: 4px;
+    bottom: 4px;
+    background: white;
+    border-radius: 50%;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: linear-gradient(135deg, #a855f7, #ec4899);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(26px);
+}
+
+/* Save Indicator */
+.save-indicator {
+    margin-left: 12px;
+    padding: 6px 12px;
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 20px;
+    animation: popIn 0.3s ease;
+}
+
+@keyframes popIn {
+    from { transform: scale(0); }
+    to { transform: scale(1); }
+}
+
+/* Last Check */
+.last-check {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 20px;
+    background: rgba(168, 85, 247, 0.1);
+    border-radius: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 14px;
+}
+
+.check-icon {
+    font-size: 18px;
+}
+
+.last-check strong {
+    color: white;
+}
+
+/* Check Button */
+.check-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    padding: 18px 32px;
+    background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+    border: none;
+    border-radius: 14px;
+    color: white;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.3);
+}
+
+.check-btn:hover:not(:disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(168, 85, 247, 0.4);
+}
+
+.check-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.check-btn.checking {
+    background: rgba(168, 85, 247, 0.3);
+}
+
+.spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spinLoader 0.8s linear infinite;
+}
+
+@keyframes spinLoader {
+    to { transform: rotate(360deg); }
+}
+
+/* About Section */
+.about-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 32px 0;
+}
+
+.app-logo {
+    margin-bottom: 24px;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.app-name {
+    font-size: 32px;
+    font-weight: 800;
+    color: white;
+    margin: 0 0 8px 0;
+    background: linear-gradient(135deg, #a855f7, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.app-version {
+    display: inline-block;
+    padding: 6px 16px;
+    background: rgba(168, 85, 247, 0.2);
+    border-radius: 20px;
+    color: #c4b5fd;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 20px;
+}
+
+.app-description {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 15px;
+    line-height: 1.6;
+    max-width: 400px;
+    margin-bottom: 32px;
+}
+
+.about-links {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.about-link {
+    padding: 12px 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.about-link:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    transform: translateY(-2px);
+}
+`;
