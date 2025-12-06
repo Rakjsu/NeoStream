@@ -54,43 +54,34 @@ export function VOD() {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const gridRef = useRef<HTMLDivElement>(null);
 
-    // Dynamic grid calculation
+    // Dynamic grid calculation based on window dimensions
     useEffect(() => {
-        const container = scrollContainerRef.current;
-        if (!container) return;
-
         const calculateGrid = () => {
-            const containerWidth = container.clientWidth - 64; // account for padding
-            const containerHeight = container.clientHeight;
+            // Use window dimensions directly - more reliable
+            const availableWidth = window.innerWidth - 100; // sidebar + padding
+            const availableHeight = window.innerHeight - 200; // header + details panel buffer
 
-            const cols = Math.max(2, Math.floor(containerWidth / (CARD_MIN_WIDTH + CARD_GAP)));
-            const rows = Math.ceil(containerHeight / 320) + 2; // card height ~280px + gap
+            const cols = Math.max(2, Math.floor(availableWidth / (CARD_MIN_WIDTH + CARD_GAP)));
+            const rows = Math.max(3, Math.ceil(availableHeight / 320) + 3); // card height ~280px + gap
 
-            const items = Math.max(cols * rows, 24);
+            const items = cols * rows;
+
+            console.log('[VOD Grid]', { windowWidth: window.innerWidth, windowHeight: window.innerHeight, cols, rows, items });
+
             setItemsPerPage(items);
-
-            // Directly set visibleCount to fill the screen on resize/maximize
             setVisibleCount(items);
         };
 
-        // Initial calculation with RAF to ensure layout is ready
-        requestAnimationFrame(() => {
-            calculateGrid();
-            // Recalculate after a brief delay in case window is still initializing
-            setTimeout(calculateGrid, 100);
-        });
+        // Initial calculation
+        calculateGrid();
 
-        // Use ResizeObserver for better container resize detection (works with maximize)
-        const resizeObserver = new ResizeObserver(() => {
-            calculateGrid();
-        });
-        resizeObserver.observe(container);
+        // Recalculate after layout is ready
+        setTimeout(calculateGrid, 200);
 
-        // Also listen to window resize as backup
+        // Listen to window resize
         window.addEventListener('resize', calculateGrid);
 
         return () => {
-            resizeObserver.disconnect();
             window.removeEventListener('resize', calculateGrid);
         };
     }, []);

@@ -43,48 +43,44 @@ export function LiveTV() {
     const [progressTick, setProgressTick] = useState(0);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-    // Calculate items per page based on container dimensions
+    // Calculate items per page based on window dimensions
     useEffect(() => {
-        const container = scrollContainerRef.current;
-        if (!container) return;
-
         const calculateItemsPerPage = () => {
-            const containerWidth = container.clientWidth - 40; // Account for padding
-            const containerHeight = container.clientHeight;
+            // Use window dimensions directly - more reliable
+            const availableWidth = window.innerWidth - 100; // sidebar + padding
+            const availableHeight = window.innerHeight - 150; // header + padding
 
             // Calculate how many columns fit
-            const columns = Math.floor(containerWidth / (CARD_WIDTH + GRID_GAP));
-            // Calculate how many rows fit + 2 extra rows for smooth scrolling
-            const rows = Math.ceil(containerHeight / (CARD_HEIGHT + GRID_GAP)) + 2;
+            const columns = Math.max(1, Math.floor(availableWidth / (CARD_WIDTH + GRID_GAP)));
+            // Calculate how many rows fit + buffer for scroll
+            const rows = Math.max(3, Math.ceil(availableHeight / (CARD_HEIGHT + GRID_GAP)) + 3);
 
-            const calculatedItems = Math.max(columns * rows, 24); // Minimum 24 items
+            const calculatedItems = columns * rows;
 
-            console.log('[LiveTV Grid]', { containerWidth, containerHeight, columns, rows, calculatedItems });
+            console.log('[LiveTV Grid]', {
+                windowWidth: window.innerWidth,
+                windowHeight: window.innerHeight,
+                availableWidth,
+                availableHeight,
+                columns,
+                rows,
+                calculatedItems
+            });
 
             setItemsPerPage(calculatedItems);
-
-            // Directly set visibleCount to fill the screen on resize/maximize
             setVisibleCount(calculatedItems);
         };
 
-        // Initial calculation with RAF to ensure layout is ready
-        requestAnimationFrame(() => {
-            calculateItemsPerPage();
-            // Recalculate after a brief delay in case window is still initializing
-            setTimeout(calculateItemsPerPage, 100);
-        });
+        // Initial calculation
+        calculateItemsPerPage();
 
-        // Use ResizeObserver for better container resize detection (works with maximize)
-        const resizeObserver = new ResizeObserver(() => {
-            calculateItemsPerPage();
-        });
-        resizeObserver.observe(container);
+        // Recalculate after layout is ready
+        setTimeout(calculateItemsPerPage, 200);
 
-        // Also listen to window resize as backup
+        // Listen to window resize
         window.addEventListener('resize', calculateItemsPerPage);
 
         return () => {
-            resizeObserver.disconnect();
             window.removeEventListener('resize', calculateItemsPerPage);
         };
     }, []);
