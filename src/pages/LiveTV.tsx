@@ -60,8 +60,8 @@ export function LiveTV() {
             const calculatedItems = Math.max(columns * rows, 24); // Minimum 24 items
             setItemsPerPage(calculatedItems);
 
-            // Always update visibleCount when recalculating - fix for fullscreen resize
-            setVisibleCount(prev => Math.max(prev, calculatedItems));
+            // Directly set visibleCount to fill the screen on resize/maximize
+            setVisibleCount(calculatedItems);
         };
 
         // Initial calculation

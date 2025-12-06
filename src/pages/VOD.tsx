@@ -69,8 +69,8 @@ export function VOD() {
             const items = Math.max(cols * rows, 24);
             setItemsPerPage(items);
 
-            // Always update visibleCount when recalculating - fix for fullscreen resize
-            setVisibleCount(prev => Math.max(prev, items));
+            // Directly set visibleCount to fill the screen on resize/maximize
+            setVisibleCount(items);
         };
 
         // Initial calculation
