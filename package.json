@@ -18,6 +18,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@types/react-window": "^1.8.8",
     "@vidstack/react": "^1.12.13",
     "airplay-protocol": "^2.0.2",
     "axios": "^1.13.2",
@@ -36,6 +37,7 @@
     "react-i18next": "^16.3.5",
     "react-icons": "^5.5.0",
     "react-router-dom": "^7.9.6",
+    "react-window": "^2.2.3",
     "tailwind-merge": "^3.4.0",
     "upnp-mediarenderer-client": "^1.4.0",
     "vidstack": "^1.12.13"
