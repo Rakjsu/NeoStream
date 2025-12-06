@@ -57,16 +57,6 @@ export function LiveTV() {
 
             const calculatedItems = columns * rows;
 
-            console.log('[LiveTV Grid]', {
-                windowWidth: window.innerWidth,
-                windowHeight: window.innerHeight,
-                availableWidth,
-                availableHeight,
-                columns,
-                rows,
-                calculatedItems
-            });
-
             setItemsPerPage(calculatedItems);
             setVisibleCount(calculatedItems);
         };
@@ -168,33 +158,18 @@ export function LiveTV() {
         return matchesSearch && matchesCategory;
     });
 
-    // Lazy loading scroll listener
-    useEffect(() => {
-        const attachScrollListener = () => {
-            const container = scrollContainerRef.current;
-            if (!container) {
-                // Retry after a short delay if container is not ready
-                setTimeout(attachScrollListener, 100);
-                return;
-            }
+    // Scroll handler for lazy loading
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const container = e.currentTarget;
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
 
-            const handleScroll = () => {
-                const { scrollTop, scrollHeight, clientHeight } = container;
-                // Load more when 80% scrolled
-                if (scrollTop + clientHeight >= scrollHeight * 0.8 && visibleCount < filteredStreams.length) {
-                    setVisibleCount(prev => Math.min(prev + itemsPerPage, filteredStreams.length));
-                }
-            };
-
-            container.addEventListener('scroll', handleScroll);
-            return () => container.removeEventListener('scroll', handleScroll);
-        };
-
-        const cleanup = attachScrollListener();
-        return () => {
-            if (cleanup) cleanup();
-        };
-    }, [filteredStreams.length, visibleCount, itemsPerPage]);
+        // Load more when 80% scrolled
+        if (scrollPercentage >= 0.8 && visibleCount < filteredStreams.length) {
+            const newCount = Math.min(visibleCount + itemsPerPage, filteredStreams.length);
+            setVisibleCount(newCount);
+        }
+    };
 
     // Reset visible count when search or category changes
     useEffect(() => {
@@ -650,7 +625,7 @@ export function LiveTV() {
                     </div>
                 )}
 
-                <div ref={scrollContainerRef} className="p-8" style={{ paddingLeft: '60px', position: 'relative', zIndex: 1, height: 'calc(100vh - 120px)', overflowY: 'auto' }}>
+                <div ref={scrollContainerRef} onScroll={handleScroll} className="p-8" style={{ paddingLeft: '60px', position: 'relative', zIndex: 1, height: 'calc(100vh - 120px)', overflowY: 'auto' }}>
                     <style>{`
                         .channel-card {
                             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);

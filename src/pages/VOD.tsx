@@ -66,8 +66,6 @@ export function VOD() {
 
             const items = cols * rows;
 
-            console.log('[VOD Grid]', { windowWidth: window.innerWidth, windowHeight: window.innerHeight, cols, rows, items });
-
             setItemsPerPage(items);
             setVisibleCount(items);
         };

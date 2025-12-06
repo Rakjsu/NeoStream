@@ -76,8 +76,6 @@ export function Series() {
 
             const items = cols * rows;
 
-            console.log('[Series Grid]', { windowWidth: window.innerWidth, windowHeight: window.innerHeight, cols, rows, items });
-
             setItemsPerPage(items);
             setVisibleCount(items);
         };
