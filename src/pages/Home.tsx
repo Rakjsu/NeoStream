@@ -298,7 +298,7 @@ export function Home() {
         setContinueWatching(prev => prev.filter(item => item.id !== itemId));
     };
 
-    // Content card component with hover preview, lazy loading, remove button
+    // Content card component with hover preview - NO STATE to prevent re-renders
     const ContentCard = ({ item, type, showProgress = false, rating, onRemove }: {
         item: ContinueWatchingItem | SeriesData | MovieData;
         type: 'continue' | 'series' | 'movie';
@@ -306,8 +306,6 @@ export function Home() {
         rating?: string;
         onRemove?: () => void;
     }) => {
-        const [showPreview, setShowPreview] = useState(false);
-
         const isContinue = type === 'continue';
         const continueItem = item as ContinueWatchingItem;
         const seriesItem = item as SeriesData;
@@ -337,10 +335,9 @@ export function Home() {
             ? continueItem.movieProgress?.progress
             : undefined;
 
-        // Simplified - no lazy loading to prevent re-mount issues
-
         return (
             <div
+                className="content-card"
                 style={{
                     position: 'relative',
                     minWidth: 160,
@@ -349,25 +346,13 @@ export function Home() {
                     overflow: 'visible',
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
-                    transition: 'all 0.3s ease',
                     flexShrink: 0
-                }}
-                onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.transform = 'scale(1.08)';
-                    (e.currentTarget as HTMLElement).style.boxShadow = '0 15px 40px rgba(0, 0, 0, 0.5)';
-                    (e.currentTarget as HTMLElement).style.zIndex = '100';
-                    setShowPreview(true);
-                }}
-                onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
-                    (e.currentTarget as HTMLElement).style.boxShadow = 'none';
-                    (e.currentTarget as HTMLElement).style.zIndex = '1';
-                    setShowPreview(false);
                 }}
             >
                 {/* Remove button for continue watching */}
-                {isContinue && showPreview && (
+                {isContinue && (
                     <button
+                        className="remove-btn"
                         onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -388,11 +373,8 @@ export function Home() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            zIndex: 150,
-                            transition: 'all 0.2s'
+                            zIndex: 150
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.2)'}
-                        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                         title="Remover de Continue Assistindo"
                     >
                         ✕
@@ -428,18 +410,18 @@ export function Home() {
                         />
 
                         {/* Hover Preview Overlay */}
-                        <div style={{
-                            position: 'absolute',
-                            inset: 0,
-                            background: 'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.95) 100%)',
-                            opacity: showPreview ? 1 : 0,
-                            transition: 'opacity 0.3s',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'flex-end',
-                            padding: 12,
-                            borderRadius: '12px 12px 0 0'
-                        }}>
+                        <div
+                            className="preview-overlay"
+                            style={{
+                                position: 'absolute',
+                                inset: 0,
+                                background: 'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.95) 100%)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'flex-end',
+                                padding: 12,
+                                borderRadius: '12px 12px 0 0'
+                            }}>
                             {/* Play button */}
                             <div style={{
                                 position: 'absolute',
@@ -763,6 +745,31 @@ export function Home() {
                 #carousel-movie::-webkit-scrollbar,
                 #carousel-recommendations::-webkit-scrollbar {
                     display: none;
+                }
+                .content-card {
+                    transform: scale(1);
+                    box-shadow: none;
+                    z-index: 1;
+                    transition: all 0.3s ease;
+                }
+                .content-card:hover {
+                    transform: scale(1.08);
+                    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+                    z-index: 100;
+                }
+                .content-card .preview-overlay {
+                    opacity: 0;
+                    transition: opacity 0.3s;
+                }
+                .content-card:hover .preview-overlay {
+                    opacity: 1;
+                }
+                .content-card .remove-btn {
+                    opacity: 0;
+                    transition: opacity 0.2s;
+                }
+                .content-card:hover .remove-btn {
+                    opacity: 1;
                 }
             `}</style>
             <div style={{
