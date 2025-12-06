@@ -170,20 +170,31 @@ export function LiveTV() {
 
     // Lazy loading scroll listener
     useEffect(() => {
-        const container = scrollContainerRef.current;
-        if (!container) return;
-
-        const handleScroll = () => {
-            const { scrollTop, scrollHeight, clientHeight } = container;
-            // Load more when 80% scrolled
-            if (scrollTop + clientHeight >= scrollHeight * 0.8 && visibleCount < filteredStreams.length) {
-                setVisibleCount(prev => Math.min(prev + itemsPerPage, filteredStreams.length));
+        const attachScrollListener = () => {
+            const container = scrollContainerRef.current;
+            if (!container) {
+                // Retry after a short delay if container is not ready
+                setTimeout(attachScrollListener, 100);
+                return;
             }
+
+            const handleScroll = () => {
+                const { scrollTop, scrollHeight, clientHeight } = container;
+                // Load more when 80% scrolled
+                if (scrollTop + clientHeight >= scrollHeight * 0.8 && visibleCount < filteredStreams.length) {
+                    setVisibleCount(prev => Math.min(prev + itemsPerPage, filteredStreams.length));
+                }
+            };
+
+            container.addEventListener('scroll', handleScroll);
+            return () => container.removeEventListener('scroll', handleScroll);
         };
 
-        container.addEventListener('scroll', handleScroll);
-        return () => container.removeEventListener('scroll', handleScroll);
-    }, [filteredStreams.length, visibleCount]);
+        const cleanup = attachScrollListener();
+        return () => {
+            if (cleanup) cleanup();
+        };
+    }, [filteredStreams.length, visibleCount, itemsPerPage]);
 
     // Reset visible count when search or category changes
     useEffect(() => {
