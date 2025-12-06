@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-// @ts-ignore - react-window v2.x has different types
 import { FixedSizeList } from 'react-window';
 import { watchProgressService, type SeriesProgress } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
