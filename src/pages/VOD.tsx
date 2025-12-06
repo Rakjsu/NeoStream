@@ -73,8 +73,12 @@ export function VOD() {
             setVisibleCount(items);
         };
 
-        // Initial calculation
-        calculateGrid();
+        // Initial calculation with RAF to ensure layout is ready
+        requestAnimationFrame(() => {
+            calculateGrid();
+            // Recalculate after a brief delay in case window is still initializing
+            setTimeout(calculateGrid, 100);
+        });
 
         // Use ResizeObserver for better container resize detection (works with maximize)
         const resizeObserver = new ResizeObserver(() => {

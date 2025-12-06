@@ -64,8 +64,12 @@ export function LiveTV() {
             setVisibleCount(calculatedItems);
         };
 
-        // Initial calculation
-        calculateItemsPerPage();
+        // Initial calculation with RAF to ensure layout is ready
+        requestAnimationFrame(() => {
+            calculateItemsPerPage();
+            // Recalculate after a brief delay in case window is still initializing
+            setTimeout(calculateItemsPerPage, 100);
+        });
 
         // Use ResizeObserver for better container resize detection (works with maximize)
         const resizeObserver = new ResizeObserver(() => {
