@@ -143,8 +143,8 @@ export function Home() {
 
         fetchData();
 
-        // Update time every second
-        const interval = setInterval(() => setCurrentTime(new Date()), 1000);
+        // Update time every minute (not every second to prevent re-renders)
+        const interval = setInterval(() => setCurrentTime(new Date()), 60000);
         return () => clearInterval(interval);
     }, []);
 
