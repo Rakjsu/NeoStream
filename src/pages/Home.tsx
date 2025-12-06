@@ -307,9 +307,6 @@ export function Home() {
         onRemove?: () => void;
     }) => {
         const [showPreview, setShowPreview] = useState(false);
-        const [imageLoaded, setImageLoaded] = useState(false);
-        const [imageError, setImageError] = useState(false);
-        const imgRef = useRef<HTMLImageElement>(null);
 
         const isContinue = type === 'continue';
         const continueItem = item as ContinueWatchingItem;
@@ -340,26 +337,7 @@ export function Home() {
             ? continueItem.movieProgress?.progress
             : undefined;
 
-        // Lazy loading with IntersectionObserver
-        useEffect(() => {
-            const img = imgRef.current;
-            if (!img || !cover) return;
-
-            const observer = new IntersectionObserver(
-                (entries) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            img.src = cover;
-                            observer.disconnect();
-                        }
-                    });
-                },
-                { rootMargin: '100px' }
-            );
-
-            observer.observe(img);
-            return () => observer.disconnect();
-        }, [cover]);
+        // Simplified - no lazy loading to prevent re-mount issues
 
         return (
             <div
@@ -432,35 +410,22 @@ export function Home() {
                         aspectRatio: '2/3',
                         borderRadius: '12px 12px 0 0',
                         position: 'relative',
-                        background: imageLoaded ? 'transparent' : 'linear-gradient(135deg, rgba(30,30,50,1) 0%, rgba(50,50,80,1) 100%)',
+                        background: 'linear-gradient(135deg, rgba(30,30,50,1) 0%, rgba(50,50,80,1) 100%)',
                         overflow: 'hidden'
                     }}>
-                        {/* Lazy loaded image */}
+                        {/* Image with native lazy loading */}
                         <img
-                            ref={imgRef}
+                            src={cover}
                             alt={name}
+                            loading="lazy"
                             style={{
                                 position: 'absolute',
                                 inset: 0,
                                 width: '100%',
                                 height: '100%',
-                                objectFit: 'cover',
-                                opacity: imageLoaded ? 1 : 0,
-                                transition: 'opacity 0.3s'
+                                objectFit: 'cover'
                             }}
-                            onLoad={() => setImageLoaded(true)}
-                            onError={() => setImageError(true)}
                         />
-
-                        {/* Loading shimmer */}
-                        {!imageLoaded && !imageError && (
-                            <div style={{
-                                position: 'absolute',
-                                inset: 0,
-                                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%)',
-                                animation: 'shimmer 1.5s infinite'
-                            }} />
-                        )}
 
                         {/* Hover Preview Overlay */}
                         <div style={{
