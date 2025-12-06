@@ -37,6 +37,17 @@ interface ContinueWatchingItem {
     hasNewEpisode?: boolean;
 }
 
+// Simple in-memory cache for data
+const dataCache = {
+    series: null as SeriesData[] | null,
+    movies: null as MovieData[] | null,
+    counts: null as ContentCounts | null,
+    timestamp: 0,
+    TTL: 5 * 60 * 1000 // 5 minutes
+};
+
+const isCacheValid = () => Date.now() - dataCache.timestamp < dataCache.TTL;
+
 export function Home() {
     const [counts, setCounts] = useState<ContentCounts>({ live: 0, vod: 0, series: 0 });
     const [loading, setLoading] = useState(true);
@@ -52,20 +63,50 @@ export function Home() {
     useEffect(() => {
         const fetchData = async () => {
             try {
+                // Check cache first
+                if (isCacheValid() && dataCache.series && dataCache.movies && dataCache.counts) {
+                    setCounts(dataCache.counts);
+                    setAllSeries(dataCache.series);
+                    setAllMovies(dataCache.movies);
+
+                    // Sort cached series
+                    const sortedSeries = [...dataCache.series].sort((a, b) => {
+                        const aDate = a.added || a.series_id;
+                        const bDate = b.added || b.series_id;
+                        return bDate - aDate;
+                    });
+                    setRecentSeries(sortedSeries.slice(0, 30));
+
+                    // Sort cached movies
+                    const sortedMovies = [...dataCache.movies].sort((a, b) => {
+                        const aDate = a.added || a.stream_id;
+                        const bDate = b.added || b.stream_id;
+                        return bDate - aDate;
+                    });
+                    setRecentMovies(sortedMovies.slice(0, 30));
+
+                    setLoading(false);
+                    setTimeout(() => setIsVisible(true), 100);
+                    return;
+                }
+
                 // Fetch counts
                 const countResult = await window.ipcRenderer.invoke('content:get-counts');
                 if (countResult.success && countResult.counts) {
-                    setCounts({
+                    const countsData = {
                         live: countResult.counts.live || 0,
                         vod: countResult.counts.vod || 0,
                         series: countResult.counts.series || 0
-                    });
+                    };
+                    setCounts(countsData);
+                    dataCache.counts = countsData;
                 }
 
                 // Fetch series data
                 const seriesResult = await window.ipcRenderer.invoke('streams:get-series');
                 if (seriesResult.success && seriesResult.data) {
                     setAllSeries(seriesResult.data);
+                    dataCache.series = seriesResult.data;
                     // Sort by added date (or stream_id as fallback - higher = newer)
                     const sortedSeries = [...seriesResult.data].sort((a: SeriesData, b: SeriesData) => {
                         const aDate = a.added || a.series_id;
@@ -79,6 +120,7 @@ export function Home() {
                 const moviesResult = await window.ipcRenderer.invoke('streams:get-vod');
                 if (moviesResult.success && moviesResult.data) {
                     setAllMovies(moviesResult.data);
+                    dataCache.movies = moviesResult.data;
                     // Sort by added date (or stream_id as fallback - higher = newer)
                     const sortedMovies = [...moviesResult.data].sort((a: MovieData, b: MovieData) => {
                         const aDate = a.added || a.stream_id;
@@ -87,6 +129,9 @@ export function Home() {
                     });
                     setRecentMovies(sortedMovies.slice(0, 30));
                 }
+
+                // Update cache timestamp
+                dataCache.timestamp = Date.now();
             } catch (error) {
                 console.error('Failed to fetch data:', error);
             } finally {
@@ -230,14 +275,29 @@ export function Home() {
         return `${hours}h ${mins}min restantes`;
     };
 
-    // Content card component with hover preview
-    const ContentCard = ({ item, type, showProgress = false, rating }: {
+    // Remove from continue watching
+    const removeFromContinue = (itemId: string, itemType: 'series' | 'movie') => {
+        if (itemType === 'series') {
+            watchProgressService.clearSeriesProgress(itemId);
+        } else {
+            movieProgressService.clearMovieProgress(itemId);
+        }
+        setContinueWatching(prev => prev.filter(item => item.id !== itemId));
+    };
+
+    // Content card component with hover preview, lazy loading, remove button
+    const ContentCard = ({ item, type, showProgress = false, rating, onRemove }: {
         item: ContinueWatchingItem | SeriesData | MovieData;
         type: 'continue' | 'series' | 'movie';
         showProgress?: boolean;
         rating?: string;
+        onRemove?: () => void;
     }) => {
         const [showPreview, setShowPreview] = useState(false);
+        const [imageLoaded, setImageLoaded] = useState(false);
+        const [imageError, setImageError] = useState(false);
+        const imgRef = useRef<HTMLImageElement>(null);
+
         const isContinue = type === 'continue';
         const continueItem = item as ContinueWatchingItem;
         const seriesItem = item as SeriesData;
@@ -248,18 +308,48 @@ export function Home() {
                 (movieItem.cover || movieItem.stream_icon);
         const name = isContinue ? continueItem.name :
             type === 'series' ? seriesItem.name : movieItem.name;
-        const href = isContinue ?
-            (continueItem.type === 'series' ? '#/dashboard/series' : '#/dashboard/vod') :
-            (type === 'series' ? '#/dashboard/series' : '#/dashboard/vod');
+
+        // Direct navigation - go to specific content
+        const getDirectLink = () => {
+            if (isContinue) {
+                return continueItem.type === 'series'
+                    ? `#/dashboard/series?id=${continueItem.id}`
+                    : `#/dashboard/vod?id=${continueItem.id}`;
+            }
+            return type === 'series'
+                ? `#/dashboard/series?id=${seriesItem.series_id}`
+                : `#/dashboard/vod?id=${movieItem.stream_id}`;
+        };
+
         const itemRating = rating || (type === 'series' ? seriesItem.rating : movieItem.rating);
 
         const progress = isContinue && continueItem.type === 'movie'
             ? continueItem.movieProgress?.progress
             : undefined;
 
+        // Lazy loading with IntersectionObserver
+        useEffect(() => {
+            const img = imgRef.current;
+            if (!img || !cover) return;
+
+            const observer = new IntersectionObserver(
+                (entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            img.src = cover;
+                            observer.disconnect();
+                        }
+                    });
+                },
+                { rootMargin: '100px' }
+            );
+
+            observer.observe(img);
+            return () => observer.disconnect();
+        }, [cover]);
+
         return (
-            <a
-                href={href}
+            <div
                 style={{
                     position: 'relative',
                     minWidth: 160,
@@ -268,175 +358,248 @@ export function Home() {
                     overflow: 'visible',
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
-                    textDecoration: 'none',
                     transition: 'all 0.3s ease',
-                    display: 'block',
                     flexShrink: 0
                 }}
                 onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.08)';
-                    e.currentTarget.style.boxShadow = '0 15px 40px rgba(0, 0, 0, 0.5)';
-                    e.currentTarget.style.zIndex = '100';
+                    (e.currentTarget as HTMLElement).style.transform = 'scale(1.08)';
+                    (e.currentTarget as HTMLElement).style.boxShadow = '0 15px 40px rgba(0, 0, 0, 0.5)';
+                    (e.currentTarget as HTMLElement).style.zIndex = '100';
                     setShowPreview(true);
                 }}
                 onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.boxShadow = 'none';
-                    e.currentTarget.style.zIndex = '1';
+                    (e.currentTarget as HTMLElement).style.transform = 'scale(1)';
+                    (e.currentTarget as HTMLElement).style.boxShadow = 'none';
+                    (e.currentTarget as HTMLElement).style.zIndex = '1';
                     setShowPreview(false);
                 }}
             >
-                <div style={{
-                    aspectRatio: '2/3',
-                    background: `url(${cover}) center/cover`,
-                    borderRadius: '12px 12px 0 0',
-                    position: 'relative'
-                }}>
-                    {/* Hover Preview Overlay */}
-                    <div style={{
-                        position: 'absolute',
-                        inset: 0,
-                        background: 'linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.95) 100%)',
-                        opacity: showPreview ? 1 : 0,
-                        transition: 'opacity 0.3s',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'flex-end',
-                        padding: 12,
-                        borderRadius: '12px 12px 0 0'
-                    }}>
-                        {/* Play button */}
-                        <div style={{
+                {/* Remove button for continue watching */}
+                {isContinue && showPreview && (
+                    <button
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onRemove?.();
+                        }}
+                        style={{
                             position: 'absolute',
-                            top: '50%',
-                            left: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            width: 48,
-                            height: 48,
+                            top: -8,
+                            right: -8,
+                            width: 24,
+                            height: 24,
                             borderRadius: '50%',
-                            background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                            background: 'rgba(239, 68, 68, 0.9)',
+                            border: 'none',
+                            color: 'white',
+                            fontSize: 14,
+                            cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: 18,
-                            color: 'white',
-                            boxShadow: '0 4px 20px rgba(168, 85, 247, 0.5)'
-                        }}>▶</div>
+                            zIndex: 150,
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.2)'}
+                        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                        title="Remover de Continue Assistindo"
+                    >
+                        ✕
+                    </button>
+                )}
 
-                        {/* Rating badge */}
-                        {itemRating && (
+                <a
+                    href={getDirectLink()}
+                    style={{
+                        textDecoration: 'none',
+                        display: 'block'
+                    }}
+                >
+                    <div style={{
+                        aspectRatio: '2/3',
+                        borderRadius: '12px 12px 0 0',
+                        position: 'relative',
+                        background: imageLoaded ? 'transparent' : 'linear-gradient(135deg, rgba(30,30,50,1) 0%, rgba(50,50,80,1) 100%)',
+                        overflow: 'hidden'
+                    }}>
+                        {/* Lazy loaded image */}
+                        <img
+                            ref={imgRef}
+                            alt={name}
+                            style={{
+                                position: 'absolute',
+                                inset: 0,
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover',
+                                opacity: imageLoaded ? 1 : 0,
+                                transition: 'opacity 0.3s'
+                            }}
+                            onLoad={() => setImageLoaded(true)}
+                            onError={() => setImageError(true)}
+                        />
+
+                        {/* Loading shimmer */}
+                        {!imageLoaded && !imageError && (
                             <div style={{
+                                position: 'absolute',
+                                inset: 0,
+                                background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%)',
+                                animation: 'shimmer 1.5s infinite'
+                            }} />
+                        )}
+
+                        {/* Hover Preview Overlay */}
+                        <div style={{
+                            position: 'absolute',
+                            inset: 0,
+                            background: 'linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.95) 100%)',
+                            opacity: showPreview ? 1 : 0,
+                            transition: 'opacity 0.3s',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'flex-end',
+                            padding: 12,
+                            borderRadius: '12px 12px 0 0'
+                        }}>
+                            {/* Play button */}
+                            <div style={{
+                                position: 'absolute',
+                                top: '40%',
+                                left: '50%',
+                                transform: 'translate(-50%, -50%)',
+                                width: 48,
+                                height: 48,
+                                borderRadius: '50%',
+                                background: 'linear-gradient(135deg, #a855f7, #ec4899)',
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: 4,
-                                marginBottom: 6
-                            }}>
-                                <span style={{ fontSize: 12 }}>⭐</span>
-                                <span style={{
-                                    fontSize: 12,
+                                justifyContent: 'center',
+                                fontSize: 18,
+                                color: 'white',
+                                boxShadow: '0 4px 20px rgba(168, 85, 247, 0.5)'
+                            }}>▶</div>
+
+                            {/* Rating badge */}
+                            {itemRating && (
+                                <div style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    marginBottom: 6
+                                }}>
+                                    <span style={{ fontSize: 12 }}>⭐</span>
+                                    <span style={{
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        color: '#fbbf24'
+                                    }}>{itemRating}</span>
+                                </div>
+                            )}
+
+                            {/* Type and time info */}
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                                <div style={{
+                                    display: 'inline-flex',
+                                    padding: '3px 8px',
+                                    background: type === 'series' || (isContinue && continueItem.type === 'series')
+                                        ? 'rgba(139, 92, 246, 0.8)'
+                                        : 'rgba(59, 130, 246, 0.8)',
+                                    borderRadius: 4,
+                                    fontSize: 10,
                                     fontWeight: 600,
-                                    color: '#fbbf24'
-                                }}>{itemRating}</span>
+                                    color: 'white'
+                                }}>
+                                    {type === 'series' || (isContinue && continueItem.type === 'series') ? 'SÉRIE' : 'FILME'}
+                                </div>
+                                {isContinue && continueItem.movieProgress && (
+                                    <div style={{
+                                        display: 'inline-flex',
+                                        padding: '3px 8px',
+                                        background: 'rgba(16, 185, 129, 0.8)',
+                                        borderRadius: 4,
+                                        fontSize: 10,
+                                        fontWeight: 600,
+                                        color: 'white'
+                                    }}>
+                                        {formatProgress(continueItem.movieProgress.currentTime, continueItem.movieProgress.duration)}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Progress bar for continue watching */}
+                        {showProgress && progress !== undefined && (
+                            <div style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                height: 4,
+                                background: 'rgba(0, 0, 0, 0.6)'
+                            }}>
+                                <div style={{
+                                    height: '100%',
+                                    width: `${progress}%`,
+                                    background: 'linear-gradient(90deg, #a855f7, #ec4899)',
+                                    borderRadius: 2
+                                }} />
                             </div>
                         )}
 
-                        {/* Type badge */}
-                        <div style={{
-                            display: 'inline-flex',
-                            padding: '3px 8px',
-                            background: type === 'series' || (isContinue && continueItem.type === 'series')
-                                ? 'rgba(139, 92, 246, 0.8)'
-                                : 'rgba(59, 130, 246, 0.8)',
-                            borderRadius: 4,
-                            fontSize: 10,
-                            fontWeight: 600,
-                            color: 'white',
-                            width: 'fit-content'
-                        }}>
-                            {type === 'series' || (isContinue && continueItem.type === 'series') ? 'SÉRIE' : 'FILME'}
-                        </div>
-                    </div>
-
-                    {/* Progress bar for continue watching */}
-                    {showProgress && progress !== undefined && (
-                        <div style={{
-                            position: 'absolute',
-                            bottom: 0,
-                            left: 0,
-                            right: 0,
-                            height: 4,
-                            background: 'rgba(0, 0, 0, 0.6)'
-                        }}>
+                        {/* Series episode info */}
+                        {isContinue && continueItem.type === 'series' && continueItem.progress && (
                             <div style={{
-                                height: '100%',
-                                width: `${progress}%`,
-                                background: 'linear-gradient(90deg, #a855f7, #ec4899)',
-                                borderRadius: 2
-                            }} />
-                        </div>
-                    )}
+                                position: 'absolute',
+                                bottom: 8,
+                                left: 8,
+                                right: 8,
+                                background: 'rgba(0, 0, 0, 0.85)',
+                                borderRadius: 6,
+                                padding: '5px 8px',
+                                fontSize: 10,
+                                fontWeight: 600,
+                                color: 'white'
+                            }}>
+                                S{continueItem.progress.lastWatchedSeason} E{continueItem.progress.lastWatchedEpisode}
+                            </div>
+                        )}
 
-                    {/* Series episode info */}
-                    {isContinue && continueItem.type === 'series' && continueItem.progress && (
-                        <div style={{
-                            position: 'absolute',
-                            bottom: 8,
-                            left: 8,
-                            right: 8,
-                            background: 'rgba(0, 0, 0, 0.85)',
-                            borderRadius: 6,
-                            padding: '5px 8px',
-                            fontSize: 10,
-                            fontWeight: 600,
-                            color: 'white'
-                        }}>
-                            S{continueItem.progress.lastWatchedSeason} E{continueItem.progress.lastWatchedEpisode}
-                        </div>
-                    )}
-
-                    {/* New Episode badge */}
-                    {isContinue && continueItem.hasNewEpisode && (
-                        <div style={{
-                            position: 'absolute',
-                            top: 8,
-                            right: 8,
-                            background: 'linear-gradient(135deg, #10b981, #059669)',
-                            borderRadius: 4,
-                            padding: '4px 8px',
-                            fontSize: 9,
-                            fontWeight: 700,
-                            color: 'white',
-                            textTransform: 'uppercase',
-                            animation: 'pulse 2s infinite'
-                        }}>
-                            Novo Ep!
-                        </div>
-                    )}
-                </div>
-                <div style={{
-                    padding: '10px 12px',
-                    background: 'linear-gradient(180deg, rgba(15, 15, 35, 0.9) 0%, rgba(15, 15, 35, 1) 100%)',
-                    borderRadius: '0 0 12px 12px'
-                }}>
+                        {/* New Episode badge */}
+                        {isContinue && continueItem.hasNewEpisode && (
+                            <div style={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                background: 'linear-gradient(135deg, #10b981, #059669)',
+                                borderRadius: 4,
+                                padding: '4px 8px',
+                                fontSize: 9,
+                                fontWeight: 700,
+                                color: 'white',
+                                textTransform: 'uppercase',
+                                animation: 'pulse 2s infinite'
+                            }}>
+                                Novo Ep!
+                            </div>
+                        )}
+                    </div>
                     <div style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: 'white',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                    }}>{name}</div>
-                    {showProgress && continueItem.movieProgress && (
+                        padding: '10px 12px',
+                        background: 'linear-gradient(180deg, rgba(15, 15, 35, 0.9) 0%, rgba(15, 15, 35, 1) 100%)',
+                        borderRadius: '0 0 12px 12px'
+                    }}>
                         <div style={{
-                            fontSize: 10,
-                            color: 'rgba(255, 255, 255, 0.6)',
-                            marginTop: 4
-                        }}>
-                            {formatProgress(continueItem.movieProgress.currentTime, continueItem.movieProgress.duration)}
-                        </div>
-                    )}
-                </div>
-            </a>
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: 'white',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                        }}>{name}</div>
+                    </div>
+                </a>
+            </div>
         );
     };
 
@@ -606,18 +769,23 @@ export function Home() {
                 >
                     {items.slice(0, 30).map((item) => {
                         const isSeries = 'series_id' in item;
-                        const itemId = isSeries ? (item as SeriesData).series_id : (item as MovieData).stream_id;
+                        const isContinueItem = type === 'continue';
+                        const continueItem = item as ContinueWatchingItem;
+                        const itemId = isContinueItem
+                            ? continueItem.id
+                            : (isSeries ? (item as SeriesData).series_id : (item as MovieData).stream_id);
                         const cardType = type === 'recommendations'
                             ? (isSeries ? 'series' : 'movie')
                             : type === 'continue' ? type : type;
 
                         return (
                             <ContentCard
-                                key={type === 'continue' ? (item as ContinueWatchingItem).id : itemId}
+                                key={itemId}
                                 item={item}
                                 type={cardType as 'continue' | 'series' | 'movie'}
                                 showProgress={showProgress}
                                 rating={isSeries ? (item as SeriesData).rating : (item as MovieData).rating}
+                                onRemove={isContinueItem ? () => removeFromContinue(continueItem.id, continueItem.type) : undefined}
                             />
                         );
                     })}
@@ -655,9 +823,14 @@ export function Home() {
                     0%, 100% { opacity: 1; }
                     50% { opacity: 0.7; }
                 }
+                @keyframes shimmer {
+                    0% { transform: translateX(-100%); }
+                    100% { transform: translateX(100%); }
+                }
                 #carousel-continue::-webkit-scrollbar,
                 #carousel-series::-webkit-scrollbar,
-                #carousel-movie::-webkit-scrollbar {
+                #carousel-movie::-webkit-scrollbar,
+                #carousel-recommendations::-webkit-scrollbar {
                     display: none;
                 }
             `}</style>
