@@ -130,7 +130,7 @@ export function Series() {
         }
 
         const categories = Array.isArray(s.category_id) ? s.category_id : [s.category_id];
-        const matchesCategory = !selectedCategory || selectedCategory === '' || categories.includes(selectedCategory);
+        const matchesCategory = !selectedCategory || selectedCategory === '' || selectedCategory === 'all' || categories.includes(selectedCategory);
         return matchesSearch && matchesCategory;
     });
 
@@ -886,9 +886,37 @@ const seriesStyles = `
 }
 
 .rating-badge {
-    background: rgba(251, 191, 36, 0.2);
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.25) 0%, rgba(245, 158, 11, 0.2) 100%);
     color: #fbbf24;
-    border: 1px solid rgba(251, 191, 36, 0.3);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    animation: ratingGlow 2s ease-in-out infinite, fadeInUp 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.rating-badge::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: ratingShine 3s ease-in-out infinite;
+}
+
+@keyframes ratingGlow {
+    0%, 100% { 
+        box-shadow: 0 0 8px rgba(251, 191, 36, 0.3);
+    }
+    50% { 
+        box-shadow: 0 0 20px rgba(251, 191, 36, 0.6), 0 0 30px rgba(251, 191, 36, 0.3);
+    }
+}
+
+@keyframes ratingShine {
+    0% { left: -100%; }
+    50%, 100% { left: 150%; }
 }
 
 .seasons-badge {
