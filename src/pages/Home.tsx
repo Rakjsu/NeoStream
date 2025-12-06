@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { FixedSizeList } from 'react-window';
 import { watchProgressService, type SeriesProgress } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
 
@@ -614,31 +613,17 @@ export function Home() {
     }) => {
         const [scrollPosition, setScrollPosition] = useState(0);
         const containerRef = useRef<HTMLDivElement>(null);
-        const [isDragging] = useState(false);
-        const [containerWidth, setContainerWidth] = useState(1200);
-
-        // Update container width on mount and resize
-        useEffect(() => {
-            const updateWidth = () => {
-                if (containerRef.current) {
-                    setContainerWidth(containerRef.current.offsetWidth);
-                }
-            };
-            updateWidth();
-            window.addEventListener('resize', updateWidth);
-            return () => window.removeEventListener('resize', updateWidth);
-        }, []);
 
         if (items.length === 0) return null;
 
         const scroll = (direction: 'left' | 'right') => {
-            const listElement = containerRef.current?.querySelector('[role="listbox"], [class*="List"]') as HTMLElement;
-            if (!listElement) return;
+            const container = containerRef.current;
+            if (!container) return;
             const scrollAmount = 340; // ~2 cards
             const newPosition = direction === 'left'
-                ? Math.max(0, listElement.scrollLeft - scrollAmount)
-                : listElement.scrollLeft + scrollAmount;
-            listElement.scrollTo({ left: newPosition, behavior: 'smooth' });
+                ? Math.max(0, container.scrollLeft - scrollAmount)
+                : container.scrollLeft + scrollAmount;
+            container.scrollTo({ left: newPosition, behavior: 'smooth' });
         };
 
         return (
@@ -721,50 +706,44 @@ export function Home() {
                     </div>
                 </div>
 
-                {/* Virtualized Carousel container */}
+                {/* Carousel container */}
                 <div
                     ref={containerRef}
                     style={{
-                        position: 'relative',
-                        height: 290,
-                        overflow: 'hidden'
+                        display: 'flex',
+                        gap: 16,
+                        overflowX: 'auto',
+                        overflowY: 'visible',
+                        paddingBottom: 16,
+                        paddingTop: 8,
+                        scrollBehavior: 'smooth',
+                        scrollbarWidth: 'none',
+                        msOverflowStyle: 'none'
                     }}
+                    onScroll={(e) => setScrollPosition(e.currentTarget.scrollLeft)}
                 >
-                    <FixedSizeList
-                        height={290}
-                        width={containerWidth}
-                        itemCount={Math.min(items.length, 30)}
-                        itemSize={176} // 160px card + 16px gap
-                        layout="horizontal"
-                        style={{
-                            overflow: 'auto',
-                            scrollBehavior: isDragging ? 'auto' : 'smooth'
-                        }}
-                        onScroll={({ scrollOffset }: { scrollOffset: number }) => setScrollPosition(scrollOffset)}
-                        overscanCount={3}
-                    >
-                        {({ index, style }: { index: number; style: React.CSSProperties }) => {
-                            const item = items[index];
-                            const isSeries = 'series_id' in item;
-                            const isContinueItem = type === 'continue';
-                            const continueItem = item as ContinueWatchingItem;
-                            const cardType = type === 'recommendations'
-                                ? (isSeries ? 'series' : 'movie')
-                                : type === 'continue' ? type : type;
+                    {items.slice(0, 30).map((item, index) => {
+                        const isSeries = 'series_id' in item;
+                        const isContinueItem = type === 'continue';
+                        const continueItem = item as ContinueWatchingItem;
+                        const itemId = isContinueItem
+                            ? continueItem.id
+                            : (isSeries ? (item as SeriesData).series_id : (item as MovieData).stream_id);
+                        const cardType = type === 'recommendations'
+                            ? (isSeries ? 'series' : 'movie')
+                            : type === 'continue' ? type : type;
 
-                            return (
-                                <div style={{ ...style, paddingRight: 16 }}>
-                                    <ContentCard
-                                        item={item}
-                                        type={cardType as 'continue' | 'series' | 'movie'}
-                                        showProgress={showProgress}
-                                        rating={isSeries ? (item as SeriesData).rating : (item as MovieData).rating}
-                                        onRemove={isContinueItem ? () => removeFromContinue(continueItem.id, continueItem.type) : undefined}
-                                    />
-                                </div>
-                            );
-                        }}
-                    </FixedSizeList>
+                        return (
+                            <ContentCard
+                                key={`${type}-${itemId}-${index}`}
+                                item={item}
+                                type={cardType as 'continue' | 'series' | 'movie'}
+                                showProgress={showProgress}
+                                rating={isSeries ? (item as SeriesData).rating : (item as MovieData).rating}
+                                onRemove={isContinueItem ? () => removeFromContinue(continueItem.id, continueItem.type) : undefined}
+                            />
+                        );
+                    })}
                 </div>
 
                 {/* Gradient fade edges */}
