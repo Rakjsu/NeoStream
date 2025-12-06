@@ -53,6 +53,10 @@ export function Series() {
     const [itemsPerPage, setItemsPerPage] = useState(36);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const gridRef = useRef<HTMLDivElement>(null);
+    const seasonTabsRef = useRef<HTMLDivElement>(null);
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStartX, setDragStartX] = useState(0);
+    const [scrollStartX, setScrollStartX] = useState(0);
 
     // Resume modal state
     const [showResumeModal, setShowResumeModal] = useState(false);
@@ -404,28 +408,71 @@ export function Series() {
                                     <p className="series-overview">{tmdbData.overview}</p>
                                 ) : null}
 
-                                {/* Season Tabs */}
-                                <div className="season-tabs-container">
-                                    <div className="season-tabs">
-                                        {seriesInfo?.episodes ? Object.keys(seriesInfo.episodes).sort((a, b) => Number(a) - Number(b)).map((season: string) => (
-                                            <button
-                                                key={season}
-                                                className={`season-tab ${selectedSeason === Number(season) ? 'active' : ''}`}
-                                                onClick={() => {
-                                                    setSelectedSeason(Number(season));
-                                                    setSelectedEpisode(1);
-                                                }}
-                                            >
-                                                <span className="season-tab-number">T{season}</span>
-                                                <span className="season-tab-label">Temporada {season}</span>
-                                            </button>
-                                        )) : (
-                                            <button className="season-tab active">
-                                                <span className="season-tab-number">T1</span>
-                                                <span className="season-tab-label">Temporada 1</span>
-                                            </button>
-                                        )}
+                                {/* Season Tabs Carousel */}
+                                <div className="season-carousel-wrapper">
+                                    <button
+                                        className="season-nav-btn season-nav-left"
+                                        onClick={() => {
+                                            if (seasonTabsRef.current) {
+                                                seasonTabsRef.current.scrollBy({ left: -200, behavior: 'smooth' });
+                                            }
+                                        }}
+                                    >
+                                        ‹
+                                    </button>
+                                    <div
+                                        className={`season-tabs-container ${isDragging ? 'dragging' : ''}`}
+                                        ref={seasonTabsRef}
+                                        onMouseDown={(e) => {
+                                            setIsDragging(true);
+                                            setDragStartX(e.pageX);
+                                            setScrollStartX(seasonTabsRef.current?.scrollLeft || 0);
+                                        }}
+                                        onMouseMove={(e) => {
+                                            if (!isDragging) return;
+                                            e.preventDefault();
+                                            const delta = e.pageX - dragStartX;
+                                            if (seasonTabsRef.current) {
+                                                seasonTabsRef.current.scrollLeft = scrollStartX - delta;
+                                            }
+                                        }}
+                                        onMouseUp={() => setIsDragging(false)}
+                                        onMouseLeave={() => setIsDragging(false)}
+                                    >
+                                        <div className="season-tabs">
+                                            {seriesInfo?.episodes ? Object.keys(seriesInfo.episodes).sort((a, b) => Number(a) - Number(b)).map((season: string, index: number) => (
+                                                <button
+                                                    key={season}
+                                                    className={`season-tab ${selectedSeason === Number(season) ? 'active' : ''}`}
+                                                    onClick={() => {
+                                                        if (!isDragging) {
+                                                            setSelectedSeason(Number(season));
+                                                            setSelectedEpisode(1);
+                                                        }
+                                                    }}
+                                                    style={{ animationDelay: `${index * 0.05}s` }}
+                                                >
+                                                    <span className="season-tab-number">T{season}</span>
+                                                    <span className="season-tab-label">Temporada {season}</span>
+                                                </button>
+                                            )) : (
+                                                <button className="season-tab active">
+                                                    <span className="season-tab-number">T1</span>
+                                                    <span className="season-tab-label">Temporada 1</span>
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
+                                    <button
+                                        className="season-nav-btn season-nav-right"
+                                        onClick={() => {
+                                            if (seasonTabsRef.current) {
+                                                seasonTabsRef.current.scrollBy({ left: 200, behavior: 'smooth' });
+                                            }
+                                        }}
+                                    >
+                                        ›
+                                    </button>
                                 </div>
 
                                 {/* Episode List */}
@@ -903,12 +950,57 @@ const seriesStyles = `
     margin-bottom: 12px;
 }
 
+/* Season Carousel */
+.season-carousel-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    position: relative;
+}
+
+.season-nav-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.season-nav-btn:hover {
+    background: rgba(168, 85, 247, 0.3);
+    border-color: rgba(168, 85, 247, 0.5);
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.season-nav-btn:active {
+    transform: scale(0.95);
+}
+
 /* Season Tabs */
 .season-tabs-container {
-    margin-bottom: 16px;
+    flex: 1;
     overflow-x: auto;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    cursor: grab;
+    user-select: none;
+    scroll-behavior: smooth;
+}
+
+.season-tabs-container.dragging {
+    cursor: grabbing;
+    scroll-behavior: auto;
 }
 
 .season-tabs-container::-webkit-scrollbar {
@@ -917,8 +1009,20 @@ const seriesStyles = `
 
 .season-tabs {
     display: flex;
-    gap: 8px;
-    padding: 4px;
+    gap: 10px;
+    padding: 4px 8px;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
 
 .season-tab {
