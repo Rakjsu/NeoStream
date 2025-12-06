@@ -45,10 +45,10 @@ export function LiveTV() {
 
     // Calculate items per page based on container dimensions
     useEffect(() => {
-        const calculateItemsPerPage = () => {
-            const container = scrollContainerRef.current;
-            if (!container) return;
+        const container = scrollContainerRef.current;
+        if (!container) return;
 
+        const calculateItemsPerPage = () => {
             const containerWidth = container.clientWidth - 40; // Account for padding
             const containerHeight = container.clientHeight;
 
@@ -64,19 +64,21 @@ export function LiveTV() {
             setVisibleCount(prev => Math.max(prev, calculatedItems));
         };
 
+        // Initial calculation
         calculateItemsPerPage();
 
-        // Recalculate on window resize with debounce
-        let resizeTimeout: ReturnType<typeof setTimeout>;
-        const handleResize = () => {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(calculateItemsPerPage, 100);
-        };
+        // Use ResizeObserver for better container resize detection (works with maximize)
+        const resizeObserver = new ResizeObserver(() => {
+            calculateItemsPerPage();
+        });
+        resizeObserver.observe(container);
 
-        window.addEventListener('resize', handleResize);
+        // Also listen to window resize as backup
+        window.addEventListener('resize', calculateItemsPerPage);
+
         return () => {
-            window.removeEventListener('resize', handleResize);
-            clearTimeout(resizeTimeout);
+            resizeObserver.disconnect();
+            window.removeEventListener('resize', calculateItemsPerPage);
         };
     }, []);
 

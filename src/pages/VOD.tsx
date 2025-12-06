@@ -56,10 +56,10 @@ export function VOD() {
 
     // Dynamic grid calculation
     useEffect(() => {
-        const calculateGrid = () => {
-            const container = scrollContainerRef.current;
-            if (!container) return;
+        const container = scrollContainerRef.current;
+        if (!container) return;
 
+        const calculateGrid = () => {
             const containerWidth = container.clientWidth - 64; // account for padding
             const containerHeight = container.clientHeight;
 
@@ -73,19 +73,21 @@ export function VOD() {
             setVisibleCount(prev => Math.max(prev, items));
         };
 
+        // Initial calculation
         calculateGrid();
 
-        // Recalculate on window resize with debounce
-        let resizeTimeout: ReturnType<typeof setTimeout>;
-        const handleResize = () => {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(calculateGrid, 100);
-        };
+        // Use ResizeObserver for better container resize detection (works with maximize)
+        const resizeObserver = new ResizeObserver(() => {
+            calculateGrid();
+        });
+        resizeObserver.observe(container);
 
-        window.addEventListener('resize', handleResize);
+        // Also listen to window resize as backup
+        window.addEventListener('resize', calculateGrid);
+
         return () => {
-            window.removeEventListener('resize', handleResize);
-            clearTimeout(resizeTimeout);
+            resizeObserver.disconnect();
+            window.removeEventListener('resize', calculateGrid);
         };
     }, []);
 
