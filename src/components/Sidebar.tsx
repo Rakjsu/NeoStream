@@ -173,42 +173,6 @@ export function Sidebar() {
                         </button>
                     )}
 
-                    {/* Profile Popup */}
-                    {showProfilePopup && (
-                        <div className="profile-popup">
-                            <div className="profile-popup-header">
-                                <Users size={18} />
-                                <span>Trocar Perfil</span>
-                            </div>
-                            <div className="profile-popup-list">
-                                {profiles.map((profile) => (
-                                    <button
-                                        key={profile.id}
-                                        className={`profile-popup-item ${activeProfile?.id === profile.id ? 'active' : ''}`}
-                                        onClick={() => handleSwitchProfile(profile)}
-                                    >
-                                        <div className="profile-popup-avatar">
-                                            {profile.avatar || '👤'}
-                                        </div>
-                                        <span className="profile-popup-name">{profile.name}</span>
-                                        {activeProfile?.id === profile.id && (
-                                            <span className="profile-popup-check">✓</span>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                            <button
-                                className="profile-popup-settings"
-                                onClick={() => {
-                                    setShowProfilePopup(false);
-                                    navigate('/dashboard/settings');
-                                }}
-                            >
-                                <Settings size={16} />
-                                <span>Gerenciar Perfis</span>
-                            </button>
-                        </div>
-                    )}
 
                     {/* Logout */}
                     <button
@@ -228,6 +192,42 @@ export function Sidebar() {
                 </div>
             </div>
 
+            {/* Profile Popup - must be outside sidebar for correct z-index stacking */}
+            {showProfilePopup && (
+                <div className="profile-popup">
+                    <div className="profile-popup-header">
+                        <Users size={18} />
+                        <span>Trocar Perfil</span>
+                    </div>
+                    <div className="profile-popup-list">
+                        {profiles.map((profile) => (
+                            <button
+                                key={profile.id}
+                                className={`profile-popup-item ${activeProfile?.id === profile.id ? 'active' : ''}`}
+                                onClick={() => handleSwitchProfile(profile)}
+                            >
+                                <div className="profile-popup-avatar">
+                                    {profile.avatar || '👤'}
+                                </div>
+                                <span className="profile-popup-name">{profile.name}</span>
+                                {activeProfile?.id === profile.id && (
+                                    <span className="profile-popup-check">✓</span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                    <button
+                        className="profile-popup-settings"
+                        onClick={() => {
+                            setShowProfilePopup(false);
+                            navigate('/dashboard/settings');
+                        }}
+                    >
+                        <Settings size={16} />
+                        <span>Gerenciar Perfis</span>
+                    </button>
+                </div>
+            )}
 
             {/* Update Modal */}
             <UpdateModal

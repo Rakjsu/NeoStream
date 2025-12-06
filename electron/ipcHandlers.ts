@@ -189,5 +189,56 @@ export function setupIpcHandlers() {
         }
     })
 
+    // Get VOD stream URL
+    ipcMain.handle('streams:get-vod-url', async (_, { streamId, container }) => {
+        try {
+            const auth = store.get('auth')
+            if (!auth.url || !auth.username || !auth.password) {
+                return { success: false, error: 'Not authenticated' }
+            }
+
+            const client = new XtreamClient(auth.url, auth.username, auth.password)
+            const url = client.getVodStreamUrl(streamId, container || 'mp4')
+
+            return { success: true, url }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Get series episode stream URL
+    ipcMain.handle('streams:get-series-url', async (_, { streamId, container }) => {
+        try {
+            const auth = store.get('auth')
+            if (!auth.url || !auth.username || !auth.password) {
+                return { success: false, error: 'Not authenticated' }
+            }
+
+            const client = new XtreamClient(auth.url, auth.username, auth.password)
+            const url = client.getSeriesStreamUrl(streamId, container || 'mp4')
+
+            return { success: true, url }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Get live stream URL
+    ipcMain.handle('streams:get-live-url', async (_, { streamId }) => {
+        try {
+            const auth = store.get('auth')
+            if (!auth.url || !auth.username || !auth.password) {
+                return { success: false, error: 'Not authenticated' }
+            }
+
+            const client = new XtreamClient(auth.url, auth.username, auth.password)
+            const url = client.getLiveStreamUrl(streamId)
+
+            return { success: true, url }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    })
+
     console.log('IPC Handlers initialized')
 }

@@ -125,4 +125,19 @@ export class XtreamClient {
     async getSeriesCategories() {
         return this.makeRequest('get_series_categories')
     }
+
+    // Build VOD stream URL
+    getVodStreamUrl(streamId: number, container: string = 'mp4'): string {
+        return `${this.baseUrl}/movie/${this.username}/${this.password}/${streamId}.${container}`
+    }
+
+    // Build live stream URL
+    getLiveStreamUrl(streamId: number): string {
+        return `${this.baseUrl}/live/${this.username}/${this.password}/${streamId}.m3u8`
+    }
+
+    // Build series episode URL
+    getSeriesStreamUrl(streamId: number, container: string = 'mp4'): string {
+        return `${this.baseUrl}/series/${this.username}/${this.password}/${streamId}.${container}`
+    }
 }
