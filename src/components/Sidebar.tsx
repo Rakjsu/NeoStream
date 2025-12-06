@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark } from 'lucide-react';
+import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark, Home } from 'lucide-react';
 import { profileService } from '../services/profileService';
 import { useState } from 'react';
 import { UpdateNotificationBadge } from './UpdateNotificationBadge';
@@ -12,253 +12,158 @@ export function Sidebar() {
     const [activeProfile] = useState(() => profileService.getActiveProfile());
     const [showUpdateModal, setShowUpdateModal] = useState(false);
     const [updateInfo] = useState<UpdateInfo | null>(null);
+    const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
     const handleUpdateBadgeClick = () => {
         setShowUpdateModal(true);
     };
 
     const menuItems = [
-        { icon: Tv, label: 'TV ao Vivo', path: '/dashboard/live', color: 'from-purple-500 to-pink-500' },
-        { icon: Film, label: 'Filmes', path: '/dashboard/vod', color: 'from-blue-500 to-cyan-500' },
-        { icon: PlaySquare, label: 'Séries', path: '/dashboard/series', color: 'from-orange-500 to-red-500' },
-        { icon: Bookmark, label: 'Assistir Depois', path: '/dashboard/watch-later', color: 'from-green-500 to-emerald-500' },
-        { icon: Settings, label: 'Configurações', path: '/dashboard/settings', color: 'from-gray-500 to-slate-500' },
+        { icon: Home, label: 'Início', path: '/dashboard/home', emoji: '🏠', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)' },
+        { icon: Tv, label: 'TV ao Vivo', path: '/dashboard/live', emoji: '📺', gradient: 'linear-gradient(135deg, #a855f7, #7c3aed)' },
+        { icon: Film, label: 'Filmes', path: '/dashboard/vod', emoji: '🎬', gradient: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' },
+        { icon: PlaySquare, label: 'Séries', path: '/dashboard/series', emoji: '📺', gradient: 'linear-gradient(135deg, #ec4899, #db2777)' },
+        { icon: Bookmark, label: 'Minha Lista', path: '/dashboard/watch-later', emoji: '🔖', gradient: 'linear-gradient(135deg, #10b981, #059669)' },
+        { icon: Settings, label: 'Configurações', path: '/dashboard/settings', emoji: '⚙️', gradient: 'linear-gradient(135deg, #6b7280, #4b5563)' },
     ];
 
     const handleLogout = async () => {
-        // Clear all local storage data
         localStorage.clear();
-        // Clear profile data
         profileService.clearActiveProfile();
-        // Logout via IPC
         await window.ipcRenderer.invoke('auth:logout');
-        // Navigate to welcome
         navigate('/welcome');
     };
 
     return (
         <>
-            <div className="bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 flex flex-col h-screen shadow-2xl" style={{ minWidth: '80px', maxWidth: '80px', width: '80px' }}>
-                {/* Header/Logo */}
-                <div className="flex items-center justify-center bg-gradient-to-br from-blue-600/10 to-purple-600/10" style={{ padding: '20px 0' }}>
-                    <div className="relative">
-                        {/* Custom Logo SVG - Play with equalizer bars */}
-                        <svg width="48" height="48" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                            {/* Play triangle outline */}
-                            <path d="M 10,10 L 10,90 L 90,50 Z" fill="none" stroke="white" strokeWidth="6" strokeLinejoin="round" />
-                            {/* Equalizer bars */}
-                            <rect x="35" y="35" width="6" height="30" fill="white" rx="3" />
-                            <rect x="45" y="25" width="6" height="50" fill="white" rx="3" />
-                            <rect x="55" y="40" width="6" height="20" fill="white" rx="3" />
+            <style>{sidebarStyles}</style>
+            <div className="sidebar">
+                {/* Animated Background */}
+                <div className="sidebar-bg">
+                    <div className="bg-gradient" />
+                    <div className="bg-glow" />
+                </div>
+
+                {/* Logo */}
+                <div className="logo-container">
+                    <div className="logo-wrapper">
+                        <svg className="logo-svg" width="44" height="44" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stopColor="#a855f7" />
+                                    <stop offset="100%" stopColor="#ec4899" />
+                                </linearGradient>
+                            </defs>
+                            <path d="M 10,10 L 10,90 L 90,50 Z" fill="none" stroke="url(#logoGradient)" strokeWidth="6" strokeLinejoin="round" />
+                            <rect className="bar bar-1" x="35" y="35" width="6" height="30" fill="url(#logoGradient)" rx="3" />
+                            <rect className="bar bar-2" x="45" y="25" width="6" height="50" fill="url(#logoGradient)" rx="3" />
+                            <rect className="bar bar-3" x="55" y="40" width="6" height="20" fill="url(#logoGradient)" rx="3" />
                         </svg>
+                        <div className="logo-ring" />
                     </div>
                 </div>
 
-                {/* Home Icon */}
-                <div style={{ padding: '0 0 16px 0', display: 'flex', justifyContent: 'center', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                    <button
-                        onClick={() => navigate('/dashboard/home')}
-                        className="flex items-center justify-center transition-all duration-200 active:scale-90"
-                        style={{
-                            width: '48px',
-                            height: '48px',
-                            background: 'transparent',
-                            border: 'none',
-                            padding: 0,
-                            cursor: 'pointer'
-                        }}
-                        title="Página Inicial"
-                    >
-                        <svg
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            className="transition-all duration-200"
-                            style={{ color: '#ffffff', stroke: '#ffffff' }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.color = '#fbbf24';
-                                e.currentTarget.style.stroke = '#fbbf24';
-                                e.currentTarget.style.transform = 'scale(1.25)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.color = '#ffffff';
-                                e.currentTarget.style.stroke = '#ffffff';
-                                e.currentTarget.style.transform = 'scale(1)';
-                            }}
-                        >
-                            <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                            <polyline points="9 22 9 12 15 12 15 22" />
-                        </svg>
-                    </button>
-                </div>
-
                 {/* Navigation */}
-                <nav className="flex-1 overflow-y-auto" style={{ padding: '16px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-                    {menuItems.map((item) => {
+                <nav className="nav-container">
+                    {menuItems.map((item, index) => {
                         const isActive = location.pathname.startsWith(item.path);
+                        const isHovered = hoveredItem === item.path;
+
                         return (
                             <button
                                 key={item.path}
                                 onClick={() => navigate(item.path)}
-                                className="flex items-center justify-center transition-all duration-200 group relative active:scale-90"
-                                style={{
-                                    width: '48px',
-                                    height: '48px',
-                                    background: 'transparent',
-                                    border: 'none',
-                                    padding: 0,
-                                    cursor: 'pointer'
-                                }}
+                                onMouseEnter={() => setHoveredItem(item.path)}
+                                onMouseLeave={() => setHoveredItem(null)}
+                                className={`nav-item ${isActive ? 'active' : ''}`}
+                                style={{ animationDelay: `${index * 0.05}s` }}
+                                title={item.label}
                             >
-                                {/* Icon - White or Yellow when active */}
-                                <item.icon
-                                    className="transition-all duration-200 relative z-10"
+                                {/* Background Glow */}
+                                <div
+                                    className="item-glow"
                                     style={{
-                                        width: '24px',
-                                        height: '24px',
-                                        color: isActive ? '#fbbf24' : '#ffffff',
-                                        stroke: isActive ? '#fbbf24' : '#ffffff'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                        if (!isActive) {
-                                            e.currentTarget.style.color = '#ef4444';
-                                            e.currentTarget.style.stroke = '#ef4444';
-                                            e.currentTarget.style.transform = 'scale(1.25)';
-                                        }
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        if (!isActive) {
-                                            e.currentTarget.style.color = '#ffffff';
-                                            e.currentTarget.style.stroke = '#ffffff';
-                                            e.currentTarget.style.transform = 'scale(1)';
-                                        }
+                                        background: item.gradient,
+                                        opacity: isActive ? 0.2 : isHovered ? 0.15 : 0
                                     }}
                                 />
 
-                                {/* Active indicator */}
+                                {/* Icon */}
+                                <div className="item-icon-wrapper">
+                                    <item.icon
+                                        className="item-icon"
+                                        style={{
+                                            stroke: isActive ? '#fff' : isHovered ? '#c4b5fd' : 'rgba(255,255,255,0.7)'
+                                        }}
+                                    />
+                                </div>
+
+                                {/* Active Indicator */}
                                 {isActive && (
-                                    <div className="absolute bg-yellow-400 rounded-full animate-pulse" style={{ bottom: '4px', right: '4px', width: '6px', height: '6px' }}></div>
+                                    <div className="active-indicator">
+                                        <div className="indicator-bar" style={{ background: item.gradient }} />
+                                    </div>
                                 )}
+
+                                {/* Tooltip */}
+                                <div className={`tooltip ${isHovered ? 'visible' : ''}`}>
+                                    <span className="tooltip-emoji">{item.emoji}</span>
+                                    <span className="tooltip-label">{item.label}</span>
+                                </div>
                             </button>
                         );
                     })}
                 </nav>
 
+                {/* Bottom Section */}
+                <div className="bottom-section">
+                    {/* Update Badge */}
+                    <UpdateNotificationBadge onClick={handleUpdateBadgeClick} />
 
-                {/* Update Notification Badge */}
-                <UpdateNotificationBadge onClick={handleUpdateBadgeClick} />
-
-                {/* Profile Section */}
-                {activeProfile && (
-                    <div className="flex items-center justify-center" style={{ padding: '12px 0', marginBottom: '16px', position: 'relative' }}>
-                        <style>{`
-                            @keyframes profileRingPulse {
-                                0%, 100% { opacity: 0.6; transform: scale(1); }
-                                50% { opacity: 1; transform: scale(1.1); }
-                            }
-                            @keyframes profileGlow {
-                                0%, 100% { box-shadow: 0 0 15px rgba(168, 85, 247, 0.3); }
-                                50% { box-shadow: 0 0 25px rgba(236, 72, 153, 0.5); }
-                            }
-                            .profile-btn {
-                                position: relative;
-                                cursor: pointer;
-                                transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-                            }
-                            .profile-btn:hover {
-                                transform: scale(1.15);
-                            }
-                            .profile-btn:hover .profile-ring {
-                                animation: profileRingPulse 1.5s ease-in-out infinite;
-                            }
-                            .profile-btn:hover .profile-inner {
-                                animation: profileGlow 2s ease-in-out infinite;
-                            }
-                            .profile-ring {
-                                position: absolute;
-                                inset: -4px;
-                                border-radius: 50%;
-                                background: linear-gradient(135deg, #a855f7, #ec4899, #a855f7);
-                                background-size: 200% 200%;
-                                z-index: 0;
-                            }
-                            .profile-inner {
-                                position: relative;
-                                z-index: 1;
-                                width: 48px;
-                                height: 48px;
-                                border-radius: 50%;
-                                background: linear-gradient(135deg, #1a1a2e, #0f0f1a);
-                                display: flex;
-                                align-items: center;
-                                justify-content: center;
-                            }
-                        `}</style>
-                        <div
+                    {/* Profile */}
+                    {activeProfile && (
+                        <button
                             className="profile-btn"
-                            onClick={() => {
-                                navigate('/dashboard/settings');
-                            }}
-                            title="Configurações de Perfil"
+                            onClick={() => navigate('/dashboard/settings')}
+                            onMouseEnter={() => setHoveredItem('profile')}
+                            onMouseLeave={() => setHoveredItem(null)}
+                            title="Perfil"
                         >
                             <div className="profile-ring" />
                             <div className="profile-inner">
-                                <svg width="32" height="32" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                                <svg width="26" height="26" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                                     <defs>
-                                        <linearGradient id="profileIconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                        <linearGradient id="profileGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                                             <stop offset="0%" stopColor="#a855f7" />
                                             <stop offset="100%" stopColor="#ec4899" />
                                         </linearGradient>
                                     </defs>
-                                    {/* Head circle */}
-                                    <circle cx="50" cy="35" r="14" fill="none" stroke="url(#profileIconGrad)" strokeWidth="6" />
-                                    {/* Body/torso */}
-                                    <path
-                                        d="M 20,85 C 20,65 30,55 50,55 C 70,55 80,65 80,85"
-                                        fill="none"
-                                        stroke="url(#profileIconGrad)"
-                                        strokeWidth="6"
-                                        strokeLinecap="round"
-                                    />
+                                    <circle cx="50" cy="35" r="14" fill="none" stroke="url(#profileGrad)" strokeWidth="6" />
+                                    <path d="M 20,85 C 20,65 30,55 50,55 C 70,55 80,65 80,85" fill="none" stroke="url(#profileGrad)" strokeWidth="6" strokeLinecap="round" />
                                 </svg>
                             </div>
-                        </div>
-                    </div>
-                )}
+                            {/* Profile Tooltip */}
+                            <div className={`tooltip ${hoveredItem === 'profile' ? 'visible' : ''}`}>
+                                <span className="tooltip-emoji">👤</span>
+                                <span className="tooltip-label">{activeProfile.name}</span>
+                            </div>
+                        </button>
+                    )}
 
-                {/* Logout Button */}
-                <div className="flex items-center justify-center" style={{ padding: '16px 0' }}>
+                    {/* Logout */}
                     <button
+                        className="logout-btn"
                         onClick={handleLogout}
-                        className="flex items-center justify-center transition-all duration-200 active:scale-90"
-                        style={{
-                            width: '48px',
-                            height: '48px',
-                            background: 'transparent',
-                            border: 'none',
-                            padding: 0,
-                            cursor: 'pointer'
-                        }}
+                        onMouseEnter={() => setHoveredItem('logout')}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        title="Sair"
                     >
-                        <LogOut
-                            className="transition-all duration-200"
-                            style={{ width: '24px', height: '24px', color: '#ffffff', stroke: '#ffffff' }}
-                            onMouseEnter={(e) => {
-                                e.currentTarget.style.color = '#ef4444';
-                                e.currentTarget.style.stroke = '#ef4444';
-                                e.currentTarget.style.transform = 'scale(1.25)';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.currentTarget.style.color = '#ffffff';
-                                e.currentTarget.style.stroke = '#ffffff';
-                                e.currentTarget.style.transform = 'scale(1)';
-                            }}
-                        />
+                        <LogOut className="logout-icon" />
+                        {/* Logout Tooltip */}
+                        <div className={`tooltip danger ${hoveredItem === 'logout' ? 'visible' : ''}`}>
+                            <span className="tooltip-emoji">🚪</span>
+                            <span className="tooltip-label">Sair</span>
+                        </div>
                     </button>
                 </div>
             </div>
@@ -272,3 +177,340 @@ export function Sidebar() {
         </>
     );
 }
+
+// CSS Styles
+const sidebarStyles = `
+/* Sidebar Container */
+.sidebar {
+    position: relative;
+    width: 80px;
+    min-width: 80px;
+    max-width: 80px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+    overflow: visible;
+}
+
+/* Background */
+.sidebar-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+}
+
+.bg-gradient {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 50%, #0f0f1a 100%);
+}
+
+.bg-glow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 200px;
+    background: radial-gradient(ellipse at center top, rgba(168, 85, 247, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+/* Logo */
+.logo-container {
+    position: relative;
+    z-index: 10;
+    padding: 20px 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.logo-wrapper {
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.logo-wrapper:hover {
+    transform: scale(1.1);
+}
+
+.logo-svg {
+    position: relative;
+    z-index: 2;
+}
+
+.logo-ring {
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    border: 2px solid rgba(168, 85, 247, 0.3);
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+.logo-wrapper:hover .logo-ring {
+    opacity: 1;
+    animation: ringPulse 2s ease-in-out infinite;
+}
+
+@keyframes ringPulse {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.1); opacity: 1; }
+}
+
+/* Animated Bars */
+.bar {
+    animation: barBounce 1.2s ease-in-out infinite;
+}
+
+.bar-1 { animation-delay: 0s; }
+.bar-2 { animation-delay: 0.2s; }
+.bar-3 { animation-delay: 0.4s; }
+
+@keyframes barBounce {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(0.6); }
+}
+
+/* Navigation */
+.nav-container {
+    position: relative;
+    z-index: 10;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Nav Item */
+.nav-item {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: itemFadeIn 0.4s ease backwards;
+}
+
+@keyframes itemFadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.nav-item:hover {
+    transform: scale(1.1);
+}
+
+.nav-item:active {
+    transform: scale(0.95);
+}
+
+.nav-item.active {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* Item Glow */
+.item-glow {
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    filter: blur(8px);
+    transition: opacity 0.3s ease;
+}
+
+/* Icon Wrapper */
+.item-icon-wrapper {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.item-icon {
+    width: 24px;
+    height: 24px;
+    transition: all 0.3s ease;
+}
+
+.nav-item:hover .item-icon {
+    transform: scale(1.15);
+}
+
+/* Active Indicator */
+.active-indicator {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 32px;
+    overflow: hidden;
+    border-radius: 0 4px 4px 0;
+}
+
+.indicator-bar {
+    width: 100%;
+    height: 100%;
+    animation: indicatorGlow 2s ease-in-out infinite;
+}
+
+@keyframes indicatorGlow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* Tooltip */
+.tooltip {
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%) translateX(-10px);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    border-radius: 12px;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+}
+
+.tooltip.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%) translateX(0);
+}
+
+.tooltip.danger {
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+.tooltip-emoji {
+    font-size: 18px;
+}
+
+.tooltip-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+}
+
+/* Bottom Section */
+.bottom-section {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Profile Button */
+.profile-btn {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.profile-btn:hover {
+    transform: scale(1.15);
+}
+
+.profile-ring {
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #a855f7, #ec4899);
+    opacity: 0.8;
+    transition: all 0.3s ease;
+}
+
+.profile-btn:hover .profile-ring {
+    animation: profilePulse 1.5s ease-in-out infinite;
+}
+
+@keyframes profilePulse {
+    0%, 100% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.15); opacity: 1; }
+}
+
+.profile-inner {
+    position: relative;
+    z-index: 1;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1a1a2e, #0f0f1a);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Logout Button */
+.logout-btn {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.logout-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    transform: scale(1.1);
+}
+
+.logout-btn:active {
+    transform: scale(0.95);
+}
+
+.logout-icon {
+    width: 22px;
+    height: 22px;
+    stroke: rgba(255, 255, 255, 0.6);
+    transition: all 0.3s ease;
+}
+
+.logout-btn:hover .logout-icon {
+    stroke: #f87171;
+}
+`;
