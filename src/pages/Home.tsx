@@ -169,12 +169,14 @@ export function Home() {
         return `${hours}h ${mins}min restantes`;
     };
 
-    // Content card component
-    const ContentCard = ({ item, type, showProgress = false }: {
+    // Content card component with hover preview
+    const ContentCard = ({ item, type, showProgress = false, rating }: {
         item: ContinueWatchingItem | SeriesData | MovieData;
         type: 'continue' | 'series' | 'movie';
         showProgress?: boolean;
+        rating?: string;
     }) => {
+        const [showPreview, setShowPreview] = useState(false);
         const isContinue = type === 'continue';
         const continueItem = item as ContinueWatchingItem;
         const seriesItem = item as SeriesData;
@@ -188,6 +190,7 @@ export function Home() {
         const href = isContinue ?
             (continueItem.type === 'series' ? '#/dashboard/series' : '#/dashboard/vod') :
             (type === 'series' ? '#/dashboard/series' : '#/dashboard/vod');
+        const itemRating = rating || (type === 'series' ? seriesItem.rating : movieItem.rating);
 
         const progress = isContinue && continueItem.type === 'movie'
             ? continueItem.movieProgress?.progress
@@ -198,52 +201,99 @@ export function Home() {
                 href={href}
                 style={{
                     position: 'relative',
+                    minWidth: 160,
+                    maxWidth: 160,
                     borderRadius: '12px',
-                    overflow: 'hidden',
+                    overflow: 'visible',
                     background: 'rgba(255, 255, 255, 0.05)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     textDecoration: 'none',
                     transition: 'all 0.3s ease',
-                    display: 'block'
+                    display: 'block',
+                    flexShrink: 0
                 }}
                 onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'scale(1.05)';
-                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.4)';
+                    e.currentTarget.style.transform = 'scale(1.08)';
+                    e.currentTarget.style.boxShadow = '0 15px 40px rgba(0, 0, 0, 0.5)';
+                    e.currentTarget.style.zIndex = '100';
+                    setShowPreview(true);
                 }}
                 onMouseLeave={(e) => {
                     e.currentTarget.style.transform = 'scale(1)';
                     e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.zIndex = '1';
+                    setShowPreview(false);
                 }}
             >
                 <div style={{
                     aspectRatio: '2/3',
                     background: `url(${cover}) center/cover`,
+                    borderRadius: '12px 12px 0 0',
                     position: 'relative'
                 }}>
-                    {/* Play overlay */}
+                    {/* Hover Preview Overlay */}
                     <div style={{
                         position: 'absolute',
                         inset: 0,
-                        background: 'rgba(0,0,0,0.3)',
+                        background: 'linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.95) 100%)',
+                        opacity: showPreview ? 1 : 0,
+                        transition: 'opacity 0.3s',
                         display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        opacity: 0,
-                        transition: 'opacity 0.3s'
-                    }}
-                        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-                        onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
-                    >
+                        flexDirection: 'column',
+                        justifyContent: 'flex-end',
+                        padding: 12,
+                        borderRadius: '12px 12px 0 0'
+                    }}>
+                        {/* Play button */}
                         <div style={{
-                            width: 50,
-                            height: 50,
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            width: 48,
+                            height: 48,
                             borderRadius: '50%',
-                            background: 'rgba(168, 85, 247, 0.9)',
+                            background: 'linear-gradient(135deg, #a855f7, #ec4899)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: 20
+                            fontSize: 18,
+                            color: 'white',
+                            boxShadow: '0 4px 20px rgba(168, 85, 247, 0.5)'
                         }}>▶</div>
+
+                        {/* Rating badge */}
+                        {itemRating && (
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                marginBottom: 6
+                            }}>
+                                <span style={{ fontSize: 12 }}>⭐</span>
+                                <span style={{
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    color: '#fbbf24'
+                                }}>{itemRating}</span>
+                            </div>
+                        )}
+
+                        {/* Type badge */}
+                        <div style={{
+                            display: 'inline-flex',
+                            padding: '3px 8px',
+                            background: type === 'series' || (isContinue && continueItem.type === 'series')
+                                ? 'rgba(139, 92, 246, 0.8)'
+                                : 'rgba(59, 130, 246, 0.8)',
+                            borderRadius: 4,
+                            fontSize: 10,
+                            fontWeight: 600,
+                            color: 'white',
+                            width: 'fit-content'
+                        }}>
+                            {type === 'series' || (isContinue && continueItem.type === 'series') ? 'SÉRIE' : 'FILME'}
+                        </div>
                     </div>
 
                     {/* Progress bar for continue watching */}
@@ -272,11 +322,12 @@ export function Home() {
                             bottom: 8,
                             left: 8,
                             right: 8,
-                            background: 'rgba(0, 0, 0, 0.8)',
+                            background: 'rgba(0, 0, 0, 0.85)',
                             borderRadius: 6,
-                            padding: '6px 10px',
-                            fontSize: 11,
-                            color: 'rgba(255, 255, 255, 0.9)'
+                            padding: '5px 8px',
+                            fontSize: 10,
+                            fontWeight: 600,
+                            color: 'white'
                         }}>
                             S{continueItem.progress.lastWatchedSeason} E{continueItem.progress.lastWatchedEpisode}
                         </div>
@@ -291,7 +342,7 @@ export function Home() {
                             background: 'linear-gradient(135deg, #10b981, #059669)',
                             borderRadius: 4,
                             padding: '4px 8px',
-                            fontSize: 10,
+                            fontSize: 9,
                             fontWeight: 700,
                             color: 'white',
                             textTransform: 'uppercase',
@@ -303,7 +354,8 @@ export function Home() {
                 </div>
                 <div style={{
                     padding: '10px 12px',
-                    background: 'linear-gradient(180deg, rgba(15, 15, 35, 0.9) 0%, rgba(15, 15, 35, 1) 100%)'
+                    background: 'linear-gradient(180deg, rgba(15, 15, 35, 0.9) 0%, rgba(15, 15, 35, 1) 100%)',
+                    borderRadius: '0 0 12px 12px'
                 }}>
                     <div style={{
                         fontSize: 12,
@@ -327,40 +379,117 @@ export function Home() {
         );
     };
 
-    // Section component
+    // Carousel Section component
     const ContentSection = ({ title, items, type, showProgress = false }: {
         title: string;
         items: any[];
         type: 'continue' | 'series' | 'movie';
         showProgress?: boolean;
     }) => {
+        const [scrollPosition, setScrollPosition] = useState(0);
+
         if (items.length === 0) return null;
 
+        const scroll = (direction: 'left' | 'right') => {
+            const container = document.getElementById(`carousel-${type}`);
+            if (!container) return;
+            const scrollAmount = 340; // ~2 cards
+            const newPosition = direction === 'left'
+                ? Math.max(0, scrollPosition - scrollAmount)
+                : scrollPosition + scrollAmount;
+            container.scrollTo({ left: newPosition, behavior: 'smooth' });
+            setScrollPosition(newPosition);
+        };
+
         return (
-            <div style={{ marginBottom: 40 }}>
-                <h2 style={{
-                    fontSize: 18,
-                    fontWeight: 600,
-                    color: 'white',
-                    marginBottom: 16,
+            <div style={{ marginBottom: 32, position: 'relative' }}>
+                <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 10
+                    justifyContent: 'space-between',
+                    marginBottom: 16
                 }}>
-                    {title}
-                    <span style={{
-                        fontSize: 12,
-                        color: 'rgba(255, 255, 255, 0.5)',
-                        fontWeight: 400
-                    }}>({items.length})</span>
-                </h2>
-                <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-                    gap: 16,
-                    maxWidth: '100%'
-                }}>
-                    {items.slice(0, 8).map((item) => (
+                    <h2 style={{
+                        fontSize: 18,
+                        fontWeight: 600,
+                        color: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        margin: 0
+                    }}>
+                        {title}
+                        <span style={{
+                            fontSize: 12,
+                            color: 'rgba(255, 255, 255, 0.5)',
+                            fontWeight: 400
+                        }}>({items.length})</span>
+                    </h2>
+
+                    {/* Navigation arrows */}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                            onClick={() => scroll('left')}
+                            style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: '50%',
+                                background: 'rgba(255, 255, 255, 0.1)',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                color: 'white',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: 16,
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(168, 85, 247, 0.4)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                        >
+                            ←
+                        </button>
+                        <button
+                            onClick={() => scroll('right')}
+                            style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: '50%',
+                                background: 'rgba(255, 255, 255, 0.1)',
+                                border: '1px solid rgba(255, 255, 255, 0.2)',
+                                color: 'white',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: 16,
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(168, 85, 247, 0.4)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                        >
+                            →
+                        </button>
+                    </div>
+                </div>
+
+                {/* Carousel container */}
+                <div
+                    id={`carousel-${type}`}
+                    style={{
+                        display: 'flex',
+                        gap: 16,
+                        overflowX: 'auto',
+                        overflowY: 'visible',
+                        paddingBottom: 16,
+                        paddingTop: 8,
+                        scrollBehavior: 'smooth',
+                        scrollbarWidth: 'none',
+                        msOverflowStyle: 'none'
+                    }}
+                    onScroll={(e) => setScrollPosition(e.currentTarget.scrollLeft)}
+                >
+                    {items.slice(0, 15).map((item) => (
                         <ContentCard
                             key={type === 'continue' ? (item as ContinueWatchingItem).id :
                                 type === 'series' ? (item as SeriesData).series_id :
@@ -368,9 +497,32 @@ export function Home() {
                             item={item}
                             type={type}
                             showProgress={showProgress}
+                            rating={type === 'series' ? (item as SeriesData).rating : (item as MovieData).rating}
                         />
                     ))}
                 </div>
+
+                {/* Gradient fade edges */}
+                <div style={{
+                    position: 'absolute',
+                    top: 48,
+                    left: 0,
+                    width: 40,
+                    height: 'calc(100% - 48px)',
+                    background: 'linear-gradient(90deg, rgba(15, 15, 35, 1) 0%, transparent 100%)',
+                    pointerEvents: 'none',
+                    opacity: scrollPosition > 0 ? 1 : 0,
+                    transition: 'opacity 0.3s'
+                }} />
+                <div style={{
+                    position: 'absolute',
+                    top: 48,
+                    right: 0,
+                    width: 40,
+                    height: 'calc(100% - 48px)',
+                    background: 'linear-gradient(270deg, rgba(15, 15, 35, 1) 0%, transparent 100%)',
+                    pointerEvents: 'none'
+                }} />
             </div>
         );
     };
@@ -381,6 +533,11 @@ export function Home() {
                 @keyframes pulse {
                     0%, 100% { opacity: 1; }
                     50% { opacity: 0.7; }
+                }
+                #carousel-continue::-webkit-scrollbar,
+                #carousel-series::-webkit-scrollbar,
+                #carousel-movie::-webkit-scrollbar {
+                    display: none;
                 }
             `}</style>
             <div style={{
