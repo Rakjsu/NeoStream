@@ -202,9 +202,12 @@ export function Home() {
         setContinueWatching(items.slice(0, 30));
     }, [allSeries, allMovies]);
 
-    // Build recommendations based on watched categories
+    // Build recommendations based on watched categories (only once when data is ready)
     useEffect(() => {
         if (continueWatching.length === 0 || (allSeries.length === 0 && allMovies.length === 0)) return;
+
+        // Only run once when we have data
+        if (recommendations.length > 0) return;
 
         // Get categories from what user is watching
         const watchedCategoryIds = new Set<string>();
@@ -242,10 +245,20 @@ export function Home() {
             }
         });
 
-        // Shuffle and limit
-        const shuffled = recs.sort(() => Math.random() - 0.5);
-        setRecommendations(shuffled.slice(0, 30));
-    }, [continueWatching, allSeries, allMovies]);
+        // Stable shuffle using Fisher-Yates with seed
+        const seed = continueWatching.length + allSeries.length;
+        let currentIndex = recs.length;
+        let randomIndex;
+        const seededRandom = (max: number) => Math.floor((seed * 9301 + 49297) % 233280 / 233280 * max);
+
+        while (currentIndex > 0) {
+            randomIndex = seededRandom(currentIndex);
+            currentIndex--;
+            [recs[currentIndex], recs[randomIndex]] = [recs[randomIndex], recs[currentIndex]];
+        }
+
+        setRecommendations(recs.slice(0, 30));
+    }, [continueWatching.length, allSeries.length, allMovies.length]); // Use .length instead of arrays
 
     const formatTime = (date: Date) => {
         return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
