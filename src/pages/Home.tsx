@@ -590,8 +590,6 @@ export function Home() {
         sectionIndex?: number;
     }) => {
         const containerRef = useRef<HTMLDivElement>(null);
-        const scrollPositionRef = useRef(0);
-        const [, forceUpdate] = useState(0);
 
         if (items.length === 0) return null;
 
@@ -603,14 +601,6 @@ export function Home() {
                 ? Math.max(0, container.scrollLeft - scrollAmount)
                 : container.scrollLeft + scrollAmount;
             container.scrollTo({ left: newPosition, behavior: 'smooth' });
-        };
-
-        const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-            scrollPositionRef.current = e.currentTarget.scrollLeft;
-            // Only force update for gradient visibility if at edge
-            if (scrollPositionRef.current === 0 || scrollPositionRef.current > 10) {
-                forceUpdate(n => n + 1);
-            }
         };
 
         return (
@@ -707,7 +697,6 @@ export function Home() {
                         scrollbarWidth: 'none',
                         msOverflowStyle: 'none'
                     }}
-                    onScroll={handleScroll}
                 >
                     {items.slice(0, 30).map((item, index) => {
                         const isSeries = 'series_id' in item;
@@ -742,7 +731,7 @@ export function Home() {
                     height: 'calc(100% - 48px)',
                     background: 'linear-gradient(90deg, rgba(15, 15, 35, 1) 0%, transparent 100%)',
                     pointerEvents: 'none',
-                    opacity: scrollPositionRef.current > 0 ? 1 : 0,
+                    opacity: 0.5,
                     transition: 'opacity 0.3s'
                 }} />
                 <div style={{
