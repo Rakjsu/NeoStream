@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { formatGenres, type TMDBSeriesDetails, fetchEpisodeDetails, getBackdropUrl, searchSeriesByName } from '../services/tmdb';
+import { type TMDBSeriesDetails, fetchEpisodeDetails, getBackdropUrl, searchSeriesByName } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
 import { favoritesService } from '../services/favoritesService';
 import { watchProgressService } from '../services/watchProgressService';
@@ -186,8 +186,8 @@ export function Series() {
             selectedSeason,
             selectedEpisode
         );
-
-        if (progress && progress.currentTime > 10 && progress.percentage < 95) {
+        const progressPercent = progress ? Math.round((progress.currentTime / progress.duration) * 100) : 0;
+        if (progress && progress.currentTime > 10 && progressPercent < 95) {
             // Has meaningful progress, show resume modal
             setResumeModalData({
                 currentTime: progress.currentTime,
@@ -404,32 +404,77 @@ export function Series() {
                                     <p className="series-overview">{tmdbData.overview}</p>
                                 ) : null}
 
-                                {/* Episode Selection */}
-                                <div className="episode-selectors">
-                                    <select
-                                        value={selectedSeason}
-                                        onChange={(e) => {
-                                            setSelectedSeason(Number(e.target.value));
-                                            setSelectedEpisode(1);
-                                        }}
-                                        className="episode-select"
-                                    >
+                                {/* Season Tabs */}
+                                <div className="season-tabs-container">
+                                    <div className="season-tabs">
                                         {seriesInfo?.episodes ? Object.keys(seriesInfo.episodes).sort((a, b) => Number(a) - Number(b)).map((season: string) => (
-                                            <option key={season} value={season}>Temporada {season}</option>
-                                        )) : <option value="1">Temporada 1</option>}
-                                    </select>
+                                            <button
+                                                key={season}
+                                                className={`season-tab ${selectedSeason === Number(season) ? 'active' : ''}`}
+                                                onClick={() => {
+                                                    setSelectedSeason(Number(season));
+                                                    setSelectedEpisode(1);
+                                                }}
+                                            >
+                                                <span className="season-tab-number">T{season}</span>
+                                                <span className="season-tab-label">Temporada {season}</span>
+                                            </button>
+                                        )) : (
+                                            <button className="season-tab active">
+                                                <span className="season-tab-number">T1</span>
+                                                <span className="season-tab-label">Temporada 1</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
 
-                                    <select
-                                        value={selectedEpisode}
-                                        onChange={(e) => setSelectedEpisode(Number(e.target.value))}
-                                        className="episode-select episode-dropdown"
-                                    >
-                                        {seriesInfo?.episodes?.[selectedSeason] ? seriesInfo.episodes[selectedSeason].map((episode: any) => (
-                                            <option key={episode.id} value={episode.episode_num}>
-                                                {getEpisodeTitle(episode.title, episode.episode_num)}
-                                            </option>
-                                        )) : <option value="1">Episódio 1</option>}
-                                    </select>
+                                {/* Episode List */}
+                                <div className="episode-list-container">
+                                    <div className="episode-list">
+                                        {seriesInfo?.episodes?.[selectedSeason] ? seriesInfo.episodes[selectedSeason].map((episode: any, index: number) => {
+                                            const episodeNum = Number(episode.episode_num);
+                                            const progress = watchProgressService.getEpisodeProgress(String(selectedSeries.series_id), selectedSeason, episodeNum);
+                                            const isSelected = selectedEpisode === episodeNum;
+                                            const isWatched = progress?.completed;
+                                            const progressPercent = progress ? Math.round((progress.currentTime / progress.duration) * 100) : 0;
+
+                                            return (
+                                                <div
+                                                    key={episode.id}
+                                                    className={`episode-card ${isSelected ? 'selected' : ''} ${isWatched ? 'watched' : ''}`}
+                                                    onClick={() => setSelectedEpisode(episodeNum)}
+                                                    style={{ animationDelay: `${index * 0.03}s` }}
+                                                >
+                                                    <div className="episode-number-badge">
+                                                        {isWatched ? '✓' : episodeNum}
+                                                    </div>
+                                                    <div className="episode-info">
+                                                        <div className="episode-title-row">
+                                                            <span className="episode-title">{getEpisodeTitle(episode.title, episodeNum)}</span>
+                                                        </div>
+                                                        {episode.info?.duration && (
+                                                            <span className="episode-duration">{episode.info.duration}</span>
+                                                        )}
+                                                        {progressPercent > 0 && progressPercent < 95 && (
+                                                            <div className="episode-progress-bar">
+                                                                <div className="episode-progress-fill" style={{ width: `${progressPercent}%` }} />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {isSelected && (
+                                                        <div className="episode-play-indicator">▶</div>
+                                                    )}
+                                                </div>
+                                            );
+                                        }) : (
+                                            <div className="episode-card selected">
+                                                <div className="episode-number-badge">1</div>
+                                                <div className="episode-info">
+                                                    <span className="episode-title">Episódio 1</span>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Action Buttons */}
@@ -858,7 +903,213 @@ const seriesStyles = `
     margin-bottom: 12px;
 }
 
-/* Episode Selectors */
+/* Season Tabs */
+.season-tabs-container {
+    margin-bottom: 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.season-tabs-container::-webkit-scrollbar {
+    display: none;
+}
+
+.season-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 4px;
+}
+
+.season-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 30px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    white-space: nowrap;
+}
+
+.season-tab:hover {
+    background: rgba(168, 85, 247, 0.15);
+    border-color: rgba(168, 85, 247, 0.4);
+    color: white;
+}
+
+.season-tab.active {
+    background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+    border-color: transparent;
+    color: white;
+    box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+}
+
+.season-tab-number {
+    display: none;
+}
+
+.season-tab-label {
+    font-weight: 600;
+}
+
+/* Episode List */
+.episode-list-container {
+    max-height: 280px;
+    overflow-y: auto;
+    margin-bottom: 20px;
+    border-radius: 16px;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(168, 85, 247, 0.4) transparent;
+}
+
+.episode-list-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.episode-list-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.episode-list-container::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #a855f7, #ec4899);
+    border-radius: 3px;
+}
+
+.episode-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.episode-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    animation: episodeFadeIn 0.3s ease-out backwards;
+}
+
+@keyframes episodeFadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.episode-card:hover {
+    background: rgba(168, 85, 247, 0.1);
+    border-color: rgba(168, 85, 247, 0.3);
+    transform: translateX(4px);
+}
+
+.episode-card.selected {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(236, 72, 153, 0.15) 100%);
+    border-color: rgba(168, 85, 247, 0.5);
+    box-shadow: 0 4px 20px rgba(168, 85, 247, 0.2);
+}
+
+.episode-card.watched {
+    opacity: 0.7;
+}
+
+.episode-card.watched .episode-number-badge {
+    background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.episode-number-badge {
+    min-width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(168, 85, 247, 0.3);
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    color: white;
+    flex-shrink: 0;
+}
+
+.episode-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.episode-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.episode-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: white;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.episode-duration {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.episode-progress-bar {
+    height: 3px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 4px;
+}
+
+.episode-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #a855f7, #ec4899);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.episode-play-indicator {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #a855f7, #ec4899);
+    border-radius: 50%;
+    font-size: 12px;
+    color: white;
+    flex-shrink: 0;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+/* Keep old styles for backwards compatibility */
 .episode-selectors {
     display: flex;
     flex-wrap: wrap;
@@ -894,6 +1145,7 @@ const seriesStyles = `
 .episode-dropdown {
     min-width: 250px;
 }
+
 
 /* Action Buttons */
 .action-buttons {
