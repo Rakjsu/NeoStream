@@ -58,6 +58,9 @@ export function LiveTV() {
             const rows = Math.ceil(containerHeight / (CARD_HEIGHT + GRID_GAP)) + 2;
 
             const calculatedItems = Math.max(columns * rows, 24); // Minimum 24 items
+
+            console.log('[LiveTV Grid]', { containerWidth, containerHeight, columns, rows, calculatedItems });
+
             setItemsPerPage(calculatedItems);
 
             // Directly set visibleCount to fill the screen on resize/maximize
@@ -640,7 +643,7 @@ export function LiveTV() {
                     </div>
                 )}
 
-                <div className="p-8" style={{ paddingLeft: '60px', position: 'relative', zIndex: 1 }}>
+                <div ref={scrollContainerRef} className="p-8" style={{ paddingLeft: '60px', position: 'relative', zIndex: 1, height: 'calc(100vh - 120px)', overflowY: 'auto' }}>
                     <style>{`
                         .channel-card {
                             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
