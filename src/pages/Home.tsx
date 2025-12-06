@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { watchProgressService, type SeriesProgress } from '../services/watchProgressService';
+import { movieProgressService } from '../services/movieProgressService';
 
 interface ContentCounts {
     live: number;
@@ -6,35 +8,138 @@ interface ContentCounts {
     series: number;
 }
 
+interface SeriesData {
+    series_id: number;
+    name: string;
+    cover: string;
+    rating?: string;
+    category_id?: string;
+}
+
+interface MovieData {
+    stream_id: number;
+    name: string;
+    stream_icon: string;
+    cover?: string;
+    rating?: string;
+    category_id?: string;
+}
+
+interface ContinueWatchingItem {
+    type: 'series' | 'movie';
+    id: string;
+    name: string;
+    cover: string;
+    progress?: SeriesProgress;
+    movieProgress?: { currentTime: number; duration: number; progress: number };
+    hasNewEpisode?: boolean;
+}
+
 export function Home() {
     const [counts, setCounts] = useState<ContentCounts>({ live: 0, vod: 0, series: 0 });
     const [loading, setLoading] = useState(true);
     const [currentTime, setCurrentTime] = useState(new Date());
+    const [continueWatching, setContinueWatching] = useState<ContinueWatchingItem[]>([]);
+    const [recentSeries, setRecentSeries] = useState<SeriesData[]>([]);
+    const [recentMovies, setRecentMovies] = useState<MovieData[]>([]);
+    const [allSeries, setAllSeries] = useState<SeriesData[]>([]);
+    const [allMovies, setAllMovies] = useState<MovieData[]>([]);
 
     useEffect(() => {
-        const fetchCounts = async () => {
+        const fetchData = async () => {
             try {
-                const result = await window.ipcRenderer.invoke('content:get-counts');
-                if (result.success && result.data) {
+                // Fetch counts
+                const countResult = await window.ipcRenderer.invoke('content:get-counts');
+                if (countResult.success && countResult.counts) {
                     setCounts({
-                        live: result.data.live || 0,
-                        vod: result.data.vod || 0,
-                        series: result.data.series || 0
+                        live: countResult.counts.live || 0,
+                        vod: countResult.counts.vod || 0,
+                        series: countResult.counts.series || 0
                     });
                 }
+
+                // Fetch series data
+                const seriesResult = await window.ipcRenderer.invoke('streams:get-series');
+                if (seriesResult.success && seriesResult.data) {
+                    setAllSeries(seriesResult.data);
+                    // Get most recent 10 series (assuming they come in order)
+                    setRecentSeries(seriesResult.data.slice(0, 10));
+                }
+
+                // Fetch movies data
+                const moviesResult = await window.ipcRenderer.invoke('streams:get-vod');
+                if (moviesResult.success && moviesResult.data) {
+                    setAllMovies(moviesResult.data);
+                    // Get most recent 10 movies
+                    setRecentMovies(moviesResult.data.slice(0, 10));
+                }
             } catch (error) {
-                console.error('Failed to fetch counts:', error);
+                console.error('Failed to fetch data:', error);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchCounts();
+        fetchData();
 
         // Update time every second
         const interval = setInterval(() => setCurrentTime(new Date()), 1000);
         return () => clearInterval(interval);
     }, []);
+
+    // Build continue watching list
+    useEffect(() => {
+        if (allSeries.length === 0 && allMovies.length === 0) return;
+
+        const items: ContinueWatchingItem[] = [];
+
+        // Get series in progress (excluding completed)
+        const seriesProgress = watchProgressService.getContinueWatching();
+        seriesProgress.forEach((progress, seriesId) => {
+            // Skip completed series
+            if (watchProgressService.isSeriesCompleted(seriesId)) return;
+
+            const seriesData = allSeries.find(s => s.series_id.toString() === seriesId);
+            if (seriesData) {
+                items.push({
+                    type: 'series',
+                    id: seriesId,
+                    name: seriesData.name,
+                    cover: seriesData.cover,
+                    progress
+                });
+            }
+        });
+
+        // Get movies in progress
+        const moviesInProgress = movieProgressService.getMoviesInProgress();
+        moviesInProgress.forEach(movieId => {
+            const movieData = allMovies.find(m => m.stream_id.toString() === movieId);
+            const progress = movieProgressService.getMoviePositionById(movieId);
+            if (movieData && progress) {
+                items.push({
+                    type: 'movie',
+                    id: movieId,
+                    name: movieData.name,
+                    cover: movieData.cover || movieData.stream_icon,
+                    movieProgress: {
+                        currentTime: progress.currentTime,
+                        duration: progress.duration,
+                        progress: progress.progress
+                    }
+                });
+            }
+        });
+
+        // Sort by most recently watched
+        items.sort((a, b) => {
+            const aTime = a.progress?.lastWatchedAt || a.movieProgress?.currentTime || 0;
+            const bTime = b.progress?.lastWatchedAt || b.movieProgress?.currentTime || 0;
+            return bTime - aTime;
+        });
+
+        setContinueWatching(items.slice(0, 10));
+    }, [allSeries, allMovies]);
 
     const formatTime = (date: Date) => {
         return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -55,313 +160,507 @@ export function Home() {
         return 'Boa noite';
     };
 
-    return (
-        <div style={{
-            minHeight: '100vh',
-            background: 'linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%)',
-            padding: '40px 60px 40px 100px',
-            position: 'relative',
-            overflow: 'hidden'
-        }}>
-            {/* Background decorations */}
-            <div style={{
-                position: 'absolute',
-                top: '-200px',
-                right: '-200px',
-                width: '600px',
-                height: '600px',
-                background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)',
-                borderRadius: '50%',
-                pointerEvents: 'none'
-            }} />
-            <div style={{
-                position: 'absolute',
-                bottom: '-150px',
-                left: '-150px',
-                width: '400px',
-                height: '400px',
-                background: 'radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 70%)',
-                borderRadius: '50%',
-                pointerEvents: 'none'
-            }} />
+    const formatProgress = (currentTime: number, duration: number) => {
+        const remaining = Math.max(0, duration - currentTime);
+        const minutes = Math.floor(remaining / 60);
+        if (minutes < 60) return `${minutes}min restantes`;
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${hours}h ${mins}min restantes`;
+    };
 
-            {/* Header */}
-            <div style={{ marginBottom: '48px' }}>
+    // Content card component
+    const ContentCard = ({ item, type, showProgress = false }: {
+        item: ContinueWatchingItem | SeriesData | MovieData;
+        type: 'continue' | 'series' | 'movie';
+        showProgress?: boolean;
+    }) => {
+        const isContinue = type === 'continue';
+        const continueItem = item as ContinueWatchingItem;
+        const seriesItem = item as SeriesData;
+        const movieItem = item as MovieData;
+
+        const cover = isContinue ? continueItem.cover :
+            type === 'series' ? seriesItem.cover :
+                (movieItem.cover || movieItem.stream_icon);
+        const name = isContinue ? continueItem.name :
+            type === 'series' ? seriesItem.name : movieItem.name;
+        const href = isContinue ?
+            (continueItem.type === 'series' ? '#/dashboard/series' : '#/dashboard/vod') :
+            (type === 'series' ? '#/dashboard/series' : '#/dashboard/vod');
+
+        const progress = isContinue && continueItem.type === 'movie'
+            ? continueItem.movieProgress?.progress
+            : undefined;
+
+        return (
+            <a
+                href={href}
+                style={{
+                    position: 'relative',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    textDecoration: 'none',
+                    transition: 'all 0.3s ease',
+                    display: 'block'
+                }}
+                onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = 'none';
+                }}
+            >
                 <div style={{
-                    fontSize: '14px',
-                    color: 'rgba(156, 163, 175, 1)',
-                    marginBottom: '8px',
-                    textTransform: 'capitalize'
+                    aspectRatio: '2/3',
+                    background: `url(${cover}) center/cover`,
+                    position: 'relative'
                 }}>
-                    {formatDate(currentTime)}
-                </div>
-                <h1 style={{
-                    fontSize: '48px',
-                    fontWeight: '700',
-                    background: 'linear-gradient(135deg, #ffffff 0%, #94a3b8 100%)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent',
-                    marginBottom: '8px'
-                }}>
-                    {getGreeting()}! 👋
-                </h1>
-                <p style={{
-                    fontSize: '18px',
-                    color: 'rgba(156, 163, 175, 1)'
-                }}>
-                    O que você quer assistir hoje?
-                </p>
-            </div>
+                    {/* Play overlay */}
+                    <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'rgba(0,0,0,0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        opacity: 0,
+                        transition: 'opacity 0.3s'
+                    }}
+                        onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+                        onMouseLeave={(e) => e.currentTarget.style.opacity = '0'}
+                    >
+                        <div style={{
+                            width: 50,
+                            height: 50,
+                            borderRadius: '50%',
+                            background: 'rgba(168, 85, 247, 0.9)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 20
+                        }}>▶</div>
+                    </div>
 
-            {/* Clock */}
-            <div style={{
-                position: 'absolute',
-                top: '40px',
-                right: '60px',
-                textAlign: 'right'
-            }}>
+                    {/* Progress bar for continue watching */}
+                    {showProgress && progress !== undefined && (
+                        <div style={{
+                            position: 'absolute',
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            height: 4,
+                            background: 'rgba(0, 0, 0, 0.6)'
+                        }}>
+                            <div style={{
+                                height: '100%',
+                                width: `${progress}%`,
+                                background: 'linear-gradient(90deg, #a855f7, #ec4899)',
+                                borderRadius: 2
+                            }} />
+                        </div>
+                    )}
+
+                    {/* Series episode info */}
+                    {isContinue && continueItem.type === 'series' && continueItem.progress && (
+                        <div style={{
+                            position: 'absolute',
+                            bottom: 8,
+                            left: 8,
+                            right: 8,
+                            background: 'rgba(0, 0, 0, 0.8)',
+                            borderRadius: 6,
+                            padding: '6px 10px',
+                            fontSize: 11,
+                            color: 'rgba(255, 255, 255, 0.9)'
+                        }}>
+                            S{continueItem.progress.lastWatchedSeason} E{continueItem.progress.lastWatchedEpisode}
+                        </div>
+                    )}
+
+                    {/* New Episode badge */}
+                    {isContinue && continueItem.hasNewEpisode && (
+                        <div style={{
+                            position: 'absolute',
+                            top: 8,
+                            right: 8,
+                            background: 'linear-gradient(135deg, #10b981, #059669)',
+                            borderRadius: 4,
+                            padding: '4px 8px',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: 'white',
+                            textTransform: 'uppercase',
+                            animation: 'pulse 2s infinite'
+                        }}>
+                            Novo Ep!
+                        </div>
+                    )}
+                </div>
                 <div style={{
-                    fontSize: '64px',
-                    fontWeight: '300',
-                    color: 'white',
-                    letterSpacing: '-2px',
-                    lineHeight: 1
+                    padding: '10px 12px',
+                    background: 'linear-gradient(180deg, rgba(15, 15, 35, 0.9) 0%, rgba(15, 15, 35, 1) 100%)'
                 }}>
-                    {formatTime(currentTime)}
+                    <div style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: 'white',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                    }}>{name}</div>
+                    {showProgress && continueItem.movieProgress && (
+                        <div style={{
+                            fontSize: 10,
+                            color: 'rgba(255, 255, 255, 0.6)',
+                            marginTop: 4
+                        }}>
+                            {formatProgress(continueItem.movieProgress.currentTime, continueItem.movieProgress.duration)}
+                        </div>
+                    )}
                 </div>
-            </div>
+            </a>
+        );
+    };
 
-            {/* Stats Cards */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '24px',
-                marginBottom: '48px',
-                maxWidth: '900px'
-            }}>
-                {/* Live TV Card */}
-                <a href="#/dashboard/live" style={{
-                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%)',
-                    borderRadius: '20px',
-                    padding: '28px',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    textDecoration: 'none',
-                    transition: 'all 0.3s ease',
-                    cursor: 'pointer'
-                }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-4px)';
-                        e.currentTarget.style.boxShadow = '0 20px 40px rgba(239, 68, 68, 0.2)';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = 'none';
-                    }}>
-                    <div style={{
-                        fontSize: '40px',
-                        marginBottom: '12px'
-                    }}>📺</div>
-                    <div style={{
-                        fontSize: '32px',
-                        fontWeight: '700',
-                        color: 'white',
-                        marginBottom: '4px'
-                    }}>
-                        {loading ? '...' : counts.live.toLocaleString()}
-                    </div>
-                    <div style={{
-                        fontSize: '14px',
-                        color: 'rgba(239, 68, 68, 0.9)',
-                        fontWeight: '600'
-                    }}>
-                        Canais ao Vivo
-                    </div>
-                </a>
+    // Section component
+    const ContentSection = ({ title, items, type, showProgress = false }: {
+        title: string;
+        items: any[];
+        type: 'continue' | 'series' | 'movie';
+        showProgress?: boolean;
+    }) => {
+        if (items.length === 0) return null;
 
-                {/* VOD Card */}
-                <a href="#/dashboard/vod" style={{
-                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%)',
-                    borderRadius: '20px',
-                    padding: '28px',
-                    border: '1px solid rgba(59, 130, 246, 0.2)',
-                    textDecoration: 'none',
-                    transition: 'all 0.3s ease',
-                    cursor: 'pointer'
-                }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-4px)';
-                        e.currentTarget.style.boxShadow = '0 20px 40px rgba(59, 130, 246, 0.2)';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = 'none';
-                    }}>
-                    <div style={{
-                        fontSize: '40px',
-                        marginBottom: '12px'
-                    }}>🎬</div>
-                    <div style={{
-                        fontSize: '32px',
-                        fontWeight: '700',
-                        color: 'white',
-                        marginBottom: '4px'
-                    }}>
-                        {loading ? '...' : counts.vod.toLocaleString()}
-                    </div>
-                    <div style={{
-                        fontSize: '14px',
-                        color: 'rgba(59, 130, 246, 0.9)',
-                        fontWeight: '600'
-                    }}>
-                        Filmes
-                    </div>
-                </a>
-
-                {/* Series Card */}
-                <a href="#/dashboard/series" style={{
-                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)',
-                    borderRadius: '20px',
-                    padding: '28px',
-                    border: '1px solid rgba(139, 92, 246, 0.2)',
-                    textDecoration: 'none',
-                    transition: 'all 0.3s ease',
-                    cursor: 'pointer'
-                }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-4px)';
-                        e.currentTarget.style.boxShadow = '0 20px 40px rgba(139, 92, 246, 0.2)';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = 'none';
-                    }}>
-                    <div style={{
-                        fontSize: '40px',
-                        marginBottom: '12px'
-                    }}>📺</div>
-                    <div style={{
-                        fontSize: '32px',
-                        fontWeight: '700',
-                        color: 'white',
-                        marginBottom: '4px'
-                    }}>
-                        {loading ? '...' : counts.series.toLocaleString()}
-                    </div>
-                    <div style={{
-                        fontSize: '14px',
-                        color: 'rgba(139, 92, 246, 0.9)',
-                        fontWeight: '600'
-                    }}>
-                        Séries
-                    </div>
-                </a>
-            </div>
-
-            {/* Quick Access */}
-            <div style={{ maxWidth: '900px' }}>
+        return (
+            <div style={{ marginBottom: 40 }}>
                 <h2 style={{
-                    fontSize: '20px',
-                    fontWeight: '600',
+                    fontSize: 18,
+                    fontWeight: 600,
                     color: 'white',
-                    marginBottom: '20px'
+                    marginBottom: 16,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10
                 }}>
-                    Acesso Rápido
+                    {title}
+                    <span style={{
+                        fontSize: 12,
+                        color: 'rgba(255, 255, 255, 0.5)',
+                        fontWeight: 400
+                    }}>({items.length})</span>
                 </h2>
                 <div style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(4, 1fr)',
-                    gap: '16px'
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                    gap: 16,
+                    maxWidth: '100%'
                 }}>
-                    <a href="#/dashboard/live" style={{
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        borderRadius: '12px',
-                        padding: '20px',
-                        textAlign: 'center',
-                        textDecoration: 'none',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        transition: 'all 0.2s'
-                    }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                        }}>
-                        <div style={{ fontSize: '28px', marginBottom: '8px' }}>🔴</div>
-                        <div style={{ color: 'white', fontSize: '14px', fontWeight: '500' }}>TV ao Vivo</div>
-                    </a>
-                    <a href="#/dashboard/vod" style={{
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        borderRadius: '12px',
-                        padding: '20px',
-                        textAlign: 'center',
-                        textDecoration: 'none',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        transition: 'all 0.2s'
-                    }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                        }}>
-                        <div style={{ fontSize: '28px', marginBottom: '8px' }}>🎥</div>
-                        <div style={{ color: 'white', fontSize: '14px', fontWeight: '500' }}>Filmes</div>
-                    </a>
-                    <a href="#/dashboard/series" style={{
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        borderRadius: '12px',
-                        padding: '20px',
-                        textAlign: 'center',
-                        textDecoration: 'none',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        transition: 'all 0.2s'
-                    }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                        }}>
-                        <div style={{ fontSize: '28px', marginBottom: '8px' }}>📺</div>
-                        <div style={{ color: 'white', fontSize: '14px', fontWeight: '500' }}>Séries</div>
-                    </a>
-                    <a href="#/dashboard/settings" style={{
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        borderRadius: '12px',
-                        padding: '20px',
-                        textAlign: 'center',
-                        textDecoration: 'none',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        transition: 'all 0.2s'
-                    }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
-                        }}>
-                        <div style={{ fontSize: '28px', marginBottom: '8px' }}>⚙️</div>
-                        <div style={{ color: 'white', fontSize: '14px', fontWeight: '500' }}>Configurações</div>
-                    </a>
+                    {items.slice(0, 8).map((item) => (
+                        <ContentCard
+                            key={type === 'continue' ? (item as ContinueWatchingItem).id :
+                                type === 'series' ? (item as SeriesData).series_id :
+                                    (item as MovieData).stream_id}
+                            item={item}
+                            type={type}
+                            showProgress={showProgress}
+                        />
+                    ))}
                 </div>
             </div>
+        );
+    };
 
-            {/* Footer */}
+    return (
+        <>
+            <style>{`
+                @keyframes pulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.7; }
+                }
+            `}</style>
             <div style={{
-                position: 'absolute',
-                bottom: '20px',
-                left: '100px',
-                right: '60px',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                color: 'rgba(156, 163, 175, 0.5)',
-                fontSize: '12px'
+                minHeight: '100vh',
+                background: 'linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%)',
+                padding: '40px 40px 40px 40px',
+                position: 'relative',
+                overflow: 'auto'
             }}>
-                <span>NeoStream IPTV</span>
-                <span>v1.0.0</span>
+                {/* Background decorations */}
+                <div style={{
+                    position: 'fixed',
+                    top: '-200px',
+                    right: '-200px',
+                    width: '600px',
+                    height: '600px',
+                    background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)',
+                    borderRadius: '50%',
+                    pointerEvents: 'none'
+                }} />
+                <div style={{
+                    position: 'fixed',
+                    bottom: '-150px',
+                    left: '-150px',
+                    width: '400px',
+                    height: '400px',
+                    background: 'radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 70%)',
+                    borderRadius: '50%',
+                    pointerEvents: 'none'
+                }} />
+
+                {/* Header */}
+                <div style={{ marginBottom: 32, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                        <div style={{
+                            fontSize: '13px',
+                            color: 'rgba(156, 163, 175, 1)',
+                            marginBottom: '6px',
+                            textTransform: 'capitalize'
+                        }}>
+                            {formatDate(currentTime)}
+                        </div>
+                        <h1 style={{
+                            fontSize: '36px',
+                            fontWeight: '700',
+                            background: 'linear-gradient(135deg, #ffffff 0%, #94a3b8 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            marginBottom: '6px'
+                        }}>
+                            {getGreeting()}! 👋
+                        </h1>
+                        <p style={{
+                            fontSize: '14px',
+                            color: 'rgba(156, 163, 175, 1)'
+                        }}>
+                            O que você quer assistir hoje?
+                        </p>
+                    </div>
+
+                    {/* Clock */}
+                    <div style={{ textAlign: 'right' }}>
+                        <div style={{
+                            fontSize: '48px',
+                            fontWeight: '300',
+                            color: 'white',
+                            letterSpacing: '-2px',
+                            lineHeight: 1
+                        }}>
+                            {formatTime(currentTime)}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Stats Cards */}
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '16px',
+                    marginBottom: '32px',
+                    maxWidth: '700px'
+                }}>
+                    {/* Live TV Card */}
+                    <a href="#/dashboard/live" style={{
+                        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%)',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                        textDecoration: 'none',
+                        transition: 'all 0.3s ease',
+                        cursor: 'pointer'
+                    }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-4px)';
+                            e.currentTarget.style.boxShadow = '0 20px 40px rgba(239, 68, 68, 0.2)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                        }}>
+                        <div style={{ fontSize: '28px', marginBottom: '8px' }}>📺</div>
+                        <div style={{ fontSize: '24px', fontWeight: '700', color: 'white', marginBottom: '2px' }}>
+                            {loading ? '...' : counts.live.toLocaleString()}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'rgba(239, 68, 68, 0.9)', fontWeight: '600' }}>
+                            Canais ao Vivo
+                        </div>
+                    </a>
+
+                    {/* VOD Card */}
+                    <a href="#/dashboard/vod" style={{
+                        background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%)',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '1px solid rgba(59, 130, 246, 0.2)',
+                        textDecoration: 'none',
+                        transition: 'all 0.3s ease',
+                        cursor: 'pointer'
+                    }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-4px)';
+                            e.currentTarget.style.boxShadow = '0 20px 40px rgba(59, 130, 246, 0.2)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                        }}>
+                        <div style={{ fontSize: '28px', marginBottom: '8px' }}>🎬</div>
+                        <div style={{ fontSize: '24px', fontWeight: '700', color: 'white', marginBottom: '2px' }}>
+                            {loading ? '...' : counts.vod.toLocaleString()}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'rgba(59, 130, 246, 0.9)', fontWeight: '600' }}>
+                            Filmes
+                        </div>
+                    </a>
+
+                    {/* Series Card */}
+                    <a href="#/dashboard/series" style={{
+                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '1px solid rgba(139, 92, 246, 0.2)',
+                        textDecoration: 'none',
+                        transition: 'all 0.3s ease',
+                        cursor: 'pointer'
+                    }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-4px)';
+                            e.currentTarget.style.boxShadow = '0 20px 40px rgba(139, 92, 246, 0.2)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                        }}>
+                        <div style={{ fontSize: '28px', marginBottom: '8px' }}>📺</div>
+                        <div style={{ fontSize: '24px', fontWeight: '700', color: 'white', marginBottom: '2px' }}>
+                            {loading ? '...' : counts.series.toLocaleString()}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'rgba(139, 92, 246, 0.9)', fontWeight: '600' }}>
+                            Séries
+                        </div>
+                    </a>
+                </div>
+
+                {/* Continue Watching Section */}
+                <ContentSection
+                    title="⏯️ Continue Assistindo"
+                    items={continueWatching}
+                    type="continue"
+                    showProgress={true}
+                />
+
+                {/* Recently Added Series */}
+                <ContentSection
+                    title="🆕 Séries Adicionadas"
+                    items={recentSeries}
+                    type="series"
+                />
+
+                {/* Recently Added Movies */}
+                <ContentSection
+                    title="🎬 Filmes Adicionados"
+                    items={recentMovies}
+                    type="movie"
+                />
+
+                {/* Quick Access */}
+                <div style={{ marginTop: 40 }}>
+                    <h2 style={{
+                        fontSize: '16px',
+                        fontWeight: '600',
+                        color: 'white',
+                        marginBottom: '16px'
+                    }}>
+                        Acesso Rápido
+                    </h2>
+                    <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(4, 1fr)',
+                        gap: '12px',
+                        maxWidth: '600px'
+                    }}>
+                        <a href="#/dashboard/live" style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: '10px',
+                            padding: '16px',
+                            textAlign: 'center',
+                            textDecoration: 'none',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            transition: 'all 0.2s'
+                        }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                        >
+                            <div style={{ fontSize: '24px', marginBottom: '6px' }}>🔴</div>
+                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>TV ao Vivo</div>
+                        </a>
+                        <a href="#/dashboard/vod" style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: '10px',
+                            padding: '16px',
+                            textAlign: 'center',
+                            textDecoration: 'none',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            transition: 'all 0.2s'
+                        }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                        >
+                            <div style={{ fontSize: '24px', marginBottom: '6px' }}>🎥</div>
+                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>Filmes</div>
+                        </a>
+                        <a href="#/dashboard/series" style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: '10px',
+                            padding: '16px',
+                            textAlign: 'center',
+                            textDecoration: 'none',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            transition: 'all 0.2s'
+                        }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                        >
+                            <div style={{ fontSize: '24px', marginBottom: '6px' }}>📺</div>
+                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>Séries</div>
+                        </a>
+                        <a href="#/dashboard/settings" style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: '10px',
+                            padding: '16px',
+                            textAlign: 'center',
+                            textDecoration: 'none',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            transition: 'all 0.2s'
+                        }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                        >
+                            <div style={{ fontSize: '24px', marginBottom: '6px' }}>⚙️</div>
+                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>Configurações</div>
+                        </a>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div style={{
+                    marginTop: '60px',
+                    paddingTop: '20px',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.05)',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    color: 'rgba(156, 163, 175, 0.5)',
+                    fontSize: '11px'
+                }}>
+                    <span>NeoStream IPTV</span>
+                    <span>v1.0.0</span>
+                </div>
             </div>
-        </div>
+        </>
     );
 }

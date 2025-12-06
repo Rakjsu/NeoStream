@@ -11,7 +11,7 @@ interface EpisodeProgress {
     duration?: number; // Total video duration
 }
 
-interface SeriesProgress {
+export interface SeriesProgress {
     seriesId: string;
     seriesName: string;
     lastWatchedSeason: number;
