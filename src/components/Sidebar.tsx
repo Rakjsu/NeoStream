@@ -577,15 +577,15 @@ const sidebarStyles = `
 .profile-popup-overlay {
     position: fixed;
     inset: 0;
-    z-index: 200;
-    background: transparent;
+    z-index: 9998;
+    background: rgba(0, 0, 0, 0.3);
 }
 
 /* Profile Popup */
 .profile-popup {
-    position: absolute;
-    left: calc(100% + 12px);
-    bottom: 60px;
+    position: fixed;
+    left: 92px;
+    bottom: 80px;
     width: 220px;
     background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
     border: 1px solid rgba(168, 85, 247, 0.3);
@@ -593,7 +593,7 @@ const sidebarStyles = `
     padding: 12px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     animation: popupSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    z-index: 300;
+    z-index: 9999;
 }
 
 @keyframes popupSlideIn {
