@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { fetchMovieDetails, searchMovieByName, type TMDBMovieDetails, getBackdropUrl } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
+import { favoritesService } from '../services/favoritesService';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import { CategoryMenu } from '../components/CategoryMenu';
@@ -362,6 +363,27 @@ export function VOD() {
                                     </button>
 
                                     <button
+                                        className={`btn btn-favorite ${favoritesService.has(String(selectedMovie.stream_id), 'movie') ? 'favorited' : ''}`}
+                                        onClick={() => {
+                                            favoritesService.toggle({
+                                                id: String(selectedMovie.stream_id),
+                                                type: 'movie',
+                                                title: selectedMovie.name,
+                                                poster: selectedMovie.cover || selectedMovie.stream_icon,
+                                                rating: tmdbData?.vote_average?.toFixed(1),
+                                                year: tmdbData?.release_date ? new Date(tmdbData.release_date).getFullYear().toString() : undefined,
+                                                streamId: selectedMovie.stream_id
+                                            });
+                                            setRefresh(r => r + 1);
+                                        }}
+                                        title={favoritesService.has(String(selectedMovie.stream_id), 'movie') ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}
+                                    >
+                                        <span className="btn-icon">
+                                            {favoritesService.has(String(selectedMovie.stream_id), 'movie') ? '❤️' : '🤍'}
+                                        </span>
+                                    </button>
+
+                                    <button
                                         className="btn btn-close"
                                         onClick={() => setSelectedMovie(null)}
                                     >
@@ -701,6 +723,38 @@ const vodStyles = `
     background: rgba(239, 68, 68, 0.2);
     color: #f87171;
     border-color: rgba(239, 68, 68, 0.4);
+}
+
+.btn-favorite {
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 22px;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.btn-favorite:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.4);
+    transform: scale(1.1);
+}
+
+.btn-favorite.favorited {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: #ef4444;
+    animation: heartBeat 0.6s ease;
+}
+
+@keyframes heartBeat {
+    0%, 100% { transform: scale(1); }
+    25% { transform: scale(1.2); }
+    50% { transform: scale(1); }
+    75% { transform: scale(1.15); }
 }
 
 /* Movies Scroll Container */
