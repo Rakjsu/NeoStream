@@ -1,18 +1,31 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark, Home } from 'lucide-react';
+import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark, Home, Users } from 'lucide-react';
 import { profileService } from '../services/profileService';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { UpdateNotificationBadge } from './UpdateNotificationBadge';
 import { UpdateModal } from './UpdateModal';
 import type { UpdateInfo } from '../types/update';
+import type { Profile } from '../types/profile';
 
 export function Sidebar() {
     const navigate = useNavigate();
     const location = useLocation();
-    const [activeProfile] = useState(() => profileService.getActiveProfile());
+    const [activeProfile, setActiveProfile] = useState(() => profileService.getActiveProfile());
     const [showUpdateModal, setShowUpdateModal] = useState(false);
     const [updateInfo] = useState<UpdateInfo | null>(null);
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+    const [showProfilePopup, setShowProfilePopup] = useState(false);
+    const [profiles, setProfiles] = useState<Profile[]>([]);
+
+    useEffect(() => {
+        setProfiles(profileService.getAllProfiles());
+    }, []);
+
+    const handleSwitchProfile = (profile: Profile) => {
+        profileService.setActiveProfile(profile.id);
+        setActiveProfile(profile);
+        setShowProfilePopup(false);
+    };
 
     const handleUpdateBadgeClick = () => {
         setShowUpdateModal(true);
@@ -124,10 +137,10 @@ export function Sidebar() {
                     {activeProfile && (
                         <button
                             className="profile-btn"
-                            onClick={() => navigate('/dashboard/settings')}
+                            onClick={() => setShowProfilePopup(!showProfilePopup)}
                             onMouseEnter={() => setHoveredItem('profile')}
                             onMouseLeave={() => setHoveredItem(null)}
-                            title="Perfil"
+                            title="Trocar Perfil"
                         >
                             <div className="profile-ring" />
                             <div className="profile-inner">
@@ -143,11 +156,48 @@ export function Sidebar() {
                                 </svg>
                             </div>
                             {/* Profile Tooltip */}
-                            <div className={`tooltip ${hoveredItem === 'profile' ? 'visible' : ''}`}>
+                            <div className={`tooltip ${hoveredItem === 'profile' && !showProfilePopup ? 'visible' : ''}`}>
                                 <span className="tooltip-emoji">👤</span>
                                 <span className="tooltip-label">{activeProfile.name}</span>
                             </div>
                         </button>
+                    )}
+
+                    {/* Profile Popup */}
+                    {showProfilePopup && (
+                        <div className="profile-popup">
+                            <div className="profile-popup-header">
+                                <Users size={18} />
+                                <span>Trocar Perfil</span>
+                            </div>
+                            <div className="profile-popup-list">
+                                {profiles.map((profile) => (
+                                    <button
+                                        key={profile.id}
+                                        className={`profile-popup-item ${activeProfile?.id === profile.id ? 'active' : ''}`}
+                                        onClick={() => handleSwitchProfile(profile)}
+                                    >
+                                        <div className="profile-popup-avatar">
+                                            {profile.avatar || '👤'}
+                                        </div>
+                                        <span className="profile-popup-name">{profile.name}</span>
+                                        {activeProfile?.id === profile.id && (
+                                            <span className="profile-popup-check">✓</span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+                            <button
+                                className="profile-popup-settings"
+                                onClick={() => {
+                                    setShowProfilePopup(false);
+                                    navigate('/dashboard/settings');
+                                }}
+                            >
+                                <Settings size={16} />
+                                <span>Gerenciar Perfis</span>
+                            </button>
+                        </div>
                     )}
 
                     {/* Logout */}
@@ -167,6 +217,14 @@ export function Sidebar() {
                     </button>
                 </div>
             </div>
+
+            {/* Profile Popup Overlay */}
+            {showProfilePopup && (
+                <div
+                    className="profile-popup-overlay"
+                    onClick={() => setShowProfilePopup(false)}
+                />
+            )}
 
             {/* Update Modal */}
             <UpdateModal
@@ -512,5 +570,126 @@ const sidebarStyles = `
 
 .logout-btn:hover .logout-icon {
     stroke: #f87171;
+}
+
+/* Profile Popup Overlay */
+.profile-popup-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: transparent;
+}
+
+/* Profile Popup */
+.profile-popup {
+    position: absolute;
+    left: calc(100% + 12px);
+    bottom: 60px;
+    width: 220px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    border-radius: 16px;
+    padding: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    animation: popupSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 300;
+}
+
+@keyframes popupSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
+.profile-popup-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 13px;
+    font-weight: 600;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 8px;
+}
+
+.profile-popup-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.profile-popup-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+}
+
+.profile-popup-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.profile-popup-item.active {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.15));
+}
+
+.profile-popup-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(236, 72, 153, 0.3));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+}
+
+.profile-popup-name {
+    flex: 1;
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    text-align: left;
+}
+
+.profile-popup-check {
+    color: #10b981;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.profile-popup-settings {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.profile-popup-settings:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
 }
 `;

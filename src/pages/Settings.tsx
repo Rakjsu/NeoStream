@@ -425,36 +425,39 @@ const settingsStyles = `
 .settings-nav {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    padding: 16px;
+    gap: 6px;
+    padding: 12px;
     background: rgba(255, 255, 255, 0.03);
     border-radius: 20px;
     border: 1px solid rgba(255, 255, 255, 0.05);
     height: fit-content;
+    min-width: 220px;
 }
 
 @media (max-width: 900px) {
     .settings-nav {
         flex-direction: row;
         overflow-x: auto;
-        padding: 12px;
+        padding: 10px;
+        min-width: unset;
     }
 }
 
 .nav-item {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 16px 20px;
+    gap: 12px;
+    padding: 14px 16px;
     background: transparent;
     border: none;
-    border-radius: 14px;
+    border-radius: 12px;
     color: rgba(255, 255, 255, 0.7);
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
     animation: slideIn 0.4s ease backwards;
+    width: 100%;
 }
 
 @keyframes slideIn {
@@ -469,14 +472,14 @@ const settingsStyles = `
 }
 
 .nav-item:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.08);
     color: white;
 }
 
 .nav-item.active {
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.15));
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(236, 72, 153, 0.2));
     color: white;
-    border: 1px solid rgba(168, 85, 247, 0.3);
+    box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.4);
 }
 
 .nav-icon {

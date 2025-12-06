@@ -239,6 +239,31 @@ export function LiveTV() {
 
     return (
         <div style={{ position: 'relative', height: '100vh', overflow: 'hidden' }}>
+            {/* Animated Backdrop */}
+            <div style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)',
+                zIndex: 0
+            }} />
+            <div style={{
+                position: 'fixed',
+                inset: 0,
+                background: `
+                    radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+                    radial-gradient(ellipse at 80% 80%, rgba(147, 51, 234, 0.1) 0%, transparent 50%),
+                    radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 70%)
+                `,
+                pointerEvents: 'none',
+                zIndex: 0,
+                animation: 'backdropPulse 8s ease-in-out infinite'
+            }} />
+            <style>{`
+                @keyframes backdropPulse {
+                    0%, 100% { opacity: 0.5; }
+                    50% { opacity: 0.8; }
+                }
+            `}</style>
             <AnimatedSearchBar
                 value={searchQuery}
                 onChange={setSearchQuery}
@@ -602,27 +627,38 @@ export function LiveTV() {
                     </div>
                 )}
 
-                <div className="p-8" style={{ paddingLeft: '60px' }}>
+                <div className="p-8" style={{ paddingLeft: '60px', position: 'relative', zIndex: 1 }}>
                     <style>{`
                         .channel-card {
                             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
                             transform-origin: center;
+                            animation: channelFadeIn 0.4s ease backwards;
+                        }
+                        @keyframes channelFadeIn {
+                            from { opacity: 0; transform: translateY(10px) scale(0.98); }
+                            to { opacity: 1; transform: translateY(0) scale(1); }
                         }
                         .channel-card:hover {
-                            transform: translateX(8px) scale(1.01);
-                            background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(55, 65, 81, 1) 100%) !important;
-                            border-color: rgba(59, 130, 246, 0.3) !important;
-                            box-shadow: 0 10px 30px -10px rgba(59, 130, 246, 0.3);
+                            transform: translateY(-4px) scale(1.02);
+                            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(31, 41, 55, 0.95) 100%) !important;
+                            border-color: rgba(59, 130, 246, 0.4) !important;
+                            box-shadow: 0 15px 40px -10px rgba(59, 130, 246, 0.35);
                         }
                         .channel-card:hover .channel-logo { transform: scale(1.1); }
                         .channel-logo { transition: transform 0.3s ease; }
-                        .channel-card:active { transform: translateX(8px) scale(0.98); }
+                        .channel-card:active { transform: translateY(-2px) scale(0.98); }
                         .channels-grid {
                             display: grid;
-                            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-                            gap: 12px;
+                            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+                            gap: 16px;
+                        }
+                        @media (max-width: 1200px) {
+                            .channels-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
                         }
                         @media (max-width: 768px) {
+                            .channels-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+                        }
+                        @media (max-width: 480px) {
                             .channels-grid { grid-template-columns: 1fr; }
                         }
                     `}</style>
