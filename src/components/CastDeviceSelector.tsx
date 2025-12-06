@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { FaTv, FaChromecast, FaApple, FaTimes } from 'react-icons/fa';
 import { useDLNA } from '../hooks/useDLNA';
 import { useAirPlay } from '../hooks/useAirPlay';
 
@@ -8,6 +7,7 @@ export interface CastDevice {
     name: string;
     type: 'chromecast' | 'dlna' | 'airplay';
     available: boolean;
+    source?: 'discovered' | 'manual';
     cast: () => void;
 }
 
@@ -33,22 +33,30 @@ export function CastDeviceSelector({
     const dlna = useDLNA(videoUrl, videoTitle);
     const airplay = useAirPlay(videoUrl, videoTitle);
     const [allDevices, setAllDevices] = useState<CastDevice[]>([]);
-    const [showAddDevice, setShowAddDevice] = useState(false);
+    const [view, setView] = useState<'list' | 'add'>('list');
     const [deviceName, setDeviceName] = useState('');
     const [deviceIP, setDeviceIP] = useState('');
     const [devicePort, setDevicePort] = useState('8080');
+    const [casting, setCasting] = useState(false);
+    const [castError, setCastError] = useState<string | null>(null);
 
-    // Combine all devices from different protocols
+    // Auto-discover on mount
+    useEffect(() => {
+        dlna.discoverDevices();
+    }, []);
+
+    // Combine all devices
     useEffect(() => {
         const devices: CastDevice[] = [];
 
-        // Add Chromecast if available
+        // Add Chromecast
         if (chromecastAvailable) {
             devices.push({
                 id: 'chromecast-default',
-                name: chromecastCasting ? 'Chromecast (Connected)' : 'Chromecast',
+                name: chromecastCasting ? 'Chromecast (Conectado)' : 'Chromecast',
                 type: 'chromecast',
                 available: true,
+                source: 'discovered',
                 cast: onChromecastCast
             });
         }
@@ -59,8 +67,9 @@ export function CastDeviceSelector({
                 id: device.id,
                 name: device.name,
                 type: 'dlna',
-                available: device.available,
-                cast: () => dlna.castToDevice(device)
+                available: device.online,
+                source: device.source,
+                cast: () => handleCast(device)
             });
         });
 
@@ -71,42 +80,38 @@ export function CastDeviceSelector({
                 name: device.name,
                 type: 'airplay',
                 available: device.available,
+                source: 'discovered',
                 cast: () => airplay.castToDevice(device)
             });
         });
 
         setAllDevices(devices);
-    }, [chromecastAvailable, chromecastCasting, dlna.devices, airplay.devices, onChromecastCast]);
+    }, [chromecastAvailable, chromecastCasting, dlna.devices, airplay.devices]);
 
-    const getDeviceIcon = (type: string) => {
-        switch (type) {
-            case 'chromecast':
-                return <FaChromecast />;
-            case 'dlna':
-                return <FaTv />;
-            case 'airplay':
-                return <FaApple />;
-            default:
-                return <FaTv />;
-        }
-    };
+    const handleCast = async (device: any) => {
+        setCasting(true);
+        setCastError(null);
 
-    const getDeviceTypeName = (type: string) => {
-        switch (type) {
-            case 'chromecast':
-                return 'Chromecast';
-            case 'dlna':
-                return 'DLNA/UPnP';
-            case 'airplay':
-                return 'AirPlay';
-            default:
-                return 'Unknown';
+        const success = await dlna.castToDevice(device);
+
+        if (success) {
+            onDeviceSelected({
+                id: device.id,
+                name: device.name,
+                type: 'dlna',
+                available: true,
+                cast: () => { }
+            });
+            setTimeout(() => onClose(), 500);
+        } else {
+            setCastError(dlna.error || 'Falha ao transmitir');
         }
+        setCasting(false);
     };
 
     const handleAddDevice = async () => {
         if (!deviceIP) {
-            alert('Digite o IP da sua Smart TV');
+            setCastError('Digite o IP da sua Smart TV');
             return;
         }
 
@@ -117,324 +122,646 @@ export function CastDeviceSelector({
         );
 
         if (success) {
-            setShowAddDevice(false);
+            setView('list');
             setDeviceName('');
             setDeviceIP('');
             setDevicePort('8080');
+            setCastError(null);
         } else {
-            alert('Erro ao adicionar dispositivo');
+            setCastError(dlna.error || 'Erro ao adicionar dispositivo');
         }
     };
 
-    // Add Device Dialog
-    if (showAddDevice) {
-        return (
-            <div style={{
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                zIndex: 10000,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-            }}>
-                <div style={{
-                    backgroundColor: '#1f2937',
-                    borderRadius: '16px',
-                    padding: '24px',
-                    maxWidth: '400px',
-                    width: '90%'
-                }}>
-                    <h2 style={{
-                        color: 'white',
-                        fontSize: '20px',
-                        fontWeight: 'bold',
-                        marginBottom: '20px'
-                    }}>
-                        Adicionar Smart TV
-                    </h2>
+    const getDeviceIcon = (type: string, source?: string) => {
+        if (type === 'chromecast') return '📡';
+        if (type === 'airplay') return '🍎';
+        return source === 'discovered' ? '📺' : '🖥️';
+    };
 
-                    <div style={{ marginBottom: '16px' }}>
-                        <label style={{ color: '#9ca3af', fontSize: '14px', marginBottom: '8px', display: 'block' }}>
-                            Nome (opcional)
-                        </label>
-                        <input
-                            type="text"
-                            value={deviceName}
-                            onChange={(e) => setDeviceName(e.target.value)}
-                            placeholder="Samsung TV"
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                borderRadius: '8px',
-                                border: '1px solid #4b5563',
-                                backgroundColor: '#374151',
-                                color: 'white',
-                                fontSize: '14px'
-                            }}
-                        />
-                    </div>
-
-                    <div style={{ marginBottom: '16px' }}>
-                        <label style={{ color: '#9ca3af', fontSize: '14px', marginBottom: '8px', display: 'block' }}>
-                            Endereço IP *
-                        </label>
-                        <input
-                            type="text"
-                            value={deviceIP}
-                            onChange={(e) => setDeviceIP(e.target.value)}
-                            placeholder="192.168.1.100"
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                borderRadius: '8px',
-                                border: '1px solid #4b5563',
-                                backgroundColor: '#374151',
-                                color: 'white',
-                                fontSize: '14px'
-                            }}
-                        />
-                    </div>
-
-                    <div style={{ marginBottom: '20px' }}>
-                        <label style={{ color: '#9ca3af', fontSize: '14px', marginBottom: '8px', display: 'block' }}>
-                            Porta
-                        </label>
-                        <input
-                            type="text"
-                            value={devicePort}
-                            onChange={(e) => setDevicePort(e.target.value)}
-                            placeholder="8080"
-                            style={{
-                                width: '100%',
-                                padding: '10px',
-                                borderRadius: '8px',
-                                border: '1px solid #4b5563',
-                                backgroundColor: '#374151',
-                                color: 'white',
-                                fontSize: '14px'
-                            }}
-                        />
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                        <button
-                            onClick={() => setShowAddDevice(false)}
-                            style={{
-                                flex: 1,
-                                padding: '10px',
-                                borderRadius: '8px',
-                                border: '1px solid #4b5563',
-                                backgroundColor: '#374151',
-                                color: 'white',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            onClick={handleAddDevice}
-                            style={{
-                                flex: 1,
-                                padding: '10px',
-                                borderRadius: '8px',
-                                border: 'none',
-                                backgroundColor: '#2563eb',
-                                color: 'white',
-                                cursor: 'pointer',
-                                fontWeight: 'bold'
-                            }}
-                        >
-                            Adicionar
-                        </button>
-                    </div>
-
-                    <div style={{
-                        marginTop: '16px',
-                        padding: '12px',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderRadius: '8px',
-                        border: '1px solid rgba(59, 130, 246, 0.2)'
-                    }}>
-                        <p style={{ color: '#93c5fd', fontSize: '12px', margin: 0 }}>
-                            💡 Encontre o IP da TV em: Configurações → Rede → Status da Rede
-                        </p>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+    const getDeviceTypeName = (type: string) => {
+        switch (type) {
+            case 'chromecast': return 'Google Cast';
+            case 'airplay': return 'Apple AirPlay';
+            default: return 'DLNA/UPnP';
+        }
+    };
 
     return (
-        <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.8)',
-            zIndex: 10000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
-        }}>
-            <div style={{
-                backgroundColor: '#1f2937',
-                borderRadius: '16px',
-                padding: '24px',
-                maxWidth: '500px',
-                width: '90%',
-                maxHeight: '80vh',
-                overflow: 'auto'
-            }}>
-                {/* Header */}
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '20px'
-                }}>
-                    <h2 style={{
-                        color: 'white',
-                        fontSize: '24px',
-                        fontWeight: 'bold',
-                        margin: 0
-                    }}>
-                        Cast to Device
-                    </h2>
-                    <button
-                        onClick={onClose}
-                        style={{
-                            background: 'transparent',
-                            border: 'none',
-                            color: '#9ca3af',
-                            fontSize: '24px',
-                            cursor: 'pointer',
-                            padding: '4px'
-                        }}
-                    >
-                        <FaTimes />
-                    </button>
-                </div>
-
-                {/* Device List */}
-                {allDevices.length === 0 ? (
-                    <div style={{
-                        textAlign: 'center',
-                        padding: '40px 20px',
-                        color: '#9ca3af'
-                    }}>
-                        <FaTv style={{ fontSize: '48px', marginBottom: '16px' }} />
-                        <p style={{ margin: 0, fontSize: '16px' }}>
-                            Nenhum dispositivo encontrado
-                        </p>
-                        <p style={{ margin: '8px 0 0 0', fontSize: '14px' }}>
-                            Adicione sua Smart TV manualmente
-                        </p>
+        <>
+            <style>{castStyles}</style>
+            <div className="cast-overlay" onClick={onClose}>
+                <div className="cast-modal" onClick={e => e.stopPropagation()}>
+                    {/* Animated Background */}
+                    <div className="cast-bg">
+                        <div className="cast-orb orb-1" />
+                        <div className="cast-orb orb-2" />
                     </div>
-                ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '16px' }}>
-                        {allDevices.map(device => (
+
+                    {/* Header */}
+                    <div className="cast-header">
+                        <div className="cast-title-row">
+                            <div className="cast-icon">📺</div>
+                            <div>
+                                <h2 className="cast-title">Transmitir para TV</h2>
+                                <p className="cast-subtitle">{videoTitle || 'Selecione um dispositivo'}</p>
+                            </div>
+                        </div>
+                        <button className="cast-close" onClick={onClose}>✕</button>
+                    </div>
+
+                    {/* Content */}
+                    {view === 'list' ? (
+                        <div className="cast-content">
+                            {/* Scan Button */}
                             <button
-                                key={device.id}
-                                onClick={() => {
-                                    device.cast();
-                                    onDeviceSelected(device);
-                                    onClose();
-                                }}
-                                style={{
-                                    background: 'rgba(55, 65, 81, 0.5)',
-                                    border: '1px solid rgba(75, 85, 99, 0.5)',
-                                    borderRadius: '12px',
-                                    padding: '16px',
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '16px',
-                                    transition: 'all 0.2s',
-                                    textAlign: 'left'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = 'rgba(37, 99, 235, 0.2)';
-                                    e.currentTarget.style.borderColor = 'rgba(37, 99, 235, 0.5)';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'rgba(55, 65, 81, 0.5)';
-                                    e.currentTarget.style.borderColor = 'rgba(75, 85, 99, 0.5)';
-                                }}
+                                className={`scan-btn ${dlna.isDiscovering ? 'scanning' : ''}`}
+                                onClick={() => dlna.discoverDevices()}
+                                disabled={dlna.isDiscovering}
                             >
-                                <div style={{
-                                    width: '48px',
-                                    height: '48px',
-                                    borderRadius: '12px',
-                                    background: 'rgba(37, 99, 235, 0.2)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: '#60a5fa',
-                                    fontSize: '24px'
-                                }}>
-                                    {getDeviceIcon(device.type)}
-                                </div>
-                                <div style={{ flex: 1 }}>
-                                    <div style={{
-                                        color: 'white',
-                                        fontSize: '16px',
-                                        fontWeight: '600',
-                                        marginBottom: '4px'
-                                    }}>
-                                        {device.name}
-                                    </div>
-                                    <div style={{
-                                        color: '#9ca3af',
-                                        fontSize: '14px'
-                                    }}>
-                                        {getDeviceTypeName(device.type)}
-                                    </div>
-                                </div>
+                                <span className="scan-icon">{dlna.isDiscovering ? '⏳' : '🔍'}</span>
+                                <span>{dlna.isDiscovering ? 'Buscando dispositivos...' : 'Buscar na rede'}</span>
                             </button>
-                        ))}
-                    </div>
-                )}
 
-                {/* Add Device Button */}
-                <button
-                    onClick={() => setShowAddDevice(true)}
-                    style={{
-                        width: '100%',
-                        padding: '12px',
-                        borderRadius: '8px',
-                        border: '2px dashed #4b5563',
-                        backgroundColor: 'transparent',
-                        color: '#60a5fa',
-                        cursor: 'pointer',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        marginBottom: '16px'
-                    }}
-                >
-                    + Adicionar Smart TV
-                </button>
+                            {/* Error */}
+                            {castError && (
+                                <div className="cast-error">
+                                    <span>⚠️</span>
+                                    <span>{castError}</span>
+                                </div>
+                            )}
 
-                {/* Info */}
-                <div style={{
-                    padding: '16px',
-                    background: 'rgba(59, 130, 246, 0.1)',
-                    borderRadius: '8px',
-                    border: '1px solid rgba(59, 130, 246, 0.2)'
-                }}>
-                    <p style={{
-                        color: '#93c5fd',
-                        fontSize: '14px',
-                        margin: 0
-                    }}>
-                        💡 Adicione sua TV usando o endereço IP da rede local
-                    </p>
+                            {/* Device List */}
+                            <div className="device-list">
+                                {allDevices.length === 0 ? (
+                                    <div className="no-devices">
+                                        <div className="no-devices-icon">📡</div>
+                                        <p>Nenhum dispositivo encontrado</p>
+                                        <p className="no-devices-hint">Adicione sua TV manualmente ou busque na rede</p>
+                                    </div>
+                                ) : (
+                                    allDevices.map((device, index) => (
+                                        <button
+                                            key={device.id}
+                                            className={`device-item ${casting ? 'disabled' : ''}`}
+                                            onClick={() => device.cast()}
+                                            style={{ animationDelay: `${index * 0.05}s` }}
+                                            disabled={casting}
+                                        >
+                                            <div className="device-icon">
+                                                {getDeviceIcon(device.type, device.source)}
+                                            </div>
+                                            <div className="device-info">
+                                                <span className="device-name">{device.name}</span>
+                                                <span className="device-type">
+                                                    {getDeviceTypeName(device.type)}
+                                                    {device.source === 'discovered' && ' • Descoberto'}
+                                                </span>
+                                            </div>
+                                            <div className="device-status">
+                                                {device.available ? (
+                                                    <span className="status-dot online" />
+                                                ) : (
+                                                    <span className="status-dot offline" />
+                                                )}
+                                            </div>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+
+                            {/* Add Device Button */}
+                            <button className="add-device-btn" onClick={() => setView('add')}>
+                                <span>➕</span>
+                                <span>Adicionar TV manualmente</span>
+                            </button>
+
+                            {/* Help */}
+                            <div className="cast-help">
+                                <div className="help-icon">💡</div>
+                                <div className="help-text">
+                                    <strong>Dica:</strong> A TV deve estar ligada e conectada na mesma rede Wi-Fi
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="cast-content">
+                            <button className="back-btn" onClick={() => setView('list')}>
+                                ← Voltar
+                            </button>
+
+                            <h3 className="add-title">Adicionar Smart TV</h3>
+
+                            {castError && (
+                                <div className="cast-error">
+                                    <span>⚠️</span>
+                                    <span>{castError}</span>
+                                </div>
+                            )}
+
+                            <div className="form-group">
+                                <label>Nome (opcional)</label>
+                                <input
+                                    type="text"
+                                    value={deviceName}
+                                    onChange={(e) => setDeviceName(e.target.value)}
+                                    placeholder="Samsung TV, LG TV..."
+                                    className="form-input"
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label>Endereço IP *</label>
+                                <input
+                                    type="text"
+                                    value={deviceIP}
+                                    onChange={(e) => setDeviceIP(e.target.value)}
+                                    placeholder="192.168.1.100"
+                                    className="form-input"
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label>Porta</label>
+                                <input
+                                    type="text"
+                                    value={devicePort}
+                                    onChange={(e) => setDevicePort(e.target.value)}
+                                    placeholder="8080"
+                                    className="form-input"
+                                />
+                            </div>
+
+                            <button className="submit-btn" onClick={handleAddDevice}>
+                                Adicionar TV
+                            </button>
+
+                            <div className="cast-help">
+                                <div className="help-icon">📺</div>
+                                <div className="help-text">
+                                    <strong>Como encontrar o IP:</strong> TV → Configurações → Rede → Status da Rede
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
-        </div>
+        </>
     );
 }
+
+const castStyles = `
+/* Overlay */
+.cast-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(8px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Modal */
+.cast-modal {
+    position: relative;
+    width: 90%;
+    max-width: 480px;
+    max-height: 85vh;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 1px solid rgba(168, 85, 247, 0.2);
+    border-radius: 24px;
+    overflow: hidden;
+    animation: modalSlide 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modalSlide {
+    from { opacity: 0; transform: scale(0.95) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Background Orbs */
+.cast-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.cast-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0.4;
+}
+
+.orb-1 {
+    width: 200px;
+    height: 200px;
+    background: linear-gradient(135deg, #a855f7, #ec4899);
+    top: -50px;
+    right: -50px;
+    animation: orbFloat 8s ease-in-out infinite;
+}
+
+.orb-2 {
+    width: 150px;
+    height: 150px;
+    background: linear-gradient(135deg, #3b82f6, #06b6d4);
+    bottom: -30px;
+    left: -30px;
+    animation: orbFloat 10s ease-in-out infinite reverse;
+}
+
+@keyframes orbFloat {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(20px, -20px) scale(1.1); }
+}
+
+/* Header */
+.cast-header {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.cast-title-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.cast-icon {
+    font-size: 36px;
+    animation: iconPulse 2s ease-in-out infinite;
+}
+
+@keyframes iconPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.cast-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: white;
+    margin: 0;
+    background: linear-gradient(135deg, #fff 0%, #c4b5fd 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.cast-subtitle {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 14px;
+    margin: 4px 0 0 0;
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cast-close {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.cast-close:hover {
+    background: rgba(239, 68, 68, 0.3);
+    transform: rotate(90deg);
+}
+
+/* Content */
+.cast-content {
+    position: relative;
+    z-index: 10;
+    padding: 24px;
+    max-height: calc(85vh - 100px);
+    overflow-y: auto;
+}
+
+/* Scan Button */
+.scan-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(147, 51, 234, 0.2));
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 12px;
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 16px;
+}
+
+.scan-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2);
+}
+
+.scan-btn.scanning {
+    pointer-events: none;
+}
+
+.scan-icon {
+    font-size: 18px;
+}
+
+.scanning .scan-icon {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Error */
+.cast-error {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 10px;
+    color: #fca5a5;
+    font-size: 14px;
+    margin-bottom: 16px;
+    animation: shake 0.4s ease;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+/* Device List */
+.device-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.no-devices {
+    text-align: center;
+    padding: 40px 20px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.no-devices-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.no-devices-hint {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 8px;
+}
+
+/* Device Item */
+.device-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    animation: itemSlide 0.4s ease backwards;
+    text-align: left;
+}
+
+@keyframes itemSlide {
+    from { opacity: 0; transform: translateX(-10px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.device-item:hover:not(.disabled) {
+    background: rgba(168, 85, 247, 0.1);
+    border-color: rgba(168, 85, 247, 0.3);
+    transform: translateX(4px);
+}
+
+.device-item.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.device-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.2));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.device-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.device-name {
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.device-type {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 13px;
+}
+
+.device-status {
+    padding-right: 8px;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: block;
+}
+
+.status-dot.online {
+    background: #10b981;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.status-dot.offline {
+    background: #6b7280;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Add Device Button */
+.add-device-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px;
+    background: transparent;
+    border: 2px dashed rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 16px;
+}
+
+.add-device-btn:hover {
+    border-color: rgba(168, 85, 247, 0.5);
+    color: white;
+    background: rgba(168, 85, 247, 0.1);
+}
+
+/* Help */
+.cast-help {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: 12px;
+}
+
+.help-icon {
+    font-size: 20px;
+}
+
+.help-text {
+    font-size: 13px;
+    color: #93c5fd;
+    line-height: 1.5;
+}
+
+/* Back Button */
+.back-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 14px;
+    cursor: pointer;
+    padding: 8px 0;
+    margin-bottom: 16px;
+    transition: color 0.2s ease;
+}
+
+.back-btn:hover {
+    color: white;
+}
+
+/* Add Title */
+.add-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: white;
+    margin: 0 0 20px 0;
+}
+
+/* Form */
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.form-input {
+    width: 100%;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: white;
+    font-size: 15px;
+    transition: all 0.2s ease;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: rgba(168, 85, 247, 0.5);
+    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
+}
+
+.form-input::placeholder {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+/* Submit Button */
+.submit-btn {
+    width: 100%;
+    padding: 14px 24px;
+    background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 16px;
+}
+
+.submit-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(168, 85, 247, 0.3);
+}
+
+.submit-btn:active {
+    transform: translateY(0);
+}
+`;

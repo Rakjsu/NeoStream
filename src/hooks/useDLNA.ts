@@ -5,14 +5,18 @@ export interface DLNADevice {
     name: string;
     type: 'dlna';
     host: string;
-    port: number;
-    available: boolean;
+    port?: number;
+    location?: string;
+    source: 'discovered' | 'manual';
+    online: boolean;
 }
 
 export function useDLNA(videoUrl: string, videoTitle: string) {
     const [devices, setDevices] = useState<DLNADevice[]>([]);
     const [isCasting, setIsCasting] = useState(false);
+    const [isDiscovering, setIsDiscovering] = useState(false);
     const [currentDevice, setCurrentDevice] = useState<DLNADevice | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
     // Load saved devices
     const loadDevices = useCallback(async () => {
@@ -25,7 +29,9 @@ export function useDLNA(videoUrl: string, videoTitle: string) {
                     type: 'dlna' as const,
                     host: d.host,
                     port: d.port,
-                    available: true
+                    location: d.location,
+                    source: d.source || 'manual',
+                    online: d.online !== false
                 }));
                 setDevices(dlnaDevices);
             }
@@ -34,8 +40,40 @@ export function useDLNA(videoUrl: string, videoTitle: string) {
         }
     }, []);
 
+    // Discover devices on network
+    const discoverDevices = useCallback(async () => {
+        setIsDiscovering(true);
+        setError(null);
+
+        try {
+            const result = await window.ipcRenderer.invoke('dlna:discover');
+            if (result.success) {
+                const dlnaDevices: DLNADevice[] = result.devices.map((d: any) => ({
+                    id: d.id,
+                    name: d.name,
+                    type: 'dlna' as const,
+                    host: d.host,
+                    port: d.port,
+                    location: d.location,
+                    source: d.source || 'discovered',
+                    online: d.online !== false
+                }));
+                setDevices(dlnaDevices);
+                console.log('✅ Discovered', dlnaDevices.length, 'devices');
+            } else {
+                setError(result.error || 'Discovery failed');
+            }
+        } catch (error: any) {
+            console.error('❌ DLNA discover error:', error);
+            setError(error.message || 'Discovery error');
+        } finally {
+            setIsDiscovering(false);
+        }
+    }, []);
+
     // Add manual device
     const addDevice = async (name: string, ip: string, port: number = 8080) => {
+        setError(null);
         try {
             const result = await window.ipcRenderer.invoke('dlna:add-device', {
                 name,
@@ -48,9 +86,26 @@ export function useDLNA(videoUrl: string, videoTitle: string) {
                 await loadDevices();
                 return true;
             }
+            setError(result.error || 'Failed to add device');
+            return false;
+        } catch (error: any) {
+            console.error('❌ DLNA add device error:', error);
+            setError(error.message || 'Add device failed');
+            return false;
+        }
+    };
+
+    // Remove device
+    const removeDevice = async (deviceId: string) => {
+        try {
+            const result = await window.ipcRenderer.invoke('dlna:remove-device', { deviceId });
+            if (result.success) {
+                await loadDevices();
+                return true;
+            }
             return false;
         } catch (error) {
-            console.error('❌ DLNA add device error:', error);
+            console.error('❌ DLNA remove device error:', error);
             return false;
         }
     };
@@ -60,7 +115,9 @@ export function useDLNA(videoUrl: string, videoTitle: string) {
         loadDevices();
     }, [loadDevices]);
 
+    // Cast to device
     const castToDevice = async (device: DLNADevice) => {
+        setError(null);
         try {
             const result = await window.ipcRenderer.invoke('dlna:cast', {
                 deviceId: device.id,
@@ -72,15 +129,19 @@ export function useDLNA(videoUrl: string, videoTitle: string) {
                 setIsCasting(true);
                 setCurrentDevice(device);
                 console.log('✅ Casting to DLNA device:', device.name);
+                return true;
             } else {
-                alert(`Erro ao transmitir: ${result.error}`);
+                setError(result.error || 'Cast failed');
+                return false;
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('❌ DLNA cast error:', error);
-            alert('Erro ao transmitir para o dispositivo');
+            setError(error.message || 'Cast error');
+            return false;
         }
     };
 
+    // Stop casting
     const stopCasting = async () => {
         if (!currentDevice) return;
 
@@ -95,19 +156,17 @@ export function useDLNA(videoUrl: string, videoTitle: string) {
         }
     };
 
-    // Dummy discover function for compatibility
-    const discoverDevices = async () => {
-        await loadDevices();
-    };
-
     return {
         devices,
         isCasting,
+        isDiscovering,
         currentDevice,
+        error,
         discoverDevices,
         castToDevice,
         stopCasting,
         addDevice,
+        removeDevice,
         loadDevices
     };
 }
