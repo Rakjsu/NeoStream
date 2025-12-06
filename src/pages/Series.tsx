@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { formatGenres, type TMDBSeriesDetails, fetchEpisodeDetails, getBackdropUrl, searchSeriesByName } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
+import { favoritesService } from '../services/favoritesService';
 import { watchProgressService } from '../services/watchProgressService';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
@@ -466,6 +467,27 @@ export function Series() {
                                             {watchLaterService.has(String(selectedSeries.series_id), 'series') ? '✓' : '+'}
                                         </span>
                                         <span>{watchLaterService.has(String(selectedSeries.series_id), 'series') ? 'Salvo' : 'Minha Lista'}</span>
+                                    </button>
+
+                                    <button
+                                        className={`btn btn-favorite ${favoritesService.has(String(selectedSeries.series_id), 'series') ? 'favorited' : ''}`}
+                                        onClick={() => {
+                                            favoritesService.toggle({
+                                                id: String(selectedSeries.series_id),
+                                                type: 'series',
+                                                title: selectedSeries.name,
+                                                poster: selectedSeries.cover || selectedSeries.stream_icon,
+                                                rating: tmdbData?.vote_average?.toFixed(1),
+                                                year: tmdbData?.first_air_date ? new Date(tmdbData.first_air_date).getFullYear().toString() : undefined,
+                                                seriesId: selectedSeries.series_id
+                                            });
+                                            setRefresh(r => r + 1);
+                                        }}
+                                        title={favoritesService.has(String(selectedSeries.series_id), 'series') ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}
+                                    >
+                                        <span className="btn-icon">
+                                            {favoritesService.has(String(selectedSeries.series_id), 'series') ? '❤️' : '🤍'}
+                                        </span>
                                     </button>
 
                                     {watchProgressService.getSeriesProgress(String(selectedSeries.series_id), selectedSeries.name) && (
@@ -964,6 +986,38 @@ const seriesStyles = `
     background: rgba(239, 68, 68, 0.2);
     color: #f87171;
     border-color: rgba(239, 68, 68, 0.4);
+}
+
+.btn-favorite {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 20px;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s ease;
+}
+
+.btn-favorite:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.4);
+    transform: scale(1.1);
+}
+
+.btn-favorite.favorited {
+    background: rgba(239, 68, 68, 0.25);
+    border-color: #ef4444;
+    animation: heartBeat 0.6s ease;
+}
+
+@keyframes heartBeat {
+    0%, 100% { transform: scale(1); }
+    25% { transform: scale(1.2); }
+    50% { transform: scale(1); }
+    75% { transform: scale(1.15); }
 }
 
 /* Series Scroll Container */
