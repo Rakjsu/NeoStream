@@ -51,6 +51,15 @@ export function Sidebar() {
     return (
         <>
             <style>{sidebarStyles}</style>
+
+            {/* Profile Popup Overlay - must be before sidebar for correct stacking */}
+            {showProfilePopup && (
+                <div
+                    className="profile-popup-overlay"
+                    onClick={() => setShowProfilePopup(false)}
+                />
+            )}
+
             <div className="sidebar">
                 {/* Animated Background */}
                 <div className="sidebar-bg">
@@ -219,13 +228,6 @@ export function Sidebar() {
                 </div>
             </div>
 
-            {/* Profile Popup Overlay */}
-            {showProfilePopup && (
-                <div
-                    className="profile-popup-overlay"
-                    onClick={() => setShowProfilePopup(false)}
-                />
-            )}
 
             {/* Update Modal */}
             <UpdateModal
