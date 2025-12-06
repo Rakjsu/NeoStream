@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark, Home, Users } from 'lucide-react';
+import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark, Home, Users, Heart } from 'lucide-react';
 import { profileService } from '../services/profileService';
 import { useState, useEffect } from 'react';
 import { UpdateNotificationBadge } from './UpdateNotificationBadge';
@@ -37,6 +37,7 @@ export function Sidebar() {
         { icon: Film, label: 'Filmes', path: '/dashboard/vod', emoji: '🎬', gradient: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' },
         { icon: PlaySquare, label: 'Séries', path: '/dashboard/series', emoji: '📺', gradient: 'linear-gradient(135deg, #ec4899, #db2777)' },
         { icon: Bookmark, label: 'Minha Lista', path: '/dashboard/watch-later', emoji: '🔖', gradient: 'linear-gradient(135deg, #10b981, #059669)' },
+        { icon: Heart, label: 'Favoritos', path: '/dashboard/favorites', emoji: '❤️', gradient: 'linear-gradient(135deg, #ef4444, #dc2626)' },
         { icon: Settings, label: 'Configurações', path: '/dashboard/settings', emoji: '⚙️', gradient: 'linear-gradient(135deg, #6b7280, #4b5563)' },
     ];
 

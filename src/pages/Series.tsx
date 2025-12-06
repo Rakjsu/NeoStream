@@ -73,20 +73,30 @@ export function Series() {
             const containerHeight = container.clientHeight;
 
             const cols = Math.max(2, Math.floor(containerWidth / (CARD_MIN_WIDTH + CARD_GAP)));
-            const rows = Math.ceil(containerHeight / 320) + 1;
+            const rows = Math.ceil(containerHeight / 320) + 2;
 
-            const items = Math.max(cols * rows, 12);
+            const items = Math.max(cols * rows, 24);
             setItemsPerPage(items);
 
-            if (visibleCount === 0) {
-                setVisibleCount(items);
-            }
+            // Always update visibleCount when recalculating - fix for fullscreen resize
+            setVisibleCount(prev => Math.max(prev, items));
         };
 
         calculateGrid();
-        window.addEventListener('resize', calculateGrid);
-        return () => window.removeEventListener('resize', calculateGrid);
-    }, [visibleCount]);
+
+        // Recalculate on window resize with debounce
+        let resizeTimeout: ReturnType<typeof setTimeout>;
+        const handleResize = () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(calculateGrid, 100);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            clearTimeout(resizeTimeout);
+        };
+    }, []);
 
     useEffect(() => { fetchSeries(); }, []);
 

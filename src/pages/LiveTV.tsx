@@ -54,24 +54,31 @@ export function LiveTV() {
 
             // Calculate how many columns fit
             const columns = Math.floor(containerWidth / (CARD_WIDTH + GRID_GAP));
-            // Calculate how many rows fit + 1 extra row for smooth scrolling
-            const rows = Math.ceil(containerHeight / (CARD_HEIGHT + GRID_GAP)) + 1;
+            // Calculate how many rows fit + 2 extra rows for smooth scrolling
+            const rows = Math.ceil(containerHeight / (CARD_HEIGHT + GRID_GAP)) + 2;
 
-            const calculatedItems = Math.max(columns * rows, 12); // Minimum 12 items
+            const calculatedItems = Math.max(columns * rows, 24); // Minimum 24 items
             setItemsPerPage(calculatedItems);
 
-            // Set initial visible count if not set
-            if (visibleCount === 0) {
-                setVisibleCount(calculatedItems);
-            }
+            // Always update visibleCount when recalculating - fix for fullscreen resize
+            setVisibleCount(prev => Math.max(prev, calculatedItems));
         };
 
         calculateItemsPerPage();
 
-        // Recalculate on window resize
-        window.addEventListener('resize', calculateItemsPerPage);
-        return () => window.removeEventListener('resize', calculateItemsPerPage);
-    }, [visibleCount]);
+        // Recalculate on window resize with debounce
+        let resizeTimeout: ReturnType<typeof setTimeout>;
+        const handleResize = () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(calculateItemsPerPage, 100);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            clearTimeout(resizeTimeout);
+        };
+    }, []);
 
     useEffect(() => {
         fetchStreams();
