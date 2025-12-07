@@ -57,8 +57,11 @@ function AsyncVideoPlayer({
                 setStreamUrl(url);
                 setLoading(false);
 
-                // Load saved video time for resume
-                if (seriesId && seasonNumber !== undefined && episodeNumber !== undefined) {
+                // Use external resume time if provided (from ResumeModal)
+                if (externalResumeTime !== undefined && externalResumeTime !== null && externalResumeTime > 0) {
+                    setResumeTime(externalResumeTime);
+                } else if (seriesId && seasonNumber !== undefined && episodeNumber !== undefined) {
+                    // Fall back to saved video time for resume
                     const savedTime = watchProgressService.getVideoTime(
                         seriesId,
                         seasonNumber,
@@ -69,6 +72,9 @@ function AsyncVideoPlayer({
                     } else {
                         setResumeTime(null);
                     }
+                } else if (externalResumeTime !== undefined) {
+                    // For movies with explicit resume time (even 0)
+                    setResumeTime(externalResumeTime);
                 }
             })
             .catch((err) => {
@@ -76,11 +82,6 @@ function AsyncVideoPlayer({
                 setError('Erro ao carregar o vídeo. Tente novamente.');
                 setLoading(false);
             });
-
-        // Set external resume time if provided (for movies)
-        if (externalResumeTime !== undefined) {
-            setResumeTime(externalResumeTime);
-        }
     }, [movie, buildStreamUrl, currentEpisode, seriesId, seasonNumber, episodeNumber, externalResumeTime]);
 
     // Disable animation after it completes

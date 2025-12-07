@@ -6,6 +6,7 @@ import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { movieProgressService } from '../services/movieProgressService';
+import { ContentDetailModal } from '../components/ContentDetailModal';
 
 interface VODStream {
     num: number;
@@ -479,6 +480,44 @@ export function VOD() {
                                 duration
                             );
                         }
+                    }}
+                />
+            )}
+
+            {/* Content Detail Modal */}
+            {selectedMovie && (
+                <ContentDetailModal
+                    isOpen={!!selectedMovie}
+                    onClose={() => setSelectedMovie(null)}
+                    contentId={String(selectedMovie.stream_id)}
+                    contentType="movie"
+                    contentData={{
+                        name: selectedMovie.name,
+                        cover: selectedMovie.stream_icon,
+                        rating: selectedMovie.rating
+                    }}
+                    onPlay={() => {
+                        setPlayingMovie(selectedMovie);
+                        setSelectedMovie(null);
+                    }}
+                />
+            )}
+
+            {/* Content Detail Modal */}
+            {selectedMovie && (
+                <ContentDetailModal
+                    isOpen={!!selectedMovie}
+                    onClose={() => setSelectedMovie(null)}
+                    contentId={String(selectedMovie.stream_id)}
+                    contentType="movie"
+                    contentData={{
+                        name: selectedMovie.name,
+                        cover: selectedMovie.stream_icon,
+                        rating: selectedMovie.rating
+                    }}
+                    onPlay={() => {
+                        setPlayingMovie(selectedMovie);
+                        setSelectedMovie(null);
                     }}
                 />
             )}

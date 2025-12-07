@@ -1,0 +1,577 @@
+import { useState, useEffect, useRef } from 'react';
+import { searchSeriesByName, searchMovieByName, type TMDBSeriesDetails, type TMDBMovieDetails } from '../services/tmdb';
+import { watchProgressService } from '../services/watchProgressService';
+import { movieProgressService } from '../services/movieProgressService';
+import { watchLaterService } from '../services/watchLater';
+import { favoritesService } from '../services/favoritesService';
+
+interface ContentDetailModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    contentId: string;
+    contentType: 'series' | 'movie';
+    contentData: {
+        name: string;
+        cover: string;
+        rating?: string;
+        plot?: string;
+        genre?: string;
+        cast?: string;
+        director?: string;
+        release_date?: string;
+    };
+    onPlay: (season?: number, episode?: number) => void;
+}
+
+export function ContentDetailModal({
+    isOpen,
+    onClose,
+    contentId,
+    contentType,
+    contentData,
+    onPlay
+}: ContentDetailModalProps) {
+    const [seriesInfo, setSeriesInfo] = useState<any>(null);
+    const [tmdbData, setTmdbData] = useState<TMDBSeriesDetails | TMDBMovieDetails | null>(null);
+    const [selectedSeason, setSelectedSeason] = useState(1);
+    const [selectedEpisode, setSelectedEpisode] = useState(1);
+    const [loading, setLoading] = useState(false);
+    const [, setRefresh] = useState(0); // Force re-render for button states
+    const modalRef = useRef<HTMLDivElement>(null);
+
+    // Fetch series info for episodes
+    useEffect(() => {
+        if (!isOpen || contentType !== 'series') return;
+
+        setLoading(true);
+        window.ipcRenderer.invoke('auth:get-credentials').then(result => {
+            if (result.success) {
+                const { url, username, password } = result.credentials;
+                fetch(`${url}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${contentId}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        setSeriesInfo(data);
+                        // Check for existing progress
+                        const lastWatched = watchProgressService.getLastWatchedEpisode(contentId);
+                        if (lastWatched) {
+                            setSelectedSeason(lastWatched.season);
+                            setSelectedEpisode(lastWatched.episode);
+                        } else {
+                            setSelectedSeason(1);
+                            setSelectedEpisode(1);
+                        }
+                        setLoading(false);
+                    })
+                    .catch(() => {
+                        setSeriesInfo(null);
+                        setLoading(false);
+                    });
+            }
+        });
+    }, [isOpen, contentId, contentType]);
+
+    // Fetch TMDB data for extra info
+    useEffect(() => {
+        if (!isOpen || !contentData.name) return;
+
+        const yearMatch = contentData.name.match(/\((\d{4})\)/);
+        const year = yearMatch ? yearMatch[1] : undefined;
+
+        if (contentType === 'series') {
+            searchSeriesByName(contentData.name, year)
+                .then(data => setTmdbData(data))
+                .catch(() => setTmdbData(null));
+        } else {
+            searchMovieByName(contentData.name, year)
+                .then(data => setTmdbData(data))
+                .catch(() => setTmdbData(null));
+        }
+    }, [isOpen, contentData.name, contentType]);
+
+    // Close on escape key
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleEscape);
+        return () => window.removeEventListener('keydown', handleEscape);
+    }, [onClose]);
+
+    // Close when clicking outside
+    const handleBackdropClick = (e: React.MouseEvent) => {
+        if (e.target === modalRef.current) {
+            onClose();
+        }
+    };
+
+    if (!isOpen) return null;
+
+    const overview = (tmdbData as any)?.overview || contentData.plot || 'Sem descrição disponível.';
+    const rating = contentData.rating || (tmdbData as any)?.vote_average?.toFixed(1);
+    const genres = contentData.genre || (tmdbData as any)?.genres?.map((g: any) => g.name).join(', ');
+    const seasons = seriesInfo?.episodes ? Object.keys(seriesInfo.episodes).sort((a, b) => Number(a) - Number(b)) : [];
+    const episodes = seriesInfo?.episodes?.[selectedSeason] || [];
+
+    // Check movie progress
+    const movieProgress = contentType === 'movie' ? movieProgressService.getMoviePositionById(contentId) : null;
+    const hasMovieProgress = movieProgress && movieProgress.progress > 0 && movieProgress.progress < 95;
+
+    return (
+        <div
+            ref={modalRef}
+            onClick={handleBackdropClick}
+            style={{
+                position: 'fixed',
+                inset: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                backdropFilter: 'blur(8px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 9999,
+                animation: 'fadeIn 0.2s ease'
+            }}
+        >
+            <style>{`
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes slideUp {
+                    from { opacity: 0; transform: translateY(40px) scale(0.95); }
+                    to { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                @keyframes ratingPulse {
+                    0%, 100% { transform: scale(1); box-shadow: 0 0 0 rgba(251, 191, 36, 0); }
+                    50% { transform: scale(1.05); box-shadow: 0 0 20px rgba(251, 191, 36, 0.4); }
+                }
+                @keyframes starSpin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `}</style>
+
+            <div
+                style={{
+                    position: 'relative',
+                    width: '90%',
+                    maxWidth: 900,
+                    maxHeight: '90vh',
+                    background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                    borderRadius: 20,
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'row',
+                    boxShadow: '0 25px 80px rgba(0, 0, 0, 0.6)',
+                    border: '1px solid rgba(168, 85, 247, 0.3)',
+                    animation: 'slideUp 0.3s ease'
+                }}
+            >
+                {/* Close Button */}
+                <button
+                    onClick={onClose}
+                    style={{
+                        position: 'absolute',
+                        top: 16,
+                        right: 16,
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        background: 'rgba(0, 0, 0, 0.5)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        color: 'white',
+                        fontSize: 20,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 10,
+                        transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.5)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.5)'}
+                >
+                    ✕
+                </button>
+
+                {/* Poster */}
+                <div style={{
+                    width: 300,
+                    minWidth: 300,
+                    position: 'relative',
+                    overflow: 'hidden'
+                }}>
+                    <img
+                        src={contentData.cover}
+                        alt={contentData.name}
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                        }}
+                    />
+                    <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'linear-gradient(90deg, transparent 60%, rgba(26, 26, 46, 1) 100%)'
+                    }} />
+                </div>
+
+                {/* Content */}
+                <div style={{
+                    flex: 1,
+                    padding: 32,
+                    overflowY: 'auto',
+                    maxHeight: '90vh'
+                }}>
+                    {/* Title */}
+                    <h2 style={{
+                        fontSize: 28,
+                        fontWeight: 700,
+                        color: 'white',
+                        marginBottom: 12,
+                        lineHeight: 1.2
+                    }}>
+                        {contentData.name}
+                    </h2>
+
+                    {/* Meta Badges */}
+                    <div style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 10,
+                        marginBottom: 16
+                    }}>
+                        {rating && (
+                            <span style={{
+                                padding: '6px 12px',
+                                borderRadius: 20,
+                                background: 'linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.3))',
+                                color: '#fbbf24',
+                                fontSize: 13,
+                                fontWeight: 600,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                animation: 'ratingPulse 2s ease-in-out infinite',
+                                border: '1px solid rgba(251, 191, 36, 0.3)'
+                            }}>
+                                <span style={{
+                                    display: 'inline-block',
+                                    animation: 'starSpin 3s linear infinite'
+                                }}>⭐</span>
+                                {rating}
+                            </span>
+                        )}
+                        <span style={{
+                            padding: '6px 12px',
+                            borderRadius: 20,
+                            background: contentType === 'series' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(59, 130, 246, 0.2)',
+                            color: contentType === 'series' ? '#a78bfa' : '#60a5fa',
+                            fontSize: 13,
+                            fontWeight: 600
+                        }}>
+                            {contentType === 'series' ? '📺 Série' : '🎬 Filme'}
+                        </span>
+                        {contentType === 'series' && seasons.length > 0 && (
+                            <span style={{
+                                padding: '6px 12px',
+                                borderRadius: 20,
+                                background: 'rgba(16, 185, 129, 0.2)',
+                                color: '#6ee7b7',
+                                fontSize: 13,
+                                fontWeight: 600
+                            }}>
+                                {seasons.length} Temporada{seasons.length > 1 ? 's' : ''}
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Genres */}
+                    {genres && (
+                        <div style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: 8,
+                            marginBottom: 16
+                        }}>
+                            {genres.split(',').map((genre: string, i: number) => (
+                                <span key={i} style={{
+                                    padding: '4px 10px',
+                                    borderRadius: 12,
+                                    background: 'rgba(255, 255, 255, 0.08)',
+                                    color: 'rgba(255, 255, 255, 0.7)',
+                                    fontSize: 12
+                                }}>
+                                    {genre.trim()}
+                                </span>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Overview */}
+                    <p style={{
+                        color: 'rgba(255, 255, 255, 0.8)',
+                        fontSize: 14,
+                        lineHeight: 1.7,
+                        marginBottom: 20,
+                        maxHeight: 100,
+                        overflow: 'hidden'
+                    }}>
+                        {overview}
+                    </p>
+
+                    {/* Series: Season & Episode Selector */}
+                    {contentType === 'series' && !loading && seasons.length > 0 && (
+                        <>
+                            {/* Season Tabs */}
+                            <div style={{
+                                display: 'flex',
+                                gap: 8,
+                                marginBottom: 12,
+                                flexWrap: 'wrap'
+                            }}>
+                                {seasons.map(season => (
+                                    <button
+                                        key={season}
+                                        onClick={() => {
+                                            setSelectedSeason(Number(season));
+                                            setSelectedEpisode(1);
+                                        }}
+                                        style={{
+                                            padding: '8px 16px',
+                                            borderRadius: 20,
+                                            border: selectedSeason === Number(season)
+                                                ? '2px solid #a855f7'
+                                                : '2px solid rgba(255, 255, 255, 0.1)',
+                                            background: selectedSeason === Number(season)
+                                                ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(236, 72, 153, 0.2))'
+                                                : 'rgba(255, 255, 255, 0.05)',
+                                            color: 'white',
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        T{season}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Episode List */}
+                            <div style={{
+                                maxHeight: 180,
+                                overflowY: 'auto',
+                                marginBottom: 20,
+                                background: 'rgba(0, 0, 0, 0.2)',
+                                borderRadius: 12,
+                                padding: 8
+                            }}>
+                                {episodes.map((ep: any, index: number) => {
+                                    const epNum = Number(ep.episode_num);
+                                    const isSelected = epNum === selectedEpisode;
+                                    const isWatched = watchProgressService.isEpisodeWatched(contentId, selectedSeason, epNum);
+
+                                    return (
+                                        <div
+                                            key={ep.id || index}
+                                            onClick={() => setSelectedEpisode(epNum)}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 12,
+                                                padding: '10px 14px',
+                                                borderRadius: 10,
+                                                cursor: 'pointer',
+                                                background: isSelected
+                                                    ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.15))'
+                                                    : 'transparent',
+                                                border: isSelected ? '1px solid rgba(168, 85, 247, 0.4)' : '1px solid transparent',
+                                                opacity: isWatched ? 0.6 : 1,
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <span style={{
+                                                width: 32,
+                                                height: 32,
+                                                borderRadius: 8,
+                                                background: isWatched
+                                                    ? 'linear-gradient(135deg, #10b981, #059669)'
+                                                    : 'rgba(168, 85, 247, 0.3)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                fontSize: 12,
+                                                fontWeight: 700,
+                                                color: 'white'
+                                            }}>
+                                                {isWatched ? '✓' : epNum}
+                                            </span>
+                                            <span style={{
+                                                fontSize: 13,
+                                                color: 'white',
+                                                flex: 1,
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                whiteSpace: 'nowrap'
+                                            }}>
+                                                Episódio {epNum}
+                                            </span>
+                                            {isSelected && (
+                                                <span style={{
+                                                    width: 24,
+                                                    height: 24,
+                                                    borderRadius: '50%',
+                                                    background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: 10,
+                                                    color: 'white'
+                                                }}>
+                                                    ▶
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
+
+                    {/* Loading for series info */}
+                    {contentType === 'series' && loading && (
+                        <div style={{
+                            padding: 20,
+                            textAlign: 'center',
+                            color: 'rgba(255, 255, 255, 0.5)'
+                        }}>
+                            Carregando episódios...
+                        </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                        {/* Play Button */}
+                        <button
+                            onClick={() => onPlay(
+                                contentType === 'series' ? selectedSeason : undefined,
+                                contentType === 'series' ? selectedEpisode : undefined
+                            )}
+                            style={{
+                                flex: 1,
+                                minWidth: 200,
+                                padding: '14px 24px',
+                                borderRadius: 12,
+                                border: 'none',
+                                background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                                color: 'white',
+                                fontSize: 15,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 10,
+                                boxShadow: '0 8px 24px rgba(168, 85, 247, 0.4)',
+                                transition: 'all 0.3s'
+                            }}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 12px 32px rgba(168, 85, 247, 0.5)';
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = '0 8px 24px rgba(168, 85, 247, 0.4)';
+                            }}
+                        >
+                            <span style={{ fontSize: 18 }}>▶</span>
+                            {contentType === 'series'
+                                ? `Assistir T${selectedSeason} E${selectedEpisode}`
+                                : hasMovieProgress
+                                    ? 'Continuar Assistindo'
+                                    : 'Assistir Filme'
+                            }
+                        </button>
+
+                        {/* Watch Later Button */}
+                        <button
+                            onClick={() => {
+                                if (watchLaterService.has(contentId, contentType)) {
+                                    watchLaterService.remove(contentId, contentType);
+                                } else {
+                                    watchLaterService.add({
+                                        id: contentId,
+                                        type: contentType,
+                                        name: contentData.name,
+                                        cover: contentData.cover
+                                    });
+                                }
+                                setRefresh(r => r + 1); // Force UI update
+                            }}
+                            style={{
+                                padding: '14px 20px',
+                                borderRadius: 12,
+                                border: watchLaterService.has(contentId, contentType)
+                                    ? '2px solid #10b981'
+                                    : '2px solid rgba(255, 255, 255, 0.2)',
+                                background: watchLaterService.has(contentId, contentType)
+                                    ? 'rgba(16, 185, 129, 0.2)'
+                                    : 'rgba(255, 255, 255, 0.08)',
+                                color: watchLaterService.has(contentId, contentType)
+                                    ? '#6ee7b7'
+                                    : 'white',
+                                fontSize: 14,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            {watchLaterService.has(contentId, contentType) ? '✓' : '+'}
+                            {watchLaterService.has(contentId, contentType) ? 'Salvo' : 'Assistir Depois'}
+                        </button>
+
+                        {/* Favorite Button */}
+                        <button
+                            onClick={() => {
+                                favoritesService.toggle({
+                                    id: contentId,
+                                    type: contentType,
+                                    title: contentData.name,
+                                    poster: contentData.cover,
+                                    rating: (tmdbData as any)?.vote_average?.toFixed(1)
+                                });
+                                setRefresh(r => r + 1); // Force UI update
+                            }}
+                            style={{
+                                width: 50,
+                                height: 50,
+                                borderRadius: '50%',
+                                border: favoritesService.has(contentId, contentType)
+                                    ? '2px solid #ef4444'
+                                    : '2px solid rgba(255, 255, 255, 0.2)',
+                                background: favoritesService.has(contentId, contentType)
+                                    ? 'rgba(239, 68, 68, 0.2)'
+                                    : 'rgba(255, 255, 255, 0.05)',
+                                color: 'white',
+                                fontSize: 20,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s'
+                            }}
+                            title={favoritesService.has(contentId, contentType) ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}
+                        >
+                            {favoritesService.has(contentId, contentType) ? '❤️' : '🤍'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}

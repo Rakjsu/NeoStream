@@ -8,6 +8,7 @@ import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { ResumeModal } from '../components/ResumeModal';
 import { ProgressBar } from '../components/ProgressBar';
+import { ContentDetailModal } from '../components/ContentDetailModal';
 
 interface Series {
     num: number;
@@ -360,7 +361,7 @@ export function Series() {
                 <div className="series-content">
                     {/* Series Details Panel */}
                     {selectedSeries && (
-                        <div className="series-details-panel">
+                        <div className="series-details-panel" style={{ display: 'none' }}>
                             <div className="details-content">
                                 {/* Meta Info */}
                                 <div className="meta-badges">
@@ -782,6 +783,26 @@ export function Series() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Content Detail Modal */}
+            {selectedSeries && (
+                <ContentDetailModal
+                    isOpen={!!selectedSeries}
+                    onClose={() => setSelectedSeries(null)}
+                    contentId={String(selectedSeries.series_id)}
+                    contentType="series"
+                    contentData={{
+                        name: selectedSeries.name,
+                        cover: selectedSeries.cover || selectedSeries.stream_icon,
+                        rating: selectedSeries.rating
+                    }}
+                    onPlay={(season, episode) => {
+                        setSelectedSeason(season || 1);
+                        setSelectedEpisode(episode || 1);
+                        handlePlaySeries(selectedSeries);
+                    }}
+                />
             )}
         </>
     );

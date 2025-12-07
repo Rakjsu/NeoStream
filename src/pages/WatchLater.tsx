@@ -1,12 +1,43 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { watchLaterService, type WatchLaterItem } from '../services/watchLater';
+import { ContentDetailModal } from '../components/ContentDetailModal';
+import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
+import { ResumeModal } from '../components/ResumeModal';
+import { watchProgressService } from '../services/watchProgressService';
+import { movieProgressService } from '../services/movieProgressService';
 
 export function WatchLater() {
     const [items, setItems] = useState<WatchLaterItem[]>([]);
     const [removingId, setRemovingId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'all' | 'movies' | 'series'>('all');
     const navigate = useNavigate();
+
+    // Modal and player states
+    const [selectedContent, setSelectedContent] = useState<{
+        id: string;
+        type: 'series' | 'movie';
+        name: string;
+        cover: string;
+    } | null>(null);
+    const [playingContent, setPlayingContent] = useState<{
+        id: string;
+        type: 'series' | 'movie';
+        name: string;
+        season?: number;
+        episode?: number;
+        resumeTime?: number;
+    } | null>(null);
+    const [showResumeModal, setShowResumeModal] = useState(false);
+    const [pendingPlay, setPendingPlay] = useState<{
+        id: string;
+        type: 'series' | 'movie';
+        name: string;
+        season?: number;
+        episode?: number;
+        currentTime: number;
+        duration: number;
+    } | null>(null);
 
     useEffect(() => {
         loadItems();
@@ -26,11 +57,12 @@ export function WatchLater() {
     }, []);
 
     const handleItemClick = (item: WatchLaterItem) => {
-        if (item.type === 'series') {
-            navigate('/dashboard/series', { state: { scrollToSeries: item.id } });
-        } else {
-            navigate('/dashboard/vod', { state: { scrollToMovie: item.id } });
-        }
+        setSelectedContent({
+            id: item.id,
+            type: item.type,
+            name: item.name,
+            cover: item.cover || ''
+        });
     };
 
     const clearAll = () => {
@@ -213,6 +245,137 @@ export function WatchLater() {
                     )}
                 </div>
             </div>
+
+            {/* Content Detail Modal */}
+            {selectedContent && (
+                <ContentDetailModal
+                    isOpen={!!selectedContent}
+                    onClose={() => setSelectedContent(null)}
+                    contentId={selectedContent.id}
+                    contentType={selectedContent.type}
+                    contentData={selectedContent}
+                    onPlay={(season, episode) => {
+                        if (selectedContent.type === 'series') {
+                            const progress = watchProgressService.getEpisodeProgress(
+                                selectedContent.id,
+                                season || 1,
+                                episode || 1
+                            );
+                            const progressPercent = progress ? Math.round((progress.currentTime / progress.duration) * 100) : 0;
+
+                            if (progress && progress.currentTime > 10 && progressPercent < 95) {
+                                setPendingPlay({
+                                    id: selectedContent.id,
+                                    type: 'series',
+                                    name: selectedContent.name,
+                                    season: season,
+                                    episode: episode,
+                                    currentTime: progress.currentTime,
+                                    duration: progress.duration
+                                });
+                                setShowResumeModal(true);
+                                setSelectedContent(null);
+                            } else {
+                                setPlayingContent({
+                                    id: selectedContent.id,
+                                    type: 'series',
+                                    name: selectedContent.name,
+                                    season: season,
+                                    episode: episode
+                                });
+                                setSelectedContent(null);
+                            }
+                        } else {
+                            const movieProgress = movieProgressService.getMoviePositionById(selectedContent.id);
+                            setPlayingContent({
+                                id: selectedContent.id,
+                                type: 'movie',
+                                name: selectedContent.name,
+                                resumeTime: movieProgress?.currentTime || 0
+                            });
+                            setSelectedContent(null);
+                        }
+                    }}
+                />
+            )}
+
+            {/* Video Player */}
+            {playingContent && (
+                <AsyncVideoPlayer
+                    movie={playingContent}
+                    buildStreamUrl={async (content) => {
+                        const result = await window.ipcRenderer.invoke('auth:get-credentials');
+                        if (result.success) {
+                            const { url, username, password } = result.credentials;
+                            if (content.type === 'series') {
+                                const seriesInfoRes = await fetch(`${url}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${content.id}`);
+                                const seriesInfo = await seriesInfoRes.json();
+                                const episodes = seriesInfo?.episodes?.[content.season || 1];
+                                const episode = episodes?.find((ep: any) => Number(ep.episode_num) === (content.episode || 1));
+                                if (episode) {
+                                    const ext = episode.container_extension || 'mp4';
+                                    return `${url}/series/${username}/${password}/${episode.id}.${ext}`;
+                                }
+                                throw new Error('Episode not found');
+                            } else {
+                                const movieInfoRes = await fetch(`${url}/player_api.php?username=${username}&password=${password}&action=get_vod_info&vod_id=${content.id}`);
+                                const movieInfo = await movieInfoRes.json();
+                                const ext = movieInfo?.movie_data?.container_extension || 'mp4';
+                                return `${url}/movie/${username}/${password}/${content.id}.${ext}`;
+                            }
+                        }
+                        throw new Error('Credentials not found');
+                    }}
+                    onClose={() => setPlayingContent(null)}
+                    customTitle={playingContent.type === 'series'
+                        ? `${playingContent.name} - T${playingContent.season} E${playingContent.episode}`
+                        : playingContent.name
+                    }
+                    seriesId={playingContent.type === 'series' ? playingContent.id : undefined}
+                    seasonNumber={playingContent.season}
+                    episodeNumber={playingContent.episode}
+                    resumeTime={playingContent.resumeTime || null}
+                />
+            )}
+
+            {/* Resume Modal */}
+            {showResumeModal && pendingPlay && (
+                <ResumeModal
+                    seriesName={pendingPlay.name}
+                    seasonNumber={pendingPlay.season || 1}
+                    episodeNumber={pendingPlay.episode || 1}
+                    currentTime={pendingPlay.currentTime}
+                    duration={pendingPlay.duration}
+                    onResume={() => {
+                        setPlayingContent({
+                            id: pendingPlay.id,
+                            type: pendingPlay.type,
+                            name: pendingPlay.name,
+                            season: pendingPlay.season,
+                            episode: pendingPlay.episode,
+                            resumeTime: pendingPlay.currentTime
+                        });
+                        setShowResumeModal(false);
+                        setPendingPlay(null);
+                    }}
+                    onRestart={() => {
+                        setPlayingContent({
+                            id: pendingPlay.id,
+                            type: pendingPlay.type,
+                            name: pendingPlay.name,
+                            season: pendingPlay.season,
+                            episode: pendingPlay.episode,
+                            resumeTime: 0
+                        });
+                        setShowResumeModal(false);
+                        setPendingPlay(null);
+                    }}
+                    onCancel={() => {
+                        setShowResumeModal(false);
+                        setPendingPlay(null);
+                    }}
+                />
+            )}
         </>
     );
 }
