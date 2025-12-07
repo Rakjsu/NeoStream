@@ -56,6 +56,19 @@ export function Favorites() {
         }, 300);
     }, []);
 
+    const getMovieProgress = (movieId: string) => {
+        return movieProgressService.getMoviePositionById(movieId);
+    };
+
+    const formatRemainingTime = (currentTime: number, duration: number) => {
+        const remaining = Math.max(0, duration - currentTime);
+        const minutes = Math.floor(remaining / 60);
+        if (minutes < 60) return `${minutes}min restantes`;
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${hours}h ${mins}min restantes`;
+    };
+
     const handleItemClick = (item: FavoriteItem) => {
         setSelectedContent({
             id: item.id,
@@ -164,45 +177,75 @@ export function Favorites() {
 
                 {/* Cards Grid */}
                 <div className="cards-grid">
-                    {displayItems.map((item, index) => (
-                        <div
-                            key={`${item.type}-${item.id}`}
-                            className={`card ${removingId === `${item.type}-${item.id}` ? 'removing' : ''}`}
-                            style={{ animationDelay: `${index * 0.05}s` }}
-                            onClick={() => handleItemClick(item)}
-                        >
-                            <div className="card-poster">
-                                <img
-                                    src={item.poster}
-                                    alt={item.title}
-                                    onError={(e) => {
-                                        (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTUwIiB2aWV3Qm94PSIwIDAgMTAwIDE1MCI+PHJlY3QgZmlsbD0iIzFmMjkzNyIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxNTAiLz48dGV4dCBmaWxsPSIjNGI1NTYzIiBmb250LXNpemU9IjQwIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgeD0iNTAlIiB5PSI1MCUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj4/PC90ZXh0Pjwvc3ZnPg==';
-                                    }}
-                                />
-                                <div className="card-type">
-                                    {item.type === 'movie' ? '🎬' : '📺'}
-                                </div>
-                                <div className="card-overlay">
-                                    <button
-                                        className="remove-btn"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            removeItem(item.id, item.type);
+                    {displayItems.map((item, index) => {
+                        const movieProgress = item.type === 'movie' ? getMovieProgress(item.id) : null;
+                        const progressPercent = movieProgress ? Math.round((movieProgress.currentTime / movieProgress.duration) * 100) : 0;
+                        const seriesProgress = item.type === 'series' ? watchProgressService.getSeriesProgress(item.id, item.title) : null;
+
+                        return (
+                            <div
+                                key={`${item.type}-${item.id}`}
+                                className={`card ${removingId === `${item.type}-${item.id}` ? 'removing' : ''}`}
+                                style={{ animationDelay: `${index * 0.05}s` }}
+                                onClick={() => handleItemClick(item)}
+                            >
+                                <div className="card-poster">
+                                    <img
+                                        src={item.poster}
+                                        alt={item.title}
+                                        onError={(e) => {
+                                            (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTUwIiB2aWV3Qm94PSIwIDAgMTAwIDE1MCI+PHJlY3QgZmlsbD0iIzFmMjkzNyIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxNTAiLz48dGV4dCBmaWxsPSIjNGI1NTYzIiBmb250LXNpemU9IjQwIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgeD0iNTAlIiB5PSI1MCUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj4/PC90ZXh0Pjwvc3ZnPg==';
                                         }}
-                                    >
-                                        <span>🗑️</span>
-                                    </button>
+                                    />
+                                    <div className="card-type">
+                                        {item.type === 'movie' ? '🎬' : '📺'}
+                                    </div>
+                                    <div className="card-overlay">
+                                        <button
+                                            className="remove-btn"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                removeItem(item.id, item.type);
+                                            }}
+                                        >
+                                            <span>🗑️</span>
+                                        </button>
+                                    </div>
+
+                                    {/* Progress Bar for movies */}
+                                    {movieProgress && progressPercent > 0 && (
+                                        <div className="card-progress-container">
+                                            <div
+                                                className="card-progress-bar"
+                                                style={{ width: `${progressPercent}%` }}
+                                            />
+                                        </div>
+                                    )}
+
+                                    {/* Remaining Time Badge (shown on hover) */}
+                                    {movieProgress && movieProgress.currentTime > 0 && progressPercent < 95 && (
+                                        <div className="remaining-time-badge">
+                                            {formatRemainingTime(movieProgress.currentTime, movieProgress.duration)}
+                                        </div>
+                                    )}
+
+                                    {/* Series episode info */}
+                                    {seriesProgress && (
+                                        <div className="episode-badge">
+                                            T{seriesProgress.lastWatchedSeason} E{seriesProgress.lastWatchedEpisode}
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="card-info">
+                                    <h3 className="card-title">{item.title}</h3>
+                                    <div className="card-meta">
+                                        {item.year && <span>{item.year}</span>}
+                                        {item.rating && <span>⭐ {item.rating}</span>}
+                                    </div>
                                 </div>
                             </div>
-                            <div className="card-info">
-                                <h3 className="card-title">{item.title}</h3>
-                                <div className="card-meta">
-                                    {item.year && <span>{item.year}</span>}
-                                    {item.rating && <span>⭐ {item.rating}</span>}
-                                </div>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
 
@@ -584,6 +627,61 @@ const favoritesStyles = `
 .remove-btn:hover {
     background: #ef4444;
     transform: scale(1.1);
+}
+
+/* Card Progress Bar */
+.card-progress-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: rgba(0, 0, 0, 0.6);
+}
+
+.card-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #ef4444, #ec4899);
+    transition: width 0.3s ease;
+}
+
+/* Remaining Time Badge */
+.remaining-time-badge {
+    position: absolute;
+    top: 50px;
+    left: 10px;
+    padding: 6px 10px;
+    background: rgba(16, 185, 129, 0.9);
+    backdrop-filter: blur(4px);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+    opacity: 0;
+    transform: translateY(-5px);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    z-index: 15;
+}
+
+.card:hover .remaining-time-badge {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Episode Badge for series */
+.episode-badge {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.85);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+    text-align: center;
 }
 
 .card-info {

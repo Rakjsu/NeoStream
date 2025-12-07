@@ -62,6 +62,7 @@ export function Home() {
     const [allMovies, setAllMovies] = useState<MovieData[]>([]);
     const [recommendations, setRecommendations] = useState<(SeriesData | MovieData)[]>([]);
     const [isVisible, setIsVisible] = useState(false);
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     // Modal state for content details
     const [selectedContent, setSelectedContent] = useState<{
@@ -237,7 +238,7 @@ export function Home() {
         });
 
         setContinueWatching(items.slice(0, 30));
-    }, [allSeries, allMovies]);
+    }, [allSeries, allMovies, refreshTrigger]);
 
     // Build recommendations based on watched categories (only once when data is ready)
     useEffect(() => {
@@ -1191,7 +1192,11 @@ export function Home() {
                         }
                         throw new Error('Credentials not found');
                     }}
-                    onClose={() => setPlayingContent(null)}
+                    onClose={() => {
+                        setPlayingContent(null);
+                        // Refresh continue watching list to show updated progress
+                        setRefreshTrigger(prev => prev + 1);
+                    }}
                     customTitle={playingContent.type === 'series'
                         ? `${playingContent.name} - T${playingContent.season} E${playingContent.episode}`
                         : playingContent.name

@@ -219,6 +219,19 @@ export function VOD() {
         return Math.round((progress.currentTime / progress.duration) * 100);
     };
 
+    const getMovieProgress = (movieId: number) => {
+        return movieProgressService.getMoviePositionById(movieId.toString());
+    };
+
+    const formatRemainingTime = (currentTime: number, duration: number) => {
+        const remaining = Math.max(0, duration - currentTime);
+        const minutes = Math.floor(remaining / 60);
+        if (minutes < 60) return `${minutes}min restantes`;
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${hours}h ${mins}min restantes`;
+    };
+
     // Loading State
     if (loading) return (
         <div className="vod-page">
@@ -405,6 +418,7 @@ export function VOD() {
                             <div ref={gridRef} className="movies-grid">
                                 {filteredStreams.slice(0, visibleCount).map((stream, index) => {
                                     const progress = getProgress(stream.stream_id);
+                                    const movieProgress = getMovieProgress(stream.stream_id);
                                     const isSelected = selectedMovie?.stream_id === stream.stream_id;
                                     const isSaved = watchLaterService.has(String(stream.stream_id), 'movie');
 
@@ -442,11 +456,18 @@ export function VOD() {
 
                                                 {/* Progress Bar */}
                                                 {progress > 0 && (
-                                                    <div className="progress-container">
+                                                    <div className="card-progress-container">
                                                         <div
-                                                            className="progress-bar"
+                                                            className="card-progress-bar"
                                                             style={{ width: `${progress}%` }}
                                                         />
+                                                    </div>
+                                                )}
+
+                                                {/* Remaining Time Badge (shown on hover) */}
+                                                {movieProgress && movieProgress.currentTime > 0 && progress < 95 && (
+                                                    <div className="remaining-time-badge">
+                                                        {formatRemainingTime(movieProgress.currentTime, movieProgress.duration)}
                                                     </div>
                                                 )}
                                             </div>
@@ -991,8 +1012,8 @@ const vodStyles = `
     to { transform: scale(1); }
 }
 
-/* Progress Bar */
-.progress-container {
+/* Card Progress Bar */
+.card-progress-container {
     position: absolute;
     bottom: 0;
     left: 0;
@@ -1001,10 +1022,34 @@ const vodStyles = `
     background: rgba(0, 0, 0, 0.6);
 }
 
-.progress-bar {
+.card-progress-bar {
     height: 100%;
     background: linear-gradient(90deg, #6366f1, #a855f7);
     transition: width 0.3s ease;
+}
+
+/* Remaining Time Badge */
+.remaining-time-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    padding: 6px 10px;
+    background: rgba(16, 185, 129, 0.9);
+    backdrop-filter: blur(4px);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+    opacity: 0;
+    transform: translateY(-5px);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    z-index: 15;
+}
+
+.movie-card:hover .remaining-time-badge {
+    opacity: 1;
+    transform: translateY(0);
 }
 
 /* Card Info */

@@ -56,6 +56,19 @@ export function WatchLater() {
         }, 300);
     }, []);
 
+    const getMovieProgress = (movieId: string) => {
+        return movieProgressService.getMoviePositionById(movieId);
+    };
+
+    const formatRemainingTime = (currentTime: number, duration: number) => {
+        const remaining = Math.max(0, duration - currentTime);
+        const minutes = Math.floor(remaining / 60);
+        if (minutes < 60) return `${minutes}min restantes`;
+        const hours = Math.floor(minutes / 60);
+        const mins = minutes % 60;
+        return `${hours}h ${mins}min restantes`;
+    };
+
     const handleItemClick = (item: WatchLaterItem) => {
         setSelectedContent({
             id: item.id,
@@ -181,6 +194,9 @@ export function WatchLater() {
                             {displayItems.map((item, index) => {
                                 const isRemoving = removingId === `${item.type}-${item.id}`;
                                 const coverUrl = item.cover?.startsWith('http') ? item.cover : `https://${item.cover}`;
+                                const movieProgress = item.type === 'movie' ? getMovieProgress(item.id) : null;
+                                const progressPercent = movieProgress ? Math.round((movieProgress.currentTime / movieProgress.duration) * 100) : 0;
+                                const seriesProgress = item.type === 'series' ? watchProgressService.getSeriesProgress(item.id, item.name) : null;
 
                                 return (
                                     <div
@@ -226,6 +242,30 @@ export function WatchLater() {
                                             <div className="card-overlay">
                                                 <div className="play-icon">▶</div>
                                             </div>
+
+                                            {/* Progress Bar for movies */}
+                                            {movieProgress && progressPercent > 0 && (
+                                                <div className="card-progress-container">
+                                                    <div
+                                                        className="card-progress-bar"
+                                                        style={{ width: `${progressPercent}%` }}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {/* Remaining Time Badge (shown on hover) */}
+                                            {movieProgress && movieProgress.currentTime > 0 && progressPercent < 95 && (
+                                                <div className="remaining-time-badge">
+                                                    {formatRemainingTime(movieProgress.currentTime, movieProgress.duration)}
+                                                </div>
+                                            )}
+
+                                            {/* Series episode info */}
+                                            {seriesProgress && (
+                                                <div className="episode-badge">
+                                                    T{seriesProgress.lastWatchedSeason} E{seriesProgress.lastWatchedEpisode}
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Card Info */}
@@ -740,6 +780,61 @@ const watchLaterStyles = `
 
 .item-card:hover .play-icon {
     transform: scale(1);
+}
+
+/* Card Progress Bar */
+.card-progress-container {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: rgba(0, 0, 0, 0.6);
+}
+
+.card-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #a855f7, #ec4899);
+    transition: width 0.3s ease;
+}
+
+/* Remaining Time Badge */
+.remaining-time-badge {
+    position: absolute;
+    top: 50px;
+    left: 12px;
+    padding: 6px 10px;
+    background: rgba(16, 185, 129, 0.9);
+    backdrop-filter: blur(4px);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+    opacity: 0;
+    transform: translateY(-5px);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    z-index: 15;
+}
+
+.item-card:hover .remaining-time-badge {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Episode Badge for series */
+.episode-badge {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.85);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+    text-align: center;
 }
 
 /* Card Info */

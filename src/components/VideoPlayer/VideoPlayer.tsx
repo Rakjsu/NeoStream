@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaCompress, FaCog, FaSpinner, FaChromecast } from 'react-icons/fa';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaCompress, FaCog, FaChromecast } from 'react-icons/fa';
 import { useVideoPlayer } from '../../hooks/useVideoPlayer';
 import { useHls } from '../../hooks/useHls';
 import { useChromecast } from '../../hooks/useChromecast';
@@ -45,7 +45,10 @@ export function VideoPlayer({
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [showDeviceSelector, setShowDeviceSelector] = useState(false);
+    const [hoverTime, setHoverTime] = useState<number | null>(null);
+    const [hoverPosition, setHoverPosition] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
+    const progressRef = useRef<HTMLDivElement>(null);
 
     const hideControlsTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -146,6 +149,68 @@ export function VideoPlayer({
         };
     }, [state.playing, seeking]);
 
+    // Keyboard shortcuts
+    const handleKeyDown = useCallback((e: KeyboardEvent) => {
+        if (e.target instanceof HTMLInputElement) return;
+
+        switch (e.key.toLowerCase()) {
+            case ' ':
+            case 'k':
+                e.preventDefault();
+                controls.togglePlay();
+                break;
+            case 'arrowleft':
+                e.preventDefault();
+                controls.seek(Math.max(0, state.currentTime - 10));
+                break;
+            case 'arrowright':
+                e.preventDefault();
+                controls.seek(Math.min(state.duration, state.currentTime + 10));
+                break;
+            case 'arrowup':
+                e.preventDefault();
+                controls.setVolume(Math.min(1, state.volume + 0.1));
+                break;
+            case 'arrowdown':
+                e.preventDefault();
+                controls.setVolume(Math.max(0, state.volume - 0.1));
+                break;
+            case 'm':
+                e.preventDefault();
+                controls.toggleMute();
+                break;
+            case 'f':
+                e.preventDefault();
+                if (!document.fullscreenElement) {
+                    containerRef.current?.requestFullscreen();
+                } else {
+                    document.exitFullscreen();
+                }
+                break;
+            case 'escape':
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                } else if (onClose) {
+                    onClose();
+                }
+                break;
+        }
+    }, [controls, state.currentTime, state.duration, state.volume, onClose]);
+
+    useEffect(() => {
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [handleKeyDown]);
+
+    // Progress bar hover preview
+    const handleProgressHover = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!progressRef.current) return;
+        const rect = progressRef.current.getBoundingClientRect();
+        const position = (e.clientX - rect.left) / rect.width;
+        setHoverPosition(e.clientX - rect.left);
+        setHoverTime(position * state.duration);
+    };
+
     const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
         const clickPosition = (e.clientX - rect.left) / rect.width;
@@ -207,9 +272,24 @@ export function VideoPlayer({
                 />
             </div>
 
+            {/* Central Play Button - Shows when paused */}
+            {!state.playing && !state.loading && !state.error && (
+                <div className="central-play-button" onClick={controls.togglePlay}>
+                    <div className="central-play-icon">
+                        <FaPlay />
+                    </div>
+                </div>
+            )}
+
+            {/* Modern Loading Spinner */}
             {state.loading && (
                 <div className="video-player-loading">
-                    <FaSpinner className="spinner" />
+                    <div className="modern-spinner">
+                        <div className="spinner-ring"></div>
+                        <div className="spinner-ring"></div>
+                        <div className="spinner-ring"></div>
+                    </div>
+                    <span className="loading-text">Carregando...</span>
                 </div>
             )}
 
@@ -227,18 +307,33 @@ export function VideoPlayer({
 
             <div className={`video-player-controls ${showControls ? 'visible' : 'hidden'}`}>
                 <div
+                    ref={progressRef}
                     className="progress-container"
                     onClick={handleProgressBarClick}
                     onMouseDown={handleProgressMouseDown}
-                    onMouseMove={handleProgressMouseMove}
+                    onMouseMove={(e) => {
+                        handleProgressMouseMove(e);
+                        handleProgressHover(e);
+                    }}
                     onMouseUp={handleProgressMouseUp}
-                    onMouseLeave={handleProgressMouseUp}
+                    onMouseLeave={() => {
+                        handleProgressMouseUp();
+                        setHoverTime(null);
+                    }}
                 >
+                    {/* Time Preview Tooltip */}
+                    {hoverTime !== null && (
+                        <div
+                            className="time-preview-tooltip"
+                            style={{ left: `${hoverPosition}px` }}
+                        >
+                            {formatTime(hoverTime)}
+                        </div>
+                    )}
                     <div className="progress-bar">
                         <div className="progress-buffered" style={{ width: `${bufferedPercent}%` }} />
-                        <div className="progress-played" style={{ width: `${currentTimePercent}%` }}>
-                            <div className="progress-handle" />
-                        </div>
+                        <div className="progress-played" style={{ width: `${currentTimePercent}%` }} />
+                        <div className="progress-handle" style={{ left: `${currentTimePercent}%` }} />
                     </div>
                 </div>
 

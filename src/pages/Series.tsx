@@ -654,6 +654,13 @@ export function Series() {
                                                 {isCompleted && (
                                                     <div className="completed-badge">✓</div>
                                                 )}
+
+                                                {/* Episode Badge */}
+                                                {hasProgress && !isCompleted && (
+                                                    <div className="episode-badge">
+                                                        T{hasProgress.lastWatchedSeason} E{hasProgress.lastWatchedEpisode}
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* Title & Progress */}
@@ -1603,6 +1610,21 @@ const seriesStyles = `
     color: white;
     font-weight: bold;
     box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+}
+
+/* Episode Badge */
+.episode-badge {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    background: rgba(0, 0, 0, 0.85);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+    text-align: center;
 }
 
 @keyframes badgePop {

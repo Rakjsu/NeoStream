@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { VideoPlayer } from './VideoPlayer/VideoPlayer';
 import { watchProgressService } from '../services/watchProgressService';
+import { movieProgressService } from '../services/movieProgressService';
 
 interface AsyncVideoPlayerProps {
     movie: any;
@@ -314,7 +315,7 @@ function AsyncVideoPlayer({
                         canGoPrevious={canGoPrevious}
                         resumeTime={resumeTime}
                         onTimeUpdate={(currentTime, duration) => {
-                            // Call external onTimeUpdate if provided (for movies)
+                            // Call external onTimeUpdate if provided
                             if (externalOnTimeUpdate) {
                                 externalOnTimeUpdate(currentTime, duration);
                             }
@@ -328,6 +329,20 @@ function AsyncVideoPlayer({
                                     currentTime,
                                     duration
                                 );
+                            }
+
+                            // Save movie progress every 5 seconds (if not a series)
+                            if (!seriesId && movie && currentTime % 5 < 0.5 && duration > 0) {
+                                const movieId = movie.stream_id || movie.id || movie.series_id;
+                                const movieName = movie.name || movie.title || 'Unknown';
+                                if (movieId) {
+                                    movieProgressService.saveMovieTime(
+                                        String(movieId),
+                                        movieName,
+                                        currentTime,
+                                        duration
+                                    );
+                                }
                             }
                         }}
                     />
