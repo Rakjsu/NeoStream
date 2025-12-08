@@ -57,7 +57,8 @@ export function Settings() {
     const sections = [
         { id: 'updates', icon: '🔄', label: 'Atualizações', color: '#10b981' },
         { id: 'appearance', icon: '🎨', label: 'Aparência', color: '#8b5cf6' },
-        { id: 'player', icon: '▶️', label: 'Player', color: '#3b82f6' },
+        { id: 'playback', icon: '⏯️', label: 'Reprodução', color: '#3b82f6' },
+        { id: 'parental', icon: '👨‍👩‍👧', label: 'Controle Parental', color: '#ef4444' },
         { id: 'about', icon: 'ℹ️', label: 'Sobre', color: '#f59e0b' }
     ];
 
@@ -190,6 +191,32 @@ export function Settings() {
                                 <div className="settings-group">
                                     <div className="setting-item">
                                         <div className="setting-info">
+                                            <label>Tamanho da Fonte</label>
+                                            <p>Ajuste o tamanho do texto na interface</p>
+                                        </div>
+                                        <select className="setting-select">
+                                            <option value="small">🔤 Pequena</option>
+                                            <option value="medium" selected>🔤 Média</option>
+                                            <option value="large">🔤 Grande</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Cor do Tema</label>
+                                            <p>Escolha a cor principal do aplicativo</p>
+                                        </div>
+                                        <select className="setting-select">
+                                            <option value="purple">💜 Roxo</option>
+                                            <option value="blue">💙 Azul</option>
+                                            <option value="green">💚 Verde</option>
+                                            <option value="red">❤️ Vermelho</option>
+                                            <option value="pink">💗 Rosa</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="setting-item">
+                                        <div className="setting-info">
                                             <label>Tema</label>
                                             <p>Escolha o tema visual do aplicativo</p>
                                         </div>
@@ -226,18 +253,70 @@ export function Settings() {
                             </div>
                         )}
 
-                        {/* Player Section */}
-                        {activeSection === 'player' && (
+                        {/* Playback Section */}
+                        {activeSection === 'playback' && (
                             <div className="section-card">
                                 <div className="section-header">
-                                    <div className="section-icon" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>▶️</div>
+                                    <div className="section-icon" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>⏯️</div>
                                     <div>
-                                        <h2>Configurações do Player</h2>
-                                        <p>Ajuste a reprodução de vídeo</p>
+                                        <h2>Reprodução</h2>
+                                        <p>Ajuste a reprodução de vídeo e áudio</p>
                                     </div>
                                 </div>
 
                                 <div className="settings-group">
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Tamanho do Buffer</label>
+                                            <p>Tempo de buffer antes de iniciar a reprodução</p>
+                                        </div>
+                                        <select className="setting-select">
+                                            <option value="5">5 segundos</option>
+                                            <option value="10">10 segundos</option>
+                                            <option value="15" selected>15 segundos</option>
+                                            <option value="30">30 segundos</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Codificador de Áudio</label>
+                                            <p>Codec de áudio preferencial</p>
+                                        </div>
+                                        <select className="setting-select">
+                                            <option value="auto">Auto</option>
+                                            <option value="aac">AAC</option>
+                                            <option value="ac3">AC3 (Dolby Digital)</option>
+                                            <option value="eac3">EAC3 (Dolby Digital Plus)</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Codificador de Vídeo</label>
+                                            <p>Codec de vídeo preferencial</p>
+                                        </div>
+                                        <select className="setting-select">
+                                            <option value="auto">Auto</option>
+                                            <option value="h264">H.264 (AVC)</option>
+                                            <option value="h265">H.265 (HEVC)</option>
+                                            <option value="vp9">VP9</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Qualidade padrão</label>
+                                            <p>Qualidade preferencial de reprodução</p>
+                                        </div>
+                                        <select className="setting-select">
+                                            <option>Auto</option>
+                                            <option>1080p (Full HD)</option>
+                                            <option>720p (HD)</option>
+                                            <option>480p (SD)</option>
+                                        </select>
+                                    </div>
+
                                     <div className="setting-item">
                                         <div className="setting-info">
                                             <label>Auto-play próximo episódio</label>
@@ -262,21 +341,90 @@ export function Settings() {
 
                                     <div className="setting-item">
                                         <div className="setting-info">
-                                            <label>Qualidade padrão</label>
-                                            <p>Qualidade preferencial de reprodução</p>
+                                            <label>Pular intro automaticamente</label>
+                                            <p>Pular abertura de séries quando disponível</p>
+                                        </div>
+                                        <label className="toggle-switch">
+                                            <input type="checkbox" defaultChecked />
+                                            <span className="toggle-slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Parental Control Section */}
+                        {activeSection === 'parental' && (
+                            <div className="section-card">
+                                <div className="section-header">
+                                    <div className="section-icon" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>👨‍👩‍👧</div>
+                                    <div>
+                                        <h2>Controle Parental</h2>
+                                        <p>Gerencie o acesso ao conteúdo</p>
+                                    </div>
+                                </div>
+
+                                <div className="settings-group">
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Ativar Controle Parental</label>
+                                            <p>Restringir acesso a conteúdo adulto</p>
+                                        </div>
+                                        <label className="toggle-switch">
+                                            <input type="checkbox" />
+                                            <span className="toggle-slider"></span>
+                                        </label>
+                                    </div>
+
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Classificação Máxima</label>
+                                            <p>Limite de classificação indicativa</p>
                                         </div>
                                         <select className="setting-select">
-                                            <option>Auto</option>
-                                            <option>1080p (Full HD)</option>
-                                            <option>720p (HD)</option>
-                                            <option>480p (SD)</option>
+                                            <option value="L">Livre</option>
+                                            <option value="10">10 anos</option>
+                                            <option value="12">12 anos</option>
+                                            <option value="14">14 anos</option>
+                                            <option value="16">16 anos</option>
+                                            <option value="18">18 anos</option>
                                         </select>
                                     </div>
 
                                     <div className="setting-item">
                                         <div className="setting-info">
-                                            <label>Pular intro automaticamente</label>
-                                            <p>Pular abertura de séries quando disponível</p>
+                                            <label>PIN de Acesso</label>
+                                            <p>Definir PIN para desbloquear conteúdo restrito</p>
+                                        </div>
+                                        <button className="setting-btn" style={{
+                                            padding: '10px 20px',
+                                            background: 'rgba(239, 68, 68, 0.2)',
+                                            border: '1px solid rgba(239, 68, 68, 0.4)',
+                                            borderRadius: '10px',
+                                            color: '#ef4444',
+                                            cursor: 'pointer',
+                                            fontWeight: 600,
+                                            transition: 'all 0.2s'
+                                        }}>
+                                            🔑 Alterar PIN
+                                        </button>
+                                    </div>
+
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Bloquear Categorias Adultas</label>
+                                            <p>Ocultar automaticamente categorias adultas</p>
+                                        </div>
+                                        <label className="toggle-switch">
+                                            <input type="checkbox" defaultChecked />
+                                            <span className="toggle-slider"></span>
+                                        </label>
+                                    </div>
+
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Filtrar por TMDB</label>
+                                            <p>Verificar classificação no TMDB automaticamente</p>
                                         </div>
                                         <label className="toggle-switch">
                                             <input type="checkbox" defaultChecked />
@@ -314,7 +462,7 @@ export function Settings() {
                                         </svg>
                                     </div>
                                     <h3 className="app-name">NeoStream</h3>
-                                    <p className="app-version">Versão 1.0.0</p>
+                                    <p className="app-version">Versão 2.3.0</p>
                                     <p className="app-description">
                                         Sua experiência de streaming completa com TV ao vivo, filmes e séries.
                                     </p>

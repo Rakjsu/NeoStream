@@ -143,7 +143,7 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
                             Versão Atual
                         </p>
                         <p style={{ color: 'white', fontSize: '18px', fontWeight: '600' }}>
-                            v{(window as any).electron?.app?.getVersion?.() || '1.0.0'}
+                            v{(window as any).electron?.app?.getVersion?.() || '2.3.0'}
                         </p>
                     </div>
                     <div style={{

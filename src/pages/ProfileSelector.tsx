@@ -16,17 +16,31 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
     const [pinError, setPinError] = useState('');
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [hoveredProfile, setHoveredProfile] = useState<string | null>(null);
+    const [isManaging, setIsManaging] = useState(false);
+    const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState<Profile | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         loadProfiles();
     }, []);
 
     const loadProfiles = () => {
-        const allProfiles = profileService.getAllProfiles();
-        setProfiles(allProfiles);
+        setIsLoading(true);
+        // Simulate loading delay for animation
+        setTimeout(() => {
+            const allProfiles = profileService.getAllProfiles();
+            setProfiles(allProfiles);
+            setIsLoading(false);
+        }, 500);
     };
 
     const handleProfileClick = async (profile: Profile) => {
+        if (isManaging) {
+            setEditingProfile(profile);
+            return;
+        }
+
         if (profileService.hasPin(profile.id)) {
             setSelectedProfileForPin(profile);
             setShowPinModal(true);
@@ -58,6 +72,28 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
             return;
         }
         setShowCreateModal(true);
+    };
+
+    const handleDeleteProfile = (profile: Profile) => {
+        if (profiles.length <= 1) {
+            alert('Você precisa ter pelo menos um perfil!');
+            return;
+        }
+        setShowDeleteConfirm(profile);
+    };
+
+    const confirmDelete = () => {
+        if (showDeleteConfirm) {
+            profileService.deleteProfile(showDeleteConfirm.id);
+            loadProfiles();
+            setShowDeleteConfirm(null);
+        }
+    };
+
+    const handleEditProfile = (profile: Profile, newName: string, newAvatar: string) => {
+        profileService.updateProfile(profile.id, { name: newName, avatar: newAvatar });
+        loadProfiles();
+        setEditingProfile(null);
     };
 
     return (
@@ -95,10 +131,31 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
 
                 {/* Profiles Grid */}
                 <div className="profiles-container">
-                    {profiles.map((profile, index) => (
+                    {/* Skeleton Loading Cards */}
+                    {isLoading && (
+                        <>
+                            {[0, 1, 2].map((i) => (
+                                <div
+                                    key={`skeleton-${i}`}
+                                    className="profile-card-skeleton"
+                                    style={{ animationDelay: `${i * 0.1}s` }}
+                                >
+                                    <div className="skeleton-avatar" />
+                                    <div className="skeleton-name" />
+                                </div>
+                            ))}
+                        </>
+                    )}
+
+                    {/* Actual Profile Cards - Kids always last */}
+                    {!isLoading && [...profiles].sort((a, b) => {
+                        if (a.isKids && !b.isKids) return 1;
+                        if (!a.isKids && b.isKids) return -1;
+                        return 0;
+                    }).map((profile, index) => (
                         <div
                             key={profile.id}
-                            className={`profile-card-wrapper ${hoveredProfile === profile.id ? 'hovered' : ''}`}
+                            className={`profile-card-wrapper ${hoveredProfile === profile.id ? 'hovered' : ''} ${isManaging ? 'managing' : ''}`}
                             style={{ animationDelay: `${index * 0.1}s` }}
                             onMouseEnter={() => setHoveredProfile(profile.id)}
                             onMouseLeave={() => setHoveredProfile(null)}
@@ -107,11 +164,22 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                                 profile={profile}
                                 onClick={() => handleProfileClick(profile)}
                             />
+                            {isManaging && (
+                                <button
+                                    className="delete-profile-btn"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteProfile(profile);
+                                    }}
+                                >
+                                    🗑️
+                                </button>
+                            )}
                         </div>
                     ))}
 
                     {/* Add Profile Card */}
-                    {profiles.length < 5 && (
+                    {profiles.length < 5 && !isManaging && (
                         <div
                             className="add-profile-card"
                             onClick={handleAddProfile}
@@ -127,11 +195,84 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                 </div>
 
                 {/* Manage Profiles Button */}
-                <button className="manage-btn">
-                    <span>⚙️</span>
-                    <span>Gerenciar Perfis</span>
+                <button
+                    className={`manage-btn ${isManaging ? 'active' : ''}`}
+                    onClick={() => setIsManaging(!isManaging)}
+                >
+                    <span>{isManaging ? '✓' : '⚙️'}</span>
+                    <span>{isManaging ? 'Concluído' : 'Gerenciar Perfis'}</span>
                 </button>
             </div>
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteConfirm && (
+                <div className="pin-modal-overlay" onClick={() => setShowDeleteConfirm(null)}>
+                    <div className="pin-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="pin-modal-header">
+                            <div className="pin-profile-icon">🗑️</div>
+                            <h2>Excluir Perfil?</h2>
+                            <p>Tem certeza que deseja excluir o perfil <strong>{showDeleteConfirm.name}</strong>?</p>
+                        </div>
+                        <div className="pin-modal-buttons">
+                            <button className="btn-cancel" onClick={() => setShowDeleteConfirm(null)}>
+                                Cancelar
+                            </button>
+                            <button className="btn-submit btn-danger" onClick={confirmDelete}>
+                                Excluir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Profile Modal */}
+            {editingProfile && (
+                <div className="pin-modal-overlay" onClick={() => setEditingProfile(null)}>
+                    <div className="pin-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="pin-modal-header">
+                            <div className="pin-profile-icon">✏️</div>
+                            <h2>Editar Perfil</h2>
+                        </div>
+                        <div className="edit-profile-form">
+                            <input
+                                type="text"
+                                className="edit-profile-input"
+                                defaultValue={editingProfile.name}
+                                placeholder="Nome do perfil"
+                                id="edit-profile-name"
+                            />
+                            <div className="avatar-selector">
+                                {['👤', '👨', '👩', '🧒', '👴', '👵', '🐱', '🐶', '🦊', '🐼', '🎮', '🎬'].map((avatar) => (
+                                    <button
+                                        key={avatar}
+                                        className={`avatar-option ${editingProfile.avatar === avatar ? 'selected' : ''}`}
+                                        onClick={() => {
+                                            const input = document.getElementById('edit-profile-name') as HTMLInputElement;
+                                            handleEditProfile(editingProfile, input?.value || editingProfile.name, avatar);
+                                        }}
+                                    >
+                                        {avatar}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="pin-modal-buttons">
+                            <button className="btn-cancel" onClick={() => setEditingProfile(null)}>
+                                Cancelar
+                            </button>
+                            <button
+                                className="btn-submit"
+                                onClick={() => {
+                                    const input = document.getElementById('edit-profile-name') as HTMLInputElement;
+                                    handleEditProfile(editingProfile, input?.value || editingProfile.name, editingProfile.avatar);
+                                }}
+                            >
+                                Salvar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* PIN Modal */}
             {showPinModal && selectedProfileForPin && (
@@ -143,7 +284,11 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                             <p>Perfil protegido: <strong>{selectedProfileForPin.name}</strong></p>
                         </div>
 
-                        <div className="pin-input-container">
+                        <div
+                            className="pin-input-container"
+                            onClick={() => document.getElementById('pin-hidden-input')?.focus()}
+                            style={{ cursor: 'text' }}
+                        >
                             {[0, 1, 2, 3].map((index) => (
                                 <div
                                     key={index}
@@ -155,6 +300,7 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                         </div>
 
                         <input
+                            id="pin-hidden-input"
                             type="password"
                             maxLength={4}
                             value={pinInput}
@@ -328,6 +474,46 @@ const profileSelectorStyles = `
     justify-content: center;
     max-width: 1100px;
     margin-bottom: 48px;
+}
+
+/* Skeleton Loading Cards */
+.profile-card-skeleton {
+    width: 180px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 24px;
+    animation: skeletonFadeIn 0.6s ease backwards;
+}
+
+.skeleton-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+
+.skeleton-name {
+    width: 100px;
+    height: 20px;
+    border-radius: 10px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    animation-delay: 0.2s;
+}
+
+@keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+@keyframes skeletonFadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
 }
 
 /* Profile Card Wrapper */
@@ -527,6 +713,7 @@ const profileSelectorStyles = `
     justify-content: center;
     gap: 16px;
     margin-bottom: 24px;
+    position: relative;
 }
 
 .pin-digit {
@@ -568,8 +755,20 @@ const profileSelectorStyles = `
 
 .hidden-pin-input {
     position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 60px;
     opacity: 0;
-    pointer-events: none;
+    font-size: 32px;
+    text-align: center;
+    letter-spacing: 48px;
+    padding-left: 24px;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: transparent;
+    caret-color: transparent;
 }
 
 /* PIN Error */
@@ -648,5 +847,135 @@ const profileSelectorStyles = `
     .add-icon {
         font-size: 48px;
     }
+}
+
+/* Profile Management Styles */
+.profile-card-wrapper.managing {
+    position: relative;
+}
+
+.profile-card-wrapper.managing::after {
+    content: '✏️';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(168, 85, 247, 0.9);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    animation: bounceIn 0.3s ease;
+}
+
+.delete-profile-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 36px;
+    height: 36px;
+    background: rgba(239, 68, 68, 0.9);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    animation: bounceIn 0.3s ease;
+    z-index: 10;
+}
+
+.delete-profile-btn:hover {
+    background: #ef4444;
+    transform: scale(1.15);
+}
+
+@keyframes bounceIn {
+    from {
+        transform: scale(0);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.manage-btn.active {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(16, 185, 129, 0.2) 100%);
+    border-color: #22c55e;
+    color: #22c55e;
+}
+
+.manage-btn.active:hover {
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(16, 185, 129, 0.3) 100%);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+}
+
+.btn-danger:hover {
+    box-shadow: 0 12px 32px rgba(239, 68, 68, 0.4) !important;
+}
+
+/* Edit Profile Form */
+.edit-profile-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+.edit-profile-input {
+    width: 100%;
+    padding: 14px 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    color: white;
+    font-size: 16px;
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+.edit-profile-input:focus {
+    border-color: #a855f7;
+    background: rgba(168, 85, 247, 0.1);
+}
+
+.avatar-selector {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+}
+
+.avatar-option {
+    width: 48px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    font-size: 24px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.avatar-option:hover {
+    border-color: rgba(168, 85, 247, 0.5);
+    background: rgba(168, 85, 247, 0.1);
+    transform: scale(1.1);
+}
+
+.avatar-option.selected {
+    border-color: #a855f7;
+    background: rgba(168, 85, 247, 0.2);
 }
 `;

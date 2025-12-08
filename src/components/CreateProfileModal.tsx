@@ -92,7 +92,7 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                zIndex: 1000
+                zIndex: 10002
             }}
             onClick={onClose}
         >
@@ -102,10 +102,8 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
                     backgroundColor: '#1e293b',
                     borderRadius: '16px',
                     padding: '40px',
-                    maxWidth: '500px',
-                    width: '90%',
-                    maxHeight: '90vh',
-                    overflowY: 'auto'
+                    maxWidth: '600px',
+                    width: '90%'
                 }}
             >
                 <h2 style={{ color: 'white', fontSize: '32px', marginBottom: '24px' }}>
@@ -302,6 +300,7 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
                         </div>
                     </div>
                 )}
+
 
                 {/* Error Message */}
                 {error && (

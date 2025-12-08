@@ -23,6 +23,7 @@ interface CategoryMenuProps {
     onSelectCategory: (categoryId: string) => void;
     selectedCategory: string | null;
     type?: 'vod' | 'series' | 'live'; // Type of content
+    isKidsProfile?: boolean; // Whether current profile is a Kids profile
 }
 
 interface Category {
@@ -31,10 +32,29 @@ interface Category {
     parent_id: number;
 }
 
-export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'series' }: CategoryMenuProps) {
+export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'series', isKidsProfile = false }: CategoryMenuProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(false);
+
+    // Categories blocked for Kids profiles
+    const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'erótico'];
+
+    // Categories allowed for Kids in LiveTV (only show these)
+    const KIDS_ALLOWED_LIVE_PATTERNS = ['infantil', 'infantis', 'kids', 'criança', '24 horas infantis'];
+
+    const isCategoryBlocked = (categoryName: string): boolean => {
+        if (!isKidsProfile) return false;
+        const lowerName = categoryName.toLowerCase();
+
+        // For LiveTV: only allow kids categories (whitelist approach)
+        if (type === 'live') {
+            return !KIDS_ALLOWED_LIVE_PATTERNS.some(pattern => lowerName.includes(pattern));
+        }
+
+        // For VOD/Series: block adult categories (blacklist approach)
+        return BLOCKED_CATEGORY_PATTERNS.some(pattern => lowerName.includes(pattern));
+    };
 
     useEffect(() => {
         if (isOpen && categories.length === 0) {
@@ -892,7 +912,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                     )}
 
                     {/* Category Items - Premium Cards */}
-                    {categories.map((category, index) => (
+                    {categories.filter(cat => !isCategoryBlocked(cat.category_name)).map((category, index) => (
                         <button
                             key={category.category_id}
                             onClick={() => {

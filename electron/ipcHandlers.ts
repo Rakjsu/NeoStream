@@ -192,13 +192,17 @@ export function setupIpcHandlers() {
     // Get VOD stream URL
     ipcMain.handle('streams:get-vod-url', async (_, { streamId, container }) => {
         try {
+            console.log('[Download] get-vod-url called with:', { streamId, container })
             const auth = store.get('auth')
             if (!auth.url || !auth.username || !auth.password) {
                 return { success: false, error: 'Not authenticated' }
             }
 
             const client = new XtreamClient(auth.url, auth.username, auth.password)
-            const url = client.getVodStreamUrl(streamId, container || 'mp4')
+            const containerExt = container || 'mp4'
+            console.log('[Download] Using container extension:', containerExt)
+            const url = client.getVodStreamUrl(Number(streamId), containerExt)
+            console.log('[Download] Generated VOD URL:', url.replace(auth.password, '***'))
 
             return { success: true, url }
         } catch (error: any) {

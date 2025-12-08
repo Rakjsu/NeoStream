@@ -2,7 +2,7 @@
   "name": "neostream-iptv",
   "productName": "NeoStream IPTV",
   "private": true,
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Advanced IPTV player with auto-update support",
   "author": "Rakjsu",
   "main": "dist-electron/main.js",
@@ -84,8 +84,18 @@
       "package.json"
     ],
     "win": {
-      "target": "nsis",
-      "publisherName": "Rakjsu"
+      "target": [
+        "portable",
+        "nsis"
+      ],
+      "publisherName": "Rakjsu",
+      "signAndEditExecutable": false,
+      "sign": null
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "Rakjsu",
+      "repo": "IPTV"
     },
     "nsis": {
       "oneClick": false,

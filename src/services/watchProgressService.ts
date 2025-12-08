@@ -21,17 +21,26 @@ export interface SeriesProgress {
 }
 
 class WatchProgressService {
-    private STORAGE_KEY = 'series_watch_progress';
+    private STORAGE_KEY_PREFIX = 'series_watch_progress';
 
-    // Get all watch progress
+    // Get storage key for current profile
+    private getStorageKey(): string {
+        const activeProfile = profileService.getActiveProfile();
+        if (activeProfile) {
+            return `${this.STORAGE_KEY_PREFIX}_${activeProfile.id}`;
+        }
+        return this.STORAGE_KEY_PREFIX; // Fallback for no profile
+    }
+
+    // Get all watch progress for current profile
     private getProgress(): EpisodeProgress[] {
-        const stored = localStorage.getItem(this.STORAGE_KEY);
+        const stored = localStorage.getItem(this.getStorageKey());
         return stored ? JSON.parse(stored) : [];
     }
 
-    // Save progress
+    // Save progress for current profile
     private saveProgress(progress: EpisodeProgress[]): void {
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(progress));
+        localStorage.setItem(this.getStorageKey(), JSON.stringify(progress));
     }
 
     // Mark episode as watched
@@ -310,9 +319,9 @@ class WatchProgressService {
         this.saveProgress(filtered);
     }
 
-    // Clear all progress
+    // Clear all progress for current profile
     clearAllProgress(): void {
-        localStorage.removeItem(this.STORAGE_KEY);
+        localStorage.removeItem(this.getStorageKey());
     }
 }
 

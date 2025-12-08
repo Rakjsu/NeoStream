@@ -3,6 +3,7 @@ import { CategoryMenu } from '../components/CategoryMenu';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { epgService } from '../services/epgService';
+import { profileService } from '../services/profileService';
 
 interface LiveStream {
     num: number;
@@ -42,6 +43,11 @@ export function LiveTV() {
     const [itemsPerPage, setItemsPerPage] = useState(48); // Default fallback
     const [progressTick, setProgressTick] = useState(0);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
+    const [allowedCategoryIds, setAllowedCategoryIds] = useState<Set<string>>(new Set());
+
+    // For Kids profiles: only allow 'infantis' and '24 horas infantis' categories
+    const KIDS_ALLOWED_PATTERNS = ['infantil', 'infantis', 'kids', 'criança', '24 horas infantis'];
 
     // Calculate items per page based on window dimensions
     useEffect(() => {
@@ -146,6 +152,18 @@ export function LiveTV() {
             const result = await window.ipcRenderer.invoke('categories:get-live');
             if (result.success) {
                 setCategories(result.data || []);
+
+                // For Kids profile: extract allowed category IDs (only infantis)
+                if (isKidsProfile) {
+                    const allowedIds = new Set<string>();
+                    (result.data || []).forEach((cat: { category_id: string; category_name: string }) => {
+                        const lowerName = cat.category_name.toLowerCase();
+                        if (KIDS_ALLOWED_PATTERNS.some(p => lowerName.includes(p))) {
+                            allowedIds.add(cat.category_id);
+                        }
+                    });
+                    setAllowedCategoryIds(allowedIds);
+                }
             }
         } catch (err) {
             console.error('Failed to load categories:', err);
@@ -155,6 +173,14 @@ export function LiveTV() {
     const filteredStreams = streams.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesCategory = !selectedCategory || selectedCategory === 'all' || stream.category_id === selectedCategory;
+
+        // Kids profile: only allow channels from infantis categories
+        if (isKidsProfile && allowedCategoryIds.size > 0) {
+            if (!allowedCategoryIds.has(stream.category_id)) {
+                return false;
+            }
+        }
+
         return matchesSearch && matchesCategory;
     });
 
@@ -271,6 +297,7 @@ export function LiveTV() {
                 onSelectCategory={setSelectedCategory}
                 selectedCategory={selectedCategory}
                 type="live"
+                isKidsProfile={isKidsProfile}
             />
             <div ref={scrollContainerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflowY: 'auto', paddingTop: '40px' }}>
                 {selectedChannel && (

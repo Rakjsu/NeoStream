@@ -4,6 +4,7 @@ import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
 import { watchLaterService } from '../services/watchLater';
 import { favoritesService } from '../services/favoritesService';
+import { downloadService } from '../services/downloadService';
 
 interface ContentDetailModalProps {
     isOpen: boolean;
@@ -19,8 +20,9 @@ interface ContentDetailModalProps {
         cast?: string;
         director?: string;
         release_date?: string;
+        container_extension?: string;
     };
-    onPlay: (season?: number, episode?: number) => void;
+    onPlay: (season?: number, episode?: number, offlineUrl?: string) => void;
 }
 
 export function ContentDetailModal({
@@ -37,6 +39,8 @@ export function ContentDetailModal({
     const [selectedEpisode, setSelectedEpisode] = useState(1);
     const [loading, setLoading] = useState(false);
     const [, setRefresh] = useState(0); // Force re-render for button states
+    const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'completed'>('idle');
+    const [downloadProgress, setDownloadProgress] = useState(0);
     const modalRef = useRef<HTMLDivElement>(null);
 
     // Fetch series info for episodes
@@ -455,17 +459,33 @@ export function ContentDetailModal({
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                         {/* Play Button */}
                         <button
-                            onClick={() => onPlay(
-                                contentType === 'series' ? selectedSeason : undefined,
-                                contentType === 'series' ? selectedEpisode : undefined
-                            )}
+                            onClick={() => {
+                                // Check for offline content
+                                let offlineUrl: string | undefined;
+                                if (contentType === 'movie') {
+                                    const localPath = downloadService.getOfflineFilePath(contentData.name, 'movie');
+                                    if (localPath) offlineUrl = localPath;
+                                } else {
+                                    const localPath = downloadService.getOfflineEpisodePath(contentData.name, selectedSeason, selectedEpisode);
+                                    if (localPath) offlineUrl = localPath;
+                                }
+
+                                onPlay(
+                                    contentType === 'series' ? selectedSeason : undefined,
+                                    contentType === 'series' ? selectedEpisode : undefined,
+                                    offlineUrl
+                                );
+                            }}
                             style={{
                                 flex: 1,
                                 minWidth: 200,
                                 padding: '14px 24px',
                                 borderRadius: 12,
                                 border: 'none',
-                                background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                                background: (contentType === 'movie' && downloadService.isDownloaded(contentData.name, 'movie')) ||
+                                    (contentType === 'series' && downloadService.getOfflineEpisodePath(contentData.name, selectedSeason, selectedEpisode))
+                                    ? 'linear-gradient(135deg, #06b6d4, #0891b2)'
+                                    : 'linear-gradient(135deg, #a855f7, #ec4899)',
                                 color: 'white',
                                 fontSize: 15,
                                 fontWeight: 600,
@@ -474,24 +494,33 @@ export function ContentDetailModal({
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 gap: 10,
-                                boxShadow: '0 8px 24px rgba(168, 85, 247, 0.4)',
+                                boxShadow: (contentType === 'movie' && downloadService.isDownloaded(contentData.name, 'movie')) ||
+                                    (contentType === 'series' && downloadService.getOfflineEpisodePath(contentData.name, selectedSeason, selectedEpisode))
+                                    ? '0 8px 24px rgba(6, 182, 212, 0.4)'
+                                    : '0 8px 24px rgba(168, 85, 247, 0.4)',
                                 transition: 'all 0.3s'
                             }}
                             onMouseEnter={e => {
                                 e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 12px 32px rgba(168, 85, 247, 0.5)';
                             }}
                             onMouseLeave={e => {
                                 e.currentTarget.style.transform = 'translateY(0)';
-                                e.currentTarget.style.boxShadow = '0 8px 24px rgba(168, 85, 247, 0.4)';
                             }}
                         >
-                            <span style={{ fontSize: 18 }}>▶</span>
+                            <span style={{ fontSize: 18 }}>
+                                {(contentType === 'movie' && downloadService.isDownloaded(contentData.name, 'movie')) ||
+                                    (contentType === 'series' && downloadService.getOfflineEpisodePath(contentData.name, selectedSeason, selectedEpisode))
+                                    ? '📥' : '▶'}
+                            </span>
                             {contentType === 'series'
-                                ? `Assistir T${selectedSeason} E${selectedEpisode}`
-                                : hasMovieProgress
-                                    ? 'Continuar Assistindo'
-                                    : 'Assistir Filme'
+                                ? downloadService.getOfflineEpisodePath(contentData.name, selectedSeason, selectedEpisode)
+                                    ? `Offline T${selectedSeason} E${selectedEpisode}`
+                                    : `Assistir T${selectedSeason} E${selectedEpisode}`
+                                : downloadService.isDownloaded(contentData.name, 'movie')
+                                    ? 'Assistir Offline'
+                                    : hasMovieProgress
+                                        ? 'Continuar Assistindo'
+                                        : 'Assistir Filme'
                             }
                         </button>
 
@@ -533,6 +562,105 @@ export function ContentDetailModal({
                         >
                             {watchLaterService.has(contentId, contentType) ? '✓' : '+'}
                             {watchLaterService.has(contentId, contentType) ? 'Salvo' : 'Assistir Depois'}
+                        </button>
+
+                        {/* Download Button (Movies and Series) */}
+                        <button
+                            onClick={async () => {
+                                if (downloadStatus === 'completed') return;
+                                if (downloadStatus === 'downloading') return;
+
+                                setDownloadStatus('downloading');
+                                try {
+                                    let result;
+                                    let downloadName = contentData.name;
+                                    let downloadType: 'movie' | 'episode' = 'movie';
+                                    let seriesInfo = undefined;
+
+                                    if (contentType === 'movie') {
+                                        // Get movie stream URL
+                                        result = await window.ipcRenderer.invoke('streams:get-vod-url', {
+                                            streamId: contentId,
+                                            container: contentData.container_extension || 'mp4'
+                                        });
+                                    } else {
+                                        // Get series episode stream URL
+                                        const episodeData = episodes.find((ep: any) => Number(ep.episode_num) === selectedEpisode);
+                                        if (episodeData) {
+                                            result = await window.ipcRenderer.invoke('streams:get-series-url', {
+                                                streamId: episodeData.id,
+                                                container: episodeData.container_extension || 'mp4'
+                                            });
+                                            downloadName = `${contentData.name} - T${selectedSeason}E${selectedEpisode}`;
+                                            downloadType = 'episode';
+                                            seriesInfo = {
+                                                seriesName: contentData.name,
+                                                season: selectedSeason,
+                                                episode: selectedEpisode
+                                            };
+                                        }
+                                    }
+
+                                    if (result?.success) {
+                                        // Start download
+                                        const download = await downloadService.addDownload(
+                                            downloadName,
+                                            downloadType,
+                                            result.url,
+                                            contentData.cover,
+                                            seriesInfo
+                                        );
+
+                                        // Listen for progress
+                                        const handleProgress = (item: any) => {
+                                            if (item.id === download.id) {
+                                                setDownloadProgress(item.progress);
+                                                if (item.status === 'completed') {
+                                                    setDownloadStatus('completed');
+                                                }
+                                            }
+                                        };
+                                        downloadService.on('progress', handleProgress);
+                                        downloadService.on('completed', handleProgress);
+                                    }
+                                } catch (err) {
+                                    console.error('Download error:', err);
+                                    setDownloadStatus('idle');
+                                }
+                            }}
+                            disabled={downloadStatus === 'downloading'}
+                            style={{
+                                padding: '14px 20px',
+                                borderRadius: 12,
+                                border: downloadStatus === 'completed'
+                                    ? '2px solid #06b6d4'
+                                    : '2px solid rgba(255, 255, 255, 0.2)',
+                                background: downloadStatus === 'completed'
+                                    ? 'rgba(6, 182, 212, 0.2)'
+                                    : downloadStatus === 'downloading'
+                                        ? 'rgba(6, 182, 212, 0.1)'
+                                        : 'rgba(255, 255, 255, 0.08)',
+                                color: downloadStatus === 'completed'
+                                    ? '#67e8f9'
+                                    : 'white',
+                                fontSize: 14,
+                                fontWeight: 600,
+                                cursor: downloadStatus === 'downloading' ? 'wait' : 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                transition: 'all 0.2s',
+                                opacity: downloadStatus === 'downloading' ? 0.7 : 1
+                            }}
+                            title={downloadStatus === 'completed' ? 'Baixado' : 'Baixar para assistir offline'}
+                        >
+                            {downloadStatus === 'completed' ? '✓' : downloadStatus === 'downloading' ? '⏳' : '📥'}
+                            {downloadStatus === 'completed'
+                                ? 'Baixado'
+                                : downloadStatus === 'downloading'
+                                    ? `${downloadProgress}%`
+                                    : 'Baixar'
+                            }
                         </button>
 
                         {/* Favorite Button */}

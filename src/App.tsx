@@ -9,7 +9,9 @@ import { Series } from './pages/Series';
 import { Settings } from './pages/Settings';
 import { WatchLater } from './pages/WatchLater';
 import { Favorites } from './pages/Favorites';
+import { Downloads } from './pages/Downloads';
 import { ProfileSelector } from './pages/ProfileSelector';
+import { UpdateNotification } from './components/UpdateNotification';
 import { profileService } from './services/profileService';
 import { useState, useEffect } from 'react';
 
@@ -63,29 +65,33 @@ function App() {
   }
 
   return (
-    <HashRouter>
-      <Routes>
-        <Route path="/welcome" element={<Welcome />} />
-        <Route path="/login" element={<Login />} />
-        <Route
-          path="/dashboard"
-          element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />}
-        >
-          <Route index element={<Navigate to="home" replace />} />
-          <Route path="home" element={<Home />} />
-          <Route path="live" element={<LiveTV />} />
-          <Route path="vod" element={<VOD />} />
-          <Route path="series" element={<Series />} />
-          <Route path="watch-later" element={<WatchLater />} />
-          <Route path="favorites" element={<Favorites />} />
-          <Route path="settings" element={<Settings />} />
-        </Route>
-        <Route
-          path="/"
-          element={isAuthenticated ? <Navigate to="/dashboard" /> : <Navigate to="/welcome" />}
-        />
-      </Routes>
-    </HashRouter>
+    <>
+      <UpdateNotification />
+      <HashRouter>
+        <Routes>
+          <Route path="/welcome" element={<Welcome />} />
+          <Route path="/login" element={<Login />} />
+          <Route
+            path="/dashboard"
+            element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />}
+          >
+            <Route index element={<Navigate to="home" replace />} />
+            <Route path="home" element={<Home />} />
+            <Route path="live" element={<LiveTV />} />
+            <Route path="vod" element={<VOD />} />
+            <Route path="series" element={<Series />} />
+            <Route path="watch-later" element={<WatchLater />} />
+            <Route path="favorites" element={<Favorites />} />
+            <Route path="downloads" element={<Downloads />} />
+            <Route path="settings" element={<Settings />} />
+          </Route>
+          <Route
+            path="/"
+            element={isAuthenticated ? <Navigate to="/dashboard" /> : <Navigate to="/welcome" />}
+          />
+        </Routes>
+      </HashRouter>
+    </>
   );
 }
 

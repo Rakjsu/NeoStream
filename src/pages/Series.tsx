@@ -9,6 +9,10 @@ import { CategoryMenu } from '../components/CategoryMenu';
 import { ResumeModal } from '../components/ResumeModal';
 import { ProgressBar } from '../components/ProgressBar';
 import { ContentDetailModal } from '../components/ContentDetailModal';
+import { profileService } from '../services/profileService';
+import { indexedDBCache } from '../services/indexedDBCache';
+import { downloadService } from '../services/downloadService';
+import { searchSeriesByName as searchSeries, isKidsFriendly } from '../services/tmdb';
 
 interface Series {
     num: number;
@@ -68,6 +72,14 @@ export function Series() {
 
     // Clear history confirmation
     const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false);
+    const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
+    const [blockedCategoryIds, setBlockedCategoryIds] = useState<Set<string>>(new Set());
+    const [checkingItem, setCheckingItem] = useState<string | null>(null);
+    const [blockMessage, setBlockMessage] = useState<string | null>(null);
+    const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
+
+    // Blocked category patterns for Kids profile
+    const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'erótico'];
 
     // Dynamic grid calculation based on window dimensions
     useEffect(() => {
@@ -118,8 +130,58 @@ export function Series() {
         }
     };
 
+    // Load hidden items from IndexedDB on mount (for Kids profile)
+    useEffect(() => {
+        if (!isKidsProfile) return;
+
+        const loadHiddenItems = async () => {
+            const hidden = await indexedDBCache.getHiddenItems('series');
+            setHiddenSeries(new Set(hidden));
+        };
+        loadHiddenItems();
+    }, [isKidsProfile]);
+
+    // Fetch blocked category IDs for Kids profile
+    useEffect(() => {
+        if (!isKidsProfile) return;
+
+        const fetchBlockedCategories = async () => {
+            try {
+                const result = await window.ipcRenderer.invoke('categories:get-series');
+                if (result.success) {
+                    const blockedIds = new Set<string>();
+                    (result.data || []).forEach((cat: { category_id: string; category_name: string }) => {
+                        const lowerName = cat.category_name.toLowerCase();
+                        if (BLOCKED_CATEGORY_PATTERNS.some(p => lowerName.includes(p))) {
+                            blockedIds.add(cat.category_id);
+                        }
+                    });
+                    setBlockedCategoryIds(blockedIds);
+                }
+            } catch (err) {
+                console.error('Failed to fetch categories for Kids filter:', err);
+            }
+        };
+        fetchBlockedCategories();
+    }, [isKidsProfile]);
+
     const filteredSeries = series.filter(s => {
         const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
+
+        // Kids profile filtering
+        if (isKidsProfile) {
+            // Block items that have been marked as hidden
+            const normalizedName = s.name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
+            if (hiddenSeries.has(normalizedName)) {
+                return false;
+            }
+
+            // Block items from blocked categories (Adult, Terror, etc.)
+            const seriesCategories = Array.isArray(s.category_id) ? s.category_id : [s.category_id];
+            if (seriesCategories.some(catId => blockedCategoryIds.has(catId))) {
+                return false;
+            }
+        }
 
         if (selectedCategory === 'CONTINUE_WATCHING') {
             const progressMap = watchProgressService.getContinueWatching();
@@ -297,6 +359,80 @@ export function Series() {
         }
     }, [selectedSeries]);
 
+    // Handle series card click - check Kids filter if needed, always cache for cross-profile use
+    const handleSeriesClick = async (s: Series) => {
+        // For non-Kids profiles: open and cache TMDB data in background
+        if (!isKidsProfile) {
+            setSelectedSeries(s);
+
+            // Background caching for cross-profile benefit
+            (async () => {
+                const cached = await indexedDBCache.getCachedSeries(s.name);
+                if (!cached) {
+                    const yearMatch = s.name.match(/\((\d{4})\)/);
+                    const year = yearMatch ? yearMatch[1] : undefined;
+                    const tmdbResult = await searchSeries(s.name, year);
+                    if (tmdbResult) {
+                        await indexedDBCache.setCacheSeries(
+                            s.name,
+                            tmdbResult.certification || null,
+                            tmdbResult.genres?.map(g => g.name) || []
+                        );
+                        // If not kids-friendly, hide it for future Kids sessions
+                        if (!isKidsFriendly(tmdbResult.certification)) {
+                            await indexedDBCache.hideItem('series', s.name);
+                        }
+                    }
+                }
+            })();
+            return;
+        }
+
+        // Kids profile flow
+        const normalizedName = s.name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
+        if (hiddenSeries.has(normalizedName)) {
+            return;
+        }
+
+        setCheckingItem(s.name);
+
+        try {
+            const cached = await indexedDBCache.getCachedSeries(s.name);
+            let certification: string | null = null;
+
+            if (cached) {
+                certification = cached.certification;
+            } else {
+                const yearMatch = s.name.match(/\((\d{4})\)/);
+                const year = yearMatch ? yearMatch[1] : undefined;
+                const tmdbResult = await searchSeries(s.name, year);
+
+                if (tmdbResult) {
+                    certification = tmdbResult.certification || null;
+                    await indexedDBCache.setCacheSeries(
+                        s.name,
+                        certification,
+                        tmdbResult.genres?.map(g => g.name) || []
+                    );
+                }
+            }
+
+            if (isKidsFriendly(certification)) {
+                setSelectedSeries(s);
+            } else {
+                setBlockMessage(`"${s.name}" não está disponível para este perfil`);
+                await indexedDBCache.hideItem('series', s.name);
+                setHiddenSeries(prev => new Set(prev).add(normalizedName));
+                setTimeout(() => setBlockMessage(null), 3000);
+            }
+        } catch (error) {
+            console.error('Error checking series rating:', error);
+            setSelectedSeries(s);
+        } finally {
+            setCheckingItem(null);
+        }
+    };
+
     // Loading State
     if (loading) return (
         <div className="series-page">
@@ -356,6 +492,7 @@ export function Series() {
                     onSelectCategory={setSelectedCategory}
                     selectedCategory={selectedCategory}
                     type="series"
+                    isKidsProfile={isKidsProfile}
                 />
 
                 <div className="series-content">
@@ -621,8 +758,8 @@ export function Series() {
                                     return (
                                         <div
                                             key={s.series_id}
-                                            className={`series-card ${isSelected ? 'selected' : ''}`}
-                                            onClick={() => setSelectedSeries(s)}
+                                            className={`series-card ${isSelected ? 'selected' : ''} ${checkingItem === s.name ? 'checking' : ''}`}
+                                            onClick={() => handleSeriesClick(s)}
                                             style={{ animationDelay: `${(index % itemsPerPage) * 0.03}s` }}
                                         >
                                             {/* Poster */}
@@ -681,6 +818,14 @@ export function Series() {
                     </div>
                 </div>
             </div>
+
+            {/* Kids Block Message Toast */}
+            {blockMessage && (
+                <div className="kids-block-toast">
+                    <span className="toast-icon">🔒</span>
+                    <span className="toast-message">{blockMessage}</span>
+                </div>
+            )}
 
             {/* Video Player */}
             {playingSeries && (
@@ -1816,5 +1961,74 @@ const seriesStyles = `
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* Kids Block Toast */
+.kids-block-toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(185, 28, 28, 0.95) 100%);
+    color: white;
+    padding: 16px 32px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+    box-shadow: 0 8px 32px rgba(239, 68, 68, 0.4);
+    z-index: 10000;
+    animation: toastSlideUp 0.3s ease, toastFadeOut 0.5s ease 2.5s forwards;
+}
+
+.kids-block-toast .toast-icon {
+    font-size: 24px;
+}
+
+.kids-block-toast .toast-message {
+    font-size: 15px;
+}
+
+@keyframes toastSlideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes toastFadeOut {
+    to {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+}
+
+/* Series card checking state */
+.series-card.checking {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.series-card.checking::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 32px;
+    height: 32px;
+    margin: -16px 0 0 -16px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 `;

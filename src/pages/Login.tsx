@@ -103,8 +103,8 @@ export function Login() {
         e.preventDefault();
         localStorage.setItem('playlistName', playlistName || 'Minha Playlist');
 
-        // Redirect to profile creation instead of dashboard
-        navigate('/profile-selector');
+        // Reload to trigger App.tsx profile selection flow
+        window.location.href = '/';
     };
 
     const handleBack = () => {

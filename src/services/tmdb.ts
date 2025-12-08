@@ -15,21 +15,26 @@ export function getBackdropUrl(backdropPath: string | null, size: string = 'orig
 }
 
 export interface TMDBMovieDetails {
+    id?: number;
     genres: { id: number; name: string }[];
     overview: string;
     title: string;
     release_date: string;
     vote_average: number;
     backdrop_path: string | null;
+    certification?: string; // Content rating (G, PG, PG-13, R, etc.)
 }
 
 export interface TMDBSeriesDetails {
+    id?: number;
     genres: { id: number; name: string }[];
     overview: string;
     name: string;
     first_air_date: string;
     vote_average: number;
     backdrop_path: string | null;
+    content_ratings?: { results: { iso_3166_1: string; rating: string }[] };
+    certification?: string; // Content rating for easy access
 }
 
 export interface TMDBEpisodeDetails {
@@ -43,9 +48,27 @@ export interface TMDBEpisodeDetails {
 export async function fetchMovieDetails(tmdbId: string): Promise<TMDBMovieDetails | null> {
     if (!tmdbId) return null;
     try {
-        const response = await fetch(`${TMDB_BASE_URL}/movie/${tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR`);
+        // Fetch movie details with release dates for certification
+        const response = await fetch(
+            `${TMDB_BASE_URL}/movie/${tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=release_dates`
+        );
         if (!response.ok) return null;
-        return await response.json();
+        const data = await response.json();
+
+        // Extract certification from release_dates
+        let certification: string | undefined;
+        if (data.release_dates?.results) {
+            // Priority: BR (Brazil) > US > any other
+            const brRelease = data.release_dates.results.find((r: any) => r.iso_3166_1 === 'BR');
+            const usRelease = data.release_dates.results.find((r: any) => r.iso_3166_1 === 'US');
+            const releaseData = brRelease || usRelease || data.release_dates.results[0];
+
+            if (releaseData?.release_dates?.[0]?.certification) {
+                certification = releaseData.release_dates[0].certification;
+            }
+        }
+
+        return { ...data, certification };
     } catch (error) {
         return null;
     }
@@ -54,9 +77,27 @@ export async function fetchMovieDetails(tmdbId: string): Promise<TMDBMovieDetail
 export async function fetchSeriesDetails(tmdbId: string): Promise<TMDBSeriesDetails | null> {
     if (!tmdbId) return null;
     try {
-        const response = await fetch(`${TMDB_BASE_URL}/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR`);
+        // Fetch series details with content ratings
+        const response = await fetch(
+            `${TMDB_BASE_URL}/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=content_ratings`
+        );
         if (!response.ok) return null;
-        return await response.json();
+        const data = await response.json();
+
+        // Extract certification from content_ratings
+        let certification: string | undefined;
+        if (data.content_ratings?.results) {
+            // Priority: BR (Brazil) > US > any other
+            const brRating = data.content_ratings.results.find((r: any) => r.iso_3166_1 === 'BR');
+            const usRating = data.content_ratings.results.find((r: any) => r.iso_3166_1 === 'US');
+            const ratingData = brRating || usRating || data.content_ratings.results[0];
+
+            if (ratingData?.rating) {
+                certification = ratingData.rating;
+            }
+        }
+
+        return { ...data, certification };
     } catch (error) {
         return null;
     }
@@ -139,5 +180,43 @@ export async function fetchEpisodeDetails(
         console.error('Error fetching episode details:', error);
         return null;
     }
+}
+
+/**
+ * Check if content is appropriate for kids based on certification
+ * Uses WHITELIST approach - only allows truly kids-friendly ratings
+ * @param certification - Content rating
+ * @returns true if content is kids-friendly
+ */
+export function isKidsFriendly(certification: string | undefined | null): boolean {
+    if (!certification) {
+        return false; // Unknown = block to be safe
+    }
+
+    const cert = certification.toUpperCase().trim();
+
+    // ONLY these ratings are truly appropriate for young children
+    const kidsFriendlyRatings = [
+        // Brazilian ratings (Livre / 10 anos)
+        'L', 'LIVRE', '10',
+        // US Movie ratings
+        'G',
+        // US TV ratings  
+        'TV-Y', 'TV-Y7', 'TV-G',
+        // Australian
+        'E', 'P', 'C',
+        // UK
+        'U', 'UC',
+        // General
+        '0', '6', '7', 'ALL'
+    ];
+
+    const isKidsFriendlyContent = kidsFriendlyRatings.includes(cert);
+    return isKidsFriendlyContent;
+}
+
+// Check if content is adult-only (helper for reference)
+export function isAdultContent(certification: string | undefined | null): boolean {
+    return !isKidsFriendly(certification);
 }
 

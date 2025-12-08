@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url'
 import { setupIpcHandlers } from './ipcHandlers'
 import { setupDLNAHandlers } from './dlnaHandlers'
 import { setupAirPlayHandlers } from './airplayHandlers'
+import { setupDownloadHandlers } from './downloadHandlers'
 import { initializeAutoUpdater } from './autoUpdater'
 
 // ES module equivalent of __dirname
@@ -24,6 +25,7 @@ app.commandLine.appendSwitch('ignore-certificate-errors')
 setupIpcHandlers()
 setupDLNAHandlers()
 setupAirPlayHandlers()
+setupDownloadHandlers()
 
 process.env.DIST = path.join(__dirname, '../dist')
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public')

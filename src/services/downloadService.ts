@@ -1,0 +1,385 @@
+/**
+ * Download Service
+ * Manages content downloads with progress tracking and queue management
+ */
+
+export interface DownloadItem {
+    id: string;
+    name: string;
+    type: 'movie' | 'series' | 'episode';
+    url: string;
+    cover: string;
+    size: number;
+    downloadedBytes: number;
+    status: 'pending' | 'downloading' | 'paused' | 'completed' | 'failed';
+    progress: number;
+    filePath?: string;
+    error?: string;
+    createdAt: number;
+    completedAt?: number;
+    // Series specific
+    seriesName?: string;
+    season?: number;
+    episode?: number;
+}
+
+export interface StorageInfo {
+    used: number;
+    total: number;
+    available: number;
+    downloadsPath: string;
+}
+
+type DownloadEventCallback = (item: DownloadItem) => void;
+
+class DownloadService {
+    private downloads: Map<string, DownloadItem> = new Map();
+    private queue: string[] = [];
+    private isProcessing: boolean = false;
+    private maxConcurrent: number = 2;
+    private activeDownloads: number = 0;
+    private listeners: Map<string, DownloadEventCallback[]> = new Map();
+    private dbName = 'neostream_downloads';
+    private storeName = 'downloads';
+    private db: IDBDatabase | null = null;
+
+    constructor() {
+        this.initDB();
+    }
+
+    private async initDB(): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(this.dbName, 1);
+
+            request.onerror = () => reject(request.error);
+
+            request.onsuccess = () => {
+                this.db = request.result;
+                this.loadDownloads();
+                resolve();
+            };
+
+            request.onupgradeneeded = (event) => {
+                const db = (event.target as IDBOpenDBRequest).result;
+                if (!db.objectStoreNames.contains(this.storeName)) {
+                    db.createObjectStore(this.storeName, { keyPath: 'id' });
+                }
+            };
+        });
+    }
+
+    private async loadDownloads(): Promise<void> {
+        if (!this.db) return;
+
+        const transaction = this.db.transaction(this.storeName, 'readonly');
+        const store = transaction.objectStore(this.storeName);
+        const request = store.getAll();
+
+        request.onsuccess = () => {
+            const items = request.result as DownloadItem[];
+            items.forEach(item => {
+                // Reset downloading items to paused on app restart
+                if (item.status === 'downloading') {
+                    item.status = 'paused';
+                }
+                this.downloads.set(item.id, item);
+            });
+        };
+    }
+
+    private async saveDownload(item: DownloadItem): Promise<void> {
+        if (!this.db) return;
+
+        const transaction = this.db.transaction(this.storeName, 'readwrite');
+        const store = transaction.objectStore(this.storeName);
+        store.put(item);
+    }
+
+    private async deleteDownloadFromDB(id: string): Promise<void> {
+        if (!this.db) return;
+
+        const transaction = this.db.transaction(this.storeName, 'readwrite');
+        const store = transaction.objectStore(this.storeName);
+        store.delete(id);
+    }
+
+    // Event handling
+    on(event: string, callback: DownloadEventCallback): void {
+        if (!this.listeners.has(event)) {
+            this.listeners.set(event, []);
+        }
+        this.listeners.get(event)!.push(callback);
+    }
+
+    off(event: string, callback: DownloadEventCallback): void {
+        const callbacks = this.listeners.get(event);
+        if (callbacks) {
+            const index = callbacks.indexOf(callback);
+            if (index > -1) {
+                callbacks.splice(index, 1);
+            }
+        }
+    }
+
+    private emit(event: string, item: DownloadItem): void {
+        const callbacks = this.listeners.get(event);
+        if (callbacks) {
+            callbacks.forEach(cb => cb(item));
+        }
+    }
+
+    // Generate unique ID
+    private generateId(type: string, name: string): string {
+        const normalized = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        return `${type}_${normalized}_${Date.now()}`;
+    }
+
+    // Add to download queue
+    async addDownload(
+        name: string,
+        type: 'movie' | 'series' | 'episode',
+        url: string,
+        cover: string,
+        seriesInfo?: { seriesName: string; season: number; episode: number }
+    ): Promise<DownloadItem> {
+        const id = this.generateId(type, name);
+
+        const item: DownloadItem = {
+            id,
+            name,
+            type,
+            url,
+            cover,
+            size: 0,
+            downloadedBytes: 0,
+            status: 'pending',
+            progress: 0,
+            createdAt: Date.now(),
+            ...(seriesInfo && {
+                seriesName: seriesInfo.seriesName,
+                season: seriesInfo.season,
+                episode: seriesInfo.episode
+            })
+        };
+
+        this.downloads.set(id, item);
+        this.queue.push(id);
+        await this.saveDownload(item);
+        this.emit('added', item);
+
+        this.processQueue();
+
+        return item;
+    }
+
+    // Process download queue
+    private async processQueue(): Promise<void> {
+        if (this.isProcessing || this.activeDownloads >= this.maxConcurrent) {
+            return;
+        }
+
+        const pendingId = this.queue.find(id => {
+            const item = this.downloads.get(id);
+            return item && item.status === 'pending';
+        });
+
+        if (!pendingId) return;
+
+        this.activeDownloads++;
+        const item = this.downloads.get(pendingId)!;
+        item.status = 'downloading';
+        this.emit('started', item);
+        await this.saveDownload(item);
+
+        try {
+            await this.downloadFile(item);
+        } catch (error: any) {
+            item.status = 'failed';
+            item.error = error.message || 'Download failed';
+            this.emit('error', item);
+            await this.saveDownload(item);
+        }
+
+        this.activeDownloads--;
+        this.processQueue();
+    }
+
+    // Download file using Electron IPC
+    private async downloadFile(item: DownloadItem): Promise<void> {
+        return new Promise((resolve, reject) => {
+            // Start download via IPC
+            window.ipcRenderer.invoke('download:start', {
+                id: item.id,
+                url: item.url,
+                name: item.name,
+                type: item.type
+            }).then((result: any) => {
+                if (result.success) {
+                    item.filePath = result.filePath;
+                    item.size = result.size || 0;
+                    item.status = 'completed';
+                    item.progress = 100;
+                    item.completedAt = Date.now();
+                    this.emit('completed', item);
+                    this.saveDownload(item);
+                    resolve();
+                } else {
+                    reject(new Error(result.error || 'Download failed'));
+                }
+            }).catch(reject);
+
+            // Listen for progress updates
+            const progressHandler = (_event: any, data: { id: string; progress: number; downloadedBytes: number; totalBytes: number }) => {
+                if (data.id === item.id) {
+                    item.progress = data.progress;
+                    item.downloadedBytes = data.downloadedBytes;
+                    item.size = data.totalBytes;
+                    this.emit('progress', item);
+                }
+            };
+
+            window.ipcRenderer.on('download:progress', progressHandler);
+        });
+    }
+
+    // Pause download
+    async pauseDownload(id: string): Promise<void> {
+        const item = this.downloads.get(id);
+        if (item && item.status === 'downloading') {
+            await window.ipcRenderer.invoke('download:pause', { id });
+            item.status = 'paused';
+            this.emit('paused', item);
+            await this.saveDownload(item);
+        }
+    }
+
+    // Resume download
+    async resumeDownload(id: string): Promise<void> {
+        const item = this.downloads.get(id);
+        if (item && item.status === 'paused') {
+            item.status = 'pending';
+            this.queue.push(id);
+            await this.saveDownload(item);
+            this.processQueue();
+        }
+    }
+
+    // Cancel download
+    async cancelDownload(id: string): Promise<void> {
+        const item = this.downloads.get(id);
+        if (item) {
+            if (item.status === 'downloading') {
+                await window.ipcRenderer.invoke('download:cancel', { id });
+            }
+
+            // Remove file if exists
+            if (item.filePath) {
+                await window.ipcRenderer.invoke('download:delete-file', { filePath: item.filePath });
+            }
+
+            this.downloads.delete(id);
+            this.queue = this.queue.filter(qId => qId !== id);
+            await this.deleteDownloadFromDB(id);
+            this.emit('cancelled', item);
+        }
+    }
+
+    // Delete completed download
+    async deleteDownload(id: string): Promise<void> {
+        const item = this.downloads.get(id);
+        if (item) {
+            if (item.filePath) {
+                await window.ipcRenderer.invoke('download:delete-file', { filePath: item.filePath });
+            }
+            this.downloads.delete(id);
+            await this.deleteDownloadFromDB(id);
+            this.emit('deleted', item);
+        }
+    }
+
+    // Get all downloads
+    getDownloads(): DownloadItem[] {
+        return Array.from(this.downloads.values()).sort((a, b) => b.createdAt - a.createdAt);
+    }
+
+    // Get downloads by status
+    getDownloadsByStatus(status: DownloadItem['status']): DownloadItem[] {
+        return this.getDownloads().filter(item => item.status === status);
+    }
+
+    // Get storage info
+    async getStorageInfo(): Promise<StorageInfo> {
+        try {
+            const result = await window.ipcRenderer.invoke('download:get-storage-info');
+            return result;
+        } catch {
+            return {
+                used: 0,
+                total: 100 * 1024 * 1024 * 1024, // 100GB default
+                available: 100 * 1024 * 1024 * 1024,
+                downloadsPath: ''
+            };
+        }
+    }
+
+    // Open downloads folder
+    async openDownloadsFolder(): Promise<void> {
+        await window.ipcRenderer.invoke('download:open-folder');
+    }
+
+    // Check if content is downloaded
+    isDownloaded(name: string, type: string): boolean {
+        return Array.from(this.downloads.values()).some(
+            item => item.name === name && item.type === type && item.status === 'completed'
+        );
+    }
+
+    // Get download by content
+    getDownloadByContent(name: string, type: string): DownloadItem | undefined {
+        return Array.from(this.downloads.values()).find(
+            item => item.name === name && item.type === type
+        );
+    }
+
+    // Get offline file path for playback (returns file:// URL or null)
+    getOfflineFilePath(name: string, type: string): string | null {
+        const item = Array.from(this.downloads.values()).find(
+            item => item.name === name && item.type === type && item.status === 'completed' && item.filePath
+        );
+        if (item?.filePath) {
+            // Convert Windows path to file:// URL
+            const normalizedPath = item.filePath.replace(/\\/g, '/');
+            return `file:///${normalizedPath}`;
+        }
+        return null;
+    }
+
+    // Get offline file path for series episode
+    getOfflineEpisodePath(seriesName: string, season: number, episode: number): string | null {
+        const item = Array.from(this.downloads.values()).find(
+            item =>
+                item.type === 'episode' &&
+                item.seriesName === seriesName &&
+                item.season === season &&
+                item.episode === episode &&
+                item.status === 'completed' &&
+                item.filePath
+        );
+        if (item?.filePath) {
+            const normalizedPath = item.filePath.replace(/\\/g, '/');
+            return `file:///${normalizedPath}`;
+        }
+        return null;
+    }
+
+    // Format bytes to human readable
+    formatBytes(bytes: number): string {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+}
+
+export const downloadService = new DownloadService();

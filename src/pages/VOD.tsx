@@ -7,6 +7,10 @@ import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { movieProgressService } from '../services/movieProgressService';
 import { ContentDetailModal } from '../components/ContentDetailModal';
+import { profileService } from '../services/profileService';
+import { indexedDBCache } from '../services/indexedDBCache';
+import { downloadService } from '../services/downloadService';
+import { searchMovieByName as searchMovie, isKidsFriendly } from '../services/tmdb';
 
 interface VODStream {
     num: number;
@@ -31,6 +35,7 @@ interface VODStream {
     genre: string;
     release_date: string;
     tmdb_id: string;
+    offlineUrl?: string;
 }
 
 // Dynamic card sizing based on container
@@ -49,11 +54,16 @@ export function VOD() {
     const [tmdbData, setTmdbData] = useState<TMDBMovieDetails | null>(null);
     const [loadingTmdb, setLoadingTmdb] = useState(false);
     const [playingMovie, setPlayingMovie] = useState<VODStream | null>(null);
-    const [, setRefresh] = useState(0);
+    const [, _setRefresh] = useState(0);
     const [visibleCount, setVisibleCount] = useState(0);
     const [itemsPerPage, setItemsPerPage] = useState(36);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const gridRef = useRef<HTMLDivElement>(null);
+    const [hiddenMovies, setHiddenMovies] = useState<Set<string>>(new Set());
+    const [blockedCategoryIds, setBlockedCategoryIds] = useState<Set<string>>(new Set());
+    const [checkingItem, setCheckingItem] = useState<string | null>(null);
+    const [blockMessage, setBlockMessage] = useState<string | null>(null);
+    const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
 
     // Dynamic grid calculation based on window dimensions
     useEffect(() => {
@@ -107,19 +117,59 @@ export function VOD() {
         }
     };
 
+    // Blocked category patterns for Kids profile
+    const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'erótico'];
+
     const fetchCategories = async () => {
         try {
             const result = await window.ipcRenderer.invoke('categories:get-vod');
             if (result.success) {
                 setCategories(result.data || []);
+
+                // Extract blocked category IDs for Kids profile
+                if (isKidsProfile) {
+                    const blockedIds = new Set<string>();
+                    (result.data || []).forEach((cat: { category_id: string; category_name: string }) => {
+                        const lowerName = cat.category_name.toLowerCase();
+                        if (BLOCKED_CATEGORY_PATTERNS.some(p => lowerName.includes(p))) {
+                            blockedIds.add(cat.category_id);
+                        }
+                    });
+                    setBlockedCategoryIds(blockedIds);
+                }
             }
         } catch (err) {
             console.error('Failed to load categories:', err);
         }
     };
 
+    // Load hidden items from IndexedDB on mount (for Kids profile)
+    useEffect(() => {
+        if (!isKidsProfile) return;
+
+        const loadHiddenItems = async () => {
+            const hidden = await indexedDBCache.getHiddenItems('movie');
+            setHiddenMovies(new Set(hidden));
+        };
+        loadHiddenItems();
+    }, [isKidsProfile]);
+
     const filteredStreams = streams.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
+
+        // Kids profile filtering
+        if (isKidsProfile) {
+            // Block items that have been marked as hidden
+            const normalizedName = stream.name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
+            if (hiddenMovies.has(normalizedName)) {
+                return false;
+            }
+
+            // Block items from blocked categories (Adult, Terror, etc.)
+            if (blockedCategoryIds.has(stream.category_id)) {
+                return false;
+            }
+        }
 
         if (selectedCategory === 'CONTINUE_WATCHING') {
             const moviesInProgress = movieProgressService.getMoviesInProgress();
@@ -198,9 +248,13 @@ export function VOD() {
 
     const fixImageUrl = (url: string): string => url?.replace(/\/\/+/g, '/').replace(':/', '://') || '';
 
-    const handlePlayMovie = (movie: VODStream) => setPlayingMovie(movie);
-
     const buildStreamUrl = async (movie: VODStream): Promise<string> => {
+        // Check for offline URL first
+        if (movie.offlineUrl) {
+            console.log('Using offline URL:', movie.offlineUrl);
+            return movie.offlineUrl;
+        }
+
         try {
             const result = await window.ipcRenderer.invoke('streams:get-vod-url', {
                 streamId: movie.stream_id,
@@ -231,6 +285,81 @@ export function VOD() {
         const mins = minutes % 60;
         return `${hours}h ${mins}min restantes`;
     };
+
+    // Handle movie card click - check Kids filter if needed, always cache for cross-profile use
+    const handleMovieClick = async (movie: VODStream) => {
+        // For non-Kids profiles: open and cache TMDB data in background
+        if (!isKidsProfile) {
+            setSelectedMovie(movie);
+
+            // Background caching for cross-profile benefit
+            (async () => {
+                const cached = await indexedDBCache.getCachedMovie(movie.name);
+                if (!cached) {
+                    const yearMatch = movie.name.match(/\((\d{4})\)/);
+                    const year = yearMatch ? yearMatch[1] : undefined;
+                    const tmdbResult = await searchMovie(movie.name, year);
+                    if (tmdbResult) {
+                        await indexedDBCache.setCacheMovie(
+                            movie.name,
+                            tmdbResult.certification || null,
+                            tmdbResult.genres?.map(g => g.name) || []
+                        );
+                        // If not kids-friendly, hide it for future Kids sessions
+                        if (!isKidsFriendly(tmdbResult.certification)) {
+                            await indexedDBCache.hideItem('movie', movie.name);
+                        }
+                    }
+                }
+            })();
+            return;
+        }
+
+        // Kids profile flow
+        const normalizedName = movie.name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
+        if (hiddenMovies.has(normalizedName)) {
+            return;
+        }
+
+        setCheckingItem(movie.name);
+
+        try {
+            const cached = await indexedDBCache.getCachedMovie(movie.name);
+            let certification: string | null = null;
+
+            if (cached) {
+                certification = cached.certification;
+            } else {
+                const yearMatch = movie.name.match(/\((\d{4})\)/);
+                const year = yearMatch ? yearMatch[1] : undefined;
+                const tmdbResult = await searchMovie(movie.name, year);
+
+                if (tmdbResult) {
+                    certification = tmdbResult.certification || null;
+                    await indexedDBCache.setCacheMovie(
+                        movie.name,
+                        certification,
+                        tmdbResult.genres?.map(g => g.name) || []
+                    );
+                }
+            }
+
+            if (isKidsFriendly(certification)) {
+                setSelectedMovie(movie);
+            } else {
+                setBlockMessage(`"${movie.name}" não está disponível para este perfil`);
+                await indexedDBCache.hideItem('movie', movie.name);
+                setHiddenMovies(prev => new Set(prev).add(normalizedName));
+                setTimeout(() => setBlockMessage(null), 3000);
+            }
+        } catch (error) {
+            console.error('Error checking movie rating:', error);
+            setSelectedMovie(movie);
+        } finally {
+            setCheckingItem(null);
+        }
+    };
+
 
     // Loading State
     if (loading) return (
@@ -291,122 +420,14 @@ export function VOD() {
                     onSelectCategory={setSelectedCategory}
                     selectedCategory={selectedCategory}
                     type="vod"
+                    isKidsProfile={isKidsProfile}
                 />
 
                 <div className="vod-content">
-                    {/* Movie Details Panel */}
-                    {selectedMovie && (
-                        <div className="movie-details-panel">
-                            <div className="details-content">
-                                {/* Meta Info */}
-                                <div className="meta-badges">
-                                    {loadingTmdb ? (
-                                        <span className="badge shimmer">Carregando...</span>
-                                    ) : (
-                                        <>
-                                            {tmdbData?.release_date && (
-                                                <span className="badge date-badge">
-                                                    📅 {new Date(tmdbData.release_date).getFullYear()}
-                                                </span>
-                                            )}
-                                            {tmdbData?.vote_average ? (
-                                                <span className="badge rating-badge">
-                                                    ⭐ {tmdbData.vote_average.toFixed(1)}
-                                                </span>
-                                            ) : null}
-                                        </>
-                                    )}
-                                </div>
-
-                                {/* Title */}
-                                <h1 className="movie-title">{selectedMovie.name}</h1>
-
-                                {/* Genres */}
-                                {loadingTmdb ? (
-                                    <p className="loading-text">Carregando gêneros...</p>
-                                ) : tmdbData?.genres && tmdbData.genres.length > 0 ? (
-                                    <div className="genre-tags">
-                                        {tmdbData.genres.slice(0, 4).map(genre => (
-                                            <span key={genre.id} className="genre-tag">{genre.name}</span>
-                                        ))}
-                                    </div>
-                                ) : null}
-
-                                {/* Overview */}
-                                {loadingTmdb ? (
-                                    <p className="loading-text">Carregando sinopse...</p>
-                                ) : tmdbData?.overview ? (
-                                    <p className="movie-overview">{tmdbData.overview}</p>
-                                ) : null}
-
-                                {/* Action Buttons */}
-                                <div className="action-buttons">
-                                    <button
-                                        className="btn btn-primary"
-                                        onClick={() => handlePlayMovie(selectedMovie)}
-                                    >
-                                        <span className="btn-icon">▶</span>
-                                        <span>Assistir Agora</span>
-                                    </button>
-
-                                    <button
-                                        className={`btn btn-secondary ${watchLaterService.has(String(selectedMovie.stream_id), 'movie') ? 'saved' : ''}`}
-                                        onClick={() => {
-                                            if (watchLaterService.has(String(selectedMovie.stream_id), 'movie')) {
-                                                watchLaterService.remove(String(selectedMovie.stream_id), 'movie');
-                                            } else {
-                                                watchLaterService.add({
-                                                    id: String(selectedMovie.stream_id),
-                                                    type: 'movie',
-                                                    name: selectedMovie.name,
-                                                    cover: selectedMovie.cover || selectedMovie.stream_icon
-                                                });
-                                            }
-                                            setRefresh(r => r + 1);
-                                        }}
-                                    >
-                                        <span className="btn-icon">
-                                            {watchLaterService.has(String(selectedMovie.stream_id), 'movie') ? '✓' : '+'}
-                                        </span>
-                                        <span>{watchLaterService.has(String(selectedMovie.stream_id), 'movie') ? 'Salvo' : 'Minha Lista'}</span>
-                                    </button>
-
-                                    <button
-                                        className={`btn btn-favorite ${favoritesService.has(String(selectedMovie.stream_id), 'movie') ? 'favorited' : ''}`}
-                                        onClick={() => {
-                                            favoritesService.toggle({
-                                                id: String(selectedMovie.stream_id),
-                                                type: 'movie',
-                                                title: selectedMovie.name,
-                                                poster: selectedMovie.cover || selectedMovie.stream_icon,
-                                                rating: tmdbData?.vote_average?.toFixed(1),
-                                                year: tmdbData?.release_date ? new Date(tmdbData.release_date).getFullYear().toString() : undefined,
-                                                streamId: selectedMovie.stream_id
-                                            });
-                                            setRefresh(r => r + 1);
-                                        }}
-                                        title={favoritesService.has(String(selectedMovie.stream_id), 'movie') ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}
-                                    >
-                                        <span className="btn-icon">
-                                            {favoritesService.has(String(selectedMovie.stream_id), 'movie') ? '❤️' : '🤍'}
-                                        </span>
-                                    </button>
-
-                                    <button
-                                        className="btn btn-close"
-                                        onClick={() => setSelectedMovie(null)}
-                                    >
-                                        ✕
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
                     {/* Movies Grid */}
                     <div
                         ref={scrollContainerRef}
-                        className={`movies-scroll-container ${selectedMovie ? 'with-details' : ''}`}
+                        className="movies-scroll-container"
                     >
                         {filteredStreams.length === 0 ? (
                             <div className="empty-state">
@@ -425,8 +446,8 @@ export function VOD() {
                                     return (
                                         <div
                                             key={stream.stream_id}
-                                            className={`movie-card ${isSelected ? 'selected' : ''}`}
-                                            onClick={() => setSelectedMovie(stream)}
+                                            className={`movie-card ${isSelected ? 'selected' : ''} ${checkingItem === stream.name ? 'checking' : ''}`}
+                                            onClick={() => handleMovieClick(stream)}
                                             style={{ animationDelay: `${(index % itemsPerPage) * 0.03}s` }}
                                         >
                                             {/* Poster */}
@@ -452,6 +473,11 @@ export function VOD() {
                                                 {/* Saved Badge */}
                                                 {isSaved && (
                                                     <div className="saved-badge">🔖</div>
+                                                )}
+
+                                                {/* Offline Badge */}
+                                                {downloadService.isDownloaded(stream.name, 'movie') && (
+                                                    <div className="offline-badge">📥</div>
                                                 )}
 
                                                 {/* Progress Bar */}
@@ -485,6 +511,14 @@ export function VOD() {
                 </div>
             </div>
 
+            {/* Kids Block Message Toast */}
+            {blockMessage && (
+                <div className="kids-block-toast">
+                    <span className="toast-icon">🔒</span>
+                    <span className="toast-message">{blockMessage}</span>
+                </div>
+            )}
+
             {/* Video Player */}
             {playingMovie && (
                 <AsyncVideoPlayer
@@ -515,29 +549,16 @@ export function VOD() {
                     contentData={{
                         name: selectedMovie.name,
                         cover: selectedMovie.stream_icon,
-                        rating: selectedMovie.rating
+                        rating: selectedMovie.rating,
+                        container_extension: selectedMovie.container_extension
                     }}
-                    onPlay={() => {
-                        setPlayingMovie(selectedMovie);
-                        setSelectedMovie(null);
-                    }}
-                />
-            )}
-
-            {/* Content Detail Modal */}
-            {selectedMovie && (
-                <ContentDetailModal
-                    isOpen={!!selectedMovie}
-                    onClose={() => setSelectedMovie(null)}
-                    contentId={String(selectedMovie.stream_id)}
-                    contentType="movie"
-                    contentData={{
-                        name: selectedMovie.name,
-                        cover: selectedMovie.stream_icon,
-                        rating: selectedMovie.rating
-                    }}
-                    onPlay={() => {
-                        setPlayingMovie(selectedMovie);
+                    onPlay={(_season, _episode, offlineUrl) => {
+                        // Set offline URL if available
+                        if (offlineUrl) {
+                            setPlayingMovie({ ...selectedMovie, offlineUrl });
+                        } else {
+                            setPlayingMovie(selectedMovie);
+                        }
                         setSelectedMovie(null);
                     }}
                 />
@@ -1012,6 +1033,23 @@ const vodStyles = `
     to { transform: scale(1); }
 }
 
+/* Offline Badge */
+.offline-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(6, 182, 212, 0.4);
+    animation: badgePop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
 /* Card Progress Bar */
 .card-progress-container {
     position: absolute;
@@ -1187,5 +1225,74 @@ const vodStyles = `
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+/* Kids Block Toast */
+.kids-block-toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(185, 28, 28, 0.95) 100%);
+    color: white;
+    padding: 16px 32px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+    box-shadow: 0 8px 32px rgba(239, 68, 68, 0.4);
+    z-index: 10000;
+    animation: toastSlideUp 0.3s ease, toastFadeOut 0.5s ease 2.5s forwards;
+}
+
+.kids-block-toast .toast-icon {
+    font-size: 24px;
+}
+
+.kids-block-toast .toast-message {
+    font-size: 15px;
+}
+
+@keyframes toastSlideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes toastFadeOut {
+    to {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+}
+
+/* Movie card checking state */
+.movie-card.checking {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.movie-card.checking::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 32px;
+    height: 32px;
+    margin: -16px 0 0 -16px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
 }
 `;

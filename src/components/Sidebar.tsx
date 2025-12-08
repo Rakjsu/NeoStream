@@ -1,9 +1,10 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark, Home, Users, Heart } from 'lucide-react';
+import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark, Home, Users, Heart, Check, Download } from 'lucide-react';
 import { profileService } from '../services/profileService';
 import { useState, useEffect } from 'react';
 import { UpdateNotificationBadge } from './UpdateNotificationBadge';
 import { UpdateModal } from './UpdateModal';
+import { ProfileManager } from './ProfileManager';
 import type { UpdateInfo } from '../types/update';
 import type { Profile } from '../types/profile';
 
@@ -15,16 +16,61 @@ export function Sidebar() {
     const [updateInfo] = useState<UpdateInfo | null>(null);
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
     const [showProfilePopup, setShowProfilePopup] = useState(false);
+    const [showProfileManager, setShowProfileManager] = useState(false);
     const [profiles, setProfiles] = useState<Profile[]>([]);
+
+    // PIN verification states
+    const [pendingProfile, setPendingProfile] = useState<Profile | null>(null);
+    const [pinInput, setPinInput] = useState('');
+    const [pinError, setPinError] = useState('');
 
     useEffect(() => {
         setProfiles(profileService.getAllProfiles());
     }, []);
 
+    // Profile transition state
+    const [isTransitioning, setIsTransitioning] = useState(false);
+
     const handleSwitchProfile = (profile: Profile) => {
-        profileService.setActiveProfile(profile.id);
-        setActiveProfile(profile);
-        setShowProfilePopup(false);
+        // Check if profile has PIN
+        if (profile.pin) {
+            setPendingProfile(profile);
+            setPinInput('');
+            setPinError('');
+            setShowProfilePopup(false);
+        } else {
+            // Trigger transition animation
+            setIsTransitioning(true);
+            setShowProfilePopup(false);
+            setTimeout(() => {
+                profileService.setActiveProfile(profile.id);
+                setActiveProfile(profile);
+                setIsTransitioning(false);
+                // Reload page to refresh Continue Watching and Favorites
+                window.location.reload();
+            }, 300);
+        }
+    };
+
+    const handlePinSubmit = async () => {
+        if (!pendingProfile || pinInput.length !== 4) return;
+
+        const isValid = await profileService.verifyPin(pendingProfile.id, pinInput);
+        if (isValid) {
+            // Trigger transition animation
+            setIsTransitioning(true);
+            setPendingProfile(null);
+            setTimeout(() => {
+                profileService.setActiveProfile(pendingProfile.id);
+                setActiveProfile(pendingProfile);
+                setIsTransitioning(false);
+                // Reload page to refresh Continue Watching and Favorites
+                window.location.reload();
+            }, 300);
+        } else {
+            setPinError('PIN incorreto');
+            setPinInput('');
+        }
     };
 
     const handleUpdateBadgeClick = () => {
@@ -38,6 +84,7 @@ export function Sidebar() {
         { icon: PlaySquare, label: 'Séries', path: '/dashboard/series', emoji: '📺', gradient: 'linear-gradient(135deg, #ec4899, #db2777)' },
         { icon: Bookmark, label: 'Minha Lista', path: '/dashboard/watch-later', emoji: '🔖', gradient: 'linear-gradient(135deg, #10b981, #059669)' },
         { icon: Heart, label: 'Favoritos', path: '/dashboard/favorites', emoji: '❤️', gradient: 'linear-gradient(135deg, #ef4444, #dc2626)' },
+        { icon: Download, label: 'Baixados', path: '/dashboard/downloads', emoji: '📥', gradient: 'linear-gradient(135deg, #06b6d4, #0891b2)' },
         { icon: Settings, label: 'Configurações', path: '/dashboard/settings', emoji: '⚙️', gradient: 'linear-gradient(135deg, #6b7280, #4b5563)' },
     ];
 
@@ -58,6 +105,16 @@ export function Sidebar() {
                     className="profile-popup-overlay"
                     onClick={() => setShowProfilePopup(false)}
                 />
+            )}
+
+            {/* Profile Transition Overlay */}
+            {isTransitioning && (
+                <div className="profile-transition-overlay">
+                    <div className="profile-transition-content">
+                        <div className="profile-transition-spinner" />
+                        <span>Trocando perfil...</span>
+                    </div>
+                </div>
             )}
 
             <div className="sidebar">
@@ -200,27 +257,35 @@ export function Sidebar() {
                         <span>Trocar Perfil</span>
                     </div>
                     <div className="profile-popup-list">
-                        {profiles.map((profile) => (
-                            <button
-                                key={profile.id}
-                                className={`profile-popup-item ${activeProfile?.id === profile.id ? 'active' : ''}`}
-                                onClick={() => handleSwitchProfile(profile)}
-                            >
-                                <div className="profile-popup-avatar">
-                                    {profile.avatar || '👤'}
-                                </div>
-                                <span className="profile-popup-name">{profile.name}</span>
-                                {activeProfile?.id === profile.id && (
-                                    <span className="profile-popup-check">✓</span>
-                                )}
-                            </button>
-                        ))}
+                        {/* Filter out Kids profiles - they can only be switched via ProfileManager */}
+                        {profiles.filter(p => !p.isKids).map((profile) => {
+                            const isImageAvatar = profile.avatar?.startsWith('data:image') || profile.avatar?.startsWith('http');
+                            return (
+                                <button
+                                    key={profile.id}
+                                    className={`profile-popup-item ${activeProfile?.id === profile.id ? 'active' : ''}`}
+                                    onClick={() => handleSwitchProfile(profile)}
+                                >
+                                    <div className="profile-popup-avatar">
+                                        {isImageAvatar ? (
+                                            <img src={profile.avatar} alt={profile.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                        ) : (
+                                            profile.avatar || '👤'
+                                        )}
+                                    </div>
+                                    <span className="profile-popup-name">{profile.name}</span>
+                                    {activeProfile?.id === profile.id && (
+                                        <span className="profile-popup-check">✓</span>
+                                    )}
+                                </button>
+                            );
+                        })}
                     </div>
                     <button
                         className="profile-popup-settings"
                         onClick={() => {
                             setShowProfilePopup(false);
-                            navigate('/dashboard/settings');
+                            setShowProfileManager(true);
                         }}
                     >
                         <Settings size={16} />
@@ -235,6 +300,82 @@ export function Sidebar() {
                 onClose={() => setShowUpdateModal(false)}
                 updateInfo={updateInfo}
             />
+
+            {/* Profile Manager Modal */}
+            {showProfileManager && (
+                <ProfileManager
+                    onClose={() => {
+                        setShowProfileManager(false);
+                        setProfiles(profileService.getAllProfiles());
+                        setActiveProfile(profileService.getActiveProfile());
+                    }}
+                />
+            )}
+
+            {/* PIN Verification Modal */}
+            {pendingProfile && (
+                <div className="sidebar-pin-overlay" onClick={() => setPendingProfile(null)}>
+                    <div className="sidebar-pin-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="sidebar-pin-header">
+                            <span className="sidebar-pin-icon">🔐</span>
+                            <h2>Digite o PIN</h2>
+                            <p>Perfil: <strong>{pendingProfile.name}</strong></p>
+                        </div>
+
+                        <div
+                            className="sidebar-pin-container"
+                            onClick={() => document.getElementById('sidebar-pin-input')?.focus()}
+                        >
+                            {[0, 1, 2, 3].map((index) => (
+                                <div
+                                    key={index}
+                                    className={`sidebar-pin-digit ${pinInput.length > index ? 'filled' : ''} ${pinError ? 'error' : ''}`}
+                                >
+                                    {pinInput[index] ? '•' : ''}
+                                </div>
+                            ))}
+                        </div>
+
+                        <input
+                            id="sidebar-pin-input"
+                            type="password"
+                            maxLength={4}
+                            value={pinInput}
+                            onChange={(e) => {
+                                setPinInput(e.target.value.replace(/\D/g, ''));
+                                setPinError('');
+                            }}
+                            onKeyPress={(e) => {
+                                if (e.key === 'Enter' && pinInput.length === 4) {
+                                    handlePinSubmit();
+                                }
+                            }}
+                            autoFocus
+                            className="sidebar-pin-hidden-input"
+                        />
+
+                        {pinError && (
+                            <p className="sidebar-pin-error">
+                                <span>⚠️</span> {pinError}
+                            </p>
+                        )}
+
+                        <div className="sidebar-pin-buttons">
+                            <button className="sidebar-pin-btn cancel" onClick={() => setPendingProfile(null)}>
+                                Cancelar
+                            </button>
+                            <button
+                                className="sidebar-pin-btn submit"
+                                onClick={handlePinSubmit}
+                                disabled={pinInput.length !== 4}
+                            >
+                                <Check size={18} />
+                                Entrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }
@@ -694,5 +835,242 @@ const sidebarStyles = `
 .profile-popup-settings:hover {
     background: rgba(255, 255, 255, 0.1);
     color: white;
+}
+
+/* Sidebar PIN Modal */
+.sidebar-pin-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: sidebarPinFadeIn 0.3s ease;
+}
+
+@keyframes sidebarPinFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.sidebar-pin-modal {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-radius: 20px;
+    padding: 32px;
+    max-width: 480px;
+    width: 95%;
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
+    animation: sidebarPinModalSlide 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes sidebarPinModalSlide {
+    from { opacity: 0; transform: translateY(-30px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.sidebar-pin-header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.sidebar-pin-icon {
+    font-size: 48px;
+    display: block;
+    margin-bottom: 12px;
+    animation: sidebarPinBounce 0.6s ease;
+}
+
+@keyframes sidebarPinBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.sidebar-pin-header h2 {
+    color: white;
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0 0 8px 0;
+}
+
+.sidebar-pin-header p {
+    color: #9ca3af;
+    font-size: 14px;
+    margin: 0;
+}
+
+.sidebar-pin-header strong {
+    color: #c4b5fd;
+}
+
+.sidebar-pin-container {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin: 24px 0;
+    position: relative;
+    cursor: text;
+}
+
+.sidebar-pin-digit {
+    width: 56px;
+    height: 64px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: white;
+    transition: all 0.2s ease;
+}
+
+.sidebar-pin-digit.filled {
+    border-color: rgba(168, 85, 247, 0.7);
+    background: rgba(168, 85, 247, 0.15);
+    animation: sidebarPinPop 0.2s ease;
+}
+
+@keyframes sidebarPinPop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.sidebar-pin-digit.error {
+    border-color: rgba(239, 68, 68, 0.7);
+    animation: sidebarPinShake 0.5s ease;
+}
+
+@keyframes sidebarPinShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-8px); }
+    80% { transform: translateX(8px); }
+}
+
+.sidebar-pin-hidden-input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 64px;
+    opacity: 0;
+    font-size: 32px;
+    text-align: center;
+    background: transparent;
+    border: none;
+    outline: none;
+}
+
+.sidebar-pin-error {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #f87171;
+    font-size: 14px;
+    margin-bottom: 16px;
+    animation: sidebarPinFadeIn 0.3s ease;
+}
+
+.sidebar-pin-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.sidebar-pin-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 20px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.sidebar-pin-btn.cancel {
+    background: rgba(255, 255, 255, 0.1);
+    color: #9ca3af;
+}
+
+.sidebar-pin-btn.cancel:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: white;
+}
+
+.sidebar-pin-btn.submit {
+    background: linear-gradient(135deg, #a855f7, #7c3aed);
+    color: white;
+}
+
+.sidebar-pin-btn.submit:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.4);
+}
+
+.sidebar-pin-btn.submit:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Profile Transition Overlay */
+.profile-transition-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    animation: transitionFadeIn 0.2s ease;
+}
+
+@keyframes transitionFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.profile-transition-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    animation: transitionPulse 0.3s ease;
+}
+
+@keyframes transitionPulse {
+    0% { transform: scale(0.9); opacity: 0; }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.profile-transition-spinner {
+    width: 48px;
+    height: 48px;
+    border: 3px solid rgba(168, 85, 247, 0.2);
+    border-top-color: #a855f7;
+    border-radius: 50%;
+    animation: transitionSpin 0.8s linear infinite;
+}
+
+@keyframes transitionSpin {
+    to { transform: rotate(360deg); }
+}
+
+.profile-transition-content span {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 16px;
+    font-weight: 500;
 }
 `;

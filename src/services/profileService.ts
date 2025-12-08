@@ -100,6 +100,7 @@ export const profileService = {
             name: profileData.name.trim(),
             avatar: profileData.avatar,
             pin: profileData.pin ? await hashPin(profileData.pin) : undefined,
+            isKids: profileData.isKids || false,
             watchLater: [],
             continueWatching: [],
             createdAt: now,
@@ -229,14 +230,23 @@ export const profileService = {
     initialize(): void {
         this.migrateExistingData();
 
+        // Create default Kids profile if no profiles exist
         const data = getStorageData();
-
-        // If no profiles exist, create a default one
         if (data.profiles.length === 0) {
-            this.createProfile({
-                name: 'Default',
-                avatar: '👤'
-            });
+            const now = new Date().toISOString();
+            const kidsProfile: Profile = {
+                id: 'kids-default',
+                name: 'Kids',
+                avatar: '👶',
+                isKids: true,
+                watchLater: [],
+                continueWatching: [],
+                createdAt: now,
+                lastUsed: now
+            };
+            data.profiles.push(kidsProfile);
+            saveStorageData(data);
+            console.log('Created default Kids profile');
         }
     }
 };

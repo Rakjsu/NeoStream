@@ -4,6 +4,9 @@ import { movieProgressService } from '../services/movieProgressService';
 import { ContentDetailModal } from '../components/ContentDetailModal';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { ResumeModal } from '../components/ResumeModal';
+import { profileService } from '../services/profileService';
+import { indexedDBCache } from '../services/indexedDBCache';
+import { searchMovieByName, searchSeriesByName, isKidsFriendly } from '../services/tmdb';
 
 interface ContentCounts {
     live: number;
@@ -63,6 +66,23 @@ export function Home() {
     const [recommendations, setRecommendations] = useState<(SeriesData | MovieData)[]>([]);
     const [isVisible, setIsVisible] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+    // Kids profile state
+    const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
+    const [hiddenItems, setHiddenItems] = useState<Set<string>>(new Set());
+    const [checkingItem, setCheckingItem] = useState<string | null>(null);
+    const [blockMessage, setBlockMessage] = useState<string | null>(null);
+
+    // Filtered counts for Kids profile
+    // For Kids: subtract hidden items from totals
+    const filteredCounts = {
+        live: isKidsProfile ? Math.max(0, counts.live -
+            ([...hiddenItems].filter(key => key.startsWith('live_')).length)) : counts.live,
+        vod: isKidsProfile ? Math.max(0, counts.vod -
+            ([...hiddenItems].filter(key => key.startsWith('movie_')).length)) : counts.vod,
+        series: isKidsProfile ? Math.max(0, counts.series -
+            ([...hiddenItems].filter(key => key.startsWith('series_')).length)) : counts.series
+    };
 
     // Modal state for content details
     const [selectedContent, setSelectedContent] = useState<{
@@ -326,6 +346,115 @@ export function Home() {
         return `${hours}h ${mins}min restantes`;
     };
 
+    // Load hidden items for Kids profile
+    useEffect(() => {
+        if (!isKidsProfile) return;
+        const loadHiddenItems = async () => {
+            const hiddenMovies = await indexedDBCache.getHiddenItems('movie');
+            const hiddenSeries = await indexedDBCache.getHiddenItems('series');
+            // Store with format type_name for matching
+            const movieKeys = hiddenMovies.map(name => `movie_${name}`);
+            const seriesKeys = hiddenSeries.map(name => `series_${name}`);
+            setHiddenItems(new Set([...movieKeys, ...seriesKeys]));
+        };
+        loadHiddenItems();
+    }, [isKidsProfile]);
+
+    // Handle content click with Kids profile verification
+    const handleContentClick = async (
+        contentId: string,
+        contentType: 'series' | 'movie',
+        name: string,
+        cover: string,
+        rating?: string
+    ) => {
+        // Use normalized name for key (same as IndexedDB)
+        const normalizeName = (n: string) => n.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
+        const itemKey = `${contentType}_${normalizeName(name)}`;
+
+        // Check if already hidden
+        if (isKidsProfile && hiddenItems.has(itemKey)) {
+            setBlockMessage(`"${name}" não está disponível para este perfil`);
+            setTimeout(() => setBlockMessage(null), 3000);
+            return;
+        }
+
+        // Check if item is hidden in IndexedDB
+        if (isKidsProfile) {
+            const isHidden = await indexedDBCache.isItemHidden(contentType, name);
+            if (isHidden) {
+                setHiddenItems(prev => new Set([...prev, itemKey]));
+                setBlockMessage(`"${name}" não está disponível para este perfil`);
+                setTimeout(() => setBlockMessage(null), 3000);
+                return;
+            }
+        }
+
+        // Check cache first
+        const cached = contentType === 'movie'
+            ? await indexedDBCache.getCachedMovie(name)
+            : await indexedDBCache.getCachedSeries(name);
+
+        if (cached && cached.certification) {
+            const friendly = isKidsFriendly(cached.certification);
+            if (isKidsProfile && !friendly) {
+                // Block and hide
+                await indexedDBCache.hideItem(contentType, name);
+                setHiddenItems(prev => new Set([...prev, itemKey]));
+                setBlockMessage(`"${name}" não é adequado para crianças`);
+                setTimeout(() => setBlockMessage(null), 3000);
+                return;
+            }
+            // Cached and allowed - proceed
+            setSelectedContent({ id: contentId, type: contentType, name, cover, rating });
+            return;
+        }
+
+        // Need to fetch from TMDB
+        setCheckingItem(itemKey);
+
+        try {
+            const tmdbResult = contentType === 'movie'
+                ? await searchMovieByName(name)
+                : await searchSeriesByName(name);
+
+            if (tmdbResult && tmdbResult.certification) {
+                const friendly = isKidsFriendly(tmdbResult.certification);
+                const genreNames = (tmdbResult.genres || []).map((g: { id: number; name: string }) => g.name);
+
+                // Always cache the result
+                if (contentType === 'movie') {
+                    await indexedDBCache.setCacheMovie(name, tmdbResult.certification, genreNames);
+                } else {
+                    await indexedDBCache.setCacheSeries(name, tmdbResult.certification, genreNames);
+                }
+
+                // If not kid-friendly, mark as hidden for future
+                if (!friendly) {
+                    await indexedDBCache.hideItem(contentType, name);
+                }
+
+                // Block for Kids if not appropriate
+                if (isKidsProfile && !friendly) {
+                    setHiddenItems(prev => new Set([...prev, itemKey]));
+                    setBlockMessage(`"${name}" não é adequado para crianças`);
+                    setTimeout(() => setBlockMessage(null), 3000);
+                    setCheckingItem(null);
+                    return;
+                }
+            }
+
+            // Allow access
+            setSelectedContent({ id: contentId, type: contentType, name, cover, rating });
+        } catch (error) {
+            console.error('Error checking content rating:', error);
+            // On error, allow access but don't cache
+            setSelectedContent({ id: contentId, type: contentType, name, cover, rating });
+        } finally {
+            setCheckingItem(null);
+        }
+    };
+
     // Remove from continue watching
     const removeFromContinue = (itemId: string, itemType: 'series' | 'movie') => {
         if (itemType === 'series') {
@@ -414,13 +543,7 @@ export function Home() {
                             type === 'series' ? String(seriesItem.series_id) : String(movieItem.stream_id);
                         const contentType = isContinue ? continueItem.type :
                             (type === 'series' ? 'series' : 'movie');
-                        setSelectedContent({
-                            id: contentId,
-                            type: contentType,
-                            name,
-                            cover,
-                            rating: itemRating
-                        });
+                        handleContentClick(contentId, contentType, name, cover, itemRating);
                     }}
                     style={{
                         textDecoration: 'none',
@@ -613,7 +736,25 @@ export function Home() {
     }) => {
         const containerRef = useRef<HTMLDivElement>(null);
 
-        if (items.length === 0) return null;
+        // Filter out hidden items for Kids profile
+        // Helper to normalize names (same as indexedDBCache)
+        const normalizeName = (name: string) => name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
+
+        const visibleItems = isKidsProfile ? items.filter(item => {
+            const isContinue = type === 'continue';
+            const isSeriesItem = type === 'series' || type === 'recommendations';
+
+            // Get name from item
+            const itemName = isContinue ? (item as ContinueWatchingItem).name :
+                isSeriesItem ? (item as SeriesData).name : (item as MovieData).name;
+            const contentType = isContinue ? (item as ContinueWatchingItem).type :
+                (type === 'series' || (type === 'recommendations' && 'series_id' in item) ? 'series' : 'movie');
+
+            const itemKey = `${contentType}_${normalizeName(itemName)}`;
+            return !hiddenItems.has(itemKey);
+        }) : items;
+
+        if (visibleItems.length === 0) return null;
 
         const scroll = (direction: 'left' | 'right') => {
             const container = containerRef.current;
@@ -655,7 +796,7 @@ export function Home() {
                             fontSize: 12,
                             color: 'rgba(255, 255, 255, 0.5)',
                             fontWeight: 400
-                        }}>({items.length})</span>
+                        }}>({visibleItems.length})</span>
                     </h2>
 
                     {/* Navigation arrows */}
@@ -720,7 +861,7 @@ export function Home() {
                         msOverflowStyle: 'none'
                     }}
                 >
-                    {items.slice(0, 30).map((item, index) => {
+                    {visibleItems.slice(0, 30).map((item, index) => {
                         const isSeries = 'series_id' in item;
                         const isContinueItem = type === 'continue';
                         const continueItem = item as ContinueWatchingItem;
@@ -811,7 +952,43 @@ export function Home() {
                 .content-card:hover .remove-btn {
                     opacity: 1;
                 }
+                .kids-block-toast {
+                    position: fixed;
+                    bottom: 30px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: linear-gradient(135deg, rgba(239, 68, 68, 0.95) 0%, rgba(185, 28, 28, 0.95) 100%);
+                    color: white;
+                    padding: 16px 32px;
+                    border-radius: 16px;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    font-weight: 600;
+                    box-shadow: 0 8px 32px rgba(239, 68, 68, 0.4);
+                    z-index: 10000;
+                    animation: toastSlideUp 0.3s ease, toastFadeOut 0.5s ease 2.5s forwards;
+                }
+                @keyframes toastSlideUp {
+                    from { transform: translateX(-50%) translateY(100px); opacity: 0; }
+                    to { transform: translateX(-50%) translateY(0); opacity: 1; }
+                }
+                @keyframes toastFadeOut {
+                    to { opacity: 0; transform: translateX(-50%) translateY(20px); }
+                }
+                .content-card.checking {
+                    opacity: 0.6;
+                    pointer-events: none;
+                }
             `}</style>
+
+            {/* Kids Block Toast */}
+            {blockMessage && (
+                <div className="kids-block-toast">
+                    <span style={{ fontSize: '24px' }}>🔒</span>
+                    <span>{blockMessage}</span>
+                </div>
+            )}
             <div style={{
                 minHeight: '100vh',
                 background: 'linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%)',
@@ -912,7 +1089,7 @@ export function Home() {
                         }}>
                         <div style={{ fontSize: '28px', marginBottom: '8px' }}>📺</div>
                         <div style={{ fontSize: '24px', fontWeight: '700', color: 'white', marginBottom: '2px' }}>
-                            {loading ? '...' : counts.live.toLocaleString()}
+                            {loading ? '...' : filteredCounts.live.toLocaleString()}
                         </div>
                         <div style={{ fontSize: '12px', color: 'rgba(239, 68, 68, 0.9)', fontWeight: '600' }}>
                             Canais ao Vivo
@@ -939,7 +1116,7 @@ export function Home() {
                         }}>
                         <div style={{ fontSize: '28px', marginBottom: '8px' }}>🎬</div>
                         <div style={{ fontSize: '24px', fontWeight: '700', color: 'white', marginBottom: '2px' }}>
-                            {loading ? '...' : counts.vod.toLocaleString()}
+                            {loading ? '...' : filteredCounts.vod.toLocaleString()}
                         </div>
                         <div style={{ fontSize: '12px', color: 'rgba(59, 130, 246, 0.9)', fontWeight: '600' }}>
                             Filmes
@@ -966,7 +1143,7 @@ export function Home() {
                         }}>
                         <div style={{ fontSize: '28px', marginBottom: '8px' }}>📺</div>
                         <div style={{ fontSize: '24px', fontWeight: '700', color: 'white', marginBottom: '2px' }}>
-                            {loading ? '...' : counts.series.toLocaleString()}
+                            {loading ? '...' : filteredCounts.series.toLocaleString()}
                         </div>
                         <div style={{ fontSize: '12px', color: 'rgba(139, 92, 246, 0.9)', fontWeight: '600' }}>
                             Séries
@@ -1098,7 +1275,7 @@ export function Home() {
                     fontSize: '11px'
                 }}>
                     <span>NeoStream IPTV</span>
-                    <span>v1.0.0</span>
+                    <span>v2.3.0</span>
                 </div>
             </div>
 
