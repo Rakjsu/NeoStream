@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react';
 import { updateService } from '../services/updateService';
 import type { UpdateInfo, DownloadProgress } from '../types/update';
 
+// Global function to show "up to date" modal
+export function showUpToDateModal() {
+    window.dispatchEvent(new CustomEvent('showUpToDateModal'));
+}
+
 interface UpdateNotificationProps {
     // Optional: can be controlled externally
 }
@@ -13,14 +18,33 @@ export function UpdateNotification({ }: UpdateNotificationProps) {
     const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
     const [isDownloaded, setIsDownloaded] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isUpToDate, setIsUpToDate] = useState(false);
+    const [currentVersion, setCurrentVersion] = useState<string>('');
 
     useEffect(() => {
+        // Listen for manual trigger to show "up to date" modal
+        const handleShowUpToDate = () => {
+            setIsUpToDate(true);
+            setCurrentVersion(__APP_VERSION__);
+            setIsVisible(true);
+        };
+        window.addEventListener('showUpToDateModal', handleShowUpToDate);
+
         // Listen for update available
         const cleanupAvailable = updateService.onUpdateAvailable((info) => {
             console.log('Update available:', info);
             setUpdateInfo(info);
+            setIsUpToDate(false);
             setIsVisible(true);
             setError(null);
+        });
+
+        // Listen for no update available (already up to date)
+        // Note: We don't auto-show modal here, only when user manually triggers check
+        const cleanupNotAvailable = updateService.onUpdateNotAvailable(() => {
+            console.log('Already up to date');
+            // Only update state, don't show modal automatically
+            // Modal will be shown when user clicks "Check for updates"
         });
 
         // Listen for download progress
@@ -43,7 +67,9 @@ export function UpdateNotification({ }: UpdateNotificationProps) {
         });
 
         return () => {
+            window.removeEventListener('showUpToDateModal', handleShowUpToDate);
             cleanupAvailable();
+            cleanupNotAvailable();
             cleanupProgress();
             cleanupDownloaded();
             cleanupError();
@@ -60,8 +86,9 @@ export function UpdateNotification({ }: UpdateNotificationProps) {
         await updateService.installUpdate();
     };
 
-    const handleLater = () => {
+    const handleClose = () => {
         setIsVisible(false);
+        setIsUpToDate(false);
     };
 
     const handleSkip = async () => {
@@ -71,14 +98,51 @@ export function UpdateNotification({ }: UpdateNotificationProps) {
         setIsVisible(false);
     };
 
-    if (!isVisible || !updateInfo) return null;
+    if (!isVisible) return null;
+
+    // Modal for "Up to Date"
+    if (isUpToDate) {
+        return (
+            <>
+                <style>{notificationStyles}</style>
+                <div className="update-backdrop" onClick={handleClose} />
+                <div className="update-notification">
+                    <div className="update-header">
+                        <div className="update-icon" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>✓</div>
+                        <div>
+                            <h3>Você está atualizado!</h3>
+                            <p className="version-info" style={{ color: '#10b981' }}>
+                                v{currentVersion || __APP_VERSION__}
+                            </p>
+                        </div>
+                        <button className="close-btn" onClick={handleClose}>✕</button>
+                    </div>
+                    <div className="update-content">
+                        <div className="download-complete">
+                            <span className="success-icon">✓</span>
+                            <span>Você já está usando a versão mais recente do NeoStream!</span>
+                        </div>
+                    </div>
+                    <div className="update-actions">
+                        <button className="btn-primary" onClick={handleClose} style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
+                            <span>👍</span>
+                            Entendi
+                        </button>
+                    </div>
+                </div>
+            </>
+        );
+    }
+
+    // Modal for "Update Available"
+    if (!updateInfo) return null;
 
     return (
         <>
             <style>{notificationStyles}</style>
 
             {/* Backdrop */}
-            <div className="update-backdrop" onClick={handleLater} />
+            <div className="update-backdrop" onClick={handleClose} />
 
             {/* Notification Modal */}
             <div className="update-notification">
@@ -91,7 +155,7 @@ export function UpdateNotification({ }: UpdateNotificationProps) {
                             v{updateInfo.version}
                         </p>
                     </div>
-                    <button className="close-btn" onClick={handleLater}>✕</button>
+                    <button className="close-btn" onClick={handleClose}>✕</button>
                 </div>
 
                 {/* Content */}
@@ -158,7 +222,7 @@ export function UpdateNotification({ }: UpdateNotificationProps) {
                                 <span>📥</span>
                                 Baixar Agora
                             </button>
-                            <button className="btn-secondary" onClick={handleLater}>
+                            <button className="btn-secondary" onClick={handleClose}>
                                 <span>⏰</span>
                                 Mais Tarde
                             </button>

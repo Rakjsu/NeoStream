@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { updateService } from '../services/updateService';
+import { showUpToDateModal } from '../components/UpdateNotification';
 import type { UpdateConfig } from '../types/update';
 
 export function Settings() {
@@ -40,15 +41,16 @@ export function Settings() {
     const handleCheckNow = async () => {
         setChecking(true);
         try {
+            // This will trigger update:available event if update exists
+            // If no update, we show the "up to date" modal manually
             const result = await updateService.checkForUpdates();
-            if (result.updateAvailable) {
-                alert(`Nova versão disponível: ${result.latestVersion}`);
-            } else {
-                alert('Você já está usando a versão mais recente!');
+            if (!result.updateAvailable) {
+                showUpToDateModal();
             }
+            // If update is available, the UpdateNotification will show automatically
             await loadUpdateConfig();
         } catch (error) {
-            alert('Erro ao verificar atualizações');
+            console.error('Error checking for updates:', error);
         } finally {
             setChecking(false);
         }
@@ -462,7 +464,7 @@ export function Settings() {
                                         </svg>
                                     </div>
                                     <h3 className="app-name">NeoStream</h3>
-                                    <p className="app-version">Versão 2.3.0</p>
+                                    <p className="app-version">Versão {__APP_VERSION__}</p>
                                     <p className="app-description">
                                         Sua experiência de streaming completa com TV ao vivo, filmes e séries.
                                     </p>

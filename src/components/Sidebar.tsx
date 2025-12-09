@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { UpdateNotificationBadge } from './UpdateNotificationBadge';
 import { UpdateModal } from './UpdateModal';
 import { ProfileManager } from './ProfileManager';
+import { updateService } from '../services/updateService';
 import type { UpdateInfo } from '../types/update';
 import type { Profile } from '../types/profile';
 
@@ -13,7 +14,7 @@ export function Sidebar() {
     const location = useLocation();
     const [activeProfile, setActiveProfile] = useState(() => profileService.getActiveProfile());
     const [showUpdateModal, setShowUpdateModal] = useState(false);
-    const [updateInfo] = useState<UpdateInfo | null>(null);
+    const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
     const [showProfilePopup, setShowProfilePopup] = useState(false);
     const [showProfileManager, setShowProfileManager] = useState(false);
@@ -26,6 +27,13 @@ export function Sidebar() {
 
     useEffect(() => {
         setProfiles(profileService.getAllProfiles());
+
+        // Listen for update available to store updateInfo
+        const cleanup = updateService.onUpdateAvailable((info) => {
+            setUpdateInfo(info);
+        });
+
+        return cleanup;
     }, []);
 
     // Profile transition state
@@ -376,6 +384,13 @@ export function Sidebar() {
                     </div>
                 </div>
             )}
+
+            {/* Update Modal */}
+            <UpdateModal
+                isOpen={showUpdateModal}
+                onClose={() => setShowUpdateModal(false)}
+                updateInfo={updateInfo}
+            />
         </>
     );
 }

@@ -12,6 +12,7 @@ import { Favorites } from './pages/Favorites';
 import { Downloads } from './pages/Downloads';
 import { ProfileSelector } from './pages/ProfileSelector';
 import { UpdateNotification } from './components/UpdateNotification';
+import { PostUpdateChangelog } from './components/PostUpdateChangelog';
 import { profileService } from './services/profileService';
 import { useState, useEffect } from 'react';
 
@@ -67,6 +68,7 @@ function App() {
   return (
     <>
       <UpdateNotification />
+      <PostUpdateChangelog />
       <HashRouter>
         <Routes>
           <Route path="/welcome" element={<Welcome />} />

@@ -53,6 +53,8 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
     // Configure autoUpdater
     autoUpdater.autoDownload = false; // Manual download control
     autoUpdater.autoInstallOnAppQuit = true;
+    // Disable code signature verification for unsigned apps
+    autoUpdater.forceDevUpdateConfig = true;
 
     // Setup event handlers
     autoUpdater.on('checking-for-update', () => {
