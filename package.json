@@ -2,7 +2,7 @@
   "name": "neostream-iptv",
   "productName": "NeoStream IPTV",
   "private": true,
-  "version": "2.4.8",
+  "version": "2.4.9",
   "description": "Advanced IPTV player with auto-update support",
   "author": "Rakjsu",
   "main": "dist-electron/main.js",
