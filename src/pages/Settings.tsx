@@ -607,14 +607,12 @@ export function Settings() {
                                         <button
                                             onClick={() => setShowTermsModal(true)}
                                             className="about-link"
-                                            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
                                         >
                                             📄 Termos de Uso
                                         </button>
                                         <button
                                             onClick={() => setShowPrivacyModal(true)}
                                             className="about-link"
-                                            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
                                         >
                                             🔒 Política de Privacidade
                                         </button>
@@ -907,12 +905,31 @@ export function Settings() {
                             alignItems: 'center',
                             justifyContent: 'center',
                             zIndex: 1000,
-                            padding: '20px'
+                            padding: '20px',
+                            animation: 'modalFadeIn 0.3s ease'
                         }}
                         onClick={(e) => {
                             if (e.target === e.currentTarget) setShowTermsModal(false);
                         }}
                     >
+                        <style>{`
+                            @keyframes modalFadeIn {
+                                from { opacity: 0; }
+                                to { opacity: 1; }
+                            }
+                            @keyframes modalSlideIn {
+                                from { opacity: 0; transform: translateY(-40px) scale(0.95); }
+                                to { opacity: 1; transform: translateY(0) scale(1); }
+                            }
+                            @keyframes iconPulse {
+                                0%, 100% { transform: scale(1); }
+                                50% { transform: scale(1.1); }
+                            }
+                            @keyframes fadeInUp {
+                                from { opacity: 0; transform: translateY(20px); }
+                                to { opacity: 1; transform: translateY(0); }
+                            }
+                        `}</style>
                         <div style={{
                             background: 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)',
                             borderRadius: '24px',
@@ -922,30 +939,55 @@ export function Settings() {
                             maxHeight: '80vh',
                             overflow: 'auto',
                             border: '1px solid rgba(168, 85, 247, 0.3)',
-                            boxShadow: '0 25px 80px rgba(0, 0, 0, 0.5)'
+                            boxShadow: '0 25px 80px rgba(0, 0, 0, 0.5), 0 0 40px rgba(168, 85, 247, 0.1)',
+                            animation: 'modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                                <h2 style={{ color: 'white', fontSize: '24px', fontWeight: 700, margin: 0 }}>
-                                    📄 Termos de Uso
+                                <h2 style={{
+                                    color: 'white',
+                                    fontSize: '24px',
+                                    fontWeight: 700,
+                                    margin: 0,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px'
+                                }}>
+                                    <span style={{ fontSize: '32px', animation: 'iconPulse 2s ease infinite' }}>📄</span>
+                                    <span style={{
+                                        background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                        backgroundClip: 'text'
+                                    }}>Termos de Uso</span>
                                 </h2>
                                 <button
                                     onClick={() => setShowTermsModal(false)}
                                     style={{
-                                        background: 'rgba(255, 255, 255, 0.1)',
-                                        border: 'none',
+                                        background: 'rgba(168, 85, 247, 0.15)',
+                                        border: '1px solid rgba(168, 85, 247, 0.3)',
                                         borderRadius: '12px',
                                         padding: '10px 16px',
-                                        color: 'white',
+                                        color: '#a855f7',
                                         cursor: 'pointer',
-                                        fontSize: '14px'
+                                        fontSize: '14px',
+                                        fontWeight: 600,
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = 'rgba(168, 85, 247, 0.25)';
+                                        e.currentTarget.style.transform = 'scale(1.05)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'rgba(168, 85, 247, 0.15)';
+                                        e.currentTarget.style.transform = 'scale(1)';
                                     }}
                                 >
                                     ✕ Fechar
                                 </button>
                             </div>
-                            <div style={{ color: '#9ca3af', fontSize: '14px', lineHeight: 1.8 }}>
-                                <p style={{ marginBottom: '16px' }}>
-                                    <strong style={{ color: 'white' }}>Última atualização:</strong> Dezembro de 2024
+                            <div style={{ color: '#9ca3af', fontSize: '14px', lineHeight: 1.8, animation: 'fadeInUp 0.5s ease 0.2s both' }}>
+                                <p style={{ marginBottom: '16px', padding: '12px 16px', background: 'rgba(168, 85, 247, 0.1)', borderRadius: '12px', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
+                                    <strong style={{ color: '#a855f7' }}>📅 Última atualização:</strong> <span style={{ color: 'white' }}>Dezembro de 2024</span>
                                 </p>
 
                                 <h3 style={{ color: '#a855f7', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>1. Aceitação dos Termos</h3>
@@ -993,7 +1035,8 @@ export function Settings() {
                             alignItems: 'center',
                             justifyContent: 'center',
                             zIndex: 1000,
-                            padding: '20px'
+                            padding: '20px',
+                            animation: 'modalFadeIn 0.3s ease'
                         }}
                         onClick={(e) => {
                             if (e.target === e.currentTarget) setShowPrivacyModal(false);
@@ -1008,30 +1051,55 @@ export function Settings() {
                             maxHeight: '80vh',
                             overflow: 'auto',
                             border: '1px solid rgba(16, 185, 129, 0.3)',
-                            boxShadow: '0 25px 80px rgba(0, 0, 0, 0.5)'
+                            boxShadow: '0 25px 80px rgba(0, 0, 0, 0.5), 0 0 40px rgba(16, 185, 129, 0.1)',
+                            animation: 'modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                                <h2 style={{ color: 'white', fontSize: '24px', fontWeight: 700, margin: 0 }}>
-                                    🔒 Política de Privacidade
+                                <h2 style={{
+                                    color: 'white',
+                                    fontSize: '24px',
+                                    fontWeight: 700,
+                                    margin: 0,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px'
+                                }}>
+                                    <span style={{ fontSize: '32px', animation: 'iconPulse 2s ease infinite' }}>🔒</span>
+                                    <span style={{
+                                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                        backgroundClip: 'text'
+                                    }}>Política de Privacidade</span>
                                 </h2>
                                 <button
                                     onClick={() => setShowPrivacyModal(false)}
                                     style={{
-                                        background: 'rgba(255, 255, 255, 0.1)',
-                                        border: 'none',
+                                        background: 'rgba(16, 185, 129, 0.15)',
+                                        border: '1px solid rgba(16, 185, 129, 0.3)',
                                         borderRadius: '12px',
                                         padding: '10px 16px',
-                                        color: 'white',
+                                        color: '#10b981',
                                         cursor: 'pointer',
-                                        fontSize: '14px'
+                                        fontSize: '14px',
+                                        fontWeight: 600,
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = 'rgba(16, 185, 129, 0.25)';
+                                        e.currentTarget.style.transform = 'scale(1.05)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)';
+                                        e.currentTarget.style.transform = 'scale(1)';
                                     }}
                                 >
                                     ✕ Fechar
                                 </button>
                             </div>
-                            <div style={{ color: '#9ca3af', fontSize: '14px', lineHeight: 1.8 }}>
-                                <p style={{ marginBottom: '16px' }}>
-                                    <strong style={{ color: 'white' }}>Última atualização:</strong> Dezembro de 2024
+                            <div style={{ color: '#9ca3af', fontSize: '14px', lineHeight: 1.8, animation: 'fadeInUp 0.5s ease 0.2s both' }}>
+                                <p style={{ marginBottom: '16px', padding: '12px 16px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                                    <strong style={{ color: '#10b981' }}>📅 Última atualização:</strong> <span style={{ color: 'white' }}>Dezembro de 2024</span>
                                 </p>
 
                                 <h3 style={{ color: '#10b981', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>1. Dados que Coletamos</h3>
