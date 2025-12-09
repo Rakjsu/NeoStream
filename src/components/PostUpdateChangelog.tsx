@@ -12,6 +12,33 @@ interface VersionChangelog {
 
 // Changelogs for each version
 const changelogs: VersionChangelog = {
+    '2.4.8': [
+        {
+            icon: '📺',
+            title: 'Próximo Episódio Inteligente',
+            items: [
+                'Auto-seleção do próximo episódio quando atual >90% completo',
+                'Toggle "Auto-play próximo episódio" nas configurações',
+                'Se desativado, próximo ep carrega mas fica pausado',
+            ]
+        },
+        {
+            icon: '🎬',
+            title: 'Codificador de Vídeo',
+            items: [
+                'Seleção de codec preferido (H.264, H.265, VP9)',
+                'Player prioriza streams com codec selecionado',
+            ]
+        },
+        {
+            icon: '🔤',
+            title: 'Legendas no Player',
+            items: [
+                'Botão de legendas (CC) nos controles',
+                'Changelog dinâmico por versão',
+            ]
+        },
+    ],
     '2.4.7': [
         {
             icon: '🎬',
