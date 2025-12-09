@@ -25,6 +25,22 @@ function App() {
     // Force refresh content by clearing cache timestamp
     localStorage.removeItem('contentLastFetch');
 
+    // Initialize theme color from localStorage
+    const savedThemeColor = localStorage.getItem('neostream_themeColor') as 'purple' | 'blue' | 'green' | 'red' | 'pink' | null;
+    if (savedThemeColor) {
+      const colors = {
+        purple: { primary: '#a855f7', secondary: '#7c3aed', gradient: 'linear-gradient(135deg, #a855f7, #7c3aed)' },
+        blue: { primary: '#3b82f6', secondary: '#2563eb', gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)' },
+        green: { primary: '#10b981', secondary: '#059669', gradient: 'linear-gradient(135deg, #10b981, #059669)' },
+        red: { primary: '#ef4444', secondary: '#dc2626', gradient: 'linear-gradient(135deg, #ef4444, #dc2626)' },
+        pink: { primary: '#ec4899', secondary: '#db2777', gradient: 'linear-gradient(135deg, #ec4899, #db2777)' }
+      };
+      const color = colors[savedThemeColor];
+      document.documentElement.style.setProperty('--theme-primary', color.primary);
+      document.documentElement.style.setProperty('--theme-secondary', color.secondary);
+      document.documentElement.style.setProperty('--theme-gradient', color.gradient);
+    }
+
     // Initialize profile service (migrate old data if needed)
     profileService.initialize();
 

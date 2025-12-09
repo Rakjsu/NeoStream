@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme Color Variables */
+:root {
+    --theme-primary: #a855f7;
+    --theme-secondary: #7c3aed;
+    --theme-gradient: linear-gradient(135deg, #a855f7, #7c3aed);
+}
+
 /* Basic debugging styles */
 * {
     margin: 0;

@@ -33,6 +33,27 @@ export function Settings() {
     const [showTermsModal, setShowTermsModal] = useState(false);
     const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
+    // Theme color setting
+    const [themeColor, setThemeColor] = useState<'purple' | 'blue' | 'green' | 'red' | 'pink'>(() => {
+        return (localStorage.getItem('neostream_themeColor') as 'purple' | 'blue' | 'green' | 'red' | 'pink') || 'purple';
+    });
+
+    // Apply theme color globally
+    useEffect(() => {
+        const colors = {
+            purple: { primary: '#a855f7', secondary: '#7c3aed', gradient: 'linear-gradient(135deg, #a855f7, #7c3aed)' },
+            blue: { primary: '#3b82f6', secondary: '#2563eb', gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)' },
+            green: { primary: '#10b981', secondary: '#059669', gradient: 'linear-gradient(135deg, #10b981, #059669)' },
+            red: { primary: '#ef4444', secondary: '#dc2626', gradient: 'linear-gradient(135deg, #ef4444, #dc2626)' },
+            pink: { primary: '#ec4899', secondary: '#db2777', gradient: 'linear-gradient(135deg, #ec4899, #db2777)' }
+        };
+        const color = colors[themeColor];
+        document.documentElement.style.setProperty('--theme-primary', color.primary);
+        document.documentElement.style.setProperty('--theme-secondary', color.secondary);
+        document.documentElement.style.setProperty('--theme-gradient', color.gradient);
+        localStorage.setItem('neostream_themeColor', themeColor);
+    }, [themeColor]);
+
     useEffect(() => {
         loadUpdateConfig();
         updateBufferInfo();
@@ -321,7 +342,11 @@ export function Settings() {
                                             <label>Cor do Tema</label>
                                             <p>Escolha a cor principal do aplicativo</p>
                                         </div>
-                                        <select className="setting-select">
+                                        <select
+                                            className="setting-select"
+                                            value={themeColor}
+                                            onChange={(e) => setThemeColor(e.target.value as 'purple' | 'blue' | 'green' | 'red' | 'pink')}
+                                        >
                                             <option value="purple">💜 Roxo</option>
                                             <option value="blue">💙 Azul</option>
                                             <option value="green">💚 Verde</option>
@@ -1095,7 +1120,7 @@ export function Settings() {
                             </div>
                             <div style={{ color: '#9ca3af', fontSize: '14px', lineHeight: 1.8, animation: 'fadeInUp 0.5s ease 0.2s both' }}>
                                 <p style={{ marginBottom: '16px', padding: '12px 16px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-                                    <strong style={{ color: '#10b981' }}>📅 Última atualização:</strong> <span style={{ color: 'white' }}>09 de Dezembro de 2024</span>
+                                    <strong style={{ color: '#10b981' }}>📅 Última atualização:</strong> <span style={{ color: 'white' }}>09 de Dezembro de 2025</span>
                                 </p>
 
                                 <h3 style={{ color: '#10b981', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>1. Dados que Coletamos</h3>
