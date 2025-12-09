@@ -249,5 +249,55 @@ export const indexedDBCache = {
         } catch {
             // Silently fail
         }
+    },
+
+    // ==================== BULK OPERATIONS FOR PARENTAL CONTROL ====================
+
+    async getAllCachedMovies(): Promise<Map<string, string | null>> {
+        try {
+            const db = await openDB();
+
+            return new Promise((resolve) => {
+                const tx = db.transaction(MOVIES_STORE, 'readonly');
+                const store = tx.objectStore(MOVIES_STORE);
+                const request = store.getAll();
+
+                request.onsuccess = () => {
+                    const items = request.result as CacheItem[];
+                    const map = new Map<string, string | null>();
+                    items.forEach(item => {
+                        map.set(item.name, item.certification);
+                    });
+                    resolve(map);
+                };
+                request.onerror = () => resolve(new Map());
+            });
+        } catch {
+            return new Map();
+        }
+    },
+
+    async getAllCachedSeries(): Promise<Map<string, string | null>> {
+        try {
+            const db = await openDB();
+
+            return new Promise((resolve) => {
+                const tx = db.transaction(SERIES_STORE, 'readonly');
+                const store = tx.objectStore(SERIES_STORE);
+                const request = store.getAll();
+
+                request.onsuccess = () => {
+                    const items = request.result as CacheItem[];
+                    const map = new Map<string, string | null>();
+                    items.forEach(item => {
+                        map.set(item.name, item.certification);
+                    });
+                    resolve(map);
+                };
+                request.onerror = () => resolve(new Map());
+            });
+        } catch {
+            return new Map();
+        }
     }
 };

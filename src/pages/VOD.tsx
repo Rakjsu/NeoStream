@@ -11,6 +11,7 @@ import { profileService } from '../services/profileService';
 import { indexedDBCache } from '../services/indexedDBCache';
 import { downloadService } from '../services/downloadService';
 import { searchMovieByName as searchMovie, isKidsFriendly } from '../services/tmdb';
+import { parentalService } from '../services/parentalService';
 
 interface VODStream {
     num: number;
@@ -63,6 +64,7 @@ export function VOD() {
     const [blockedCategoryIds, setBlockedCategoryIds] = useState<Set<string>>(new Set());
     const [checkingItem, setCheckingItem] = useState<string | null>(null);
     const [blockMessage, setBlockMessage] = useState<string | null>(null);
+    const [cachedRatings, setCachedRatings] = useState<Map<string, string | null>>(new Map());
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
 
     // Dynamic grid calculation based on window dimensions
@@ -117,7 +119,7 @@ export function VOD() {
         }
     };
 
-    // Blocked category patterns for Kids profile
+    // Blocked category patterns for Kids profile and Parental Control
     const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'erótico'];
 
     const fetchCategories = async () => {
@@ -126,8 +128,11 @@ export function VOD() {
             if (result.success) {
                 setCategories(result.data || []);
 
-                // Extract blocked category IDs for Kids profile
-                if (isKidsProfile) {
+                // Extract blocked category IDs for Kids profile OR Parental Control
+                const parentalConfig = parentalService.getConfig();
+                const shouldBlockCategories = isKidsProfile || (parentalConfig.enabled && parentalConfig.blockAdultCategories && !parentalService.isSessionUnlocked());
+
+                if (shouldBlockCategories) {
                     const blockedIds = new Set<string>();
                     (result.data || []).forEach((cat: { category_id: string; category_name: string }) => {
                         const lowerName = cat.category_name.toLowerCase();
@@ -136,6 +141,8 @@ export function VOD() {
                         }
                     });
                     setBlockedCategoryIds(blockedIds);
+                } else {
+                    setBlockedCategoryIds(new Set());
                 }
             }
         } catch (err) {
@@ -154,19 +161,37 @@ export function VOD() {
         loadHiddenItems();
     }, [isKidsProfile]);
 
+    // Load cached ratings for parental control filtering
+    useEffect(() => {
+        const loadCachedRatings = async () => {
+            const ratings = await indexedDBCache.getAllCachedMovies();
+            setCachedRatings(ratings);
+        };
+        loadCachedRatings();
+    }, [streams]);
+
     const filteredStreams = streams.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
+        const normalizedName = stream.name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
 
-        // Kids profile filtering
-        if (isKidsProfile) {
-            // Block items that have been marked as hidden
-            const normalizedName = stream.name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
-            if (hiddenMovies.has(normalizedName)) {
+        // Parental Control filtering (applies to all profiles)
+        if (blockedCategoryIds.has(stream.category_id)) {
+            return false;
+        }
+
+        // Parental Control: Filter by cached rating
+        const parentalConfig = parentalService.getConfig();
+        if (parentalConfig.enabled && !parentalService.isSessionUnlocked()) {
+            const cachedRating = cachedRatings.get(normalizedName);
+            if (cachedRating && parentalService.isContentBlocked(cachedRating)) {
                 return false;
             }
+        }
 
-            // Block items from blocked categories (Adult, Terror, etc.)
-            if (blockedCategoryIds.has(stream.category_id)) {
+        // Kids profile filtering (additional checks)
+        if (isKidsProfile) {
+            // Block items that have been marked as hidden
+            if (hiddenMovies.has(normalizedName)) {
                 return false;
             }
         }
@@ -286,10 +311,21 @@ export function VOD() {
         return `${hours}h ${mins}min restantes`;
     };
 
-    // Handle movie card click - check Kids filter if needed, always cache for cross-profile use
+    // Handle movie card click - check Kids filter and Parental Control, always cache for future use
     const handleMovieClick = async (movie: VODStream) => {
-        // For non-Kids profiles: open and cache TMDB data in background
-        if (!isKidsProfile) {
+        const normalizedName = movie.name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
+
+        // Check if already hidden for Kids profile
+        if (isKidsProfile && hiddenMovies.has(normalizedName)) {
+            return;
+        }
+
+        // Get parental control config
+        const parentalConfig = parentalService.getConfig();
+        const isParentalActive = parentalConfig.enabled && !parentalService.isSessionUnlocked();
+
+        // If no restrictions, just open and cache in background
+        if (!isKidsProfile && !isParentalActive) {
             setSelectedMovie(movie);
 
             // Background caching for cross-profile benefit
@@ -315,12 +351,7 @@ export function VOD() {
             return;
         }
 
-        // Kids profile flow
-        const normalizedName = movie.name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
-        if (hiddenMovies.has(normalizedName)) {
-            return;
-        }
-
+        // Need to check rating - show loading
         setCheckingItem(movie.name);
 
         try {
@@ -341,17 +372,35 @@ export function VOD() {
                         certification,
                         tmdbResult.genres?.map(g => g.name) || []
                     );
+                    // Update local cache for immediate filtering
+                    setCachedRatings(prev => new Map(prev).set(normalizedName, certification));
                 }
             }
 
-            if (isKidsFriendly(certification)) {
-                setSelectedMovie(movie);
-            } else {
-                setBlockMessage(`"${movie.name}" não está disponível para este perfil`);
-                await indexedDBCache.hideItem('movie', movie.name);
-                setHiddenMovies(prev => new Set(prev).add(normalizedName));
-                setTimeout(() => setBlockMessage(null), 3000);
+            // Check Kids profile restriction
+            if (isKidsProfile) {
+                if (isKidsFriendly(certification)) {
+                    setSelectedMovie(movie);
+                } else {
+                    setBlockMessage(`"${movie.name}" não está disponível para este perfil`);
+                    await indexedDBCache.hideItem('movie', movie.name);
+                    setHiddenMovies(prev => new Set(prev).add(normalizedName));
+                    setTimeout(() => setBlockMessage(null), 3000);
+                }
+                return;
             }
+
+            // Check Parental Control restriction
+            if (isParentalActive && certification) {
+                if (parentalService.isContentBlocked(certification)) {
+                    setBlockMessage(`"${movie.name}" está bloqueado pelo controle parental (${certification})`);
+                    setTimeout(() => setBlockMessage(null), 3000);
+                    return;
+                }
+            }
+
+            // Allow access
+            setSelectedMovie(movie);
         } catch (error) {
             console.error('Error checking movie rating:', error);
             setSelectedMovie(movie);

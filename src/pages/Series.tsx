@@ -13,6 +13,7 @@ import { profileService } from '../services/profileService';
 import { indexedDBCache } from '../services/indexedDBCache';
 import { downloadService } from '../services/downloadService';
 import { searchSeriesByName as searchSeries, isKidsFriendly } from '../services/tmdb';
+import { parentalService } from '../services/parentalService';
 
 interface Series {
     num: number;
@@ -76,6 +77,7 @@ export function Series() {
     const [blockedCategoryIds, setBlockedCategoryIds] = useState<Set<string>>(new Set());
     const [checkingItem, setCheckingItem] = useState<string | null>(null);
     const [blockMessage, setBlockMessage] = useState<string | null>(null);
+    const [cachedRatings, setCachedRatings] = useState<Map<string, string | null>>(new Map());
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
 
     // Blocked category patterns for Kids profile
@@ -141,25 +143,39 @@ export function Series() {
         loadHiddenItems();
     }, [isKidsProfile]);
 
-    // Fetch blocked category IDs for Kids profile
+    // Load cached ratings for parental control filtering
     useEffect(() => {
-        if (!isKidsProfile) return;
+        const loadCachedRatings = async () => {
+            const ratings = await indexedDBCache.getAllCachedSeries();
+            setCachedRatings(ratings);
+        };
+        loadCachedRatings();
+    }, [series]);
 
+    // Fetch blocked category IDs for Kids profile OR Parental Control
+    useEffect(() => {
         const fetchBlockedCategories = async () => {
             try {
                 const result = await window.ipcRenderer.invoke('categories:get-series');
                 if (result.success) {
-                    const blockedIds = new Set<string>();
-                    (result.data || []).forEach((cat: { category_id: string; category_name: string }) => {
-                        const lowerName = cat.category_name.toLowerCase();
-                        if (BLOCKED_CATEGORY_PATTERNS.some(p => lowerName.includes(p))) {
-                            blockedIds.add(cat.category_id);
-                        }
-                    });
-                    setBlockedCategoryIds(blockedIds);
+                    const parentalConfig = parentalService.getConfig();
+                    const shouldBlockCategories = isKidsProfile || (parentalConfig.enabled && parentalConfig.blockAdultCategories && !parentalService.isSessionUnlocked());
+
+                    if (shouldBlockCategories) {
+                        const blockedIds = new Set<string>();
+                        (result.data || []).forEach((cat: { category_id: string; category_name: string }) => {
+                            const lowerName = cat.category_name.toLowerCase();
+                            if (BLOCKED_CATEGORY_PATTERNS.some(p => lowerName.includes(p))) {
+                                blockedIds.add(cat.category_id);
+                            }
+                        });
+                        setBlockedCategoryIds(blockedIds);
+                    } else {
+                        setBlockedCategoryIds(new Set());
+                    }
                 }
             } catch (err) {
-                console.error('Failed to fetch categories for Kids filter:', err);
+                console.error('Failed to fetch categories for filter:', err);
             }
         };
         fetchBlockedCategories();
@@ -167,18 +183,27 @@ export function Series() {
 
     const filteredSeries = series.filter(s => {
         const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
+        const normalizedName = s.name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
 
-        // Kids profile filtering
-        if (isKidsProfile) {
-            // Block items that have been marked as hidden
-            const normalizedName = s.name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
-            if (hiddenSeries.has(normalizedName)) {
+        // Parental Control filtering (applies to all profiles)
+        const seriesCategories = Array.isArray(s.category_id) ? s.category_id : [s.category_id];
+        if (seriesCategories.some(catId => blockedCategoryIds.has(catId))) {
+            return false;
+        }
+
+        // Parental Control: Filter by cached rating
+        const parentalConfig = parentalService.getConfig();
+        if (parentalConfig.enabled && !parentalService.isSessionUnlocked()) {
+            const cachedRating = cachedRatings.get(normalizedName);
+            if (cachedRating && parentalService.isContentBlocked(cachedRating)) {
                 return false;
             }
+        }
 
-            // Block items from blocked categories (Adult, Terror, etc.)
-            const seriesCategories = Array.isArray(s.category_id) ? s.category_id : [s.category_id];
-            if (seriesCategories.some(catId => blockedCategoryIds.has(catId))) {
+        // Kids profile filtering (additional checks)
+        if (isKidsProfile) {
+            // Block items that have been marked as hidden
+            if (hiddenSeries.has(normalizedName)) {
                 return false;
             }
         }
@@ -359,10 +384,21 @@ export function Series() {
         }
     }, [selectedSeries]);
 
-    // Handle series card click - check Kids filter if needed, always cache for cross-profile use
+    // Handle series card click - check Kids filter and Parental Control, always cache for future use
     const handleSeriesClick = async (s: Series) => {
-        // For non-Kids profiles: open and cache TMDB data in background
-        if (!isKidsProfile) {
+        const normalizedName = s.name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
+
+        // Check if already hidden for Kids profile
+        if (isKidsProfile && hiddenSeries.has(normalizedName)) {
+            return;
+        }
+
+        // Get parental control config
+        const parentalConfig = parentalService.getConfig();
+        const isParentalActive = parentalConfig.enabled && !parentalService.isSessionUnlocked();
+
+        // If no restrictions, just open and cache in background
+        if (!isKidsProfile && !isParentalActive) {
             setSelectedSeries(s);
 
             // Background caching for cross-profile benefit
@@ -388,12 +424,7 @@ export function Series() {
             return;
         }
 
-        // Kids profile flow
-        const normalizedName = s.name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
-        if (hiddenSeries.has(normalizedName)) {
-            return;
-        }
-
+        // Need to check rating - show loading
         setCheckingItem(s.name);
 
         try {
@@ -414,17 +445,35 @@ export function Series() {
                         certification,
                         tmdbResult.genres?.map(g => g.name) || []
                     );
+                    // Update local cache for immediate filtering
+                    setCachedRatings(prev => new Map(prev).set(normalizedName, certification));
                 }
             }
 
-            if (isKidsFriendly(certification)) {
-                setSelectedSeries(s);
-            } else {
-                setBlockMessage(`"${s.name}" não está disponível para este perfil`);
-                await indexedDBCache.hideItem('series', s.name);
-                setHiddenSeries(prev => new Set(prev).add(normalizedName));
-                setTimeout(() => setBlockMessage(null), 3000);
+            // Check Kids profile restriction
+            if (isKidsProfile) {
+                if (isKidsFriendly(certification)) {
+                    setSelectedSeries(s);
+                } else {
+                    setBlockMessage(`"${s.name}" não está disponível para este perfil`);
+                    await indexedDBCache.hideItem('series', s.name);
+                    setHiddenSeries(prev => new Set(prev).add(normalizedName));
+                    setTimeout(() => setBlockMessage(null), 3000);
+                }
+                return;
             }
+
+            // Check Parental Control restriction
+            if (isParentalActive && certification) {
+                if (parentalService.isContentBlocked(certification)) {
+                    setBlockMessage(`"${s.name}" está bloqueado pelo controle parental (${certification})`);
+                    setTimeout(() => setBlockMessage(null), 3000);
+                    return;
+                }
+            }
+
+            // Allow access
+            setSelectedSeries(s);
         } catch (error) {
             console.error('Error checking series rating:', error);
             setSelectedSeries(s);

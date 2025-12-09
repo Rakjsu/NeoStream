@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { parentalService } from '../services/parentalService';
 import netflixLogo from '../assets/logos/netflix.png';
 import brasilParaleloLogo from '../assets/logos/brasil-paralelo.png';
 import disneyLogo from '../assets/logos/disney-new.png';
@@ -44,16 +45,25 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
     const KIDS_ALLOWED_LIVE_PATTERNS = ['infantil', 'infantis', 'kids', 'criança', '24 horas infantis'];
 
     const isCategoryBlocked = (categoryName: string): boolean => {
-        if (!isKidsProfile) return false;
         const lowerName = categoryName.toLowerCase();
 
-        // For LiveTV: only allow kids categories (whitelist approach)
-        if (type === 'live') {
-            return !KIDS_ALLOWED_LIVE_PATTERNS.some(pattern => lowerName.includes(pattern));
+        // Check parental control settings (applies to all profiles)
+        if (parentalService.shouldHideContent(categoryName)) {
+            return true;
         }
 
-        // For VOD/Series: block adult categories (blacklist approach)
-        return BLOCKED_CATEGORY_PATTERNS.some(pattern => lowerName.includes(pattern));
+        // Kids profile specific logic
+        if (isKidsProfile) {
+            // For LiveTV: only allow kids categories (whitelist approach)
+            if (type === 'live') {
+                return !KIDS_ALLOWED_LIVE_PATTERNS.some(pattern => lowerName.includes(pattern));
+            }
+
+            // For VOD/Series: block adult categories (blacklist approach)
+            return BLOCKED_CATEGORY_PATTERNS.some(pattern => lowerName.includes(pattern));
+        }
+
+        return false;
     };
 
     useEffect(() => {

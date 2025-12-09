@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { updateService } from '../services/updateService';
 import { playbackService } from '../services/playbackService';
 import type { PlaybackConfig } from '../services/playbackService';
+import { parentalService } from '../services/parentalService';
+import type { ParentalConfig } from '../services/parentalService';
 import { showUpToDateModal } from '../components/UpdateNotification';
 import type { UpdateConfig } from '../types/update';
 
@@ -12,11 +14,20 @@ export function Settings() {
         lastCheck: 0
     });
     const [playbackConfig, setPlaybackConfig] = useState<PlaybackConfig>(playbackService.getConfig());
+    const [parentalConfig, setParentalConfig] = useState<ParentalConfig>(parentalService.getConfig());
     const [bufferInfo, setBufferInfo] = useState<string>('');
     const [checking, setChecking] = useState(false);
     const [lastCheckDate, setLastCheckDate] = useState<string>('');
     const [activeSection, setActiveSection] = useState<string>('updates');
     const [saveAnimation, setSaveAnimation] = useState<string | null>(null);
+
+    // PIN Modal states
+    const [showPinModal, setShowPinModal] = useState(false);
+    const [pinInput, setPinInput] = useState(['', '', '', '']);
+    const [pinConfirm, setPinConfirm] = useState(['', '', '', '']);
+    const [pinStep, setPinStep] = useState<'enter' | 'confirm'>('enter');
+    const [pinError, setPinError] = useState('');
+    const [pinMode, setPinMode] = useState<'set' | 'verify'>('set'); // 'set' for new PIN, 'verify' for disabling
 
     useEffect(() => {
         loadUpdateConfig();
@@ -61,6 +72,90 @@ export function Settings() {
         // Show save animation
         setSaveAnimation(key);
         setTimeout(() => setSaveAnimation(null), 1500);
+    };
+
+    const handleParentalConfigChange = (key: keyof ParentalConfig, value: any) => {
+        // When trying to disable parental control, require PIN verification
+        if (key === 'enabled' && value === false && parentalService.hasPin()) {
+            resetPinModal();
+            setPinMode('verify');
+            setShowPinModal(true);
+            return; // Don't change config until PIN is verified
+        }
+
+        const newConfig = { ...parentalConfig, [key]: value };
+        setParentalConfig(newConfig);
+        parentalService.setConfig({ [key]: value });
+
+        // When enabling parental control for the first time, prompt for PIN
+        if (key === 'enabled' && value === true && !parentalService.hasPin()) {
+            resetPinModal();
+            setPinMode('set');
+            setShowPinModal(true);
+        }
+
+        // Show save animation
+        setSaveAnimation(`parental_${key}`);
+        setTimeout(() => setSaveAnimation(null), 1500);
+    };
+
+    const handlePinSubmit = () => {
+        const pin = pinInput.join('');
+
+        if (pin.length !== 4) {
+            setPinError('Digite 4 dígitos');
+            return;
+        }
+
+        // Verification mode - check if PIN is correct to disable parental control
+        if (pinMode === 'verify') {
+            if (parentalService.verifyPin(pin)) {
+                // PIN is correct - disable parental control
+                setParentalConfig(prev => ({ ...prev, enabled: false }));
+                parentalService.setConfig({ enabled: false });
+                setShowPinModal(false);
+                resetPinModal();
+
+                // Show save animation
+                setSaveAnimation('parental_enabled');
+                setTimeout(() => setSaveAnimation(null), 1500);
+            } else {
+                setPinError('PIN incorreto');
+                setPinInput(['', '', '', '']);
+            }
+            return;
+        }
+
+        // Set mode - setting a new PIN
+        if (pinStep === 'enter') {
+            // Move to confirm step
+            setPinStep('confirm');
+            setPinError('');
+        } else {
+            // Confirm PIN
+            const confirmPin = pinConfirm.join('');
+            if (pin !== confirmPin) {
+                setPinError('Os PINs não coincidem');
+                setPinConfirm(['', '', '', '']);
+                return;
+            }
+            // Save PIN
+            parentalService.setPin(pin);
+            setParentalConfig(parentalService.getConfig());
+            setShowPinModal(false);
+            resetPinModal();
+
+            // Show save animation
+            setSaveAnimation('parental_pin');
+            setTimeout(() => setSaveAnimation(null), 1500);
+        }
+    };
+
+    const resetPinModal = () => {
+        setPinInput(['', '', '', '']);
+        setPinConfirm(['', '', '', '']);
+        setPinStep('enter');
+        setPinError('');
     };
 
     const handleCheckNow = async () => {
@@ -377,9 +472,14 @@ export function Settings() {
                                             <p>Restringir acesso a conteúdo adulto</p>
                                         </div>
                                         <label className="toggle-switch">
-                                            <input type="checkbox" />
+                                            <input
+                                                type="checkbox"
+                                                checked={parentalConfig.enabled}
+                                                onChange={(e) => handleParentalConfigChange('enabled', e.target.checked)}
+                                            />
                                             <span className="toggle-slider"></span>
                                         </label>
+                                        {saveAnimation === 'parental_enabled' && <span className="save-indicator">✓ Salvo</span>}
                                     </div>
 
                                     <div className="setting-item">
@@ -387,7 +487,12 @@ export function Settings() {
                                             <label>Classificação Máxima</label>
                                             <p>Limite de classificação indicativa</p>
                                         </div>
-                                        <select className="setting-select">
+                                        <select
+                                            className="setting-select"
+                                            value={parentalConfig.maxRating}
+                                            onChange={(e) => handleParentalConfigChange('maxRating', e.target.value)}
+                                            disabled={!parentalConfig.enabled}
+                                        >
                                             <option value="L">Livre</option>
                                             <option value="10">10 anos</option>
                                             <option value="12">12 anos</option>
@@ -395,25 +500,35 @@ export function Settings() {
                                             <option value="16">16 anos</option>
                                             <option value="18">18 anos</option>
                                         </select>
+                                        {saveAnimation === 'parental_maxRating' && <span className="save-indicator">✓ Salvo</span>}
                                     </div>
 
                                     <div className="setting-item">
                                         <div className="setting-info">
                                             <label>PIN de Acesso</label>
-                                            <p>Definir PIN para desbloquear conteúdo restrito</p>
+                                            <p>{parentalService.hasPin() ? 'PIN configurado ✓' : 'Definir PIN para desbloquear conteúdo'}</p>
                                         </div>
-                                        <button className="setting-btn" style={{
-                                            padding: '10px 20px',
-                                            background: 'rgba(239, 68, 68, 0.2)',
-                                            border: '1px solid rgba(239, 68, 68, 0.4)',
-                                            borderRadius: '10px',
-                                            color: '#ef4444',
-                                            cursor: 'pointer',
-                                            fontWeight: 600,
-                                            transition: 'all 0.2s'
-                                        }}>
-                                            🔑 Alterar PIN
+                                        <button
+                                            className="setting-btn"
+                                            onClick={() => {
+                                                resetPinModal();
+                                                setShowPinModal(true);
+                                            }}
+                                            disabled={!parentalConfig.enabled}
+                                            style={{
+                                                padding: '10px 20px',
+                                                background: parentalConfig.enabled ? 'rgba(239, 68, 68, 0.2)' : 'rgba(100, 100, 100, 0.2)',
+                                                border: `1px solid ${parentalConfig.enabled ? 'rgba(239, 68, 68, 0.4)' : 'rgba(100, 100, 100, 0.4)'}`,
+                                                borderRadius: '10px',
+                                                color: parentalConfig.enabled ? '#ef4444' : '#666',
+                                                cursor: parentalConfig.enabled ? 'pointer' : 'not-allowed',
+                                                fontWeight: 600,
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            🔑 {parentalService.hasPin() ? 'Alterar' : 'Definir'} PIN
                                         </button>
+                                        {saveAnimation === 'parental_pin' && <span className="save-indicator">✓ Salvo</span>}
                                     </div>
 
                                     <div className="setting-item">
@@ -422,9 +537,15 @@ export function Settings() {
                                             <p>Ocultar automaticamente categorias adultas</p>
                                         </div>
                                         <label className="toggle-switch">
-                                            <input type="checkbox" defaultChecked />
+                                            <input
+                                                type="checkbox"
+                                                checked={parentalConfig.blockAdultCategories}
+                                                onChange={(e) => handleParentalConfigChange('blockAdultCategories', e.target.checked)}
+                                                disabled={!parentalConfig.enabled}
+                                            />
                                             <span className="toggle-slider"></span>
                                         </label>
+                                        {saveAnimation === 'parental_blockAdultCategories' && <span className="save-indicator">✓ Salvo</span>}
                                     </div>
 
                                     <div className="setting-item">
@@ -433,9 +554,15 @@ export function Settings() {
                                             <p>Verificar classificação no TMDB automaticamente</p>
                                         </div>
                                         <label className="toggle-switch">
-                                            <input type="checkbox" defaultChecked />
+                                            <input
+                                                type="checkbox"
+                                                checked={parentalConfig.filterByTMDB}
+                                                onChange={(e) => handleParentalConfigChange('filterByTMDB', e.target.checked)}
+                                                disabled={!parentalConfig.enabled}
+                                            />
                                             <span className="toggle-slider"></span>
                                         </label>
+                                        {saveAnimation === 'parental_filterByTMDB' && <span className="save-indicator">✓ Salvo</span>}
                                     </div>
                                 </div>
                             </div>
@@ -482,6 +609,275 @@ export function Settings() {
                         )}
                     </div>
                 </div>
+
+                {/* PIN Modal */}
+                {showPinModal && (
+                    <div
+                        className="pin-modal-overlay"
+                        style={{
+                            position: 'fixed',
+                            inset: 0,
+                            background: 'rgba(0, 0, 0, 0.9)',
+                            backdropFilter: 'blur(12px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1000,
+                            animation: 'pinFadeIn 0.3s ease'
+                        }}
+                        onClick={(e) => {
+                            if (e.target === e.currentTarget) {
+                                setShowPinModal(false);
+                                resetPinModal();
+                            }
+                        }}
+                    >
+                        <style>{`
+                            @keyframes pinFadeIn {
+                                from { opacity: 0; }
+                                to { opacity: 1; }
+                            }
+                            @keyframes pinSlideIn {
+                                from { opacity: 0; transform: translateY(-30px) scale(0.95); }
+                                to { opacity: 1; transform: translateY(0) scale(1); }
+                            }
+                            @keyframes pinBounce {
+                                0%, 100% { transform: scale(1); }
+                                50% { transform: scale(1.15); }
+                            }
+                            @keyframes pinDigitPop {
+                                0% { transform: scale(1); }
+                                50% { transform: scale(1.1); }
+                                100% { transform: scale(1); }
+                            }
+                            @keyframes pinShake {
+                                0%, 100% { transform: translateX(0); }
+                                20% { transform: translateX(-10px); }
+                                40% { transform: translateX(10px); }
+                                60% { transform: translateX(-10px); }
+                                80% { transform: translateX(10px); }
+                            }
+                            .pin-digit-filled {
+                                animation: pinDigitPop 0.2s ease !important;
+                            }
+                            .pin-error-shake {
+                                animation: pinShake 0.5s ease !important;
+                            }
+                        `}</style>
+                        <div style={{
+                            background: 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)',
+                            borderRadius: '28px',
+                            padding: '48px 40px',
+                            maxWidth: '420px',
+                            width: '90%',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            boxShadow: '0 30px 100px rgba(0, 0, 0, 0.6), 0 0 40px rgba(239, 68, 68, 0.1)',
+                            animation: 'pinSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                        }}>
+                            {/* Header */}
+                            <div style={{ textAlign: 'center', marginBottom: '36px' }}>
+                                <span style={{
+                                    fontSize: '56px',
+                                    display: 'block',
+                                    marginBottom: '16px',
+                                    animation: 'pinBounce 0.6s ease'
+                                }}>{pinMode === 'verify' ? '🔓' : '🔐'}</span>
+                                <h2 style={{
+                                    color: 'white',
+                                    fontSize: '26px',
+                                    fontWeight: 700,
+                                    margin: '0 0 10px 0',
+                                    background: 'linear-gradient(135deg, #fff 0%, #f87171 100%)',
+                                    WebkitBackgroundClip: 'text',
+                                    WebkitTextFillColor: 'transparent',
+                                    backgroundClip: 'text'
+                                }}>
+                                    {pinMode === 'verify'
+                                        ? 'Verificar PIN'
+                                        : pinStep === 'enter'
+                                            ? 'Definir PIN'
+                                            : 'Confirmar PIN'}
+                                </h2>
+                                <p style={{ color: '#9ca3af', fontSize: '15px', margin: 0 }}>
+                                    {pinMode === 'verify'
+                                        ? 'Digite o PIN para desativar o controle parental'
+                                        : pinStep === 'enter'
+                                            ? 'Digite um PIN de 4 dígitos para proteger o controle parental'
+                                            : 'Digite o PIN novamente para confirmar'}
+                                </p>
+                            </div>
+
+                            {/* PIN Input Container */}
+                            <div
+                                style={{
+                                    position: 'relative',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    gap: '14px',
+                                    marginBottom: '28px'
+                                }}
+                                onClick={() => {
+                                    const input = document.getElementById('pin-hidden-input');
+                                    if (input) input.focus();
+                                }}
+                            >
+                                {/* Hidden Input that captures keyboard */}
+                                <input
+                                    id="pin-hidden-input"
+                                    type="tel"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    maxLength={4}
+                                    autoFocus
+                                    autoComplete="off"
+                                    value={pinStep === 'enter' ? pinInput.join('') : pinConfirm.join('')}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/\D/g, '').slice(0, 4);
+                                        const digits = value.split('').concat(['', '', '', '']).slice(0, 4);
+                                        if (pinStep === 'enter') {
+                                            setPinInput(digits);
+                                        } else {
+                                            setPinConfirm(digits);
+                                        }
+                                        setPinError('');
+                                    }}
+                                    style={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        width: '100%',
+                                        height: '100%',
+                                        opacity: 0,
+                                        cursor: 'pointer',
+                                        zIndex: 10
+                                    }}
+                                />
+
+                                {/* Visual PIN Digits */}
+                                {(pinStep === 'enter' ? pinInput : pinConfirm).map((digit, index) => (
+                                    <div
+                                        key={index}
+                                        className={digit ? 'pin-digit-filled' : ''}
+                                        style={{
+                                            width: '64px',
+                                            height: '76px',
+                                            background: digit
+                                                ? 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(220, 38, 38, 0.15) 100%)'
+                                                : 'rgba(255, 255, 255, 0.05)',
+                                            border: `2px solid ${digit ? '#ef4444' : 'rgba(255, 255, 255, 0.15)'}`,
+                                            borderRadius: '16px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: '36px',
+                                            color: '#ef4444',
+                                            transition: 'all 0.2s ease',
+                                            boxShadow: digit ? '0 4px 20px rgba(239, 68, 68, 0.3)' : 'none',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        {digit ? '●' : ''}
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Error Message */}
+                            {pinError && (
+                                <div
+                                    className="pin-error-shake"
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px',
+                                        color: '#f87171',
+                                        fontSize: '14px',
+                                        fontWeight: 500,
+                                        marginBottom: '20px',
+                                        padding: '12px',
+                                        background: 'rgba(239, 68, 68, 0.1)',
+                                        borderRadius: '10px',
+                                        border: '1px solid rgba(239, 68, 68, 0.2)'
+                                    }}
+                                >
+                                    ⚠️ {pinError}
+                                </div>
+                            )}
+
+                            {/* Buttons */}
+                            <div style={{
+                                display: 'flex',
+                                gap: '14px',
+                                marginTop: '28px'
+                            }}>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowPinModal(false);
+                                        resetPinModal();
+                                        // If we're enabling parental control and user cancels, disable it
+                                        if (!parentalService.hasPin()) {
+                                            handleParentalConfigChange('enabled', false);
+                                        }
+                                    }}
+                                    style={{
+                                        flex: 1,
+                                        padding: '16px 24px',
+                                        borderRadius: '14px',
+                                        fontSize: '15px',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        background: 'rgba(255, 255, 255, 0.08)',
+                                        color: '#9ca3af',
+                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
+                                        e.currentTarget.style.color = 'white';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
+                                        e.currentTarget.style.color = '#9ca3af';
+                                    }}
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handlePinSubmit()}
+                                    style={{
+                                        flex: 1,
+                                        padding: '16px 24px',
+                                        borderRadius: '14px',
+                                        fontSize: '15px',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                        color: 'white',
+                                        border: 'none',
+                                        transition: 'all 0.2s ease',
+                                        boxShadow: '0 4px 20px rgba(239, 68, 68, 0.4)'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(-2px)';
+                                        e.currentTarget.style.boxShadow = '0 6px 25px rgba(239, 68, 68, 0.5)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.transform = 'translateY(0)';
+                                        e.currentTarget.style.boxShadow = '0 4px 20px rgba(239, 68, 68, 0.4)';
+                                    }}
+                                >
+                                    {pinMode === 'verify'
+                                        ? '🔓 Desbloquear'
+                                        : pinStep === 'enter'
+                                            ? 'Continuar →'
+                                            : '✓ Confirmar'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </>
     );

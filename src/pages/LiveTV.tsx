@@ -4,6 +4,7 @@ import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { epgService } from '../services/epgService';
 import { profileService } from '../services/profileService';
+import { parentalService } from '../services/parentalService';
 
 interface LiveStream {
     num: number;
@@ -45,9 +46,13 @@ export function LiveTV() {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const [allowedCategoryIds, setAllowedCategoryIds] = useState<Set<string>>(new Set());
+    const [blockedCategoryIds, setBlockedCategoryIds] = useState<Set<string>>(new Set());
 
     // For Kids profiles: only allow 'infantis' and '24 horas infantis' categories
     const KIDS_ALLOWED_PATTERNS = ['infantil', 'infantis', 'kids', 'criança', '24 horas infantis'];
+
+    // Blocked category patterns for Parental Control
+    const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'erotic', 'erótico'];
 
     // Calculate items per page based on window dimensions
     useEffect(() => {
@@ -164,6 +169,21 @@ export function LiveTV() {
                     });
                     setAllowedCategoryIds(allowedIds);
                 }
+
+                // For Parental Control: block adult categories
+                const parentalConfig = parentalService.getConfig();
+                if (parentalConfig.enabled && parentalConfig.blockAdultCategories && !parentalService.isSessionUnlocked()) {
+                    const blockedIds = new Set<string>();
+                    (result.data || []).forEach((cat: { category_id: string; category_name: string }) => {
+                        const lowerName = cat.category_name.toLowerCase();
+                        if (BLOCKED_CATEGORY_PATTERNS.some(p => lowerName.includes(p))) {
+                            blockedIds.add(cat.category_id);
+                        }
+                    });
+                    setBlockedCategoryIds(blockedIds);
+                } else {
+                    setBlockedCategoryIds(new Set());
+                }
             }
         } catch (err) {
             console.error('Failed to load categories:', err);
@@ -173,6 +193,11 @@ export function LiveTV() {
     const filteredStreams = streams.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
         const matchesCategory = !selectedCategory || selectedCategory === 'all' || stream.category_id === selectedCategory;
+
+        // Parental Control: block channels from adult categories
+        if (blockedCategoryIds.has(stream.category_id)) {
+            return false;
+        }
 
         // Kids profile: only allow channels from infantis categories
         if (isKidsProfile && allowedCategoryIds.size > 0) {
