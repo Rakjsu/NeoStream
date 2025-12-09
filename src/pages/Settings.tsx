@@ -29,6 +29,10 @@ export function Settings() {
     const [pinError, setPinError] = useState('');
     const [pinMode, setPinMode] = useState<'set' | 'verify'>('set'); // 'set' for new PIN, 'verify' for disabling
 
+    // Legal modals
+    const [showTermsModal, setShowTermsModal] = useState(false);
+    const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+
     useEffect(() => {
         loadUpdateConfig();
         updateBufferInfo();
@@ -600,9 +604,21 @@ export function Settings() {
                                         Sua experiência de streaming completa com TV ao vivo, filmes e séries.
                                     </p>
                                     <div className="about-links">
-                                        <a href="#" className="about-link">📄 Termos de Uso</a>
-                                        <a href="#" className="about-link">🔒 Política de Privacidade</a>
-                                        <a href="#" className="about-link">💬 Suporte</a>
+                                        <button
+                                            onClick={() => setShowTermsModal(true)}
+                                            className="about-link"
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                                        >
+                                            📄 Termos de Uso
+                                        </button>
+                                        <button
+                                            onClick={() => setShowPrivacyModal(true)}
+                                            className="about-link"
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                                        >
+                                            🔒 Política de Privacidade
+                                        </button>
+                                        <a href="mailto:suporte@neostream.app" className="about-link">💬 Suporte</a>
                                     </div>
                                 </div>
                             </div>
@@ -874,6 +890,196 @@ export function Settings() {
                                             ? 'Continuar →'
                                             : '✓ Confirmar'}
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Terms of Use Modal */}
+                {showTermsModal && (
+                    <div
+                        style={{
+                            position: 'fixed',
+                            inset: 0,
+                            background: 'rgba(0, 0, 0, 0.9)',
+                            backdropFilter: 'blur(12px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1000,
+                            padding: '20px'
+                        }}
+                        onClick={(e) => {
+                            if (e.target === e.currentTarget) setShowTermsModal(false);
+                        }}
+                    >
+                        <div style={{
+                            background: 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)',
+                            borderRadius: '24px',
+                            padding: '32px',
+                            maxWidth: '700px',
+                            width: '100%',
+                            maxHeight: '80vh',
+                            overflow: 'auto',
+                            border: '1px solid rgba(168, 85, 247, 0.3)',
+                            boxShadow: '0 25px 80px rgba(0, 0, 0, 0.5)'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                                <h2 style={{ color: 'white', fontSize: '24px', fontWeight: 700, margin: 0 }}>
+                                    📄 Termos de Uso
+                                </h2>
+                                <button
+                                    onClick={() => setShowTermsModal(false)}
+                                    style={{
+                                        background: 'rgba(255, 255, 255, 0.1)',
+                                        border: 'none',
+                                        borderRadius: '12px',
+                                        padding: '10px 16px',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontSize: '14px'
+                                    }}
+                                >
+                                    ✕ Fechar
+                                </button>
+                            </div>
+                            <div style={{ color: '#9ca3af', fontSize: '14px', lineHeight: 1.8 }}>
+                                <p style={{ marginBottom: '16px' }}>
+                                    <strong style={{ color: 'white' }}>Última atualização:</strong> Dezembro de 2024
+                                </p>
+
+                                <h3 style={{ color: '#a855f7', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>1. Aceitação dos Termos</h3>
+                                <p>Ao utilizar o NeoStream, você concorda com estes Termos de Uso. O aplicativo é destinado exclusivamente para uso pessoal e não comercial.</p>
+
+                                <h3 style={{ color: '#a855f7', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>2. Descrição do Serviço</h3>
+                                <p>O NeoStream é um player de mídia que permite visualizar conteúdo IPTV através de listas M3U fornecidas pelo usuário. Não fornecemos, hospedamos ou distribuímos qualquer conteúdo de mídia.</p>
+
+                                <h3 style={{ color: '#a855f7', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>3. Responsabilidade do Usuário</h3>
+                                <p>Você é responsável por:</p>
+                                <ul style={{ marginLeft: '20px', marginTop: '8px' }}>
+                                    <li>Garantir que possui direitos legais sobre o conteúdo acessado</li>
+                                    <li>Cumprir as leis de direitos autorais do seu país</li>
+                                    <li>Manter suas credenciais de acesso seguras</li>
+                                    <li>Usar o aplicativo de forma ética e responsável</li>
+                                </ul>
+
+                                <h3 style={{ color: '#a855f7', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>4. Uso do Controle Parental</h3>
+                                <p>O recurso de controle parental é fornecido como ferramenta auxiliar. Os pais/responsáveis devem supervisionar o uso do aplicativo por menores.</p>
+
+                                <h3 style={{ color: '#a855f7', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>5. Limitação de Responsabilidade</h3>
+                                <p>O NeoStream é fornecido "como está", sem garantias. Não nos responsabilizamos por:</p>
+                                <ul style={{ marginLeft: '20px', marginTop: '8px' }}>
+                                    <li>Conteúdo de terceiros acessado através do aplicativo</li>
+                                    <li>Interrupções no serviço de streaming</li>
+                                    <li>Perdas de dados ou problemas técnicos</li>
+                                </ul>
+
+                                <h3 style={{ color: '#a855f7', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>6. Modificações</h3>
+                                <p>Reservamo-nos o direito de modificar estes termos a qualquer momento. Alterações significativas serão comunicadas através do aplicativo.</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Privacy Policy Modal */}
+                {showPrivacyModal && (
+                    <div
+                        style={{
+                            position: 'fixed',
+                            inset: 0,
+                            background: 'rgba(0, 0, 0, 0.9)',
+                            backdropFilter: 'blur(12px)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 1000,
+                            padding: '20px'
+                        }}
+                        onClick={(e) => {
+                            if (e.target === e.currentTarget) setShowPrivacyModal(false);
+                        }}
+                    >
+                        <div style={{
+                            background: 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)',
+                            borderRadius: '24px',
+                            padding: '32px',
+                            maxWidth: '700px',
+                            width: '100%',
+                            maxHeight: '80vh',
+                            overflow: 'auto',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            boxShadow: '0 25px 80px rgba(0, 0, 0, 0.5)'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                                <h2 style={{ color: 'white', fontSize: '24px', fontWeight: 700, margin: 0 }}>
+                                    🔒 Política de Privacidade
+                                </h2>
+                                <button
+                                    onClick={() => setShowPrivacyModal(false)}
+                                    style={{
+                                        background: 'rgba(255, 255, 255, 0.1)',
+                                        border: 'none',
+                                        borderRadius: '12px',
+                                        padding: '10px 16px',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontSize: '14px'
+                                    }}
+                                >
+                                    ✕ Fechar
+                                </button>
+                            </div>
+                            <div style={{ color: '#9ca3af', fontSize: '14px', lineHeight: 1.8 }}>
+                                <p style={{ marginBottom: '16px' }}>
+                                    <strong style={{ color: 'white' }}>Última atualização:</strong> Dezembro de 2024
+                                </p>
+
+                                <h3 style={{ color: '#10b981', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>1. Dados que Coletamos</h3>
+                                <p>O NeoStream coleta e armazena <strong style={{ color: 'white' }}>localmente no seu dispositivo</strong>:</p>
+                                <ul style={{ marginLeft: '20px', marginTop: '8px' }}>
+                                    <li>Credenciais de conexão IPTV (criptografadas)</li>
+                                    <li>Preferências de configuração</li>
+                                    <li>Histórico de reprodução e progresso</li>
+                                    <li>Configurações de controle parental</li>
+                                    <li>Cache de classificações de conteúdo</li>
+                                </ul>
+
+                                <h3 style={{ color: '#10b981', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>2. Armazenamento Local</h3>
+                                <p>Todos os dados são armazenados <strong style={{ color: 'white' }}>exclusivamente no seu dispositivo</strong> usando:</p>
+                                <ul style={{ marginLeft: '20px', marginTop: '8px' }}>
+                                    <li>LocalStorage para configurações</li>
+                                    <li>IndexedDB para cache de conteúdo</li>
+                                    <li>SessionStorage para dados temporários</li>
+                                </ul>
+
+                                <h3 style={{ color: '#10b981', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>3. Comunicações Externas</h3>
+                                <p>O aplicativo faz conexões externas apenas para:</p>
+                                <ul style={{ marginLeft: '20px', marginTop: '8px' }}>
+                                    <li>Seu servidor IPTV (fornecido por você)</li>
+                                    <li>API do TMDB para metadados e classificações</li>
+                                    <li>Verificação de atualizações (opcional)</li>
+                                </ul>
+
+                                <h3 style={{ color: '#10b981', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>4. Não Coletamos</h3>
+                                <p style={{ color: '#10b981' }}>❌ NÃO coletamos, transmitimos ou vendemos:</p>
+                                <ul style={{ marginLeft: '20px', marginTop: '8px' }}>
+                                    <li>Informações pessoais identificáveis</li>
+                                    <li>Dados de localização</li>
+                                    <li>Histórico de navegação</li>
+                                    <li>Informações de contatos</li>
+                                    <li>Dados analíticos ou telemetria</li>
+                                </ul>
+
+                                <h3 style={{ color: '#10b981', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>5. Seus Direitos</h3>
+                                <p>Você pode a qualquer momento:</p>
+                                <ul style={{ marginLeft: '20px', marginTop: '8px' }}>
+                                    <li>Limpar todos os dados locais nas configurações</li>
+                                    <li>Desinstalar o aplicativo para remover todos os dados</li>
+                                    <li>Exportar seus dados (histórico, favoritos)</li>
+                                </ul>
+
+                                <h3 style={{ color: '#10b981', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>6. Contato</h3>
+                                <p>Para questões sobre privacidade, entre em contato através do suporte do aplicativo.</p>
                             </div>
                         </div>
                     </div>
