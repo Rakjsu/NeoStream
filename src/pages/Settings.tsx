@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { updateService } from '../services/updateService';
+import { playbackService } from '../services/playbackService';
+import type { PlaybackConfig } from '../services/playbackService';
 import { showUpToDateModal } from '../components/UpdateNotification';
 import type { UpdateConfig } from '../types/update';
 
@@ -9,6 +11,8 @@ export function Settings() {
         autoInstall: false,
         lastCheck: 0
     });
+    const [playbackConfig, setPlaybackConfig] = useState<PlaybackConfig>(playbackService.getConfig());
+    const [bufferInfo, setBufferInfo] = useState<string>('');
     const [checking, setChecking] = useState(false);
     const [lastCheckDate, setLastCheckDate] = useState<string>('');
     const [activeSection, setActiveSection] = useState<string>('updates');
@@ -16,6 +20,7 @@ export function Settings() {
 
     useEffect(() => {
         loadUpdateConfig();
+        updateBufferInfo();
     }, []);
 
     const loadUpdateConfig = async () => {
@@ -32,6 +37,26 @@ export function Settings() {
         const newConfig = { ...updateConfig, [key]: value };
         setUpdateConfig(newConfig);
         await updateService.setConfig(newConfig);
+
+        // Show save animation
+        setSaveAnimation(key);
+        setTimeout(() => setSaveAnimation(null), 1500);
+    };
+
+    const updateBufferInfo = async () => {
+        const description = playbackService.getBufferDescription();
+        setBufferInfo(description);
+    };
+
+    const handlePlaybackConfigChange = async (key: keyof PlaybackConfig, value: any) => {
+        const newConfig = { ...playbackConfig, [key]: value };
+        setPlaybackConfig(newConfig);
+        playbackService.setConfig({ [key]: value });
+
+        // Update buffer info display when buffer changes
+        if (key === 'bufferSize') {
+            await updateBufferInfo();
+        }
 
         // Show save animation
         setSaveAnimation(key);
@@ -272,12 +297,18 @@ export function Settings() {
                                             <label>Tamanho do Buffer</label>
                                             <p>Tempo de buffer antes de iniciar a reprodução</p>
                                         </div>
-                                        <select className="setting-select">
+                                        <select
+                                            className="setting-select"
+                                            value={playbackConfig.bufferSize}
+                                            onChange={(e) => handlePlaybackConfigChange('bufferSize', e.target.value)}
+                                        >
+                                            <option value="intelligent">🧠 Inteligente (Adaptativo)</option>
                                             <option value="5">5 segundos</option>
                                             <option value="10">10 segundos</option>
-                                            <option value="15" selected>15 segundos</option>
+                                            <option value="15">15 segundos</option>
                                             <option value="30">30 segundos</option>
                                         </select>
+                                        {saveAnimation === 'bufferSize' && <span className="save-indicator">✓ Salvo</span>}
                                     </div>
 
                                     <div className="setting-item">

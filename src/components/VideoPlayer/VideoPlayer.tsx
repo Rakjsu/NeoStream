@@ -88,8 +88,11 @@ export function VideoPlayer({
 
         const setResumeTime = () => {
             if (video && resumeTime) {
-                console.log(`Resuming playback at ${resumeTime} seconds`);
-                video.currentTime = resumeTime;
+                // Only seek if not already at or past the resume point
+                if (Math.abs(video.currentTime - resumeTime) > 5) {
+                    console.log(`Resuming playback at ${Math.floor(resumeTime)} seconds`);
+                    video.currentTime = resumeTime;
+                }
             }
         };
 
@@ -97,8 +100,8 @@ export function VideoPlayer({
         if (video.readyState >= 2) {
             setResumeTime();
         } else {
-            // Otherwise, wait for metadata to load
-            video.addEventListener('loadedmetadata', setResumeTime);
+            // Otherwise, wait for metadata to load (once only)
+            video.addEventListener('loadedmetadata', setResumeTime, { once: true });
             video.addEventListener('canplay', setResumeTime, { once: true });
         }
 

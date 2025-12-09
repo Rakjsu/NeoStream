@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { VideoPlayer } from './VideoPlayer/VideoPlayer';
 import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
@@ -43,8 +43,15 @@ function AsyncVideoPlayer({
     const [error, setError] = useState<string | null>(null);
     const [isAnimating, setIsAnimating] = useState(true);
     const [resumeTime, setResumeTime] = useState<number | null>(null);
+    const urlLoadedRef = useRef(false);
 
+    // Effect 1: Load stream URL (only triggers on movie/episode changes, NOT resumeTime)
     useEffect(() => {
+        // Skip if already loaded for same content
+        if (urlLoadedRef.current && streamUrl) {
+            return;
+        }
+
         setLoading(true);
         setError(null);
 
@@ -57,33 +64,39 @@ function AsyncVideoPlayer({
                 }
                 setStreamUrl(url);
                 setLoading(false);
-
-                // Use external resume time if provided (from ResumeModal)
-                if (externalResumeTime !== undefined && externalResumeTime !== null && externalResumeTime > 0) {
-                    setResumeTime(externalResumeTime);
-                } else if (seriesId && seasonNumber !== undefined && episodeNumber !== undefined) {
-                    // Fall back to saved video time for resume
-                    const savedTime = watchProgressService.getVideoTime(
-                        seriesId,
-                        seasonNumber,
-                        episodeNumber
-                    );
-                    if (savedTime) {
-                        setResumeTime(savedTime);
-                    } else {
-                        setResumeTime(null);
-                    }
-                } else if (externalResumeTime !== undefined) {
-                    // For movies with explicit resume time (even 0)
-                    setResumeTime(externalResumeTime);
-                }
+                urlLoadedRef.current = true;
             })
             .catch((err) => {
                 console.error('Error building stream URL:', err);
                 setError('Erro ao carregar o vídeo. Tente novamente.');
                 setLoading(false);
             });
-    }, [movie, buildStreamUrl, currentEpisode, seriesId, seasonNumber, episodeNumber, externalResumeTime]);
+    }, [movie, buildStreamUrl, currentEpisode, seriesId, seasonNumber, episodeNumber]);
+
+    // Effect 2: Set resume time (separate from URL loading to avoid remounting)
+    useEffect(() => {
+        if (!streamUrl || loading) return; // Wait for URL to load
+
+        // Use external resume time if provided (from ResumeModal)
+        if (externalResumeTime !== undefined && externalResumeTime !== null && externalResumeTime > 0) {
+            setResumeTime(externalResumeTime);
+        } else if (seriesId && seasonNumber !== undefined && episodeNumber !== undefined) {
+            // Fall back to saved video time for resume
+            const savedTime = watchProgressService.getVideoTime(
+                seriesId,
+                seasonNumber,
+                episodeNumber
+            );
+            if (savedTime) {
+                setResumeTime(savedTime);
+            } else {
+                setResumeTime(null);
+            }
+        } else if (externalResumeTime !== undefined) {
+            // For movies with explicit resume time (even 0)
+            setResumeTime(externalResumeTime);
+        }
+    }, [streamUrl, loading, externalResumeTime, seriesId, seasonNumber, episodeNumber]);
 
     // Disable animation after it completes
     useEffect(() => {
