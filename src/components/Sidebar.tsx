@@ -138,8 +138,8 @@ export function Sidebar() {
                         <svg className="logo-svg" width="44" height="44" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                             <defs>
                                 <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                    <stop offset="0%" stopColor="#a855f7" />
-                                    <stop offset="100%" stopColor="#ec4899" />
+                                    <stop offset="0%" stopColor="var(--theme-primary, #a855f7)" />
+                                    <stop offset="100%" stopColor="var(--theme-secondary, #7c3aed)" />
                                 </linearGradient>
                             </defs>
                             <path d="M 10,10 L 10,90 L 90,50 Z" fill="none" stroke="url(#logoGradient)" strokeWidth="6" strokeLinejoin="round" />
@@ -222,8 +222,8 @@ export function Sidebar() {
                                 <svg width="26" height="26" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                                     <defs>
                                         <linearGradient id="profileGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stopColor="#a855f7" />
-                                            <stop offset="100%" stopColor="#ec4899" />
+                                            <stop offset="0%" stopColor="var(--theme-primary, #a855f7)" />
+                                            <stop offset="100%" stopColor="var(--theme-secondary, #7c3aed)" />
                                         </linearGradient>
                                     </defs>
                                     <circle cx="50" cy="35" r="14" fill="none" stroke="url(#profileGrad)" strokeWidth="6" />
@@ -670,7 +670,7 @@ const sidebarStyles = `
     position: absolute;
     inset: -3px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #a855f7, #ec4899);
+    background: var(--theme-gradient, linear-gradient(135deg, #a855f7, #7c3aed));
     opacity: 0.8;
     transition: all 0.3s ease;
 }
