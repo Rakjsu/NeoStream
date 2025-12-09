@@ -353,17 +353,6 @@ export function Settings() {
                                             <option>🇪🇸 Español</option>
                                         </select>
                                     </div>
-
-                                    <div className="setting-item">
-                                        <div className="setting-info">
-                                            <label>Animações</label>
-                                            <p>Ativar animações de transição</p>
-                                        </div>
-                                        <label className="toggle-switch">
-                                            <input type="checkbox" defaultChecked />
-                                            <span className="toggle-slider"></span>
-                                        </label>
-                                    </div>
                                 </div>
                             </div>
                         )}
@@ -976,7 +965,7 @@ export function Settings() {
                             </div>
                             <div style={{ color: '#9ca3af', fontSize: '14px', lineHeight: 1.8, animation: 'fadeInUp 0.5s ease 0.2s both' }}>
                                 <p style={{ marginBottom: '16px', padding: '12px 16px', background: 'rgba(168, 85, 247, 0.1)', borderRadius: '12px', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
-                                    <strong style={{ color: '#a855f7' }}>📅 Última atualização:</strong> <span style={{ color: 'white' }}>09 de Dezembro de 2024</span>
+                                    <strong style={{ color: '#a855f7' }}>📅 Última atualização:</strong> <span style={{ color: 'white' }}>09 de Dezembro de 2025</span>
                                 </p>
 
                                 <h3 style={{ color: '#a855f7', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>1. Aceitação dos Termos</h3>
