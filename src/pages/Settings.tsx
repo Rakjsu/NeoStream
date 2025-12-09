@@ -272,14 +272,6 @@ export function Settings() {
                                         )}
                                     </div>
 
-                                    {/* Last Check */}
-                                    {lastCheckDate && (
-                                        <div className="last-check">
-                                            <span className="check-icon">🕐</span>
-                                            <span>Última verificação: <strong>{lastCheckDate}</strong></span>
-                                        </div>
-                                    )}
-
                                     <div className="setting-item">
                                         <div className="setting-info">
                                             <label>Idioma</label>
@@ -291,6 +283,14 @@ export function Settings() {
                                             <option>🇪🇸 Español</option>
                                         </select>
                                     </div>
+
+                                    {/* Last Check */}
+                                    {lastCheckDate && (
+                                        <div className="last-check">
+                                            <span className="check-icon">🕐</span>
+                                            <span>Última verificação: <strong>{lastCheckDate}</strong></span>
+                                        </div>
+                                    )}
 
                                     {/* Check Now Button */}
                                     <button
