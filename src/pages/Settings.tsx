@@ -1042,6 +1042,24 @@ export function Settings() {
                             if (e.target === e.currentTarget) setShowPrivacyModal(false);
                         }}
                     >
+                        <style>{`
+                            @keyframes modalFadeIn {
+                                from { opacity: 0; }
+                                to { opacity: 1; }
+                            }
+                            @keyframes modalSlideIn {
+                                from { opacity: 0; transform: translateY(-40px) scale(0.95); }
+                                to { opacity: 1; transform: translateY(0) scale(1); }
+                            }
+                            @keyframes iconPulse {
+                                0%, 100% { transform: scale(1); }
+                                50% { transform: scale(1.1); }
+                            }
+                            @keyframes fadeInUp {
+                                from { opacity: 0; transform: translateY(20px); }
+                                to { opacity: 1; transform: translateY(0); }
+                            }
+                        `}</style>
                         <div style={{
                             background: 'linear-gradient(145deg, #1e293b 0%, #0f172a 100%)',
                             borderRadius: '24px',
@@ -1615,19 +1633,28 @@ const settingsStyles = `
 }
 
 .about-link {
-    padding: 12px 20px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    color: rgba(255, 255, 255, 0.7);
+    padding: 14px 24px;
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    border-radius: 14px;
+    color: #c4b5fd;
     text-decoration: none;
     font-size: 14px;
-    font-weight: 500;
-    transition: all 0.3s ease;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 4px 15px rgba(168, 85, 247, 0.15);
 }
 
 .about-link:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(236, 72, 153, 0.25) 100%);
     color: white;
-    transform: translateY(-2px);
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(168, 85, 247, 0.3);
+    border-color: rgba(168, 85, 247, 0.5);
+}
+
+.about-link:active {
+    transform: translateY(-2px) scale(1);
 }
 `;
