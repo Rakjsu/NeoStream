@@ -182,7 +182,6 @@ export function Settings() {
 
     const sections = [
         { id: 'updates', icon: '🔄', label: 'Atualizações', color: '#10b981' },
-        { id: 'appearance', icon: '🎨', label: 'Aparência', color: '#8b5cf6' },
         { id: 'playback', icon: '⏯️', label: 'Reprodução', color: '#3b82f6' },
         { id: 'parental', icon: '👨‍👩‍👧', label: 'Controle Parental', color: '#ef4444' },
         { id: 'about', icon: 'ℹ️', label: 'Sobre', color: '#f59e0b' }
@@ -281,6 +280,18 @@ export function Settings() {
                                         </div>
                                     )}
 
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Idioma</label>
+                                            <p>Idioma da interface</p>
+                                        </div>
+                                        <select className="setting-select">
+                                            <option>🇧🇷 Português</option>
+                                            <option>🇺🇸 English</option>
+                                            <option>🇪🇸 Español</option>
+                                        </select>
+                                    </div>
+
                                     {/* Check Now Button */}
                                     <button
                                         className={`check-btn ${checking ? 'checking' : ''}`}
@@ -299,46 +310,6 @@ export function Settings() {
                                             </>
                                         )}
                                     </button>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Appearance Section */}
-                        {activeSection === 'appearance' && (
-                            <div className="section-card">
-                                <div className="section-header">
-                                    <div className="section-icon" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>🎨</div>
-                                    <div>
-                                        <h2>Aparência</h2>
-                                        <p>Personalize a interface do aplicativo</p>
-                                    </div>
-                                </div>
-
-                                <div className="settings-group">
-
-                                    <div className="setting-item">
-                                        <div className="setting-info">
-                                            <label>Tema</label>
-                                            <p>Escolha o tema visual do aplicativo</p>
-                                        </div>
-                                        <select className="setting-select">
-                                            <option>🌙 Escuro</option>
-                                            <option>☀️ Claro</option>
-                                            <option>🖥️ Sistema</option>
-                                        </select>
-                                    </div>
-
-                                    <div className="setting-item">
-                                        <div className="setting-info">
-                                            <label>Idioma</label>
-                                            <p>Idioma da interface</p>
-                                        </div>
-                                        <select className="setting-select">
-                                            <option>🇧🇷 Português</option>
-                                            <option>🇺🇸 English</option>
-                                            <option>🇪🇸 Español</option>
-                                        </select>
-                                    </div>
                                 </div>
                             </div>
                         )}
