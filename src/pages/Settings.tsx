@@ -316,12 +316,17 @@ export function Settings() {
                                             <label>Codificador de Áudio</label>
                                             <p>Codec de áudio preferencial</p>
                                         </div>
-                                        <select className="setting-select">
+                                        <select
+                                            className="setting-select"
+                                            value={playbackConfig.audioCodec}
+                                            onChange={(e) => handlePlaybackConfigChange('audioCodec', e.target.value as PlaybackConfig['audioCodec'])}
+                                        >
                                             <option value="auto">Auto</option>
                                             <option value="aac">AAC</option>
                                             <option value="ac3">AC3 (Dolby Digital)</option>
                                             <option value="eac3">EAC3 (Dolby Digital Plus)</option>
                                         </select>
+                                        {saveAnimation === 'audioCodec' && <span className="save-indicator">✓ Salvo</span>}
                                     </div>
 
                                     <div className="setting-item">
@@ -329,25 +334,17 @@ export function Settings() {
                                             <label>Codificador de Vídeo</label>
                                             <p>Codec de vídeo preferencial</p>
                                         </div>
-                                        <select className="setting-select">
+                                        <select
+                                            className="setting-select"
+                                            value={playbackConfig.videoCodec}
+                                            onChange={(e) => handlePlaybackConfigChange('videoCodec', e.target.value as PlaybackConfig['videoCodec'])}
+                                        >
                                             <option value="auto">Auto</option>
                                             <option value="h264">H.264 (AVC)</option>
                                             <option value="h265">H.265 (HEVC)</option>
                                             <option value="vp9">VP9</option>
                                         </select>
-                                    </div>
-
-                                    <div className="setting-item">
-                                        <div className="setting-info">
-                                            <label>Qualidade padrão</label>
-                                            <p>Qualidade preferencial de reprodução</p>
-                                        </div>
-                                        <select className="setting-select">
-                                            <option>Auto</option>
-                                            <option>1080p (Full HD)</option>
-                                            <option>720p (HD)</option>
-                                            <option>480p (SD)</option>
-                                        </select>
+                                        {saveAnimation === 'videoCodec' && <span className="save-indicator">✓ Salvo</span>}
                                     </div>
 
                                     <div className="setting-item">

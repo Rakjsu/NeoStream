@@ -1,5 +1,98 @@
 import { useState, useEffect } from 'react';
 
+interface ChangelogEntry {
+    icon: string;
+    title: string;
+    items: string[];
+}
+
+interface VersionChangelog {
+    [version: string]: ChangelogEntry[];
+}
+
+// Changelogs for each version
+const changelogs: VersionChangelog = {
+    '2.4.7': [
+        {
+            icon: '🎬',
+            title: 'Correções do Player',
+            items: [
+                'Corrigido player reinicializando múltiplas vezes',
+                'Corrigido vídeo "voltando no tempo" ao retomar',
+                'Melhorada estabilidade do sistema de resume',
+            ]
+        },
+        {
+            icon: '🧠',
+            title: 'Buffer Inteligente',
+            items: [
+                'Sistema adaptativo baseado na velocidade da conexão',
+                'Menos travamentos em conexões instáveis',
+            ]
+        },
+    ],
+    '2.4.6': [
+        {
+            icon: '🧠',
+            title: 'Buffer Inteligente',
+            items: [
+                'Novo sistema de buffer adaptativo',
+                'Detecta velocidade da conexão automaticamente',
+                'Otimiza reprodução para sua internet',
+            ]
+        },
+    ],
+    '2.4.5': [
+        {
+            icon: '🔄',
+            title: 'Sistema de Atualização',
+            items: [
+                'Corrigido modal de atualização aparecendo em loop',
+                'Melhorada detecção de versão disponível',
+            ]
+        },
+    ],
+    '2.4.4': [
+        {
+            icon: '🔄',
+            title: 'Auto-Update',
+            items: [
+                'Corrigido download de atualizações',
+                'Melhor tratamento de erros de rede',
+            ]
+        },
+    ],
+    'default': [
+        {
+            icon: '🔄',
+            title: 'Sistema de Atualização',
+            items: [
+                'Notificação visual quando há atualizações',
+                'Modal mostrando versão atual vs nova',
+                'Barra de progresso durante download',
+                'Instalação automática opcional',
+            ]
+        },
+        {
+            icon: '📥',
+            title: 'Downloads & Offline',
+            items: [
+                'Baixe filmes e séries para assistir offline',
+                'Nova página de gerenciamento de downloads',
+                'Indicador de espaço utilizado',
+            ]
+        },
+        {
+            icon: '🐛',
+            title: 'Correções',
+            items: [
+                'Corrigido erro 404 durante downloads',
+                'Melhorada compatibilidade com servidores',
+            ]
+        },
+    ],
+};
+
 interface PostUpdateChangelogProps {
     // No props needed, it manages its own state
 }
@@ -27,6 +120,9 @@ export function PostUpdateChangelog({ }: PostUpdateChangelogProps) {
         setIsVisible(false);
     };
 
+    // Get changelog for current version, fallback to default
+    const currentChangelog = changelogs[__APP_VERSION__] || changelogs['default'];
+
     if (!isVisible) return null;
 
     return (
@@ -52,34 +148,18 @@ export function PostUpdateChangelog({ }: PostUpdateChangelogProps) {
 
                 {/* Content */}
                 <div className="changelog-content">
-                    <h4>✨ Novidades nesta versão:</h4>
+                    <h4>✨ Novidades na v{__APP_VERSION__}:</h4>
 
-                    <div className="changelog-section">
-                        <h5>🔄 Sistema de Atualização</h5>
-                        <ul>
-                            <li>Notificação visual quando há atualizações</li>
-                            <li>Modal mostrando versão atual vs nova</li>
-                            <li>Barra de progresso durante download</li>
-                            <li>Instalação automática opcional</li>
-                        </ul>
-                    </div>
-
-                    <div className="changelog-section">
-                        <h5>📥 Downloads & Offline</h5>
-                        <ul>
-                            <li>Baixe filmes e séries para assistir offline</li>
-                            <li>Nova página de gerenciamento de downloads</li>
-                            <li>Indicador de espaço utilizado</li>
-                        </ul>
-                    </div>
-
-                    <div className="changelog-section">
-                        <h5>🐛 Correções</h5>
-                        <ul>
-                            <li>Corrigido erro 404 durante downloads</li>
-                            <li>Melhorada compatibilidade com servidores</li>
-                        </ul>
-                    </div>
+                    {currentChangelog.map((section, index) => (
+                        <div key={index} className="changelog-section">
+                            <h5>{section.icon} {section.title}</h5>
+                            <ul>
+                                {section.items.map((item, itemIndex) => (
+                                    <li key={itemIndex}>{item}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
                 </div>
 
                 {/* Footer */}

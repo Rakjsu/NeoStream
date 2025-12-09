@@ -55,11 +55,48 @@ export function ContentDetailModal({
                     .then(res => res.json())
                     .then(data => {
                         setSeriesInfo(data);
+
                         // Check for existing progress
                         const lastWatched = watchProgressService.getLastWatchedEpisode(contentId);
                         if (lastWatched) {
-                            setSelectedSeason(lastWatched.season);
-                            setSelectedEpisode(lastWatched.episode);
+                            const episodeProgress = watchProgressService.getEpisodeProgress(
+                                contentId,
+                                lastWatched.season,
+                                lastWatched.episode
+                            );
+
+                            // Check if the last watched episode is complete (>90% or completed flag)
+                            const isComplete = episodeProgress && (
+                                episodeProgress.completed ||
+                                (episodeProgress.duration > 0 && episodeProgress.currentTime / episodeProgress.duration > 0.9)
+                            );
+
+                            if (isComplete) {
+                                // Auto-advance to next episode
+                                const seasons = Object.keys(data.episodes || {}).map(Number).sort((a, b) => a - b);
+                                const currentSeasonIndex = seasons.indexOf(lastWatched.season);
+                                const currentSeasonEpisodes = data.episodes?.[lastWatched.season] || [];
+                                const totalEpisodesInSeason = currentSeasonEpisodes.length;
+
+                                if (lastWatched.episode < totalEpisodesInSeason) {
+                                    // Next episode in same season
+                                    setSelectedSeason(lastWatched.season);
+                                    setSelectedEpisode(lastWatched.episode + 1);
+                                } else if (currentSeasonIndex < seasons.length - 1) {
+                                    // First episode of next season
+                                    const nextSeason = seasons[currentSeasonIndex + 1];
+                                    setSelectedSeason(nextSeason);
+                                    setSelectedEpisode(1);
+                                } else {
+                                    // Last episode of last season - stay on it
+                                    setSelectedSeason(lastWatched.season);
+                                    setSelectedEpisode(lastWatched.episode);
+                                }
+                            } else {
+                                // Not complete - select the episode to continue watching
+                                setSelectedSeason(lastWatched.season);
+                                setSelectedEpisode(lastWatched.episode);
+                            }
                         } else {
                             setSelectedSeason(1);
                             setSelectedEpisode(1);
