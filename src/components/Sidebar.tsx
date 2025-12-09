@@ -456,13 +456,32 @@ const sidebarStyles = `
 .logo-svg {
     position: relative;
     z-index: 2;
+    filter: drop-shadow(0 0 8px rgba(var(--theme-primary-rgb, 168, 85, 247), 0.5));
+    transition: filter 0.3s ease;
+}
+
+.logo-wrapper:hover .logo-svg {
+    filter: drop-shadow(0 0 15px rgba(var(--theme-primary-rgb, 168, 85, 247), 0.8))
+            drop-shadow(0 0 30px rgba(var(--theme-primary-rgb, 168, 85, 247), 0.5));
+    animation: logoGlow 2s ease-in-out infinite;
+}
+
+@keyframes logoGlow {
+    0%, 100% { 
+        filter: drop-shadow(0 0 15px rgba(var(--theme-primary-rgb, 168, 85, 247), 0.8))
+                drop-shadow(0 0 30px rgba(var(--theme-primary-rgb, 168, 85, 247), 0.5));
+    }
+    50% { 
+        filter: drop-shadow(0 0 25px rgba(var(--theme-primary-rgb, 168, 85, 247), 1))
+                drop-shadow(0 0 50px rgba(var(--theme-primary-rgb, 168, 85, 247), 0.7));
+    }
 }
 
 .logo-ring {
     position: absolute;
     inset: -8px;
     border-radius: 50%;
-    border: 2px solid rgba(168, 85, 247, 0.3);
+    border: 2px solid rgba(var(--theme-primary-rgb, 168, 85, 247), 0.3);
     opacity: 0;
     transition: all 0.3s ease;
 }
@@ -474,7 +493,7 @@ const sidebarStyles = `
 
 @keyframes ringPulse {
     0%, 100% { transform: scale(1); opacity: 0.5; }
-    50% { transform: scale(1.1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 1; }
 }
 
 /* Animated Bars */

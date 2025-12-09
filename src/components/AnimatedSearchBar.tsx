@@ -164,12 +164,42 @@ export function AnimatedSearchBar({ value, onChange, placeholder = "Buscar..." }
                     animation: pulseGlow 2s ease-in-out infinite;
                 }
                 
+                /* Shimmer effect overlay */
+                .search-btn::before {
+                    content: '';
+                    position: absolute;
+                    inset: 0;
+                    border-radius: 50%;
+                    background: linear-gradient(
+                        90deg,
+                        transparent 0%,
+                        rgba(255, 255, 255, 0.3) 50%,
+                        transparent 100%
+                    );
+                    background-size: 200% 100%;
+                    opacity: 0;
+                    transition: opacity 0.3s ease;
+                }
+                
+                .search-btn:hover::before {
+                    opacity: 1;
+                    animation: shimmerEffect 1.5s ease-in-out infinite;
+                }
+                
+                @keyframes shimmerEffect {
+                    0% { background-position: 200% 0; }
+                    100% { background-position: -200% 0; }
+                }
+                
                 .search-btn-icon {
                     transition: all 0.3s ease;
+                    position: relative;
+                    z-index: 1;
                 }
                 
                 .search-btn:hover .search-btn-icon {
                     animation: iconBounce 0.5s ease;
+                    filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.8));
                 }
                 
                 .clear-icon {
