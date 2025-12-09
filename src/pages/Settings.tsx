@@ -33,29 +33,6 @@ export function Settings() {
     const [showTermsModal, setShowTermsModal] = useState(false);
     const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
-    // Theme color setting
-    const [themeColor, setThemeColor] = useState<'purple' | 'blue' | 'green' | 'red' | 'pink'>(() => {
-        return (localStorage.getItem('neostream_themeColor') as 'purple' | 'blue' | 'green' | 'red' | 'pink') || 'purple';
-    });
-
-    // Apply theme color globally
-    useEffect(() => {
-        const colors = {
-            purple: { primary: '#a855f7', secondary: '#7c3aed', gradient: 'linear-gradient(135deg, #a855f7, #7c3aed)', primaryRgb: '168, 85, 247', secondaryRgb: '124, 58, 237' },
-            blue: { primary: '#3b82f6', secondary: '#2563eb', gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)', primaryRgb: '59, 130, 246', secondaryRgb: '37, 99, 235' },
-            green: { primary: '#10b981', secondary: '#059669', gradient: 'linear-gradient(135deg, #10b981, #059669)', primaryRgb: '16, 185, 129', secondaryRgb: '5, 150, 105' },
-            red: { primary: '#ef4444', secondary: '#dc2626', gradient: 'linear-gradient(135deg, #ef4444, #dc2626)', primaryRgb: '239, 68, 68', secondaryRgb: '220, 38, 38' },
-            pink: { primary: '#ec4899', secondary: '#db2777', gradient: 'linear-gradient(135deg, #ec4899, #db2777)', primaryRgb: '236, 72, 153', secondaryRgb: '219, 39, 119' }
-        };
-        const color = colors[themeColor];
-        document.documentElement.style.setProperty('--theme-primary', color.primary);
-        document.documentElement.style.setProperty('--theme-secondary', color.secondary);
-        document.documentElement.style.setProperty('--theme-gradient', color.gradient);
-        document.documentElement.style.setProperty('--theme-primary-rgb', color.primaryRgb);
-        document.documentElement.style.setProperty('--theme-secondary-rgb', color.secondaryRgb);
-        localStorage.setItem('neostream_themeColor', themeColor);
-    }, [themeColor]);
-
     useEffect(() => {
         loadUpdateConfig();
         updateBufferInfo();
@@ -338,24 +315,6 @@ export function Settings() {
                                 </div>
 
                                 <div className="settings-group">
-
-                                    <div className="setting-item">
-                                        <div className="setting-info">
-                                            <label>Cor do Tema</label>
-                                            <p>Escolha a cor principal do aplicativo</p>
-                                        </div>
-                                        <select
-                                            className="setting-select"
-                                            value={themeColor}
-                                            onChange={(e) => setThemeColor(e.target.value as 'purple' | 'blue' | 'green' | 'red' | 'pink')}
-                                        >
-                                            <option value="purple">💜 Roxo</option>
-                                            <option value="blue">💙 Azul</option>
-                                            <option value="green">💚 Verde</option>
-                                            <option value="red">❤️ Vermelho</option>
-                                            <option value="pink">💗 Rosa</option>
-                                        </select>
-                                    </div>
 
                                     <div className="setting-item">
                                         <div className="setting-info">

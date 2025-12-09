@@ -138,8 +138,8 @@ export function Sidebar() {
                         <svg className="logo-svg" width="44" height="44" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                             <defs>
                                 <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                    <stop offset="0%" stopColor="var(--theme-primary, #a855f7)" />
-                                    <stop offset="100%" stopColor="var(--theme-secondary, #7c3aed)" />
+                                    <stop offset="0%" stopColor="#a855f7" />
+                                    <stop offset="100%" stopColor="#ec4899" />
                                 </linearGradient>
                             </defs>
                             <path d="M 10,10 L 10,90 L 90,50 Z" fill="none" stroke="url(#logoGradient)" strokeWidth="6" strokeLinejoin="round" />
@@ -222,8 +222,8 @@ export function Sidebar() {
                                 <svg width="26" height="26" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                                     <defs>
                                         <linearGradient id="profileGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stopColor="var(--theme-primary, #a855f7)" />
-                                            <stop offset="100%" stopColor="var(--theme-secondary, #7c3aed)" />
+                                            <stop offset="0%" stopColor="#a855f7" />
+                                            <stop offset="100%" stopColor="#ec4899" />
                                         </linearGradient>
                                     </defs>
                                     <circle cx="50" cy="35" r="14" fill="none" stroke="url(#profileGrad)" strokeWidth="6" />
@@ -456,24 +456,24 @@ const sidebarStyles = `
 .logo-svg {
     position: relative;
     z-index: 2;
-    filter: drop-shadow(0 0 8px rgba(var(--theme-primary-rgb, 168, 85, 247), 0.5));
+    filter: drop-shadow(0 0 8px rgba(168, 85, 247, 0.5));
     transition: filter 0.3s ease;
 }
 
 .logo-wrapper:hover .logo-svg {
-    filter: drop-shadow(0 0 15px rgba(var(--theme-primary-rgb, 168, 85, 247), 0.8))
-            drop-shadow(0 0 30px rgba(var(--theme-primary-rgb, 168, 85, 247), 0.5));
+    filter: drop-shadow(0 0 15px rgba(168, 85, 247, 0.8))
+            drop-shadow(0 0 30px rgba(168, 85, 247, 0.5));
     animation: logoGlow 2s ease-in-out infinite;
 }
 
 @keyframes logoGlow {
     0%, 100% { 
-        filter: drop-shadow(0 0 15px rgba(var(--theme-primary-rgb, 168, 85, 247), 0.8))
-                drop-shadow(0 0 30px rgba(var(--theme-primary-rgb, 168, 85, 247), 0.5));
+        filter: drop-shadow(0 0 15px rgba(168, 85, 247, 0.8))
+                drop-shadow(0 0 30px rgba(168, 85, 247, 0.5));
     }
     50% { 
-        filter: drop-shadow(0 0 25px rgba(var(--theme-primary-rgb, 168, 85, 247), 1))
-                drop-shadow(0 0 50px rgba(var(--theme-primary-rgb, 168, 85, 247), 0.7));
+        filter: drop-shadow(0 0 25px rgba(168, 85, 247, 1))
+                drop-shadow(0 0 50px rgba(168, 85, 247, 0.7));
     }
 }
 
@@ -481,7 +481,7 @@ const sidebarStyles = `
     position: absolute;
     inset: -8px;
     border-radius: 50%;
-    border: 2px solid rgba(var(--theme-primary-rgb, 168, 85, 247), 0.3);
+    border: 2px solid rgba(168, 85, 247, 0.3);
     opacity: 0;
     transition: all 0.3s ease;
 }
@@ -689,7 +689,7 @@ const sidebarStyles = `
     position: absolute;
     inset: -3px;
     border-radius: 50%;
-    background: var(--theme-gradient, linear-gradient(135deg, #a855f7, #7c3aed));
+    background: linear-gradient(135deg, #a855f7, #ec4899);
     opacity: 0.8;
     transition: all 0.3s ease;
 }

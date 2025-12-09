@@ -353,7 +353,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                     inset: 0;
                     border-radius: 14px;
                     padding: 2px;
-                    background: var(--theme-gradient, linear-gradient(135deg, #a855f7, #7c3aed));
+                    background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899, #6366f1);
                     background-size: 300% 300%;
                     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
                     mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -370,7 +370,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                 
                 .category-item:hover {
                     transform: translateX(8px) scale(1.02);
-                    background: rgba(var(--theme-primary-rgb, 168, 85, 247), 0.1) !important;
+                    background: rgba(99, 102, 241, 0.1) !important;
                 }
                 
                 .category-item.selected {
@@ -388,14 +388,14 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                 }
                 
                 .category-scroll::-webkit-scrollbar-thumb {
-                    background: var(--theme-gradient, linear-gradient(180deg, #a855f7, #7c3aed));
+                    background: linear-gradient(180deg, #6366f1, #a855f7);
                     border-radius: 4px;
                     border: 2px solid transparent;
                     background-clip: content-box;
                 }
                 
                 .category-scroll::-webkit-scrollbar-thumb:hover {
-                    background: var(--theme-gradient, linear-gradient(180deg, #a855f7, #7c3aed));
+                    background: linear-gradient(180deg, #818cf8, #c084fc);
                     background-clip: content-box;
                 }
                 
@@ -406,7 +406,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                 
                 .toggle-btn:hover {
                     transform: scale(1.15);
-                    filter: drop-shadow(0 0 12px rgba(var(--theme-primary-rgb, 168, 85, 247), 0.6));
+                    filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.6));
                 }
                 
                 .toggle-btn:active {
@@ -426,7 +426,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                     width: '48px',
                     height: '48px',
                     background: isOpen
-                        ? 'linear-gradient(135deg, rgba(var(--theme-primary-rgb, 168, 85, 247), 0.3) 0%, rgba(var(--theme-secondary-rgb, 124, 58, 237), 0.3) 100%)'
+                        ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(168, 85, 247, 0.3) 100%)'
                         : 'transparent',
                     border: 'none',
                     borderRadius: '12px',
@@ -444,7 +444,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                     style={{
                         width: '22px',
                         height: '2.5px',
-                        background: 'var(--theme-gradient, linear-gradient(90deg, #a855f7, #7c3aed))',
+                        background: 'linear-gradient(90deg, #6366f1, #a855f7)',
                         borderRadius: '2px',
                         display: 'block'
                     }}
@@ -454,7 +454,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                     style={{
                         width: '22px',
                         height: '2.5px',
-                        background: 'var(--theme-gradient, linear-gradient(90deg, #a855f7, #7c3aed))',
+                        background: 'linear-gradient(90deg, #a855f7, #ec4899)',
                         borderRadius: '2px',
                         display: 'block'
                     }}
@@ -464,7 +464,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                     style={{
                         width: '22px',
                         height: '2.5px',
-                        background: 'var(--theme-gradient, linear-gradient(90deg, #a855f7, #7c3aed))',
+                        background: 'linear-gradient(90deg, #ec4899, #6366f1)',
                         borderRadius: '2px',
                         display: 'block'
                     }}
