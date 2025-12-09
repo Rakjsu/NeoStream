@@ -313,24 +313,6 @@ export function Settings() {
 
                                     <div className="setting-item">
                                         <div className="setting-info">
-                                            <label>Codificador de Áudio</label>
-                                            <p>Codec de áudio preferencial</p>
-                                        </div>
-                                        <select
-                                            className="setting-select"
-                                            value={playbackConfig.audioCodec}
-                                            onChange={(e) => handlePlaybackConfigChange('audioCodec', e.target.value as PlaybackConfig['audioCodec'])}
-                                        >
-                                            <option value="auto">Auto</option>
-                                            <option value="aac">AAC</option>
-                                            <option value="ac3">AC3 (Dolby Digital)</option>
-                                            <option value="eac3">EAC3 (Dolby Digital Plus)</option>
-                                        </select>
-                                        {saveAnimation === 'audioCodec' && <span className="save-indicator">✓ Salvo</span>}
-                                    </div>
-
-                                    <div className="setting-item">
-                                        <div className="setting-info">
                                             <label>Codificador de Vídeo</label>
                                             <p>Codec de vídeo preferencial</p>
                                         </div>
@@ -353,20 +335,14 @@ export function Settings() {
                                             <p>Reproduzir automaticamente o próximo episódio</p>
                                         </div>
                                         <label className="toggle-switch">
-                                            <input type="checkbox" defaultChecked />
+                                            <input
+                                                type="checkbox"
+                                                checked={playbackConfig.autoPlayNextEpisode}
+                                                onChange={(e) => handlePlaybackConfigChange('autoPlayNextEpisode', e.target.checked)}
+                                            />
                                             <span className="toggle-slider"></span>
                                         </label>
-                                    </div>
-
-                                    <div className="setting-item">
-                                        <div className="setting-info">
-                                            <label>Legendas</label>
-                                            <p>Ativar legendas por padrão</p>
-                                        </div>
-                                        <label className="toggle-switch">
-                                            <input type="checkbox" />
-                                            <span className="toggle-slider"></span>
-                                        </label>
+                                        {saveAnimation === 'autoPlayNextEpisode' && <span className="save-indicator">✓ Salvo</span>}
                                     </div>
 
                                     <div className="setting-item">

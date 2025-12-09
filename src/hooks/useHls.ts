@@ -66,8 +66,43 @@ export function useHls({ src, videoRef }: UseHlsOptions) {
             hls.loadSource(src);
             hls.attachMedia(video);
 
-            hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                console.log('✅ HLS manifest loaded');
+            hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+                console.log('✅ HLS manifest loaded with', data.levels.length, 'quality levels');
+
+                // Apply video codec preference if set
+                if (config.videoCodec !== 'auto' && data.levels.length > 1) {
+                    const preferredCodec = config.videoCodec;
+                    console.log(`🎬 Looking for ${preferredCodec} video codec`);
+
+                    // Map codec setting to actual codec identifiers
+                    const codecMap: { [key: string]: string[] } = {
+                        'h264': ['avc1', 'avc', 'h264'],
+                        'h265': ['hev1', 'hvc1', 'hevc', 'h265'],
+                        'vp9': ['vp09', 'vp9']
+                    };
+
+                    const targetCodecs = codecMap[preferredCodec] || [];
+
+                    // Find levels matching the preferred codec
+                    const matchingLevelIndices: number[] = [];
+                    data.levels.forEach((level, index) => {
+                        const levelCodecs = (level.codecSet || level.videoCodec || '').toLowerCase();
+                        if (targetCodecs.some(c => levelCodecs.includes(c))) {
+                            matchingLevelIndices.push(index);
+                            console.log(`  ✓ Level ${index}: ${level.width}x${level.height} matches ${preferredCodec}`);
+                        }
+                    });
+
+                    if (matchingLevelIndices.length > 0) {
+                        // Restrict HLS to only use matching levels
+                        // Start with highest quality matching level
+                        const bestMatch = matchingLevelIndices[matchingLevelIndices.length - 1];
+                        hls.currentLevel = bestMatch;
+                        console.log(`🔊 Set initial level to ${bestMatch} (${preferredCodec})`);
+                    } else {
+                        console.log(`ℹ️ No ${preferredCodec} levels found, using auto selection`);
+                    }
+                }
             });
 
             hls.on(Hls.Events.ERROR, (_event, data) => {

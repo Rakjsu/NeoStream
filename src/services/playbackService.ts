@@ -8,13 +8,15 @@ export interface PlaybackConfig {
     audioCodec: 'auto' | 'aac' | 'ac3' | 'eac3';
     videoCodec: 'auto' | 'h264' | 'h265' | 'vp9';
     quality: 'auto' | '1080p' | '720p' | '480p';
+    autoPlayNextEpisode: boolean;
 }
 
 const DEFAULT_CONFIG: PlaybackConfig = {
     bufferSize: 'intelligent',
     audioCodec: 'auto',
     videoCodec: 'auto',
-    quality: 'auto'
+    quality: 'auto',
+    autoPlayNextEpisode: true
 };
 
 const STORAGE_KEY = 'playbackConfig';

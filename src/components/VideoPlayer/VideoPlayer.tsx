@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaCompress, FaCog, FaChromecast } from 'react-icons/fa';
+import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaCompress, FaCog, FaChromecast, FaClosedCaptioning } from 'react-icons/fa';
 import { useVideoPlayer } from '../../hooks/useVideoPlayer';
 import { useHls } from '../../hooks/useHls';
 import { useChromecast } from '../../hooks/useChromecast';
@@ -45,6 +45,7 @@ export function VideoPlayer({
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [showDeviceSelector, setShowDeviceSelector] = useState(false);
+    const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     const [hoverPosition, setHoverPosition] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -74,11 +75,29 @@ export function VideoPlayer({
         };
     }, [state.playing, seeking, state.fullscreen]); // Added fullscreen to dependencies
 
+    // Handle auto-play (respects the shouldAutoPlayNextEpisode setting)
     useEffect(() => {
-        if (autoPlay && videoRef.current) {
+        if (!videoRef.current) return;
+
+        // Check if we should auto-play (either autoPlay prop or from episode transition)
+        const shouldAutoPlay = localStorage.getItem('shouldAutoPlayNextEpisode');
+
+        // Clear the flag after reading
+        if (shouldAutoPlay !== null) {
+            localStorage.removeItem('shouldAutoPlayNextEpisode');
+
+            if (shouldAutoPlay === 'true') {
+                console.log('▶️ Auto-playing next episode');
+                videoRef.current.play();
+            } else {
+                console.log('⏸️ Next episode loaded but paused (auto-play disabled)');
+                // Don't play, let user manually start
+            }
+        } else if (autoPlay) {
+            // Normal autoPlay behavior for initial video load
             videoRef.current.play();
         }
-    }, [autoPlay]);
+    }, [autoPlay, src]);
 
     // Resume from saved time
     useEffect(() => {
@@ -124,6 +143,29 @@ export function VideoPlayer({
         videoRef.current.addEventListener('timeupdate', handleTimeUpdate);
         return () => videoRef.current?.removeEventListener('timeupdate', handleTimeUpdate);
     }, [onTimeUpdate]);
+
+    // Go to next episode when video ends
+    useEffect(() => {
+        if (!videoRef.current || !onNextEpisode || !canGoNext) return;
+
+        const video = videoRef.current;
+
+        const handleEnded = async () => {
+            // Check if auto-play is enabled to determine if we should auto-start
+            const { playbackService } = await import('../../services/playbackService');
+            const config = playbackService.getConfig();
+
+            // Always go to next episode, but store the auto-play preference
+            // The next video will check localStorage for shouldAutoPlay
+            localStorage.setItem('shouldAutoPlayNextEpisode', config.autoPlayNextEpisode ? 'true' : 'false');
+
+            console.log(`📺 Video ended, going to next episode (auto-play: ${config.autoPlayNextEpisode})`);
+            onNextEpisode();
+        };
+
+        video.addEventListener('ended', handleEnded);
+        return () => video.removeEventListener('ended', handleEnded);
+    }, [onNextEpisode, canGoNext]);
 
     // Add mousemove listener - works both in and out of fullscreen
     useEffect(() => {
@@ -423,6 +465,27 @@ export function VideoPlayer({
                                 )}
                             </>
                         )}
+
+                        {/* Subtitles toggle */}
+                        <button
+                            className="control-btn"
+                            onClick={() => {
+                                setSubtitlesEnabled(!subtitlesEnabled);
+                                // Toggle text tracks if available
+                                const video = videoRef.current;
+                                if (video && video.textTracks.length > 0) {
+                                    for (let i = 0; i < video.textTracks.length; i++) {
+                                        video.textTracks[i].mode = !subtitlesEnabled ? 'showing' : 'hidden';
+                                    }
+                                }
+                            }}
+                            title={subtitlesEnabled ? "Desativar Legendas" : "Ativar Legendas"}
+                            style={{
+                                color: subtitlesEnabled ? '#10b981' : 'white'
+                            }}
+                        >
+                            <FaClosedCaptioning />
+                        </button>
 
                         <button
                             className="control-btn"
