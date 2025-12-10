@@ -84,10 +84,11 @@ export function setupDownloadHandlers() {
                     port: parsedUrl.port || (url.startsWith('https') ? 443 : 80),
                     path: parsedUrl.pathname + parsedUrl.search,
                     method: 'GET',
+                    timeout: 60000, // 60s timeout - prevents hanging
                     headers: {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                         'Accept': '*/*',
-                        'Accept-Encoding': 'identity',
+                        'Accept-Encoding': 'identity', // No compression for max speed
                         'Connection': 'keep-alive',
                         'Referer': `${parsedUrl.protocol}//${parsedUrl.hostname}/`
                     }
@@ -142,7 +143,9 @@ export function setupDownloadHandlers() {
                     console.log('[Download] Starting file write, totalBytes:', totalBytes);
                     let downloadedBytes = 0;
 
-                    const writeStream = fs.createWriteStream(filePath);
+                    const writeStream = fs.createWriteStream(filePath, {
+                        highWaterMark: 64 * 1024 // 64KB buffer for faster writes
+                    });
 
                     const download: ActiveDownload = {
                         id,
