@@ -238,7 +238,7 @@ export function Downloads() {
 
                 {/* Content */}
                 <div className="downloads-content">
-                    {filteredDownloads.length === 0 ? (
+                    {filteredDownloads.length === 0 && groupedData.series.length === 0 ? (
                         <div className="empty-state">
                             <div className="empty-icon">📥</div>
                             <h3>Nenhum download</h3>
