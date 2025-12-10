@@ -41,6 +41,7 @@ export function ContentDetailModal({
     const [, setRefresh] = useState(0); // Force re-render for button states
     const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'completed'>('idle');
     const [downloadProgress, setDownloadProgress] = useState(0);
+    const [showDownloadModal, setShowDownloadModal] = useState(false);
     const modalRef = useRef<HTMLDivElement>(null);
 
     // Fetch series info for episodes
@@ -142,6 +143,52 @@ export function ContentDetailModal({
     const handleBackdropClick = (e: React.MouseEvent) => {
         if (e.target === modalRef.current) {
             onClose();
+        }
+    };
+
+    // Download a single episode
+    const downloadSingleEpisode = async (seasonNum: number, episodeNum: number) => {
+        const episodeData = seriesInfo?.episodes?.[seasonNum]?.find(
+            (ep: any) => Number(ep.episode_num) === episodeNum
+        );
+        if (!episodeData) return;
+
+        setDownloadStatus('downloading');
+        setShowDownloadModal(false);
+
+        try {
+            const result = await window.ipcRenderer.invoke('streams:get-series-url', {
+                streamId: episodeData.id,
+                container: episodeData.container_extension || 'mp4'
+            });
+
+            if (result?.success) {
+                const download = await downloadService.addDownload(
+                    contentData.name,
+                    'episode',
+                    result.url,
+                    contentData.cover,
+                    {
+                        seriesName: contentData.name,
+                        season: seasonNum,
+                        episode: episodeNum
+                    }
+                );
+
+                const handleProgress = (item: any) => {
+                    if (item.id === download.id) {
+                        setDownloadProgress(item.progress);
+                        if (item.status === 'completed') {
+                            setDownloadStatus('completed');
+                        }
+                    }
+                };
+                downloadService.on('progress', handleProgress);
+                downloadService.on('completed', handleProgress);
+            }
+        } catch (err) {
+            console.error('Download error:', err);
+            setDownloadStatus('idle');
         }
     };
 
@@ -607,6 +654,13 @@ export function ContentDetailModal({
                                 if (downloadStatus === 'completed') return;
                                 if (downloadStatus === 'downloading') return;
 
+                                // For series, open the selection modal
+                                if (contentType === 'series') {
+                                    setShowDownloadModal(true);
+                                    return;
+                                }
+
+                                // For movies, download directly
                                 setDownloadStatus('downloading');
                                 try {
                                     let result;
@@ -738,6 +792,80 @@ export function ContentDetailModal({
                     </div>
                 </div>
             </div>
+
+            {/* Download Selection Modal */}
+            {showDownloadModal && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0, 0, 0, 0.8)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 10001
+                    }}
+                    onClick={() => setShowDownloadModal(false)}
+                >
+                    <div
+                        style={{
+                            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                            borderRadius: 20,
+                            padding: 32,
+                            maxWidth: 400,
+                            textAlign: 'center',
+                            border: '1px solid rgba(168, 85, 247, 0.3)'
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <h3 style={{ color: 'white', marginBottom: 16, fontSize: 20 }}>
+                            📥 O que deseja baixar?
+                        </h3>
+                        <p style={{ color: 'rgba(255,255,255,0.7)', marginBottom: 24, fontSize: 14 }}>
+                            Temporada {selectedSeason} - Episódio {selectedEpisode}
+                        </p>
+
+                        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                            <button
+                                onClick={() => {
+                                    downloadSingleEpisode(selectedSeason, selectedEpisode);
+                                }}
+                                style={{
+                                    padding: '14px 24px',
+                                    borderRadius: 12,
+                                    border: 'none',
+                                    background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                                    color: 'white',
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8
+                                }}
+                            >
+                                📺 Episódio {selectedEpisode}
+                            </button>
+
+                            <button
+                                onClick={() => setShowDownloadModal(false)}
+                                style={{
+                                    padding: '14px 24px',
+                                    borderRadius: 12,
+                                    border: '2px solid rgba(255,255,255,0.2)',
+                                    background: 'transparent',
+                                    color: 'white',
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
