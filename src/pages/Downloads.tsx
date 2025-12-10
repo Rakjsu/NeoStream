@@ -348,6 +348,22 @@ export function Downloads() {
                                             alt={series.seriesName}
                                         />
                                         <div className="type-badge">📺</div>
+                                        {/* Delete button */}
+                                        <button
+                                            className="delete-btn-corner"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                // Delete all episodes from this series
+                                                series.seasons.forEach(s => {
+                                                    s.episodes.forEach(ep => {
+                                                        downloadService.deleteDownload(ep.id);
+                                                    });
+                                                });
+                                            }}
+                                            title="Remover série"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
                                         <div className="status-badge completed">✓ Baixado</div>
                                         <div className="card-overlay">
                                             <button className="play-btn-center">
