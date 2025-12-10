@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Download, Trash2, Play, FolderOpen, HardDrive, Film, Tv } from 'lucide-react';
+import { Download, Trash2, Play, FolderOpen, HardDrive, Film, Tv, AlertTriangle, X } from 'lucide-react';
 import { downloadService } from '../services/downloadService';
 import type { DownloadItem, StorageInfo } from '../services/downloadService';
 
@@ -11,6 +11,12 @@ export function Downloads() {
         total: 100 * 1024 * 1024 * 1024,
         available: 100 * 1024 * 1024 * 1024,
         downloadsPath: ''
+    });
+
+    // Delete confirmation modal state
+    const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; item: DownloadItem | null }>({
+        isOpen: false,
+        item: null
     });
 
     const loadData = useCallback(async () => {
@@ -39,10 +45,19 @@ export function Downloads() {
         };
     }, [loadData]);
 
-    const handleDelete = async (id: string) => {
-        if (confirm('Tem certeza que deseja remover este download?')) {
-            await downloadService.deleteDownload(id);
+    const handleDeleteClick = (item: DownloadItem) => {
+        setDeleteModal({ isOpen: true, item });
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (deleteModal.item) {
+            await downloadService.deleteDownload(deleteModal.item.id);
         }
+        setDeleteModal({ isOpen: false, item: null });
+    };
+
+    const handleDeleteCancel = () => {
+        setDeleteModal({ isOpen: false, item: null });
     };
 
     const handleOpenFolder = async () => {
@@ -65,6 +80,38 @@ export function Downloads() {
             <style>{downloadsStyles}</style>
             <div className="downloads-page">
                 <div className="downloads-backdrop" />
+
+                {/* Delete Confirmation Modal */}
+                {deleteModal.isOpen && deleteModal.item && (
+                    <>
+                        <div className="delete-modal-overlay" onClick={handleDeleteCancel} />
+                        <div className="delete-modal">
+                            <button className="delete-modal-close" onClick={handleDeleteCancel}>
+                                <X size={20} />
+                            </button>
+                            <div className="delete-modal-icon">
+                                <AlertTriangle size={48} />
+                            </div>
+                            <h3>Remover Download?</h3>
+                            <p>
+                                Tem certeza que deseja remover <strong>"{deleteModal.item.name}"</strong>?
+                                O arquivo será excluído permanentemente.
+                            </p>
+                            <div className="delete-modal-size">
+                                📦 {downloadService.formatBytes(deleteModal.item.size)}
+                            </div>
+                            <div className="delete-modal-buttons">
+                                <button className="cancel-btn" onClick={handleDeleteCancel}>
+                                    Cancelar
+                                </button>
+                                <button className="confirm-btn" onClick={handleDeleteConfirm}>
+                                    <Trash2 size={18} />
+                                    Remover
+                                </button>
+                            </div>
+                        </div>
+                    </>
+                )}
 
                 {/* Header */}
                 <header className="downloads-header">
@@ -162,7 +209,7 @@ export function Downloads() {
                                             <span>{item.status === 'completed' ? '✓ Concluído' : `${item.progress}%`}</span>
                                         </div>
                                     </div>
-                                    <button className="delete-btn" title="Remover download" onClick={() => handleDelete(item.id)}>
+                                    <button className="delete-btn" title="Remover download" onClick={() => handleDeleteClick(item)}>
                                         <Trash2 size={18} />
                                     </button>
                                 </div>
@@ -522,5 +569,152 @@ const downloadsStyles = `
 .delete-btn:hover {
     background: rgba(239, 68, 68, 0.2);
     border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* Delete Confirmation Modal */
+.delete-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
+}
+
+.delete-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 420px;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 20px;
+    padding: 32px;
+    z-index: 1001;
+    text-align: center;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5), 0 0 60px rgba(239, 68, 68, 0.1);
+    animation: modalSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes modalSlideIn {
+    from { opacity: 0; transform: translate(-50%, -40%); }
+    to { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+.delete-modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.delete-modal-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+}
+
+.delete-modal-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 20px;
+    background: rgba(239, 68, 68, 0.15);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ef4444;
+    animation: iconPulse 0.5s ease;
+}
+
+@keyframes iconPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+.delete-modal h3 {
+    font-size: 22px;
+    font-weight: 700;
+    color: white;
+    margin: 0 0 12px 0;
+}
+
+.delete-modal p {
+    font-size: 15px;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0 0 16px 0;
+    line-height: 1.5;
+}
+
+.delete-modal p strong {
+    color: #ef4444;
+}
+
+.delete-modal-size {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 14px;
+    margin-bottom: 24px;
+}
+
+.delete-modal-buttons {
+    display: flex;
+    gap: 12px;
+}
+
+.delete-modal-buttons .cancel-btn {
+    flex: 1;
+    padding: 14px 24px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.delete-modal-buttons .cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.delete-modal-buttons .confirm-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 24px;
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3);
+}
+
+.delete-modal-buttons .confirm-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(239, 68, 68, 0.4);
 }
 `;
