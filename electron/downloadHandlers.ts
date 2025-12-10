@@ -1,4 +1,4 @@
-import { ipcMain, app, BrowserWindow, shell } from 'electron'
+import { ipcMain, app, BrowserWindow, shell, Notification } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import https from 'https'
@@ -58,6 +58,22 @@ function getFolderSize(folderPath: string): number {
         // Folder doesn't exist
     }
     return totalSize;
+}
+
+// Show native Windows notification when download completes
+function showDownloadNotification(name: string, filePath: string): void {
+    if (Notification.isSupported()) {
+        const notification = new Notification({
+            title: 'Download Concluído! ✓',
+            body: `"${name}" foi baixado com sucesso.`,
+            icon: undefined,
+            silent: false
+        });
+        notification.on('click', () => {
+            shell.showItemInFolder(filePath);
+        });
+        notification.show();
+    }
 }
 
 // Download a single chunk with Range header
@@ -303,6 +319,10 @@ export function setupDownloadHandlers() {
             });
 
             console.log('[Download] Complete:', filePath);
+
+            // Show native notification
+            showDownloadNotification(name, filePath);
+
             return { success: true, filePath, size: totalBytes };
 
         } catch (error: any) {
