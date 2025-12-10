@@ -61,6 +61,20 @@ export function useHls({ src, videoRef }: UseHlsOptions) {
                 maxBufferLength: bufferSeconds,
                 maxMaxBufferLength: bufferSeconds * 20,
                 maxBufferHole: 0.5,
+                // Network/Bandwidth settings - remove limitations
+                abrEwmaDefaultEstimate: 5000000, // Start assuming 5Mbps (higher = better quality initially)
+                abrEwmaFastLive: 3, // Fast adaptation for live
+                abrEwmaSlowLive: 9,
+                abrEwmaFastVoD: 3,
+                abrEwmaSlowVoD: 9,
+                abrBandWidthFactor: 0.95, // Use 95% of estimated bandwidth (was implicit 0.8)
+                abrBandWidthUpFactor: 0.7, // Be more aggressive switching to higher quality
+                startLevel: -1, // Auto-select best quality based on bandwidth
+                // Loader settings - faster network usage
+                fragLoadingTimeOut: 20000, // 20s timeout for fragments
+                fragLoadingMaxRetry: 6,
+                manifestLoadingTimeOut: 10000,
+                levelLoadingTimeOut: 10000,
             });
 
             hls.loadSource(src);
