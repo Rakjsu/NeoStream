@@ -348,9 +348,7 @@ export function Downloads() {
                                             alt={series.seriesName}
                                         />
                                         <div className="type-badge">📺</div>
-                                        <div className="status-badge completed">
-                                            {series.seasons.reduce((acc, s) => acc + s.episodes.filter(e => e.status === 'completed').length, 0)} eps
-                                        </div>
+                                        <div className="status-badge completed">✓ Baixado</div>
                                         <div className="card-overlay">
                                             <button className="play-btn-center">
                                                 <Play size={28} fill="white" />

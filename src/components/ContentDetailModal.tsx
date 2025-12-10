@@ -157,6 +157,12 @@ export function ContentDetailModal({
 
     // Download a single episode
     const downloadSingleEpisode = async (seasonNum: number, episodeNum: number) => {
+        // Check if episode is already in queue
+        if (downloadService.isEpisodeInQueue(contentData.name, seasonNum, episodeNum)) {
+            setShowDownloadModal(false);
+            return; // Already downloading or downloaded
+        }
+
         const episodeData = seriesInfo?.episodes?.[seasonNum]?.find(
             (ep: any) => Number(ep.episode_num) === episodeNum
         );

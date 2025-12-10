@@ -246,16 +246,34 @@ function singleDownload(id: string, url: string, filePath: string): Promise<{ su
 
 export function setupDownloadHandlers() {
     // Start download with parallel connections
-    ipcMain.handle('download:start', async (event, { id, url, name, type }) => {
-        console.log('[Download] Starting parallel download:', { id, name, type });
+    ipcMain.handle('download:start', async (event, { id, url, name, type, seriesName, season, episode }) => {
+        console.log('[Download] Starting parallel download:', { id, name, type, seriesName, season, episode });
         try {
             const downloadsPath = getDownloadsPath();
-            const fileName = sanitizeFilename(`${name}.mp4`);
-            const filePath = path.join(downloadsPath, type, fileName);
+            let filePath: string;
 
-            const typeDir = path.join(downloadsPath, type);
-            if (!fs.existsSync(typeDir)) {
-                fs.mkdirSync(typeDir, { recursive: true });
+            if (type === 'episode' && seriesName && season !== undefined && episode !== undefined) {
+                // Organize: Series/SeriesName/Temporada X/EpY.mp4
+                const seriesDir = path.join(downloadsPath, 'series', sanitizeFilename(seriesName));
+                const seasonDir = path.join(seriesDir, `Temporada ${season}`);
+                if (!fs.existsSync(seasonDir)) {
+                    fs.mkdirSync(seasonDir, { recursive: true });
+                }
+                filePath = path.join(seasonDir, `Ep${episode}.mp4`);
+            } else if (type === 'movie') {
+                // Movies go in movies folder
+                const movieDir = path.join(downloadsPath, 'movies');
+                if (!fs.existsSync(movieDir)) {
+                    fs.mkdirSync(movieDir, { recursive: true });
+                }
+                filePath = path.join(movieDir, sanitizeFilename(`${name}.mp4`));
+            } else {
+                // Fallback
+                const typeDir = path.join(downloadsPath, type);
+                if (!fs.existsSync(typeDir)) {
+                    fs.mkdirSync(typeDir, { recursive: true });
+                }
+                filePath = path.join(typeDir, sanitizeFilename(`${name}.mp4`));
             }
 
             // Get file size first

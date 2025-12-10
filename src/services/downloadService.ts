@@ -253,7 +253,10 @@ class DownloadService {
                 id: item.id,
                 url: item.url,
                 name: item.name,
-                type: item.type
+                type: item.type,
+                seriesName: item.seriesName,
+                season: item.season,
+                episode: item.episode
             }).then((result: any) => {
                 if (result.success) {
                     item.filePath = result.filePath;
@@ -373,6 +376,17 @@ class DownloadService {
     isDownloaded(name: string, type: string): boolean {
         return Array.from(this.downloads.values()).some(
             item => item.name === name && item.type === type && item.status === 'completed'
+        );
+    }
+
+    // Check if episode is already in queue (downloading, pending, or completed)
+    isEpisodeInQueue(seriesName: string, season: number, episode: number): boolean {
+        return Array.from(this.downloads.values()).some(
+            item => item.type === 'episode' &&
+                item.seriesName === seriesName &&
+                item.season === season &&
+                item.episode === episode &&
+                (item.status === 'pending' || item.status === 'downloading' || item.status === 'completed')
         );
     }
 
