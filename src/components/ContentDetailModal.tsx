@@ -628,7 +628,8 @@ export function ContentDetailModal({
                                                 streamId: episodeData.id,
                                                 container: episodeData.container_extension || 'mp4'
                                             });
-                                            downloadName = `${contentData.name} - T${selectedSeason}E${selectedEpisode}`;
+                                            // Use only the series name for display, store season/episode in seriesInfo
+                                            downloadName = contentData.name;
                                             downloadType = 'episode';
                                             seriesInfo = {
                                                 seriesName: contentData.name,
