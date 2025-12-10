@@ -185,42 +185,60 @@ export function Downloads() {
                         <div className="downloads-grid">
                             {filteredDownloads.map((item) => (
                                 <div key={item.id} className="download-card">
-                                    <div className="download-cover">
-                                        <img src={item.cover} alt={item.name} />
-                                        <div className="download-overlay">
-                                            <button className="play-btn">
-                                                <Play size={24} fill="white" />
-                                            </button>
-                                        </div>
-                                        <div className="download-type">
-                                            {item.type === 'movie' ? '🎬' : '📺'}
-                                        </div>
-                                    </div>
-                                    <div className="download-info">
-                                        <h4>{item.name}</h4>
-                                        {item.seriesName && (
-                                            <p className="series-info">
-                                                {item.seriesName} • S{item.season}E{item.episode}
-                                            </p>
-                                        )}
-                                        <div className="download-meta">
-                                            <span>{downloadService.formatBytes(item.size)}</span>
-                                            <span>•</span>
-                                            <span>{item.status === 'completed' ? '✓ Concluído' : `${item.progress}%`}</span>
-                                        </div>
-                                        {/* Progress Bar for downloading items */}
+                                    {/* Cover/Poster */}
+                                    <div className="card-poster">
+                                        <img
+                                            src={item.localCover || item.cover}
+                                            alt={item.name}
+                                            onError={(e) => {
+                                                const target = e.target as HTMLImageElement;
+                                                target.src = item.cover;
+                                            }}
+                                        />
+                                        {/* Progress bar on poster */}
                                         {item.status !== 'completed' && item.progress > 0 && (
-                                            <div className="download-progress-bar">
+                                            <div className="poster-progress">
                                                 <div
-                                                    className="download-progress-fill"
+                                                    className="poster-progress-fill"
                                                     style={{ width: `${item.progress}%` }}
                                                 />
                                             </div>
                                         )}
+                                        {/* Type badge */}
+                                        <div className="type-badge">
+                                            {item.type === 'movie' ? '🎬' : '📺'}
+                                        </div>
+                                        {/* Status badge */}
+                                        {item.status === 'completed' && (
+                                            <div className="status-badge completed">✓</div>
+                                        )}
+                                        {item.status === 'downloading' && (
+                                            <div className="status-badge downloading">{item.progress}%</div>
+                                        )}
+                                        {/* Hover overlay */}
+                                        <div className="card-overlay">
+                                            <button className="play-btn-large">
+                                                <Play size={32} fill="white" />
+                                            </button>
+                                            <button
+                                                className="delete-btn-overlay"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteClick(item);
+                                                }}
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
                                     </div>
-                                    <button className="delete-btn" title="Remover download" onClick={() => handleDeleteClick(item)}>
-                                        <Trash2 size={18} />
-                                    </button>
+                                    {/* Info */}
+                                    <div className="card-info">
+                                        <h4 className="card-title">{item.name}</h4>
+                                        {item.seriesName && (
+                                            <p className="card-series">S{item.season}E{item.episode}</p>
+                                        )}
+                                        <p className="card-size">{downloadService.formatBytes(item.size)}</p>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -451,62 +469,167 @@ const downloadsStyles = `
     font-size: 14px;
 }
 
-/* Downloads Grid */
+/* Downloads Grid - Same style as VOD/Series */
 .downloads-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 24px;
+    padding-bottom: 32px;
 }
 
+@media (max-width: 768px) {
+    .downloads-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 16px;
+    }
+}
+
+/* Download Card - Vertical style like VOD */
 .download-card {
-    display: flex;
-    gap: 16px;
-    padding: 16px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    position: relative;
     border-radius: 16px;
-    transition: all 0.2s;
-    animation: fadeIn 0.4s ease backwards;
+    overflow: hidden;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid transparent;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    animation: cardSlideIn 0.5s ease backwards;
+}
+
+@keyframes cardSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 .download-card:hover {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-8px) scale(1.03);
+    border-color: rgba(6, 182, 212, 0.4);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4),
+                0 0 40px rgba(6, 182, 212, 0.15);
 }
 
-.download-cover {
+/* Card Poster */
+.card-poster {
     position: relative;
-    width: 80px;
-    height: 120px;
-    border-radius: 10px;
+    aspect-ratio: 2 / 3;
     overflow: hidden;
-    flex-shrink: 0;
+    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
 }
 
-.download-cover img {
+.card-poster img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    transition: transform 0.4s ease;
 }
 
-.download-overlay {
+.download-card:hover .card-poster img {
+    transform: scale(1.08);
+}
+
+/* Type Badge */
+.type-badge {
     position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
+    top: 10px;
+    left: 10px;
+    width: 32px;
+    height: 32px;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s;
+    font-size: 16px;
+    z-index: 5;
 }
 
-.download-card:hover .download-overlay {
+/* Status Badge */
+.status-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    z-index: 5;
+}
+
+.status-badge.completed {
+    background: rgba(16, 185, 129, 0.9);
+    color: white;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.status-badge.downloading {
+    background: rgba(6, 182, 212, 0.9);
+    color: white;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+/* Progress on Poster */
+.poster-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 5;
+}
+
+.poster-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #06b6d4, #0891b2);
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.poster-progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: progressShimmer 1.5s infinite;
+}
+
+/* Card Overlay */
+.card-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0,0,0,0.3) 50%, transparent 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.download-card:hover .card-overlay {
     opacity: 1;
 }
 
-.play-btn {
-    width: 44px;
-    height: 44px;
+/* Play Button Large */
+.play-btn-large {
+    width: 64px;
+    height: 64px;
     border-radius: 50%;
     background: linear-gradient(135deg, #06b6d4, #0891b2);
     border: none;
@@ -514,70 +637,81 @@ const downloadsStyles = `
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: transform 0.2s;
+    transform: scale(0);
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 8px 24px rgba(6, 182, 212, 0.5);
 }
 
-.play-btn:hover {
-    transform: scale(1.1);
+.download-card:hover .play-btn-large {
+    transform: scale(1);
 }
 
-.download-type {
+.play-btn-large:hover {
+    transform: scale(1.1) !important;
+}
+
+/* Delete Button Overlay */
+.delete-btn-overlay {
     position: absolute;
-    top: 6px;
-    right: 6px;
-    font-size: 16px;
-}
-
-.download-info {
-    flex: 1;
+    bottom: 60px;
+    right: 12px;
+    width: 40px;
+    height: 40px;
+    background: rgba(239, 68, 68, 0.9);
+    border: none;
+    border-radius: 10px;
+    color: white;
     display: flex;
-    flex-direction: column;
+    align-items: center;
     justify-content: center;
-    min-width: 0;
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(0.8) translateY(10px);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
 }
 
-.download-info h4 {
-    font-size: 16px;
+.download-card:hover .delete-btn-overlay {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+.delete-btn-overlay:hover {
+    background: #ef4444;
+    transform: scale(1.1) !important;
+}
+
+/* Card Info */
+.card-info {
+    padding: 14px;
+    background: linear-gradient(135deg, rgba(15, 15, 26, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%);
+}
+
+.card-title {
+    font-size: 14px;
     font-weight: 600;
     color: white;
     margin: 0 0 4px 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    transition: color 0.2s ease;
 }
 
-.series-info {
-    font-size: 13px;
+.download-card:hover .card-title {
     color: #67e8f9;
-    margin: 0 0 8px 0;
 }
 
-.download-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
+.card-series {
+    font-size: 12px;
+    color: #67e8f9;
+    margin: 0 0 4px 0;
+}
+
+.card-size {
+    font-size: 12px;
     color: rgba(255, 255, 255, 0.5);
-}
-
-.delete-btn {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.2);
-    color: #ef4444;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s;
-    align-self: center;
-}
-
-.delete-btn:hover {
-    background: rgba(239, 68, 68, 0.2);
-    border-color: rgba(239, 68, 68, 0.4);
+    margin: 0;
 }
 
 /* Delete Confirmation Modal */
