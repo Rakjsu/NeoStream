@@ -161,15 +161,33 @@ class DownloadService {
     ): Promise<DownloadItem> {
         const id = this.generateId(type, name);
 
-        // Cache the cover image
+        // Cache the cover image - for episodes, use seriesName to avoid duplicates
         let localCover: string | undefined;
         try {
-            const cacheResult = await window.ipcRenderer.invoke('download:cache-image', {
-                url: cover,
-                id: id
-            });
-            if (cacheResult.success) {
-                localCover = cacheResult.localPath;
+            // For episodes, use seriesName as cache key so all eps share same poster
+            const cacheKey = type === 'episode' && seriesInfo?.seriesName
+                ? `series_${seriesInfo.seriesName.toLowerCase().replace(/[^a-z0-9]/g, '_')}`
+                : id;
+
+            // First check if we already have the poster cached for this series
+            if (type === 'episode' && seriesInfo?.seriesName) {
+                const existingEp = Array.from(this.downloads.values()).find(
+                    item => item.seriesName === seriesInfo.seriesName && item.localCover
+                );
+                if (existingEp?.localCover) {
+                    localCover = existingEp.localCover;
+                }
+            }
+
+            // Only download if we don't have it cached
+            if (!localCover) {
+                const cacheResult = await window.ipcRenderer.invoke('download:cache-image', {
+                    url: cover,
+                    id: cacheKey
+                });
+                if (cacheResult.success) {
+                    localCover = cacheResult.localPath;
+                }
             }
         } catch (e) {
             console.warn('Failed to cache cover image:', e);
