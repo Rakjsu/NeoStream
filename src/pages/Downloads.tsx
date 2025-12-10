@@ -459,40 +459,80 @@ export function Downloads() {
                                 </select>
                             </div>
 
-                            {/* Episodes List */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {/* Episodes List - Style matching ContentDetailModal */}
+                            <div style={{
+                                maxHeight: 180,
+                                overflowY: 'auto',
+                                background: 'rgba(0, 0, 0, 0.2)',
+                                borderRadius: 12,
+                                padding: 8
+                            }}>
                                 {seriesModal.series.seasons
                                     .find(s => s.season === seriesModal.selectedSeason)?.episodes
-                                    .map(ep => (
-                                        <div
-                                            key={ep.id}
-                                            onClick={() => ep.status === 'completed' && handlePlayOfflineEpisode(ep)}
-                                            style={{
-                                                display: 'flex', alignItems: 'center', gap: 12,
-                                                padding: 12, borderRadius: 10,
-                                                background: ep.status === 'completed' ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)',
-                                                border: ep.status === 'completed' ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.1)',
-                                                cursor: ep.status === 'completed' ? 'pointer' : 'default',
-                                                transition: 'all 0.2s'
-                                            }}
-                                        >
-                                            <div style={{
-                                                width: 36, height: 36, borderRadius: '50%',
-                                                background: ep.status === 'completed' ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.1)',
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                color: ep.status === 'completed' ? '#6ee7b7' : 'rgba(255,255,255,0.5)'
-                                            }}>
-                                                {ep.status === 'completed' ? <Play size={18} /> : ep.progress + '%'}
+                                    .map(ep => {
+                                        const isCompleted = ep.status === 'completed';
+                                        return (
+                                            <div
+                                                key={ep.id}
+                                                onClick={() => isCompleted && handlePlayOfflineEpisode(ep)}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 12,
+                                                    padding: '10px 14px',
+                                                    borderRadius: 10,
+                                                    cursor: isCompleted ? 'pointer' : 'default',
+                                                    background: isCompleted
+                                                        ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.15))'
+                                                        : 'transparent',
+                                                    border: isCompleted ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid transparent',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                <span style={{
+                                                    width: 32,
+                                                    height: 32,
+                                                    borderRadius: 8,
+                                                    background: isCompleted
+                                                        ? 'linear-gradient(135deg, #10b981, #059669)'
+                                                        : 'rgba(168, 85, 247, 0.3)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    fontSize: 12,
+                                                    fontWeight: 700,
+                                                    color: 'white'
+                                                }}>
+                                                    {isCompleted ? '✓' : ep.progress + '%'}
+                                                </span>
+                                                <span style={{
+                                                    fontSize: 13,
+                                                    color: 'white',
+                                                    flex: 1,
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap'
+                                                }}>
+                                                    Episódio {ep.episode}
+                                                </span>
+                                                {isCompleted && (
+                                                    <span style={{
+                                                        width: 24,
+                                                        height: 24,
+                                                        borderRadius: '50%',
+                                                        background: 'linear-gradient(135deg, #10b981, #059669)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        fontSize: 10,
+                                                        color: 'white'
+                                                    }}>
+                                                        ▶
+                                                    </span>
+                                                )}
                                             </div>
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ color: 'white', fontSize: 14, fontWeight: 500 }}>Episódio {ep.episode}</div>
-                                                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>{downloadService.formatBytes(ep.size)}</div>
-                                            </div>
-                                            {ep.status === 'completed' && (
-                                                <div style={{ color: '#6ee7b7', fontSize: 12 }}>✓ Baixado</div>
-                                            )}
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                             </div>
                         </div>
                     </div>
