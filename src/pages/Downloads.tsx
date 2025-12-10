@@ -259,11 +259,11 @@ export function Downloads() {
                                     {/* Cover/Poster */}
                                     <div className="card-poster">
                                         <img
-                                            src={item.localCover || item.cover}
+                                            src={item.cover}
                                             alt={item.name}
                                             onError={(e) => {
                                                 const target = e.target as HTMLImageElement;
-                                                target.src = item.cover;
+                                                target.src = 'https://via.placeholder.com/150x225?text=No+Image';
                                             }}
                                         />
                                         {/* Progress bar on poster for incomplete downloads */}
@@ -344,7 +344,7 @@ export function Downloads() {
                                 >
                                     <div className="card-poster">
                                         <img
-                                            src={series.localCover || series.cover}
+                                            src={series.cover}
                                             alt={series.seriesName}
                                         />
                                         <div className="type-badge">📺</div>
@@ -405,7 +405,7 @@ export function Downloads() {
                         {/* Poster */}
                         <div style={{ width: 260, minWidth: 260, position: 'relative' }}>
                             <img
-                                src={seriesModal.series.localCover || seriesModal.series.cover}
+                                src={seriesModal.series.cover}
                                 alt={seriesModal.series.seriesName}
                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             />
