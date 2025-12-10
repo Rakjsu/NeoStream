@@ -60,6 +60,17 @@ export function Downloads() {
         setDeleteModal({ isOpen: false, item: null });
     };
 
+    const handleCardClick = (item: DownloadItem) => {
+        if (item.status !== 'completed') return; // Only play completed downloads
+
+        // Navigate to player with offline file
+        if (item.type === 'movie') {
+            window.location.hash = `#/dashboard/vod?play=${item.name}&offline=true`;
+        } else if (item.type === 'episode') {
+            window.location.hash = `#/dashboard/series?series=${item.seriesName}&season=${item.season}&episode=${item.episode}&offline=true`;
+        }
+    };
+
     const handleOpenFolder = async () => {
         await downloadService.openDownloadsFolder();
     };
@@ -184,7 +195,11 @@ export function Downloads() {
                     ) : (
                         <div className="downloads-grid">
                             {filteredDownloads.map((item) => (
-                                <div key={item.id} className="download-card">
+                                <div
+                                    key={item.id}
+                                    className={`download-card ${item.status === 'completed' ? 'clickable' : ''}`}
+                                    onClick={() => handleCardClick(item)}
+                                >
                                     {/* Cover/Poster */}
                                     <div className="card-poster">
                                         <img
@@ -231,7 +246,13 @@ export function Downloads() {
                                         )}
                                         {/* Hover overlay with play button */}
                                         <div className="card-overlay">
-                                            <button className="play-btn-center">
+                                            <button
+                                                className="play-btn-center"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleCardClick(item);
+                                                }}
+                                            >
                                                 <Play size={28} fill="white" />
                                             </button>
                                         </div>
@@ -517,6 +538,14 @@ const downloadsStyles = `
     border-color: rgba(6, 182, 212, 0.4);
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4),
                 0 0 40px rgba(6, 182, 212, 0.15);
+}
+
+.download-card.clickable {
+    cursor: pointer;
+}
+
+.download-card:not(.clickable) {
+    cursor: default;
 }
 
 /* Card Poster */
