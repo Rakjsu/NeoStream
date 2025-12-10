@@ -345,13 +345,32 @@ export function setupDownloadHandlers() {
         }
     });
 
-    // Get storage info
+    // Get storage info - get real disk space
     ipcMain.handle('download:get-storage-info', async () => {
         try {
             const downloadsPath = getDownloadsPath();
             const used = getFolderSize(downloadsPath);
-            const total = 100 * 1024 * 1024 * 1024;
-            return { success: true, used, total, available: total - used, downloadsPath };
+
+            // Get real disk space using fs.statfs (Node.js 18.15+)
+            let total = 100 * 1024 * 1024 * 1024; // Default fallback
+            let available = total - used;
+
+            try {
+                const stats = fs.statfsSync(downloadsPath);
+                total = stats.bsize * stats.blocks;
+                available = stats.bsize * stats.bavail;
+            } catch (e) {
+                // Fallback: try to estimate from userData path
+                console.warn('[Download] statfs not available, using fallback');
+            }
+
+            return {
+                success: true,
+                used,
+                total,
+                available,
+                downloadsPath
+            };
         } catch (error: any) {
             return { success: false, error: error.message };
         }
@@ -363,6 +382,24 @@ export function setupDownloadHandlers() {
             shell.openPath(getDownloadsPath());
             return { success: true };
         } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    });
+
+    // Delete file from disk
+    ipcMain.handle('download:delete-file', async (_, { filePath }) => {
+        try {
+            console.log('[Download] Deleting file:', filePath);
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+                console.log('[Download] File deleted successfully');
+                return { success: true };
+            } else {
+                console.log('[Download] File not found:', filePath);
+                return { success: true }; // File already gone, consider success
+            }
+        } catch (error: any) {
+            console.error('[Download] Delete error:', error);
             return { success: false, error: error.message };
         }
     });

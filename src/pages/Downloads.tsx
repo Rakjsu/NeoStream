@@ -195,7 +195,7 @@ export function Downloads() {
                                                 target.src = item.cover;
                                             }}
                                         />
-                                        {/* Progress bar on poster */}
+                                        {/* Progress bar on poster for incomplete downloads */}
                                         {item.status !== 'completed' && item.progress > 0 && (
                                             <div className="poster-progress">
                                                 <div
@@ -204,30 +204,35 @@ export function Downloads() {
                                                 />
                                             </div>
                                         )}
-                                        {/* Type badge */}
+                                        {/* Type badge - top left */}
                                         <div className="type-badge">
                                             {item.type === 'movie' ? '🎬' : '📺'}
                                         </div>
-                                        {/* Status badge */}
+                                        {/* Delete button - top right (always visible on hover) */}
+                                        <button
+                                            className="delete-btn-corner"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteClick(item);
+                                            }}
+                                            title="Remover download"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                        {/* Status badge - bottom right */}
                                         {item.status === 'completed' && (
-                                            <div className="status-badge completed">✓</div>
+                                            <div className="status-badge completed">✓ Baixado</div>
                                         )}
                                         {item.status === 'downloading' && (
                                             <div className="status-badge downloading">{item.progress}%</div>
                                         )}
-                                        {/* Hover overlay */}
+                                        {(item.status === 'paused' || item.status === 'failed') && (
+                                            <div className="status-badge paused">⏸ Pausado</div>
+                                        )}
+                                        {/* Hover overlay with play button */}
                                         <div className="card-overlay">
-                                            <button className="play-btn-large">
-                                                <Play size={32} fill="white" />
-                                            </button>
-                                            <button
-                                                className="delete-btn-overlay"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteClick(item);
-                                                }}
-                                            >
-                                                <Trash2 size={18} />
+                                            <button className="play-btn-center">
+                                                <Play size={28} fill="white" />
                                             </button>
                                         </div>
                                     </div>
@@ -574,12 +579,17 @@ const downloadsStyles = `
     animation: pulse 1.5s infinite;
 }
 
+.status-badge.paused {
+    background: rgba(251, 191, 36, 0.9);
+    color: white;
+}
+
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
 }
 
-/* Progress on Poster */
+/* Progress on Poster - only for incomplete downloads */
 .poster-progress {
     position: absolute;
     bottom: 0;
@@ -608,16 +618,14 @@ const downloadsStyles = `
     animation: progressShimmer 1.5s infinite;
 }
 
-/* Card Overlay */
+/* Card Overlay - simplified */
 .card-overlay {
     position: absolute;
     inset: 0;
-    background: linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0,0,0,0.3) 50%, transparent 100%);
+    background: rgba(0, 0, 0, 0.5);
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 16px;
     opacity: 0;
     transition: opacity 0.3s ease;
 }
@@ -626,10 +634,10 @@ const downloadsStyles = `
     opacity: 1;
 }
 
-/* Play Button Large */
-.play-btn-large {
-    width: 64px;
-    height: 64px;
+/* Play Button Center */
+.play-btn-center {
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
     background: linear-gradient(135deg, #06b6d4, #0891b2);
     border: none;
@@ -642,49 +650,50 @@ const downloadsStyles = `
     box-shadow: 0 8px 24px rgba(6, 182, 212, 0.5);
 }
 
-.download-card:hover .play-btn-large {
+.download-card:hover .play-btn-center {
     transform: scale(1);
 }
 
-.play-btn-large:hover {
-    transform: scale(1.1) !important;
+.play-btn-center:hover {
+    transform: scale(1.15) !important;
+    box-shadow: 0 12px 32px rgba(6, 182, 212, 0.6);
 }
 
-/* Delete Button Overlay */
-.delete-btn-overlay {
+/* Delete Button Corner - top right */
+.delete-btn-corner {
     position: absolute;
-    bottom: 60px;
-    right: 12px;
-    width: 40px;
-    height: 40px;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
     background: rgba(239, 68, 68, 0.9);
     border: none;
-    border-radius: 10px;
+    border-radius: 8px;
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     opacity: 0;
-    transform: scale(0.8) translateY(10px);
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+    transform: scale(0.8);
+    transition: all 0.2s ease;
+    z-index: 10;
 }
 
-.download-card:hover .delete-btn-overlay {
+.download-card:hover .delete-btn-corner {
     opacity: 1;
-    transform: scale(1) translateY(0);
+    transform: scale(1);
 }
 
-.delete-btn-overlay:hover {
+.delete-btn-corner:hover {
     background: #ef4444;
     transform: scale(1.1) !important;
 }
 
-/* Card Info */
+/* Card Info - clean, no extra lines */
 .card-info {
-    padding: 14px;
-    background: linear-gradient(135deg, rgba(15, 15, 26, 0.95) 0%, rgba(26, 26, 46, 0.95) 100%);
+    padding: 12px;
+    background: rgba(15, 15, 26, 0.9);
 }
 
 .card-title {
