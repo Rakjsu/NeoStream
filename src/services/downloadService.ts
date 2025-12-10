@@ -297,8 +297,9 @@ class DownloadService {
     // Resume download
     async resumeDownload(id: string): Promise<void> {
         const item = this.downloads.get(id);
-        if (item && item.status === 'paused') {
+        if (item && (item.status === 'paused' || item.status === 'failed')) {
             item.status = 'pending';
+            item.error = undefined;
             this.queue.push(id);
             await this.saveDownload(item);
             this.processQueue();

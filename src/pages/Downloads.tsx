@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Download, Trash2, Play, FolderOpen, HardDrive, Film, Tv, AlertTriangle, X } from 'lucide-react';
+import { Download, Trash2, Play, FolderOpen, HardDrive, Film, Tv, AlertTriangle, X, RefreshCw } from 'lucide-react';
 import { downloadService } from '../services/downloadService';
 import type { DownloadItem, StorageInfo } from '../services/downloadService';
 
@@ -61,18 +61,26 @@ export function Downloads() {
     };
 
     const handleCardClick = (item: DownloadItem) => {
-        if (item.status !== 'completed') return; // Only play completed downloads
+        if (item.status !== 'completed' || !item.filePath) return; // Only play completed downloads with file
 
-        // Navigate to player with offline file
+        // Convert file path to file:// URL
+        const fileUrl = `file:///${item.filePath.replace(/\\/g, '/')}`;
+
+        // Navigate to player with offline file path
         if (item.type === 'movie') {
-            window.location.hash = `#/dashboard/vod?play=${item.name}&offline=true`;
+            window.location.hash = `#/dashboard/vod?play=${encodeURIComponent(item.name)}&offline=${encodeURIComponent(fileUrl)}`;
         } else if (item.type === 'episode') {
-            window.location.hash = `#/dashboard/series?series=${item.seriesName}&season=${item.season}&episode=${item.episode}&offline=true`;
+            window.location.hash = `#/dashboard/series?series=${encodeURIComponent(item.seriesName || '')}&season=${item.season}&episode=${item.episode}&offline=${encodeURIComponent(fileUrl)}`;
         }
     };
 
     const handleOpenFolder = async () => {
         await downloadService.openDownloadsFolder();
+    };
+
+    const handleResumeDownload = async (item: DownloadItem) => {
+        // Try to resume or restart the download
+        await downloadService.resumeDownload(item.id);
     };
 
     const filteredDownloads = downloads.filter(item => {
@@ -244,25 +252,36 @@ export function Downloads() {
                                         {(item.status === 'paused' || item.status === 'failed') && (
                                             <div className="status-badge paused">⏸ Pausado</div>
                                         )}
-                                        {/* Hover overlay with play button */}
+                                        {/* Hover overlay - show play for completed, resume for paused */}
                                         <div className="card-overlay">
-                                            <button
-                                                className="play-btn-center"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleCardClick(item);
-                                                }}
-                                            >
-                                                <Play size={28} fill="white" />
-                                            </button>
+                                            {item.status === 'completed' ? (
+                                                <button
+                                                    className="play-btn-center"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleCardClick(item);
+                                                    }}
+                                                >
+                                                    <Play size={28} fill="white" />
+                                                </button>
+                                            ) : (item.status === 'paused' || item.status === 'failed') && (
+                                                <button
+                                                    className="resume-btn"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleResumeDownload(item);
+                                                    }}
+                                                    title="Continuar download"
+                                                >
+                                                    <RefreshCw size={24} />
+                                                    <span>Continuar</span>
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                     {/* Info */}
                                     <div className="card-info">
                                         <h4 className="card-title">{item.name}</h4>
-                                        {item.seriesName && (
-                                            <p className="card-series">S{item.season}E{item.episode}</p>
-                                        )}
                                         <p className="card-size">{downloadService.formatBytes(item.size)}</p>
                                     </div>
                                 </div>
@@ -686,6 +705,34 @@ const downloadsStyles = `
 .play-btn-center:hover {
     transform: scale(1.15) !important;
     box-shadow: 0 12px 32px rgba(6, 182, 212, 0.6);
+}
+
+/* Resume Button for paused downloads */
+.resume-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 24px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    border: none;
+    border-radius: 16px;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transform: scale(0);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.4);
+}
+
+.download-card:hover .resume-btn {
+    transform: scale(1);
+}
+
+.resume-btn:hover {
+    transform: scale(1.05) !important;
+    box-shadow: 0 12px 32px rgba(245, 158, 11, 0.6);
 }
 
 /* Delete Button Corner - bottom right */
