@@ -1196,9 +1196,9 @@ export function Home() {
                     </h2>
                     <div style={{
                         display: 'grid',
-                        gridTemplateColumns: 'repeat(4, 1fr)',
+                        gridTemplateColumns: 'repeat(7, 1fr)',
                         gap: '12px',
-                        maxWidth: '600px'
+                        maxWidth: '900px'
                     }}>
                         <a href="#/dashboard/live" style={{
                             background: 'rgba(255, 255, 255, 0.05)',
@@ -1244,6 +1244,51 @@ export function Home() {
                         >
                             <div style={{ fontSize: '24px', marginBottom: '6px' }}>📺</div>
                             <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>Séries</div>
+                        </a>
+                        <a href="#/dashboard/watch-later" style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: '10px',
+                            padding: '16px',
+                            textAlign: 'center',
+                            textDecoration: 'none',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            transition: 'all 0.2s'
+                        }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.15)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                        >
+                            <div style={{ fontSize: '24px', marginBottom: '6px' }}>🔖</div>
+                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>Minha Lista</div>
+                        </a>
+                        <a href="#/dashboard/favorites" style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: '10px',
+                            padding: '16px',
+                            textAlign: 'center',
+                            textDecoration: 'none',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            transition: 'all 0.2s'
+                        }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                        >
+                            <div style={{ fontSize: '24px', marginBottom: '6px' }}>❤️</div>
+                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>Favoritos</div>
+                        </a>
+                        <a href="#/dashboard/downloads" style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: '10px',
+                            padding: '16px',
+                            textAlign: 'center',
+                            textDecoration: 'none',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            transition: 'all 0.2s'
+                        }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(6, 182, 212, 0.15)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                        >
+                            <div style={{ fontSize: '24px', marginBottom: '6px' }}>📥</div>
+                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>Baixados</div>
                         </a>
                         <a href="#/dashboard/settings" style={{
                             background: 'rgba(255, 255, 255, 0.05)',
