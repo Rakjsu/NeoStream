@@ -386,24 +386,6 @@ export function setupDownloadHandlers() {
         }
     });
 
-    // Delete file from disk
-    ipcMain.handle('download:delete-file', async (_, { filePath }) => {
-        try {
-            console.log('[Download] Deleting file:', filePath);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-                console.log('[Download] File deleted successfully');
-                return { success: true };
-            } else {
-                console.log('[Download] File not found:', filePath);
-                return { success: true }; // File already gone, consider success
-            }
-        } catch (error: any) {
-            console.error('[Download] Delete error:', error);
-            return { success: false, error: error.message };
-        }
-    });
-
     // Get files
     ipcMain.handle('download:get-files', async () => {
         try {

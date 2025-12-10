@@ -555,11 +555,11 @@ const downloadsStyles = `
     z-index: 5;
 }
 
-/* Status Badge */
+/* Status Badge - bottom left */
 .status-badge {
     position: absolute;
-    top: 10px;
-    right: 10px;
+    bottom: 10px;
+    left: 10px;
     padding: 6px 10px;
     border-radius: 8px;
     font-size: 12px;
@@ -659,10 +659,10 @@ const downloadsStyles = `
     box-shadow: 0 12px 32px rgba(6, 182, 212, 0.6);
 }
 
-/* Delete Button Corner - top right */
+/* Delete Button Corner - bottom right */
 .delete-btn-corner {
     position: absolute;
-    top: 8px;
+    bottom: 8px;
     right: 8px;
     width: 32px;
     height: 32px;
