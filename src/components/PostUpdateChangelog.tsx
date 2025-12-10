@@ -12,32 +12,32 @@ interface VersionChangelog {
 
 // Changelogs for each version
 const changelogs: VersionChangelog = {
-    '2.4.9': [
+    '1.5.0': [
         {
-            icon: '🏠',
-            title: 'Acesso Rápido Expandido',
+            icon: '📥',
+            title: 'Downloads Offline',
             items: [
-                'Novos atalhos: Minha Lista, Favoritos, Baixados',
-                'Grid expandido para 7 itens na Home',
-                'Navegação mais rápida entre seções',
+                'Baixe filmes e séries para assistir offline',
+                'Organização por pastas: Serie/Temporada/Episódio',
+                'Modal de série offline com temporadas e episódios',
             ]
         },
         {
-            icon: '⚙️',
-            title: 'Configurações Reorganizadas',
+            icon: '📂',
+            title: 'Gestão de Downloads',
             items: [
-                'Removida seção Aparência (não funcional)',
-                'Idioma movido para seção Atualizações',
-                'Layout mais limpo e organizado',
+                'Botão para baixar temporada inteira ou episódio',
+                'Prevenção de downloads duplicados',
+                'Notificações nativas do Windows ao completar',
             ]
         },
         {
-            icon: '✨',
-            title: 'Animações Premium',
+            icon: '🎬',
+            title: 'Playback Offline',
             items: [
-                'Efeito shimmer na barra de busca',
-                'Glow pulsante no logo da sidebar',
-                'Animações mais suaves e elegantes',
+                'Clique em conteúdo baixado para assistir offline',
+                'Player usa arquivo local automaticamente',
+                'Funciona sem conexão com internet',
             ]
         },
     ],
