@@ -181,6 +181,12 @@ export function ContentDetailModal({
                         seriesName: contentData.name,
                         season: seasonNum,
                         episode: episodeNum
+                    },
+                    {
+                        plot: (tmdbData as any)?.overview || contentData.plot,
+                        rating: contentData.rating || (tmdbData as any)?.vote_average?.toFixed(1),
+                        year: contentData.release_date?.split('-')[0],
+                        genres: (tmdbData as any)?.genres?.map((g: any) => g.name)
                     }
                 );
 

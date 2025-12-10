@@ -431,6 +431,10 @@ class DownloadService {
             seriesId?: string;
             cover: string;
             localCover?: string;
+            plot?: string;
+            rating?: string;
+            year?: string;
+            genres?: string[];
             seasons: {
                 season: number;
                 episodes: DownloadItem[]
@@ -450,6 +454,10 @@ class DownloadService {
             seriesId?: string;
             cover: string;
             localCover?: string;
+            plot?: string;
+            rating?: string;
+            year?: string;
+            genres?: string[];
             seasonsMap: Map<number, DownloadItem[]>
         }>();
 
@@ -461,6 +469,10 @@ class DownloadService {
                     seriesId: ep.seriesId,
                     cover: ep.cover,
                     localCover: ep.localCover,
+                    plot: ep.plot,
+                    rating: ep.rating,
+                    year: ep.year,
+                    genres: ep.genres,
                     seasonsMap: new Map()
                 });
             }
@@ -477,6 +489,10 @@ class DownloadService {
             seriesId: s.seriesId,
             cover: s.cover,
             localCover: s.localCover,
+            plot: s.plot,
+            rating: s.rating,
+            year: s.year,
+            genres: s.genres,
             seasons: Array.from(s.seasonsMap.entries())
                 .sort((a, b) => a[0] - b[0])
                 .map(([season, episodes]) => ({

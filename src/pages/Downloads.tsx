@@ -3,8 +3,25 @@ import { Download, Trash2, Play, FolderOpen, HardDrive, Film, Tv, AlertTriangle,
 import { downloadService } from '../services/downloadService';
 import type { DownloadItem, StorageInfo } from '../services/downloadService';
 
+// Type for grouped series
+type SeriesGroup = {
+    seriesName: string;
+    seriesId?: string;
+    cover: string;
+    localCover?: string;
+    plot?: string;
+    rating?: string;
+    year?: string;
+    genres?: string[];
+    seasons: {
+        season: number;
+        episodes: DownloadItem[]
+    }[]
+};
+
 export function Downloads() {
     const [downloads, setDownloads] = useState<DownloadItem[]>([]);
+    const [groupedData, setGroupedData] = useState<{ movies: DownloadItem[]; series: SeriesGroup[] }>({ movies: [], series: [] });
     const [activeTab, setActiveTab] = useState<'all' | 'movies' | 'series'>('all');
     const [storageInfo, setStorageInfo] = useState<StorageInfo>({
         used: 0,
@@ -19,8 +36,17 @@ export function Downloads() {
         item: null
     });
 
+    // Series detail modal state
+    const [seriesModal, setSeriesModal] = useState<{ isOpen: boolean; series: SeriesGroup | null; selectedSeason: number; selectedEpisode: number }>({
+        isOpen: false,
+        series: null,
+        selectedSeason: 1,
+        selectedEpisode: 1
+    });
+
     const loadData = useCallback(async () => {
         setDownloads(downloadService.getDownloads());
+        setGroupedData(downloadService.getDownloadsGrouped());
         const storage = await downloadService.getStorageInfo();
         setStorageInfo(storage);
     }, []);
@@ -74,6 +100,25 @@ export function Downloads() {
         }
     };
 
+    const handleSeriesClick = (series: SeriesGroup) => {
+        // Open series modal with first available season and episode
+        const firstSeason = series.seasons[0]?.season || 1;
+        const firstEpisode = series.seasons[0]?.episodes[0]?.episode || 1;
+        setSeriesModal({
+            isOpen: true,
+            series,
+            selectedSeason: firstSeason,
+            selectedEpisode: firstEpisode
+        });
+    };
+
+    const handlePlayOfflineEpisode = (episode: DownloadItem) => {
+        if (!episode.filePath) return;
+        const fileUrl = `file:///${episode.filePath.replace(/\\/g, '/')}`;
+        window.location.hash = `#/dashboard/series?series=${encodeURIComponent(episode.seriesName || '')}&season=${episode.season}&episode=${episode.episode}&offline=${encodeURIComponent(fileUrl)}`;
+        setSeriesModal({ isOpen: false, series: null, selectedSeason: 1, selectedEpisode: 1 });
+    };
+
     const handleOpenFolder = async () => {
         await downloadService.openDownloadsFolder();
     };
@@ -83,10 +128,13 @@ export function Downloads() {
         await downloadService.resumeDownload(item.id);
     };
 
+
+    // Filter downloads - episodes are shown grouped, so exclude them here
     const filteredDownloads = downloads.filter(item => {
+        // Episodes are grouped separately, exclude from main grid
+        if (item.type === 'episode') return false;
         if (activeTab === 'all') return true;
         if (activeTab === 'movies') return item.type === 'movie';
-        if (activeTab === 'series') return item.type === 'episode' || item.type === 'series';
         return true;
     });
 
@@ -286,10 +334,156 @@ export function Downloads() {
                                     </div>
                                 </div>
                             ))}
+
+                            {/* Grouped Series Cards */}
+                            {(activeTab === 'all' || activeTab === 'series') && groupedData.series.map((series) => (
+                                <div
+                                    key={series.seriesName}
+                                    className="download-card clickable"
+                                    onClick={() => handleSeriesClick(series)}
+                                >
+                                    <div className="card-poster">
+                                        <img
+                                            src={series.localCover || series.cover}
+                                            alt={series.seriesName}
+                                        />
+                                        <div className="type-badge">📺</div>
+                                        <div className="status-badge completed">
+                                            {series.seasons.reduce((acc, s) => acc + s.episodes.filter(e => e.status === 'completed').length, 0)} eps
+                                        </div>
+                                        <div className="card-overlay">
+                                            <button className="play-btn-center">
+                                                <Play size={28} fill="white" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="card-info">
+                                        <h4 className="card-title">{series.seriesName}</h4>
+                                        <p className="card-size">{series.seasons.length} temporada(s)</p>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     )}
                 </div>
             </div>
+
+            {/* Series Detail Modal */}
+            {seriesModal.isOpen && seriesModal.series && (
+                <>
+                    <div className="delete-modal-overlay" onClick={() => setSeriesModal({ isOpen: false, series: null, selectedSeason: 1, selectedEpisode: 1 })} />
+                    <div style={{
+                        position: 'fixed',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        width: '90%',
+                        maxWidth: 800,
+                        maxHeight: '85vh',
+                        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                        borderRadius: 20,
+                        overflow: 'hidden',
+                        display: 'flex',
+                        zIndex: 1001,
+                        boxShadow: '0 25px 80px rgba(0, 0, 0, 0.6)',
+                        border: '1px solid rgba(168, 85, 247, 0.3)'
+                    }}>
+                        {/* Poster */}
+                        <div style={{ width: 260, minWidth: 260, position: 'relative' }}>
+                            <img
+                                src={seriesModal.series.localCover || seriesModal.series.cover}
+                                alt={seriesModal.series.seriesName}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, transparent 60%, rgba(26, 26, 46, 1) 100%)' }} />
+                        </div>
+
+                        {/* Content */}
+                        <div style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
+                            <button
+                                onClick={() => setSeriesModal({ isOpen: false, series: null, selectedSeason: 1, selectedEpisode: 1 })}
+                                style={{
+                                    position: 'absolute', top: 16, right: 16, width: 36, height: 36,
+                                    borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: 'none',
+                                    color: 'white', fontSize: 18, cursor: 'pointer', display: 'flex',
+                                    alignItems: 'center', justifyContent: 'center'
+                                }}
+                            >
+                                ✕
+                            </button>
+
+                            <h2 style={{ color: 'white', fontSize: 24, marginBottom: 8 }}>{seriesModal.series.seriesName}</h2>
+
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                                {seriesModal.series.year && <span style={{ background: 'rgba(168,85,247,0.3)', padding: '4px 10px', borderRadius: 6, color: '#c4b5fd', fontSize: 12 }}>{seriesModal.series.year}</span>}
+                                {seriesModal.series.rating && <span style={{ background: 'rgba(251,191,36,0.3)', padding: '4px 10px', borderRadius: 6, color: '#fcd34d', fontSize: 12 }}>⭐ {seriesModal.series.rating}</span>}
+                                <span style={{ background: 'rgba(16,185,129,0.3)', padding: '4px 10px', borderRadius: 6, color: '#6ee7b7', fontSize: 12 }}>📥 Offline</span>
+                            </div>
+
+                            {seriesModal.series.plot && (
+                                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginBottom: 20, lineHeight: 1.6 }}>
+                                    {seriesModal.series.plot.slice(0, 200)}{seriesModal.series.plot.length > 200 ? '...' : ''}
+                                </p>
+                            )}
+
+                            {/* Season Selector */}
+                            <div style={{ marginBottom: 16 }}>
+                                <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginBottom: 6, display: 'block' }}>Temporada</label>
+                                <select
+                                    value={seriesModal.selectedSeason}
+                                    onChange={(e) => setSeriesModal(s => ({ ...s, selectedSeason: Number(e.target.value), selectedEpisode: 1 }))}
+                                    style={{
+                                        background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                                        borderRadius: 8, padding: '10px 14px', color: 'white', width: '100%', fontSize: 14
+                                    }}
+                                >
+                                    {seriesModal.series.seasons.map(s => (
+                                        <option key={s.season} value={s.season} style={{ background: '#1a1a2e' }}>
+                                            Temporada {s.season} ({s.episodes.length} eps)
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Episodes List */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {seriesModal.series.seasons
+                                    .find(s => s.season === seriesModal.selectedSeason)?.episodes
+                                    .map(ep => (
+                                        <div
+                                            key={ep.id}
+                                            onClick={() => ep.status === 'completed' && handlePlayOfflineEpisode(ep)}
+                                            style={{
+                                                display: 'flex', alignItems: 'center', gap: 12,
+                                                padding: 12, borderRadius: 10,
+                                                background: ep.status === 'completed' ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)',
+                                                border: ep.status === 'completed' ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(255,255,255,0.1)',
+                                                cursor: ep.status === 'completed' ? 'pointer' : 'default',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <div style={{
+                                                width: 36, height: 36, borderRadius: '50%',
+                                                background: ep.status === 'completed' ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.1)',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                color: ep.status === 'completed' ? '#6ee7b7' : 'rgba(255,255,255,0.5)'
+                                            }}>
+                                                {ep.status === 'completed' ? <Play size={18} /> : ep.progress + '%'}
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ color: 'white', fontSize: 14, fontWeight: 500 }}>Episódio {ep.episode}</div>
+                                                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>{downloadService.formatBytes(ep.size)}</div>
+                                            </div>
+                                            {ep.status === 'completed' && (
+                                                <div style={{ color: '#6ee7b7', fontSize: 12 }}>✓ Baixado</div>
+                                            )}
+                                        </div>
+                                    ))}
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
         </>
     );
 }
