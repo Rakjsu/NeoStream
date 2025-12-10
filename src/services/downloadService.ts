@@ -9,6 +9,7 @@ export interface DownloadItem {
     type: 'movie' | 'series' | 'episode';
     url: string;
     cover: string;
+    localCover?: string; // Cached poster path
     size: number;
     downloadedBytes: number;
     status: 'pending' | 'downloading' | 'paused' | 'completed' | 'failed';
@@ -19,8 +20,16 @@ export interface DownloadItem {
     completedAt?: number;
     // Series specific
     seriesName?: string;
+    seriesId?: string;
     season?: number;
     episode?: number;
+    // Metadata
+    plot?: string;
+    rating?: string;
+    year?: string;
+    genres?: string[];
+    duration?: number;
+    tmdbId?: number;
 }
 
 export interface StorageInfo {
@@ -140,9 +149,31 @@ class DownloadService {
         type: 'movie' | 'series' | 'episode',
         url: string,
         cover: string,
-        seriesInfo?: { seriesName: string; season: number; episode: number }
+        seriesInfo?: { seriesName: string; seriesId?: string; season: number; episode: number },
+        metadata?: {
+            plot?: string;
+            rating?: string;
+            year?: string;
+            genres?: string[];
+            duration?: number;
+            tmdbId?: number;
+        }
     ): Promise<DownloadItem> {
         const id = this.generateId(type, name);
+
+        // Cache the cover image
+        let localCover: string | undefined;
+        try {
+            const cacheResult = await window.ipcRenderer.invoke('download:cache-image', {
+                url: cover,
+                id: id
+            });
+            if (cacheResult.success) {
+                localCover = cacheResult.localPath;
+            }
+        } catch (e) {
+            console.warn('Failed to cache cover image:', e);
+        }
 
         const item: DownloadItem = {
             id,
@@ -150,6 +181,7 @@ class DownloadService {
             type,
             url,
             cover,
+            localCover,
             size: 0,
             downloadedBytes: 0,
             status: 'pending',
@@ -157,8 +189,17 @@ class DownloadService {
             createdAt: Date.now(),
             ...(seriesInfo && {
                 seriesName: seriesInfo.seriesName,
+                seriesId: seriesInfo.seriesId,
                 season: seriesInfo.season,
                 episode: seriesInfo.episode
+            }),
+            ...(metadata && {
+                plot: metadata.plot,
+                rating: metadata.rating,
+                year: metadata.year,
+                genres: metadata.genres,
+                duration: metadata.duration,
+                tmdbId: metadata.tmdbId
             })
         };
 
@@ -379,6 +420,71 @@ class DownloadService {
         const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // Get downloads grouped by series for UI display
+    getDownloadsGrouped(): {
+        movies: DownloadItem[];
+        series: {
+            seriesName: string;
+            seriesId?: string;
+            cover: string;
+            localCover?: string;
+            seasons: {
+                season: number;
+                episodes: DownloadItem[]
+            }[]
+        }[]
+    } {
+        const movies = Array.from(this.downloads.values())
+            .filter(item => item.type === 'movie')
+            .sort((a, b) => b.createdAt - a.createdAt);
+
+        const episodeItems = Array.from(this.downloads.values())
+            .filter(item => item.type === 'episode' && item.seriesName);
+
+        // Group episodes by series
+        const seriesMap = new Map<string, {
+            seriesName: string;
+            seriesId?: string;
+            cover: string;
+            localCover?: string;
+            seasonsMap: Map<number, DownloadItem[]>
+        }>();
+
+        episodeItems.forEach(ep => {
+            const key = ep.seriesName!;
+            if (!seriesMap.has(key)) {
+                seriesMap.set(key, {
+                    seriesName: ep.seriesName!,
+                    seriesId: ep.seriesId,
+                    cover: ep.cover,
+                    localCover: ep.localCover,
+                    seasonsMap: new Map()
+                });
+            }
+            const seriesData = seriesMap.get(key)!;
+            if (!seriesData.seasonsMap.has(ep.season!)) {
+                seriesData.seasonsMap.set(ep.season!, []);
+            }
+            seriesData.seasonsMap.get(ep.season!)!.push(ep);
+        });
+
+        // Convert to array structure
+        const series = Array.from(seriesMap.values()).map(s => ({
+            seriesName: s.seriesName,
+            seriesId: s.seriesId,
+            cover: s.cover,
+            localCover: s.localCover,
+            seasons: Array.from(s.seasonsMap.entries())
+                .sort((a, b) => a[0] - b[0])
+                .map(([season, episodes]) => ({
+                    season,
+                    episodes: episodes.sort((a, b) => (a.episode || 0) - (b.episode || 0))
+                }))
+        }));
+
+        return { movies, series };
     }
 }
 

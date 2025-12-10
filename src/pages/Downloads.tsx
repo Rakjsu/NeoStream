@@ -208,6 +208,15 @@ export function Downloads() {
                                             <span>•</span>
                                             <span>{item.status === 'completed' ? '✓ Concluído' : `${item.progress}%`}</span>
                                         </div>
+                                        {/* Progress Bar for downloading items */}
+                                        {item.status !== 'completed' && item.progress > 0 && (
+                                            <div className="download-progress-bar">
+                                                <div
+                                                    className="download-progress-fill"
+                                                    style={{ width: `${item.progress}%` }}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                     <button className="delete-btn" title="Remover download" onClick={() => handleDeleteClick(item)}>
                                         <Trash2 size={18} />
@@ -716,5 +725,44 @@ const downloadsStyles = `
 .delete-modal-buttons .confirm-btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 12px 32px rgba(239, 68, 68, 0.4);
+}
+
+/* Download Progress Bar */
+.download-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 10px;
+}
+
+.download-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #06b6d4, #0891b2);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    position: relative;
+}
+
+.download-progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.3) 50%,
+        transparent 100%
+    );
+    animation: progressShimmer 1.5s infinite;
+}
+
+@keyframes progressShimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
 }
 `;

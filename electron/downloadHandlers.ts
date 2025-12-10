@@ -388,5 +388,76 @@ export function setupDownloadHandlers() {
         }
     });
 
+    // Cache image locally
+    ipcMain.handle('download:cache-image', async (_, { url, id }) => {
+        try {
+            const downloadsPath = getDownloadsPath();
+            const coversPath = path.join(downloadsPath, 'covers');
+
+            if (!fs.existsSync(coversPath)) {
+                fs.mkdirSync(coversPath, { recursive: true });
+            }
+
+            const ext = url.includes('.png') ? '.png' : '.jpg';
+            const fileName = `${sanitizeFilename(id)}${ext}`;
+            const filePath = path.join(coversPath, fileName);
+
+            // If already cached, return existing path
+            if (fs.existsSync(filePath)) {
+                return { success: true, localPath: `file:///${filePath.replace(/\\/g, '/')}` };
+            }
+
+            // Download the image
+            return new Promise((resolve) => {
+                const protocol = url.startsWith('https') ? https : http;
+
+                const request = protocol.get(url, (response) => {
+                    // Handle redirects
+                    if (response.statusCode === 301 || response.statusCode === 302) {
+                        const redirectUrl = response.headers.location;
+                        if (redirectUrl) {
+                            const redirectProtocol = redirectUrl.startsWith('https') ? https : http;
+                            redirectProtocol.get(redirectUrl, (redirectRes) => {
+                                const writeStream = fs.createWriteStream(filePath);
+                                redirectRes.pipe(writeStream);
+                                writeStream.on('finish', () => {
+                                    resolve({ success: true, localPath: `file:///${filePath.replace(/\\/g, '/')}` });
+                                });
+                            }).on('error', () => {
+                                resolve({ success: false, error: 'Redirect download failed' });
+                            });
+                            return;
+                        }
+                    }
+
+                    if (response.statusCode !== 200) {
+                        resolve({ success: false, error: `HTTP ${response.statusCode}` });
+                        return;
+                    }
+
+                    const writeStream = fs.createWriteStream(filePath);
+                    response.pipe(writeStream);
+                    writeStream.on('finish', () => {
+                        resolve({ success: true, localPath: `file:///${filePath.replace(/\\/g, '/')}` });
+                    });
+                    writeStream.on('error', (err) => {
+                        resolve({ success: false, error: err.message });
+                    });
+                });
+
+                request.on('error', (err) => {
+                    resolve({ success: false, error: err.message });
+                });
+
+                request.setTimeout(30000, () => {
+                    request.destroy();
+                    resolve({ success: false, error: 'Timeout' });
+                });
+            });
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    });
+
     console.log('Download Handlers initialized with parallel connections');
 }
