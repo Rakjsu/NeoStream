@@ -130,6 +130,15 @@ export function ContentDetailModal({
         }
     }, [isOpen, contentData.name, contentType]);
 
+    // Check if content is already downloaded
+    useEffect(() => {
+        if (!isOpen) return;
+        if (contentType === 'movie') {
+            const isAlreadyDownloaded = downloadService.isDownloaded(contentData.name, 'movie');
+            setDownloadStatus(isAlreadyDownloaded ? 'completed' : 'idle');
+        }
+    }, [isOpen, contentData.name, contentType]);
+
     // Close on escape key
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
@@ -822,14 +831,36 @@ export function ContentDetailModal({
                             📥 O que deseja baixar?
                         </h3>
                         <p style={{ color: 'rgba(255,255,255,0.7)', marginBottom: 24, fontSize: 14 }}>
-                            Temporada {selectedSeason} - Episódio {selectedEpisode}
+                            {contentData.name} - Temporada {selectedSeason}
                         </p>
 
-                        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                             <button
                                 onClick={() => {
-                                    downloadSingleEpisode(selectedSeason, selectedEpisode);
+                                    const epList = seriesInfo?.episodes?.[selectedSeason] || [];
+                                    epList.forEach((ep: any, idx: number) => {
+                                        setTimeout(() => {
+                                            downloadSingleEpisode(selectedSeason, Number(ep.episode_num));
+                                        }, idx * 2000);
+                                    });
+                                    setShowDownloadModal(false);
                                 }}
+                                style={{
+                                    padding: '14px 24px',
+                                    borderRadius: 12,
+                                    border: 'none',
+                                    background: 'linear-gradient(135deg, #06b6d4, #0891b2)',
+                                    color: 'white',
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                📂 Temporada {selectedSeason} ({seriesInfo?.episodes?.[selectedSeason]?.length || 0} episódios)
+                            </button>
+
+                            <button
+                                onClick={() => downloadSingleEpisode(selectedSeason, selectedEpisode)}
                                 style={{
                                     padding: '14px 24px',
                                     borderRadius: 12,
@@ -838,13 +869,10 @@ export function ContentDetailModal({
                                     color: 'white',
                                     fontSize: 14,
                                     fontWeight: 600,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8
+                                    cursor: 'pointer'
                                 }}
                             >
-                                📺 Episódio {selectedEpisode}
+                                📺 Apenas Episódio {selectedEpisode}
                             </button>
 
                             <button
