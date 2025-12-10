@@ -12,6 +12,35 @@ interface VersionChangelog {
 
 // Changelogs for each version
 const changelogs: VersionChangelog = {
+    '2.4.9': [
+        {
+            icon: '🏠',
+            title: 'Acesso Rápido Expandido',
+            items: [
+                'Novos atalhos: Minha Lista, Favoritos, Baixados',
+                'Grid expandido para 7 itens na Home',
+                'Navegação mais rápida entre seções',
+            ]
+        },
+        {
+            icon: '⚙️',
+            title: 'Configurações Reorganizadas',
+            items: [
+                'Removida seção Aparência (não funcional)',
+                'Idioma movido para seção Atualizações',
+                'Layout mais limpo e organizado',
+            ]
+        },
+        {
+            icon: '✨',
+            title: 'Animações Premium',
+            items: [
+                'Efeito shimmer na barra de busca',
+                'Glow pulsante no logo da sidebar',
+                'Animações mais suaves e elegantes',
+            ]
+        },
+    ],
     '2.4.8': [
         {
             icon: '📺',
