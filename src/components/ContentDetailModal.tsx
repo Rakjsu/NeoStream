@@ -715,13 +715,19 @@ export function ContentDetailModal({
                                     }
 
                                     if (result?.success) {
-                                        // Start download
+                                        // Start download with metadata
                                         const download = await downloadService.addDownload(
                                             downloadName,
                                             downloadType,
                                             result.url,
                                             contentData.cover,
-                                            seriesInfo
+                                            seriesInfo,
+                                            {
+                                                plot: (tmdbData as any)?.overview || contentData.plot,
+                                                rating: contentData.rating || (tmdbData as any)?.vote_average?.toFixed(1),
+                                                year: contentData.release_date?.split('-')[0] || (tmdbData as any)?.release_date?.split('-')[0],
+                                                genres: (tmdbData as any)?.genres?.map((g: any) => g.name)
+                                            }
                                         );
 
                                         // Listen for progress
