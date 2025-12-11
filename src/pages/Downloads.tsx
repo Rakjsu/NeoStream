@@ -71,6 +71,24 @@ export function Downloads() {
         };
     }, [loadData]);
 
+    // Sync modal data when groupedData changes (e.g., after delete)
+    useEffect(() => {
+        if (seriesModal.isOpen && seriesModal.series) {
+            const updatedSeries = groupedData.series.find(
+                (s: SeriesGroup) => s.seriesName === seriesModal.series?.seriesName
+            );
+            if (updatedSeries) {
+                setSeriesModal(prev => ({
+                    ...prev,
+                    series: updatedSeries
+                }));
+            } else {
+                // Series no longer exists (all episodes deleted), close modal
+                setSeriesModal({ isOpen: false, series: null, selectedSeason: 1, selectedEpisode: 1 });
+            }
+        }
+    }, [groupedData, seriesModal.isOpen, seriesModal.series?.seriesName]);
+
     const handleDeleteClick = (item: DownloadItem) => {
         setDeleteModal({ isOpen: true, item });
     };
