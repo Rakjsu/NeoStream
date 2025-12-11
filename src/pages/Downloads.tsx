@@ -114,9 +114,11 @@ export function Downloads() {
 
     const handlePlayOfflineEpisode = (episode: DownloadItem) => {
         if (!episode.filePath) return;
+        // Navigate directly to player with offline file
         const fileUrl = `file:///${episode.filePath.replace(/\\/g, '/')}`;
-        window.location.hash = `#/dashboard/series?series=${encodeURIComponent(episode.seriesName || '')}&season=${episode.season}&episode=${episode.episode}&offline=${encodeURIComponent(fileUrl)}`;
         setSeriesModal({ isOpen: false, series: null, selectedSeason: 1, selectedEpisode: 1 });
+        // Navigate to player page with offline URL
+        window.location.hash = `#/dashboard/player?name=${encodeURIComponent(episode.seriesName || episode.name)}&season=${episode.season}&episode=${episode.episode}&offline=${encodeURIComponent(fileUrl)}`;
     };
 
     const handleOpenFolder = async () => {
