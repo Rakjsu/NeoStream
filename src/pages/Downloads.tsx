@@ -393,12 +393,8 @@ export function Downloads() {
                                             className="delete-btn-corner"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                // Delete all episodes from this series
-                                                series.seasons.forEach(s => {
-                                                    s.episodes.forEach(ep => {
-                                                        downloadService.deleteDownload(ep.id);
-                                                    });
-                                                });
+                                                // Delete all episodes and series folder
+                                                downloadService.deleteSeries(series.seriesName);
                                             }}
                                             title="Remover série"
                                         >

@@ -369,6 +369,26 @@ class DownloadService {
         }
     }
 
+    // Delete entire series (all episodes + folder)
+    async deleteSeries(seriesName: string): Promise<void> {
+        // Find all episodes of this series
+        const seriesEpisodes = Array.from(this.downloads.values()).filter(
+            item => item.type === 'episode' && item.seriesName === seriesName
+        );
+
+        // Delete each episode
+        for (const ep of seriesEpisodes) {
+            await this.deleteDownload(ep.id);
+        }
+
+        // Delete the series folder
+        try {
+            await window.ipcRenderer.invoke('download:delete-folder', { folderName: seriesName });
+        } catch (e) {
+            console.warn('Failed to delete series folder:', e);
+        }
+    }
+
     // Get all downloads
     getDownloads(): DownloadItem[] {
         return Array.from(this.downloads.values()).sort((a, b) => b.createdAt - a.createdAt);

@@ -440,6 +440,20 @@ export function setupDownloadHandlers() {
         }
     });
 
+    // Delete series folder
+    ipcMain.handle('download:delete-folder', async (_, { folderName }: { folderName: string }) => {
+        try {
+            const folderPath = path.join(getDownloadsPath(), folderName);
+            if (fs.existsSync(folderPath)) {
+                // Remove folder recursively
+                fs.rmSync(folderPath, { recursive: true, force: true });
+            }
+            return { success: true };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    });
+
     // Get files
     ipcMain.handle('download:get-files', async () => {
         try {
