@@ -219,9 +219,12 @@ function singleDownload(id: string, url: string, filePath: string): Promise<{ su
 
             response.on('data', (chunk) => {
                 downloadedBytes += chunk.length;
-                const progress = totalBytes > 0 ? Math.round((downloadedBytes / totalBytes) * 100) : 0;
+                // If we don't know total size, show bytes downloaded and estimate based on typical file sizes
+                // For video files, estimate ~500MB average, show real progress if known
+                const estimatedTotal = totalBytes > 0 ? totalBytes : 500 * 1024 * 1024; // 500MB estimate
+                const progress = Math.min(99, Math.round((downloadedBytes / estimatedTotal) * 100));
                 BrowserWindow.getAllWindows().forEach(win => {
-                    win.webContents.send('download:progress', { id, progress, downloadedBytes, totalBytes });
+                    win.webContents.send('download:progress', { id, progress, downloadedBytes, totalBytes: totalBytes || downloadedBytes });
                 });
             });
 

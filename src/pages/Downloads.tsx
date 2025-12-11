@@ -441,10 +441,11 @@ export function Downloads() {
 
                             <h2 style={{ color: 'white', fontSize: 24, marginBottom: 8 }}>{seriesModal.series.seriesName}</h2>
 
-                            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
                                 {seriesModal.series.year && <span style={{ background: 'rgba(168,85,247,0.3)', padding: '4px 10px', borderRadius: 6, color: '#c4b5fd', fontSize: 12 }}>{seriesModal.series.year}</span>}
                                 {seriesModal.series.rating && <span style={{ background: 'rgba(251,191,36,0.3)', padding: '4px 10px', borderRadius: 6, color: '#fcd34d', fontSize: 12 }}>⭐ {seriesModal.series.rating}</span>}
-                                <span style={{ background: 'rgba(16,185,129,0.3)', padding: '4px 10px', borderRadius: 6, color: '#6ee7b7', fontSize: 12 }}>📥 Offline</span>
+                                <span style={{ background: 'rgba(16,185,129,0.3)', padding: '4px 10px', borderRadius: 6, color: '#6ee7b7', fontSize: 12 }}>{seriesModal.series.seasons.length} Temporada{seriesModal.series.seasons.length > 1 ? 's' : ''}</span>
+                                <span style={{ background: 'rgba(59,130,246,0.3)', padding: '4px 10px', borderRadius: 6, color: '#93c5fd', fontSize: 12 }}>📥 Offline</span>
                             </div>
 
                             {seriesModal.series.plot && (
