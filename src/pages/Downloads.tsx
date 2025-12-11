@@ -101,12 +101,20 @@ export function Downloads() {
     };
 
     const handleSeriesClick = (series: SeriesGroup) => {
+        // Refresh data before opening modal to get latest status
+        const freshData = downloadService.getDownloadsGrouped();
+        setGroupedData(freshData);
+
+        // Find the updated series data
+        const updatedSeries = freshData.series.find((s: SeriesGroup) => s.seriesName === series.seriesName);
+        if (!updatedSeries) return;
+
         // Open series modal with first available season and episode
-        const firstSeason = series.seasons[0]?.season || 1;
-        const firstEpisode = series.seasons[0]?.episodes[0]?.episode || 1;
+        const firstSeason = updatedSeries.seasons[0]?.season || 1;
+        const firstEpisode = updatedSeries.seasons[0]?.episodes[0]?.episode || 1;
         setSeriesModal({
             isOpen: true,
-            series,
+            series: updatedSeries,
             selectedSeason: firstSeason,
             selectedEpisode: firstEpisode
         });
