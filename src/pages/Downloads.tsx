@@ -711,198 +711,97 @@ export function Downloads() {
             {/* Movie Detail Modal */}
             {movieModal.isOpen && movieModal.movie && (
                 <>
-                    {/* Backdrop */}
-                    <div
-                        onClick={() => setMovieModal({ isOpen: false, movie: null })}
-                        style={{
-                            position: 'fixed',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            background: 'rgba(0, 0, 0, 0.85)',
-                            backdropFilter: 'blur(8px)',
-                            zIndex: 9998
-                        }}
-                    />
-                    {/* Modal */}
+                    <div className="delete-modal-overlay" onClick={() => setMovieModal({ isOpen: false, movie: null })} />
                     <div style={{
                         position: 'fixed',
                         top: '50%',
                         left: '50%',
                         transform: 'translate(-50%, -50%)',
-                        background: 'linear-gradient(135deg, #1a1a2e, #16213e)',
-                        borderRadius: 20,
-                        padding: 30,
-                        zIndex: 9999,
-                        maxWidth: 500,
                         width: '90%',
-                        maxHeight: '80vh',
-                        overflow: 'auto',
-                        boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)'
+                        maxWidth: 700,
+                        maxHeight: '85vh',
+                        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                        borderRadius: 20,
+                        overflow: 'hidden',
+                        display: 'flex',
+                        zIndex: 1001,
+                        boxShadow: '0 25px 80px rgba(0, 0, 0, 0.6)',
+                        border: '1px solid rgba(16, 185, 129, 0.3)'
                     }}>
-                        {/* Close button */}
-                        <button
-                            onClick={() => setMovieModal({ isOpen: false, movie: null })}
-                            style={{
-                                position: 'absolute',
-                                top: 16,
-                                right: 16,
-                                width: 36,
-                                height: 36,
-                                borderRadius: '50%',
-                                background: 'rgba(255, 255, 255, 0.1)',
-                                border: 'none',
-                                color: 'white',
-                                fontSize: 18,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
-                            }}
-                        >
-                            ✕
-                        </button>
-
-                        {/* Header with poster and info */}
-                        <div style={{ display: 'flex', gap: 20, marginBottom: 20 }}>
+                        {/* Poster */}
+                        <div style={{ width: 260, minWidth: 260, position: 'relative' }}>
                             <img
                                 src={movieModal.movie.cover}
                                 alt={movieModal.movie.name}
-                                style={{
-                                    width: 120,
-                                    height: 180,
-                                    objectFit: 'cover',
-                                    borderRadius: 12
-                                }}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             />
-                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                <h2 style={{
-                                    color: 'white',
-                                    fontSize: 22,
-                                    fontWeight: 700,
-                                    marginBottom: 8
-                                }}>
-                                    {movieModal.movie.name}
-                                </h2>
-                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
-                                    {movieModal.movie.year && (
-                                        <span style={{
-                                            background: 'rgba(255, 255, 255, 0.1)',
-                                            padding: '4px 12px',
-                                            borderRadius: 20,
-                                            color: 'rgba(255, 255, 255, 0.7)',
-                                            fontSize: 12
-                                        }}>
-                                            📅 {movieModal.movie.year}
-                                        </span>
-                                    )}
-                                    {movieModal.movie.rating && (
-                                        <span style={{
-                                            background: 'rgba(255, 255, 255, 0.1)',
-                                            padding: '4px 12px',
-                                            borderRadius: 20,
-                                            color: '#fbbf24',
-                                            fontSize: 12,
-                                            fontWeight: 600
-                                        }}>
-                                            ⭐ {movieModal.movie.rating}
-                                        </span>
-                                    )}
-                                    <span style={{
-                                        background: movieModal.movie.status === 'completed'
-                                            ? 'linear-gradient(135deg, #10b981, #059669)'
-                                            : 'rgba(245, 158, 11, 0.3)',
-                                        padding: '4px 12px',
-                                        borderRadius: 20,
-                                        color: 'white',
-                                        fontSize: 12,
-                                        fontWeight: 600
-                                    }}>
-                                        {movieModal.movie.status === 'completed' ? '✓ Offline' : `${movieModal.movie.progress || 0}%`}
-                                    </span>
-                                </div>
-                            </div>
+                            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg, transparent 60%, rgba(26, 26, 46, 1) 100%)' }} />
                         </div>
 
-                        {/* Genres */}
-                        {movieModal.movie.genres && movieModal.movie.genres.length > 0 && (
-                            <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-                                {movieModal.movie.genres.slice(0, 4).map((genre, i) => (
-                                    <span key={i} style={{
-                                        background: 'rgba(236, 72, 153, 0.2)',
-                                        padding: '4px 10px',
-                                        borderRadius: 20,
-                                        color: '#f9a8d4',
-                                        fontSize: 11
-                                    }}>
-                                        {genre}
-                                    </span>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Plot */}
-                        {movieModal.movie.plot && (
-                            <p style={{
-                                color: 'rgba(255, 255, 255, 0.7)',
-                                fontSize: 14,
-                                lineHeight: 1.6,
-                                marginBottom: 20
-                            }}>
-                                {movieModal.movie.plot}
-                            </p>
-                        )}
-
-                        {/* Action buttons */}
-                        {movieModal.movie.status === 'completed' ? (
+                        {/* Content */}
+                        <div style={{ flex: 1, padding: 24, overflowY: 'auto' }}>
                             <button
-                                onClick={() => handlePlayOfflineMovie(movieModal.movie!)}
+                                onClick={() => setMovieModal({ isOpen: false, movie: null })}
                                 style={{
-                                    width: '100%',
-                                    padding: '14px 28px',
-                                    borderRadius: 12,
-                                    border: 'none',
-                                    background: 'linear-gradient(135deg, #10b981, #059669)',
-                                    color: 'white',
-                                    fontSize: 16,
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: 10,
-                                    transition: 'all 0.2s',
-                                    boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)'
+                                    position: 'absolute', top: 16, right: 16, width: 36, height: 36,
+                                    borderRadius: '50%', background: 'rgba(0,0,0,0.5)', border: 'none',
+                                    color: 'white', fontSize: 18, cursor: 'pointer', display: 'flex',
+                                    alignItems: 'center', justifyContent: 'center'
                                 }}
                             >
-                                <Play size={20} fill="white" />
-                                Assistir Filme
+                                ✕
                             </button>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                <div style={{
-                                    width: '100%',
-                                    padding: '12px 20px',
-                                    borderRadius: 12,
-                                    background: 'rgba(245, 158, 11, 0.2)',
-                                    border: '1px solid rgba(245, 158, 11, 0.4)',
-                                    color: '#fcd34d',
-                                    fontSize: 14,
-                                    textAlign: 'center'
+
+                            <h2 style={{ color: 'white', fontSize: 24, marginBottom: 8 }}>{movieModal.movie.name}</h2>
+
+                            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                                {movieModal.movie.year && <span style={{ background: 'rgba(168,85,247,0.3)', padding: '4px 10px', borderRadius: 6, color: '#c4b5fd', fontSize: 12 }}>{movieModal.movie.year}</span>}
+                                {movieModal.movie.rating && <span style={{ background: 'rgba(251,191,36,0.3)', padding: '4px 10px', borderRadius: 6, color: '#fcd34d', fontSize: 12 }}>⭐ {movieModal.movie.rating}</span>}
+                                <span style={{
+                                    background: movieModal.movie.status === 'completed' ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)',
+                                    padding: '4px 10px',
+                                    borderRadius: 6,
+                                    color: movieModal.movie.status === 'completed' ? '#6ee7b7' : '#fcd34d',
+                                    fontSize: 12
                                 }}>
-                                    ⏳ Filme ainda não foi baixado completamente ({movieModal.movie.progress || 0}%)
+                                    {movieModal.movie.status === 'completed' ? '📥 Offline' : `⏳ ${movieModal.movie.progress || 0}%`}
+                                </span>
+                            </div>
+
+                            {/* Genres */}
+                            {movieModal.movie.genres && movieModal.movie.genres.length > 0 && (
+                                <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+                                    {movieModal.movie.genres.slice(0, 4).map((genre, i) => (
+                                        <span key={i} style={{
+                                            background: 'rgba(236, 72, 153, 0.2)',
+                                            padding: '4px 10px',
+                                            borderRadius: 20,
+                                            color: '#f9a8d4',
+                                            fontSize: 11
+                                        }}>
+                                            {genre}
+                                        </span>
+                                    ))}
                                 </div>
+                            )}
+
+                            {/* Plot */}
+                            {movieModal.movie.plot && (
+                                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginBottom: 20, lineHeight: 1.6 }}>
+                                    {movieModal.movie.plot.slice(0, 300)}{movieModal.movie.plot.length > 300 ? '...' : ''}
+                                </p>
+                            )}
+
+                            {/* Action buttons */}
+                            {movieModal.movie.status === 'completed' ? (
                                 <button
-                                    className="resume-download-btn"
-                                    onClick={() => downloadService.resumeDownload(movieModal.movie!.id)}
+                                    onClick={() => handlePlayOfflineMovie(movieModal.movie!)}
                                     style={{
                                         width: '100%',
                                         padding: '14px 28px',
                                         borderRadius: 12,
                                         border: 'none',
-                                        background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                                        background: 'linear-gradient(135deg, #10b981, #059669)',
                                         color: 'white',
                                         fontSize: 16,
                                         fontWeight: 600,
@@ -911,14 +810,53 @@ export function Downloads() {
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         gap: 10,
-                                        transition: 'all 0.2s'
+                                        transition: 'all 0.2s',
+                                        boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)'
                                     }}
                                 >
-                                    <RefreshCw size={20} className="spin-icon" />
-                                    Retomar Download
+                                    <Play size={20} fill="white" />
+                                    Assistir Filme
                                 </button>
-                            </div>
-                        )}
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                    <div style={{
+                                        width: '100%',
+                                        padding: '12px 20px',
+                                        borderRadius: 12,
+                                        background: 'rgba(245, 158, 11, 0.2)',
+                                        border: '1px solid rgba(245, 158, 11, 0.4)',
+                                        color: '#fcd34d',
+                                        fontSize: 14,
+                                        textAlign: 'center'
+                                    }}>
+                                        ⏳ Filme ainda não foi baixado completamente ({movieModal.movie.progress || 0}%)
+                                    </div>
+                                    <button
+                                        className="resume-download-btn"
+                                        onClick={() => downloadService.resumeDownload(movieModal.movie!.id)}
+                                        style={{
+                                            width: '100%',
+                                            padding: '14px 28px',
+                                            borderRadius: 12,
+                                            border: 'none',
+                                            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                                            color: 'white',
+                                            fontSize: 16,
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: 10,
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        <RefreshCw size={20} className="spin-icon" />
+                                        Retomar Download
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </>
             )}
