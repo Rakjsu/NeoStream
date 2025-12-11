@@ -347,10 +347,19 @@ class DownloadService {
         }
     }
 
-    // Delete completed download
+    // Delete download (cancels if active, deletes file and removes from queue)
     async deleteDownload(id: string): Promise<void> {
         const item = this.downloads.get(id);
         if (item) {
+            // Cancel if still downloading or pending
+            if (item.status === 'downloading' || item.status === 'pending' || item.status === 'paused') {
+                try {
+                    await window.ipcRenderer.invoke('download:cancel', { id });
+                } catch (e) {
+                    console.warn('Failed to cancel download:', e);
+                }
+            }
+            // Delete file if exists
             if (item.filePath) {
                 await window.ipcRenderer.invoke('download:delete-file', { filePath: item.filePath });
             }
