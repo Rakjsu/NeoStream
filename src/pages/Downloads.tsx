@@ -489,6 +489,7 @@ export function Downloads() {
                                     .find(s => s.season === seriesModal.selectedSeason)?.episodes
                                     .map(ep => {
                                         const isCompleted = ep.status === 'completed';
+                                        const isDownloading = ep.status === 'downloading';
                                         const isSelected = ep.episode === seriesModal.selectedEpisode;
                                         return (
                                             <div
@@ -505,25 +506,29 @@ export function Downloads() {
                                                         ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.15))'
                                                         : 'transparent',
                                                     border: isSelected ? '1px solid rgba(168, 85, 247, 0.4)' : '1px solid transparent',
-                                                    opacity: isCompleted ? 1 : 0.5,
+                                                    opacity: isCompleted ? 1 : 0.7,
                                                     transition: 'all 0.2s'
                                                 }}
                                             >
-                                                <span style={{
-                                                    width: 32,
-                                                    height: 32,
-                                                    borderRadius: 8,
-                                                    background: isCompleted
-                                                        ? 'linear-gradient(135deg, #10b981, #059669)'
-                                                        : 'linear-gradient(135deg, #f59e0b, #d97706)',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    fontSize: 12,
-                                                    fontWeight: 700,
-                                                    color: 'white'
-                                                }}>
-                                                    {ep.episode}
+                                                <span
+                                                    className={isDownloading ? 'download-pulse' : ''}
+                                                    style={{
+                                                        width: 32,
+                                                        height: 32,
+                                                        borderRadius: 8,
+                                                        background: isCompleted
+                                                            ? 'linear-gradient(135deg, #10b981, #059669)'
+                                                            : isDownloading
+                                                                ? 'linear-gradient(135deg, #3b82f6, #1d4ed8)'
+                                                                : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        fontSize: 12,
+                                                        fontWeight: 700,
+                                                        color: 'white'
+                                                    }}>
+                                                    {isDownloading ? '↓' : ep.episode}
                                                 </span>
                                                 <span style={{
                                                     fontSize: 13,
@@ -672,6 +677,28 @@ const downloadsStyles = `
 @keyframes fadeInDown {
     from { opacity: 0; transform: translateY(-20px); }
     to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes downloadPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+}
+
+@keyframes downloadArrow {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(3px); }
+}
+
+.download-pulse {
+    animation: downloadPulse 1.5s ease-in-out infinite;
+}
+
+.download-pulse::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    animation: downloadArrow 0.8s ease-in-out infinite;
 }
 
 .header-icon {
