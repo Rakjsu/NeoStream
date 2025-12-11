@@ -474,6 +474,23 @@ export function Downloads() {
                                 <span style={{ background: 'rgba(59,130,246,0.3)', padding: '4px 10px', borderRadius: 6, color: '#93c5fd', fontSize: 12 }}>📥 Offline</span>
                             </div>
 
+                            {/* Genres */}
+                            {seriesModal.series.genres && seriesModal.series.genres.length > 0 && (
+                                <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+                                    {seriesModal.series.genres.slice(0, 4).map((genre, i) => (
+                                        <span key={i} style={{
+                                            background: 'rgba(236, 72, 153, 0.2)',
+                                            padding: '4px 10px',
+                                            borderRadius: 20,
+                                            color: '#f9a8d4',
+                                            fontSize: 11
+                                        }}>
+                                            {genre}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+
                             {seriesModal.series.plot && (
                                 <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginBottom: 20, lineHeight: 1.6 }}>
                                     {seriesModal.series.plot.slice(0, 200)}{seriesModal.series.plot.length > 200 ? '...' : ''}
@@ -808,6 +825,23 @@ export function Downloads() {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Genres */}
+                        {movieModal.movie.genres && movieModal.movie.genres.length > 0 && (
+                            <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+                                {movieModal.movie.genres.slice(0, 4).map((genre, i) => (
+                                    <span key={i} style={{
+                                        background: 'rgba(236, 72, 153, 0.2)',
+                                        padding: '4px 10px',
+                                        borderRadius: 20,
+                                        color: '#f9a8d4',
+                                        fontSize: 11
+                                    }}>
+                                        {genre}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
 
                         {/* Plot */}
                         {movieModal.movie.plot && (
