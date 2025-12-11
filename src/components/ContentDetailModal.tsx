@@ -892,21 +892,36 @@ export function ContentDetailModal({
                                 </button>
                             )}
 
-                            <button
-                                onClick={() => downloadSingleEpisode(selectedSeason, selectedEpisode)}
-                                style={{
+                            {downloadService.isEpisodeInQueue(contentData.name, selectedSeason, selectedEpisode) ? (
+                                <div style={{
                                     padding: '14px 24px',
                                     borderRadius: 12,
-                                    border: 'none',
-                                    background: 'linear-gradient(135deg, #a855f7, #ec4899)',
-                                    color: 'white',
+                                    background: 'rgba(168, 85, 247, 0.2)',
+                                    border: '2px solid rgba(168, 85, 247, 0.4)',
+                                    color: '#c4b5fd',
                                     fontSize: 14,
                                     fontWeight: 600,
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                📺 Apenas Episódio {selectedEpisode}
-                            </button>
+                                    textAlign: 'center'
+                                }}>
+                                    ✓ Episódio {selectedEpisode} já está em download
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => downloadSingleEpisode(selectedSeason, selectedEpisode)}
+                                    style={{
+                                        padding: '14px 24px',
+                                        borderRadius: 12,
+                                        border: 'none',
+                                        background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                                        color: 'white',
+                                        fontSize: 14,
+                                        fontWeight: 600,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    📺 Apenas Episódio {selectedEpisode}
+                                </button>
+                            )}
 
                             <button
                                 onClick={() => setShowDownloadModal(false)}
