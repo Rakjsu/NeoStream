@@ -540,6 +540,18 @@ export function Downloads() {
                                                 }}>
                                                     Episódio {ep.episode}
                                                 </span>
+                                                {/* Progress percentage for downloading episodes */}
+                                                {isDownloading && (
+                                                    <span style={{
+                                                        fontSize: 12,
+                                                        fontWeight: 600,
+                                                        color: '#3b82f6',
+                                                        minWidth: 40,
+                                                        textAlign: 'right'
+                                                    }}>
+                                                        {ep.progress || 0}%
+                                                    </span>
+                                                )}
                                                 {isSelected && isCompleted && (
                                                     <span style={{
                                                         width: 24,
@@ -608,6 +620,7 @@ export function Downloads() {
                                             ⏳ Episódio {seriesModal.selectedEpisode} ainda não foi baixado
                                         </div>
                                         <button
+                                            className="resume-download-btn"
                                             onClick={() => {
                                                 if (selectedEp) {
                                                     downloadService.resumeDownload(selectedEp.id);
@@ -631,7 +644,7 @@ export function Downloads() {
                                                 boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)'
                                             }}
                                         >
-                                            <RefreshCw size={20} />
+                                            <RefreshCw size={20} className="spin-icon" />
                                             Retomar Download
                                         </button>
                                     </div>
@@ -689,6 +702,11 @@ const downloadsStyles = `
     50% { transform: translateY(3px); }
 }
 
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
 .download-pulse {
     animation: downloadPulse 1.5s ease-in-out infinite;
 }
@@ -699,6 +717,15 @@ const downloadsStyles = `
     inset: 0;
     border-radius: inherit;
     animation: downloadArrow 0.8s ease-in-out infinite;
+}
+
+.resume-download-btn:hover .spin-icon {
+    animation: spin 1s linear infinite;
+}
+
+.resume-download-btn:hover {
+    transform: scale(1.02);
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.5) !important;
 }
 
 .header-icon {
