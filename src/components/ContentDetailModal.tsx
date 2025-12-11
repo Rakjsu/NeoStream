@@ -130,12 +130,12 @@ export function ContentDetailModal({
         }
     }, [isOpen, contentData.name, contentType]);
 
-    // Check if content is already downloaded
+    // Check if content is already downloaded or in queue
     useEffect(() => {
         if (!isOpen) return;
         if (contentType === 'movie') {
-            const isAlreadyDownloaded = downloadService.isDownloaded(contentData.name, 'movie');
-            setDownloadStatus(isAlreadyDownloaded ? 'completed' : 'idle');
+            const isAlreadyInQueue = downloadService.isMovieInQueue(contentData.name);
+            setDownloadStatus(isAlreadyInQueue ? 'completed' : 'idle');
         }
     }, [isOpen, contentData.name, contentType]);
 

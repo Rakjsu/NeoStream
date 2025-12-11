@@ -417,6 +417,34 @@ class DownloadService {
         );
     }
 
+    // Check if any episode from a season is in queue
+    isSeasonInQueue(seriesName: string, season: number): boolean {
+        return Array.from(this.downloads.values()).some(
+            item => item.type === 'episode' &&
+                item.seriesName === seriesName &&
+                item.season === season &&
+                (item.status === 'pending' || item.status === 'downloading' || item.status === 'completed' || item.status === 'paused')
+        );
+    }
+
+    // Check if movie is already in queue
+    isMovieInQueue(movieName: string): boolean {
+        return Array.from(this.downloads.values()).some(
+            item => item.type === 'movie' &&
+                item.name === movieName &&
+                (item.status === 'pending' || item.status === 'downloading' || item.status === 'completed' || item.status === 'paused')
+        );
+    }
+
+    // Count episodes in queue for a season
+    getSeasonDownloadCount(seriesName: string, season: number): number {
+        return Array.from(this.downloads.values()).filter(
+            item => item.type === 'episode' &&
+                item.seriesName === seriesName &&
+                item.season === season
+        ).length;
+    }
+
     // Get download by content
     getDownloadByContent(name: string, type: string): DownloadItem | undefined {
         return Array.from(this.downloads.values()).find(
