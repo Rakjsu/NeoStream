@@ -112,13 +112,15 @@ export function Downloads() {
         });
     };
 
-    const handlePlayOfflineEpisode = (episode: DownloadItem) => {
+    const handlePlayOfflineEpisode = async (episode: DownloadItem) => {
         if (!episode.filePath) return;
-        // Navigate to series page which will handle offline playback
-        const fileUrl = `file:///${episode.filePath.replace(/\\/g, '/')}`;
-        setSeriesModal({ isOpen: false, series: null, selectedSeason: 1, selectedEpisode: 1 });
-        // Use series route with autoplay parameter - the VideoPlayer will use offline URL
-        window.location.hash = `#/dashboard/series?series=${encodeURIComponent(episode.seriesName || '')}&season=${episode.season}&episode=${episode.episode}&play=true&offline=${encodeURIComponent(fileUrl)}`;
+        // Open file in default system player (VLC, Windows Media Player, etc.)
+        try {
+            await window.ipcRenderer.invoke('download:open-file', episode.filePath);
+            setSeriesModal({ isOpen: false, series: null, selectedSeason: 1, selectedEpisode: 1 });
+        } catch (e) {
+            console.error('Failed to open file:', e);
+        }
     };
 
     const handleOpenFolder = async () => {

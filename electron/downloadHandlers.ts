@@ -427,6 +427,19 @@ export function setupDownloadHandlers() {
         }
     });
 
+    // Open file in default player (VLC, Windows Media Player, etc.)
+    ipcMain.handle('download:open-file', async (_, filePath: string) => {
+        try {
+            if (!filePath || !fs.existsSync(filePath)) {
+                return { success: false, error: 'File not found' };
+            }
+            shell.openPath(filePath);
+            return { success: true };
+        } catch (error: any) {
+            return { success: false, error: error.message };
+        }
+    });
+
     // Get files
     ipcMain.handle('download:get-files', async () => {
         try {
