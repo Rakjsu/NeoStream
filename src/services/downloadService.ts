@@ -161,6 +161,13 @@ class DownloadService {
     ): Promise<DownloadItem> {
         const id = this.generateId(type, name);
 
+        // Check if already exists - prevent duplicates
+        const existing = this.downloads.get(id);
+        if (existing) {
+            console.log('[Download] Already exists, skipping:', id);
+            return existing;
+        }
+
         // Cache the cover image - for episodes, use seriesName to avoid duplicates
         let localCover: string | undefined;
         try {
