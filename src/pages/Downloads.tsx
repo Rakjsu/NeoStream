@@ -589,17 +589,46 @@ export function Downloads() {
                                         Assistir Episódio {seriesModal.selectedEpisode}
                                     </button>
                                 ) : (
-                                    <div style={{
-                                        width: '100%',
-                                        padding: '14px 28px',
-                                        borderRadius: 12,
-                                        background: 'rgba(245, 158, 11, 0.2)',
-                                        border: '1px solid rgba(245, 158, 11, 0.4)',
-                                        color: '#fcd34d',
-                                        fontSize: 14,
-                                        textAlign: 'center'
-                                    }}>
-                                        ⏳ Episódio {seriesModal.selectedEpisode} ainda não foi baixado
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                        <div style={{
+                                            width: '100%',
+                                            padding: '12px 20px',
+                                            borderRadius: 12,
+                                            background: 'rgba(245, 158, 11, 0.2)',
+                                            border: '1px solid rgba(245, 158, 11, 0.4)',
+                                            color: '#fcd34d',
+                                            fontSize: 14,
+                                            textAlign: 'center'
+                                        }}>
+                                            ⏳ Episódio {seriesModal.selectedEpisode} ainda não foi baixado
+                                        </div>
+                                        <button
+                                            onClick={() => {
+                                                if (selectedEp) {
+                                                    downloadService.resumeDownload(selectedEp.id);
+                                                }
+                                            }}
+                                            style={{
+                                                width: '100%',
+                                                padding: '14px 28px',
+                                                borderRadius: 12,
+                                                border: 'none',
+                                                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                                                color: 'white',
+                                                fontSize: 16,
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: 10,
+                                                transition: 'all 0.2s',
+                                                boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)'
+                                            }}
+                                        >
+                                            <RefreshCw size={20} />
+                                            Retomar Download
+                                        </button>
                                     </div>
                                 );
                             })()}
