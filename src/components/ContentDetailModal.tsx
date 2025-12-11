@@ -853,29 +853,44 @@ export function ContentDetailModal({
                         </p>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                            <button
-                                onClick={() => {
-                                    const epList = seriesInfo?.episodes?.[selectedSeason] || [];
-                                    epList.forEach((ep: any, idx: number) => {
-                                        setTimeout(() => {
-                                            downloadSingleEpisode(selectedSeason, Number(ep.episode_num));
-                                        }, idx * 2000);
-                                    });
-                                    setShowDownloadModal(false);
-                                }}
-                                style={{
+                            {downloadService.isSeasonInQueue(contentData.name, selectedSeason) ? (
+                                <div style={{
                                     padding: '14px 24px',
                                     borderRadius: 12,
-                                    border: 'none',
-                                    background: 'linear-gradient(135deg, #06b6d4, #0891b2)',
-                                    color: 'white',
+                                    background: 'rgba(16, 185, 129, 0.2)',
+                                    border: '2px solid rgba(16, 185, 129, 0.4)',
+                                    color: '#6ee7b7',
                                     fontSize: 14,
                                     fontWeight: 600,
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                📂 Temporada {selectedSeason} ({seriesInfo?.episodes?.[selectedSeason]?.length || 0} episódios)
-                            </button>
+                                    textAlign: 'center'
+                                }}>
+                                    ✓ Temporada {selectedSeason} já está em download ({downloadService.getSeasonDownloadCount(contentData.name, selectedSeason)} eps)
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => {
+                                        const epList = seriesInfo?.episodes?.[selectedSeason] || [];
+                                        epList.forEach((ep: any, idx: number) => {
+                                            setTimeout(() => {
+                                                downloadSingleEpisode(selectedSeason, Number(ep.episode_num));
+                                            }, idx * 2000);
+                                        });
+                                        setShowDownloadModal(false);
+                                    }}
+                                    style={{
+                                        padding: '14px 24px',
+                                        borderRadius: 12,
+                                        border: 'none',
+                                        background: 'linear-gradient(135deg, #06b6d4, #0891b2)',
+                                        color: 'white',
+                                        fontSize: 14,
+                                        fontWeight: 600,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    📂 Temporada {selectedSeason} ({seriesInfo?.episodes?.[selectedSeason]?.length || 0} episódios)
+                                </button>
+                            )}
 
                             <button
                                 onClick={() => downloadSingleEpisode(selectedSeason, selectedEpisode)}
