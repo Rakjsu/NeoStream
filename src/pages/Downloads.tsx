@@ -511,7 +511,7 @@ export function Downloads() {
                                                     borderRadius: 8,
                                                     background: isCompleted
                                                         ? 'linear-gradient(135deg, #10b981, #059669)'
-                                                        : 'rgba(168, 85, 247, 0.3)',
+                                                        : 'linear-gradient(135deg, #f59e0b, #d97706)',
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
@@ -519,7 +519,7 @@ export function Downloads() {
                                                     fontWeight: 700,
                                                     color: 'white'
                                                 }}>
-                                                    {isCompleted ? '✓' : ep.episode}
+                                                    {ep.episode}
                                                 </span>
                                                 <span style={{
                                                     fontSize: 13,
@@ -531,12 +531,12 @@ export function Downloads() {
                                                 }}>
                                                     Episódio {ep.episode}
                                                 </span>
-                                                {isSelected && (
+                                                {isSelected && isCompleted && (
                                                     <span style={{
                                                         width: 24,
                                                         height: 24,
                                                         borderRadius: '50%',
-                                                        background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                                                        background: 'linear-gradient(135deg, #10b981, #059669)',
                                                         display: 'flex',
                                                         alignItems: 'center',
                                                         justifyContent: 'center',
@@ -551,43 +551,58 @@ export function Downloads() {
                                     })}
                             </div>
 
-                            {/* Play Button - at bottom like ContentDetailModal */}
-                            <button
-                                onClick={() => {
-                                    if (!seriesModal.series) return;
-                                    const selectedEp = seriesModal.series.seasons
-                                        .find(s => s.season === seriesModal.selectedSeason)?.episodes
-                                        .find(ep => ep.episode === seriesModal.selectedEpisode);
-                                    if (selectedEp && selectedEp.status === 'completed') {
-                                        handlePlayOfflineEpisode(selectedEp);
-                                    }
-                                }}
-                                style={{
-                                    width: '100%',
-                                    padding: '14px 28px',
-                                    borderRadius: 12,
-                                    border: 'none',
-                                    background: 'linear-gradient(135deg, #10b981, #059669)',
-                                    color: 'white',
-                                    fontSize: 16,
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: 10,
-                                    transition: 'all 0.2s',
-                                    boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)'
-                                }}
-                            >
-                                <Play size={20} fill="white" />
-                                Assistir Episódio {seriesModal.selectedEpisode}
-                            </button>
+                            {/* Play Button - only show if selected episode is completed */}
+                            {(() => {
+                                const selectedEp = seriesModal.series.seasons
+                                    .find(s => s.season === seriesModal.selectedSeason)?.episodes
+                                    .find(ep => ep.episode === seriesModal.selectedEpisode);
+                                const isSelectedCompleted = selectedEp?.status === 'completed';
+
+                                return isSelectedCompleted ? (
+                                    <button
+                                        onClick={() => {
+                                            if (selectedEp) handlePlayOfflineEpisode(selectedEp);
+                                        }}
+                                        style={{
+                                            width: '100%',
+                                            padding: '14px 28px',
+                                            borderRadius: 12,
+                                            border: 'none',
+                                            background: 'linear-gradient(135deg, #10b981, #059669)',
+                                            color: 'white',
+                                            fontSize: 16,
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            gap: 10,
+                                            transition: 'all 0.2s',
+                                            boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)'
+                                        }}
+                                    >
+                                        <Play size={20} fill="white" />
+                                        Assistir Episódio {seriesModal.selectedEpisode}
+                                    </button>
+                                ) : (
+                                    <div style={{
+                                        width: '100%',
+                                        padding: '14px 28px',
+                                        borderRadius: 12,
+                                        background: 'rgba(245, 158, 11, 0.2)',
+                                        border: '1px solid rgba(245, 158, 11, 0.4)',
+                                        color: '#fcd34d',
+                                        fontSize: 14,
+                                        textAlign: 'center'
+                                    }}>
+                                        ⏳ Episódio {seriesModal.selectedEpisode} ainda não foi baixado
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 </>
-            )
-            }
+            )}
         </>
     );
 }
