@@ -364,6 +364,20 @@ export function Downloads() {
                                         >
                                             <Trash2 size={16} />
                                         </button>
+                                        {/* Season count badge - like normal series */}
+                                        <div style={{
+                                            position: 'absolute',
+                                            top: 8,
+                                            left: 40,
+                                            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.9), rgba(5, 150, 105, 0.9))',
+                                            padding: '4px 8px',
+                                            borderRadius: 6,
+                                            fontSize: 11,
+                                            fontWeight: 600,
+                                            color: 'white'
+                                        }}>
+                                            {series.seasons.length} Temp
+                                        </div>
                                         <div className="status-badge completed">✓ Baixado</div>
                                         <div className="card-overlay">
                                             <button className="play-btn-center">
@@ -373,7 +387,6 @@ export function Downloads() {
                                     </div>
                                     <div className="card-info">
                                         <h4 className="card-title">{series.seriesName}</h4>
-                                        <p className="card-size">{series.seasons.length} temporada(s)</p>
                                     </div>
                                 </div>
                             ))}
