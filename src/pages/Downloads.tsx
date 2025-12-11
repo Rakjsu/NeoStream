@@ -364,20 +364,6 @@ export function Downloads() {
                                         >
                                             <Trash2 size={16} />
                                         </button>
-                                        {/* Season count badge - like normal series */}
-                                        <div style={{
-                                            position: 'absolute',
-                                            top: 8,
-                                            left: 40,
-                                            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.9), rgba(5, 150, 105, 0.9))',
-                                            padding: '4px 8px',
-                                            borderRadius: 6,
-                                            fontSize: 11,
-                                            fontWeight: 600,
-                                            color: 'white'
-                                        }}>
-                                            {series.seasons.length} Temp
-                                        </div>
                                         <div className="status-badge completed">✓ Baixado</div>
                                         <div className="card-overlay">
                                             <button className="play-btn-center">
@@ -486,33 +472,36 @@ export function Downloads() {
                                 ))}
                             </div>
 
-                            {/* Episodes List - Style matching ContentDetailModal */}
+                            {/* Episodes List - Selectable like ContentDetailModal */}
                             <div style={{
                                 maxHeight: 180,
                                 overflowY: 'auto',
                                 background: 'rgba(0, 0, 0, 0.2)',
                                 borderRadius: 12,
-                                padding: 8
+                                padding: 8,
+                                marginBottom: 20
                             }}>
                                 {seriesModal.series.seasons
                                     .find(s => s.season === seriesModal.selectedSeason)?.episodes
                                     .map(ep => {
                                         const isCompleted = ep.status === 'completed';
+                                        const isSelected = ep.episode === seriesModal.selectedEpisode;
                                         return (
                                             <div
                                                 key={ep.id}
-                                                onClick={() => isCompleted && handlePlayOfflineEpisode(ep)}
+                                                onClick={() => setSeriesModal(prev => ({ ...prev, selectedEpisode: ep.episode || 1 }))}
                                                 style={{
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     gap: 12,
                                                     padding: '10px 14px',
                                                     borderRadius: 10,
-                                                    cursor: isCompleted ? 'pointer' : 'default',
-                                                    background: isCompleted
-                                                        ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(5, 150, 105, 0.15))'
+                                                    cursor: 'pointer',
+                                                    background: isSelected
+                                                        ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.15))'
                                                         : 'transparent',
-                                                    border: isCompleted ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid transparent',
+                                                    border: isSelected ? '1px solid rgba(168, 85, 247, 0.4)' : '1px solid transparent',
+                                                    opacity: isCompleted ? 1 : 0.5,
                                                     transition: 'all 0.2s'
                                                 }}
                                             >
@@ -530,7 +519,7 @@ export function Downloads() {
                                                     fontWeight: 700,
                                                     color: 'white'
                                                 }}>
-                                                    {isCompleted ? '✓' : ep.progress + '%'}
+                                                    {isCompleted ? '✓' : ep.episode}
                                                 </span>
                                                 <span style={{
                                                     fontSize: 13,
@@ -542,12 +531,12 @@ export function Downloads() {
                                                 }}>
                                                     Episódio {ep.episode}
                                                 </span>
-                                                {isCompleted && (
+                                                {isSelected && (
                                                     <span style={{
                                                         width: 24,
                                                         height: 24,
                                                         borderRadius: '50%',
-                                                        background: 'linear-gradient(135deg, #10b981, #059669)',
+                                                        background: 'linear-gradient(135deg, #a855f7, #ec4899)',
                                                         display: 'flex',
                                                         alignItems: 'center',
                                                         justifyContent: 'center',
@@ -561,10 +550,44 @@ export function Downloads() {
                                         );
                                     })}
                             </div>
+
+                            {/* Play Button - at bottom like ContentDetailModal */}
+                            <button
+                                onClick={() => {
+                                    if (!seriesModal.series) return;
+                                    const selectedEp = seriesModal.series.seasons
+                                        .find(s => s.season === seriesModal.selectedSeason)?.episodes
+                                        .find(ep => ep.episode === seriesModal.selectedEpisode);
+                                    if (selectedEp && selectedEp.status === 'completed') {
+                                        handlePlayOfflineEpisode(selectedEp);
+                                    }
+                                }}
+                                style={{
+                                    width: '100%',
+                                    padding: '14px 28px',
+                                    borderRadius: 12,
+                                    border: 'none',
+                                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                                    color: 'white',
+                                    fontSize: 16,
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 10,
+                                    transition: 'all 0.2s',
+                                    boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)'
+                                }}
+                            >
+                                <Play size={20} fill="white" />
+                                Assistir Episódio {seriesModal.selectedEpisode}
+                            </button>
                         </div>
                     </div>
                 </>
-            )}
+            )
+            }
         </>
     );
 }
