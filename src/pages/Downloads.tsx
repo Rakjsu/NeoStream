@@ -440,23 +440,36 @@ export function Downloads() {
                                 </p>
                             )}
 
-                            {/* Season Selector */}
-                            <div style={{ marginBottom: 16 }}>
-                                <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginBottom: 6, display: 'block' }}>Temporada</label>
-                                <select
-                                    value={seriesModal.selectedSeason}
-                                    onChange={(e) => setSeriesModal(s => ({ ...s, selectedSeason: Number(e.target.value), selectedEpisode: 1 }))}
-                                    style={{
-                                        background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
-                                        borderRadius: 8, padding: '10px 14px', color: 'white', width: '100%', fontSize: 14
-                                    }}
-                                >
-                                    {seriesModal.series.seasons.map(s => (
-                                        <option key={s.season} value={s.season} style={{ background: '#1a1a2e' }}>
-                                            Temporada {s.season} ({s.episodes.length} eps)
-                                        </option>
-                                    ))}
-                                </select>
+                            {/* Season Tabs - Style matching ContentDetailModal */}
+                            <div style={{
+                                display: 'flex',
+                                gap: 8,
+                                marginBottom: 12,
+                                flexWrap: 'wrap'
+                            }}>
+                                {seriesModal.series.seasons.map(s => (
+                                    <button
+                                        key={s.season}
+                                        onClick={() => setSeriesModal(prev => ({ ...prev, selectedSeason: s.season, selectedEpisode: 1 }))}
+                                        style={{
+                                            padding: '8px 16px',
+                                            borderRadius: 20,
+                                            border: seriesModal.selectedSeason === s.season
+                                                ? '2px solid #10b981'
+                                                : '2px solid rgba(255, 255, 255, 0.1)',
+                                            background: seriesModal.selectedSeason === s.season
+                                                ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.3), rgba(5, 150, 105, 0.2))'
+                                                : 'rgba(255, 255, 255, 0.05)',
+                                            color: 'white',
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        T{s.season}
+                                    </button>
+                                ))}
                             </div>
 
                             {/* Episodes List - Style matching ContentDetailModal */}
