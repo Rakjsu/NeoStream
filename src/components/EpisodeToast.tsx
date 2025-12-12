@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { X, Tv } from 'lucide-react';
-import { episodeNotificationService, type EpisodeNotification } from '../services/episodeNotificationService';
+import { episodeNotificationService, type AppNotification } from '../services/episodeNotificationService';
 
 interface EpisodeToastProps {
     onNavigateToSeries?: (seriesId: string) => void;
 }
 
 export function EpisodeToast({ onNavigateToSeries }: EpisodeToastProps) {
-    const [toasts, setToasts] = useState<EpisodeNotification[]>([]);
+    const [toasts, setToasts] = useState<AppNotification[]>([]);
     const [hasChecked, setHasChecked] = useState(false);
 
     const removeToast = useCallback((id: string) => {
@@ -97,8 +97,8 @@ export function EpisodeToast({ onNavigateToSeries }: EpisodeToastProps) {
                         cursor: 'pointer'
                     }}
                     onClick={() => {
-                        if (onNavigateToSeries) {
-                            onNavigateToSeries(toast.seriesId);
+                        if (onNavigateToSeries && toast.meta?.seriesId) {
+                            onNavigateToSeries(toast.meta.seriesId);
                         }
                         removeToast(toast.id);
                     }}
@@ -115,7 +115,7 @@ export function EpisodeToast({ onNavigateToSeries }: EpisodeToastProps) {
                         {toast.poster ? (
                             <img
                                 src={toast.poster}
-                                alt={toast.seriesName}
+                                alt={toast.title}
                                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             />
                         ) : (
@@ -162,7 +162,7 @@ export function EpisodeToast({ onNavigateToSeries }: EpisodeToastProps) {
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap'
                         }}>
-                            {toast.seriesName}
+                            {toast.title}
                         </div>
                         <div style={{
                             color: 'rgba(255,255,255,0.7)',
