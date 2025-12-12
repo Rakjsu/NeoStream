@@ -12,6 +12,43 @@ interface VersionChangelog {
 
 // Changelogs for each version
 const changelogs: VersionChangelog = {
+    '1.6.0': [
+        {
+            icon: '🛡️',
+            title: 'Proteção contra Duplicados',
+            items: [
+                'Prevenção de downloads duplicados de filmes e episódios',
+                'Cada serie pode ser baixada apenas uma vez',
+                'Sistema inteligente de verificação de fila',
+            ]
+        },
+        {
+            icon: '📺',
+            title: 'Melhorias de Séries',
+            items: [
+                'Temporadas combinam com o modal de detalhes',
+                'Botão de deletar série diretamente no card',
+                'Modal atualiza automaticamente após exclusões',
+            ]
+        },
+        {
+            icon: '🖼️',
+            title: 'Otimização de Imagens',
+            items: [
+                'Capas otimizadas usando URL HTTP',
+                'Metadados de série aprimorados',
+                'Melhor carregamento de posters',
+            ]
+        },
+        {
+            icon: '⚙️',
+            title: 'Configurações',
+            items: [
+                'Seção de Atualizações reorganizada nas configurações',
+                'Última verificação de atualizações exibida',
+            ]
+        },
+    ],
     '1.5.0': [
         {
             icon: '📥',

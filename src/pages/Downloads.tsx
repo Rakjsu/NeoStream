@@ -670,9 +670,19 @@ export function Downloads() {
                                         </div>
                                         <button
                                             className="resume-download-btn"
-                                            onClick={() => {
+                                            onClick={async () => {
                                                 if (selectedEp) {
-                                                    downloadService.resumeDownload(selectedEp.id);
+                                                    // Check if episode is paused/failed - then resume
+                                                    if (selectedEp.status === 'paused' || selectedEp.status === 'failed') {
+                                                        await downloadService.resumeDownload(selectedEp.id);
+                                                    } else if (selectedEp.status === 'pending') {
+                                                        // Already pending, just process queue
+                                                        console.log('Episode is pending, processing queue...');
+                                                    } else {
+                                                        // Not in queue - need to start fresh download
+                                                        // This shouldn't happen as cards only show downloaded eps
+                                                        console.log('Episode status:', selectedEp.status);
+                                                    }
                                                 }
                                             }}
                                             style={{
@@ -694,7 +704,7 @@ export function Downloads() {
                                             }}
                                         >
                                             <RefreshCw size={20} className="spin-icon" />
-                                            Retomar Download
+                                            {selectedEp?.status === 'pending' ? 'Aguardando na fila...' : 'Retomar Download'}
                                         </button>
                                     </div>
                                 );
