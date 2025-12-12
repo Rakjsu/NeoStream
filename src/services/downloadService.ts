@@ -3,6 +3,8 @@
  * Manages content downloads with progress tracking and queue management
  */
 
+import { appNotificationService } from './episodeNotificationService';
+
 export interface DownloadItem {
     id: string;
     name: string;
@@ -264,6 +266,18 @@ class DownloadService {
             item.error = error.message || 'Download failed';
             this.emit('error', item);
             await this.saveDownload(item);
+            // Send failed notification
+            appNotificationService.addDownloadNotification(
+                'failed',
+                item.name,
+                item.type,
+                item.localCover || item.cover,
+                item.type === 'episode' ? {
+                    seriesName: item.seriesName,
+                    seasonNumber: item.season,
+                    episodeNumber: item.episode
+                } : undefined
+            );
         }
 
         this.activeDownloads--;
@@ -291,6 +305,18 @@ class DownloadService {
                     item.completedAt = Date.now();
                     this.emit('completed', item);
                     this.saveDownload(item);
+                    // Send completed notification
+                    appNotificationService.addDownloadNotification(
+                        'complete',
+                        item.name,
+                        item.type,
+                        item.localCover || item.cover,
+                        item.type === 'episode' ? {
+                            seriesName: item.seriesName,
+                            seasonNumber: item.season,
+                            episodeNumber: item.episode
+                        } : undefined
+                    );
                     resolve();
                 } else {
                     reject(new Error(result.error || 'Download failed'));

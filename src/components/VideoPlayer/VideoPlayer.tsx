@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaCompress, FaCog, FaChromecast, FaClosedCaptioning } from 'react-icons/fa';
+import { RiPictureInPictureExitLine, RiPictureInPictureLine } from 'react-icons/ri';
 import { useVideoPlayer } from '../../hooks/useVideoPlayer';
 import { useHls } from '../../hooks/useHls';
 import { useChromecast } from '../../hooks/useChromecast';
 import { CastDeviceSelector } from '../CastDeviceSelector';
 import { formatTime, percentage } from '../../utils/videoHelpers';
+import { usageStatsService } from '../../services/usageStatsService';
+import { useMiniPlayer } from '../MiniPlayer';
 import './VideoPlayer.css';
 
 export interface VideoPlayerProps {
@@ -19,6 +22,13 @@ export interface VideoPlayerProps {
     canGoPrevious?: boolean;
     resumeTime?: number | null; // Time in seconds to resume from
     onTimeUpdate?: (currentTime: number, duration: number) => void; // Callback for video progress
+    // Usage stats tracking
+    contentId?: string;
+    contentType?: 'movie' | 'series' | 'live';
+    genre?: string;
+    // For series PiP expand
+    seasonNumber?: number;
+    episodeNumber?: number;
 }
 
 export function VideoPlayer({
@@ -32,7 +42,12 @@ export function VideoPlayer({
     canGoNext,
     canGoPrevious,
     resumeTime,
-    onTimeUpdate
+    onTimeUpdate,
+    contentId,
+    contentType = 'movie',
+    genre,
+    seasonNumber,
+    episodeNumber
 }: VideoPlayerProps) {
     const { videoRef, state, controls } = useVideoPlayer();
     useHls({ src, videoRef });
@@ -143,6 +158,37 @@ export function VideoPlayer({
         videoRef.current.addEventListener('timeupdate', handleTimeUpdate);
         return () => videoRef.current?.removeEventListener('timeupdate', handleTimeUpdate);
     }, [onTimeUpdate]);
+
+    // Usage stats tracking - start session on play, end on pause/unmount
+    useEffect(() => {
+        if (!contentId || !title) return;
+
+        const handlePlay = () => {
+            usageStatsService.startSession(contentId, contentType, title, genre);
+        };
+
+        const handlePause = () => {
+            usageStatsService.endSession();
+        };
+
+        const video = videoRef.current;
+        if (video) {
+            video.addEventListener('play', handlePlay);
+            video.addEventListener('pause', handlePause);
+            video.addEventListener('ended', handlePause);
+        }
+
+        return () => {
+            // End session when component unmounts
+            usageStatsService.endSession();
+            if (video) {
+                video.removeEventListener('play', handlePlay);
+                video.removeEventListener('pause', handlePause);
+                video.removeEventListener('ended', handlePause);
+            }
+        };
+    }, [contentId, contentType, title, genre]);
+
 
     // Go to next episode when video ends
     useEffect(() => {
@@ -487,6 +533,45 @@ export function VideoPlayer({
                             <FaClosedCaptioning />
                         </button>
 
+                        {/* Picture-in-Picture */}
+                        <button
+                            className="control-btn"
+                            onClick={() => {
+                                if (src && title) {
+                                    try {
+                                        const miniPlayer = (window as any).__miniPlayerContext;
+                                        if (miniPlayer) {
+                                            miniPlayer.startMiniPlayer({
+                                                src,
+                                                title: title || 'Video',
+                                                poster,
+                                                contentId,
+                                                contentType,
+                                                currentTime: state.currentTime,
+                                                seasonNumber,
+                                                episodeNumber,
+                                                onExpand: (time: number) => {
+                                                    if (videoRef.current) {
+                                                        videoRef.current.currentTime = time;
+                                                        videoRef.current.play();
+                                                    }
+                                                }
+                                            });
+                                            if (onClose) onClose();
+                                        }
+                                    } catch (e) {
+                                        // Fallback to native PiP if available
+                                        if (videoRef.current && document.pictureInPictureEnabled) {
+                                            videoRef.current.requestPictureInPicture();
+                                        }
+                                    }
+                                }
+                            }}
+                            title="Picture-in-Picture"
+                        >
+                            <RiPictureInPictureLine size={18} />
+                        </button>
+
                         <button
                             className="control-btn"
                             onClick={() => setShowDeviceSelector(true)}
@@ -513,22 +598,24 @@ export function VideoPlayer({
             </div>
 
             {/* Device Selector Modal */}
-            {showDeviceSelector && (
-                <CastDeviceSelector
-                    videoUrl={src}
-                    videoTitle={title || 'Video'}
-                    onClose={() => setShowDeviceSelector(false)}
-                    onDeviceSelected={(device) => {
-                        console.log('Selected device:', device);
-                    }}
-                    chromecastAvailable={chromecast.isAvailable}
-                    chromecastCasting={chromecast.isCasting}
-                    onChromecastCast={() => {
-                        chromecast.setCurrentTime(state.currentTime);
-                        chromecast.startCasting();
-                    }}
-                />
-            )}
-        </div>
+            {
+                showDeviceSelector && (
+                    <CastDeviceSelector
+                        videoUrl={src}
+                        videoTitle={title || 'Video'}
+                        onClose={() => setShowDeviceSelector(false)}
+                        onDeviceSelected={(device) => {
+                            console.log('Selected device:', device);
+                        }}
+                        chromecastAvailable={chromecast.isAvailable}
+                        chromecastCasting={chromecast.isCasting}
+                        onChromecastCast={() => {
+                            chromecast.setCurrentTime(state.currentTime);
+                            chromecast.startCasting();
+                        }}
+                    />
+                )
+            }
+        </div >
     );
 }

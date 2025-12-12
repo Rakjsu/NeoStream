@@ -6,6 +6,7 @@ import { parentalService } from '../services/parentalService';
 import type { ParentalConfig } from '../services/parentalService';
 import { showUpToDateModal } from '../components/UpdateNotification';
 import type { UpdateConfig } from '../types/update';
+import { usageStatsService, type UsageStats, type DailyStats } from '../services/usageStatsService';
 
 export function Settings() {
     const [updateConfig, setUpdateConfig] = useState<UpdateConfig>({
@@ -33,9 +34,16 @@ export function Settings() {
     const [showTermsModal, setShowTermsModal] = useState(false);
     const [showPrivacyModal, setShowPrivacyModal] = useState(false);
 
+    // Usage stats
+    const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
+    const [weeklyStats, setWeeklyStats] = useState<DailyStats[]>([]);
+
     useEffect(() => {
         loadUpdateConfig();
         updateBufferInfo();
+        // Load usage stats
+        setUsageStats(usageStatsService.getStats());
+        setWeeklyStats(usageStatsService.getWeeklyStats());
     }, []);
 
     const loadUpdateConfig = async () => {
@@ -183,9 +191,27 @@ export function Settings() {
     const sections = [
         { id: 'updates', icon: '🔄', label: 'Atualizações', color: '#10b981' },
         { id: 'playback', icon: '⏯️', label: 'Reprodução', color: '#3b82f6' },
+        { id: 'stats', icon: '📊', label: 'Estatísticas', color: '#8b5cf6' },
         { id: 'parental', icon: '👨‍👩‍👧', label: 'Controle Parental', color: '#ef4444' },
         { id: 'about', icon: 'ℹ️', label: 'Sobre', color: '#f59e0b' }
     ];
+
+    // Helper functions for stats display
+    const formatWatchTime = (seconds: number) => {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        if (hours > 0) return `${hours}h ${minutes}min`;
+        return `${minutes}min`;
+    };
+
+    const getWeekDayLabel = (dateStr: string) => {
+        const date = new Date(dateStr + 'T12:00:00');
+        return ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'][date.getDay()];
+    };
+
+    const getMaxWeeklySeconds = () => {
+        return Math.max(...weeklyStats.map(d => d.totalSeconds), 1);
+    };
 
     return (
         <>
@@ -388,6 +414,172 @@ export function Settings() {
                                             <input type="checkbox" defaultChecked />
                                             <span className="toggle-slider"></span>
                                         </label>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Statistics Section */}
+                        {activeSection === 'stats' && (
+                            <div className="section-card">
+                                <div className="section-header">
+                                    <div className="section-icon" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>📊</div>
+                                    <div>
+                                        <h2>Suas Estatísticas</h2>
+                                        <p>Acompanhe seu tempo de visualização</p>
+                                    </div>
+                                </div>
+
+                                <div className="settings-group">
+                                    {/* Main Stats Cards */}
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(2, 1fr)',
+                                        gap: '16px',
+                                        marginBottom: '24px'
+                                    }}>
+                                        {/* Total Watch Time */}
+                                        <div style={{
+                                            background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(124, 58, 237, 0.1))',
+                                            borderRadius: '16px',
+                                            padding: '24px',
+                                            border: '1px solid rgba(139, 92, 246, 0.3)'
+                                        }}>
+                                            <div style={{ fontSize: '32px', marginBottom: '8px' }}>⏱️</div>
+                                            <div style={{
+                                                fontSize: '28px',
+                                                fontWeight: 700,
+                                                color: '#a78bfa',
+                                                marginBottom: '4px'
+                                            }}>
+                                                {formatWatchTime(usageStats?.totalWatchTimeThisMonth || 0)}
+                                            </div>
+                                            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>
+                                                este mês
+                                            </div>
+                                        </div>
+
+                                        {/* Watch Streak */}
+                                        <div style={{
+                                            background: 'linear-gradient(135deg, rgba(251, 146, 60, 0.2), rgba(234, 88, 12, 0.1))',
+                                            borderRadius: '16px',
+                                            padding: '24px',
+                                            border: '1px solid rgba(251, 146, 60, 0.3)'
+                                        }}>
+                                            <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔥</div>
+                                            <div style={{
+                                                fontSize: '28px',
+                                                fontWeight: 700,
+                                                color: '#fb923c',
+                                                marginBottom: '4px'
+                                            }}>
+                                                {usageStats?.watchStreak || 0} dias
+                                            </div>
+                                            <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>
+                                                sequência atual
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Content Breakdown */}
+                                    <div style={{
+                                        background: 'rgba(255,255,255,0.03)',
+                                        borderRadius: '16px',
+                                        padding: '20px',
+                                        border: '1px solid rgba(255,255,255,0.05)',
+                                        marginBottom: '20px'
+                                    }}>
+                                        <h3 style={{ color: 'white', fontSize: '14px', fontWeight: 600, marginBottom: '16px' }}>
+                                            Tempo por Tipo
+                                        </h3>
+                                        <div style={{ display: 'flex', gap: '12px' }}>
+                                            <div style={{ flex: 1, textAlign: 'center' }}>
+                                                <div style={{ fontSize: '24px', marginBottom: '4px' }}>🎬</div>
+                                                <div style={{ color: '#3b82f6', fontWeight: 600 }}>
+                                                    {formatWatchTime(usageStats?.contentBreakdown?.movies || 0)}
+                                                </div>
+                                                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>Filmes</div>
+                                            </div>
+                                            <div style={{ flex: 1, textAlign: 'center' }}>
+                                                <div style={{ fontSize: '24px', marginBottom: '4px' }}>📺</div>
+                                                <div style={{ color: '#10b981', fontWeight: 600 }}>
+                                                    {formatWatchTime(usageStats?.contentBreakdown?.series || 0)}
+                                                </div>
+                                                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>Séries</div>
+                                            </div>
+                                            <div style={{ flex: 1, textAlign: 'center' }}>
+                                                <div style={{ fontSize: '24px', marginBottom: '4px' }}>📡</div>
+                                                <div style={{ color: '#f59e0b', fontWeight: 600 }}>
+                                                    {formatWatchTime(usageStats?.contentBreakdown?.live || 0)}
+                                                </div>
+                                                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>TV ao Vivo</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Weekly Chart */}
+                                    <div style={{
+                                        background: 'rgba(255,255,255,0.03)',
+                                        borderRadius: '16px',
+                                        padding: '20px',
+                                        border: '1px solid rgba(255,255,255,0.05)'
+                                    }}>
+                                        <h3 style={{ color: 'white', fontSize: '14px', fontWeight: 600, marginBottom: '16px' }}>
+                                            Últimos 7 Dias
+                                        </h3>
+                                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '80px' }}>
+                                            {weeklyStats.map((day, i) => {
+                                                const height = Math.max(8, (day.totalSeconds / getMaxWeeklySeconds()) * 70);
+                                                const isToday = day.date === new Date().toISOString().split('T')[0];
+                                                return (
+                                                    <div key={i} style={{ flex: 1, textAlign: 'center' }}>
+                                                        <div
+                                                            style={{
+                                                                height: `${height}px`,
+                                                                background: isToday
+                                                                    ? 'linear-gradient(180deg, #8b5cf6, #6d28d9)'
+                                                                    : 'linear-gradient(180deg, rgba(139, 92, 246, 0.5), rgba(139, 92, 246, 0.2))',
+                                                                borderRadius: '4px',
+                                                                margin: '0 auto',
+                                                                width: '100%',
+                                                                maxWidth: '24px',
+                                                                transition: 'height 0.3s ease'
+                                                            }}
+                                                            title={`${formatWatchTime(day.totalSeconds)}`}
+                                                        />
+                                                        <div style={{
+                                                            color: isToday ? '#a78bfa' : 'rgba(255,255,255,0.4)',
+                                                            fontSize: '11px',
+                                                            marginTop: '6px',
+                                                            fontWeight: isToday ? 600 : 400
+                                                        }}>
+                                                            {getWeekDayLabel(day.date)}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Total All Time */}
+                                    <div style={{
+                                        marginTop: '16px',
+                                        padding: '16px',
+                                        background: 'rgba(255,255,255,0.02)',
+                                        borderRadius: '12px',
+                                        textAlign: 'center'
+                                    }}>
+                                        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>
+                                            Total acumulado: {' '}
+                                        </span>
+                                        <span style={{ color: 'white', fontWeight: 600 }}>
+                                            {formatWatchTime(usageStats?.totalWatchTimeSeconds || 0)}
+                                        </span>
+                                        {usageStats?.longestStreak && usageStats.longestStreak > 0 && (
+                                            <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginLeft: '16px' }}>
+                                                • Maior sequência: {usageStats.longestStreak} dias
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             </div>

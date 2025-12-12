@@ -6,6 +6,7 @@ import { UpdateNotificationBadge } from './UpdateNotificationBadge';
 import { UpdateModal } from './UpdateModal';
 import { ProfileManager } from './ProfileManager';
 import { updateService } from '../services/updateService';
+import { NotificationsPanel } from './NotificationsPanel';
 import type { UpdateInfo } from '../types/update';
 import type { Profile } from '../types/profile';
 
@@ -207,6 +208,16 @@ export function Sidebar() {
                 <div className="bottom-section">
                     {/* Update Badge */}
                     <UpdateNotificationBadge onClick={handleUpdateBadgeClick} />
+
+                    {/* Episode Notifications */}
+                    <NotificationsPanel
+                        onNavigateToSeries={(seriesId) => {
+                            navigate(`/dashboard/series?id=${seriesId}`);
+                        }}
+                        onNavigateToDownloads={() => {
+                            navigate('/dashboard/downloads');
+                        }}
+                    />
 
                     {/* Profile */}
                     {activeProfile && (

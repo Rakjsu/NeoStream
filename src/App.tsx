@@ -1,4 +1,4 @@
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Welcome } from './pages/Welcome';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
@@ -13,8 +13,16 @@ import { Downloads } from './pages/Downloads';
 import { ProfileSelector } from './pages/ProfileSelector';
 import { UpdateNotification } from './components/UpdateNotification';
 import { PostUpdateChangelog } from './components/PostUpdateChangelog';
+import { EpisodeToast } from './components/EpisodeToast';
+import { MiniPlayerProvider } from './components/MiniPlayer';
 import { profileService } from './services/profileService';
 import { useState, useEffect } from 'react';
+
+// Wrapper component to use navigate hook inside App
+function EpisodeToastWithNavigation() {
+  const navigate = useNavigate();
+  return <EpisodeToast onNavigateToSeries={(seriesId) => navigate(`/dashboard/series?id=${seriesId}`)} />;
+}
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -66,10 +74,11 @@ function App() {
   }
 
   return (
-    <>
+    <MiniPlayerProvider>
       <UpdateNotification />
       <PostUpdateChangelog />
       <HashRouter>
+        <EpisodeToastWithNavigation />
         <Routes>
           <Route path="/welcome" element={<Welcome />} />
           <Route path="/login" element={<Login />} />
@@ -93,7 +102,7 @@ function App() {
           />
         </Routes>
       </HashRouter>
-    </>
+    </MiniPlayerProvider>
   );
 }
 

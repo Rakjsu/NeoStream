@@ -158,6 +158,122 @@ export async function searchSeriesByName(seriesName: string, year?: string): Pro
 }
 
 /**
+ * Fetch movie trailer from TMDB
+ * @param movieName - Movie name to search
+ * @param year - Optional release year
+ * @returns YouTube trailer URL or null if not found
+ */
+export async function fetchMovieTrailer(movieName: string, year?: string): Promise<string | null> {
+    try {
+        let cleanName = movieName.replace(/\s*\(\d{4}\)\s*/g, '').trim();
+        cleanName = cleanName.replace(/\s*\[.*?\]\s*/g, '').trim();
+        cleanName = cleanName.replace(/\s+/g, ' ').trim();
+
+        // First, search for the movie
+        const searchUrl = year
+            ? `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanName)}&year=${year}`
+            : `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanName)}`;
+
+        const searchResponse = await fetch(searchUrl);
+        if (!searchResponse.ok) return null;
+
+        const searchData = await searchResponse.json();
+        if (!searchData.results || searchData.results.length === 0) return null;
+
+        const movieId = searchData.results[0].id;
+
+        // Fetch videos for the movie
+        const videosResponse = await fetch(
+            `${TMDB_BASE_URL}/movie/${movieId}/videos?api_key=${TMDB_API_KEY}&language=pt-BR`
+        );
+
+        let videosData = await videosResponse.json();
+
+        // If no videos in Portuguese, try English
+        if (!videosData.results || videosData.results.length === 0) {
+            const videosResponseEn = await fetch(
+                `${TMDB_BASE_URL}/movie/${movieId}/videos?api_key=${TMDB_API_KEY}&language=en-US`
+            );
+            videosData = await videosResponseEn.json();
+        }
+
+        if (!videosData.results || videosData.results.length === 0) return null;
+
+        // Prefer official trailer, then teaser, then any video
+        const trailer = videosData.results.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube') ||
+            videosData.results.find((v: any) => v.type === 'Teaser' && v.site === 'YouTube') ||
+            videosData.results.find((v: any) => v.site === 'YouTube');
+
+        if (trailer?.key) {
+            return `https://www.youtube.com/watch?v=${trailer.key}`;
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error fetching movie trailer:', error);
+        return null;
+    }
+}
+
+/**
+ * Fetch series trailer from TMDB
+ * @param seriesName - Series name to search
+ * @param year - Optional first air date year
+ * @returns YouTube trailer URL or null if not found
+ */
+export async function fetchSeriesTrailer(seriesName: string, year?: string): Promise<string | null> {
+    try {
+        let cleanName = seriesName.replace(/\s*\(\d{4}\)\s*/g, '').trim();
+        cleanName = cleanName.replace(/\s*\[.*?\]\s*/g, '').trim();
+        cleanName = cleanName.replace(/\s+/g, ' ').trim();
+
+        // First, search for the series
+        const searchUrl = year
+            ? `${TMDB_BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanName)}&first_air_date_year=${year}`
+            : `${TMDB_BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanName)}`;
+
+        const searchResponse = await fetch(searchUrl);
+        if (!searchResponse.ok) return null;
+
+        const searchData = await searchResponse.json();
+        if (!searchData.results || searchData.results.length === 0) return null;
+
+        const seriesId = searchData.results[0].id;
+
+        // Fetch videos for the series
+        const videosResponse = await fetch(
+            `${TMDB_BASE_URL}/tv/${seriesId}/videos?api_key=${TMDB_API_KEY}&language=pt-BR`
+        );
+
+        let videosData = await videosResponse.json();
+
+        // If no videos in Portuguese, try English
+        if (!videosData.results || videosData.results.length === 0) {
+            const videosResponseEn = await fetch(
+                `${TMDB_BASE_URL}/tv/${seriesId}/videos?api_key=${TMDB_API_KEY}&language=en-US`
+            );
+            videosData = await videosResponseEn.json();
+        }
+
+        if (!videosData.results || videosData.results.length === 0) return null;
+
+        // Prefer official trailer, then teaser, then any video
+        const trailer = videosData.results.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube') ||
+            videosData.results.find((v: any) => v.type === 'Teaser' && v.site === 'YouTube') ||
+            videosData.results.find((v: any) => v.site === 'YouTube');
+
+        if (trailer?.key) {
+            return `https://www.youtube.com/watch?v=${trailer.key}`;
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error fetching series trailer:', error);
+        return null;
+    }
+}
+
+/**
  * Fetch episode details from TMDB
  * @param tmdbSeriesId - TMDB series ID
  * @param seasonNumber - Season number

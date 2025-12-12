@@ -12,6 +12,45 @@ interface VersionChangelog {
 
 // Changelogs for each version
 const changelogs: VersionChangelog = {
+    '2.7.0': [
+        {
+            icon: '🖼️',
+            title: 'Picture-in-Picture (PiP)',
+            items: [
+                'Modo janela flutuante para assistir enquanto navega',
+                'Janela arrastável e redimensionável',
+                'Controles de play/pause, volume e barra de progresso',
+                'Botão de expandir para voltar ao player completo',
+            ]
+        },
+        {
+            icon: '📊',
+            title: 'Estatísticas de Uso',
+            items: [
+                'Rastreamento de tempo de visualização por perfil',
+                'Breakdown por tipo de conteúdo (Filmes, Séries, TV)',
+                'Sequência de dias assistindo (Watch Streak)',
+                'Gráfico semanal de tempo assistido',
+            ]
+        },
+        {
+            icon: '🔔',
+            title: 'Sistema de Notificações',
+            items: [
+                'Notificações de novos episódios de séries favoritas',
+                'Notificações de downloads concluídos/falhos',
+                'Painel de notificações no sidebar',
+            ]
+        },
+        {
+            icon: '📡',
+            title: 'Melhorias Gerais',
+            items: [
+                'Volume slider no mini player com hover',
+                'Correções de bugs no player de vídeo',
+            ]
+        },
+    ],
     '2.6.0': [
         {
             icon: '🛡️',

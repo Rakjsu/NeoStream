@@ -20,6 +20,9 @@ interface AsyncVideoPlayerProps {
     // For movie progress tracking
     resumeTime?: number | null;
     onTimeUpdate?: (currentTime: number, duration: number) => void;
+    // For PiP expand functionality
+    contentId?: string;
+    contentType?: 'movie' | 'series' | 'live';
 }
 
 function AsyncVideoPlayer({
@@ -36,7 +39,9 @@ function AsyncVideoPlayer({
     seasonNumber,
     episodeNumber,
     resumeTime: externalResumeTime,
-    onTimeUpdate: externalOnTimeUpdate
+    onTimeUpdate: externalOnTimeUpdate,
+    contentId,
+    contentType
 }: AsyncVideoPlayerProps) {
     const [streamUrl, setStreamUrl] = useState<string>('');
     const [loading, setLoading] = useState(true);
@@ -327,6 +332,10 @@ function AsyncVideoPlayer({
                         canGoNext={canGoNext}
                         canGoPrevious={canGoPrevious}
                         resumeTime={resumeTime}
+                        contentId={contentId || seriesId || (movie.stream_id?.toString() || movie.id?.toString())}
+                        contentType={contentType || (seriesId ? 'series' : 'movie')}
+                        seasonNumber={seasonNumber}
+                        episodeNumber={episodeNumber}
                         onTimeUpdate={(currentTime, duration) => {
                             // Call external onTimeUpdate if provided
                             if (externalOnTimeUpdate) {

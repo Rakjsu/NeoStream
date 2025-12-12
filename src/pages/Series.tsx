@@ -14,6 +14,7 @@ import { indexedDBCache } from '../services/indexedDBCache';
 import { downloadService } from '../services/downloadService';
 import { searchSeriesByName as searchSeries, isKidsFriendly } from '../services/tmdb';
 import { parentalService } from '../services/parentalService';
+import { HoverPreviewCard, closeAllPreviews } from '../components/HoverPreviewCard';
 
 interface Series {
     num: number;
@@ -50,6 +51,7 @@ export function Series() {
     const [tmdbData, setTmdbData] = useState<TMDBSeriesDetails | null>(null);
     const [loadingTmdb, setLoadingTmdb] = useState(false);
     const [playingSeries, setPlayingSeries] = useState<Series | null>(null);
+    const [pipResumeTime, setPipResumeTime] = useState<number | null>(null);
     const [selectedSeason, setSelectedSeason] = useState<number>(1);
     const [selectedEpisode, setSelectedEpisode] = useState<number>(1);
     const [seriesInfo, setSeriesInfo] = useState<any>(null);
@@ -82,6 +84,32 @@ export function Series() {
 
     // Blocked category patterns for Kids profile
     const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'erótico'];
+
+    // Close any open previews when this page mounts
+    useEffect(() => {
+        closeAllPreviews();
+    }, []);
+
+    // Listen for mini player expand event to reopen full player
+    useEffect(() => {
+        const handleMiniPlayerExpand = (e: CustomEvent) => {
+            const { contentId, contentType, currentTime, seasonNumber: season, episodeNumber: episode } = e.detail;
+            if (contentType === 'series' && contentId) {
+                // Find the series in our list
+                const foundSeries = series.find((s: Series) => s.series_id.toString() === contentId);
+                if (foundSeries) {
+                    // Set the season and episode to match PiP state
+                    if (season !== undefined) setSelectedSeason(season);
+                    if (episode !== undefined) setSelectedEpisode(episode);
+                    setPipResumeTime(currentTime || 0);
+                    setPlayingSeries(foundSeries);
+                }
+            }
+        };
+
+        window.addEventListener('miniPlayerExpand', handleMiniPlayerExpand as EventListener);
+        return () => window.removeEventListener('miniPlayerExpand', handleMiniPlayerExpand as EventListener);
+    }, [series]);
 
     // Dynamic grid calculation based on window dimensions
     useEffect(() => {
@@ -799,66 +827,99 @@ export function Series() {
                         ) : (
                             <div ref={gridRef} className="series-grid">
                                 {filteredSeries.slice(0, visibleCount).map((s, index) => {
-                                    const isSelected = selectedSeries?.series_id === s.series_id;
                                     const isSaved = watchLaterService.has(String(s.series_id), 'series');
+                                    const isFavorite = favoritesService.has(String(s.series_id), 'series');
                                     const hasProgress = watchProgressService.getSeriesProgress(String(s.series_id), s.name);
                                     const isCompleted = watchProgressService.isSeriesCompleted(String(s.series_id));
+                                    const yearMatch = s.release_date?.match(/(\d{4})/);
+                                    const year = yearMatch ? yearMatch[1] : undefined;
+                                    const genres = s.genre?.split(',').map(g => g.trim()).filter(Boolean);
 
                                     return (
                                         <div
                                             key={s.series_id}
-                                            className={`series-card ${isSelected ? 'selected' : ''} ${checkingItem === s.name ? 'checking' : ''}`}
-                                            onClick={() => handleSeriesClick(s)}
+                                            className={checkingItem === s.name ? 'checking' : ''}
                                             style={{ animationDelay: `${(index % itemsPerPage) * 0.03}s` }}
                                         >
-                                            {/* Poster */}
-                                            <div className="card-poster">
-                                                {(s.cover || s.stream_icon) && !brokenImages.has(s.series_id) ? (
-                                                    <img
-                                                        loading="lazy"
-                                                        src={fixImageUrl(s.cover || s.stream_icon)}
-                                                        alt={s.name}
-                                                        onError={() => handleImageError(s.series_id)}
-                                                    />
-                                                ) : (
-                                                    <div className="poster-fallback">
-                                                        <span>📺</span>
-                                                    </div>
-                                                )}
-
-                                                {/* Overlay */}
-                                                <div className="card-overlay">
-                                                    <div className="play-icon">▶</div>
-                                                </div>
-
+                                            <HoverPreviewCard
+                                                type="series"
+                                                id={s.series_id}
+                                                cover={fixImageUrl(s.cover || s.stream_icon)}
+                                                backdrop={s.backdrop_path?.[0] ? `https://image.tmdb.org/t/p/w780${s.backdrop_path[0]}` : undefined}
+                                                title={s.name}
+                                                year={year}
+                                                rating={s.rating}
+                                                genres={genres}
+                                                plot={s.plot}
+                                                youtubeTrailer={s.youtube_trailer}
+                                                isFavorite={isFavorite}
+                                                onPlay={() => {
+                                                    handleSeriesClick(s);
+                                                }}
+                                                onMoreInfo={() => handleSeriesClick(s)}
+                                                onToggleFavorite={() => {
+                                                    if (isFavorite) {
+                                                        favoritesService.remove(String(s.series_id), 'series');
+                                                    } else {
+                                                        favoritesService.add({
+                                                            id: String(s.series_id),
+                                                            type: 'series',
+                                                            title: s.name,
+                                                            poster: fixImageUrl(s.cover || s.stream_icon),
+                                                            seriesId: s.series_id
+                                                        });
+                                                    }
+                                                    setRefresh(r => r + 1);
+                                                }}
+                                            >
                                                 {/* Saved Badge */}
                                                 {isSaved && (
-                                                    <div className="saved-badge">🔖</div>
+                                                    <span style={{
+                                                        position: 'absolute',
+                                                        top: 10,
+                                                        right: 10,
+                                                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                                        borderRadius: 8,
+                                                        padding: '4px 8px',
+                                                        fontSize: 14,
+                                                        zIndex: 5
+                                                    }}>🔖</span>
                                                 )}
 
                                                 {/* Completed Badge */}
                                                 {isCompleted && (
-                                                    <div className="completed-badge">✓</div>
+                                                    <span style={{
+                                                        position: 'absolute',
+                                                        top: 10,
+                                                        left: 10,
+                                                        background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+                                                        borderRadius: 8,
+                                                        padding: '4px 8px',
+                                                        fontSize: 14,
+                                                        zIndex: 5
+                                                    }}>✓</span>
                                                 )}
 
-                                                {/* Episode Badge */}
+                                                {/* Episode Progress Badge */}
                                                 {hasProgress && !isCompleted && (
-                                                    <div className="episode-badge">
+                                                    <span style={{
+                                                        position: 'absolute',
+                                                        bottom: 50,
+                                                        left: 8,
+                                                        right: 8,
+                                                        background: 'rgba(0, 0, 0, 0.85)',
+                                                        borderRadius: 6,
+                                                        padding: '5px 8px',
+                                                        fontSize: 11,
+                                                        fontWeight: 600,
+                                                        color: '#c4b5fd',
+                                                        textAlign: 'center',
+                                                        zIndex: 5
+                                                    }}>
                                                         T{hasProgress.lastWatchedSeason} E{hasProgress.lastWatchedEpisode}
-                                                    </div>
+                                                    </span>
                                                 )}
-                                            </div>
-
-                                            {/* Title & Progress */}
-                                            <div className="card-info">
-                                                <h4 className="card-title">{s.name}</h4>
-                                                {hasProgress && (
-                                                    <ProgressBar
-                                                        progress={100}
-                                                        completed={isCompleted}
-                                                    />
-                                                )}
-                                            </div>
+                                            </HoverPreviewCard>
                                         </div>
                                     );
                                 })}
@@ -881,10 +942,14 @@ export function Series() {
                 <AsyncVideoPlayer
                     movie={playingSeries}
                     buildStreamUrl={buildSeriesStreamUrl}
-                    onClose={() => setPlayingSeries(null)}
+                    onClose={() => {
+                        setPlayingSeries(null);
+                        setPipResumeTime(null);
+                    }}
                     seriesId={String(playingSeries.series_id)}
                     seasonNumber={selectedSeason}
                     episodeNumber={selectedEpisode}
+                    resumeTime={pipResumeTime}
                     onNextEpisode={() => {
                         watchProgressService.markEpisodeWatched(
                             String(playingSeries.series_id),
@@ -996,7 +1061,8 @@ export function Series() {
                     contentData={{
                         name: selectedSeries.name,
                         cover: selectedSeries.cover || selectedSeries.stream_icon,
-                        rating: selectedSeries.rating
+                        rating: selectedSeries.rating,
+                        youtube_trailer: selectedSeries.youtube_trailer
                     }}
                     onPlay={(season, episode) => {
                         setSelectedSeason(season || 1);

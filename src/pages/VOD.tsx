@@ -12,6 +12,7 @@ import { indexedDBCache } from '../services/indexedDBCache';
 import { downloadService } from '../services/downloadService';
 import { searchMovieByName as searchMovie, isKidsFriendly } from '../services/tmdb';
 import { parentalService } from '../services/parentalService';
+import { HoverPreviewCard, closeAllPreviews } from '../components/HoverPreviewCard';
 
 interface VODStream {
     num: number;
@@ -55,6 +56,7 @@ export function VOD() {
     const [tmdbData, setTmdbData] = useState<TMDBMovieDetails | null>(null);
     const [loadingTmdb, setLoadingTmdb] = useState(false);
     const [playingMovie, setPlayingMovie] = useState<VODStream | null>(null);
+    const [pipResumeTime, setPipResumeTime] = useState<number | null>(null);
     const [, _setRefresh] = useState(0);
     const [visibleCount, setVisibleCount] = useState(0);
     const [itemsPerPage, setItemsPerPage] = useState(36);
@@ -66,6 +68,29 @@ export function VOD() {
     const [blockMessage, setBlockMessage] = useState<string | null>(null);
     const [cachedRatings, setCachedRatings] = useState<Map<string, string | null>>(new Map());
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
+
+    // Close any open previews when this page mounts
+    useEffect(() => {
+        closeAllPreviews();
+    }, []);
+
+    // Listen for mini player expand event to reopen full player
+    useEffect(() => {
+        const handleMiniPlayerExpand = (e: CustomEvent) => {
+            const { contentId, contentType, currentTime } = e.detail;
+            if (contentType === 'movie' && contentId) {
+                // Find the movie in our list and set it as playing
+                const movie = streams.find((m: VODStream) => m.stream_id.toString() === contentId);
+                if (movie) {
+                    setPipResumeTime(currentTime || 0);
+                    setPlayingMovie(movie);
+                }
+            }
+        };
+
+        window.addEventListener('miniPlayerExpand', handleMiniPlayerExpand as EventListener);
+        return () => window.removeEventListener('miniPlayerExpand', handleMiniPlayerExpand as EventListener);
+    }, [streams]);
 
     // Dynamic grid calculation based on window dimensions
     useEffect(() => {
@@ -489,68 +514,112 @@ export function VOD() {
                                 {filteredStreams.slice(0, visibleCount).map((stream, index) => {
                                     const progress = getProgress(stream.stream_id);
                                     const movieProgress = getMovieProgress(stream.stream_id);
-                                    const isSelected = selectedMovie?.stream_id === stream.stream_id;
                                     const isSaved = watchLaterService.has(String(stream.stream_id), 'movie');
+                                    const isFavorite = favoritesService.has(String(stream.stream_id), 'movie');
+                                    const yearMatch = stream.release_date?.match(/(\d{4})/);
+                                    const year = yearMatch ? yearMatch[1] : undefined;
+                                    const genres = stream.genre?.split(',').map(g => g.trim()).filter(Boolean);
 
                                     return (
                                         <div
                                             key={stream.stream_id}
-                                            className={`movie-card ${isSelected ? 'selected' : ''} ${checkingItem === stream.name ? 'checking' : ''}`}
-                                            onClick={() => handleMovieClick(stream)}
+                                            className={checkingItem === stream.name ? 'checking' : ''}
                                             style={{ animationDelay: `${(index % itemsPerPage) * 0.03}s` }}
                                         >
-                                            {/* Poster */}
-                                            <div className="card-poster">
-                                                {stream.stream_icon && !brokenImages.has(stream.stream_id) ? (
-                                                    <img
-                                                        loading="lazy"
-                                                        src={fixImageUrl(stream.stream_icon)}
-                                                        alt={stream.name}
-                                                        onError={() => handleImageError(stream.stream_id)}
-                                                    />
-                                                ) : (
-                                                    <div className="poster-fallback">
-                                                        <span>🎬</span>
-                                                    </div>
-                                                )}
-
-                                                {/* Overlay */}
-                                                <div className="card-overlay">
-                                                    <div className="play-icon">▶</div>
-                                                </div>
-
+                                            <HoverPreviewCard
+                                                type="movie"
+                                                id={stream.stream_id}
+                                                cover={fixImageUrl(stream.stream_icon) || stream.cover}
+                                                backdrop={stream.backdrop_path?.[0] ? `https://image.tmdb.org/t/p/w780${stream.backdrop_path[0]}` : undefined}
+                                                title={stream.name}
+                                                year={year}
+                                                rating={stream.rating}
+                                                genres={genres}
+                                                plot={stream.plot}
+                                                youtubeTrailer={stream.youtube_trailer}
+                                                isFavorite={isFavorite}
+                                                onPlay={async () => {
+                                                    const url = await buildStreamUrl(stream);
+                                                    if (url) {
+                                                        setPlayingMovie(stream);
+                                                    }
+                                                }}
+                                                onMoreInfo={() => handleMovieClick(stream)}
+                                                onToggleFavorite={() => {
+                                                    if (isFavorite) {
+                                                        favoritesService.remove(String(stream.stream_id), 'movie');
+                                                    } else {
+                                                        favoritesService.add({
+                                                            id: String(stream.stream_id),
+                                                            type: 'movie',
+                                                            title: stream.name,
+                                                            poster: fixImageUrl(stream.stream_icon) || stream.cover,
+                                                            streamId: stream.stream_id
+                                                        });
+                                                    }
+                                                    _setRefresh(r => r + 1);
+                                                }}
+                                            >
                                                 {/* Saved Badge */}
                                                 {isSaved && (
-                                                    <div className="saved-badge">🔖</div>
+                                                    <span style={{
+                                                        position: 'absolute',
+                                                        top: 10,
+                                                        right: 10,
+                                                        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                                        borderRadius: 8,
+                                                        padding: '4px 8px',
+                                                        fontSize: 14
+                                                    }}>🔖</span>
                                                 )}
 
                                                 {/* Offline Badge */}
                                                 {downloadService.isDownloaded(stream.name, 'movie') && (
-                                                    <div className="offline-badge">📥</div>
+                                                    <span style={{
+                                                        position: 'absolute',
+                                                        top: 10,
+                                                        left: 10,
+                                                        background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                                                        borderRadius: 8,
+                                                        padding: '4px 8px',
+                                                        fontSize: 14
+                                                    }}>📥</span>
                                                 )}
 
                                                 {/* Progress Bar */}
                                                 {progress > 0 && (
-                                                    <div className="card-progress-container">
-                                                        <div
-                                                            className="card-progress-bar"
-                                                            style={{ width: `${progress}%` }}
-                                                        />
+                                                    <div style={{
+                                                        position: 'absolute',
+                                                        bottom: 0,
+                                                        left: 0,
+                                                        right: 0,
+                                                        height: 4,
+                                                        background: 'rgba(0,0,0,0.6)'
+                                                    }}>
+                                                        <div style={{
+                                                            width: `${progress}%`,
+                                                            height: '100%',
+                                                            background: 'linear-gradient(90deg, #6366f1, #a855f7)'
+                                                        }} />
                                                     </div>
                                                 )}
 
-                                                {/* Remaining Time Badge (shown on hover) */}
+                                                {/* Remaining Time Badge */}
                                                 {movieProgress && movieProgress.currentTime > 0 && progress < 95 && (
-                                                    <div className="remaining-time-badge">
+                                                    <div style={{
+                                                        position: 'absolute',
+                                                        bottom: 8,
+                                                        left: 8,
+                                                        background: 'rgba(0,0,0,0.8)',
+                                                        padding: '4px 8px',
+                                                        borderRadius: 4,
+                                                        fontSize: 11,
+                                                        color: 'white'
+                                                    }}>
                                                         {formatRemainingTime(movieProgress.currentTime, movieProgress.duration)}
                                                     </div>
                                                 )}
-                                            </div>
-
-                                            {/* Title */}
-                                            <div className="card-info">
-                                                <h4 className="card-title">{stream.name}</h4>
-                                            </div>
+                                            </HoverPreviewCard>
                                         </div>
                                     );
                                 })}
@@ -573,8 +642,11 @@ export function VOD() {
                 <AsyncVideoPlayer
                     movie={playingMovie}
                     buildStreamUrl={buildStreamUrl}
-                    onClose={() => setPlayingMovie(null)}
-                    resumeTime={movieProgressService.getMoviePositionById(playingMovie.stream_id.toString())?.currentTime || null}
+                    onClose={() => {
+                        setPlayingMovie(null);
+                        setPipResumeTime(null);
+                    }}
+                    resumeTime={pipResumeTime !== null ? pipResumeTime : (movieProgressService.getMoviePositionById(playingMovie.stream_id.toString())?.currentTime || null)}
                     onTimeUpdate={(currentTime, duration) => {
                         if (Math.floor(currentTime) % 5 === 0) {
                             movieProgressService.saveMovieTime(
@@ -599,7 +671,8 @@ export function VOD() {
                         name: selectedMovie.name,
                         cover: selectedMovie.stream_icon,
                         rating: selectedMovie.rating,
-                        container_extension: selectedMovie.container_extension
+                        container_extension: selectedMovie.container_extension,
+                        youtube_trailer: selectedMovie.youtube_trailer
                     }}
                     onPlay={(_season, _episode, offlineUrl) => {
                         // Set offline URL if available

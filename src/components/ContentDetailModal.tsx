@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { searchSeriesByName, searchMovieByName, type TMDBSeriesDetails, type TMDBMovieDetails } from '../services/tmdb';
+import { searchSeriesByName, searchMovieByName, fetchMovieTrailer, fetchSeriesTrailer, type TMDBSeriesDetails, type TMDBMovieDetails } from '../services/tmdb';
 import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
 import { watchLaterService } from '../services/watchLater';
@@ -21,6 +21,7 @@ interface ContentDetailModalProps {
         director?: string;
         release_date?: string;
         container_extension?: string;
+        youtube_trailer?: string;
     };
     onPlay: (season?: number, episode?: number, offlineUrl?: string) => void;
 }
@@ -42,6 +43,8 @@ export function ContentDetailModal({
     const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'completed'>('idle');
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [showDownloadModal, setShowDownloadModal] = useState(false);
+    const [trailerUrl, setTrailerUrl] = useState<string | null>(null);
+    const [showTrailerModal, setShowTrailerModal] = useState(false);
     const modalRef = useRef<HTMLDivElement>(null);
 
     // Fetch series info for episodes
@@ -138,6 +141,31 @@ export function ContentDetailModal({
             setDownloadStatus(isAlreadyInQueue ? 'completed' : 'idle');
         }
     }, [isOpen, contentData.name, contentType]);
+
+    // Fetch trailer from TMDB if not provided by API
+    useEffect(() => {
+        if (!isOpen || !contentData.name) return;
+
+        // If API provided a trailer, use it
+        if (contentData.youtube_trailer) {
+            setTrailerUrl(contentData.youtube_trailer);
+            return;
+        }
+
+        // Otherwise, fetch from TMDB
+        const yearMatch = contentData.name.match(/\((\d{4})\)/);
+        const year = yearMatch ? yearMatch[1] : undefined;
+
+        if (contentType === 'movie') {
+            fetchMovieTrailer(contentData.name, year)
+                .then(url => setTrailerUrl(url))
+                .catch(() => setTrailerUrl(null));
+        } else {
+            fetchSeriesTrailer(contentData.name, year)
+                .then(url => setTrailerUrl(url))
+                .catch(() => setTrailerUrl(null));
+        }
+    }, [isOpen, contentData.name, contentData.youtube_trailer, contentType]);
 
     // Close on escape key
     useEffect(() => {
@@ -782,6 +810,38 @@ export function ContentDetailModal({
                             }
                         </button>
 
+                        {/* Ver Trailer Button */}
+                        {trailerUrl && (
+                            <button
+                                onClick={() => setShowTrailerModal(true)}
+                                style={{
+                                    padding: '14px 20px',
+                                    borderRadius: 12,
+                                    border: '2px solid rgba(239, 68, 68, 0.4)',
+                                    background: 'rgba(239, 68, 68, 0.15)',
+                                    color: '#fca5a5',
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={e => {
+                                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
+                                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.6)';
+                                }}
+                                onMouseLeave={e => {
+                                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                                }}
+                                title="Assistir trailer"
+                            >
+                                🎬 Ver Trailer
+                            </button>
+                        )}
+
                         {/* Favorite Button */}
                         <button
                             onClick={() => {
@@ -952,6 +1012,95 @@ export function ContentDetailModal({
                                 Cancelar
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Trailer Modal */}
+            {showTrailerModal && trailerUrl && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        background: 'rgba(0, 0, 0, 0.95)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 10002,
+                        animation: 'fadeIn 0.2s ease'
+                    }}
+                    onClick={() => setShowTrailerModal(false)}
+                >
+                    <div
+                        style={{
+                            position: 'relative',
+                            width: '90%',
+                            maxWidth: 1200,
+                            aspectRatio: '16 / 9',
+                            background: '#000',
+                            borderRadius: 16,
+                            overflow: 'hidden',
+                            boxShadow: '0 25px 80px rgba(0, 0, 0, 0.8)',
+                            border: '2px solid rgba(239, 68, 68, 0.4)'
+                        }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {/* Close Button */}
+                        <button
+                            onClick={() => setShowTrailerModal(false)}
+                            style={{
+                                position: 'absolute',
+                                top: 16,
+                                right: 16,
+                                width: 44,
+                                height: 44,
+                                borderRadius: '50%',
+                                background: 'rgba(0, 0, 0, 0.7)',
+                                border: '2px solid rgba(255, 255, 255, 0.3)',
+                                color: 'white',
+                                fontSize: 22,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                zIndex: 10,
+                                transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.6)';
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.7)';
+                            }}
+                        >
+                            ✕
+                        </button>
+
+                        {/* YouTube Embed */}
+                        <iframe
+                            src={(() => {
+                                // Extract video ID from URL
+                                const patterns = [
+                                    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+                                    /^([a-zA-Z0-9_-]{11})$/
+                                ];
+                                for (const pattern of patterns) {
+                                    const match = trailerUrl.match(pattern);
+                                    if (match && match[1]) {
+                                        return `https://www.youtube.com/embed/${match[1]}?autoplay=1&rel=0&modestbranding=1`;
+                                    }
+                                }
+                                return '';
+                            })()}
+                            style={{
+                                width: '100%',
+                                height: '100%',
+                                border: 'none'
+                            }}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            title="Trailer"
+                        />
                     </div>
                 </div>
             )}
