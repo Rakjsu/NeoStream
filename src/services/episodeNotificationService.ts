@@ -357,3 +357,6 @@ export const appNotificationService = new AppNotificationService();
 
 // Re-export for backward compatibility
 export const episodeNotificationService = appNotificationService;
+
+// Type alias for backwards compatibility
+export type EpisodeNotification = AppNotification;
