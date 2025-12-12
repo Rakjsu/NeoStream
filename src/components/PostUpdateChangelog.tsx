@@ -12,7 +12,7 @@ interface VersionChangelog {
 
 // Changelogs for each version
 const changelogs: VersionChangelog = {
-    '1.6.0': [
+    '2.6.0': [
         {
             icon: '🛡️',
             title: 'Proteção contra Duplicados',
