@@ -7,6 +7,8 @@ import type { ParentalConfig } from '../services/parentalService';
 import { showUpToDateModal } from '../components/UpdateNotification';
 import type { UpdateConfig } from '../types/update';
 import { usageStatsService, type UsageStats, type DailyStats } from '../services/usageStatsService';
+import { useLanguage, type SupportedLanguage } from '../services/languageService';
+
 
 export function Settings() {
     const [updateConfig, setUpdateConfig] = useState<UpdateConfig>({
@@ -37,6 +39,9 @@ export function Settings() {
     // Usage stats
     const [usageStats, setUsageStats] = useState<UsageStats | null>(null);
     const [weeklyStats, setWeeklyStats] = useState<DailyStats[]>([]);
+
+    // Language
+    const { language, setLanguage, t, languages } = useLanguage();
 
     useEffect(() => {
         loadUpdateConfig();
@@ -115,7 +120,7 @@ export function Settings() {
         const pin = pinInput.join('');
 
         if (pin.length !== 4) {
-            setPinError('Digite 4 dígitos');
+            setPinError(t('parental', 'pinError4Digits'));
             return;
         }
 
@@ -132,7 +137,7 @@ export function Settings() {
                 setSaveAnimation('parental_enabled');
                 setTimeout(() => setSaveAnimation(null), 1500);
             } else {
-                setPinError('PIN incorreto');
+                setPinError(t('parental', 'pinIncorrect'));
                 setPinInput(['', '', '', '']);
             }
             return;
@@ -147,7 +152,7 @@ export function Settings() {
             // Confirm PIN
             const confirmPin = pinConfirm.join('');
             if (pin !== confirmPin) {
-                setPinError('Os PINs não coincidem');
+                setPinError(t('parental', 'pinMismatch'));
                 setPinConfirm(['', '', '', '']);
                 return;
             }
@@ -189,11 +194,11 @@ export function Settings() {
     };
 
     const sections = [
-        { id: 'updates', icon: '🔄', label: 'Atualizações', color: '#10b981' },
-        { id: 'playback', icon: '⏯️', label: 'Reprodução', color: '#3b82f6' },
-        { id: 'stats', icon: '📊', label: 'Estatísticas', color: '#8b5cf6' },
-        { id: 'parental', icon: '👨‍👩‍👧', label: 'Controle Parental', color: '#ef4444' },
-        { id: 'about', icon: 'ℹ️', label: 'Sobre', color: '#f59e0b' }
+        { id: 'updates', icon: '🔄', label: t('nav', 'updates'), color: '#10b981' },
+        { id: 'playback', icon: '⏯️', label: t('nav', 'playback'), color: '#3b82f6' },
+        { id: 'stats', icon: '📊', label: t('nav', 'stats'), color: '#8b5cf6' },
+        { id: 'parental', icon: '👨‍👩‍👧', label: t('nav', 'parental'), color: '#ef4444' },
+        { id: 'about', icon: 'ℹ️', label: t('nav', 'about'), color: '#f59e0b' }
     ];
 
     // Helper functions for stats display
@@ -223,8 +228,8 @@ export function Settings() {
                 <header className="settings-header">
                     <div className="header-icon">⚙️</div>
                     <div>
-                        <h1>Configurações</h1>
-                        <p className="subtitle">Personalize sua experiência</p>
+                        <h1>{t('settings', 'title')}</h1>
+                        <p className="subtitle">{t('settings', 'subtitle')}</p>
                     </div>
                 </header>
 
@@ -255,8 +260,8 @@ export function Settings() {
                                 <div className="section-header">
                                     <div className="section-icon" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>🔄</div>
                                     <div>
-                                        <h2>Atualizações Automáticas</h2>
-                                        <p>Mantenha seu aplicativo sempre atualizado</p>
+                                        <h2>{t('updates', 'title')}</h2>
+                                        <p>{t('updates', 'description')}</p>
                                     </div>
                                 </div>
 
@@ -264,26 +269,26 @@ export function Settings() {
                                     {/* Check Frequency */}
                                     <div className="setting-item">
                                         <div className="setting-info">
-                                            <label>Verificar atualizações</label>
-                                            <p>Define com que frequência o app verifica por novas versões</p>
+                                            <label>{t('updates', 'checkFrequency')}</label>
+                                            <p>{t('updates', 'checkFrequencyDesc')}</p>
                                         </div>
                                         <select
                                             className="setting-select"
                                             value={updateConfig.checkFrequency}
                                             onChange={(e) => handleUpdateConfigChange('checkFrequency', e.target.value as UpdateConfig['checkFrequency'])}
                                         >
-                                            <option value="on-open">Ao abrir o app</option>
-                                            <option value="1-day">A cada 1 dia</option>
-                                            <option value="1-week">A cada 1 semana</option>
-                                            <option value="1-month">A cada 1 mês</option>
+                                            <option value="on-open">{t('updates', 'onOpen')}</option>
+                                            <option value="1-day">{t('updates', 'daily')}</option>
+                                            <option value="1-week">{t('updates', 'weekly')}</option>
+                                            <option value="1-month">{t('updates', 'monthly')}</option>
                                         </select>
                                     </div>
 
                                     {/* Auto Install Toggle */}
                                     <div className="setting-item">
                                         <div className="setting-info">
-                                            <label>Instalar automaticamente</label>
-                                            <p>Atualizações serão instaladas sem pedir confirmação</p>
+                                            <label>{t('updates', 'autoInstall')}</label>
+                                            <p>{t('updates', 'autoInstallDesc')}</p>
                                         </div>
                                         <label className="toggle-switch">
                                             <input
@@ -300,14 +305,27 @@ export function Settings() {
 
                                     <div className="setting-item">
                                         <div className="setting-info">
-                                            <label>Idioma</label>
-                                            <p>Idioma da interface</p>
+                                            <label>{t('updates', 'language')}</label>
+                                            <p>{t('updates', 'languageDesc')}</p>
                                         </div>
-                                        <select className="setting-select">
-                                            <option>🇧🇷 Português</option>
-                                            <option>🇺🇸 English</option>
-                                            <option>🇪🇸 Español</option>
+                                        <select
+                                            className="setting-select"
+                                            value={language}
+                                            onChange={(e) => {
+                                                setLanguage(e.target.value as SupportedLanguage);
+                                                setSaveAnimation('language');
+                                                setTimeout(() => setSaveAnimation(null), 1500);
+                                            }}
+                                        >
+                                            {languages.map(lang => (
+                                                <option key={lang.code} value={lang.code}>
+                                                    {lang.flag} {lang.name}
+                                                </option>
+                                            ))}
                                         </select>
+                                        {saveAnimation === 'language' && (
+                                            <span className="save-indicator">{t('settings', 'saved')}</span>
+                                        )}
                                     </div>
 
                                     {/* Last Check */}
@@ -346,35 +364,35 @@ export function Settings() {
                                 <div className="section-header">
                                     <div className="section-icon" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)' }}>⏯️</div>
                                     <div>
-                                        <h2>Reprodução</h2>
-                                        <p>Ajuste a reprodução de vídeo e áudio</p>
+                                        <h2>{t('playback', 'title')}</h2>
+                                        <p>{t('playback', 'description')}</p>
                                     </div>
                                 </div>
 
                                 <div className="settings-group">
                                     <div className="setting-item">
                                         <div className="setting-info">
-                                            <label>Tamanho do Buffer</label>
-                                            <p>Tempo de buffer antes de iniciar a reprodução</p>
+                                            <label>{t('playback', 'bufferSize')}</label>
+                                            <p>{t('playback', 'bufferSizeDesc')}</p>
                                         </div>
                                         <select
                                             className="setting-select"
                                             value={playbackConfig.bufferSize}
                                             onChange={(e) => handlePlaybackConfigChange('bufferSize', e.target.value)}
                                         >
-                                            <option value="intelligent">🧠 Inteligente (Adaptativo)</option>
-                                            <option value="5">5 segundos</option>
-                                            <option value="10">10 segundos</option>
-                                            <option value="15">15 segundos</option>
-                                            <option value="30">30 segundos</option>
+                                            <option value="intelligent">{t('playback', 'intelligent')}</option>
+                                            <option value="5">5 {t('playback', 'seconds')}</option>
+                                            <option value="10">10 {t('playback', 'seconds')}</option>
+                                            <option value="15">15 {t('playback', 'seconds')}</option>
+                                            <option value="30">30 {t('playback', 'seconds')}</option>
                                         </select>
-                                        {saveAnimation === 'bufferSize' && <span className="save-indicator">✓ Salvo</span>}
+                                        {saveAnimation === 'bufferSize' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                                     </div>
 
                                     <div className="setting-item">
                                         <div className="setting-info">
-                                            <label>Codificador de Vídeo</label>
-                                            <p>Codec de vídeo preferencial</p>
+                                            <label>{t('playback', 'videoCodec')}</label>
+                                            <p>{t('playback', 'videoCodecDesc')}</p>
                                         </div>
                                         <select
                                             className="setting-select"
@@ -386,13 +404,13 @@ export function Settings() {
                                             <option value="h265">H.265 (HEVC)</option>
                                             <option value="vp9">VP9</option>
                                         </select>
-                                        {saveAnimation === 'videoCodec' && <span className="save-indicator">✓ Salvo</span>}
+                                        {saveAnimation === 'videoCodec' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                                     </div>
 
                                     <div className="setting-item">
                                         <div className="setting-info">
-                                            <label>Auto-play próximo episódio</label>
-                                            <p>Reproduzir automaticamente o próximo episódio</p>
+                                            <label>{t('playback', 'autoPlayNext')}</label>
+                                            <p>{t('playback', 'autoPlayNextDesc')}</p>
                                         </div>
                                         <label className="toggle-switch">
                                             <input
@@ -402,13 +420,13 @@ export function Settings() {
                                             />
                                             <span className="toggle-slider"></span>
                                         </label>
-                                        {saveAnimation === 'autoPlayNextEpisode' && <span className="save-indicator">✓ Salvo</span>}
+                                        {saveAnimation === 'autoPlayNextEpisode' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                                     </div>
 
                                     <div className="setting-item">
                                         <div className="setting-info">
-                                            <label>Pular intro automaticamente</label>
-                                            <p>Pular abertura de séries quando disponível</p>
+                                            <label>{t('playback', 'skipIntro')}</label>
+                                            <p>{t('playback', 'skipIntroDesc')}</p>
                                         </div>
                                         <label className="toggle-switch">
                                             <input type="checkbox" defaultChecked />
@@ -425,8 +443,8 @@ export function Settings() {
                                 <div className="section-header">
                                     <div className="section-icon" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>📊</div>
                                     <div>
-                                        <h2>Suas Estatísticas</h2>
-                                        <p>Acompanhe seu tempo de visualização</p>
+                                        <h2>{t('stats', 'title')}</h2>
+                                        <p>{t('stats', 'description')}</p>
                                     </div>
                                 </div>
 
@@ -455,7 +473,7 @@ export function Settings() {
                                                 {formatWatchTime(usageStats?.totalWatchTimeThisMonth || 0)}
                                             </div>
                                             <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>
-                                                este mês
+                                                {t('stats', 'thisMonth')}
                                             </div>
                                         </div>
 
@@ -473,10 +491,10 @@ export function Settings() {
                                                 color: '#fb923c',
                                                 marginBottom: '4px'
                                             }}>
-                                                {usageStats?.watchStreak || 0} dias
+                                                {usageStats?.watchStreak || 0} {t('stats', 'days')}
                                             </div>
                                             <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px' }}>
-                                                sequência atual
+                                                {t('stats', 'currentStreak')}
                                             </div>
                                         </div>
                                     </div>
@@ -490,7 +508,7 @@ export function Settings() {
                                         marginBottom: '20px'
                                     }}>
                                         <h3 style={{ color: 'white', fontSize: '14px', fontWeight: 600, marginBottom: '16px' }}>
-                                            Tempo por Tipo
+                                            {t('stats', 'timeByType')}
                                         </h3>
                                         <div style={{ display: 'flex', gap: '12px' }}>
                                             <div style={{ flex: 1, textAlign: 'center' }}>
@@ -498,21 +516,21 @@ export function Settings() {
                                                 <div style={{ color: '#3b82f6', fontWeight: 600 }}>
                                                     {formatWatchTime(usageStats?.contentBreakdown?.movies || 0)}
                                                 </div>
-                                                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>Filmes</div>
+                                                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>{t('stats', 'movies')}</div>
                                             </div>
                                             <div style={{ flex: 1, textAlign: 'center' }}>
                                                 <div style={{ fontSize: '24px', marginBottom: '4px' }}>📺</div>
                                                 <div style={{ color: '#10b981', fontWeight: 600 }}>
                                                     {formatWatchTime(usageStats?.contentBreakdown?.series || 0)}
                                                 </div>
-                                                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>Séries</div>
+                                                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>{t('stats', 'series')}</div>
                                             </div>
                                             <div style={{ flex: 1, textAlign: 'center' }}>
                                                 <div style={{ fontSize: '24px', marginBottom: '4px' }}>📡</div>
                                                 <div style={{ color: '#f59e0b', fontWeight: 600 }}>
                                                     {formatWatchTime(usageStats?.contentBreakdown?.live || 0)}
                                                 </div>
-                                                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>TV ao Vivo</div>
+                                                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px' }}>{t('stats', 'liveTV')}</div>
                                             </div>
                                         </div>
                                     </div>
@@ -525,7 +543,7 @@ export function Settings() {
                                         border: '1px solid rgba(255,255,255,0.05)'
                                     }}>
                                         <h3 style={{ color: 'white', fontSize: '14px', fontWeight: 600, marginBottom: '16px' }}>
-                                            Últimos 7 Dias
+                                            {t('stats', 'last7Days')}
                                         </h3>
                                         <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '80px' }}>
                                             {weeklyStats.map((day, i) => {
@@ -570,14 +588,14 @@ export function Settings() {
                                         textAlign: 'center'
                                     }}>
                                         <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>
-                                            Total acumulado: {' '}
+                                            {t('stats', 'totalAccumulated')}: {' '}
                                         </span>
                                         <span style={{ color: 'white', fontWeight: 600 }}>
                                             {formatWatchTime(usageStats?.totalWatchTimeSeconds || 0)}
                                         </span>
                                         {usageStats?.longestStreak && usageStats.longestStreak > 0 && (
                                             <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', marginLeft: '16px' }}>
-                                                • Maior sequência: {usageStats.longestStreak} dias
+                                                • {t('stats', 'longestStreak')}: {usageStats.longestStreak} {t('stats', 'days')}
                                             </span>
                                         )}
                                     </div>
@@ -591,16 +609,16 @@ export function Settings() {
                                 <div className="section-header">
                                     <div className="section-icon" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)' }}>👨‍👩‍👧</div>
                                     <div>
-                                        <h2>Controle Parental</h2>
-                                        <p>Gerencie o acesso ao conteúdo</p>
+                                        <h2>{t('parental', 'title')}</h2>
+                                        <p>{t('parental', 'description')}</p>
                                     </div>
                                 </div>
 
                                 <div className="settings-group">
                                     <div className="setting-item">
                                         <div className="setting-info">
-                                            <label>Ativar Controle Parental</label>
-                                            <p>Restringir acesso a conteúdo adulto</p>
+                                            <label>{t('parental', 'enable')}</label>
+                                            <p>{t('parental', 'enableDesc')}</p>
                                         </div>
                                         <label className="toggle-switch">
                                             <input
@@ -610,13 +628,13 @@ export function Settings() {
                                             />
                                             <span className="toggle-slider"></span>
                                         </label>
-                                        {saveAnimation === 'parental_enabled' && <span className="save-indicator">✓ Salvo</span>}
+                                        {saveAnimation === 'parental_enabled' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                                     </div>
 
                                     <div className="setting-item">
                                         <div className="setting-info">
-                                            <label>Classificação Máxima</label>
-                                            <p>Limite de classificação indicativa</p>
+                                            <label>{t('parental', 'maxRating')}</label>
+                                            <p>{t('parental', 'maxRatingDesc')}</p>
                                         </div>
                                         <select
                                             className="setting-select"
@@ -624,20 +642,20 @@ export function Settings() {
                                             onChange={(e) => handleParentalConfigChange('maxRating', e.target.value)}
                                             disabled={!parentalConfig.enabled}
                                         >
-                                            <option value="L">Livre</option>
-                                            <option value="10">10 anos</option>
-                                            <option value="12">12 anos</option>
-                                            <option value="14">14 anos</option>
-                                            <option value="16">16 anos</option>
-                                            <option value="18">18 anos</option>
+                                            <option value="L">{t('parental', 'free')}</option>
+                                            <option value="10">10 {t('parental', 'years')}</option>
+                                            <option value="12">12 {t('parental', 'years')}</option>
+                                            <option value="14">14 {t('parental', 'years')}</option>
+                                            <option value="16">16 {t('parental', 'years')}</option>
+                                            <option value="18">18 {t('parental', 'years')}</option>
                                         </select>
-                                        {saveAnimation === 'parental_maxRating' && <span className="save-indicator">✓ Salvo</span>}
+                                        {saveAnimation === 'parental_maxRating' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                                     </div>
 
                                     <div className="setting-item">
                                         <div className="setting-info">
-                                            <label>PIN de Acesso</label>
-                                            <p>{parentalService.hasPin() ? 'PIN configurado ✓' : 'Definir PIN para desbloquear conteúdo'}</p>
+                                            <label>{t('parental', 'pin')}</label>
+                                            <p>{parentalService.hasPin() ? t('parental', 'pinConfigured') : t('parental', 'pinDefine')}</p>
                                         </div>
                                         <button
                                             className="setting-btn"
@@ -657,15 +675,15 @@ export function Settings() {
                                                 transition: 'all 0.2s'
                                             }}
                                         >
-                                            🔑 {parentalService.hasPin() ? 'Alterar' : 'Definir'} PIN
+                                            🔑 {parentalService.hasPin() ? t('parental', 'changePin') : t('parental', 'setPin')} PIN
                                         </button>
-                                        {saveAnimation === 'parental_pin' && <span className="save-indicator">✓ Salvo</span>}
+                                        {saveAnimation === 'parental_pin' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                                     </div>
 
                                     <div className="setting-item">
                                         <div className="setting-info">
-                                            <label>Bloquear Categorias Adultas</label>
-                                            <p>Ocultar automaticamente categorias adultas</p>
+                                            <label>{t('parental', 'blockAdult')}</label>
+                                            <p>{t('parental', 'blockAdultDesc')}</p>
                                         </div>
                                         <label className="toggle-switch">
                                             <input
@@ -676,13 +694,13 @@ export function Settings() {
                                             />
                                             <span className="toggle-slider"></span>
                                         </label>
-                                        {saveAnimation === 'parental_blockAdultCategories' && <span className="save-indicator">✓ Salvo</span>}
+                                        {saveAnimation === 'parental_blockAdultCategories' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                                     </div>
 
                                     <div className="setting-item">
                                         <div className="setting-info">
-                                            <label>Filtrar por TMDB</label>
-                                            <p>Verificar classificação no TMDB automaticamente</p>
+                                            <label>{t('parental', 'filterTMDB')}</label>
+                                            <p>{t('parental', 'filterTMDBDesc')}</p>
                                         </div>
                                         <label className="toggle-switch">
                                             <input
@@ -693,7 +711,7 @@ export function Settings() {
                                             />
                                             <span className="toggle-slider"></span>
                                         </label>
-                                        {saveAnimation === 'parental_filterByTMDB' && <span className="save-indicator">✓ Salvo</span>}
+                                        {saveAnimation === 'parental_filterByTMDB' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                                     </div>
                                 </div>
                             </div>
@@ -705,8 +723,8 @@ export function Settings() {
                                 <div className="section-header">
                                     <div className="section-icon" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>ℹ️</div>
                                     <div>
-                                        <h2>Sobre o Aplicativo</h2>
-                                        <p>Informações e créditos</p>
+                                        <h2>{t('about', 'title')}</h2>
+                                        <p>{t('about', 'description')}</p>
                                     </div>
                                 </div>
 
@@ -726,24 +744,24 @@ export function Settings() {
                                         </svg>
                                     </div>
                                     <h3 className="app-name">NeoStream</h3>
-                                    <p className="app-version">Versão {__APP_VERSION__}</p>
+                                    <p className="app-version">{t('about', 'version')} {__APP_VERSION__}</p>
                                     <p className="app-description">
-                                        Sua experiência de streaming completa com TV ao vivo, filmes e séries.
+                                        {t('about', 'appDescription')}
                                     </p>
                                     <div className="about-links">
                                         <button
                                             onClick={() => setShowTermsModal(true)}
                                             className="about-link"
                                         >
-                                            📄 Termos de Uso
+                                            📄 {t('about', 'termsOfUse')}
                                         </button>
                                         <button
                                             onClick={() => setShowPrivacyModal(true)}
                                             className="about-link"
                                         >
-                                            🔒 Política de Privacidade
+                                            🔒 {t('about', 'privacyPolicy')}
                                         </button>
-                                        <a href="mailto:suporte@neostream.app" className="about-link">💬 Suporte</a>
+                                        <a href="mailto:suporte@neostream.app" className="about-link">💬 {t('about', 'support')}</a>
                                     </div>
                                 </div>
                             </div>
@@ -834,17 +852,17 @@ export function Settings() {
                                     backgroundClip: 'text'
                                 }}>
                                     {pinMode === 'verify'
-                                        ? 'Verificar PIN'
+                                        ? t('parental', 'verifyPin')
                                         : pinStep === 'enter'
-                                            ? 'Definir PIN'
-                                            : 'Confirmar PIN'}
+                                            ? t('parental', 'setPin') + ' PIN'
+                                            : t('parental', 'confirmPin')}
                                 </h2>
                                 <p style={{ color: '#9ca3af', fontSize: '15px', margin: 0 }}>
                                     {pinMode === 'verify'
-                                        ? 'Digite o PIN para desativar o controle parental'
+                                        ? t('parental', 'verifyPin')
                                         : pinStep === 'enter'
-                                            ? 'Digite um PIN de 4 dígitos para proteger o controle parental'
-                                            : 'Digite o PIN novamente para confirmar'}
+                                            ? t('parental', 'enterPin')
+                                            : t('parental', 'confirmPin')}
                                 </p>
                             </div>
 
@@ -1297,7 +1315,7 @@ export function Settings() {
                         </div>
                     </div>
                 )}
-            </div>
+            </div >
         </>
     );
 }

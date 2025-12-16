@@ -10,6 +10,8 @@ import { usageStatsService } from '../../services/usageStatsService';
 import { useMiniPlayer } from '../MiniPlayer';
 import './VideoPlayer.css';
 
+import type { MovieVersion } from '../../services/movieVersionService';
+
 export interface VideoPlayerProps {
     src: string;
     title?: string;
@@ -29,6 +31,10 @@ export interface VideoPlayerProps {
     // For series PiP expand
     seasonNumber?: number;
     episodeNumber?: number;
+    // Movie version switching
+    movieVersions?: MovieVersion[];
+    currentMovieId?: number;
+    onSwitchVersion?: (movie: any, currentTime: number) => void;
 }
 
 export function VideoPlayer({
@@ -47,7 +53,10 @@ export function VideoPlayer({
     contentType = 'movie',
     genre,
     seasonNumber,
-    episodeNumber
+    episodeNumber,
+    movieVersions,
+    currentMovieId,
+    onSwitchVersion
 }: VideoPlayerProps) {
     const { videoRef, state, controls } = useVideoPlayer();
     useHls({ src, videoRef });
@@ -471,23 +480,50 @@ export function VideoPlayer({
 
                             {showSettings && (
                                 <div className="settings-menu">
-                                    <div className="settings-section">
-                                        <span className="settings-label">Velocidade</span>
-                                        <div className="settings-options">
-                                            {playbackRates.map(rate => (
-                                                <button
-                                                    key={rate}
-                                                    className={`settings-option ${state.playbackRate === rate ? 'active' : ''}`}
-                                                    onClick={() => {
-                                                        controls.setPlaybackRate(rate);
-                                                        setShowSettings(false);
-                                                    }}
-                                                >
-                                                    {rate}x
-                                                </button>
-                                            ))}
+                                    {/* Movie Version Switcher - only show for movies with multiple versions */}
+                                    {movieVersions && movieVersions.length > 1 && onSwitchVersion ? (
+                                        <div className="settings-section">
+                                            <span className="settings-label">Versão</span>
+                                            <div className="settings-options">
+                                                {movieVersions.map(version => {
+                                                    const isActive = version.movie.stream_id === currentMovieId;
+                                                    return (
+                                                        <button
+                                                            key={version.movie.stream_id}
+                                                            className={`settings-option ${isActive ? 'active' : ''}`}
+                                                            onClick={() => {
+                                                                if (!isActive) {
+                                                                    onSwitchVersion(version.movie, state.currentTime);
+                                                                }
+                                                                setShowSettings(false);
+                                                            }}
+                                                        >
+                                                            {version.label}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
-                                    </div>
+                                    ) : (
+                                        /* Playback Speed - show for series or single-version movies */
+                                        <div className="settings-section">
+                                            <span className="settings-label">Velocidade</span>
+                                            <div className="settings-options">
+                                                {playbackRates.map(rate => (
+                                                    <button
+                                                        key={rate}
+                                                        className={`settings-option ${state.playbackRate === rate ? 'active' : ''}`}
+                                                        onClick={() => {
+                                                            controls.setPlaybackRate(rate);
+                                                            setShowSettings(false);
+                                                        }}
+                                                    >
+                                                        {rate}x
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>

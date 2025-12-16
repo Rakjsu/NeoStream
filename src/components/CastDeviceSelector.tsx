@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useDLNA } from '../hooks/useDLNA';
 import { useAirPlay } from '../hooks/useAirPlay';
+import { useLanguage } from '../services/languageService';
 
 export interface CastDevice {
     id: string;
@@ -39,6 +40,7 @@ export function CastDeviceSelector({
     const [devicePort, setDevicePort] = useState('8080');
     const [casting, setCasting] = useState(false);
     const [castError, setCastError] = useState<string | null>(null);
+    const { t } = useLanguage();
 
     // Auto-discover on mount
     useEffect(() => {
@@ -53,7 +55,7 @@ export function CastDeviceSelector({
         if (chromecastAvailable) {
             devices.push({
                 id: 'chromecast-default',
-                name: chromecastCasting ? 'Chromecast (Conectado)' : 'Chromecast',
+                name: chromecastCasting ? 'Chromecast (' + t('cast', 'connected') + ')' : 'Chromecast',
                 type: 'chromecast',
                 available: true,
                 source: 'discovered',
@@ -104,14 +106,14 @@ export function CastDeviceSelector({
             });
             setTimeout(() => onClose(), 500);
         } else {
-            setCastError(dlna.error || 'Falha ao transmitir');
+            setCastError(dlna.error || t('cast', 'failedToTransmit'));
         }
         setCasting(false);
     };
 
     const handleAddDevice = async () => {
         if (!deviceIP) {
-            setCastError('Digite o IP da sua Smart TV');
+            setCastError(t('cast', 'enterIP'));
             return;
         }
 
@@ -128,7 +130,7 @@ export function CastDeviceSelector({
             setDevicePort('8080');
             setCastError(null);
         } else {
-            setCastError(dlna.error || 'Erro ao adicionar dispositivo');
+            setCastError(dlna.error || t('cast', 'errorAddingDevice'));
         }
     };
 
@@ -162,8 +164,8 @@ export function CastDeviceSelector({
                         <div className="cast-title-row">
                             <div className="cast-icon">📺</div>
                             <div>
-                                <h2 className="cast-title">Transmitir para TV</h2>
-                                <p className="cast-subtitle">{videoTitle || 'Selecione um dispositivo'}</p>
+                                <h2 className="cast-title">{t('cast', 'title')}</h2>
+                                <p className="cast-subtitle">{videoTitle || t('cast', 'selectDevice')}</p>
                             </div>
                         </div>
                         <button className="cast-close" onClick={onClose}>✕</button>
@@ -179,7 +181,7 @@ export function CastDeviceSelector({
                                 disabled={dlna.isDiscovering}
                             >
                                 <span className="scan-icon">{dlna.isDiscovering ? '⏳' : '🔍'}</span>
-                                <span>{dlna.isDiscovering ? 'Buscando dispositivos...' : 'Buscar na rede'}</span>
+                                <span>{dlna.isDiscovering ? t('cast', 'searching') : t('cast', 'searchNetwork')}</span>
                             </button>
 
                             {/* Error */}
@@ -195,8 +197,8 @@ export function CastDeviceSelector({
                                 {allDevices.length === 0 ? (
                                     <div className="no-devices">
                                         <div className="no-devices-icon">📡</div>
-                                        <p>Nenhum dispositivo encontrado</p>
-                                        <p className="no-devices-hint">Adicione sua TV manualmente ou busque na rede</p>
+                                        <p>{t('cast', 'noDevices')}</p>
+                                        <p className="no-devices-hint">{t('cast', 'addManually')}</p>
                                     </div>
                                 ) : (
                                     allDevices.map((device, index) => (
@@ -214,7 +216,7 @@ export function CastDeviceSelector({
                                                 <span className="device-name">{device.name}</span>
                                                 <span className="device-type">
                                                     {getDeviceTypeName(device.type)}
-                                                    {device.source === 'discovered' && ' • Descoberto'}
+                                                    {device.source === 'discovered' && ' • ' + t('cast', 'discovered')}
                                                 </span>
                                             </div>
                                             <div className="device-status">
@@ -232,24 +234,24 @@ export function CastDeviceSelector({
                             {/* Add Device Button */}
                             <button className="add-device-btn" onClick={() => setView('add')}>
                                 <span>➕</span>
-                                <span>Adicionar TV manualmente</span>
+                                <span>{t('cast', 'addTVManually')}</span>
                             </button>
 
                             {/* Help */}
                             <div className="cast-help">
                                 <div className="help-icon">💡</div>
                                 <div className="help-text">
-                                    <strong>Dica:</strong> A TV deve estar ligada e conectada na mesma rede Wi-Fi
+                                    <strong>{t('cast', 'tip')}</strong> {t('cast', 'tipText')}
                                 </div>
                             </div>
                         </div>
                     ) : (
                         <div className="cast-content">
                             <button className="back-btn" onClick={() => setView('list')}>
-                                ← Voltar
+                                ← {t('cast', 'back')}
                             </button>
 
-                            <h3 className="add-title">Adicionar Smart TV</h3>
+                            <h3 className="add-title">{t('cast', 'addSmartTV')}</h3>
 
                             {castError && (
                                 <div className="cast-error">
@@ -259,7 +261,7 @@ export function CastDeviceSelector({
                             )}
 
                             <div className="form-group">
-                                <label>Nome (opcional)</label>
+                                <label>{t('cast', 'nameOptional')}</label>
                                 <input
                                     type="text"
                                     value={deviceName}
@@ -270,7 +272,7 @@ export function CastDeviceSelector({
                             </div>
 
                             <div className="form-group">
-                                <label>Endereço IP *</label>
+                                <label>{t('cast', 'ipAddress')} *</label>
                                 <input
                                     type="text"
                                     value={deviceIP}
@@ -281,7 +283,7 @@ export function CastDeviceSelector({
                             </div>
 
                             <div className="form-group">
-                                <label>Porta</label>
+                                <label>{t('cast', 'port')}</label>
                                 <input
                                     type="text"
                                     value={devicePort}
@@ -292,13 +294,13 @@ export function CastDeviceSelector({
                             </div>
 
                             <button className="submit-btn" onClick={handleAddDevice}>
-                                Adicionar TV
+                                {t('cast', 'addTV')}
                             </button>
 
                             <div className="cast-help">
                                 <div className="help-icon">📺</div>
                                 <div className="help-text">
-                                    <strong>Como encontrar o IP:</strong> TV → Configurações → Rede → Status da Rede
+                                    <strong>{t('cast', 'howToFindIP')}</strong> {t('cast', 'howToFindIPText')}
                                 </div>
                             </div>
                         </div>

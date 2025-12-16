@@ -3,6 +3,7 @@ import { profileService } from '../services/profileService';
 import type { Profile } from '../types/profile';
 import { ProfileCard } from '../components/ProfileCard';
 import { CreateProfileModal } from '../components/CreateProfileModal';
+import { useLanguage } from '../services/languageService';
 
 interface ProfileSelectorProps {
     onProfileSelected: () => void;
@@ -20,6 +21,7 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
     const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<Profile | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const { t } = useLanguage();
 
     useEffect(() => {
         loadProfiles();
@@ -61,14 +63,14 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
             setShowPinModal(false);
             onProfileSelected();
         } else {
-            setPinError('PIN incorreto. Tente novamente.');
+            setPinError(t('nav', 'incorrectPin') + '. ' + t('profile', 'tryAgain') + '.');
             setPinInput('');
         }
     };
 
     const handleAddProfile = () => {
         if (profiles.length >= 5) {
-            alert('Limite de 5 perfis atingido!');
+            alert(t('profile', 'profileCreationError'));
             return;
         }
         setShowCreateModal(true);
@@ -76,7 +78,7 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
 
     const handleDeleteProfile = (profile: Profile) => {
         if (profiles.length <= 1) {
-            alert('Você precisa ter pelo menos um perfil!');
+            alert(t('profile', 'needOneProfile'));
             return;
         }
         setShowDeleteConfirm(profile);
@@ -126,7 +128,7 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                 {/* Title */}
                 <h1 className="profile-title">
                     <span className="title-icon">👋</span>
-                    Quem está assistindo?
+                    {t('profile', 'whoIsWatching')}
                 </h1>
 
                 {/* Profiles Grid */}
@@ -189,7 +191,7 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                                 <span className="add-icon">+</span>
                                 <div className="add-icon-glow" />
                             </div>
-                            <span className="add-label">Adicionar Perfil</span>
+                            <span className="add-label">{t('profile', 'addProfile')}</span>
                         </div>
                     )}
                 </div>
@@ -200,7 +202,7 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                     onClick={() => setIsManaging(!isManaging)}
                 >
                     <span>{isManaging ? '✓' : '⚙️'}</span>
-                    <span>{isManaging ? 'Concluído' : 'Gerenciar Perfis'}</span>
+                    <span>{isManaging ? t('profile', 'done') : t('profile', 'manageProfiles')}</span>
                 </button>
             </div>
 
@@ -210,15 +212,15 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                     <div className="pin-modal" onClick={(e) => e.stopPropagation()}>
                         <div className="pin-modal-header">
                             <div className="pin-profile-icon">🗑️</div>
-                            <h2>Excluir Perfil?</h2>
-                            <p>Tem certeza que deseja excluir o perfil <strong>{showDeleteConfirm.name}</strong>?</p>
+                            <h2>{t('profile', 'deleteProfile')}?</h2>
+                            <p>{t('profile', 'confirmDelete').replace('este perfil', '')} <strong>{showDeleteConfirm.name}</strong>?</p>
                         </div>
                         <div className="pin-modal-buttons">
                             <button className="btn-cancel" onClick={() => setShowDeleteConfirm(null)}>
-                                Cancelar
+                                {t('profile', 'cancel')}
                             </button>
                             <button className="btn-submit btn-danger" onClick={confirmDelete}>
-                                Excluir
+                                {t('profile', 'delete')}
                             </button>
                         </div>
                     </div>
@@ -231,14 +233,14 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                     <div className="pin-modal" onClick={(e) => e.stopPropagation()}>
                         <div className="pin-modal-header">
                             <div className="pin-profile-icon">✏️</div>
-                            <h2>Editar Perfil</h2>
+                            <h2>{t('profile', 'editProfile')}</h2>
                         </div>
                         <div className="edit-profile-form">
                             <input
                                 type="text"
                                 className="edit-profile-input"
                                 defaultValue={editingProfile.name}
-                                placeholder="Nome do perfil"
+                                placeholder={t('profile', 'profileName')}
                                 id="edit-profile-name"
                             />
                             <div className="avatar-selector">
@@ -258,7 +260,7 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                         </div>
                         <div className="pin-modal-buttons">
                             <button className="btn-cancel" onClick={() => setEditingProfile(null)}>
-                                Cancelar
+                                {t('profile', 'cancel')}
                             </button>
                             <button
                                 className="btn-submit"
@@ -267,7 +269,7 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                                     handleEditProfile(editingProfile, input?.value || editingProfile.name, editingProfile.avatar);
                                 }}
                             >
-                                Salvar
+                                {t('profile', 'save')}
                             </button>
                         </div>
                     </div>
@@ -280,8 +282,8 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                     <div className="pin-modal" onClick={(e) => e.stopPropagation()}>
                         <div className="pin-modal-header">
                             <div className="pin-profile-icon">🔐</div>
-                            <h2>Digite o PIN</h2>
-                            <p>Perfil protegido: <strong>{selectedProfileForPin.name}</strong></p>
+                            <h2>{t('profile', 'enterPin')}</h2>
+                            <p>{t('profile', 'protectedProfile')}: <strong>{selectedProfileForPin.name}</strong></p>
                         </div>
 
                         <div
@@ -325,14 +327,14 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
 
                         <div className="pin-modal-buttons">
                             <button className="btn-cancel" onClick={() => setShowPinModal(false)}>
-                                Cancelar
+                                {t('profile', 'cancel')}
                             </button>
                             <button
                                 className="btn-submit"
                                 onClick={handlePinSubmit}
                                 disabled={pinInput.length !== 4}
                             >
-                                Entrar
+                                {t('nav', 'enter')}
                             </button>
                         </div>
                     </div>

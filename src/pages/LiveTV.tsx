@@ -5,6 +5,7 @@ import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { epgService } from '../services/epgService';
 import { profileService } from '../services/profileService';
 import { parentalService } from '../services/parentalService';
+import { useLanguage } from '../services/languageService';
 
 interface LiveStream {
     num: number;
@@ -47,6 +48,8 @@ export function LiveTV() {
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const [allowedCategoryIds, setAllowedCategoryIds] = useState<Set<string>>(new Set());
     const [blockedCategoryIds, setBlockedCategoryIds] = useState<Set<string>>(new Set());
+    const [pipResumeTime, setPipResumeTime] = useState<number | null>(null);
+    const { t } = useLanguage();
 
     // For Kids profiles: only allow 'infantis' and '24 horas infantis' categories
     const KIDS_ALLOWED_PATTERNS = ['infantil', 'infantis', 'kids', 'criança', '24 horas infantis'];
@@ -85,6 +88,24 @@ export function LiveTV() {
             window.removeEventListener('resize', calculateItemsPerPage);
         };
     }, []);
+
+    // Listen for mini player expand event to reopen full player
+    useEffect(() => {
+        const handleMiniPlayerExpand = (e: CustomEvent) => {
+            const { contentId, contentType, currentTime } = e.detail;
+            if (contentType === 'live' && contentId) {
+                // Find the channel in our list
+                const channel = streams.find((c: LiveStream) => c.stream_id.toString() === contentId);
+                if (channel) {
+                    setPipResumeTime(currentTime || 0);
+                    setPlayingChannel(channel);
+                }
+            }
+        };
+
+        window.addEventListener('miniPlayerExpand', handleMiniPlayerExpand as EventListener);
+        return () => window.removeEventListener('miniPlayerExpand', handleMiniPlayerExpand as EventListener);
+    }, [streams]);
 
     useEffect(() => {
         fetchStreams();
@@ -252,14 +273,173 @@ export function LiveTV() {
 
     if (loading) {
         return (
-            <div className="p-8">
-                <h1 className="text-3xl font-bold text-white mb-6">Canais de TV</h1>
-                <div className="space-y-px">
-                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
-                        <div key={i} className="bg-gray-800 py-1 px-2 border-b border-gray-700/50 flex items-center gap-2 animate-pulse">
-                            <div className="w-[16px] h-[16px] bg-gray-700 rounded"></div>
-                            <div className="flex-1">
-                                <div className="h-3 bg-gray-700 rounded w-2/3"></div>
+            <div style={{
+                position: 'relative',
+                height: '100vh',
+                overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center'
+            }}>
+                {/* Background */}
+                <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)',
+                    zIndex: 0
+                }} />
+                <div style={{
+                    position: 'fixed',
+                    inset: 0,
+                    background: `
+                        radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+                        radial-gradient(ellipse at 80% 80%, rgba(147, 51, 234, 0.1) 0%, transparent 50%)
+                    `,
+                    pointerEvents: 'none',
+                    zIndex: 0
+                }} />
+
+                <style>{`
+                    @keyframes tvPulse {
+                        0%, 100% { transform: scale(1); opacity: 1; }
+                        50% { transform: scale(1.1); opacity: 0.8; }
+                    }
+                    @keyframes ringExpand {
+                        0% { transform: scale(0.8); opacity: 0.8; }
+                        100% { transform: scale(2); opacity: 0; }
+                    }
+                    @keyframes shimmerLoad {
+                        0% { background-position: -200% 0; }
+                        100% { background-position: 200% 0; }
+                    }
+                    @keyframes fadeInUp {
+                        from { opacity: 0; transform: translateY(20px); }
+                        to { opacity: 1; transform: translateY(0); }
+                    }
+                    @keyframes dotPulse {
+                        0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+                        40% { transform: scale(1); opacity: 1; }
+                    }
+                `}</style>
+
+                {/* Animated Icon Container */}
+                <div style={{
+                    position: 'relative',
+                    zIndex: 1,
+                    marginBottom: '40px'
+                }}>
+                    {/* Expanding Rings */}
+                    {[0, 1, 2].map((i) => (
+                        <div key={i} style={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            width: '100px',
+                            height: '100px',
+                            borderRadius: '50%',
+                            border: '2px solid rgba(59, 130, 246, 0.3)',
+                            animation: `ringExpand 2s ease-out infinite`,
+                            animationDelay: `${i * 0.5}s`
+                        }} />
+                    ))}
+
+                    {/* TV Icon */}
+                    <div style={{
+                        width: '100px',
+                        height: '100px',
+                        borderRadius: '24px',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '48px',
+                        boxShadow: '0 20px 60px rgba(59, 130, 246, 0.4)',
+                        animation: 'tvPulse 2s ease-in-out infinite'
+                    }}>
+                        📺
+                    </div>
+                </div>
+
+                {/* Loading Text with Dots */}
+                <div style={{
+                    position: 'relative',
+                    zIndex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    marginBottom: '60px',
+                    animation: 'fadeInUp 0.6s ease-out'
+                }}>
+                    <span style={{
+                        fontSize: '18px',
+                        fontWeight: '600',
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        letterSpacing: '0.5px'
+                    }}>
+                        {t('categories', 'loadingChannels')}
+                    </span>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                        {[0, 1, 2].map((i) => (
+                            <span key={i} style={{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                background: '#3b82f6',
+                                animation: 'dotPulse 1.4s ease-in-out infinite',
+                                animationDelay: `${i * 0.2}s`
+                            }} />
+                        ))}
+                    </div>
+                </div>
+
+                {/* Skeleton Cards Preview */}
+                <div style={{
+                    position: 'relative',
+                    zIndex: 1,
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 200px)',
+                    gap: '16px',
+                    opacity: 0.5,
+                    animation: 'fadeInUp 0.6s ease-out 0.2s both'
+                }}>
+                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                        <div key={i} style={{
+                            background: 'linear-gradient(135deg, rgba(31, 41, 55, 0.6) 0%, rgba(55, 65, 81, 0.4) 100%)',
+                            borderRadius: '12px',
+                            padding: '12px 16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '12px',
+                            border: '1px solid rgba(255, 255, 255, 0.05)'
+                        }}>
+                            <div style={{
+                                width: '48px',
+                                height: '48px',
+                                borderRadius: '10px',
+                                background: 'linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 100%)',
+                                backgroundSize: '200% 100%',
+                                animation: 'shimmerLoad 1.5s infinite'
+                            }} />
+                            <div style={{ flex: 1 }}>
+                                <div style={{
+                                    height: '12px',
+                                    width: '80%',
+                                    borderRadius: '6px',
+                                    background: 'linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 100%)',
+                                    backgroundSize: '200% 100%',
+                                    animation: 'shimmerLoad 1.5s infinite',
+                                    marginBottom: '8px'
+                                }} />
+                                <div style={{
+                                    height: '8px',
+                                    width: '50%',
+                                    borderRadius: '4px',
+                                    background: 'linear-gradient(90deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 100%)',
+                                    backgroundSize: '200% 100%',
+                                    animation: 'shimmerLoad 1.5s infinite'
+                                }} />
                             </div>
                         </div>
                     ))}
@@ -316,7 +496,7 @@ export function LiveTV() {
             <AnimatedSearchBar
                 value={searchQuery}
                 onChange={setSearchQuery}
-                placeholder="Buscar canais..."
+                placeholder={t('login', 'searchChannels')}
             />
             <CategoryMenu
                 onSelectCategory={setSelectedCategory}
@@ -478,7 +658,7 @@ export function LiveTV() {
                                             borderRadius: '50%',
                                             animation: 'liveDot 1s ease-in-out infinite'
                                         }} />
-                                        AO VIVO
+                                        {t('liveTV', 'live')}
                                     </div>
                                 </div>
 
@@ -516,7 +696,7 @@ export function LiveTV() {
                                             e.currentTarget.style.boxShadow = '0 10px 30px -5px rgba(59, 130, 246, 0.5)';
                                         }}
                                     >
-                                        <span style={{ fontSize: '18px' }}>▶</span> Assistir Agora
+                                        <span style={{ fontSize: '18px' }}>▶</span> {t('liveTV', 'watchNow')}
                                     </button>
 
                                     <button
@@ -542,7 +722,7 @@ export function LiveTV() {
                                             e.currentTarget.style.transform = 'translateY(0)';
                                         }}
                                     >
-                                        ✕ Fechar
+                                        ✕ {t('liveTV', 'close')}
                                     </button>
                                 </div>
                             </div>
@@ -574,7 +754,7 @@ export function LiveTV() {
                                         display: 'flex',
                                         boxShadow: '0 4px 15px rgba(59, 130, 246, 0.3)'
                                     }}>📺</span>
-                                    Grade Horária
+                                    {t('liveTV', 'scheduleTitle')}
                                 </h3>
 
                                 {currentProgram ? (
@@ -608,7 +788,7 @@ export function LiveTV() {
                                                     boxShadow: '0 0 10px rgba(239, 68, 68, 0.6)'
                                                 }} />
                                                 <span style={{ fontSize: '12px', color: '#93c5fd', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                                                    AGORA
+                                                    {t('liveTV', 'nowPlaying')}
                                                 </span>
                                             </div>
 
@@ -638,7 +818,7 @@ export function LiveTV() {
                                         {upcomingPrograms.length > 0 && (
                                             <div>
                                                 <div style={{ fontSize: '13px', color: 'rgba(148, 163, 184, 1)', marginBottom: '14px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                                    A Seguir
+                                                    {t('liveTV', 'upNext')}
                                                 </div>
                                                 {upcomingPrograms.map((program, index) => (
                                                     <div
@@ -669,7 +849,7 @@ export function LiveTV() {
                                 ) : (
                                     <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(148, 163, 184, 0.8)' }}>
                                         <div style={{ fontSize: '48px', marginBottom: '16px', filter: 'grayscale(0.3)' }}>📺</div>
-                                        <div style={{ fontWeight: '500' }}>Sem informações de programação</div>
+                                        <div style={{ fontWeight: '500' }}>{t('liveTV', 'noScheduleInfo')}</div>
                                     </div>
                                 )}
                             </div>
@@ -810,8 +990,14 @@ export function LiveTV() {
                     <AsyncVideoPlayer
                         movie={playingChannel as any}
                         buildStreamUrl={buildLiveStreamUrl}
-                        onClose={() => setPlayingChannel(null)}
+                        onClose={() => {
+                            setPlayingChannel(null);
+                            setPipResumeTime(null);
+                        }}
                         customTitle={playingChannel.name}
+                        contentId={playingChannel.stream_id.toString()}
+                        contentType="live"
+                        resumeTime={pipResumeTime}
                     />
                 )
             }

@@ -15,6 +15,7 @@ import { downloadService } from '../services/downloadService';
 import { searchSeriesByName as searchSeries, isKidsFriendly } from '../services/tmdb';
 import { parentalService } from '../services/parentalService';
 import { HoverPreviewCard, closeAllPreviews } from '../components/HoverPreviewCard';
+import { useLanguage } from '../services/languageService';
 
 interface Series {
     num: number;
@@ -81,6 +82,7 @@ export function Series() {
     const [blockMessage, setBlockMessage] = useState<string | null>(null);
     const [cachedRatings, setCachedRatings] = useState<Map<string, string | null>>(new Map());
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
+    const { t } = useLanguage();
 
     // Blocked category patterns for Kids profile
     const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'erótico'];
@@ -562,7 +564,7 @@ export function Series() {
                 <AnimatedSearchBar
                     value={searchQuery}
                     onChange={setSearchQuery}
-                    placeholder="Buscar séries..."
+                    placeholder={t('login', 'searchSeries')}
                 />
 
                 <CategoryMenu

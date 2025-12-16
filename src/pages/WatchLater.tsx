@@ -6,12 +6,14 @@ import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { ResumeModal } from '../components/ResumeModal';
 import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
+import { useLanguage } from '../services/languageService';
 
 export function WatchLater() {
     const [items, setItems] = useState<WatchLaterItem[]>([]);
     const [removingId, setRemovingId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'all' | 'movies' | 'series'>('all');
     const navigate = useNavigate();
+    const { t } = useLanguage();
 
     // Modal and player states
     const [selectedContent, setSelectedContent] = useState<{
@@ -63,10 +65,10 @@ export function WatchLater() {
     const formatRemainingTime = (currentTime: number, duration: number) => {
         const remaining = Math.max(0, duration - currentTime);
         const minutes = Math.floor(remaining / 60);
-        if (minutes < 60) return `${minutes}min restantes`;
+        if (minutes < 60) return `${minutes} ${t('home', 'minRemaining')}`;
         const hours = Math.floor(minutes / 60);
         const mins = minutes % 60;
-        return `${hours}h ${mins}min restantes`;
+        return `${hours}h ${mins}min ${t('home', 'hRemaining').replace('h ', '')}`;
     };
 
     const handleItemClick = (item: WatchLaterItem) => {
@@ -103,9 +105,9 @@ export function WatchLater() {
                             <div className="empty-icon">🔖</div>
                             <div className="empty-icon-glow" />
                         </div>
-                        <h2 className="empty-title">Sua lista está vazia</h2>
+                        <h2 className="empty-title">{t('watchLater', 'emptyTitle')}</h2>
                         <p className="empty-text">
-                            Adicione filmes e séries para assistir depois clicando no botão <strong>+ Minha Lista</strong>
+                            {t('watchLater', 'emptyText')} <strong>{t('watchLater', 'emptyButton')}</strong>
                         </p>
                         <div className="empty-suggestions">
                             <button
@@ -113,14 +115,14 @@ export function WatchLater() {
                                 onClick={() => navigate('/dashboard/vod')}
                             >
                                 <span>🎬</span>
-                                <span>Explorar Filmes</span>
+                                <span>{t('watchLater', 'exploreMovies')}</span>
                             </button>
                             <button
                                 className="suggestion-btn"
                                 onClick={() => navigate('/dashboard/series')}
                             >
                                 <span>📺</span>
-                                <span>Explorar Séries</span>
+                                <span>{t('watchLater', 'exploreSeries')}</span>
                             </button>
                         </div>
                     </div>
@@ -140,8 +142,8 @@ export function WatchLater() {
                     <div className="header-title">
                         <div className="title-icon">🔖</div>
                         <div>
-                            <h1>Minha Lista</h1>
-                            <p className="subtitle">{items.length} {items.length === 1 ? 'item salvo' : 'itens salvos'}</p>
+                            <h1>{t('watchLater', 'title')}</h1>
+                            <p className="subtitle">{items.length} {items.length === 1 ? t('watchLater', 'itemSaved') : t('watchLater', 'itemsSaved')}</p>
                         </div>
                     </div>
 
@@ -149,7 +151,7 @@ export function WatchLater() {
                         {items.length > 0 && (
                             <button className="clear-all-btn" onClick={clearAll}>
                                 <span>🗑️</span>
-                                <span>Limpar Tudo</span>
+                                <span>{t('watchLater', 'clearAll')}</span>
                             </button>
                         )}
                     </div>
@@ -162,7 +164,7 @@ export function WatchLater() {
                         onClick={() => setActiveTab('all')}
                     >
                         <span className="tab-icon">📋</span>
-                        <span>Todos</span>
+                        <span>{t('watchLater', 'all')}</span>
                         <span className="tab-count">{items.length}</span>
                     </button>
                     <button
@@ -170,7 +172,7 @@ export function WatchLater() {
                         onClick={() => setActiveTab('movies')}
                     >
                         <span className="tab-icon">🎬</span>
-                        <span>Filmes</span>
+                        <span>{t('watchLater', 'movies')}</span>
                         <span className="tab-count">{movies.length}</span>
                     </button>
                     <button
@@ -178,7 +180,7 @@ export function WatchLater() {
                         onClick={() => setActiveTab('series')}
                     >
                         <span className="tab-icon">📺</span>
-                        <span>Séries</span>
+                        <span>{t('watchLater', 'series')}</span>
                         <span className="tab-count">{series.length}</span>
                     </button>
                 </div>
@@ -187,7 +189,7 @@ export function WatchLater() {
                 <div className="content-scroll">
                     {displayItems.length === 0 ? (
                         <div className="no-items-message">
-                            <p>Nenhum {activeTab === 'movies' ? 'filme' : 'série'} salvo</p>
+                            <p>{activeTab === 'movies' ? t('watchLater', 'noMovies') : t('watchLater', 'noSeries')}</p>
                         </div>
                     ) : (
                         <div className="items-grid">
@@ -211,7 +213,7 @@ export function WatchLater() {
                                                 e.stopPropagation();
                                                 removeItem(item.id, item.type);
                                             }}
-                                            title="Remover da lista"
+                                            title={t('watchLater', 'removeFromList')}
                                         >
                                             <span>✕</span>
                                         </button>
@@ -275,7 +277,7 @@ export function WatchLater() {
                                         >
                                             <h3 className="card-title">{item.name}</h3>
                                             <p className="card-type">
-                                                {item.type === 'movie' ? 'Filme' : 'Série'}
+                                                {item.type === 'movie' ? t('watchLater', 'movie') : t('watchLater', 'serie')}
                                             </p>
                                         </div>
                                     </div>

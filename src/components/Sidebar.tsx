@@ -7,6 +7,7 @@ import { UpdateModal } from './UpdateModal';
 import { ProfileManager } from './ProfileManager';
 import { updateService } from '../services/updateService';
 import { NotificationsPanel } from './NotificationsPanel';
+import { useLanguage } from '../services/languageService';
 import type { UpdateInfo } from '../types/update';
 import type { Profile } from '../types/profile';
 
@@ -25,6 +26,7 @@ export function Sidebar() {
     const [pendingProfile, setPendingProfile] = useState<Profile | null>(null);
     const [pinInput, setPinInput] = useState('');
     const [pinError, setPinError] = useState('');
+    const { t } = useLanguage();
 
     useEffect(() => {
         setProfiles(profileService.getAllProfiles());
@@ -77,7 +79,7 @@ export function Sidebar() {
                 window.location.reload();
             }, 300);
         } else {
-            setPinError('PIN incorreto');
+            setPinError(t('nav', 'incorrectPin'));
             setPinInput('');
         }
     };
@@ -87,14 +89,14 @@ export function Sidebar() {
     };
 
     const menuItems = [
-        { icon: Home, label: 'Início', path: '/dashboard/home', emoji: '🏠', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)' },
-        { icon: Tv, label: 'TV ao Vivo', path: '/dashboard/live', emoji: '📺', gradient: 'linear-gradient(135deg, #a855f7, #7c3aed)' },
-        { icon: Film, label: 'Filmes', path: '/dashboard/vod', emoji: '🎬', gradient: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' },
-        { icon: PlaySquare, label: 'Séries', path: '/dashboard/series', emoji: '📺', gradient: 'linear-gradient(135deg, #ec4899, #db2777)' },
-        { icon: Bookmark, label: 'Minha Lista', path: '/dashboard/watch-later', emoji: '🔖', gradient: 'linear-gradient(135deg, #10b981, #059669)' },
-        { icon: Heart, label: 'Favoritos', path: '/dashboard/favorites', emoji: '❤️', gradient: 'linear-gradient(135deg, #ef4444, #dc2626)' },
-        { icon: Download, label: 'Baixados', path: '/dashboard/downloads', emoji: '📥', gradient: 'linear-gradient(135deg, #06b6d4, #0891b2)' },
-        { icon: Settings, label: 'Configurações', path: '/dashboard/settings', emoji: '⚙️', gradient: 'linear-gradient(135deg, #6b7280, #4b5563)' },
+        { icon: Home, label: t('nav', 'home'), path: '/dashboard/home', emoji: '🏠', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)' },
+        { icon: Tv, label: t('nav', 'liveTV'), path: '/dashboard/live', emoji: '📺', gradient: 'linear-gradient(135deg, #a855f7, #7c3aed)' },
+        { icon: Film, label: t('nav', 'movies'), path: '/dashboard/vod', emoji: '🎬', gradient: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' },
+        { icon: PlaySquare, label: t('nav', 'series'), path: '/dashboard/series', emoji: '📺', gradient: 'linear-gradient(135deg, #ec4899, #db2777)' },
+        { icon: Bookmark, label: t('nav', 'myList'), path: '/dashboard/watch-later', emoji: '🔖', gradient: 'linear-gradient(135deg, #10b981, #059669)' },
+        { icon: Heart, label: t('nav', 'favorites'), path: '/dashboard/favorites', emoji: '❤️', gradient: 'linear-gradient(135deg, #ef4444, #dc2626)' },
+        { icon: Download, label: t('nav', 'downloads'), path: '/dashboard/downloads', emoji: '📥', gradient: 'linear-gradient(135deg, #06b6d4, #0891b2)' },
+        { icon: Settings, label: t('nav', 'settings'), path: '/dashboard/settings', emoji: '⚙️', gradient: 'linear-gradient(135deg, #6b7280, #4b5563)' },
     ];
 
     const handleLogout = async () => {
@@ -121,7 +123,7 @@ export function Sidebar() {
                 <div className="profile-transition-overlay">
                     <div className="profile-transition-content">
                         <div className="profile-transition-spinner" />
-                        <span>Trocando perfil...</span>
+                        <span>{t('nav', 'switchingProfile')}</span>
                     </div>
                 </div>
             )}
@@ -226,7 +228,7 @@ export function Sidebar() {
                             onClick={() => setShowProfilePopup(!showProfilePopup)}
                             onMouseEnter={() => setHoveredItem('profile')}
                             onMouseLeave={() => setHoveredItem(null)}
-                            title="Trocar Perfil"
+                            title={t('nav', 'switchProfile')}
                         >
                             <div className="profile-ring" />
                             <div className="profile-inner">
@@ -256,13 +258,13 @@ export function Sidebar() {
                         onClick={handleLogout}
                         onMouseEnter={() => setHoveredItem('logout')}
                         onMouseLeave={() => setHoveredItem(null)}
-                        title="Sair"
+                        title={t('nav', 'logout')}
                     >
                         <LogOut className="logout-icon" />
                         {/* Logout Tooltip */}
                         <div className={`tooltip danger ${hoveredItem === 'logout' ? 'visible' : ''}`}>
                             <span className="tooltip-emoji">🚪</span>
-                            <span className="tooltip-label">Sair</span>
+                            <span className="tooltip-label">{t('nav', 'logout')}</span>
                         </div>
                     </button>
                 </div>
@@ -273,7 +275,7 @@ export function Sidebar() {
                 <div className="profile-popup">
                     <div className="profile-popup-header">
                         <Users size={18} />
-                        <span>Trocar Perfil</span>
+                        <span>{t('nav', 'switchProfile')}</span>
                     </div>
                     <div className="profile-popup-list">
                         {/* Filter out Kids profiles - they can only be switched via ProfileManager */}
@@ -308,7 +310,7 @@ export function Sidebar() {
                         }}
                     >
                         <Settings size={16} />
-                        <span>Gerenciar Perfis</span>
+                        <span>{t('nav', 'manageProfiles')}</span>
                     </button>
                 </div>
             )}
@@ -337,8 +339,8 @@ export function Sidebar() {
                     <div className="sidebar-pin-modal" onClick={(e) => e.stopPropagation()}>
                         <div className="sidebar-pin-header">
                             <span className="sidebar-pin-icon">🔐</span>
-                            <h2>Digite o PIN</h2>
-                            <p>Perfil: <strong>{pendingProfile.name}</strong></p>
+                            <h2>{t('nav', 'enterPin')}</h2>
+                            <p>{t('nav', 'profile')}: <strong>{pendingProfile.name}</strong></p>
                         </div>
 
                         <div
@@ -381,7 +383,7 @@ export function Sidebar() {
 
                         <div className="sidebar-pin-buttons">
                             <button className="sidebar-pin-btn cancel" onClick={() => setPendingProfile(null)}>
-                                Cancelar
+                                {t('nav', 'cancel')}
                             </button>
                             <button
                                 className="sidebar-pin-btn submit"
@@ -389,7 +391,7 @@ export function Sidebar() {
                                 disabled={pinInput.length !== 4}
                             >
                                 <Check size={18} />
-                                Entrar
+                                {t('nav', 'enter')}
                             </button>
                         </div>
                     </div>

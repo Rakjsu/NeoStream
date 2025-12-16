@@ -1,9 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, Server, LogIn, Tv, ArrowLeft, Play, Film, PlaySquare } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useLanguage } from '../services/languageService';
 
 export function Login() {
     const navigate = useNavigate();
+    const { t } = useLanguage();
     const [step, setStep] = useState<'credentials' | 'playlist-name'>('credentials');
     const [includeTV, setIncludeTV] = useState(true);
     const [includeVOD, setIncludeVOD] = useState(true);
@@ -133,7 +135,7 @@ export function Login() {
                         )}
 
                         <div className="space-y-2">
-                            <label className="text-base font-medium text-gray-400 text-center block">Endereço do servidor</label>
+                            <label className="text-base font-medium text-gray-400 text-center block">{t('login', 'serverAddress')}</label>
                             <div className="flex items-center justify-center gap-3">
                                 <Server className="w-5 h-5 text-gray-500" />
                                 <input type="text" required value={formData.url} onChange={(e) => setFormData({ ...formData, url: e.target.value })} className="bg-gray-900 border border-gray-700 rounded-xl py-2.5 px-4 text-white text-center text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" style={{ width: '280px' }} placeholder="http://example.com:8080" disabled={loading} />
@@ -141,7 +143,7 @@ export function Login() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-base font-medium text-gray-400 text-center block">Usuário</label>
+                            <label className="text-base font-medium text-gray-400 text-center block">{t('login', 'username')}</label>
                             <div className="flex items-center justify-center gap-3">
                                 <User className="w-5 h-5 text-gray-500" />
                                 <input type="text" required value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} className="bg-gray-900 border border-gray-700 rounded-xl py-2.5 px-4 text-white text-center text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" style={{ width: '280px' }} disabled={loading} />
@@ -149,7 +151,7 @@ export function Login() {
                         </div>
 
                         <div className="space-y-2">
-                            <label className="text-base font-medium text-gray-400 text-center block">Senha</label>
+                            <label className="text-base font-medium text-gray-400 text-center block">{t('login', 'password')}</label>
                             <div className="flex items-center justify-center gap-3">
                                 <Lock className="w-5 h-5 text-gray-500" />
                                 <input type="password" required value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} className="bg-gray-900 border border-gray-700 rounded-xl py-2.5 px-4 text-white text-center text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" style={{ width: '280px' }} disabled={loading} />
@@ -159,31 +161,31 @@ export function Login() {
                         <div className="space-y-4 pt-4 flex flex-col items-center">
                             <label className="flex items-center gap-3 cursor-pointer">
                                 <input type="checkbox" checked={includeTV} onChange={(e) => setIncludeTV(e.target.checked)} className="w-5 h-5 rounded border-2 border-gray-600 bg-gray-900 checked:bg-blue-600 checked:border-blue-600 cursor-pointer accent-blue-600" style={{ accentColor: '#2563eb' }} disabled={loading} />
-                                <span className="text-gray-300 text-base">Incluir canais de TV</span>
+                                <span className="text-gray-300 text-base">{t('login', 'includeTV')}</span>
                             </label>
 
                             <label className="flex items-center gap-3 cursor-pointer">
                                 <input type="checkbox" checked={includeVOD} onChange={(e) => setIncludeVOD(e.target.checked)} className="w-5 h-5 rounded border-2 border-gray-600 bg-gray-900 checked:bg-blue-600 checked:border-blue-600 cursor-pointer accent-blue-600" style={{ accentColor: '#2563eb' }} disabled={loading} />
-                                <span className="text-gray-300 text-base">Incluir VOD (Filmes e Séries)</span>
+                                <span className="text-gray-300 text-base">{t('login', 'includeVOD')}</span>
                             </label>
                         </div>
 
                         <div className="flex justify-center items-center pt-6" style={{ gap: '18px' }}>
                             <button type="button" onClick={handleBack} className="hover:scale-105 hover:shadow-lg active:scale-95 transition-all duration-200 flex items-center gap-2" style={{ backgroundColor: '#232427ff', color: 'white', borderRadius: '8px', padding: '13px 24px', fontSize: '16px', fontWeight: 500, border: 'none', cursor: 'pointer' }} disabled={loading}>
                                 <ArrowLeft className="w-5 h-5" />
-                                Voltar
+                                {t('login', 'back')}
                             </button>
 
                             <button type="submit" className="bg-gray-200 text-gray-900 hover:bg-white hover:scale-105 hover:shadow-xl active:scale-95 transition-all duration-200 flex items-center gap-2" style={{ backgroundColor: loading ? '#4a4a4a' : '#e5e7eb', color: loading ? '#9ca3af' : '#111827', borderRadius: '8px', padding: '13px 24px', fontSize: '16px', fontWeight: 500, border: 'none', cursor: loading ? 'not-allowed' : 'pointer' }} disabled={loading}>
                                 {loading ? (
                                     <>
                                         <div className="w-5 h-5 border-2 border-gray-400 border-t-gray-700 rounded-full animate-spin" />
-                                        Autenticando...
+                                        {t('login', 'authenticating')}
                                     </>
                                 ) : (
                                     <>
                                         <LogIn className="w-5 h-5" />
-                                        Login
+                                        {t('login', 'loginButton')}
                                     </>
                                 )}
                             </button>
@@ -194,7 +196,7 @@ export function Login() {
                 {step === 'playlist-name' && (
                     <div className="relative flex justify-center">
                         <form onSubmit={handlePlaylistNameSubmit} className="space-y-8">
-                            <label className="text-xl font-medium text-white text-center block">Digite o nome da playlist</label>
+                            <label className="text-xl font-medium text-white text-center block">{t('login', 'playlistNameLabel')}</label>
 
                             <div className="flex justify-center">
                                 <div className="flex items-center gap-3">
@@ -205,7 +207,7 @@ export function Login() {
                                         onChange={(e) => setPlaylistName(e.target.value)}
                                         className="bg-gray-900 border border-gray-700 rounded-xl py-2.5 px-4 text-white text-center text-base focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
                                         style={{ width: '320px' }}
-                                        placeholder="Minha Playlist"
+                                        placeholder={t('login', 'playlistPlaceholder')}
                                         autoFocus
                                     />
                                 </div>
@@ -219,7 +221,7 @@ export function Login() {
                                     style={{ backgroundColor: '#232427ff', color: 'white', borderRadius: '8px', padding: '13px 24px', fontSize: '16px', fontWeight: 500, border: 'none', cursor: 'pointer' }}
                                 >
                                     <ArrowLeft className="w-5 h-5" />
-                                    Voltar
+                                    {t('login', 'back')}
                                 </button>
 
                                 <button
@@ -228,13 +230,13 @@ export function Login() {
                                     style={{ borderRadius: '8px', padding: '13px 24px', fontSize: '16px', fontWeight: 500, border: 'none', cursor: 'pointer' }}
                                 >
                                     <Play className="w-5 h-5" />
-                                    Continuar
+                                    {t('login', 'continueButton')}
                                 </button>
                             </div>
                         </form>
 
                         <div className="absolute left-1/2 top-12 bg-gradient-to-br from-gray-800/60 to-gray-900/60 backdrop-blur-sm border border-gray-700/50 rounded-2xl p-5 min-w-[220px] shadow-xl" style={{ transform: 'translateX(200px)', animation: 'fadeSlideIn 0.5s ease-out' }}>
-                            <div className="text-gray-300 text-sm font-semibold mb-4 text-center tracking-wide">Biblioteca</div>
+                            <div className="text-gray-300 text-sm font-semibold mb-4 text-center tracking-wide">{t('login', 'library')}</div>
 
                             {loadingCounts ? (
                                 <div className="flex items-center justify-center py-8">
@@ -249,7 +251,7 @@ export function Login() {
                                             </div>
                                             <div className="flex-1 flex items-baseline gap-2">
                                                 <div className="text-2xl font-bold text-white group-hover:text-blue-300 transition-colors duration-300" style={{ animation: 'countUp 1s ease-out' }}>{counts.live}</div>
-                                                <div className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors duration-300">Canais</div>
+                                                <div className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors duration-300">{t('login', 'channels')}</div>
                                             </div>
                                         </div>
                                     )}
@@ -262,7 +264,7 @@ export function Login() {
                                                 </div>
                                                 <div className="flex-1 flex items-baseline gap-2">
                                                     <div className="text-2xl font-bold text-white group-hover:text-purple-300 transition-colors duration-300" style={{ animation: 'countUp 1.2s ease-out' }}>{counts.vod}</div>
-                                                    <div className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors duration-300">Filmes</div>
+                                                    <div className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors duration-300">{t('login', 'moviesCount')}</div>
                                                 </div>
                                             </div>
 
@@ -272,7 +274,7 @@ export function Login() {
                                                 </div>
                                                 <div className="flex-1 flex items-baseline gap-2">
                                                     <div className="text-2xl font-bold text-white group-hover:text-green-300 transition-colors duration-300" style={{ animation: 'countUp 1.4s ease-out' }}>{counts.series}</div>
-                                                    <div className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors duration-300">Séries</div>
+                                                    <div className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors duration-300">{t('login', 'seriesCount')}</div>
                                                 </div>
                                             </div>
                                         </>

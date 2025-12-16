@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Download, Trash2, Play, FolderOpen, HardDrive, Film, Tv, AlertTriangle, X, RefreshCw } from 'lucide-react';
 import { downloadService } from '../services/downloadService';
 import type { DownloadItem, StorageInfo } from '../services/downloadService';
+import { useLanguage } from '../services/languageService';
 
 // Type for grouped series
 type SeriesGroup = {
@@ -29,6 +30,7 @@ export function Downloads() {
         available: 100 * 1024 * 1024 * 1024,
         downloadsPath: ''
     });
+    const { t } = useLanguage();
 
     // Delete confirmation modal state
     const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; item: DownloadItem | null }>({
@@ -199,21 +201,21 @@ export function Downloads() {
                             <div className="delete-modal-icon">
                                 <AlertTriangle size={48} />
                             </div>
-                            <h3>Remover Download?</h3>
+                            <h3>{t('downloads', 'deleteConfirm')}?</h3>
                             <p>
-                                Tem certeza que deseja remover <strong>"{deleteModal.item.name}"</strong>?
-                                O arquivo será excluído permanentemente.
+                                {t('downloads', 'deleteConfirm')} <strong>"{deleteModal.item.name}"</strong>?
+                                {t('downloads', 'deleteConfirmText')}
                             </p>
                             <div className="delete-modal-size">
                                 📦 {downloadService.formatBytes(deleteModal.item.size)}
                             </div>
                             <div className="delete-modal-buttons">
                                 <button className="cancel-btn" onClick={handleDeleteCancel}>
-                                    Cancelar
+                                    {t('downloads', 'cancel')}
                                 </button>
                                 <button className="confirm-btn" onClick={handleDeleteConfirm}>
                                     <Trash2 size={18} />
-                                    Remover
+                                    {t('downloads', 'delete')}
                                 </button>
                             </div>
                         </div>
@@ -224,8 +226,8 @@ export function Downloads() {
                 <header className="downloads-header">
                     <div className="header-icon">📥</div>
                     <div>
-                        <h1>Baixados</h1>
-                        <p className="subtitle">Conteúdo disponível offline</p>
+                        <h1>{t('downloads', 'title')}</h1>
+                        <p className="subtitle">{t('downloads', 'emptyText')}</p>
                     </div>
                 </header>
 
@@ -236,7 +238,7 @@ export function Downloads() {
                     </div>
                     <div className="storage-info">
                         <div className="storage-text">
-                            <span>Armazenamento usado</span>
+                            <span>{t('downloads', 'storageUsed')}</span>
                             <span className="storage-value">
                                 {downloadService.formatBytes(storageInfo.used)} / {downloadService.formatBytes(storageInfo.total)}
                             </span>
@@ -247,7 +249,7 @@ export function Downloads() {
                     </div>
                     <button className="storage-btn" onClick={handleOpenFolder}>
                         <FolderOpen size={18} />
-                        Abrir Pasta
+                        {t('downloads', 'openFolder')}
                     </button>
                 </div>
 
@@ -258,21 +260,21 @@ export function Downloads() {
                         onClick={() => setActiveTab('all')}
                     >
                         <Download size={18} />
-                        Todos
+                        {t('downloads', 'all')}
                     </button>
                     <button
                         className={`tab-btn ${activeTab === 'movies' ? 'active' : ''}`}
                         onClick={() => setActiveTab('movies')}
                     >
                         <Film size={18} />
-                        Filmes
+                        {t('downloads', 'movies')}
                     </button>
                     <button
                         className={`tab-btn ${activeTab === 'series' ? 'active' : ''}`}
                         onClick={() => setActiveTab('series')}
                     >
                         <Tv size={18} />
-                        Séries
+                        {t('downloads', 'series')}
                     </button>
                 </div>
 
@@ -281,11 +283,11 @@ export function Downloads() {
                     {filteredDownloads.length === 0 && groupedData.series.length === 0 ? (
                         <div className="empty-state">
                             <div className="empty-icon">📥</div>
-                            <h3>Nenhum download</h3>
-                            <p>Baixe filmes e séries para assistir offline</p>
+                            <h3>{t('downloads', 'emptyTitle')}</h3>
+                            <p>{t('downloads', 'emptyText')}</p>
                             <div className="empty-hint">
                                 <span>💡</span>
-                                <span>Clique no ícone de download em qualquer filme ou série</span>
+                                <span>{t('downloads', 'emptyText')}</span>
                             </div>
                         </div>
                     ) : (
@@ -326,19 +328,19 @@ export function Downloads() {
                                                 e.stopPropagation();
                                                 handleDeleteClick(item);
                                             }}
-                                            title="Remover download"
+                                            title={t('downloads', 'removeDownload')}
                                         >
                                             <Trash2 size={16} />
                                         </button>
                                         {/* Status badge - bottom right */}
                                         {item.status === 'completed' && (
-                                            <div className="status-badge completed">✓ Baixado</div>
+                                            <div className="status-badge completed">✓ {t('downloads', 'downloaded')}</div>
                                         )}
                                         {item.status === 'downloading' && (
                                             <div className="status-badge downloading">{item.progress}%</div>
                                         )}
                                         {(item.status === 'paused' || item.status === 'failed') && (
-                                            <div className="status-badge paused">⏸ Pausado</div>
+                                            <div className="status-badge paused">⏸ {t('downloads', 'paused')}</div>
                                         )}
                                         {/* Hover overlay - show play for completed, resume for paused */}
                                         <div className="card-overlay">
@@ -359,10 +361,10 @@ export function Downloads() {
                                                         e.stopPropagation();
                                                         handleResumeDownload(item);
                                                     }}
-                                                    title="Continuar download"
+                                                    title={t('downloads', 'resumeDownload')}
                                                 >
                                                     <RefreshCw size={24} />
-                                                    <span>Continuar</span>
+                                                    <span>{t('downloads', 'continueDownload')}</span>
                                                 </button>
                                             )}
                                         </div>
@@ -396,11 +398,11 @@ export function Downloads() {
                                                 // Delete all episodes and series folder
                                                 downloadService.deleteSeries(series.seriesName);
                                             }}
-                                            title="Remover série"
+                                            title={t('downloads', 'removeSeries')}
                                         >
                                             <Trash2 size={16} />
                                         </button>
-                                        <div className="status-badge completed">✓ Baixado</div>
+                                        <div className="status-badge completed">✓ {t('downloads', 'downloaded')}</div>
                                         <div className="card-overlay">
                                             <button className="play-btn-center">
                                                 <Play size={28} fill="white" />
@@ -466,8 +468,8 @@ export function Downloads() {
                             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
                                 {seriesModal.series.year && <span style={{ background: 'rgba(168,85,247,0.3)', padding: '4px 10px', borderRadius: 6, color: '#c4b5fd', fontSize: 12 }}>{seriesModal.series.year}</span>}
                                 {seriesModal.series.rating && <span style={{ background: 'rgba(251,191,36,0.3)', padding: '4px 10px', borderRadius: 6, color: '#fcd34d', fontSize: 12 }}>⭐ {seriesModal.series.rating}</span>}
-                                <span style={{ background: 'rgba(16,185,129,0.3)', padding: '4px 10px', borderRadius: 6, color: '#6ee7b7', fontSize: 12 }}>{seriesModal.series.seasons.length} Temporada{seriesModal.series.seasons.length > 1 ? 's' : ''}</span>
-                                <span style={{ background: 'rgba(59,130,246,0.3)', padding: '4px 10px', borderRadius: 6, color: '#93c5fd', fontSize: 12 }}>📥 Offline</span>
+                                <span style={{ background: 'rgba(16,185,129,0.3)', padding: '4px 10px', borderRadius: 6, color: '#6ee7b7', fontSize: 12 }}>{seriesModal.series.seasons.length} {seriesModal.series.seasons.length > 1 ? t('downloads', 'seasons') : t('downloads', 'season')}</span>
+                                <span style={{ background: 'rgba(59,130,246,0.3)', padding: '4px 10px', borderRadius: 6, color: '#93c5fd', fontSize: 12 }}>📥 {t('downloads', 'offline')}</span>
                             </div>
 
                             {/* Genres */}
@@ -587,7 +589,7 @@ export function Downloads() {
                                                     textOverflow: 'ellipsis',
                                                     whiteSpace: 'nowrap'
                                                 }}>
-                                                    Episódio {ep.episode}
+                                                    {t('downloads', 'episode')} {ep.episode}
                                                 </span>
                                                 {/* Progress percentage for downloading episodes */}
                                                 {isDownloading && (
@@ -652,7 +654,7 @@ export function Downloads() {
                                         }}
                                     >
                                         <Play size={20} fill="white" />
-                                        Assistir Episódio {seriesModal.selectedEpisode}
+                                        {t('downloads', 'watchEpisode')} {seriesModal.selectedEpisode}
                                     </button>
                                 ) : (
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -666,7 +668,7 @@ export function Downloads() {
                                             fontSize: 14,
                                             textAlign: 'center'
                                         }}>
-                                            ⏳ Episódio {seriesModal.selectedEpisode} ainda não foi baixado
+                                            ⏳ {t('downloads', 'episode')} {seriesModal.selectedEpisode} {t('downloads', 'episodeNotDownloaded')}
                                         </div>
                                         <button
                                             className="resume-download-btn"
@@ -704,7 +706,7 @@ export function Downloads() {
                                             }}
                                         >
                                             <RefreshCw size={20} className="spin-icon" />
-                                            {selectedEp?.status === 'pending' ? 'Aguardando na fila...' : 'Retomar Download'}
+                                            {selectedEp?.status === 'pending' ? t('downloads', 'waitingInQueue') : t('downloads', 'resumeDownload')}
                                         </button>
                                     </div>
                                 );
@@ -770,7 +772,7 @@ export function Downloads() {
                                     color: movieModal.movie.status === 'completed' ? '#6ee7b7' : '#fcd34d',
                                     fontSize: 12
                                 }}>
-                                    {movieModal.movie.status === 'completed' ? '📥 Offline' : `⏳ ${movieModal.movie.progress || 0}%`}
+                                    {movieModal.movie.status === 'completed' ? `📥 ${t('downloads', 'offline')}` : `⏳ ${movieModal.movie.progress || 0}%`}
                                 </span>
                             </div>
 
@@ -821,7 +823,7 @@ export function Downloads() {
                                     }}
                                 >
                                     <Play size={20} fill="white" />
-                                    Assistir Filme
+                                    {t('downloads', 'play')} {t('downloads', 'movie')}
                                 </button>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -835,7 +837,7 @@ export function Downloads() {
                                         fontSize: 14,
                                         textAlign: 'center'
                                     }}>
-                                        ⏳ Filme ainda não foi baixado completamente ({movieModal.movie.progress || 0}%)
+                                        ⏳ {t('downloads', 'movie')} {t('downloads', 'episodeNotDownloaded')} ({movieModal.movie.progress || 0}%)
                                     </div>
                                     <button
                                         className="resume-download-btn"
@@ -858,7 +860,7 @@ export function Downloads() {
                                         }}
                                     >
                                         <RefreshCw size={20} className="spin-icon" />
-                                        Retomar Download
+                                        {t('downloads', 'resumeDownload')}
                                     </button>
                                 </div>
                             )}

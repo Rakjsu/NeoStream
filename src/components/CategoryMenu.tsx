@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { parentalService } from '../services/parentalService';
+import { useLanguage } from '../services/languageService';
 import netflixLogo from '../assets/logos/netflix.png';
 import brasilParaleloLogo from '../assets/logos/brasil-paralelo.png';
 import disneyLogo from '../assets/logos/disney-new.png';
@@ -37,6 +38,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
     const [isOpen, setIsOpen] = useState(false);
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(false);
+    const { t } = useLanguage();
 
     // Categories blocked for Kids profiles
     const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'erótico'];
@@ -573,7 +575,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                             letterSpacing: '-0.5px',
                             marginBottom: '8px'
                         }}>
-                            Categorias
+                            {t('categories', 'title')}
                         </h2>
                         <p style={{
                             margin: 0,
@@ -581,7 +583,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                             fontSize: '14px',
                             fontWeight: '500'
                         }}>
-                            Explore por gênero
+                            {t('categories', 'exploreByGenre')}
                         </p>
                     </div>
                 </div>
@@ -616,7 +618,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                                 fontSize: '14px',
                                 fontWeight: '500'
                             }}>
-                                Carregando categorias...
+                                {t('categories', 'loadingCategories')}
                             </p>
                         </div>
                     )}
@@ -689,7 +691,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                             📺
                         </div>
                         <span style={{ flex: 1 }}>
-                            {type === 'vod' ? 'Todos os Filmes' : type === 'live' ? 'Todos os Canais' : 'Todas as Séries'}
+                            {type === 'vod' ? t('categories', 'allMovies') : type === 'live' ? t('categories', 'allChannels') : t('categories', 'allSeries')}
                         </span>
                         {(selectedCategory === 'all' || selectedCategory === '' || selectedCategory === null) && (
                             <div style={{
@@ -762,7 +764,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                             }}>
                                 ▶️
                             </div>
-                            <span style={{ flex: 1 }}>Continue Assistindo</span>
+                            <span style={{ flex: 1 }}>{t('categories', 'continueWatching')}</span>
                             {selectedCategory === 'CONTINUE_WATCHING' && (
                                 <div style={{
                                     width: '8px',
@@ -835,7 +837,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                             }}>
                                 🏆
                             </div>
-                            <span style={{ flex: 1 }}>Séries Finalizadas</span>
+                            <span style={{ flex: 1 }}>{t('categories', 'completedSeries')}</span>
                             {selectedCategory === 'COMPLETED' && (
                                 <div style={{
                                     width: '8px',
@@ -908,7 +910,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                             }}>
                                 ✅
                             </div>
-                            <span style={{ flex: 1 }}>Filmes Assistidos</span>
+                            <span style={{ flex: 1 }}>{t('categories', 'watchedMovies')}</span>
                             {selectedCategory === 'WATCHED' && (
                                 <div style={{
                                     width: '8px',

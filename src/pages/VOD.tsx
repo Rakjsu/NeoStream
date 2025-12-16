@@ -13,6 +13,7 @@ import { downloadService } from '../services/downloadService';
 import { searchMovieByName as searchMovie, isKidsFriendly } from '../services/tmdb';
 import { parentalService } from '../services/parentalService';
 import { HoverPreviewCard, closeAllPreviews } from '../components/HoverPreviewCard';
+import { useLanguage } from '../services/languageService';
 
 interface VODStream {
     num: number;
@@ -68,6 +69,7 @@ export function VOD() {
     const [blockMessage, setBlockMessage] = useState<string | null>(null);
     const [cachedRatings, setCachedRatings] = useState<Map<string, string | null>>(new Map());
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
+    const { t } = useLanguage();
 
     // Close any open previews when this page mounts
     useEffect(() => {
@@ -487,7 +489,7 @@ export function VOD() {
                 <AnimatedSearchBar
                     value={searchQuery}
                     onChange={setSearchQuery}
-                    placeholder="Buscar filmes..."
+                    placeholder={t('login', 'searchMovies')}
                 />
 
                 <CategoryMenu
@@ -656,6 +658,12 @@ export function VOD() {
                                 duration
                             );
                         }
+                    }}
+                    allMovies={streams}
+                    onSwitchVersion={(newMovie, currentTime) => {
+                        // Switch to new movie version while maintaining playback time
+                        setPipResumeTime(currentTime);
+                        setPlayingMovie(newMovie);
                     }}
                 />
             )}

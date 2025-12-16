@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLanguage } from '../services/languageService';
 
 interface ChangelogEntry {
     icon: string;
@@ -10,8 +11,8 @@ interface VersionChangelog {
     [version: string]: ChangelogEntry[];
 }
 
-// Changelogs for each version
 const changelogs: VersionChangelog = {
+    '2.8.0': [], // Dynamic from translations
     '2.7.0': [
         {
             icon: '🖼️',
@@ -232,6 +233,7 @@ interface PostUpdateChangelogProps {
 export function PostUpdateChangelog({ }: PostUpdateChangelogProps) {
     const [isVisible, setIsVisible] = useState(false);
     const [previousVersion, setPreviousVersion] = useState<string>('');
+    const { t } = useLanguage();
 
     useEffect(() => {
         // Check if this is first launch after update
@@ -252,8 +254,31 @@ export function PostUpdateChangelog({ }: PostUpdateChangelogProps) {
         setIsVisible(false);
     };
 
-    // Get changelog for current version, fallback to default
-    const currentChangelog = changelogs[__APP_VERSION__] || changelogs['default'];
+    // Get changelog for current version - dynamic for 2.8.0, fallback for others
+    const getChangelog = (): ChangelogEntry[] => {
+        if (__APP_VERSION__ === '2.8.0') {
+            return [
+                {
+                    icon: '🌐',
+                    title: t('changelog', 'i18nTitle'),
+                    items: t('changelog', 'i18nItems').split('|')
+                },
+                {
+                    icon: '👥',
+                    title: t('changelog', 'profilesTitle'),
+                    items: t('changelog', 'profilesItems').split('|')
+                },
+                {
+                    icon: '🐛',
+                    title: t('changelog', 'fixesTitle'),
+                    items: t('changelog', 'fixesItems').split('|')
+                }
+            ];
+        }
+        return changelogs[__APP_VERSION__] || changelogs['default'];
+    };
+
+    const currentChangelog = getChangelog();
 
     if (!isVisible) return null;
 
@@ -270,7 +295,7 @@ export function PostUpdateChangelog({ }: PostUpdateChangelogProps) {
                 <div className="changelog-header">
                     <div className="changelog-icon">🎉</div>
                     <div>
-                        <h3>Atualização Instalada!</h3>
+                        <h3>{t('changelog', 'updateInstalled')}</h3>
                         <p className="changelog-version">
                             v{previousVersion} → v{__APP_VERSION__}
                         </p>
@@ -280,7 +305,7 @@ export function PostUpdateChangelog({ }: PostUpdateChangelogProps) {
 
                 {/* Content */}
                 <div className="changelog-content">
-                    <h4>✨ Novidades na v{__APP_VERSION__}:</h4>
+                    <h4>✨ {t('changelog', 'whatsNew')} v{__APP_VERSION__}:</h4>
 
                     {currentChangelog.map((section, index) => (
                         <div key={index} className="changelog-section">
@@ -298,7 +323,7 @@ export function PostUpdateChangelog({ }: PostUpdateChangelogProps) {
                 <div className="changelog-footer">
                     <button className="changelog-btn" onClick={handleClose}>
                         <span>👍</span>
-                        Entendi, vamos lá!
+                        {t('changelog', 'gotIt')}
                     </button>
                 </div>
             </div>

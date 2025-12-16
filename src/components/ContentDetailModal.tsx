@@ -5,6 +5,7 @@ import { movieProgressService } from '../services/movieProgressService';
 import { watchLaterService } from '../services/watchLater';
 import { favoritesService } from '../services/favoritesService';
 import { downloadService } from '../services/downloadService';
+import { useLanguage } from '../services/languageService';
 
 interface ContentDetailModalProps {
     isOpen: boolean;
@@ -46,6 +47,7 @@ export function ContentDetailModal({
     const [trailerUrl, setTrailerUrl] = useState<string | null>(null);
     const [showTrailerModal, setShowTrailerModal] = useState(false);
     const modalRef = useRef<HTMLDivElement>(null);
+    const { t } = useLanguage();
 
     // Fetch series info for episodes
     useEffect(() => {
@@ -243,7 +245,7 @@ export function ContentDetailModal({
 
     if (!isOpen) return null;
 
-    const overview = (tmdbData as any)?.overview || contentData.plot || 'Sem descrição disponível.';
+    const overview = (tmdbData as any)?.overview || contentData.plot || t('contentModal', 'noDescription');
     const rating = contentData.rating || (tmdbData as any)?.vote_average?.toFixed(1);
     const genres = contentData.genre || (tmdbData as any)?.genres?.map((g: any) => g.name).join(', ');
     const seasons = seriesInfo?.episodes ? Object.keys(seriesInfo.episodes).sort((a, b) => Number(a) - Number(b)) : [];
@@ -408,7 +410,7 @@ export function ContentDetailModal({
                             fontSize: 13,
                             fontWeight: 600
                         }}>
-                            {contentType === 'series' ? '📺 Série' : '🎬 Filme'}
+                            {contentType === 'series' ? `📺 ${t('contentModal', 'series')}` : `🎬 ${t('contentModal', 'movie')}`}
                         </span>
                         {contentType === 'series' && seasons.length > 0 && (
                             <span style={{
@@ -419,7 +421,7 @@ export function ContentDetailModal({
                                 fontSize: 13,
                                 fontWeight: 600
                             }}>
-                                {seasons.length} Temporada{seasons.length > 1 ? 's' : ''}
+                                {seasons.length} {seasons.length > 1 ? t('contentModal', 'seasonsPlural') : t('contentModal', 'seasons')}
                             </span>
                         )}
                     </div>
@@ -647,13 +649,13 @@ export function ContentDetailModal({
                             </span>
                             {contentType === 'series'
                                 ? downloadService.getOfflineEpisodePath(contentData.name, selectedSeason, selectedEpisode)
-                                    ? `Offline T${selectedSeason} E${selectedEpisode}`
-                                    : `Assistir T${selectedSeason} E${selectedEpisode}`
+                                    ? `${t('contentModal', 'offlineSeason')}${selectedSeason} ${t('contentModal', 'episode')}${selectedEpisode}`
+                                    : `${t('contentModal', 'watchSeason')}${selectedSeason} ${t('contentModal', 'episode')}${selectedEpisode}`
                                 : downloadService.isDownloaded(contentData.name, 'movie')
-                                    ? 'Assistir Offline'
+                                    ? t('contentModal', 'watchOffline')
                                     : hasMovieProgress
-                                        ? 'Continuar Assistindo'
-                                        : 'Assistir Filme'
+                                        ? t('contentModal', 'continueWatching')
+                                        : t('contentModal', 'watchMovie')
                             }
                         </button>
 
@@ -694,7 +696,7 @@ export function ContentDetailModal({
                             }}
                         >
                             {watchLaterService.has(contentId, contentType) ? '✓' : '+'}
-                            {watchLaterService.has(contentId, contentType) ? 'Salvo' : 'Assistir Depois'}
+                            {watchLaterService.has(contentId, contentType) ? t('contentModal', 'saved') : t('contentModal', 'watchLater')}
                         </button>
 
                         {/* Download Button (Movies and Series) */}
@@ -799,14 +801,14 @@ export function ContentDetailModal({
                                 transition: 'all 0.2s',
                                 opacity: downloadStatus === 'downloading' ? 0.7 : 1
                             }}
-                            title={downloadStatus === 'completed' ? 'Baixado' : 'Baixar para assistir offline'}
+                            title={downloadStatus === 'completed' ? t('contentModal', 'downloaded') : t('contentModal', 'downloadTooltip')}
                         >
                             {downloadStatus === 'completed' ? '✓' : downloadStatus === 'downloading' ? '⏳' : '📥'}
                             {downloadStatus === 'completed'
-                                ? 'Baixado'
+                                ? t('contentModal', 'downloaded')
                                 : downloadStatus === 'downloading'
                                     ? `${downloadProgress}%`
-                                    : 'Baixar'
+                                    : t('contentModal', 'download')
                             }
                         </button>
 
@@ -836,9 +838,9 @@ export function ContentDetailModal({
                                     e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
                                     e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)';
                                 }}
-                                title="Assistir trailer"
+                                title={t('contentModal', 'trailerTooltip')}
                             >
-                                🎬 Ver Trailer
+                                🎬 {t('contentModal', 'watchTrailer')}
                             </button>
                         )}
 
@@ -872,7 +874,7 @@ export function ContentDetailModal({
                                 justifyContent: 'center',
                                 transition: 'all 0.2s'
                             }}
-                            title={favoritesService.has(contentId, contentType) ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}
+                            title={favoritesService.has(contentId, contentType) ? t('contentModal', 'removeFromFavorites') : t('contentModal', 'addToFavorites')}
                         >
                             {favoritesService.has(contentId, contentType) ? '❤️' : '🤍'}
                         </button>
@@ -906,10 +908,10 @@ export function ContentDetailModal({
                         onClick={e => e.stopPropagation()}
                     >
                         <h3 style={{ color: 'white', marginBottom: 16, fontSize: 20 }}>
-                            📥 O que deseja baixar?
+                            📥 {t('contentModal', 'whatToDownload')}
                         </h3>
                         <p style={{ color: 'rgba(255,255,255,0.7)', marginBottom: 24, fontSize: 14 }}>
-                            {contentData.name} - Temporada {selectedSeason}
+                            {contentData.name} - {t('contentModal', 'season')} {selectedSeason}
                         </p>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -932,7 +934,7 @@ export function ContentDetailModal({
                                             fontWeight: 600,
                                             textAlign: 'center'
                                         }}>
-                                            ✓ Temporada {selectedSeason} completa ({downloadedCount} eps em download)
+                                            ✓ {t('contentModal', 'seasonComplete').replace('{season}', String(selectedSeason)).replace('{count}', String(downloadedCount))}
                                         </div>
                                     );
                                 }
@@ -959,8 +961,8 @@ export function ContentDetailModal({
                                         }}
                                     >
                                         📂 {downloadedCount > 0
-                                            ? `Baixar ${remainingEps.length} episódios restantes (${downloadedCount} já na fila)`
-                                            : `Temporada ${selectedSeason} (${allEps.length} episódios)`}
+                                            ? t('contentModal', 'downloadRemaining').replace('{count}', String(remainingEps.length)).replace('{downloaded}', String(downloadedCount))
+                                            : t('contentModal', 'downloadSeason').replace('{season}', String(selectedSeason)).replace('{count}', String(allEps.length))}
                                     </button>
                                 );
                             })()}
@@ -976,7 +978,7 @@ export function ContentDetailModal({
                                     fontWeight: 600,
                                     textAlign: 'center'
                                 }}>
-                                    ✓ Episódio {selectedEpisode} já está em download
+                                    ✓ {t('contentModal', 'episodeAlreadyDownloading').replace('{episode}', String(selectedEpisode))}
                                 </div>
                             ) : (
                                 <button
@@ -992,7 +994,7 @@ export function ContentDetailModal({
                                         cursor: 'pointer'
                                     }}
                                 >
-                                    📺 Apenas Episódio {selectedEpisode}
+                                    📺 {t('contentModal', 'onlyEpisode').replace('{episode}', String(selectedEpisode))}
                                 </button>
                             )}
 
@@ -1009,7 +1011,7 @@ export function ContentDetailModal({
                                     cursor: 'pointer'
                                 }}
                             >
-                                Cancelar
+                                {t('contentModal', 'cancel')}
                             </button>
                         </div>
                     </div>

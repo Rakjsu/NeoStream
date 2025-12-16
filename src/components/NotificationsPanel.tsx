@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Bell, X, Check, CheckCheck, ExternalLink, Download, Tv, Film, AlertCircle } from 'lucide-react';
 import { appNotificationService, type AppNotification } from '../services/episodeNotificationService';
+import { useLanguage } from '../services/languageService';
 
 interface NotificationsPanelProps {
     onNavigateToSeries?: (seriesId: string) => void;
@@ -11,6 +12,8 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
     const [isOpen, setIsOpen] = useState(false);
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
+    const { t } = useLanguage();
 
     useEffect(() => {
         // Initial load
@@ -69,10 +72,11 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
         const diffHours = Math.floor(diffMs / 3600000);
         const diffDays = Math.floor(diffMs / 86400000);
 
-        if (diffMins < 1) return 'agora';
-        if (diffMins < 60) return `${diffMins}m atrás`;
-        if (diffHours < 24) return `${diffHours}h atrás`;
-        return `${diffDays}d atrás`;
+        const ago = t('notifications', 'ago');
+        if (diffMins < 1) return t('notifications', 'now');
+        if (diffMins < 60) return `${diffMins}m ${ago}`;
+        if (diffHours < 24) return `${diffHours}h ${ago}`;
+        return `${diffDays}d ${ago}`;
     };
 
     const getNotificationIcon = (type: AppNotification['type']) => {
@@ -110,13 +114,39 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
 
     const getTypeLabel = (type: AppNotification['type']) => {
         switch (type) {
-            case 'new_season': return 'Nova Temporada';
-            case 'new_episodes': return 'Novos Episódios';
-            case 'download_complete': return 'Download Concluído';
-            case 'download_failed': return 'Download Falhou';
-            case 'download_started': return 'Download Iniciado';
-            default: return 'Notificação';
+            case 'new_season': return t('notifications', 'newSeason');
+            case 'new_episodes': return t('notifications', 'newEpisodes');
+            case 'download_complete': return t('notifications', 'downloadComplete');
+            case 'download_failed': return t('notifications', 'downloadFailed');
+            case 'download_started': return t('notifications', 'downloadStarted');
+            default: return t('notifications', 'notification');
         }
+    };
+
+    // Fix poster URL - handle relative paths and file:// URLs
+    const fixPosterUrl = (url: string | undefined): string | undefined => {
+        if (!url) {
+            console.log('[Notifications] No poster URL provided');
+            return undefined;
+        }
+
+        // Log for debugging
+        console.log('[Notifications] Poster URL:', url);
+
+        // If it's a file:// URL (local cached image), return as-is
+        if (url.startsWith('file://')) return url;
+
+        // If it's a Windows absolute path, convert to file:// URL
+        if (/^[A-Za-z]:\\/.test(url)) {
+            return `file:///${url.replace(/\\/g, '/')}`;
+        }
+
+        // If it's an http/https URL, return as-is
+        if (url.startsWith('http://') || url.startsWith('https://')) return url;
+
+        // Otherwise it's invalid
+        console.log('[Notifications] Invalid poster URL format:', url);
+        return undefined;
     };
 
     return (
@@ -138,7 +168,7 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
                 }}
                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                title="Notificações"
+                title={t('notifications', 'tooltip')}
             >
                 <Bell size={22} color={unreadCount > 0 ? '#fbbf24' : 'rgba(255,255,255,0.7)'} />
                 {unreadCount > 0 && (
@@ -201,6 +231,45 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
                                 from { opacity: 0; transform: translateX(-10px) scale(0.95); }
                                 to { opacity: 1; transform: translateX(0) scale(1); }
                             }
+                            @keyframes buttonPop {
+                                0% { transform: scale(1); }
+                                50% { transform: scale(1.15); }
+                                100% { transform: scale(1); }
+                            }
+                            .notif-action-btn {
+                                background: rgba(255,255,255,0.1);
+                                border: none;
+                                border-radius: 6px;
+                                padding: 6px;
+                                cursor: pointer;
+                                display: flex;
+                                align-items: center;
+                                transition: all 0.2s ease;
+                            }
+                            .notif-action-btn:hover {
+                                background: rgba(168, 85, 247, 0.3);
+                                transform: scale(1.1);
+                            }
+                            .notif-action-btn:active {
+                                animation: buttonPop 0.3s ease;
+                            }
+                            .notif-header-btn {
+                                background: rgba(255,255,255,0.1);
+                                border: none;
+                                border-radius: 6px;
+                                padding: 6px;
+                                cursor: pointer;
+                                display: flex;
+                                align-items: center;
+                                transition: all 0.2s ease;
+                            }
+                            .notif-header-btn:hover {
+                                background: rgba(168, 85, 247, 0.3);
+                                transform: scale(1.1);
+                            }
+                            .notif-header-btn:active {
+                                animation: buttonPop 0.3s ease;
+                            }
                         `}</style>
 
                         {/* Header */}
@@ -214,7 +283,7 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                 <Bell size={18} color="#a855f7" />
                                 <span style={{ color: 'white', fontWeight: 600, fontSize: 15 }}>
-                                    Notificações
+                                    {t('notifications', 'title')}
                                 </span>
                                 {unreadCount > 0 && (
                                     <span style={{
@@ -225,7 +294,7 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
                                         padding: '2px 8px',
                                         borderRadius: 10
                                     }}>
-                                        {unreadCount} nova{unreadCount !== 1 && 's'}
+                                        {unreadCount} {unreadCount !== 1 ? t('notifications', 'newPlural') : t('notifications', 'new')}
                                     </span>
                                 )}
                             </div>
@@ -234,31 +303,15 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
                                     <>
                                         <button
                                             onClick={handleMarkAllAsRead}
-                                            title="Marcar todas como lidas"
-                                            style={{
-                                                background: 'rgba(255,255,255,0.1)',
-                                                border: 'none',
-                                                borderRadius: 6,
-                                                padding: 6,
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center'
-                                            }}
+                                            title={t('notifications', 'markAllAsRead')}
+                                            className="notif-header-btn"
                                         >
                                             <CheckCheck size={16} color="rgba(255,255,255,0.7)" />
                                         </button>
                                         <button
                                             onClick={handleClearAll}
-                                            title="Limpar todas"
-                                            style={{
-                                                background: 'rgba(255,255,255,0.1)',
-                                                border: 'none',
-                                                borderRadius: 6,
-                                                padding: 6,
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center'
-                                            }}
+                                            title={t('notifications', 'clearAll')}
+                                            className="notif-header-btn"
                                         >
                                             <X size={16} color="rgba(255,255,255,0.7)" />
                                         </button>
@@ -280,14 +333,17 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
                                     color: 'rgba(255,255,255,0.5)'
                                 }}>
                                     <Bell size={40} style={{ marginBottom: 12, opacity: 0.3 }} />
-                                    <p style={{ fontSize: 14 }}>Nenhuma notificação</p>
+                                    <p style={{ fontSize: 14 }}>{t('notifications', 'noNotifications')}</p>
                                     <p style={{ fontSize: 12, marginTop: 4 }}>
-                                        Novidades aparecerão aqui
+                                        {t('notifications', 'newNotifications')}
                                     </p>
                                 </div>
                             ) : (
                                 notifications.map(notification => {
                                     const colors = getNotificationColor(notification.type);
+                                    const posterUrl = fixPosterUrl(notification.poster);
+                                    const showImage = posterUrl && !brokenImages.has(notification.id);
+
                                     return (
                                         <div
                                             key={notification.id}
@@ -316,11 +372,14 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
                                                 alignItems: 'center',
                                                 justifyContent: 'center'
                                             }}>
-                                                {notification.poster ? (
+                                                {showImage ? (
                                                     <img
-                                                        src={notification.poster}
+                                                        src={posterUrl}
                                                         alt=""
                                                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                        onError={() => {
+                                                            setBrokenImages(prev => new Set(prev).add(notification.id));
+                                                        }}
                                                     />
                                                 ) : (
                                                     <div style={{
@@ -398,13 +457,7 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
                                                             handleMarkAsRead(notification.id);
                                                         }}
                                                         title="Marcar como lida"
-                                                        style={{
-                                                            background: 'rgba(255,255,255,0.1)',
-                                                            border: 'none',
-                                                            borderRadius: 6,
-                                                            padding: 6,
-                                                            cursor: 'pointer'
-                                                        }}
+                                                        className="notif-action-btn"
                                                     >
                                                         <Check size={14} color="rgba(255,255,255,0.7)" />
                                                     </button>
@@ -421,3 +474,4 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
         </div>
     );
 }
+

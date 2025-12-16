@@ -4,6 +4,7 @@
 import { profileService } from './profileService';
 import { favoritesService } from './favoritesService';
 import { watchProgressService } from './watchProgressService';
+import { languageService } from './languageService';
 
 // Notification types
 export type NotificationType =
@@ -130,16 +131,18 @@ class AppNotificationService {
             failed: 'download_failed' as NotificationType
         };
 
+        const t = (section: string, key: string) => languageService.t(section, key);
+
         const titleMap = {
-            started: '📥 Download Iniciado',
-            complete: '✅ Download Concluído',
-            failed: '❌ Download Falhou'
+            started: `📥 ${t('notifications', 'downloadStarted')}`,
+            complete: `✅ ${t('notifications', 'downloadComplete')}`,
+            failed: `❌ ${t('notifications', 'downloadFailed')}`
         };
 
         const messageMap = {
-            started: `Baixando "${contentName}"...`,
-            complete: `"${contentName}" está disponível offline!`,
-            failed: `Falha ao baixar "${contentName}". Tente novamente.`
+            started: `${t('downloads', 'downloading')?.replace('...', '') || 'Baixando'} "${contentName}"...`,
+            complete: `"${contentName}" ${t('downloads', 'availableOffline') || 'está disponível offline!'}`,
+            failed: `${t('downloads', 'failedTo') || 'Falha ao baixar'} "${contentName}". ${t('profile', 'tryAgain') || 'Tente novamente'}.`
         };
 
         return this.addNotification({

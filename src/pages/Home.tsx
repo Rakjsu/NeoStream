@@ -7,6 +7,7 @@ import { ResumeModal } from '../components/ResumeModal';
 import { profileService } from '../services/profileService';
 import { indexedDBCache } from '../services/indexedDBCache';
 import { searchMovieByName, searchSeriesByName, isKidsFriendly } from '../services/tmdb';
+import { useLanguage } from '../services/languageService';
 
 interface ContentCounts {
     live: number;
@@ -69,6 +70,9 @@ export function Home() {
 
     // Kids profile state
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
+
+    // Language
+    const { t } = useLanguage();
     const [hiddenItems, setHiddenItems] = useState<Set<string>>(new Set());
     const [checkingItem, setCheckingItem] = useState<string | null>(null);
     const [blockMessage, setBlockMessage] = useState<string | null>(null);
@@ -319,11 +323,11 @@ export function Home() {
     }, [continueWatching.length, allSeries.length, allMovies.length]); // Use .length instead of arrays
 
     const formatTime = (date: Date) => {
-        return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleTimeString(t('home', 'locale'), { hour: '2-digit', minute: '2-digit' });
     };
 
     const formatDate = (date: Date) => {
-        return date.toLocaleDateString('pt-BR', {
+        return date.toLocaleDateString(t('home', 'locale'), {
             weekday: 'long',
             day: 'numeric',
             month: 'long'
@@ -332,18 +336,18 @@ export function Home() {
 
     const getGreeting = () => {
         const hour = currentTime.getHours();
-        if (hour < 12) return 'Bom dia';
-        if (hour < 18) return 'Boa tarde';
-        return 'Boa noite';
+        if (hour < 12) return t('home', 'goodMorning');
+        if (hour < 18) return t('home', 'goodAfternoon');
+        return t('home', 'goodEvening');
     };
 
     const formatProgress = (currentTime: number, duration: number) => {
         const remaining = Math.max(0, duration - currentTime);
         const minutes = Math.floor(remaining / 60);
-        if (minutes < 60) return `${minutes}min restantes`;
+        if (minutes < 60) return `${minutes} ${t('home', 'minRemaining')}`;
         const hours = Math.floor(minutes / 60);
         const mins = minutes % 60;
-        return `${hours}h ${mins}min restantes`;
+        return `${hours}h ${mins}min ${t('home', 'hRemaining').replace('h ', '')}`;
     };
 
     // Load hidden items for Kids profile
@@ -374,7 +378,7 @@ export function Home() {
 
         // Check if already hidden
         if (isKidsProfile && hiddenItems.has(itemKey)) {
-            setBlockMessage(`"${name}" não está disponível para este perfil`);
+            setBlockMessage(`"${name}" ${t('home', 'notAvailableForProfile')}`);
             setTimeout(() => setBlockMessage(null), 3000);
             return;
         }
@@ -384,7 +388,7 @@ export function Home() {
             const isHidden = await indexedDBCache.isItemHidden(contentType, name);
             if (isHidden) {
                 setHiddenItems(prev => new Set([...prev, itemKey]));
-                setBlockMessage(`"${name}" não está disponível para este perfil`);
+                setBlockMessage(`"${name}" ${t('home', 'notAvailableForProfile')}`);
                 setTimeout(() => setBlockMessage(null), 3000);
                 return;
             }
@@ -401,7 +405,7 @@ export function Home() {
                 // Block and hide
                 await indexedDBCache.hideItem(contentType, name);
                 setHiddenItems(prev => new Set([...prev, itemKey]));
-                setBlockMessage(`"${name}" não é adequado para crianças`);
+                setBlockMessage(`"${name}" ${t('home', 'notSuitableForKids')}`);
                 setTimeout(() => setBlockMessage(null), 3000);
                 return;
             }
@@ -437,7 +441,7 @@ export function Home() {
                 // Block for Kids if not appropriate
                 if (isKidsProfile && !friendly) {
                     setHiddenItems(prev => new Set([...prev, itemKey]));
-                    setBlockMessage(`"${name}" não é adequado para crianças`);
+                    setBlockMessage(`"${name}" ${t('home', 'notSuitableForKids')}`);
                     setTimeout(() => setBlockMessage(null), 3000);
                     setCheckingItem(null);
                     return;
@@ -531,7 +535,7 @@ export function Home() {
                             justifyContent: 'center',
                             zIndex: 150
                         }}
-                        title="Remover de Continue Assistindo"
+                        title={t('home', 'removeFromContinue')}
                     >
                         ✕
                     </button>
@@ -633,7 +637,7 @@ export function Home() {
                                     fontWeight: 600,
                                     color: 'white'
                                 }}>
-                                    {type === 'series' || (isContinue && continueItem.type === 'series') ? 'SÉRIE' : 'FILME'}
+                                    {type === 'series' || (isContinue && continueItem.type === 'series') ? t('home', 'series') : t('home', 'movie')}
                                 </div>
                                 {isContinue && continueItem.movieProgress && (
                                     <div style={{
@@ -703,7 +707,7 @@ export function Home() {
                                 textTransform: 'uppercase',
                                 animation: 'pulse 2s infinite'
                             }}>
-                                Novo Ep!
+                                {t('home', 'newEpisode')}
                             </div>
                         )}
                     </div>
@@ -1043,7 +1047,7 @@ export function Home() {
                             fontSize: '14px',
                             color: 'rgba(156, 163, 175, 1)'
                         }}>
-                            O que você quer assistir hoje?
+                            {t('home', 'whatToWatch')}
                         </p>
                     </div>
 
@@ -1092,7 +1096,7 @@ export function Home() {
                             {loading ? '...' : filteredCounts.live.toLocaleString()}
                         </div>
                         <div style={{ fontSize: '12px', color: 'rgba(239, 68, 68, 0.9)', fontWeight: '600' }}>
-                            Canais ao Vivo
+                            {t('home', 'channels')}
                         </div>
                     </a>
 
@@ -1119,7 +1123,7 @@ export function Home() {
                             {loading ? '...' : filteredCounts.vod.toLocaleString()}
                         </div>
                         <div style={{ fontSize: '12px', color: 'rgba(59, 130, 246, 0.9)', fontWeight: '600' }}>
-                            Filmes
+                            {t('home', 'movies')}
                         </div>
                     </a>
 
@@ -1146,14 +1150,14 @@ export function Home() {
                             {loading ? '...' : filteredCounts.series.toLocaleString()}
                         </div>
                         <div style={{ fontSize: '12px', color: 'rgba(139, 92, 246, 0.9)', fontWeight: '600' }}>
-                            Séries
+                            {t('home', 'seriesCount')}
                         </div>
                     </a>
                 </div>
 
                 {/* Continue Watching Section */}
                 <ContentSection
-                    title="⏯️ Continue Assistindo"
+                    title={`⏯️ ${t('home', 'continueWatching')}`}
                     items={continueWatching}
                     type="continue"
                     showProgress={true}
@@ -1162,7 +1166,7 @@ export function Home() {
 
                 {/* Recommendations Section */}
                 <ContentSection
-                    title="💡 Recomendados Para Você"
+                    title={`💡 ${t('home', 'recommendations')}`}
                     items={recommendations}
                     type="recommendations"
                     sectionIndex={1}
@@ -1170,7 +1174,7 @@ export function Home() {
 
                 {/* Recently Added Series */}
                 <ContentSection
-                    title="🆕 Séries Adicionadas"
+                    title={`🆕 ${t('home', 'recentSeries')}`}
                     items={recentSeries}
                     type="series"
                     sectionIndex={2}
@@ -1178,7 +1182,7 @@ export function Home() {
 
                 {/* Recently Added Movies */}
                 <ContentSection
-                    title="🎬 Filmes Adicionados"
+                    title={`🎬 ${t('home', 'recentMovies')}`}
                     items={recentMovies}
                     type="movie"
                     sectionIndex={3}
@@ -1192,7 +1196,7 @@ export function Home() {
                         color: 'white',
                         marginBottom: '16px'
                     }}>
-                        Acesso Rápido
+                        {t('home', 'quickAccess')}
                     </h2>
                     <div style={{
                         display: 'grid',
@@ -1213,7 +1217,7 @@ export function Home() {
                             onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
                         >
                             <div style={{ fontSize: '24px', marginBottom: '6px' }}>🔴</div>
-                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>TV ao Vivo</div>
+                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>{t('home', 'liveTV')}</div>
                         </a>
                         <a href="#/dashboard/vod" style={{
                             background: 'rgba(255, 255, 255, 0.05)',
@@ -1228,7 +1232,7 @@ export function Home() {
                             onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
                         >
                             <div style={{ fontSize: '24px', marginBottom: '6px' }}>🎥</div>
-                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>Filmes</div>
+                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>{t('home', 'movies')}</div>
                         </a>
                         <a href="#/dashboard/series" style={{
                             background: 'rgba(255, 255, 255, 0.05)',
@@ -1243,7 +1247,7 @@ export function Home() {
                             onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
                         >
                             <div style={{ fontSize: '24px', marginBottom: '6px' }}>📺</div>
-                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>Séries</div>
+                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>{t('home', 'seriesCount')}</div>
                         </a>
                         <a href="#/dashboard/watch-later" style={{
                             background: 'rgba(255, 255, 255, 0.05)',
@@ -1258,7 +1262,7 @@ export function Home() {
                             onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
                         >
                             <div style={{ fontSize: '24px', marginBottom: '6px' }}>🔖</div>
-                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>Minha Lista</div>
+                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>{t('home', 'myList')}</div>
                         </a>
                         <a href="#/dashboard/favorites" style={{
                             background: 'rgba(255, 255, 255, 0.05)',
@@ -1273,7 +1277,7 @@ export function Home() {
                             onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
                         >
                             <div style={{ fontSize: '24px', marginBottom: '6px' }}>❤️</div>
-                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>Favoritos</div>
+                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>{t('home', 'favorites')}</div>
                         </a>
                         <a href="#/dashboard/downloads" style={{
                             background: 'rgba(255, 255, 255, 0.05)',
@@ -1288,7 +1292,7 @@ export function Home() {
                             onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
                         >
                             <div style={{ fontSize: '24px', marginBottom: '6px' }}>📥</div>
-                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>Baixados</div>
+                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>{t('home', 'downloaded')}</div>
                         </a>
                         <a href="#/dashboard/settings" style={{
                             background: 'rgba(255, 255, 255, 0.05)',
@@ -1303,7 +1307,7 @@ export function Home() {
                             onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
                         >
                             <div style={{ fontSize: '24px', marginBottom: '6px' }}>⚙️</div>
-                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>Configurações</div>
+                            <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>{t('home', 'settings')}</div>
                         </a>
                     </div>
                 </div>

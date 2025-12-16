@@ -3,6 +3,7 @@ import { profileService } from '../services/profileService';
 import type { Profile } from '../types/profile';
 import { CreateProfileModal } from './CreateProfileModal';
 import { X, Edit2, Trash2, Plus, Lock, Check } from 'lucide-react';
+import { useLanguage } from '../services/languageService';
 
 interface ProfileManagerProps {
     onClose: () => void;
@@ -27,23 +28,24 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
     const [deletePinError, setDeletePinError] = useState('');
 
     const activeProfile = profileService.getActiveProfile();
+    const { t } = useLanguage();
 
     const avatarOptions = ['👤', '👨', '👩', '🧒', '👴', '👵', '🐱', '🐶', '🦊', '🐼', '🎮', '🎬', '🎧', '🎸', '⚽', '🏀'];
 
     const handleDeleteProfile = (profile: Profile) => {
         if (profile.id === activeProfile?.id) {
-            alert('Não é possível deletar o perfil ativo!');
+            alert(t('profile', 'cannotDeleteActive'));
             return;
         }
 
         if (profiles.length <= 1) {
-            alert('Não é possível deletar o último perfil!');
+            alert(t('profile', 'cannotDeleteLast'));
             return;
         }
 
         // Kids profile cannot be deleted
         if (profile.isKids) {
-            alert('O perfil Kids não pode ser deletado!');
+            alert(t('profile', 'cannotDeleteKids'));
             return;
         }
 
@@ -66,7 +68,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
             setProfiles(profileService.getAllProfiles());
             setPendingDelete(null);
         } else {
-            setDeletePinError('PIN incorreto');
+            setDeletePinError(t('parental', 'pinIncorrect'));
             setDeletePinInput('');
         }
     };
@@ -114,7 +116,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                 setPinEditStep('new');
                 setEditPinError('');
             } else {
-                setEditPinError('PIN atual incorreto');
+                setEditPinError(t('profile', 'currentPinIncorrect'));
                 setCurrentPinInput('');
             }
         } else if (pinEditStep === 'new') {
@@ -132,7 +134,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                 const updatedProfile = updatedProfiles.find(p => p.id === editingProfile.id);
                 if (updatedProfile) setEditingProfile(updatedProfile);
             } else {
-                setEditPinError('Os PINs não coincidem');
+                setEditPinError(t('profile', 'pinsDoNotMatch'));
                 setConfirmPinInput('');
             }
         }
@@ -152,7 +154,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                 const updatedProfile = updatedProfiles.find(p => p.id === editingProfile.id);
                 if (updatedProfile) setEditingProfile(updatedProfile);
             } else {
-                setEditPinError('PIN incorreto');
+                setEditPinError(t('parental', 'pinIncorrect'));
                 setCurrentPinInput('');
             }
         }
@@ -192,7 +194,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
             // Reload to refresh Continue Watching and Favorites
             window.location.reload();
         } else {
-            setPinError('PIN incorreto');
+            setPinError(t('parental', 'pinIncorrect'));
             setPinInput('');
         }
     };
@@ -223,7 +225,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                 <div className="pm-header">
                     <h1 className="pm-title">
                         <span className="pm-title-icon">👥</span>
-                        Gerenciar Perfis
+                        {t('profile', 'manageProfiles')}
                     </h1>
                     <button className="pm-close-btn" onClick={onClose}>
                         <X size={24} />
@@ -252,7 +254,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                                 {isActive && (
                                     <div className="pm-active-badge">
                                         <Check size={12} />
-                                        <span>Ativo</span>
+                                        <span>{t('profile', 'active')}</span>
                                     </div>
                                 )}
 
@@ -277,7 +279,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                                 {profile.pin && (
                                     <div className="pm-pin-indicator">
                                         <Lock size={14} />
-                                        <span>PIN Ativo</span>
+                                        <span>{t('profile', 'pinActive')}</span>
                                     </div>
                                 )}
 
@@ -290,7 +292,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                                             onClick={(e) => { e.stopPropagation(); handleEditClick(profile); }}
                                         >
                                             <Edit2 size={16} />
-                                            <span>Editar</span>
+                                            <span>{t('profile', 'edit')}</span>
                                         </button>
                                         <button
                                             className="pm-btn pm-btn-delete"
@@ -298,7 +300,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                                             disabled={isActive || profiles.length <= 1}
                                         >
                                             <Trash2 size={16} />
-                                            <span>Deletar</span>
+                                            <span>{t('profile', 'delete')}</span>
                                         </button>
                                     </div>
                                 )}
@@ -316,7 +318,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                             <div className="pm-add-icon">
                                 <Plus size={40} />
                             </div>
-                            <span className="pm-add-label">Adicionar Perfil</span>
+                            <span className="pm-add-label">{t('profile', 'addProfile')}</span>
                         </button>
                     )}
                 </div>
@@ -336,21 +338,21 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                     <div className="pm-modal" onClick={(e) => e.stopPropagation()}>
                         <div className="pm-modal-header">
                             <span className="pm-modal-icon">✏️</span>
-                            <h2>Editar Perfil</h2>
+                            <h2>{t('profile', 'editProfile')}</h2>
                         </div>
 
                         <div className="pm-edit-form">
-                            <label className="pm-label">Nome do Perfil</label>
+                            <label className="pm-label">{t('profile', 'profileName')}</label>
                             <input
                                 type="text"
                                 className="pm-input"
                                 value={editName}
                                 onChange={(e) => setEditName(e.target.value)}
-                                placeholder="Digite o nome"
+                                placeholder={t('profile', 'enterName')}
                                 maxLength={20}
                             />
 
-                            <label className="pm-label">Avatar</label>
+                            <label className="pm-label">{t('profile', 'avatar')}</label>
                             <div className="pm-avatar-grid">
                                 {avatarOptions.map((avatar) => (
                                     <button
@@ -369,13 +371,13 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                                 onClick={handleStartEditPin}
                             >
                                 <Lock size={16} />
-                                {editingProfile.pin ? 'Alterar PIN' : 'Adicionar PIN'}
+                                {editingProfile.pin ? t('parental', 'changePin') + ' PIN' : t('profile', 'addPin')}
                             </button>
                         </div>
 
                         <div className="pm-modal-buttons">
                             <button className="pm-btn pm-btn-cancel" onClick={() => setEditingProfile(null)}>
-                                Cancelar
+                                {t('profile', 'cancel')}
                             </button>
                             <button
                                 className="pm-btn pm-btn-save"
@@ -383,7 +385,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                                 disabled={!editName.trim()}
                             >
                                 <Check size={18} />
-                                Salvar
+                                {t('profile', 'save')}
                             </button>
                         </div>
                     </div>
@@ -396,22 +398,22 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                     <div className="pm-modal pm-modal-delete" onClick={(e) => e.stopPropagation()}>
                         <div className="pm-modal-header">
                             <span className="pm-modal-icon danger">🗑️</span>
-                            <h2>Deletar Perfil?</h2>
+                            <h2>{t('profile', 'deleteProfile')}?</h2>
                         </div>
 
                         <p className="pm-delete-msg">
-                            Tem certeza que deseja deletar o perfil <strong>{deleteConfirm.name}</strong>?
+                            {t('profile', 'confirmDelete').replace('este perfil', '')} <strong>{deleteConfirm.name}</strong>?
                             <br />
-                            <span className="pm-delete-warning">Esta ação não pode ser desfeita.</span>
+                            <span className="pm-delete-warning">{t('profile', 'actionCannotBeUndone')}</span>
                         </p>
 
                         <div className="pm-modal-buttons">
                             <button className="pm-btn pm-btn-cancel" onClick={() => setDeleteConfirm(null)}>
-                                Cancelar
+                                {t('profile', 'cancel')}
                             </button>
                             <button className="pm-btn pm-btn-danger" onClick={confirmDelete}>
                                 <Trash2 size={18} />
-                                Deletar Perfil
+                                {t('profile', 'deleteProfile')}
                             </button>
                         </div>
                     </div>
@@ -424,8 +426,8 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                     <div className="pm-pin-modal" onClick={(e) => e.stopPropagation()}>
                         <div className="pm-pin-header">
                             <span className="pm-pin-icon">🔐</span>
-                            <h2>Digite o PIN</h2>
-                            <p>Perfil: <strong>{pendingActivation.name}</strong></p>
+                            <h2>{t('profile', 'enterPin')}</h2>
+                            <p>{t('profile', 'protectedProfile').replace('Perfil protegido', 'Perfil')}: <strong>{pendingActivation.name}</strong></p>
                         </div>
 
                         <div
@@ -468,7 +470,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
 
                         <div className="pm-pin-buttons">
                             <button className="pm-pin-btn cancel" onClick={() => setPendingActivation(null)}>
-                                Cancelar
+                                {t('profile', 'cancel')}
                             </button>
                             <button
                                 className="pm-pin-btn submit"
@@ -476,7 +478,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                                 disabled={pinInput.length !== 4}
                             >
                                 <Check size={18} />
-                                Entrar
+                                {t('profile', 'enter')}
                             </button>
                         </div>
                     </div>
@@ -489,8 +491,8 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                     <div className="pm-pin-modal" onClick={(e) => e.stopPropagation()}>
                         <div className="pm-pin-header">
                             <span className="pm-pin-icon">🗑️</span>
-                            <h2>Confirmar Exclusão</h2>
-                            <p>Digite o PIN para deletar <strong>{pendingDelete.name}</strong></p>
+                            <h2>{t('profile', 'confirmDeletion')}</h2>
+                            <p>{t('profile', 'enterPinToDelete')} <strong>{pendingDelete.name}</strong></p>
                         </div>
 
                         <div
@@ -533,7 +535,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
 
                         <div className="pm-pin-buttons">
                             <button className="pm-pin-btn cancel" onClick={() => setPendingDelete(null)}>
-                                Cancelar
+                                {t('profile', 'cancel')}
                             </button>
                             <button
                                 className="pm-pin-btn submit"
@@ -542,7 +544,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                                 disabled={deletePinInput.length !== 4}
                             >
                                 <Trash2 size={18} />
-                                Deletar
+                                {t('profile', 'delete')}
                             </button>
                         </div>
                     </div>
@@ -556,14 +558,14 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                         <div className="pm-pin-header">
                             <span className="pm-pin-icon">🔑</span>
                             <h2>
-                                {pinEditStep === 'verify' && 'PIN Atual'}
-                                {pinEditStep === 'new' && 'Novo PIN'}
-                                {pinEditStep === 'confirm' && 'Confirmar PIN'}
+                                {pinEditStep === 'verify' && t('profile', 'currentPin')}
+                                {pinEditStep === 'new' && t('profile', 'newPin')}
+                                {pinEditStep === 'confirm' && t('profile', 'confirmPin')}
                             </h2>
                             <p>
-                                {pinEditStep === 'verify' && 'Digite seu PIN atual'}
-                                {pinEditStep === 'new' && 'Digite o novo PIN de 4 dígitos'}
-                                {pinEditStep === 'confirm' && 'Digite o novo PIN novamente'}
+                                {pinEditStep === 'verify' && t('profile', 'enterCurrentPin')}
+                                {pinEditStep === 'new' && t('profile', 'enterNewPin')}
+                                {pinEditStep === 'confirm' && t('profile', 'reenterNewPin')}
                             </p>
                         </div>
 
@@ -615,7 +617,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
 
                         <div className="pm-pin-buttons">
                             <button className="pm-pin-btn cancel" onClick={() => setShowEditPin(false)}>
-                                Cancelar
+                                {t('profile', 'cancel')}
                             </button>
                             {pinEditStep === 'verify' && editingProfile.pin && (
                                 <button
@@ -625,7 +627,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                                     disabled={currentPinInput.length !== 4}
                                 >
                                     <Trash2 size={18} />
-                                    Remover PIN
+                                    {t('profile', 'removePin')}
                                 </button>
                             )}
                             <button
@@ -634,7 +636,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                                 disabled={(pinEditStep === 'verify' ? currentPinInput : pinEditStep === 'new' ? newPinInput : confirmPinInput).length !== 4}
                             >
                                 <Check size={18} />
-                                {pinEditStep === 'confirm' ? 'Salvar' : 'Continuar'}
+                                {pinEditStep === 'confirm' ? t('profile', 'save') : t('profile', 'continue')}
                             </button>
                         </div>
                     </div>

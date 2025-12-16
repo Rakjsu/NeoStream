@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { profileService } from '../services/profileService';
+import { useLanguage } from '../services/languageService';
 
 interface CreateProfileModalProps {
     onClose: () => void;
@@ -18,6 +19,7 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
     const [confirmPin, setConfirmPin] = useState('');
     const [error, setError] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const { t } = useLanguage();
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -25,7 +27,7 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
 
         // Check file size (max 50KB)
         if (file.size > 50 * 1024) {
-            setError('Imagem muito grande! Máximo 50KB.');
+            setError(t('profile', 'imageTooBig'));
             return;
         }
 
@@ -42,24 +44,24 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
 
         // Validate name
         if (!name.trim()) {
-            setError('Nome é obrigatório');
+            setError(t('profile', 'nameRequired'));
             return;
         }
 
         if (name.length > 20) {
-            setError('Nome deve ter no máximo 20 caracteres');
+            setError(t('profile', 'nameMaxLength'));
             return;
         }
 
         // Validate PIN if enabled
         if (usePin) {
             if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
-                setError('PIN deve ter exatamente 4 dígitos');
+                setError(t('profile', 'pinMustBe4Digits'));
                 return;
             }
 
             if (pin !== confirmPin) {
-                setError('PINs não conferem');
+                setError(t('profile', 'pinsDoNotMatch'));
                 return;
             }
         }
@@ -76,7 +78,7 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
             onProfileCreated();
             onClose();
         } else {
-            setError('Erro ao criar perfil. Limite de 5 perfis atingido?');
+            setError(t('profile', 'profileCreationError'));
         }
     };
 
@@ -107,20 +109,20 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
                 }}
             >
                 <h2 style={{ color: 'white', fontSize: '32px', marginBottom: '24px' }}>
-                    Criar Novo Perfil
+                    {t('profile', 'createNewProfile')}
                 </h2>
 
                 {/* Name */}
                 <div style={{ marginBottom: '24px' }}>
                     <label style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '14px', display: 'block', marginBottom: '8px' }}>
-                        Nome
+                        {t('profile', 'name')}
                     </label>
                     <input
                         type="text"
                         maxLength={20}
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        placeholder="Digite o nome"
+                        placeholder={t('profile', 'enterName')}
                         style={{
                             width: '100%',
                             padding: '12px',
@@ -139,7 +141,7 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
                 {/* Avatar Selection */}
                 <div style={{ marginBottom: '24px' }}>
                     <label style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '14px', display: 'block', marginBottom: '8px' }}>
-                        Avatar
+                        {t('profile', 'avatar')}
                     </label>
 
                     {/* Toggle between Emoji and Image */}
@@ -156,7 +158,7 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
                                 cursor: 'pointer'
                             }}
                         >
-                            😀 Emoji
+                            😀 {t('profile', 'emoji')}
                         </button>
                         <button
                             onClick={() => {
@@ -173,7 +175,7 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
                                 cursor: 'pointer'
                             }}
                         >
-                            🖼️ Imagem
+                            🖼️ {t('profile', 'image')}
                         </button>
                         <input
                             ref={fileInputRef}
@@ -234,7 +236,7 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
                                     cursor: 'pointer'
                                 }}
                             >
-                                Alterar Imagem
+                                {t('profile', 'changeImage')}
                             </button>
                         </div>
                     )}
@@ -250,7 +252,7 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
                             style={{ width: '20px', height: '20px', cursor: 'pointer' }}
                         />
                         <span style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '14px' }}>
-                            🔒 Proteger com PIN (4 dígitos)
+                            🔒 {t('profile', 'protectWithPin')}
                         </span>
                     </label>
                 </div>
@@ -264,7 +266,7 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
                                 maxLength={4}
                                 value={pin}
                                 onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                                placeholder="PIN"
+                                placeholder={t('profile', 'pin')}
                                 style={{
                                     width: '100%',
                                     padding: '12px',
@@ -284,7 +286,7 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
                                 maxLength={4}
                                 value={confirmPin}
                                 onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
-                                placeholder="Confirmar PIN"
+                                placeholder={t('profile', 'confirmPin')}
                                 style={{
                                     width: '100%',
                                     padding: '12px',
@@ -325,7 +327,7 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
                             cursor: 'pointer'
                         }}
                     >
-                        Cancelar
+                        {t('profile', 'cancel')}
                     </button>
                     <button
                         onClick={handleCreate}
@@ -342,7 +344,7 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
                             cursor: name.trim() ? 'pointer' : 'not-allowed'
                         }}
                     >
-                        Criar Perfil
+                        {t('profile', 'createProfile')}
                     </button>
                 </div>
             </div>

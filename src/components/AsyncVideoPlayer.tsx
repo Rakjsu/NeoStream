@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { VideoPlayer } from './VideoPlayer/VideoPlayer';
 import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
+import { findMovieVersions, type MovieVersion } from '../services/movieVersionService';
 
 interface AsyncVideoPlayerProps {
     movie: any;
@@ -23,6 +24,9 @@ interface AsyncVideoPlayerProps {
     // For PiP expand functionality
     contentId?: string;
     contentType?: 'movie' | 'series' | 'live';
+    // For movie version switching
+    allMovies?: any[];
+    onSwitchVersion?: (movie: any, currentTime: number) => void;
 }
 
 function AsyncVideoPlayer({
@@ -41,7 +45,9 @@ function AsyncVideoPlayer({
     resumeTime: externalResumeTime,
     onTimeUpdate: externalOnTimeUpdate,
     contentId,
-    contentType
+    contentType,
+    allMovies,
+    onSwitchVersion
 }: AsyncVideoPlayerProps) {
     const [streamUrl, setStreamUrl] = useState<string>('');
     const [loading, setLoading] = useState(true);
@@ -49,9 +55,29 @@ function AsyncVideoPlayer({
     const [isAnimating, setIsAnimating] = useState(true);
     const [resumeTime, setResumeTime] = useState<number | null>(null);
     const urlLoadedRef = useRef(false);
+    const lastMovieIdRef = useRef<number | null>(null);
+    const lastEpisodeRef = useRef<string | null>(null);
 
     // Effect 1: Load stream URL (only triggers on movie/episode changes, NOT resumeTime)
     useEffect(() => {
+        // Create a unique key for current content (movie ID + episode info for series)
+        const currentMovieId = movie.stream_id || movie.id;
+        const currentEpisodeKey = seriesId ? `${seriesId}-S${seasonNumber}-E${episodeNumber}` : null;
+
+        // Reset urlLoadedRef if movie changed (for version switching)
+        if (lastMovieIdRef.current !== null && lastMovieIdRef.current !== currentMovieId) {
+            console.log('[AsyncVideoPlayer] Movie ID changed, resetting URL loader');
+            urlLoadedRef.current = false;
+        }
+        lastMovieIdRef.current = currentMovieId;
+
+        // Reset urlLoadedRef if episode changed (for series navigation)
+        if (currentEpisodeKey && lastEpisodeRef.current !== null && lastEpisodeRef.current !== currentEpisodeKey) {
+            console.log('[AsyncVideoPlayer] Episode changed, resetting URL loader:', currentEpisodeKey);
+            urlLoadedRef.current = false;
+        }
+        lastEpisodeRef.current = currentEpisodeKey;
+
         // Skip if already loaded for same content
         if (urlLoadedRef.current && streamUrl) {
             return;
@@ -336,6 +362,9 @@ function AsyncVideoPlayer({
                         contentType={contentType || (seriesId ? 'series' : 'movie')}
                         seasonNumber={seasonNumber}
                         episodeNumber={episodeNumber}
+                        movieVersions={allMovies && !seriesId ? findMovieVersions(movie, allMovies) : undefined}
+                        currentMovieId={movie.stream_id}
+                        onSwitchVersion={onSwitchVersion}
                         onTimeUpdate={(currentTime, duration) => {
                             // Call external onTimeUpdate if provided
                             if (externalOnTimeUpdate) {

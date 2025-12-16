@@ -6,12 +6,14 @@ import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { ResumeModal } from '../components/ResumeModal';
 import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
+import { useLanguage } from '../services/languageService';
 
 export function Favorites() {
     const [items, setItems] = useState<FavoriteItem[]>([]);
     const [removingId, setRemovingId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'all' | 'movies' | 'series'>('all');
     const navigate = useNavigate();
+    const { t } = useLanguage();
 
     // Modal and player states
     const [selectedContent, setSelectedContent] = useState<{
@@ -63,10 +65,10 @@ export function Favorites() {
     const formatRemainingTime = (currentTime: number, duration: number) => {
         const remaining = Math.max(0, duration - currentTime);
         const minutes = Math.floor(remaining / 60);
-        if (minutes < 60) return `${minutes}min restantes`;
+        if (minutes < 60) return `${minutes} ${t('home', 'minRemaining')}`;
         const hours = Math.floor(minutes / 60);
         const mins = minutes % 60;
-        return `${hours}h ${mins}min restantes`;
+        return `${hours}h ${mins}min ${t('home', 'hRemaining').replace('h ', '')}`;
     };
 
     const handleItemClick = (item: FavoriteItem) => {
@@ -101,9 +103,9 @@ export function Favorites() {
                             <div className="empty-icon">❤️</div>
                             <div className="empty-icon-glow" />
                         </div>
-                        <h2 className="empty-title">Nenhum favorito ainda</h2>
+                        <h2 className="empty-title">{t('favoritesPage', 'emptyTitle')}</h2>
                         <p className="empty-text">
-                            Adicione filmes e séries aos favoritos clicando no ícone <strong>❤️</strong>
+                            {t('favoritesPage', 'emptyText')} <strong>{t('favoritesPage', 'emptyButton')}</strong>
                         </p>
                         <div className="empty-suggestions">
                             <button
@@ -111,14 +113,14 @@ export function Favorites() {
                                 onClick={() => navigate('/dashboard/vod')}
                             >
                                 <span>🎬</span>
-                                <span>Explorar Filmes</span>
+                                <span>{t('favoritesPage', 'exploreMovies')}</span>
                             </button>
                             <button
                                 className="suggestion-btn"
                                 onClick={() => navigate('/dashboard/series')}
                             >
                                 <span>📺</span>
-                                <span>Explorar Séries</span>
+                                <span>{t('favoritesPage', 'exploreSeries')}</span>
                             </button>
                         </div>
                     </div>
@@ -138,14 +140,14 @@ export function Favorites() {
                     <div className="header-title">
                         <div className="title-icon">❤️</div>
                         <div>
-                            <h1>Favoritos</h1>
-                            <p className="subtitle">{items.length} {items.length === 1 ? 'favorito' : 'favoritos'}</p>
+                            <h1>{t('favoritesPage', 'title')}</h1>
+                            <p className="subtitle">{items.length} {t('favoritesPage', 'itemCount')}</p>
                         </div>
                     </div>
                     {items.length > 0 && (
                         <button className="clear-btn" onClick={clearAll}>
                             <span>🗑️</span>
-                            <span>Limpar Tudo</span>
+                            <span>{t('favoritesPage', 'clearAll')}</span>
                         </button>
                     )}
                 </header>
@@ -156,21 +158,21 @@ export function Favorites() {
                         className={`tab ${activeTab === 'all' ? 'active' : ''}`}
                         onClick={() => setActiveTab('all')}
                     >
-                        <span>Todos</span>
+                        <span>{t('favoritesPage', 'all')}</span>
                         <span className="tab-count">{items.length}</span>
                     </button>
                     <button
                         className={`tab ${activeTab === 'movies' ? 'active' : ''}`}
                         onClick={() => setActiveTab('movies')}
                     >
-                        <span>🎬 Filmes</span>
+                        <span>🎬 {t('favoritesPage', 'movies')}</span>
                         <span className="tab-count">{movies.length}</span>
                     </button>
                     <button
                         className={`tab ${activeTab === 'series' ? 'active' : ''}`}
                         onClick={() => setActiveTab('series')}
                     >
-                        <span>📺 Séries</span>
+                        <span>📺 {t('favoritesPage', 'series')}</span>
                         <span className="tab-count">{series.length}</span>
                     </button>
                 </div>
