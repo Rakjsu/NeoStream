@@ -89,7 +89,7 @@ export function Login() {
     const handlePlaylistNameSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         localStorage.setItem('playlistName', playlistName || 'Minha Playlist');
-        window.location.href = '/';
+        window.location.reload();
     };
 
     const handleBack = () => {
