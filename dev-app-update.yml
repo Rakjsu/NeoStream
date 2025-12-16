@@ -1,0 +1,4 @@
+provider: github
+owner: Rakjsu
+repo: NeoStream
+updaterCacheDirName: neostream-iptv-updater

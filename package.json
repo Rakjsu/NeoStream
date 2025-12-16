@@ -81,7 +81,8 @@
       "dist",
       "dist-electron",
       "node_modules",
-      "package.json"
+      "package.json",
+      "dev-app-update.yml"
     ],
     "win": {
       "target": [
@@ -89,7 +90,8 @@
         "nsis"
       ],
       "signAndEditExecutable": false,
-      "sign": null
+      "sign": null,
+      "verifyUpdateCodeSignature": false
     },
     "publish": {
       "provider": "github",
