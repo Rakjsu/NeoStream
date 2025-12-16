@@ -58,6 +58,8 @@ function App() {
 
   const handleProfileSelected = () => {
     setProfileSelected(true);
+    // Force navigation to dashboard after profile selection
+    window.location.hash = '#/dashboard';
   };
 
   if (loading) {
