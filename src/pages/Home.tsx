@@ -122,6 +122,12 @@ export function Home() {
         duration: number;
     } | null>(null);
 
+    // Series episode data for navigation
+    const [seriesEpisodeData, setSeriesEpisodeData] = useState<{
+        seriesId: string;
+        episodes: { [season: string]: any[] };
+    } | null>(null);
+
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -467,6 +473,105 @@ export function Home() {
             movieProgressService.clearMovieProgress(itemId);
         }
         setContinueWatching(prev => prev.filter(item => item.id !== itemId));
+    };
+
+    // Episode navigation helpers for series playback
+    const canGoNextEpisode = (): boolean => {
+        if (!playingContent || playingContent.type !== 'series' || !seriesEpisodeData) return false;
+        const { season, episode } = playingContent;
+        if (!season || !episode) return false;
+
+        const currentSeasonEpisodes = seriesEpisodeData.episodes[season] || [];
+        const currentEpIndex = currentSeasonEpisodes.findIndex((ep: any) => Number(ep.episode_num) === episode);
+
+        // Check if there's a next episode in current season
+        if (currentEpIndex >= 0 && currentEpIndex < currentSeasonEpisodes.length - 1) return true;
+
+        // Check if there's a next season with episodes
+        const seasons = Object.keys(seriesEpisodeData.episodes).map(Number).sort((a, b) => a - b);
+        const currentSeasonIndex = seasons.indexOf(season);
+        if (currentSeasonIndex >= 0 && currentSeasonIndex < seasons.length - 1) {
+            const nextSeason = seasons[currentSeasonIndex + 1];
+            return (seriesEpisodeData.episodes[nextSeason]?.length || 0) > 0;
+        }
+        return false;
+    };
+
+    const canGoPreviousEpisode = (): boolean => {
+        if (!playingContent || playingContent.type !== 'series' || !seriesEpisodeData) return false;
+        const { season, episode } = playingContent;
+        if (!season || !episode) return false;
+
+        const currentSeasonEpisodes = seriesEpisodeData.episodes[season] || [];
+        const currentEpIndex = currentSeasonEpisodes.findIndex((ep: any) => Number(ep.episode_num) === episode);
+
+        // Check if there's a previous episode in current season
+        if (currentEpIndex > 0) return true;
+
+        // Check if there's a previous season with episodes
+        const seasons = Object.keys(seriesEpisodeData.episodes).map(Number).sort((a, b) => a - b);
+        const currentSeasonIndex = seasons.indexOf(season);
+        if (currentSeasonIndex > 0) {
+            const prevSeason = seasons[currentSeasonIndex - 1];
+            return (seriesEpisodeData.episodes[prevSeason]?.length || 0) > 0;
+        }
+        return false;
+    };
+
+    const handleNextEpisode = () => {
+        if (!playingContent || playingContent.type !== 'series' || !seriesEpisodeData) return;
+        const { season, episode } = playingContent;
+        if (!season || !episode) return;
+
+        const currentSeasonEpisodes = seriesEpisodeData.episodes[season] || [];
+        const currentEpIndex = currentSeasonEpisodes.findIndex((ep: any) => Number(ep.episode_num) === episode);
+
+        // Go to next episode in current season
+        if (currentEpIndex >= 0 && currentEpIndex < currentSeasonEpisodes.length - 1) {
+            const nextEp = currentSeasonEpisodes[currentEpIndex + 1];
+            setPlayingContent(prev => prev ? { ...prev, season, episode: Number(nextEp.episode_num), resumeTime: 0 } : null);
+            return;
+        }
+
+        // Go to first episode of next season
+        const seasons = Object.keys(seriesEpisodeData.episodes).map(Number).sort((a, b) => a - b);
+        const currentSeasonIndex = seasons.indexOf(season);
+        if (currentSeasonIndex >= 0 && currentSeasonIndex < seasons.length - 1) {
+            const nextSeason = seasons[currentSeasonIndex + 1];
+            const nextSeasonEpisodes = seriesEpisodeData.episodes[nextSeason];
+            if (nextSeasonEpisodes?.length > 0) {
+                const firstEp = nextSeasonEpisodes[0];
+                setPlayingContent(prev => prev ? { ...prev, season: nextSeason, episode: Number(firstEp.episode_num), resumeTime: 0 } : null);
+            }
+        }
+    };
+
+    const handlePreviousEpisode = () => {
+        if (!playingContent || playingContent.type !== 'series' || !seriesEpisodeData) return;
+        const { season, episode } = playingContent;
+        if (!season || !episode) return;
+
+        const currentSeasonEpisodes = seriesEpisodeData.episodes[season] || [];
+        const currentEpIndex = currentSeasonEpisodes.findIndex((ep: any) => Number(ep.episode_num) === episode);
+
+        // Go to previous episode in current season
+        if (currentEpIndex > 0) {
+            const prevEp = currentSeasonEpisodes[currentEpIndex - 1];
+            setPlayingContent(prev => prev ? { ...prev, season, episode: Number(prevEp.episode_num), resumeTime: 0 } : null);
+            return;
+        }
+
+        // Go to last episode of previous season
+        const seasons = Object.keys(seriesEpisodeData.episodes).map(Number).sort((a, b) => a - b);
+        const currentSeasonIndex = seasons.indexOf(season);
+        if (currentSeasonIndex > 0) {
+            const prevSeason = seasons[currentSeasonIndex - 1];
+            const prevSeasonEpisodes = seriesEpisodeData.episodes[prevSeason];
+            if (prevSeasonEpisodes?.length > 0) {
+                const lastEp = prevSeasonEpisodes[prevSeasonEpisodes.length - 1];
+                setPlayingContent(prev => prev ? { ...prev, season: prevSeason, episode: Number(lastEp.episode_num), resumeTime: 0 } : null);
+            }
+        }
     };
 
     // Content card component with hover preview - NO STATE to prevent re-renders
@@ -1401,6 +1506,15 @@ export function Home() {
                                 // Fetch episode info for series
                                 const seriesInfoRes = await fetch(`${url}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${content.id}`);
                                 const seriesInfo = await seriesInfoRes.json();
+
+                                // Store episode data for navigation
+                                if (seriesInfo?.episodes) {
+                                    setSeriesEpisodeData({
+                                        seriesId: content.id,
+                                        episodes: seriesInfo.episodes
+                                    });
+                                }
+
                                 const episodes = seriesInfo?.episodes?.[content.season || 1];
                                 const episode = episodes?.find((ep: any) => Number(ep.episode_num) === (content.episode || 1));
                                 if (episode) {
@@ -1420,6 +1534,7 @@ export function Home() {
                     }}
                     onClose={() => {
                         setPlayingContent(null);
+                        setSeriesEpisodeData(null);
                         // Refresh continue watching list to show updated progress
                         setRefreshTrigger(prev => prev + 1);
                     }}
@@ -1431,6 +1546,10 @@ export function Home() {
                     seasonNumber={playingContent.season}
                     episodeNumber={playingContent.episode}
                     resumeTime={playingContent.resumeTime || null}
+                    onNextEpisode={playingContent.type === 'series' ? handleNextEpisode : undefined}
+                    onPreviousEpisode={playingContent.type === 'series' ? handlePreviousEpisode : undefined}
+                    canGoNext={playingContent.type === 'series' ? canGoNextEpisode() : false}
+                    canGoPrevious={playingContent.type === 'series' ? canGoPreviousEpisode() : false}
                 />
             )}
 
