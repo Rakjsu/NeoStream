@@ -63,6 +63,7 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             playlistNameLabel: 'Digite o nome da playlist',
             playlistPlaceholder: 'Minha Playlist',
             library: 'Biblioteca',
+            iptvLogin: 'Login IPTV',
             channels: 'Canais',
             moviesCount: 'Filmes',
             seriesCount: 'Séries',
@@ -71,10 +72,16 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             searchSeries: 'Buscar séries...',
             searchChannels: 'Buscar canais...',
             // Error messages
-            connectionError: 'Não foi possível conectar ao servidor. Verifique:\\n• URL do servidor está correta\\n• Servidor está online\\n• Sua conexão com internet',
-            authError: 'Usuário ou senha incorretos. Verifique suas credenciais.',
+            connectionError: 'Não foi possível conectar ao servidor',
+            connectionErrorDetails: 'Verifique: URL do servidor, servidor online, sua conexão',
+            authError: 'Usuário ou senha incorretos',
             timeoutError: 'Tempo esgotado. O servidor demorou muito para responder.',
-            unexpectedError: 'Erro inesperado. Se o problema persistir, verifique as configurações.'
+            unexpectedError: 'Erro inesperado. Verifique as configurações.',
+            notAuthenticated: 'Não autenticado. Faça login novamente.',
+            loadChannelsError: 'Erro ao carregar canais',
+            loadMoviesError: 'Erro ao carregar filmes',
+            loadSeriesError: 'Erro ao carregar séries',
+            invalidUrl: 'URL inválida. Verifique o endereço do servidor.'
         },
         // Profile creation/management
         profile: {
@@ -376,13 +383,23 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             updateInstalled: 'Atualização Instalada!',
             whatsNew: 'Novidades na',
             gotIt: 'Entendi, vamos lá!',
-            // Version 2.8.0
-            i18nTitle: 'Internacionalização',
-            i18nItems: 'Interface traduzida para Português, Inglês e Espanhol|Notificações de download traduzidas|Perfis e modais traduzidos|Changelog dinâmico por idioma',
-            profilesTitle: 'Gerenciador de Perfis',
-            profilesItems: 'Todas as strings traduzidas|Modais de PIN traduzidos|Editar, deletar e adicionar perfis',
+            // Version 2.9.0
+            i18nTitle: 'Redesign de Interface',
+            i18nItems: 'Página Welcome redesenhada com animações|Página de Login premium com gradientes|Painel de Configurações deslizante|Telas de erro estilizadas para TV, Filmes e Séries',
+            profilesTitle: 'Traduções Aprimoradas',
+            profilesItems: 'Todas mensagens de erro traduzidas|Tradução de URL inválida|Badge de login traduzido',
             fixesTitle: 'Correções',
-            fixesItems: 'Tempo relativo nas notificações|Strings do Cast Device traduzidas'
+            fixesItems: 'Notificações removidas ao marcar como lida|Erros de escape em strings corrigidos'
+        },
+        // Welcome page
+        welcome: {
+            noChannels: 'Nenhuma playlist configurada',
+            addPlaylistHint: 'Adicione uma playlist do seu provedor IPTV para começar a assistir',
+            addPlaylist: 'Adicionar Playlist',
+            addPlaylistDesc: 'Conecte sua conta IPTV',
+            settings: 'Configurações',
+            settingsDesc: 'Personalize o aplicativo',
+            disclaimer: 'NeoStream não fornece conteúdo. Use sua própria assinatura IPTV.'
         },
         // Home page
         home: {
@@ -539,6 +556,7 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             playlistNameLabel: 'Enter playlist name',
             playlistPlaceholder: 'My Playlist',
             library: 'Library',
+            iptvLogin: 'IPTV Login',
             channels: 'Channels',
             moviesCount: 'Movies',
             seriesCount: 'Series',
@@ -547,10 +565,16 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             searchSeries: 'Search series...',
             searchChannels: 'Search channels...',
             // Error messages
-            connectionError: 'Could not connect to server. Check:\\n• Server URL is correct\\n• Server is online\\n• Your internet connection',
-            authError: 'Incorrect username or password. Check your credentials.',
+            connectionError: 'Could not connect to server',
+            connectionErrorDetails: 'Check: Server URL, server online, your connection',
+            authError: 'Incorrect username or password',
             timeoutError: 'Timeout. Server took too long to respond.',
-            unexpectedError: 'Unexpected error. If the problem persists, check settings.'
+            unexpectedError: 'Unexpected error. Check settings.',
+            notAuthenticated: 'Not authenticated. Please login again.',
+            loadChannelsError: 'Error loading channels',
+            loadMoviesError: 'Error loading movies',
+            loadSeriesError: 'Error loading series',
+            invalidUrl: 'Invalid URL. Check the server address.'
         },
         // Profile creation/management
         profile: {
@@ -723,13 +747,23 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             updateInstalled: 'Update Installed!',
             whatsNew: "What's New in",
             gotIt: "Got it, let's go!",
-            // Version 2.8.0
-            i18nTitle: 'Internationalization',
-            i18nItems: 'Interface translated to Portuguese, English and Spanish|Download notifications translated|Profiles and modals translated|Dynamic changelog by language',
-            profilesTitle: 'Profile Manager',
-            profilesItems: 'All strings translated|PIN modals translated|Edit, delete and add profiles',
+            // Version 2.9.0
+            i18nTitle: 'Interface Redesign',
+            i18nItems: 'Redesigned Welcome page with animations|Premium Login page with gradients|Slide-in Settings panel|Styled error screens for TV, Movies and Series',
+            profilesTitle: 'Enhanced Translations',
+            profilesItems: 'All error messages translated|Invalid URL translation|Login badge translated',
             fixesTitle: 'Fixes',
-            fixesItems: 'Relative time in notifications|Cast Device strings translated'
+            fixesItems: 'Notifications removed when marked as read|Escape errors in strings fixed'
+        },
+        // Welcome page
+        welcome: {
+            noChannels: 'No playlist configured',
+            addPlaylistHint: 'Add a playlist from your IPTV provider to start watching',
+            addPlaylist: 'Add Playlist',
+            addPlaylistDesc: 'Connect your IPTV account',
+            settings: 'Settings',
+            settingsDesc: 'Customize the app',
+            disclaimer: 'NeoStream does not provide content. Use your own IPTV subscription.'
         },
         updates: {
             title: 'Automatic Updates',
@@ -1002,6 +1036,7 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             playlistNameLabel: 'Ingresa el nombre de la playlist',
             playlistPlaceholder: 'Mi Playlist',
             library: 'Biblioteca',
+            iptvLogin: 'Inicio IPTV',
             channels: 'Canales',
             moviesCount: 'Películas',
             seriesCount: 'Series',
@@ -1010,10 +1045,16 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             searchSeries: 'Buscar series...',
             searchChannels: 'Buscar canales...',
             // Error messages
-            connectionError: 'No se pudo conectar al servidor. Verifica:\\n• URL del servidor es correcta\\n• Servidor está en línea\\n• Tu conexión a internet',
-            authError: 'Usuario o contraseña incorrectos. Verifica tus credenciales.',
+            connectionError: 'No se pudo conectar al servidor',
+            connectionErrorDetails: 'Verifica: URL del servidor, servidor en línea, tu conexión',
+            authError: 'Usuario o contraseña incorrectos',
             timeoutError: 'Tiempo agotado. El servidor tardó mucho en responder.',
-            unexpectedError: 'Error inesperado. Si el problema persiste, verifica la configuración.'
+            unexpectedError: 'Error inesperado. Verifica la configuración.',
+            notAuthenticated: 'No autenticado. Inicia sesión de nuevo.',
+            loadChannelsError: 'Error al cargar canales',
+            loadMoviesError: 'Error al cargar películas',
+            loadSeriesError: 'Error al cargar series',
+            invalidUrl: 'URL inválida. Verifica la dirección del servidor.'
         },
         // Profile creation/management
         profile: {
@@ -1181,13 +1222,23 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             updateInstalled: '¡Actualización Instalada!',
             whatsNew: 'Novedades en',
             gotIt: '¡Entendido, vamos!',
-            // Version 2.8.0
-            i18nTitle: 'Internacionalización',
-            i18nItems: 'Interfaz traducida a Portugués, Inglés y Español|Notificaciones de descarga traducidas|Perfiles y modales traducidos|Changelog dinámico por idioma',
-            profilesTitle: 'Gestor de Perfiles',
-            profilesItems: 'Todas las cadenas traducidas|Modales de PIN traducidos|Editar, eliminar y añadir perfiles',
+            // Version 2.9.0
+            i18nTitle: 'Rediseño de Interfaz',
+            i18nItems: 'Página Welcome rediseñada con animaciones|Página de Login premium con degradados|Panel de Configuración deslizante|Pantallas de error estilizadas para TV, Películas y Series',
+            profilesTitle: 'Traducciones Mejoradas',
+            profilesItems: 'Todos los mensajes de error traducidos|Traducción de URL inválida|Badge de login traducido',
             fixesTitle: 'Correcciones',
-            fixesItems: 'Tiempo relativo en notificaciones|Cadenas de Cast Device traducidas'
+            fixesItems: 'Notificaciones eliminadas al marcar como leída|Errores de escape en cadenas corregidos'
+        },
+        // Welcome page
+        welcome: {
+            noChannels: 'Ninguna playlist configurada',
+            addPlaylistHint: 'Añade una playlist de tu proveedor IPTV para empezar a ver',
+            addPlaylist: 'Añadir Playlist',
+            addPlaylistDesc: 'Conecta tu cuenta IPTV',
+            settings: 'Configuración',
+            settingsDesc: 'Personaliza la aplicación',
+            disclaimer: 'NeoStream no proporciona contenido. Usa tu propia suscripción IPTV.'
         },
         settings: {
             title: 'Configuración',

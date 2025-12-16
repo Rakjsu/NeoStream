@@ -30,7 +30,7 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
     }, []);
 
     const handleMarkAsRead = (id: string) => {
-        appNotificationService.markAsRead(id);
+        appNotificationService.deleteNotification(id);
         setNotifications(appNotificationService.getNotifications());
         setUnreadCount(appNotificationService.getUnreadCount());
     };

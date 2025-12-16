@@ -456,14 +456,56 @@ export function VOD() {
 
     // Error State
     if (error) return (
-        <div className="vod-page">
-            <style>{vodStyles}</style>
-            <div className="vod-error">
-                <div className="error-icon">🎬</div>
-                <h2>Erro ao carregar filmes</h2>
-                <p>{error}</p>
-                <button onClick={fetchStreams} className="retry-btn">
-                    Tentar novamente
+        <div style={{
+            minHeight: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '40px 20px',
+            background: 'linear-gradient(135deg, #0a0a0f 0%, #0d0d15 50%, #0a0f1a 100%)',
+            position: 'relative',
+            overflow: 'hidden'
+        }}>
+            <div style={{
+                position: 'absolute',
+                width: '400px',
+                height: '400px',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(239, 68, 68, 0.2) 0%, transparent 70%)',
+                filter: 'blur(80px)',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)'
+            }} />
+            <div style={{ position: 'relative', zIndex: 1, textAlign: 'center', maxWidth: '400px' }}>
+                <div style={{
+                    width: '80px', height: '80px',
+                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%)',
+                    borderRadius: '20px',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    margin: '0 auto 24px',
+                    border: '1px solid rgba(239, 68, 68, 0.3)'
+                }}>
+                    <span style={{ fontSize: '36px' }}>🎬</span>
+                </div>
+                <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'white', margin: '0 0 8px 0' }}>
+                    {t('login', 'loadMoviesError')}
+                </h2>
+                <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.5)', margin: '0 0 8px 0' }}>
+                    {t('login', 'connectionErrorDetails')}
+                </p>
+                <p style={{
+                    fontSize: '13px', color: '#f87171', margin: '0 0 32px 0',
+                    padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)',
+                    borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)'
+                }}>{error === 'Not authenticated' ? t('login', 'notAuthenticated') : error}</p>
+                <button onClick={fetchStreams} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '8px',
+                    padding: '14px 28px', background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                    border: 'none', borderRadius: '12px', color: 'white', fontSize: '15px', fontWeight: 600,
+                    cursor: 'pointer', boxShadow: '0 8px 32px rgba(239, 68, 68, 0.3)'
+                }}>
+                    <span>🔄</span> {t('profile', 'tryAgain')}
                 </button>
             </div>
         </div>

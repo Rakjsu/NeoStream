@@ -450,18 +450,115 @@ export function LiveTV() {
 
     if (error) {
         return (
-            <div className="p-8">
-                <h1 className="text-3xl font-bold text-white mb-6">Canais de TV</h1>
-                <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-4 rounded-lg text-center">
-                    <p className="font-medium mb-2">Erro ao carregar canais</p>
-                    <p className="text-sm">{error}</p>
+            <div style={{
+                minHeight: '100vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '40px 20px',
+                background: 'linear-gradient(135deg, #0a0a0f 0%, #0d0d15 50%, #0a0f1a 100%)',
+                position: 'relative',
+                overflow: 'hidden'
+            }}>
+                {/* Animated Background */}
+                <div style={{
+                    position: 'absolute',
+                    width: '400px',
+                    height: '400px',
+                    borderRadius: '50%',
+                    background: 'radial-gradient(circle, rgba(239, 68, 68, 0.2) 0%, transparent 70%)',
+                    filter: 'blur(80px)',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    animation: 'pulse 4s ease-in-out infinite'
+                }} />
+
+                {/* Content */}
+                <div style={{
+                    position: 'relative',
+                    zIndex: 1,
+                    textAlign: 'center',
+                    maxWidth: '400px'
+                }}>
+                    {/* Icon */}
+                    <div style={{
+                        width: '80px',
+                        height: '80px',
+                        background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2) 0%, rgba(239, 68, 68, 0.1) 100%)',
+                        borderRadius: '20px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 24px',
+                        border: '1px solid rgba(239, 68, 68, 0.3)'
+                    }}>
+                        <span style={{ fontSize: '36px' }}>📡</span>
+                    </div>
+
+                    {/* Title */}
+                    <h2 style={{
+                        fontSize: '24px',
+                        fontWeight: 600,
+                        color: 'white',
+                        margin: '0 0 8px 0'
+                    }}>{t('login', 'loadChannelsError')}</h2>
+
+                    {/* Error Message */}
+                    <p style={{
+                        fontSize: '14px',
+                        color: 'rgba(255,255,255,0.5)',
+                        margin: '0 0 8px 0'
+                    }}>{t('login', 'connectionErrorDetails')}</p>
+
+                    <p style={{
+                        fontSize: '13px',
+                        color: '#f87171',
+                        margin: '0 0 32px 0',
+                        padding: '12px 16px',
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(239, 68, 68, 0.2)'
+                    }}>{error === 'Not authenticated' ? t('login', 'notAuthenticated') : error}</p>
+
+                    {/* Retry Button */}
                     <button
                         onClick={fetchStreams}
-                        className="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                        style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            padding: '14px 28px',
+                            background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                            border: 'none',
+                            borderRadius: '12px',
+                            color: 'white',
+                            fontSize: '15px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            boxShadow: '0 8px 32px rgba(239, 68, 68, 0.3)',
+                            transition: 'all 0.3s ease'
+                        }}
+                        onMouseOver={(e) => {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 12px 40px rgba(239, 68, 68, 0.4)';
+                        }}
+                        onMouseOut={(e) => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 8px 32px rgba(239, 68, 68, 0.3)';
+                        }}
                     >
-                        Tentar novamente
+                        <span>🔄</span>
+                        {t('profile', 'tryAgain') || 'Tentar novamente'}
                     </button>
                 </div>
+
+                <style>{`
+                    @keyframes pulse {
+                        0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+                        50% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.1); }
+                    }
+                `}</style>
             </div>
         );
     }
