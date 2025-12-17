@@ -234,7 +234,7 @@ export async function autoFetchSubtitle(params: {
     imdbId?: string;
     season?: number;
     episode?: number;
-}): Promise<{ url: string; language: string; vttContent: string } | null> {
+}): Promise<{ url: string; language: string; vttContent: string; warning?: string } | null> {
     try {
         // Get user's preferred subtitle language from settings
         const { playbackService } = await import('./playbackService');
@@ -498,10 +498,18 @@ export async function autoFetchSubtitle(params: {
         const blobUrl = URL.createObjectURL(blob);
         console.log(`🔗 Created blob URL: ${blobUrl}`);
 
+        // Check if we got a fallback language
+        const selectedLangNorm = best.language.toLowerCase();
+        const isPreferredLang = selectedLangNorm === normalizedPreferredLang;
+        const warning = !isPreferredLang
+            ? `Legenda em ${preferredLang.toUpperCase()} não disponível. Usando ${best.language.toUpperCase()}.`
+            : undefined;
+
         return {
             url: blobUrl,
             language: best.language,
-            vttContent: vttContent
+            vttContent: vttContent,
+            warning: warning
         };
     } catch (error) {
         console.error('Error auto-fetching subtitle:', error);

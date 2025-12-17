@@ -86,6 +86,7 @@ export function VideoPlayer({
     const [subtitleLoading, setSubtitleLoading] = useState(false);
     const [subtitleLanguage, setSubtitleLanguage] = useState<string | null>(null);
     const [vttContent, setVttContent] = useState<string | null>(null);
+    const [subtitleWarning, setSubtitleWarning] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const progressRef = useRef<HTMLDivElement>(null);
 
@@ -403,6 +404,29 @@ export function VideoPlayer({
                     videoRef={videoRef}
                     enabled={subtitlesEnabled}
                 />
+
+                {/* Subtitle Warning Toast */}
+                {subtitleWarning && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: '80px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            padding: '10px 20px',
+                            backgroundColor: 'rgba(245, 158, 11, 0.9)',
+                            borderRadius: '8px',
+                            color: 'white',
+                            fontSize: '0.9rem',
+                            fontWeight: 500,
+                            zIndex: 1000,
+                            animation: 'fadeIn 0.3s ease-in-out',
+                            boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                        }}
+                    >
+                        ⚠️ {subtitleWarning}
+                    </div>
+                )}
             </div>
 
             {/* Central Play Button - Shows when paused */}
@@ -662,7 +686,15 @@ export function VideoPlayer({
                                                     setSubtitleLanguage(result.language);
                                                     setVttContent(result.vttContent);
                                                     setSubtitlesEnabled(true);
+                                                    // Show warning if using fallback language
+                                                    if (result.warning) {
+                                                        setSubtitleWarning(result.warning);
+                                                        // Clear warning after 5 seconds
+                                                        setTimeout(() => setSubtitleWarning(null), 5000);
+                                                    }
                                                 } else {
+                                                    setSubtitleWarning('Nenhuma legenda encontrada para este título.');
+                                                    setTimeout(() => setSubtitleWarning(null), 4000);
                                                     console.log('No subtitles found');
                                                 }
                                             } catch (error) {
