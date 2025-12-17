@@ -144,6 +144,37 @@ export function ContentDetailModal({
         }
     }, [isOpen, contentData.name, contentType]);
 
+    // Helper function to get clean episode title
+    const getEpisodeTitle = (ep: any): string => {
+        const epNum = Number(ep.episode_num);
+        const rawTitle = ep.title || '';
+
+        // Clean the title - remove series name, season/episode markers, etc.
+        let cleanTitle = rawTitle
+            .replace(/^(.*?)[\s\-–—]*S\d+[\s\-:\.]*E\d+[\s\-:\.–—]*/i, '') // Remove "SeriesName S01E01 -"
+            .replace(/\s*[\[\(]?S\d+[\s\.\-]*E\d+[\]\)]?\s*/gi, '') // Remove [S01E01] or (S01.E01)
+            .replace(/\s*-\s*Temporada\s*\d+\s*Epis[óo]dio\s*\d+\s*/gi, '') // Remove "Temporada X Epi..."
+            .replace(/\s*Temp\s*\d+\s*Ep\s*\d+\s*/gi, '') // Remove "Temp X Ep Y"
+            .replace(/Episode\s*\d+/gi, '') // Remove "Episode X"
+            .replace(/^\d+\.?\s*/, '') // Remove leading numbers like "1. " or "01 "
+            .trim();
+
+        // Check if remaining title is valid (not empty or generic)
+        const genericPatterns = [
+            /^ep\s*\d+$/i,
+            /^\d+$/,
+            /^temporada\s*\d+\s*episodio\s*\d+$/i,
+            /^episode$/i
+        ];
+        const isValidTitle = cleanTitle.length > 0 && !genericPatterns.some(p => p.test(cleanTitle));
+
+        if (isValidTitle) {
+            return cleanTitle;
+        }
+
+        return `Episódio ${epNum}`;
+    };
+
     // Fetch trailer from TMDB if not provided by API
     useEffect(() => {
         if (!isOpen || !contentData.name) return;
@@ -555,7 +586,7 @@ export function ContentDetailModal({
                                                 textOverflow: 'ellipsis',
                                                 whiteSpace: 'nowrap'
                                             }}>
-                                                Episódio {epNum}
+                                                {getEpisodeTitle(ep)}
                                             </span>
                                             {isSelected && (
                                                 <span style={{
