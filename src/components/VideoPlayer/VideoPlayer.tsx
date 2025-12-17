@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FaPlay, FaPause, FaVolumeUp, FaVolumeMute, FaExpand, FaCompress, FaCog, FaChromecast, FaClosedCaptioning } from 'react-icons/fa';
+import { FaPlay, FaPause, FaVolumeUp, FaVolumeDown, FaVolumeOff, FaVolumeMute, FaExpand, FaCompress, FaCog, FaChromecast, FaClosedCaptioning } from 'react-icons/fa';
 import { RiPictureInPictureExitLine, RiPictureInPictureLine } from 'react-icons/ri';
 import { useVideoPlayer } from '../../hooks/useVideoPlayer';
 import { useHls } from '../../hooks/useHls';
@@ -448,8 +448,16 @@ export function VideoPlayer({
                             onMouseEnter={() => setShowVolumeSlider(true)}
                             onMouseLeave={() => setShowVolumeSlider(false)}
                         >
-                            <button className="control-btn" onClick={controls.toggleMute}>
-                                {state.muted || state.volume === 0 ? <FaVolumeMute /> : <FaVolumeUp />}
+                            <button className="control-btn volume-btn" onClick={controls.toggleMute}>
+                                {state.muted || state.volume === 0 ? (
+                                    <FaVolumeMute />
+                                ) : state.volume < 0.33 ? (
+                                    <FaVolumeOff />
+                                ) : state.volume < 0.66 ? (
+                                    <FaVolumeDown />
+                                ) : (
+                                    <FaVolumeUp />
+                                )}
                             </button>
                             {showVolumeSlider && (
                                 <input
