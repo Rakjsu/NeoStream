@@ -407,12 +407,31 @@ export async function autoFetchSubtitle(params: {
                 return releaseNumber === movieNumber;
             });
 
-            // If we have exact matches, use only those
-            if (exactMatches.length > 0) {
-                console.log(`🎬 Exact sequel ${movieNumber} matches: ${exactMatches.length} results`);
-                filteredResults = exactMatches;
+            // Check if all exact matches are Director's Cut/Special editions
+            const specialEditionPatterns = /director.?s?.?cut|extended|unrated|uncut/i;
+            const nonSpecialExactMatches = exactMatches.filter(r => !specialEditionPatterns.test(r.release));
+
+            // If we have non-special exact matches, use those
+            if (nonSpecialExactMatches.length > 0) {
+                console.log(`🎬 Exact sequel ${movieNumber} matches (non-special): ${nonSpecialExactMatches.length} results`);
+                filteredResults = nonSpecialExactMatches;
+            } else if (exactMatches.length > 0) {
+                // All exact matches are special editions - try to find non-special releases without number
+                const nonSpecialNoNumber = filteredResults.filter(r => {
+                    const releaseNumber = extractSequelNumber(r.release);
+                    return releaseNumber === null && !specialEditionPatterns.test(r.release);
+                });
+
+                if (nonSpecialNoNumber.length > 0) {
+                    console.log(`🎬 Using non-special releases without sequel number: ${nonSpecialNoNumber.length} results`);
+                    filteredResults = nonSpecialNoNumber;
+                } else {
+                    // Last resort: use exact matches even if special edition
+                    console.log(`🎬 Exact sequel ${movieNumber} matches (special edition only): ${exactMatches.length} results`);
+                    filteredResults = exactMatches;
+                }
             } else {
-                // Otherwise, exclude releases that have a DIFFERENT number
+                // No exact matches - exclude releases that have a DIFFERENT number
                 const noConflictMatches = filteredResults.filter(r => {
                     const releaseNumber = extractSequelNumber(r.release);
                     // Accept if no number detected (might be generic title)
