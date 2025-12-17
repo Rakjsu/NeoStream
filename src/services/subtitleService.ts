@@ -5,6 +5,12 @@
 
 const OPENSUBTITLES_API_KEY = 'SG2i7zzvvhSdqYbgFRVDPqb8vQkJMDs9';
 const OPENSUBTITLES_BASE_URL = 'https://api.opensubtitles.com/api/v1';
+const OPENSUBTITLES_USERNAME = 'Rakjsu';
+const OPENSUBTITLES_PASSWORD = '05062981';
+
+// JWT token cache
+let cachedToken: string | null = null;
+let tokenExpiry: number = 0;
 
 interface SubtitleResult {
     id: string;
@@ -25,10 +31,62 @@ interface SubtitleSearchParams {
 }
 
 /**
+ * Login to OpenSubtitles and get JWT token
+ */
+async function getAuthToken(): Promise<string | null> {
+    // Return cached token if still valid (with 5 min buffer)
+    if (cachedToken && Date.now() < tokenExpiry - 300000) {
+        return cachedToken;
+    }
+
+    try {
+        console.log('🔐 Logging in to OpenSubtitles...');
+        const response = await fetch(`${OPENSUBTITLES_BASE_URL}/login`, {
+            method: 'POST',
+            headers: {
+                'Api-Key': OPENSUBTITLES_API_KEY,
+                'Content-Type': 'application/json',
+                'User-Agent': 'NeoStream IPTV v2.9.0'
+            },
+            body: JSON.stringify({
+                username: OPENSUBTITLES_USERNAME,
+                password: OPENSUBTITLES_PASSWORD
+            })
+        });
+
+        if (!response.ok) {
+            console.error('OpenSubtitles login failed:', response.status, response.statusText);
+            return null;
+        }
+
+        const data = await response.json();
+        if (data.token) {
+            cachedToken = data.token;
+            // Token is valid for 24 hours, cache for 23 hours
+            tokenExpiry = Date.now() + (23 * 60 * 60 * 1000);
+            console.log('✅ OpenSubtitles login successful');
+            return cachedToken;
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error logging in to OpenSubtitles:', error);
+        return null;
+    }
+}
+
+/**
  * Search for subtitles on OpenSubtitles
  */
 export async function searchSubtitles(params: SubtitleSearchParams): Promise<SubtitleResult[]> {
     try {
+        // Get auth token first
+        const token = await getAuthToken();
+        if (!token) {
+            console.error('Failed to get OpenSubtitles auth token');
+            return [];
+        }
+
         const searchParams = new URLSearchParams();
 
         if (params.query) searchParams.set('query', params.query);
@@ -42,6 +100,7 @@ export async function searchSubtitles(params: SubtitleSearchParams): Promise<Sub
             method: 'GET',
             headers: {
                 'Api-Key': OPENSUBTITLES_API_KEY,
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
                 'User-Agent': 'NeoStream IPTV v2.9.0'
             }
@@ -78,10 +137,18 @@ export async function searchSubtitles(params: SubtitleSearchParams): Promise<Sub
  */
 export async function downloadSubtitle(fileId: number): Promise<string | null> {
     try {
+        // Get auth token first
+        const token = await getAuthToken();
+        if (!token) {
+            console.error('Failed to get OpenSubtitles auth token for download');
+            return null;
+        }
+
         const response = await fetch(`${OPENSUBTITLES_BASE_URL}/download`, {
             method: 'POST',
             headers: {
                 'Api-Key': OPENSUBTITLES_API_KEY,
+                'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json',
                 'User-Agent': 'NeoStream IPTV v2.9.0'
             },
