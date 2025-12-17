@@ -67,14 +67,29 @@ export function isSameMovie(name1: string, name2: string): boolean {
     const base1 = getMovieBaseName(name1);
     const base2 = getMovieBaseName(name2);
 
-    // Exact match on base name
+    // Both names must be non-empty
+    if (!base1 || !base2) return false;
+
+    // Exact match on base name - this is the safest
     if (base1 === base2) return true;
 
-    // One name contains the other (for slight variations)
+    // For partial matching, be very strict to avoid false positives:
+    // 1. Both base names must be at least 8 characters (short names like "Urano" shouldn't use partial match)
+    // 2. The shorter name must be at least 80% of the longer name's length
+    // 3. One must contain the other completely
+    const minLength = Math.min(base1.length, base2.length);
+    const maxLength = Math.max(base1.length, base2.length);
+
+    if (minLength < 8) {
+        // For short names, only allow exact match (already handled above)
+        return false;
+    }
+
+    // Check if one contains the other with strict length requirement
     if (base1.includes(base2) || base2.includes(base1)) {
-        // Only if length difference is small (avoid false positives)
-        const lenDiff = Math.abs(base1.length - base2.length);
-        return lenDiff <= 5;
+        // The shorter name must be at least 80% of the longer name
+        const ratio = minLength / maxLength;
+        return ratio >= 0.8;
     }
 
     return false;
