@@ -188,6 +188,7 @@ export interface TMDBMovieDetails {
     vote_average: number;
     backdrop_path: string | null;
     certification?: string; // Content rating (G, PG, PG-13, R, etc.)
+    imdb_id?: string; // IMDB ID for subtitle matching
 }
 
 export interface TMDBSeriesDetails {
@@ -221,9 +222,9 @@ export async function fetchMovieDetails(tmdbId: string): Promise<TMDBMovieDetail
 
     try {
         apiCallCount++;
-        // Fetch movie details with release dates for certification
+        // Fetch movie details with release dates for certification and external_ids for IMDB
         const response = await fetch(
-            `${TMDB_BASE_URL}/movie/${tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=release_dates`
+            `${TMDB_BASE_URL}/movie/${tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=release_dates,external_ids`
         );
         if (!response.ok) return null;
         const data = await response.json();

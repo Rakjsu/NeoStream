@@ -307,13 +307,48 @@ export async function autoFetchSubtitle(params: {
         const movieNumber = extractSequelNumber(cleanTitle);
         console.log(`📌 Detected sequel number: ${movieNumber || 'none'}`);
 
+        // If no TMDB/IMDB IDs provided, try to look them up
+        let tmdbId = params.tmdbId;
+        let imdbId = params.imdbId;
+
+        if (!tmdbId && !imdbId) {
+            console.log(`🔎 No IDs provided, searching TMDB for: ${cleanTitle}`);
+            try {
+                // Extract year from original title if present
+                const yearMatch = params.title.match(/\((\d{4})\)/);
+                const year = yearMatch ? yearMatch[1] : undefined;
+
+                const { searchMovieByName, searchSeriesByName } = await import('./tmdb');
+
+                // For series with season/episode, search as series
+                if (params.season !== undefined && params.episode !== undefined) {
+                    const series = await searchSeriesByName(cleanTitle, year);
+                    if (series?.id) {
+                        tmdbId = series.id;
+                        console.log(`✅ Found TMDB Series ID: ${tmdbId}`);
+                        // Note: series don't have imdb_id in the same way
+                    }
+                } else {
+                    // Search as movie
+                    const movie = await searchMovieByName(cleanTitle, year);
+                    if (movie?.id) {
+                        tmdbId = movie.id;
+                        imdbId = movie.imdb_id;
+                        console.log(`✅ Found TMDB ID: ${tmdbId}, IMDB ID: ${imdbId || 'none'}`);
+                    }
+                }
+            } catch (error) {
+                console.warn('Failed to lookup TMDB IDs:', error);
+            }
+        }
+
         let results: SubtitleResult[] = [];
 
         // Strategy 1: Search by TMDB ID (most accurate)
-        if (params.tmdbId) {
-            console.log(`🔍 Searching by TMDB ID: ${params.tmdbId}`);
+        if (tmdbId) {
+            console.log(`🔍 Searching by TMDB ID: ${tmdbId}`);
             results = await searchSubtitles({
-                tmdbId: params.tmdbId,
+                tmdbId: tmdbId,
                 languages: preferredLanguages.join(','),
                 season: params.season,
                 episode: params.episode
@@ -322,10 +357,10 @@ export async function autoFetchSubtitle(params: {
         }
 
         // Strategy 2: Search by IMDB ID if TMDB didn't work
-        if (results.length === 0 && params.imdbId) {
-            console.log(`🔍 Searching by IMDB ID: ${params.imdbId}`);
+        if (results.length === 0 && imdbId) {
+            console.log(`🔍 Searching by IMDB ID: ${imdbId}`);
             results = await searchSubtitles({
-                imdbId: params.imdbId,
+                imdbId: imdbId,
                 languages: preferredLanguages.join(','),
                 season: params.season,
                 episode: params.episode
