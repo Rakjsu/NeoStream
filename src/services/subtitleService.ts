@@ -307,15 +307,43 @@ export async function autoFetchSubtitle(params: {
         const movieNumber = extractSequelNumber(cleanTitle);
         console.log(`📌 Detected sequel number: ${movieNumber || 'none'}`);
 
-        // Search for subtitles
-        const results = await searchSubtitles({
-            query: cleanTitle,
-            tmdbId: params.tmdbId,
-            imdbId: params.imdbId,
-            languages: preferredLanguages.join(','),
-            season: params.season,
-            episode: params.episode
-        });
+        let results: SubtitleResult[] = [];
+
+        // Strategy 1: Search by TMDB ID (most accurate)
+        if (params.tmdbId) {
+            console.log(`🔍 Searching by TMDB ID: ${params.tmdbId}`);
+            results = await searchSubtitles({
+                tmdbId: params.tmdbId,
+                languages: preferredLanguages.join(','),
+                season: params.season,
+                episode: params.episode
+            });
+            console.log(`   Found ${results.length} results by TMDB ID`);
+        }
+
+        // Strategy 2: Search by IMDB ID if TMDB didn't work
+        if (results.length === 0 && params.imdbId) {
+            console.log(`🔍 Searching by IMDB ID: ${params.imdbId}`);
+            results = await searchSubtitles({
+                imdbId: params.imdbId,
+                languages: preferredLanguages.join(','),
+                season: params.season,
+                episode: params.episode
+            });
+            console.log(`   Found ${results.length} results by IMDB ID`);
+        }
+
+        // Strategy 3: Fall back to title search
+        if (results.length === 0) {
+            console.log(`🔍 Searching by title: ${cleanTitle}`);
+            results = await searchSubtitles({
+                query: cleanTitle,
+                languages: preferredLanguages.join(','),
+                season: params.season,
+                episode: params.episode
+            });
+            console.log(`   Found ${results.length} results by title`);
+        }
 
         if (results.length === 0) {
             console.log('No subtitles found for:', cleanTitle);

@@ -365,6 +365,8 @@ function AsyncVideoPlayer({
                         movieVersions={allMovies && !seriesId ? findMovieVersions(movie, allMovies) : undefined}
                         currentMovieId={movie.stream_id || Number(movie.id)}
                         onSwitchVersion={onSwitchVersion}
+                        tmdbId={movie.tmdb_id || movie.tmdb || movie.tmdbId}
+                        imdbId={movie.imdb_id || movie.imdb || movie.imdbId}
                         isSubtitled={/\[L\]/i.test(movie.name || customTitle || '')}
                         onTimeUpdate={(currentTime, duration) => {
                             // Call external onTimeUpdate if provided
