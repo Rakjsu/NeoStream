@@ -325,8 +325,8 @@ export async function autoFetchSubtitle(params: {
                     const series = await searchSeriesByName(cleanTitle, year);
                     if (series?.id) {
                         tmdbId = series.id;
-                        console.log(`✅ Found TMDB Series ID: ${tmdbId}`);
-                        // Note: series don't have imdb_id in the same way
+                        imdbId = series.imdb_id;
+                        console.log(`✅ Found TMDB Series ID: ${tmdbId}, IMDB ID: ${imdbId || 'none'}`);
                     }
                 } else {
                     // Search as movie

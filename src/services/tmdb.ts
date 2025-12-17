@@ -201,6 +201,7 @@ export interface TMDBSeriesDetails {
     backdrop_path: string | null;
     content_ratings?: { results: { iso_3166_1: string; rating: string }[] };
     certification?: string; // Content rating for easy access
+    imdb_id?: string; // IMDB ID for subtitle matching (from external_ids)
 }
 
 export interface TMDBEpisodeDetails {
@@ -261,9 +262,9 @@ export async function fetchSeriesDetails(tmdbId: string): Promise<TMDBSeriesDeta
 
     try {
         apiCallCount++;
-        // Fetch series details with content ratings
+        // Fetch series details with content ratings and external_ids for IMDB
         const response = await fetch(
-            `${TMDB_BASE_URL}/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=content_ratings`
+            `${TMDB_BASE_URL}/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=content_ratings,external_ids`
         );
         if (!response.ok) return null;
         const data = await response.json();
@@ -280,8 +281,10 @@ export async function fetchSeriesDetails(tmdbId: string): Promise<TMDBSeriesDeta
                 certification = ratingData.rating;
             }
         }
+        // Extract imdb_id from external_ids
+        const imdb_id = data.external_ids?.imdb_id || undefined;
 
-        const result = { ...data, certification };
+        const result = { ...data, certification, imdb_id };
         setCache(memoryCache.seriesDetails, tmdbId, result, CACHE_KEYS.SERIES_DETAILS);
         return result;
     } catch (error) {
