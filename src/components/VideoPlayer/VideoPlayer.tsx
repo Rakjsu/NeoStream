@@ -480,10 +480,42 @@ export function VideoPlayer({
                     <div className="controls-right">
                         <div className="settings-menu-container">
                             <button
-                                className="control-btn"
+                                className="control-btn settings-btn"
                                 onClick={() => setShowSettings(!showSettings)}
+                                style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '4px' }}
                             >
                                 <FaCog />
+                                {/* Quality Badge - show current quality when movie versions available */}
+                                {movieVersions && movieVersions.length > 0 && (() => {
+                                    const currentVersion = movieVersions.find(v => v.movie.stream_id === currentMovieId);
+                                    if (currentVersion) {
+                                        const qualityText = currentVersion.quality === '4k' ? '4K' : '1080p';
+                                        const audioText = currentVersion.audio === 'subtitled' ? 'LEG' : 'DUB';
+                                        return (
+                                            <span style={{
+                                                fontSize: '9px',
+                                                fontWeight: 700,
+                                                padding: '2px 5px',
+                                                borderRadius: '4px',
+                                                background: currentVersion.quality === '4k'
+                                                    ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+                                                    : 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                                                color: 'white',
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.5px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '3px',
+                                                boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                                            }}>
+                                                {qualityText}
+                                                <span style={{ opacity: 0.7, fontSize: '7px' }}>•</span>
+                                                <span style={{ fontSize: '7px', opacity: 0.9 }}>{audioText}</span>
+                                            </span>
+                                        );
+                                    }
+                                    return null;
+                                })()}
                             </button>
 
                             {showSettings && (
