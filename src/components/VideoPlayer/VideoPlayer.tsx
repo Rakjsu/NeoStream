@@ -8,7 +8,7 @@ import { CastDeviceSelector } from '../CastDeviceSelector';
 import { formatTime, percentage } from '../../utils/videoHelpers';
 import { usageStatsService } from '../../services/usageStatsService';
 import { useMiniPlayer } from '../MiniPlayer';
-import { autoFetchSubtitle, cleanupSubtitleUrl } from '../../services/subtitleService';
+import { autoFetchSubtitle, autoFetchForcedSubtitle, cleanupSubtitleUrl } from '../../services/subtitleService';
 import { SubtitleOverlay } from './SubtitleOverlay';
 import './VideoPlayer.css';
 
@@ -87,6 +87,7 @@ export function VideoPlayer({
     const [subtitleLanguage, setSubtitleLanguage] = useState<string | null>(null);
     const [vttContent, setVttContent] = useState<string | null>(null);
     const [subtitleWarning, setSubtitleWarning] = useState<string | null>(null);
+    const [isForcedSubtitle, setIsForcedSubtitle] = useState(false); // Track if current subtitle is Forced type
     const containerRef = useRef<HTMLDivElement>(null);
     const progressRef = useRef<HTMLDivElement>(null);
 
@@ -113,6 +114,40 @@ export function VideoPlayer({
             }
         };
     }, [state.playing, seeking, state.fullscreen]); // Added fullscreen to dependencies
+
+    // Auto-load Forced subtitles when movie starts (only for movies, not series)
+    useEffect(() => {
+        // Only for movies (no seasonNumber/episodeNumber)
+        if (!title || seasonNumber || episodeNumber) return;
+
+        const loadForcedSubtitles = async () => {
+            try {
+                console.log('🎬 Auto-loading forced subtitles for movie...');
+                const result = await autoFetchForcedSubtitle({
+                    title,
+                    tmdbId,
+                    imdbId
+                });
+
+                if (result) {
+                    setSubtitleUrl(result.url);
+                    setSubtitleLanguage(result.language);
+                    setVttContent(result.vttContent);
+                    setSubtitlesEnabled(true);
+                    setIsForcedSubtitle(true);
+                    console.log('✅ Forced subtitles loaded automatically');
+                } else {
+                    console.log('ℹ️ No forced subtitles available for this movie');
+                }
+            } catch (error) {
+                console.error('Error auto-loading forced subtitles:', error);
+            }
+        };
+
+        // Small delay to let video player initialize
+        const timer = setTimeout(loadForcedSubtitles, 1000);
+        return () => clearTimeout(timer);
+    }, [title, tmdbId, imdbId, seasonNumber, episodeNumber]);
 
     // Handle auto-play (respects the shouldAutoPlayNextEpisode setting)
     useEffect(() => {
@@ -650,9 +685,49 @@ export function VideoPlayer({
                             <button
                                 className="control-btn"
                                 onClick={async () => {
+                                    // If currently showing Forced subtitles, switch to full subtitles
+                                    if (subtitlesEnabled && isForcedSubtitle) {
+                                        console.log('🔄 Switching from Forced to full subtitles...');
+                                        // Cleanup Forced subtitle
+                                        if (subtitleUrl) {
+                                            cleanupSubtitleUrl(subtitleUrl);
+                                        }
+                                        setSubtitleLoading(true);
+                                        setIsForcedSubtitle(false);
+
+                                        try {
+                                            const result = await autoFetchSubtitle({
+                                                title: title || '',
+                                                tmdbId,
+                                                imdbId,
+                                                season: seasonNumber,
+                                                episode: episodeNumber
+                                            });
+                                            if (result) {
+                                                setSubtitleUrl(result.url);
+                                                setSubtitleLanguage(result.language);
+                                                setVttContent(result.vttContent);
+                                                if (result.warning) {
+                                                    setSubtitleWarning(result.warning);
+                                                    setTimeout(() => setSubtitleWarning(null), 5000);
+                                                }
+                                                console.log('✅ Switched to full subtitles');
+                                            } else {
+                                                setSubtitleWarning('Nenhuma legenda completa encontrada.');
+                                                setTimeout(() => setSubtitleWarning(null), 4000);
+                                            }
+                                        } catch (error) {
+                                            console.error('Error fetching full subtitles:', error);
+                                        } finally {
+                                            setSubtitleLoading(false);
+                                        }
+                                        return;
+                                    }
+
                                     if (subtitlesEnabled) {
                                         // Disable subtitles and cleanup
                                         setSubtitlesEnabled(false);
+                                        setIsForcedSubtitle(false);
 
                                         // Cleanup subtitle blob URL from memory
                                         if (subtitleUrl) {

@@ -37,6 +37,7 @@ interface SubtitleSearchParams {
     languages?: string; // e.g., 'pt-br,en'
     season?: number;
     episode?: number;
+    forcedOnly?: boolean; // For auto-loading "foreign parts only" subtitles
 }
 
 /**
@@ -141,6 +142,13 @@ export async function searchSubtitles(params: SubtitleSearchParams): Promise<Sub
             hearingImpaired: item.attributes?.hearing_impaired || false,
             foreignPartsOnly: item.attributes?.foreign_parts_only || false
         })).filter((sub: SubtitleResult) => sub.fileId > 0);
+
+        // If looking for forced subtitles only (for auto-load on movie start)
+        if (params.forcedOnly) {
+            const forcedSubs = allSubs.filter((sub: SubtitleResult) => sub.foreignPartsOnly);
+            console.log(`🎯 Forced subtitles: ${forcedSubs.length} found`);
+            return forcedSubs;
+        }
 
         // Prefer full subtitles (not HI, not foreign parts only)
         const fullSubs = allSubs.filter((sub: SubtitleResult) =>
@@ -529,5 +537,99 @@ export async function autoFetchSubtitle(params: {
 export function cleanupSubtitleUrl(url: string): void {
     if (url.startsWith('blob:')) {
         URL.revokeObjectURL(url);
+    }
+}
+
+/**
+ * Auto-fetch "Forced" (foreign parts only) subtitles for movies
+ * These are subtitles for signs, foreign language dialogue, etc.
+ * Used for auto-loading when movie starts (for dubbed content)
+ */
+export async function autoFetchForcedSubtitle(params: {
+    title: string;
+    tmdbId?: string | number;
+    imdbId?: string;
+}): Promise<{ url: string; language: string; vttContent: string } | null> {
+    try {
+        console.log(`🎯 Searching FORCED subtitles for: ${params.title}`);
+
+        // Clean the title
+        const cleanTitle = params.title
+            .replace(/\s*\[.*?\]\s*/g, '')
+            .replace(/\s*\(\d{4}\)\s*/g, '')
+            .trim();
+
+        // Get preferred language
+        const { playbackService } = await import('./playbackService');
+        playbackService.reloadConfig();
+        const config = playbackService.getConfig();
+        const preferredLang = config.subtitleLanguage || 'pt-br';
+
+        // Try to get IDs if not provided
+        let tmdbId = params.tmdbId;
+        let imdbId = params.imdbId;
+
+        if (!tmdbId && !imdbId) {
+            try {
+                const { searchMovieByName } = await import('./tmdb');
+                const yearMatch = params.title.match(/\((\d{4})\)/);
+                const year = yearMatch ? yearMatch[1] : undefined;
+                const movie = await searchMovieByName(cleanTitle, year);
+                if (movie?.id) {
+                    tmdbId = movie.id;
+                    imdbId = movie.imdb_id;
+                }
+            } catch { }
+        }
+
+        // Search for forced subtitles only
+        let results: SubtitleResult[] = [];
+
+        if (tmdbId) {
+            results = await searchSubtitles({
+                tmdbId,
+                languages: preferredLang,
+                forcedOnly: true
+            });
+        }
+
+        if (results.length === 0 && imdbId) {
+            results = await searchSubtitles({
+                imdbId,
+                languages: preferredLang,
+                forcedOnly: true
+            });
+        }
+
+        if (results.length === 0) {
+            console.log('🎯 No forced subtitles found');
+            return null;
+        }
+
+        // Sort by download count and get best
+        const sorted = results.sort((a, b) => b.downloadCount - a.downloadCount);
+        const best = sorted[0];
+        console.log(`🎯 Selected forced subtitle: [${best.language}] ${best.release}`);
+
+        // Download the subtitle
+        const downloadUrl = await downloadSubtitle(best.fileId);
+        if (!downloadUrl) return null;
+
+        // Fetch and convert content
+        const vttContent = await fetchSubtitleContent(downloadUrl);
+        if (!vttContent) return null;
+
+        // Create blob URL
+        const blob = new Blob([vttContent], { type: 'text/vtt' });
+        const blobUrl = URL.createObjectURL(blob);
+
+        return {
+            url: blobUrl,
+            language: best.language,
+            vttContent: vttContent
+        };
+    } catch (error) {
+        console.error('Error fetching forced subtitle:', error);
+        return null;
     }
 }
