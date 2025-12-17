@@ -26,6 +26,8 @@ interface SubtitleResult {
     downloadCount: number;
     url: string;
     fileId: number;
+    hearingImpaired: boolean;
+    foreignPartsOnly: boolean;
 }
 
 interface SubtitleSearchParams {
@@ -129,14 +131,25 @@ export async function searchSubtitles(params: SubtitleSearchParams): Promise<Sub
         }
 
         // Map to simpler format
-        return data.data.map((item: any) => ({
+        const allSubs = data.data.map((item: any) => ({
             id: item.id,
             language: item.attributes?.language || 'unknown',
             release: item.attributes?.release || item.attributes?.files?.[0]?.file_name || 'Unknown',
             downloadCount: item.attributes?.download_count || 0,
             url: item.attributes?.url || '',
-            fileId: item.attributes?.files?.[0]?.file_id || 0
+            fileId: item.attributes?.files?.[0]?.file_id || 0,
+            hearingImpaired: item.attributes?.hearing_impaired || false,
+            foreignPartsOnly: item.attributes?.foreign_parts_only || false
         })).filter((sub: SubtitleResult) => sub.fileId > 0);
+
+        // Prefer full subtitles (not HI, not foreign parts only)
+        const fullSubs = allSubs.filter((sub: SubtitleResult) =>
+            !sub.hearingImpaired && !sub.foreignPartsOnly
+        );
+
+        // Return full subs if available, otherwise all subs
+        console.log(`📺 Subtitles: ${allSubs.length} total, ${fullSubs.length} full (not HI/forced)`);
+        return fullSubs.length > 0 ? fullSubs : allSubs;
     } catch (error) {
         console.error('Error searching subtitles:', error);
         return [];
