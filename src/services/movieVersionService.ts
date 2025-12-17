@@ -61,6 +61,40 @@ export function getMovieBaseName(name: string): string {
 }
 
 /**
+ * Extract sequel/part numbers from movie name
+ * e.g., "Velozes e Furiosos 9 [4K]" -> ["9"]
+ *       "Matrix 2: Reloaded" -> ["2"]
+ *       "Toy Story" -> []
+ */
+function extractSequelNumbers(name: string): string[] {
+    // Remove year patterns like (2021) first
+    const withoutYear = name.replace(/\s*\(\d{4}\)\s*/g, '');
+
+    // Find standalone numbers that are likely sequel numbers (1-20)
+    // Patterns: "Movie 2", "Movie II", "Part 3", "Chapter 4"
+    const numbers: string[] = [];
+
+    // Match patterns like "Movie 9", "Part 2", etc.
+    const standaloneMatch = withoutYear.match(/\b(\d{1,2})\b/g);
+    if (standaloneMatch) {
+        standaloneMatch.forEach(num => {
+            const n = parseInt(num);
+            if (n >= 1 && n <= 20) {
+                numbers.push(num);
+            }
+        });
+    }
+
+    // Match Roman numerals II, III, IV, V, etc.
+    const romanMatch = withoutYear.match(/\b(II|III|IV|V|VI|VII|VIII|IX|X)\b/gi);
+    if (romanMatch) {
+        numbers.push(...romanMatch.map(r => r.toUpperCase()));
+    }
+
+    return numbers;
+}
+
+/**
  * Check if two movies are the same movie (different versions)
  */
 export function isSameMovie(name1: string, name2: string): boolean {
@@ -70,12 +104,28 @@ export function isSameMovie(name1: string, name2: string): boolean {
     // Both names must be non-empty
     if (!base1 || !base2) return false;
 
+    // Extract sequel numbers from original names (before cleaning)
+    const numbers1 = extractSequelNumbers(name1);
+    const numbers2 = extractSequelNumbers(name2);
+
+    // If either movie has sequel numbers, they must match
+    if (numbers1.length > 0 || numbers2.length > 0) {
+        // Sort and compare
+        const sorted1 = [...numbers1].sort().join(',');
+        const sorted2 = [...numbers2].sort().join(',');
+
+        if (sorted1 !== sorted2) {
+            // Numbers don't match - different movies
+            return false;
+        }
+    }
+
     // Exact match on base name - this is the safest
     if (base1 === base2) return true;
 
     // For partial matching, be very strict to avoid false positives:
     // 1. Both base names must be at least 8 characters (short names like "Urano" shouldn't use partial match)
-    // 2. The shorter name must be at least 80% of the longer name's length
+    // 2. The shorter name must be at least 90% of the longer name's length (increased from 80%)
     // 3. One must contain the other completely
     const minLength = Math.min(base1.length, base2.length);
     const maxLength = Math.max(base1.length, base2.length);
@@ -87,9 +137,9 @@ export function isSameMovie(name1: string, name2: string): boolean {
 
     // Check if one contains the other with strict length requirement
     if (base1.includes(base2) || base2.includes(base1)) {
-        // The shorter name must be at least 80% of the longer name
+        // The shorter name must be at least 90% of the longer name
         const ratio = minLength / maxLength;
-        return ratio >= 0.8;
+        return ratio >= 0.9;
     }
 
     return false;
