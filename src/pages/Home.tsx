@@ -1550,6 +1550,15 @@ export function Home() {
                     onPreviousEpisode={playingContent.type === 'series' ? handlePreviousEpisode : undefined}
                     canGoNext={playingContent.type === 'series' ? canGoNextEpisode() : false}
                     canGoPrevious={playingContent.type === 'series' ? canGoPreviousEpisode() : false}
+                    allMovies={playingContent.type === 'movie' ? allMovies : undefined}
+                    onSwitchVersion={playingContent.type === 'movie' ? (newMovie, currentTime) => {
+                        setPlayingContent({
+                            id: String(newMovie.stream_id),
+                            type: 'movie',
+                            name: newMovie.name,
+                            resumeTime: currentTime
+                        });
+                    } : undefined}
                 />
             )}
 
