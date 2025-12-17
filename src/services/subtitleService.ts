@@ -619,6 +619,9 @@ export async function autoFetchForcedSubtitle(params: {
         const vttContent = await fetchSubtitleContent(downloadUrl);
         if (!vttContent) return null;
 
+        // Log VTT content preview for debugging
+        console.log(`📝 Forced VTT content preview (first 500 chars):\n${vttContent.substring(0, 500)}`);
+
         // Create blob URL
         const blob = new Blob([vttContent], { type: 'text/vtt' });
         const blobUrl = URL.createObjectURL(blob);
