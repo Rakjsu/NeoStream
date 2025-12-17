@@ -266,15 +266,33 @@ export function VideoPlayer({
         // When subtitle URL changes and is enabled, activate the track
         if (subtitleUrl && subtitlesEnabled && videoRef.current) {
             const video = videoRef.current;
-            // Wait for track to be added
-            setTimeout(() => {
+
+            // Function to activate tracks
+            const activateTracks = () => {
                 if (video.textTracks.length > 0) {
                     for (let i = 0; i < video.textTracks.length; i++) {
                         video.textTracks[i].mode = 'showing';
                     }
-                    console.log('✅ Subtitle track activated');
                 }
+            };
+
+            // Wait for track to be added and activate
+            setTimeout(() => {
+                activateTracks();
+                console.log('✅ Subtitle track activated');
             }, 100);
+
+            // Reactivate tracks after seeking to maintain sync
+            const handleSeeked = () => {
+                activateTracks();
+                console.log('🔄 Subtitle track refreshed after seek');
+            };
+
+            video.addEventListener('seeked', handleSeeked);
+
+            return () => {
+                video.removeEventListener('seeked', handleSeeked);
+            };
         }
     }, [subtitleUrl, subtitlesEnabled]);
 
