@@ -9,6 +9,7 @@ export interface PlaybackConfig {
     videoCodec: 'auto' | 'h264' | 'h265' | 'vp9';
     quality: 'auto' | '1080p' | '720p' | '480p';
     autoPlayNextEpisode: boolean;
+    subtitleLanguage: 'pt-br' | 'pt' | 'en' | 'es' | 'off';
 }
 
 const DEFAULT_CONFIG: PlaybackConfig = {
@@ -16,7 +17,8 @@ const DEFAULT_CONFIG: PlaybackConfig = {
     audioCodec: 'auto',
     videoCodec: 'auto',
     quality: 'auto',
-    autoPlayNextEpisode: true
+    autoPlayNextEpisode: true,
+    subtitleLanguage: 'pt-br'
 };
 
 const STORAGE_KEY = 'playbackConfig';

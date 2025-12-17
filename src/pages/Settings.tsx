@@ -195,7 +195,7 @@ export function Settings() {
 
     const sections = [
         { id: 'updates', icon: '🔄', label: t('nav', 'updates'), color: '#10b981' },
-        { id: 'playback', icon: '⏯️', label: t('nav', 'playback'), color: '#3b82f6' },
+        { id: 'playback', icon: '⏯️', label: t('nav', 'playback') || 'Reprodução', color: '#3b82f6' },
         { id: 'stats', icon: '📊', label: t('nav', 'stats'), color: '#8b5cf6' },
         { id: 'parental', icon: '👨‍👩‍👧', label: t('nav', 'parental'), color: '#ef4444' },
         { id: 'about', icon: 'ℹ️', label: t('nav', 'about'), color: '#f59e0b' }
@@ -421,6 +421,26 @@ export function Settings() {
                                             <span className="toggle-slider"></span>
                                         </label>
                                         {saveAnimation === 'autoPlayNextEpisode' && <span className="save-indicator">{t('settings', 'saved')}</span>}
+                                    </div>
+
+                                    {/* Subtitle Language Setting */}
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>{t('playback', 'subtitleLanguage') || 'Idioma das Legendas'}</label>
+                                            <p>{t('playback', 'subtitleLanguageDesc') || 'Idioma preferido para download automático de legendas'}</p>
+                                        </div>
+                                        <select
+                                            className="setting-select"
+                                            value={playbackConfig.subtitleLanguage}
+                                            onChange={(e) => handlePlaybackConfigChange('subtitleLanguage', e.target.value as PlaybackConfig['subtitleLanguage'])}
+                                        >
+                                            <option value="pt-br">🇧🇷 Português (Brasil)</option>
+                                            <option value="pt">🇵🇹 Português</option>
+                                            <option value="en">🇺🇸 English</option>
+                                            <option value="es">🇪🇸 Español</option>
+                                            <option value="off">❌ {t('playback', 'subtitleOff') || 'Desativado'}</option>
+                                        </select>
+                                        {saveAnimation === 'subtitleLanguage' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                                     </div>
 
                                     <div className="setting-item">

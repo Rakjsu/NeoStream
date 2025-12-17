@@ -213,7 +213,7 @@ export async function fetchSubtitleContent(url: string): Promise<string | null> 
 
 /**
  * Auto-fetch best subtitle for a movie/series
- * Prioritizes Portuguese (Brazil), then Portuguese, then English
+ * Uses user's preferred language from settings
  */
 export async function autoFetchSubtitle(params: {
     title: string;
@@ -223,8 +223,38 @@ export async function autoFetchSubtitle(params: {
     episode?: number;
 }): Promise<{ url: string; language: string } | null> {
     try {
-        // Preferred languages in order
-        const preferredLanguages = ['pt-br', 'pt', 'en'];
+        // Get user's preferred subtitle language from settings
+        const { playbackService } = await import('./playbackService');
+        const config = playbackService.getConfig();
+
+        // If subtitles are disabled, return null
+        if (config.subtitleLanguage === 'off') {
+            console.log('⏸️ Subtitles disabled in settings');
+            return null;
+        }
+
+        // Build language priority based on user preference
+        const preferredLang = config.subtitleLanguage;
+        let preferredLanguages: string[];
+
+        switch (preferredLang) {
+            case 'pt-br':
+                preferredLanguages = ['pt-br', 'pt', 'en'];
+                break;
+            case 'pt':
+                preferredLanguages = ['pt', 'pt-br', 'en'];
+                break;
+            case 'en':
+                preferredLanguages = ['en', 'pt-br', 'pt'];
+                break;
+            case 'es':
+                preferredLanguages = ['es', 'en', 'pt-br'];
+                break;
+            default:
+                preferredLanguages = ['pt-br', 'pt', 'en'];
+        }
+
+        console.log(`🎯 Subtitle preference: ${preferredLang} → ${preferredLanguages.join(', ')}`);
 
         // Clean the title - remove tags like [4K], [L], (2021), etc.
         const cleanTitle = params.title
