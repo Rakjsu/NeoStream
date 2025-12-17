@@ -244,5 +244,50 @@ export function setupIpcHandlers() {
         }
     })
 
+    // OpenSubtitles API proxy (bypass CORS)
+    ipcMain.handle('opensubtitles:request', async (_, { endpoint, method, body }) => {
+        try {
+            const fetch = (await import('node-fetch')).default
+            const baseUrl = 'https://api.opensubtitles.com/api/v1'
+            const apiKey = 'SG2i7zzvvhSdqYbgFRVDPqb8vQkJMDs9'
+
+            const headers: Record<string, string> = {
+                'Api-Key': apiKey,
+                'Content-Type': 'application/json',
+                'User-Agent': 'NeoStream IPTV v2.9.0'
+            }
+
+            // Add Authorization header if provided in body
+            if (body?.authToken) {
+                headers['Authorization'] = `Bearer ${body.authToken}`
+                delete body.authToken
+            }
+
+            const options: any = {
+                method: method || 'GET',
+                headers
+            }
+
+            if (body && method === 'POST') {
+                options.body = JSON.stringify(body)
+            }
+
+            const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`
+            console.log(`[OpenSubtitles] ${method} ${endpoint}`)
+
+            const response = await fetch(url, options)
+            const data = await response.json()
+
+            return {
+                success: response.ok,
+                status: response.status,
+                data
+            }
+        } catch (error: any) {
+            console.error('[OpenSubtitles] Error:', error.message)
+            return { success: false, error: error.message }
+        }
+    })
+
     console.log('IPC Handlers initialized')
 }

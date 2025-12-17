@@ -1,16 +1,23 @@
 /**
  * Subtitle Service
- * Fetches subtitles from OpenSubtitles API
+ * Fetches subtitles from OpenSubtitles API via IPC (bypasses CORS)
  */
 
-const OPENSUBTITLES_API_KEY = 'SG2i7zzvvhSdqYbgFRVDPqb8vQkJMDs9';
-const OPENSUBTITLES_BASE_URL = 'https://api.opensubtitles.com/api/v1';
 const OPENSUBTITLES_USERNAME = 'Rakjsu';
 const OPENSUBTITLES_PASSWORD = '05062981';
 
 // JWT token cache
 let cachedToken: string | null = null;
 let tokenExpiry: number = 0;
+
+// Window type for IPC
+declare global {
+    interface Window {
+        ipcRenderer?: {
+            invoke: (channel: string, data: any) => Promise<any>;
+        };
+    }
+}
 
 interface SubtitleResult {
     id: string;
@@ -31,6 +38,22 @@ interface SubtitleSearchParams {
 }
 
 /**
+ * Make request to OpenSubtitles via IPC (bypasses CORS)
+ */
+async function openSubtitlesRequest(
+    endpoint: string,
+    method: 'GET' | 'POST' = 'GET',
+    body?: any
+): Promise<{ success: boolean; status?: number; data?: any; error?: string }> {
+    if (!window.ipcRenderer) {
+        console.error('IPC not available - not running in Electron');
+        return { success: false, error: 'IPC not available' };
+    }
+
+    return window.ipcRenderer.invoke('opensubtitles:request', { endpoint, method, body });
+}
+
+/**
  * Login to OpenSubtitles and get JWT token
  */
 async function getAuthToken(): Promise<string | null> {
@@ -41,26 +64,18 @@ async function getAuthToken(): Promise<string | null> {
 
     try {
         console.log('🔐 Logging in to OpenSubtitles...');
-        const response = await fetch(`${OPENSUBTITLES_BASE_URL}/login`, {
-            method: 'POST',
-            headers: {
-                'Api-Key': OPENSUBTITLES_API_KEY,
-                'Content-Type': 'application/json',
-                'User-Agent': 'NeoStream IPTV v2.9.0'
-            },
-            body: JSON.stringify({
-                username: OPENSUBTITLES_USERNAME,
-                password: OPENSUBTITLES_PASSWORD
-            })
+        const result = await openSubtitlesRequest('/login', 'POST', {
+            username: OPENSUBTITLES_USERNAME,
+            password: OPENSUBTITLES_PASSWORD
         });
 
-        if (!response.ok) {
-            console.error('OpenSubtitles login failed:', response.status, response.statusText);
+        if (!result.success) {
+            console.error('OpenSubtitles login failed:', result.status, result.error);
             return null;
         }
 
-        const data = await response.json();
-        if (data.token) {
+        const data = result.data;
+        if (data?.token) {
             cachedToken = data.token;
             // Token is valid for 24 hours, cache for 23 hours
             tokenExpiry = Date.now() + (23 * 60 * 60 * 1000);
@@ -96,24 +111,20 @@ export async function searchSubtitles(params: SubtitleSearchParams): Promise<Sub
         if (params.season) searchParams.set('season_number', String(params.season));
         if (params.episode) searchParams.set('episode_number', String(params.episode));
 
-        const response = await fetch(`${OPENSUBTITLES_BASE_URL}/subtitles?${searchParams.toString()}`, {
-            method: 'GET',
-            headers: {
-                'Api-Key': OPENSUBTITLES_API_KEY,
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-                'User-Agent': 'NeoStream IPTV v2.9.0'
-            }
-        });
+        const result = await openSubtitlesRequest(
+            `/subtitles?${searchParams.toString()}`,
+            'GET',
+            { authToken: token }
+        );
 
-        if (!response.ok) {
-            console.error('OpenSubtitles search failed:', response.status, response.statusText);
+        if (!result.success) {
+            console.error('OpenSubtitles search failed:', result.status, result.error);
             return [];
         }
 
-        const data = await response.json();
+        const data = result.data;
 
-        if (!data.data || !Array.isArray(data.data)) {
+        if (!data?.data || !Array.isArray(data.data)) {
             return [];
         }
 
@@ -144,24 +155,17 @@ export async function downloadSubtitle(fileId: number): Promise<string | null> {
             return null;
         }
 
-        const response = await fetch(`${OPENSUBTITLES_BASE_URL}/download`, {
-            method: 'POST',
-            headers: {
-                'Api-Key': OPENSUBTITLES_API_KEY,
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-                'User-Agent': 'NeoStream IPTV v2.9.0'
-            },
-            body: JSON.stringify({ file_id: fileId })
+        const result = await openSubtitlesRequest('/download', 'POST', {
+            file_id: fileId,
+            authToken: token
         });
 
-        if (!response.ok) {
-            console.error('OpenSubtitles download failed:', response.status, response.statusText);
+        if (!result.success) {
+            console.error('OpenSubtitles download failed:', result.status, result.error);
             return null;
         }
 
-        const data = await response.json();
-        return data.link || null;
+        return result.data?.link || null;
     } catch (error) {
         console.error('Error downloading subtitle:', error);
         return null;
@@ -222,9 +226,17 @@ export async function autoFetchSubtitle(params: {
         // Preferred languages in order
         const preferredLanguages = ['pt-br', 'pt', 'en'];
 
+        // Clean the title - remove tags like [4K], [L], (2021), etc.
+        const cleanTitle = params.title
+            .replace(/\s*\[.*?\]\s*/g, '') // Remove [anything]
+            .replace(/\s*\(\d{4}\)\s*/g, '') // Remove (year)
+            .trim();
+
+        console.log(`🔍 Searching subtitles for: ${cleanTitle}`);
+
         // Search for subtitles
         const results = await searchSubtitles({
-            query: params.title,
+            query: cleanTitle,
             tmdbId: params.tmdbId,
             imdbId: params.imdbId,
             languages: preferredLanguages.join(','),
@@ -233,7 +245,7 @@ export async function autoFetchSubtitle(params: {
         });
 
         if (results.length === 0) {
-            console.log('No subtitles found for:', params.title);
+            console.log('No subtitles found for:', cleanTitle);
             return null;
         }
 
