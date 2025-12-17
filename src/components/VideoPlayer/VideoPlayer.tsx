@@ -39,6 +39,8 @@ export interface VideoPlayerProps {
     // Subtitle search
     tmdbId?: string | number;
     imdbId?: string;
+    // If true, movie is already subtitled (has [L] in name), hide subtitle button
+    isSubtitled?: boolean;
 }
 
 export function VideoPlayer({
@@ -62,7 +64,8 @@ export function VideoPlayer({
     currentMovieId,
     onSwitchVersion,
     tmdbId,
-    imdbId
+    imdbId,
+    isSubtitled
 }: VideoPlayerProps) {
     const { videoRef, state, controls } = useVideoPlayer();
     useHls({ src, videoRef });
@@ -635,67 +638,69 @@ export function VideoPlayer({
                             </>
                         )}
 
-                        {/* Subtitles toggle */}
-                        <button
-                            className="control-btn"
-                            onClick={async () => {
-                                if (subtitlesEnabled) {
-                                    // Disable subtitles
-                                    setSubtitlesEnabled(false);
-                                    const video = videoRef.current;
-                                    if (video && video.textTracks.length > 0) {
-                                        for (let i = 0; i < video.textTracks.length; i++) {
-                                            video.textTracks[i].mode = 'hidden';
-                                        }
-                                    }
-                                } else {
-                                    // Enable subtitles - fetch if not already loaded
-                                    if (!subtitleUrl && title) {
-                                        setSubtitleLoading(true);
-                                        try {
-                                            const result = await autoFetchSubtitle({
-                                                title,
-                                                tmdbId,
-                                                imdbId,
-                                                season: seasonNumber,
-                                                episode: episodeNumber
-                                            });
-                                            if (result) {
-                                                setSubtitleUrl(result.url);
-                                                setSubtitleLanguage(result.language);
-                                                setSubtitlesEnabled(true);
-                                            } else {
-                                                console.log('No subtitles found');
-                                            }
-                                        } catch (error) {
-                                            console.error('Error fetching subtitles:', error);
-                                        } finally {
-                                            setSubtitleLoading(false);
-                                        }
-                                    } else {
-                                        setSubtitlesEnabled(true);
+                        {/* Subtitles toggle - only show for dubbed movies (not already subtitled) */}
+                        {!isSubtitled && (
+                            <button
+                                className="control-btn"
+                                onClick={async () => {
+                                    if (subtitlesEnabled) {
+                                        // Disable subtitles
+                                        setSubtitlesEnabled(false);
                                         const video = videoRef.current;
                                         if (video && video.textTracks.length > 0) {
                                             for (let i = 0; i < video.textTracks.length; i++) {
-                                                video.textTracks[i].mode = 'showing';
+                                                video.textTracks[i].mode = 'hidden';
+                                            }
+                                        }
+                                    } else {
+                                        // Enable subtitles - fetch if not already loaded
+                                        if (!subtitleUrl && title) {
+                                            setSubtitleLoading(true);
+                                            try {
+                                                const result = await autoFetchSubtitle({
+                                                    title,
+                                                    tmdbId,
+                                                    imdbId,
+                                                    season: seasonNumber,
+                                                    episode: episodeNumber
+                                                });
+                                                if (result) {
+                                                    setSubtitleUrl(result.url);
+                                                    setSubtitleLanguage(result.language);
+                                                    setSubtitlesEnabled(true);
+                                                } else {
+                                                    console.log('No subtitles found');
+                                                }
+                                            } catch (error) {
+                                                console.error('Error fetching subtitles:', error);
+                                            } finally {
+                                                setSubtitleLoading(false);
+                                            }
+                                        } else {
+                                            setSubtitlesEnabled(true);
+                                            const video = videoRef.current;
+                                            if (video && video.textTracks.length > 0) {
+                                                for (let i = 0; i < video.textTracks.length; i++) {
+                                                    video.textTracks[i].mode = 'showing';
+                                                }
                                             }
                                         }
                                     }
-                                }
-                            }}
-                            title={subtitleLoading ? 'Buscando legendas...' : (subtitlesEnabled ? `Desativar Legendas (${subtitleLanguage || 'PT'})` : 'Ativar Legendas')}
-                            style={{
-                                color: subtitlesEnabled ? '#10b981' : (subtitleLoading ? '#f59e0b' : 'white'),
-                                opacity: subtitleLoading ? 0.7 : 1
-                            }}
-                            disabled={subtitleLoading}
-                        >
-                            {subtitleLoading ? (
-                                <span style={{ fontSize: '10px', fontWeight: 600 }}>...</span>
-                            ) : (
-                                <FaClosedCaptioning />
-                            )}
-                        </button>
+                                }}
+                                title={subtitleLoading ? 'Buscando legendas...' : (subtitlesEnabled ? `Desativar Legendas (${subtitleLanguage || 'PT'})` : 'Ativar Legendas')}
+                                style={{
+                                    color: subtitlesEnabled ? '#10b981' : (subtitleLoading ? '#f59e0b' : 'white'),
+                                    opacity: subtitleLoading ? 0.7 : 1
+                                }}
+                                disabled={subtitleLoading}
+                            >
+                                {subtitleLoading ? (
+                                    <span style={{ fontSize: '10px', fontWeight: 600 }}>...</span>
+                                ) : (
+                                    <FaClosedCaptioning />
+                                )}
+                            </button>
+                        )}
 
                         {/* Picture-in-Picture */}
                         <button
