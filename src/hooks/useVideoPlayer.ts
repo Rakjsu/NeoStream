@@ -13,13 +13,25 @@ export interface VideoPlayerState {
     playbackRate: number;
 }
 
+// Helper to get saved volume from localStorage
+const getSavedVolume = (): number => {
+    try {
+        const saved = localStorage.getItem('playerVolume');
+        if (saved !== null) {
+            const vol = parseFloat(saved);
+            return isNaN(vol) ? 1 : Math.max(0, Math.min(1, vol));
+        }
+    } catch { }
+    return 1;
+};
+
 export function useVideoPlayer() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [state, setState] = useState<VideoPlayerState>({
         playing: false,
         currentTime: 0,
         duration: 0,
-        volume: 1,
+        volume: getSavedVolume(),
         muted: false,
         buffered: 0,
         error: null,
@@ -50,6 +62,10 @@ export function useVideoPlayer() {
         const clampedVolume = Math.max(0, Math.min(1, volume));
         videoRef.current.volume = clampedVolume;
         setState(prev => ({ ...prev, volume: clampedVolume }));
+        // Save volume to localStorage
+        try {
+            localStorage.setItem('playerVolume', clampedVolume.toString());
+        } catch { }
     }, []);
 
     // Mute
@@ -79,6 +95,9 @@ export function useVideoPlayer() {
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
+
+        // Initialize video element with saved volume
+        video.volume = state.volume;
 
         const handlePlay = () => setState(prev => ({ ...prev, playing: true }));
         const handlePause = () => setState(prev => ({ ...prev, playing: false }));
