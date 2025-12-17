@@ -432,7 +432,7 @@ export async function autoFetchSubtitle(params: {
 
         console.log(`📌 Filtered results count: ${filteredResults.length}`);
 
-        // Sort by preferred language and download count - case insensitive
+        // Sort by preferred language, avoid special editions, and download count - case insensitive
         const sorted = candidateResults.sort((a, b) => {
             const aLangNorm = a.language.toLowerCase();
             const bLangNorm = b.language.toLowerCase();
@@ -441,7 +441,14 @@ export async function autoFetchSubtitle(params: {
             const aLangScore = aIndex === -1 ? 999 : aIndex;
             const bLangScore = bIndex === -1 ? 999 : bIndex;
 
+            // Deprioritize special editions (Director's Cut, Extended, Unrated, etc.)
+            const specialEditionPatterns = /director.?s?.?cut|extended|unrated|uncut|theatrical/i;
+            const aIsSpecial = specialEditionPatterns.test(a.release) ? 1 : 0;
+            const bIsSpecial = specialEditionPatterns.test(b.release) ? 1 : 0;
+
+            // Priority: Language > Special Edition > Download Count
             if (aLangScore !== bLangScore) return aLangScore - bLangScore;
+            if (aIsSpecial !== bIsSpecial) return aIsSpecial - bIsSpecial; // Non-special comes first
             return b.downloadCount - a.downloadCount;
         });
 
