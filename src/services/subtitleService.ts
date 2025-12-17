@@ -379,6 +379,7 @@ export async function autoFetchSubtitle(params: {
             console.error('Failed to get download URL');
             return null;
         }
+        console.log(`📥 Subtitle download URL: ${downloadUrl.substring(0, 100)}...`);
 
         // Fetch and convert content
         const vttContent = await fetchSubtitleContent(downloadUrl);
@@ -387,9 +388,13 @@ export async function autoFetchSubtitle(params: {
             return null;
         }
 
+        // Log first lines of VTT content for debugging
+        console.log(`📝 VTT content preview (first 500 chars):\n${vttContent.substring(0, 500)}`);
+
         // Create a blob URL for the VTT content
         const blob = new Blob([vttContent], { type: 'text/vtt' });
         const blobUrl = URL.createObjectURL(blob);
+        console.log(`🔗 Created blob URL: ${blobUrl}`);
 
         return {
             url: blobUrl,
