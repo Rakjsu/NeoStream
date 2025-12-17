@@ -264,17 +264,20 @@ export async function autoFetchSubtitle(params: {
 
         // Extract sequel number from title (e.g., "9" from "Velozes & Furiosos 9")
         const extractSequelNumber = (title: string): string | null => {
-            // Match number at end of title or after common patterns
+            // Normalize dots/underscores to spaces for matching
+            const normalized = title.replace(/[._]/g, ' ');
+
+            // Match number patterns - be generous to catch variations
             const patterns = [
-                /\s+(\d+)\s*$/,                    // "Movie 9" or "Movie 9"
-                /\s+(\d+)\s*[-:]/,                  // "Movie 9 - Subtitle"
-                /\s+(\d+)(?:\s|$)/,                 // "Movie 9 something"
-                /[:\-]\s*(\d+)\s*$/,               // "Movie: 9" or "Movie - 9"
-                /\b(IX|VIII|VII|VI|V|IV|III|II|I)\b/i, // Roman numerals
+                /[\s.](IX|VIII|VII|VI|V|IV|III|II|I)[\s.]/i,  // Roman numerals with separators
+                /[\s.](\d{1,2})[\s.]/,                         // "Movie 9 " or "Movie.9."
+                /[\s.](\d{1,2})$/,                             // "Movie 9" at end
+                /[\s.](\d{1,2})[-:]/,                          // "Movie 9:" or "Movie 9-"
+                /\b(IX|VIII|VII|VI|V|IV|III|II|I)\b/i,        // Roman numerals standalone
             ];
 
             for (const pattern of patterns) {
-                const match = title.match(pattern);
+                const match = normalized.match(pattern);
                 if (match) {
                     // Convert Roman numerals
                     const value = match[1].toUpperCase();
@@ -322,16 +325,29 @@ export async function autoFetchSubtitle(params: {
 
         // If movie has a sequel number, filter to match the correct sequel
         if (movieNumber && filteredResults.length > 0) {
-            const sequelFiltered = filteredResults.filter(r => {
+            // First, try to find exact matches (release contains the same number)
+            const exactMatches = filteredResults.filter(r => {
                 const releaseNumber = extractSequelNumber(r.release);
-                // Accept if: exact match, or no number in release (might be correct)
-                return releaseNumber === movieNumber || releaseNumber === null;
+                return releaseNumber === movieNumber;
             });
 
-            // Only use filtered if we still have results
-            if (sequelFiltered.length > 0) {
-                console.log(`🎬 Filtered by sequel number ${movieNumber}: ${sequelFiltered.length} results`);
-                filteredResults = sequelFiltered;
+            // If we have exact matches, use only those
+            if (exactMatches.length > 0) {
+                console.log(`🎬 Exact sequel ${movieNumber} matches: ${exactMatches.length} results`);
+                filteredResults = exactMatches;
+            } else {
+                // Otherwise, exclude releases that have a DIFFERENT number
+                const noConflictMatches = filteredResults.filter(r => {
+                    const releaseNumber = extractSequelNumber(r.release);
+                    // Accept if no number detected (might be generic title)
+                    // Reject if number detected but doesn't match
+                    return releaseNumber === null;
+                });
+
+                if (noConflictMatches.length > 0) {
+                    console.log(`🎬 No-conflict matches (no number): ${noConflictMatches.length} results`);
+                    filteredResults = noConflictMatches;
+                }
             }
         }
 
