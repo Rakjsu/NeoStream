@@ -9,6 +9,7 @@ import { formatTime, percentage } from '../../utils/videoHelpers';
 import { usageStatsService } from '../../services/usageStatsService';
 import { useMiniPlayer } from '../MiniPlayer';
 import { autoFetchSubtitle, cleanupSubtitleUrl } from '../../services/subtitleService';
+import { SubtitleOverlay } from './SubtitleOverlay';
 import './VideoPlayer.css';
 
 import type { MovieVersion } from '../../services/movieVersionService';
@@ -84,6 +85,7 @@ export function VideoPlayer({
     const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
     const [subtitleLoading, setSubtitleLoading] = useState(false);
     const [subtitleLanguage, setSubtitleLanguage] = useState<string | null>(null);
+    const [vttContent, setVttContent] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const progressRef = useRef<HTMLDivElement>(null);
 
@@ -261,40 +263,7 @@ export function VideoPlayer({
         };
     }, [state.playing, seeking]);
 
-    // Cleanup subtitle URL on unmount and activate track when subtitle is loaded
-    useEffect(() => {
-        // When subtitle URL changes and is enabled, activate the track
-        if (subtitleUrl && subtitlesEnabled && videoRef.current) {
-            const video = videoRef.current;
-
-            // Function to activate tracks
-            const activateTracks = () => {
-                if (video.textTracks.length > 0) {
-                    for (let i = 0; i < video.textTracks.length; i++) {
-                        video.textTracks[i].mode = 'showing';
-                    }
-                }
-            };
-
-            // Wait for track to be added and activate
-            setTimeout(() => {
-                activateTracks();
-                console.log('✅ Subtitle track activated');
-            }, 100);
-
-            // Reactivate tracks after seeking to maintain sync
-            const handleSeeked = () => {
-                activateTracks();
-                console.log('🔄 Subtitle track refreshed after seek');
-            };
-
-            video.addEventListener('seeked', handleSeeked);
-
-            return () => {
-                video.removeEventListener('seeked', handleSeeked);
-            };
-        }
-    }, [subtitleUrl, subtitlesEnabled]);
+    // Note: SubtitleOverlay component handles its own timeupdate/seeked events
 
     // Cleanup subtitle blob URL on unmount
     useEffect(() => {
@@ -426,18 +395,14 @@ export function VideoPlayer({
                     poster={poster}
                     onClick={controls.togglePlay}
                     crossOrigin="anonymous"
-                >
-                    {/* Subtitle track */}
-                    {subtitleUrl && subtitlesEnabled && (
-                        <track
-                            kind="subtitles"
-                            src={subtitleUrl}
-                            srcLang={subtitleLanguage || 'pt'}
-                            label={subtitleLanguage === 'pt-br' ? 'Português (BR)' : subtitleLanguage === 'en' ? 'English' : 'Português'}
-                            default
-                        />
-                    )}
-                </video>
+                />
+
+                {/* Custom Subtitle Overlay - replaces native <track> for better HLS sync */}
+                <SubtitleOverlay
+                    vttContent={vttContent}
+                    videoRef={videoRef}
+                    enabled={subtitlesEnabled}
+                />
             </div>
 
             {/* Central Play Button - Shows when paused */}
@@ -670,6 +635,7 @@ export function VideoPlayer({
                                             cleanupSubtitleUrl(subtitleUrl);
                                             setSubtitleUrl(null);
                                             setSubtitleLanguage(null);
+                                            setVttContent(null);
                                             console.log('🗑️ Subtitles cleaned up from memory');
                                         }
 
@@ -694,6 +660,7 @@ export function VideoPlayer({
                                                 if (result) {
                                                     setSubtitleUrl(result.url);
                                                     setSubtitleLanguage(result.language);
+                                                    setVttContent(result.vttContent);
                                                     setSubtitlesEnabled(true);
                                                 } else {
                                                     console.log('No subtitles found');

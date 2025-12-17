@@ -234,7 +234,7 @@ export async function autoFetchSubtitle(params: {
     imdbId?: string;
     season?: number;
     episode?: number;
-}): Promise<{ url: string; language: string } | null> {
+}): Promise<{ url: string; language: string; vttContent: string } | null> {
     try {
         // Get user's preferred subtitle language from settings
         const { playbackService } = await import('./playbackService');
@@ -411,7 +411,8 @@ export async function autoFetchSubtitle(params: {
 
         return {
             url: blobUrl,
-            language: best.language
+            language: best.language,
+            vttContent: vttContent
         };
     } catch (error) {
         console.error('Error auto-fetching subtitle:', error);
