@@ -1,7 +1,11 @@
 /**
  * Playback Configuration Service
  * Handles buffer settings, codec preferences, and quality settings
+ * Settings are stored per user profile
  */
+
+import { profileService } from './profileService';
+import { languageService } from './languageService';
 
 export interface PlaybackConfig {
     bufferSize: 'intelligent' | '5' | '10' | '15' | '30';
@@ -10,18 +14,33 @@ export interface PlaybackConfig {
     quality: 'auto' | '1080p' | '720p' | '480p';
     autoPlayNextEpisode: boolean;
     subtitleLanguage: 'pt-br' | 'pt' | 'en' | 'es';
+    subtitleLanguageUserSet?: boolean; // True if user manually changed subtitle language
 }
 
-const DEFAULT_CONFIG: PlaybackConfig = {
-    bufferSize: 'intelligent',
-    audioCodec: 'auto',
-    videoCodec: 'auto',
-    quality: 'auto',
-    autoPlayNextEpisode: true,
-    subtitleLanguage: 'pt-br'
-};
+const STORAGE_KEY_PREFIX = 'playbackConfig';
 
-const STORAGE_KEY = 'playbackConfig';
+// Map app language to subtitle language
+function getDefaultSubtitleLanguage(): 'pt-br' | 'pt' | 'en' | 'es' {
+    const appLang = languageService.getLanguage();
+    switch (appLang) {
+        case 'pt': return 'pt-br';
+        case 'en': return 'en';
+        case 'es': return 'es';
+        default: return 'pt-br';
+    }
+}
+
+function getDefaultConfig(): PlaybackConfig {
+    return {
+        bufferSize: 'intelligent',
+        audioCodec: 'auto',
+        videoCodec: 'auto',
+        quality: 'auto',
+        autoPlayNextEpisode: true,
+        subtitleLanguage: getDefaultSubtitleLanguage(),
+        subtitleLanguageUserSet: false
+    };
+}
 
 // Connection speed test result
 interface SpeedTestResult {
@@ -31,7 +50,7 @@ interface SpeedTestResult {
 }
 
 class PlaybackService {
-    private config: PlaybackConfig = DEFAULT_CONFIG;
+    private config: PlaybackConfig = getDefaultConfig();
     private lastSpeedTest: SpeedTestResult | null = null;
     private speedTestInProgress = false;
 
@@ -39,23 +58,50 @@ class PlaybackService {
         this.loadConfig();
     }
 
+    // Get storage key for current profile
+    private getStorageKey(): string {
+        const activeProfile = profileService.getActiveProfile();
+        if (activeProfile) {
+            return `${STORAGE_KEY_PREFIX}_${activeProfile.id}`;
+        }
+        return STORAGE_KEY_PREFIX; // Fallback for no profile
+    }
+
     private loadConfig(): void {
         try {
-            const saved = localStorage.getItem(STORAGE_KEY);
+            const key = this.getStorageKey();
+            const saved = localStorage.getItem(key);
             if (saved) {
-                this.config = { ...DEFAULT_CONFIG, ...JSON.parse(saved) };
+                const parsed = JSON.parse(saved);
+                const defaultConfig = getDefaultConfig();
+
+                // If subtitle language was not explicitly set by user, use app language
+                if (!parsed.subtitleLanguageUserSet) {
+                    parsed.subtitleLanguage = getDefaultSubtitleLanguage();
+                }
+
+                this.config = { ...defaultConfig, ...parsed };
+            } else {
+                this.config = getDefaultConfig();
             }
         } catch (error) {
             console.error('Error loading playback config:', error);
+            this.config = getDefaultConfig();
         }
     }
 
     private saveConfig(): void {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(this.config));
+            const key = this.getStorageKey();
+            localStorage.setItem(key, JSON.stringify(this.config));
         } catch (error) {
             console.error('Error saving playback config:', error);
         }
+    }
+
+    // Reload config (call when profile changes)
+    reloadConfig(): void {
+        this.loadConfig();
     }
 
     getConfig(): PlaybackConfig {
@@ -63,6 +109,11 @@ class PlaybackService {
     }
 
     setConfig(config: Partial<PlaybackConfig>): void {
+        // If user is setting subtitle language, mark it as user-set
+        if (config.subtitleLanguage !== undefined) {
+            config.subtitleLanguageUserSet = true;
+        }
+
         this.config = { ...this.config, ...config };
         this.saveConfig();
     }
