@@ -216,6 +216,52 @@ export function Home() {
         return () => clearInterval(interval);
     }, []);
 
+    // Listen for mini player expand event to reopen full player
+    useEffect(() => {
+        const handleMiniPlayerExpand = (e: CustomEvent) => {
+            const { contentId, contentType, currentTime, seasonNumber, episodeNumber, title } = e.detail;
+
+            if (contentType === 'movie' && contentId) {
+                // Find the movie in our list
+                const movie = allMovies.find((m: MovieData) => m.stream_id.toString() === contentId);
+                if (movie) {
+                    setPlayingContent({
+                        id: contentId,
+                        type: 'movie',
+                        name: movie.name,
+                        resumeTime: currentTime || 0
+                    });
+                }
+            } else if (contentType === 'series' && contentId) {
+                // For series, reopen with the current episode
+                const series = allSeries.find((s: SeriesData) => s.series_id.toString() === contentId);
+                if (series) {
+                    setPlayingContent({
+                        id: contentId,
+                        type: 'series',
+                        name: series.name,
+                        season: seasonNumber || 1,
+                        episode: episodeNumber || 1,
+                        resumeTime: currentTime || 0
+                    });
+                } else {
+                    // Fallback: use title from event if series not found in list
+                    setPlayingContent({
+                        id: contentId,
+                        type: 'series',
+                        name: title || 'Série',
+                        season: seasonNumber || 1,
+                        episode: episodeNumber || 1,
+                        resumeTime: currentTime || 0
+                    });
+                }
+            }
+        };
+
+        window.addEventListener('miniPlayerExpand', handleMiniPlayerExpand as EventListener);
+        return () => window.removeEventListener('miniPlayerExpand', handleMiniPlayerExpand as EventListener);
+    }, [allMovies, allSeries]);
+
     // Build continue watching list
     useEffect(() => {
         if (allSeries.length === 0 && allMovies.length === 0) return;
