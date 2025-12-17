@@ -267,10 +267,16 @@ export async function autoFetchSubtitle(params: {
         console.log(`🎯 Subtitle preference from settings: ${preferredLang}`);
         console.log(`🎯 Language priority: ${preferredLanguages.join(' → ')}`);
 
-        // Clean the title - remove tags like [4K], [L], (2021), etc.
+        // Clean the title - remove tags like [4K], [L], (2021), season/episode markers, etc.
         const cleanTitle = params.title
             .replace(/\s*\[.*?\]\s*/g, '') // Remove [anything]
             .replace(/\s*\(\d{4}\)\s*/g, '') // Remove (year)
+            .replace(/\s*[-–—]\s*T\d+\s*E\d+\s*/gi, '') // Remove "- T1 E1" or "– T01 E05"
+            .replace(/\s*[-–—]\s*S\d+\s*E\d+\s*/gi, '') // Remove "- S1 E1" or "– S01 E05"
+            .replace(/\s*S\d+[.\s]*E\d+\s*/gi, '') // Remove "S1E1" or "S01.E01"
+            .replace(/\s*[-–—]\s*Temporada\s*\d+\s*Epis[oó]dio\s*\d+\s*/gi, '') // Remove "- Temporada 1 Episódio 1"
+            .replace(/\s*[-–—]\s*Temp\s*\d+\s*Ep\s*\d+\s*/gi, '') // Remove "- Temp 1 Ep 1"
+            .replace(/\s*[-–—]\s*Season\s*\d+\s*Episode\s*\d+\s*/gi, '') // Remove "- Season 1 Episode 1"
             .trim();
 
         console.log(`🔍 Searching subtitles for: ${cleanTitle}`);
