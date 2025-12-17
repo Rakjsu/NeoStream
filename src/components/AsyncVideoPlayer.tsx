@@ -363,7 +363,7 @@ function AsyncVideoPlayer({
                         seasonNumber={seasonNumber}
                         episodeNumber={episodeNumber}
                         movieVersions={allMovies && !seriesId ? findMovieVersions(movie, allMovies) : undefined}
-                        currentMovieId={movie.stream_id}
+                        currentMovieId={movie.stream_id || Number(movie.id)}
                         onSwitchVersion={onSwitchVersion}
                         onTimeUpdate={(currentTime, duration) => {
                             // Call external onTimeUpdate if provided
