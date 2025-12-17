@@ -225,6 +225,9 @@ export async function autoFetchSubtitle(params: {
     try {
         // Get user's preferred subtitle language from settings
         const { playbackService } = await import('./playbackService');
+
+        // Reload config to ensure we have latest profile settings
+        playbackService.reloadConfig();
         const config = playbackService.getConfig();
 
         // Build language priority based on user preference
@@ -248,7 +251,8 @@ export async function autoFetchSubtitle(params: {
                 preferredLanguages = ['pt-br', 'pt', 'en'];
         }
 
-        console.log(`🎯 Subtitle preference: ${preferredLang} → ${preferredLanguages.join(', ')}`);
+        console.log(`🎯 Subtitle preference from settings: ${preferredLang}`);
+        console.log(`🎯 Language priority: ${preferredLanguages.join(' → ')}`);
 
         // Clean the title - remove tags like [4K], [L], (2021), etc.
         const cleanTitle = params.title
@@ -273,8 +277,21 @@ export async function autoFetchSubtitle(params: {
             return null;
         }
 
+        console.log(`📃 Found ${results.length} subtitles`);
+        results.slice(0, 5).forEach((r, i) => {
+            console.log(`   ${i + 1}. [${r.language}] ${r.release} (${r.downloadCount} downloads)`);
+        });
+
+        // Filter to get only subtitles in the preferred language (first choice)
+        const primaryLangResults = results.filter(r => r.language === preferredLang);
+
+        // If we have results in the primary language, use those
+        let candidateResults = primaryLangResults.length > 0 ? primaryLangResults : results;
+
+        console.log(`📌 Primary language (${preferredLang}) count: ${primaryLangResults.length}`);
+
         // Sort by preferred language and download count
-        const sorted = results.sort((a, b) => {
+        const sorted = candidateResults.sort((a, b) => {
             const aIndex = preferredLanguages.indexOf(a.language);
             const bIndex = preferredLanguages.indexOf(b.language);
             const aLangScore = aIndex === -1 ? 999 : aIndex;
@@ -286,7 +303,7 @@ export async function autoFetchSubtitle(params: {
 
         // Get the best subtitle
         const best = sorted[0];
-        console.log(`Found subtitle: ${best.language} - ${best.release}`);
+        console.log(`✅ Selected subtitle: [${best.language}] ${best.release}`);
 
         // Download the subtitle
         const downloadUrl = await downloadSubtitle(best.fileId);

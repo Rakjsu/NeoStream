@@ -644,8 +644,17 @@ export function VideoPlayer({
                                 className="control-btn"
                                 onClick={async () => {
                                     if (subtitlesEnabled) {
-                                        // Disable subtitles
+                                        // Disable subtitles and cleanup
                                         setSubtitlesEnabled(false);
+
+                                        // Cleanup subtitle blob URL from memory
+                                        if (subtitleUrl) {
+                                            cleanupSubtitleUrl(subtitleUrl);
+                                            setSubtitleUrl(null);
+                                            setSubtitleLanguage(null);
+                                            console.log('🗑️ Subtitles cleaned up from memory');
+                                        }
+
                                         const video = videoRef.current;
                                         if (video && video.textTracks.length > 0) {
                                             for (let i = 0; i < video.textTracks.length; i++) {
