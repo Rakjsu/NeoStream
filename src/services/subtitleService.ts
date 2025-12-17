@@ -282,18 +282,26 @@ export async function autoFetchSubtitle(params: {
             console.log(`   ${i + 1}. [${r.language}] ${r.release} (${r.downloadCount} downloads)`);
         });
 
-        // Filter to get only subtitles in the preferred language (first choice)
-        const primaryLangResults = results.filter(r => r.language === preferredLang);
+        // Normalize language codes to lowercase for comparison
+        const normalizedPreferredLang = preferredLang.toLowerCase();
+        const normalizedPreferredLanguages = preferredLanguages.map(l => l.toLowerCase());
+
+        // Filter to get only subtitles in the preferred language (first choice) - case insensitive
+        const primaryLangResults = results.filter(r =>
+            r.language.toLowerCase() === normalizedPreferredLang
+        );
 
         // If we have results in the primary language, use those
         let candidateResults = primaryLangResults.length > 0 ? primaryLangResults : results;
 
         console.log(`📌 Primary language (${preferredLang}) count: ${primaryLangResults.length}`);
 
-        // Sort by preferred language and download count
+        // Sort by preferred language and download count - case insensitive
         const sorted = candidateResults.sort((a, b) => {
-            const aIndex = preferredLanguages.indexOf(a.language);
-            const bIndex = preferredLanguages.indexOf(b.language);
+            const aLangNorm = a.language.toLowerCase();
+            const bLangNorm = b.language.toLowerCase();
+            const aIndex = normalizedPreferredLanguages.indexOf(aLangNorm);
+            const bIndex = normalizedPreferredLanguages.indexOf(bLangNorm);
             const aLangScore = aIndex === -1 ? 999 : aIndex;
             const bLangScore = bIndex === -1 ? 999 : bIndex;
 
