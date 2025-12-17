@@ -8,6 +8,7 @@ import { CastDeviceSelector } from '../CastDeviceSelector';
 import { formatTime, percentage } from '../../utils/videoHelpers';
 import { usageStatsService } from '../../services/usageStatsService';
 import { useMiniPlayer } from '../MiniPlayer';
+import { autoFetchSubtitle, cleanupSubtitleUrl } from '../../services/subtitleService';
 import './VideoPlayer.css';
 
 import type { MovieVersion } from '../../services/movieVersionService';
@@ -35,6 +36,9 @@ export interface VideoPlayerProps {
     movieVersions?: MovieVersion[];
     currentMovieId?: number;
     onSwitchVersion?: (movie: any, currentTime: number) => void;
+    // Subtitle search
+    tmdbId?: string | number;
+    imdbId?: string;
 }
 
 export function VideoPlayer({
@@ -56,7 +60,9 @@ export function VideoPlayer({
     episodeNumber,
     movieVersions,
     currentMovieId,
-    onSwitchVersion
+    onSwitchVersion,
+    tmdbId,
+    imdbId
 }: VideoPlayerProps) {
     const { videoRef, state, controls } = useVideoPlayer();
     useHls({ src, videoRef });
@@ -72,6 +78,9 @@ export function VideoPlayer({
     const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     const [hoverPosition, setHoverPosition] = useState(0);
+    const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
+    const [subtitleLoading, setSubtitleLoading] = useState(false);
+    const [subtitleLanguage, setSubtitleLanguage] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const progressRef = useRef<HTMLDivElement>(null);
 
@@ -249,6 +258,32 @@ export function VideoPlayer({
         };
     }, [state.playing, seeking]);
 
+    // Cleanup subtitle URL on unmount and activate track when subtitle is loaded
+    useEffect(() => {
+        // When subtitle URL changes and is enabled, activate the track
+        if (subtitleUrl && subtitlesEnabled && videoRef.current) {
+            const video = videoRef.current;
+            // Wait for track to be added
+            setTimeout(() => {
+                if (video.textTracks.length > 0) {
+                    for (let i = 0; i < video.textTracks.length; i++) {
+                        video.textTracks[i].mode = 'showing';
+                    }
+                    console.log('✅ Subtitle track activated');
+                }
+            }, 100);
+        }
+    }, [subtitleUrl, subtitlesEnabled]);
+
+    // Cleanup subtitle blob URL on unmount
+    useEffect(() => {
+        return () => {
+            if (subtitleUrl) {
+                cleanupSubtitleUrl(subtitleUrl);
+            }
+        };
+    }, [subtitleUrl]);
+
     // Keyboard shortcuts
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
         if (e.target instanceof HTMLInputElement) return;
@@ -369,7 +404,19 @@ export function VideoPlayer({
                     className="video-fullwidth"
                     poster={poster}
                     onClick={controls.togglePlay}
-                />
+                    crossOrigin="anonymous"
+                >
+                    {/* Subtitle track */}
+                    {subtitleUrl && subtitlesEnabled && (
+                        <track
+                            kind="subtitles"
+                            src={subtitleUrl}
+                            srcLang={subtitleLanguage || 'pt'}
+                            label={subtitleLanguage === 'pt-br' ? 'Português (BR)' : subtitleLanguage === 'en' ? 'English' : 'Português'}
+                            default
+                        />
+                    )}
+                </video>
             </div>
 
             {/* Central Play Button - Shows when paused */}
@@ -591,22 +638,63 @@ export function VideoPlayer({
                         {/* Subtitles toggle */}
                         <button
                             className="control-btn"
-                            onClick={() => {
-                                setSubtitlesEnabled(!subtitlesEnabled);
-                                // Toggle text tracks if available
-                                const video = videoRef.current;
-                                if (video && video.textTracks.length > 0) {
-                                    for (let i = 0; i < video.textTracks.length; i++) {
-                                        video.textTracks[i].mode = !subtitlesEnabled ? 'showing' : 'hidden';
+                            onClick={async () => {
+                                if (subtitlesEnabled) {
+                                    // Disable subtitles
+                                    setSubtitlesEnabled(false);
+                                    const video = videoRef.current;
+                                    if (video && video.textTracks.length > 0) {
+                                        for (let i = 0; i < video.textTracks.length; i++) {
+                                            video.textTracks[i].mode = 'hidden';
+                                        }
+                                    }
+                                } else {
+                                    // Enable subtitles - fetch if not already loaded
+                                    if (!subtitleUrl && title) {
+                                        setSubtitleLoading(true);
+                                        try {
+                                            const result = await autoFetchSubtitle({
+                                                title,
+                                                tmdbId,
+                                                imdbId,
+                                                season: seasonNumber,
+                                                episode: episodeNumber
+                                            });
+                                            if (result) {
+                                                setSubtitleUrl(result.url);
+                                                setSubtitleLanguage(result.language);
+                                                setSubtitlesEnabled(true);
+                                            } else {
+                                                console.log('No subtitles found');
+                                            }
+                                        } catch (error) {
+                                            console.error('Error fetching subtitles:', error);
+                                        } finally {
+                                            setSubtitleLoading(false);
+                                        }
+                                    } else {
+                                        setSubtitlesEnabled(true);
+                                        const video = videoRef.current;
+                                        if (video && video.textTracks.length > 0) {
+                                            for (let i = 0; i < video.textTracks.length; i++) {
+                                                video.textTracks[i].mode = 'showing';
+                                            }
+                                        }
                                     }
                                 }
                             }}
-                            title={subtitlesEnabled ? "Desativar Legendas" : "Ativar Legendas"}
+                            title={subtitleLoading ? 'Buscando legendas...' : (subtitlesEnabled ? `Desativar Legendas (${subtitleLanguage || 'PT'})` : 'Ativar Legendas')}
                             style={{
-                                color: subtitlesEnabled ? '#10b981' : 'white'
+                                color: subtitlesEnabled ? '#10b981' : (subtitleLoading ? '#f59e0b' : 'white'),
+                                opacity: subtitleLoading ? 0.7 : 1
                             }}
+                            disabled={subtitleLoading}
                         >
-                            <FaClosedCaptioning />
+                            {subtitleLoading ? (
+                                <span style={{ fontSize: '10px', fontWeight: 600 }}>...</span>
+                            ) : (
+                                <FaClosedCaptioning />
+                            )}
                         </button>
 
                         {/* Picture-in-Picture */}
