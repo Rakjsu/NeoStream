@@ -438,7 +438,6 @@ export function Settings() {
                                             <option value="pt">🇵🇹 Português</option>
                                             <option value="en">🇺🇸 English</option>
                                             <option value="es">🇪🇸 Español</option>
-                                            <option value="off">❌ {t('playback', 'subtitleOff') || 'Desativado'}</option>
                                         </select>
                                         {saveAnimation === 'subtitleLanguage' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                                     </div>

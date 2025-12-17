@@ -261,7 +261,9 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             autoPlayNext: 'Auto-play próximo episódio',
             autoPlayNextDesc: 'Reproduzir automaticamente o próximo episódio',
             skipIntro: 'Pular intro automaticamente',
-            skipIntroDesc: 'Pular abertura de séries quando disponível'
+            skipIntroDesc: 'Pular abertura de séries quando disponível',
+            subtitleLanguage: 'Idioma das Legendas',
+            subtitleLanguageDesc: 'Idioma preferido para download automático de legendas'
         },
         // Stats section
         stats: {
@@ -794,7 +796,9 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             autoPlayNext: 'Auto-play next episode',
             autoPlayNextDesc: 'Automatically play the next episode',
             skipIntro: 'Skip intro automatically',
-            skipIntroDesc: 'Skip series opening when available'
+            skipIntroDesc: 'Skip series opening when available',
+            subtitleLanguage: 'Subtitle Language',
+            subtitleLanguageDesc: 'Preferred language for automatic subtitle download'
         },
         stats: {
             title: 'Your Statistics',
@@ -1274,7 +1278,9 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             autoPlayNext: 'Reproducir siguiente episodio',
             autoPlayNextDesc: 'Reproducir automáticamente el siguiente episodio',
             skipIntro: 'Saltar intro automáticamente',
-            skipIntroDesc: 'Saltar apertura de series cuando esté disponible'
+            skipIntroDesc: 'Saltar apertura de series cuando esté disponible',
+            subtitleLanguage: 'Idioma de Subtítulos',
+            subtitleLanguageDesc: 'Idioma preferido para descarga automática de subtítulos'
         },
         stats: {
             title: 'Tus Estadísticas',

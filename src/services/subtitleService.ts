@@ -227,12 +227,6 @@ export async function autoFetchSubtitle(params: {
         const { playbackService } = await import('./playbackService');
         const config = playbackService.getConfig();
 
-        // If subtitles are disabled, return null
-        if (config.subtitleLanguage === 'off') {
-            console.log('⏸️ Subtitles disabled in settings');
-            return null;
-        }
-
         // Build language priority based on user preference
         const preferredLang = config.subtitleLanguage;
         let preferredLanguages: string[];

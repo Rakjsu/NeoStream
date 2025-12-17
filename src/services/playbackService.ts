@@ -9,7 +9,7 @@ export interface PlaybackConfig {
     videoCodec: 'auto' | 'h264' | 'h265' | 'vp9';
     quality: 'auto' | '1080p' | '720p' | '480p';
     autoPlayNextEpisode: boolean;
-    subtitleLanguage: 'pt-br' | 'pt' | 'en' | 'es' | 'off';
+    subtitleLanguage: 'pt-br' | 'pt' | 'en' | 'es';
 }
 
 const DEFAULT_CONFIG: PlaybackConfig = {
