@@ -262,6 +262,35 @@ export async function autoFetchSubtitle(params: {
 
         console.log(`🔍 Searching subtitles for: ${cleanTitle}`);
 
+        // Extract sequel number from title (e.g., "9" from "Velozes & Furiosos 9")
+        const extractSequelNumber = (title: string): string | null => {
+            // Match number at end of title or after common patterns
+            const patterns = [
+                /\s+(\d+)\s*$/,                    // "Movie 9" or "Movie 9"
+                /\s+(\d+)\s*[-:]/,                  // "Movie 9 - Subtitle"
+                /\s+(\d+)(?:\s|$)/,                 // "Movie 9 something"
+                /[:\-]\s*(\d+)\s*$/,               // "Movie: 9" or "Movie - 9"
+                /\b(IX|VIII|VII|VI|V|IV|III|II|I)\b/i, // Roman numerals
+            ];
+
+            for (const pattern of patterns) {
+                const match = title.match(pattern);
+                if (match) {
+                    // Convert Roman numerals
+                    const value = match[1].toUpperCase();
+                    const romanMap: Record<string, string> = {
+                        'I': '1', 'II': '2', 'III': '3', 'IV': '4', 'V': '5',
+                        'VI': '6', 'VII': '7', 'VIII': '8', 'IX': '9', 'X': '10'
+                    };
+                    return romanMap[value] || match[1];
+                }
+            }
+            return null;
+        };
+
+        const movieNumber = extractSequelNumber(cleanTitle);
+        console.log(`📌 Detected sequel number: ${movieNumber || 'none'}`);
+
         // Search for subtitles
         const results = await searchSubtitles({
             query: cleanTitle,
@@ -287,14 +316,29 @@ export async function autoFetchSubtitle(params: {
         const normalizedPreferredLanguages = preferredLanguages.map(l => l.toLowerCase());
 
         // Filter to get only subtitles in the preferred language (first choice) - case insensitive
-        const primaryLangResults = results.filter(r =>
+        let filteredResults = results.filter(r =>
             r.language.toLowerCase() === normalizedPreferredLang
         );
 
-        // If we have results in the primary language, use those
-        let candidateResults = primaryLangResults.length > 0 ? primaryLangResults : results;
+        // If movie has a sequel number, filter to match the correct sequel
+        if (movieNumber && filteredResults.length > 0) {
+            const sequelFiltered = filteredResults.filter(r => {
+                const releaseNumber = extractSequelNumber(r.release);
+                // Accept if: exact match, or no number in release (might be correct)
+                return releaseNumber === movieNumber || releaseNumber === null;
+            });
 
-        console.log(`📌 Primary language (${preferredLang}) count: ${primaryLangResults.length}`);
+            // Only use filtered if we still have results
+            if (sequelFiltered.length > 0) {
+                console.log(`🎬 Filtered by sequel number ${movieNumber}: ${sequelFiltered.length} results`);
+                filteredResults = sequelFiltered;
+            }
+        }
+
+        // If we have results in the primary language, use those
+        let candidateResults = filteredResults.length > 0 ? filteredResults : results;
+
+        console.log(`📌 Filtered results count: ${filteredResults.length}`);
 
         // Sort by preferred language and download count - case insensitive
         const sorted = candidateResults.sort((a, b) => {
