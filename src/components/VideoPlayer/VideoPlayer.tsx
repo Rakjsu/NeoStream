@@ -91,19 +91,23 @@ export function VideoPlayer({
     const [showSettingsMenu, setShowSettingsMenu] = useState(false); // Gear menu visibility
     // Initialize session toggle from global config (enabled = setting is ON)
     const [forcedEnabledForSession, setForcedEnabledForSession] = useState(() => {
-        // Import and use playbackService synchronously for initial state
         try {
-            // Dynamic import workaround - read from correct localStorage key with profile
-            const profileData = localStorage.getItem('neostream_active_profile');
-            const profileId = profileData ? JSON.parse(profileData).id : null;
+            // Read active profile ID from neostream_profiles (correct key)
+            const profilesData = localStorage.getItem('neostream_profiles');
+            let profileId: string | null = null;
+            if (profilesData) {
+                const parsed = JSON.parse(profilesData);
+                profileId = parsed.activeProfileId || null;
+            }
             const configKey = profileId ? `playbackConfig_${profileId}` : 'playbackConfig';
             const saved = localStorage.getItem(configKey);
             if (saved) {
                 const config = JSON.parse(saved);
                 const result = config.forcedSubtitlesEnabled !== false;
-                console.log(`🔧 Forced subtitles init: ${result} (from ${configKey})`, config.forcedSubtitlesEnabled);
+                console.log(`🔧 Forced init: ${result} (key: ${configKey}, value: ${config.forcedSubtitlesEnabled})`);
                 return result;
             }
+            console.log(`🔧 Forced init: true (no config found at ${configKey})`);
         } catch (e) { console.error('Error reading forced config:', e); }
         return true; // default enabled
     });
