@@ -549,6 +549,8 @@ export async function autoFetchForcedSubtitle(params: {
     title: string;
     tmdbId?: string | number;
     imdbId?: string;
+    season?: number;
+    episode?: number;
 }): Promise<{ url: string; language: string; vttContent: string } | null> {
     try {
         console.log(`🎯 Searching FORCED subtitles for: ${params.title}`);
@@ -571,13 +573,23 @@ export async function autoFetchForcedSubtitle(params: {
 
         if (!tmdbId && !imdbId) {
             try {
-                const { searchMovieByName } = await import('./tmdb');
+                const { searchMovieByName, searchSeriesByName } = await import('./tmdb');
                 const yearMatch = params.title.match(/\((\d{4})\)/);
                 const year = yearMatch ? yearMatch[1] : undefined;
-                const movie = await searchMovieByName(cleanTitle, year);
-                if (movie?.id) {
-                    tmdbId = movie.id;
-                    imdbId = movie.imdb_id;
+
+                // Search as series if season/episode provided
+                if (params.season !== undefined && params.episode !== undefined) {
+                    const series = await searchSeriesByName(cleanTitle, year);
+                    if (series?.id) {
+                        tmdbId = series.id;
+                        imdbId = series.imdb_id;
+                    }
+                } else {
+                    const movie = await searchMovieByName(cleanTitle, year);
+                    if (movie?.id) {
+                        tmdbId = movie.id;
+                        imdbId = movie.imdb_id;
+                    }
                 }
             } catch { }
         }
@@ -589,6 +601,8 @@ export async function autoFetchForcedSubtitle(params: {
             results = await searchSubtitles({
                 tmdbId,
                 languages: preferredLang,
+                season: params.season,
+                episode: params.episode,
                 forcedOnly: true
             });
         }
@@ -597,6 +611,8 @@ export async function autoFetchForcedSubtitle(params: {
             results = await searchSubtitles({
                 imdbId,
                 languages: preferredLang,
+                season: params.season,
+                episode: params.episode,
                 forcedOnly: true
             });
         }

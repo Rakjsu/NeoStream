@@ -115,18 +115,20 @@ export function VideoPlayer({
         };
     }, [state.playing, seeking, state.fullscreen]); // Added fullscreen to dependencies
 
-    // Auto-load Forced subtitles when movie starts (only for movies, not series)
+    // Auto-load Forced subtitles when content starts (movies and series)
     useEffect(() => {
-        // Only for movies (no seasonNumber/episodeNumber)
-        if (!title || seasonNumber || episodeNumber) return;
+        // Skip if no title
+        if (!title) return;
 
         const loadForcedSubtitles = async () => {
             try {
-                console.log('🎬 Auto-loading forced subtitles for movie...');
+                console.log('🎬 Auto-loading forced subtitles...');
                 const result = await autoFetchForcedSubtitle({
                     title,
                     tmdbId,
-                    imdbId
+                    imdbId,
+                    season: seasonNumber,
+                    episode: episodeNumber
                 });
 
                 if (result) {
@@ -790,7 +792,7 @@ export function VideoPlayer({
                                 }}
                                 title={subtitleLoading ? 'Buscando legendas...' : (subtitlesEnabled ? `Desativar Legendas (${subtitleLanguage || 'PT'})` : 'Ativar Legendas')}
                                 style={{
-                                    color: subtitlesEnabled ? '#10b981' : (subtitleLoading ? '#f59e0b' : 'white'),
+                                    color: subtitlesEnabled && !isForcedSubtitle ? '#10b981' : (subtitleLoading ? '#f59e0b' : 'white'),
                                     opacity: subtitleLoading ? 0.7 : 1
                                 }}
                                 disabled={subtitleLoading}
