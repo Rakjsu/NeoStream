@@ -921,7 +921,11 @@ export function VideoPlayer({
                                                             season: seasonNumber,
                                                             episode: episodeNumber
                                                         });
-                                                        if (result && result.vttContent) {
+                                                        if (result && result.warning) {
+                                                            // Show warning toast for rejected special editions
+                                                            setSubtitleWarning(result.warning);
+                                                            setTimeout(() => setSubtitleWarning(null), 4000);
+                                                        } else if (result && result.vttContent) {
                                                             const blob = new Blob([result.vttContent], { type: 'text/vtt' });
                                                             const blobUrl = URL.createObjectURL(blob);
                                                             setSubtitleUrl(blobUrl);
@@ -929,9 +933,14 @@ export function VideoPlayer({
                                                             setSubtitlesEnabled(true);
                                                             setIsForcedSubtitle(true);
                                                             console.log('✅ Forced subtitles loaded after toggle enable');
+                                                        } else {
+                                                            setSubtitleWarning('Nenhuma legenda forçada encontrada');
+                                                            setTimeout(() => setSubtitleWarning(null), 4000);
                                                         }
                                                     } catch (e) {
                                                         console.error('Failed to load forced subtitles:', e);
+                                                        setSubtitleWarning('Erro ao carregar legendas forçadas');
+                                                        setTimeout(() => setSubtitleWarning(null), 4000);
                                                     }
                                                 }
                                                 console.log(`🎯 Forced subtitles ${newValue ? 'enabled' : 'disabled'} for session`);

@@ -551,7 +551,7 @@ export async function autoFetchForcedSubtitle(params: {
     imdbId?: string;
     season?: number;
     episode?: number;
-}): Promise<{ url: string; language: string; vttContent: string } | null> {
+}): Promise<{ url: string; language: string; vttContent: string; warning?: string } | null> {
     try {
         console.log(`🎯 Searching FORCED subtitles for: ${params.title}`);
 
@@ -623,20 +623,23 @@ export async function autoFetchForcedSubtitle(params: {
         }
 
         // Sort by download count and get best
-        // First, filter out Extended/Director's Cut/Unrated if we have normal versions
+        // NEVER use Extended/Director's Cut/Unrated for forced subtitles
         const specialEditionPatterns = /director'?s?\s*cut|extended|unrated|ultimate|theatrical\s*cut|special\s*edition/i;
         const normalResults = results.filter(r => !specialEditionPatterns.test(r.release));
         const specialResults = results.filter(r => specialEditionPatterns.test(r.release));
 
-        // Prefer normal versions, fall back to special editions if no normal available
-        let sorted: SubtitleResult[];
-        if (normalResults.length > 0) {
-            sorted = normalResults.sort((a, b) => b.downloadCount - a.downloadCount);
-            console.log(`🎯 Using normal version (${normalResults.length} found, ${specialResults.length} special filtered out)`);
-        } else {
-            sorted = specialResults.sort((a, b) => b.downloadCount - a.downloadCount);
-            console.log(`🎯 Only special editions found (${specialResults.length}), using them`);
+        // Only use normal versions - reject special editions completely
+        if (normalResults.length === 0) {
+            if (specialResults.length > 0) {
+                console.log(`🎯 Only special editions found (${specialResults.length}), rejecting them for forced subtitles`);
+                return { url: '', language: '', vttContent: '', warning: 'Apenas edições especiais (Extended/Director\'s Cut) encontradas - ignorando' };
+            }
+            console.log('🎯 No forced subtitles found');
+            return null;
         }
+
+        const sorted = normalResults.sort((a, b) => b.downloadCount - a.downloadCount);
+        console.log(`🎯 Using normal version (${normalResults.length} found, ${specialResults.length} special rejected)`);
 
         const best = sorted[0];
         console.log(`🎯 Selected forced subtitle: [${best.language}] ${best.release}`);
