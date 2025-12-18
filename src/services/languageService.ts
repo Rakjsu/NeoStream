@@ -318,6 +318,11 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             support: 'Suporte',
             version: 'Versão'
         },
+        // Playback section
+        playback: {
+            forcedSubtitles: 'Legendas Forçadas',
+            forcedSubtitlesDesc: 'Carregar automaticamente legendas de placas e diálogos estrangeiros (não funciona em conteúdo [L] já legendado)'
+        },
         // Dashboard / Main navigation
         dashboard: {
             live: 'TV Ao Vivo',
@@ -798,7 +803,9 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             skipIntro: 'Skip intro automatically',
             skipIntroDesc: 'Skip series opening when available',
             subtitleLanguage: 'Subtitle Language',
-            subtitleLanguageDesc: 'Preferred language for automatic subtitle download'
+            subtitleLanguageDesc: 'Preferred language for automatic subtitle download',
+            forcedSubtitles: 'Forced Subtitles',
+            forcedSubtitlesDesc: 'Automatically load sign and foreign dialogue subtitles (does not work on [L] content already subtitled)'
         },
         stats: {
             title: 'Your Statistics',
@@ -1280,7 +1287,9 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             skipIntro: 'Saltar intro automáticamente',
             skipIntroDesc: 'Saltar apertura de series cuando esté disponible',
             subtitleLanguage: 'Idioma de Subtítulos',
-            subtitleLanguageDesc: 'Idioma preferido para descarga automática de subtítulos'
+            subtitleLanguageDesc: 'Idioma preferido para descarga automática de subtítulos',
+            forcedSubtitles: 'Subtítulos Forzados',
+            forcedSubtitlesDesc: 'Cargar automáticamente subtítulos de carteles y diálogos extranjeros (no funciona en contenido [L] ya subtitulado)'
         },
         stats: {
             title: 'Tus Estadísticas',
