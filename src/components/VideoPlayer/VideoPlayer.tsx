@@ -89,7 +89,17 @@ export function VideoPlayer({
     const [subtitleWarning, setSubtitleWarning] = useState<string | null>(null);
     const [isForcedSubtitle, setIsForcedSubtitle] = useState(false); // Track if current subtitle is Forced type
     const [showSettingsMenu, setShowSettingsMenu] = useState(false); // Gear menu visibility
-    const [forcedDisabledForSession, setForcedDisabledForSession] = useState(false); // Session-only Forced disable
+    // Initialize session toggle from global config (disabled = setting is OFF)
+    const [forcedDisabledForSession, setForcedDisabledForSession] = useState(() => {
+        const saved = localStorage.getItem('playback_config');
+        if (saved) {
+            try {
+                const config = JSON.parse(saved);
+                return config.forcedSubtitlesEnabled === false;
+            } catch { return false; }
+        }
+        return false;
+    });
     const containerRef = useRef<HTMLDivElement>(null);
     const progressRef = useRef<HTMLDivElement>(null);
 
