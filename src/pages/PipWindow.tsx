@@ -65,20 +65,28 @@ export function PipWindow() {
         const video = videoRef.current;
         if (!video) return;
 
+        // Check if video is already playing
+        if (video.readyState >= 3 && !video.paused) {
+            setIsLoading(false);
+        }
+
         const handleCanPlay = () => setIsLoading(false);
         const handlePlaying = () => setIsLoading(false);
         const handleWaiting = () => setIsLoading(true);
+        const handleLoadedData = () => setIsLoading(false);
 
         video.addEventListener('canplay', handleCanPlay);
         video.addEventListener('playing', handlePlaying);
         video.addEventListener('waiting', handleWaiting);
+        video.addEventListener('loadeddata', handleLoadedData);
 
         return () => {
             video.removeEventListener('canplay', handleCanPlay);
             video.removeEventListener('playing', handlePlaying);
             video.removeEventListener('waiting', handleWaiting);
+            video.removeEventListener('loadeddata', handleLoadedData);
         };
-    }, []);
+    }, [content]);
 
     // Send state updates to main window
     useEffect(() => {
