@@ -12,6 +12,35 @@ interface VersionChangelog {
 }
 
 const changelogs: VersionChangelog = {
+    '3.0.0': [
+        {
+            icon: '🎬',
+            title: 'Sistema de Legendas Forçadas',
+            items: [
+                'Toggle nas Configurações para ativar/desativar',
+                'Botão F no player para controle por sessão',
+                'Carregamento automático ao ativar no player',
+            ]
+        },
+        {
+            icon: '🎭',
+            title: 'Filtros de Edições Especiais',
+            items: [
+                'Rejeita Extended e Directors Cut para forçadas',
+                'Suporte a padrões PT (Versão Estendida)',
+                'Aviso na tela quando só edições especiais',
+            ]
+        },
+        {
+            icon: '🔧',
+            title: 'Correções',
+            items: [
+                'Toggle sincroniza com localStorage correto',
+                'Leitura correta do perfil ativo',
+                'Filtros aplicados a séries também',
+            ]
+        },
+    ],
     '2.8.0': [], // Dynamic from translations
     '2.7.0': [
         {
@@ -197,30 +226,30 @@ const changelogs: VersionChangelog = {
     ],
     'default': [
         {
-            icon: '🔄',
-            title: 'Sistema de Atualização',
+            icon: '🎬',
+            title: 'Sistema de Legendas Forçadas',
             items: [
-                'Notificação visual quando há atualizações',
-                'Modal mostrando versão atual vs nova',
-                'Barra de progresso durante download',
-                'Instalação automática opcional',
+                'Toggle nas Configurações para ativar/desativar',
+                'Botão F no player para controle por sessão',
+                'Carregamento automático ao ativar no player',
             ]
         },
         {
-            icon: '📥',
-            title: 'Downloads & Offline',
+            icon: '🎭',
+            title: 'Filtros de Edições Especiais',
             items: [
-                'Baixe filmes e séries para assistir offline',
-                'Nova página de gerenciamento de downloads',
-                'Indicador de espaço utilizado',
+                'Rejeita Extended e Directors Cut para forçadas',
+                'Suporte a padrões PT (Versão Estendida)',
+                'Aviso na tela quando só edições especiais',
             ]
         },
         {
-            icon: '🐛',
+            icon: '�',
             title: 'Correções',
             items: [
-                'Corrigido erro 404 durante downloads',
-                'Melhorada compatibilidade com servidores',
+                'Toggle sincroniza com localStorage correto',
+                'Leitura correta do perfil ativo',
+                'Filtros aplicados a séries também',
             ]
         },
     ],
