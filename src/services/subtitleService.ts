@@ -623,7 +623,21 @@ export async function autoFetchForcedSubtitle(params: {
         }
 
         // Sort by download count and get best
-        const sorted = results.sort((a, b) => b.downloadCount - a.downloadCount);
+        // First, filter out Extended/Director's Cut/Unrated if we have normal versions
+        const specialEditionPatterns = /director'?s?\s*cut|extended|unrated|ultimate|theatrical\s*cut|special\s*edition/i;
+        const normalResults = results.filter(r => !specialEditionPatterns.test(r.release));
+        const specialResults = results.filter(r => specialEditionPatterns.test(r.release));
+
+        // Prefer normal versions, fall back to special editions if no normal available
+        let sorted: SubtitleResult[];
+        if (normalResults.length > 0) {
+            sorted = normalResults.sort((a, b) => b.downloadCount - a.downloadCount);
+            console.log(`🎯 Using normal version (${normalResults.length} found, ${specialResults.length} special filtered out)`);
+        } else {
+            sorted = specialResults.sort((a, b) => b.downloadCount - a.downloadCount);
+            console.log(`🎯 Only special editions found (${specialResults.length}), using them`);
+        }
+
         const best = sorted[0];
         console.log(`🎯 Selected forced subtitle: [${best.language}] ${best.release}`);
 
