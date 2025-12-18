@@ -623,8 +623,8 @@ export async function autoFetchForcedSubtitle(params: {
         }
 
         // Sort by download count and get best
-        // NEVER use Extended/Director's Cut/Unrated for forced subtitles
-        const specialEditionPatterns = /director'?s?\s*cut|extended|unrated|ultimate|theatrical\s*cut|special\s*edition/i;
+        // NEVER use Extended/Director's Cut/Unrated for forced subtitles (English + Portuguese patterns)
+        const specialEditionPatterns = /director'?s?\s*cut|extended|unrated|ultimate|theatrical\s*cut|special\s*edition|vers[aã]o\s*estendida|corte\s*do\s*diretor|edi[cç][aã]o\s*especial/i;
         const normalResults = results.filter(r => !specialEditionPatterns.test(r.release));
         const specialResults = results.filter(r => specialEditionPatterns.test(r.release));
 
