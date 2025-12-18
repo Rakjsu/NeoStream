@@ -24,6 +24,7 @@ export function PipWindow() {
     const [searchParams] = useSearchParams();
     const [content, setContent] = useState<PipContent | null>(null);
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const { videoRef, state, controls } = useVideoPlayer();
 
     // Parse content from URL
@@ -58,6 +59,26 @@ export function PipWindow() {
             }
         }
     }, [content?.currentTime]);
+
+    // Local loading state management
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        const handleCanPlay = () => setIsLoading(false);
+        const handlePlaying = () => setIsLoading(false);
+        const handleWaiting = () => setIsLoading(true);
+
+        video.addEventListener('canplay', handleCanPlay);
+        video.addEventListener('playing', handlePlaying);
+        video.addEventListener('waiting', handleWaiting);
+
+        return () => {
+            video.removeEventListener('canplay', handleCanPlay);
+            video.removeEventListener('playing', handlePlaying);
+            video.removeEventListener('waiting', handleWaiting);
+        };
+    }, []);
 
     // Send state updates to main window
     useEffect(() => {
@@ -330,7 +351,7 @@ export function PipWindow() {
             </div>
 
             {/* Loading indicator */}
-            {state.loading && (
+            {isLoading && (
                 <div style={{
                     position: 'absolute',
                     inset: 0,
