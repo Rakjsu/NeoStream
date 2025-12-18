@@ -12,5 +12,9 @@
         "vod": "Filmes",
         "series": "Séries",
         "settings": "Configurações"
+    },
+    "playback": {
+        "forcedSubtitles": "Legendas Forçadas",
+        "forcedSubtitlesDesc": "Carregar automaticamente legendas de placas e diálogos estrangeiros (não funciona em conteúdo [L] já legendado)"
     }
 }

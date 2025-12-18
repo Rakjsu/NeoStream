@@ -12,5 +12,9 @@
         "vod": "Películas",
         "series": "Series",
         "settings": "Configuración"
+    },
+    "playback": {
+        "forcedSubtitles": "Subtítulos Forzados",
+        "forcedSubtitlesDesc": "Cargar automáticamente subtítulos de carteles y diálogos extranjeros (no funciona en contenido [L] ya subtitulado)"
     }
 }

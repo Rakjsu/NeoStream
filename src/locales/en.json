@@ -12,5 +12,9 @@
         "vod": "Movies",
         "series": "Series",
         "settings": "Settings"
+    },
+    "playback": {
+        "forcedSubtitles": "Forced Subtitles",
+        "forcedSubtitlesDesc": "Automatically load sign and foreign dialogue subtitles (does not work on [L] content already subtitled)"
     }
 }
