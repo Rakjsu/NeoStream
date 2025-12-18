@@ -421,8 +421,8 @@ export async function autoFetchSubtitle(params: {
                 return releaseNumber === movieNumber;
             });
 
-            // Check if all exact matches are Director's Cut/Special editions
-            const specialEditionPatterns = /director.?s?.?cut|extended|unrated|uncut/i;
+            // Check if all exact matches are Director's Cut/Special editions (English + Portuguese)
+            const specialEditionPatterns = /director.?s?.?cut|extended|unrated|uncut|vers[aã]o\s*estendida|corte\s*do\s*diretor|edi[cç][aã]o\s*especial/i;
             const nonSpecialExactMatches = exactMatches.filter(r => !specialEditionPatterns.test(r.release));
 
             // If we have non-special exact matches, use those
@@ -474,8 +474,8 @@ export async function autoFetchSubtitle(params: {
             const aLangScore = aIndex === -1 ? 999 : aIndex;
             const bLangScore = bIndex === -1 ? 999 : bIndex;
 
-            // Deprioritize special editions (Director's Cut, Extended, Unrated, etc.)
-            const specialEditionPatterns = /director.?s?.?cut|extended|unrated|uncut|theatrical/i;
+            // Deprioritize special editions (Director's Cut, Extended, Unrated, etc. - English + Portuguese)
+            const specialEditionPatterns = /director.?s?.?cut|extended|unrated|uncut|theatrical|vers[aã]o\s*estendida|corte\s*do\s*diretor|edi[cç][aã]o\s*especial/i;
             const aIsSpecial = specialEditionPatterns.test(a.release) ? 1 : 0;
             const bIsSpecial = specialEditionPatterns.test(b.release) ? 1 : 0;
 
