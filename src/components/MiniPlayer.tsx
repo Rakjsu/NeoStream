@@ -60,8 +60,19 @@ export function MiniPlayerProvider({ children }: { children: React.ReactNode }) 
         }
 
         // Open external PiP window via IPC
+        // Remove non-serializable properties (functions) before sending
         if (window.ipcRenderer) {
-            window.ipcRenderer.invoke('pip:open', newContent).catch(console.error);
+            const serializableContent = {
+                src: newContent.src,
+                title: newContent.title,
+                poster: newContent.poster,
+                contentId: newContent.contentId,
+                contentType: newContent.contentType,
+                currentTime: newContent.currentTime,
+                seasonNumber: newContent.seasonNumber,
+                episodeNumber: newContent.episodeNumber
+            };
+            window.ipcRenderer.invoke('pip:open', serializableContent).catch(console.error);
         }
     }, []);
 
