@@ -6,6 +6,7 @@ import { setupDLNAHandlers } from './dlnaHandlers'
 import { setupAirPlayHandlers } from './airplayHandlers'
 import { setupDownloadHandlers } from './downloadHandlers'
 import { initializeAutoUpdater } from './autoUpdater'
+import { setupPipHandlers } from './pipHandlers'
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url)
@@ -78,5 +79,6 @@ app.whenReady().then(() => {
     // Initialize auto-updater after window is created
     if (win) {
         initializeAutoUpdater(win)
+        setupPipHandlers(win)
     }
 })

@@ -10,6 +10,7 @@ import { Settings } from './pages/Settings';
 import { WatchLater } from './pages/WatchLater';
 import { Favorites } from './pages/Favorites';
 import { Downloads } from './pages/Downloads';
+import { PipWindow } from './pages/PipWindow';
 import { ProfileSelector } from './pages/ProfileSelector';
 import { UpdateNotification } from './components/UpdateNotification';
 import { PostUpdateChangelog } from './components/PostUpdateChangelog';
@@ -83,6 +84,7 @@ function App() {
         <EpisodeToastWithNavigation />
         <Routes>
           <Route path="/welcome" element={<Welcome />} />
+          <Route path="/pip" element={<PipWindow />} />
           <Route path="/login" element={<Login />} />
           <Route
             path="/dashboard"

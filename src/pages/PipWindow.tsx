@@ -1,0 +1,362 @@
+/**
+ * PiP Window Page
+ * Rendered in the independent PiP BrowserWindow
+ */
+
+import { useState, useEffect, useRef } from 'react';
+import { FaPlay, FaPause, FaTimes, FaExpand, FaVolumeUp, FaVolumeMute } from 'react-icons/fa';
+import { useHls } from '../hooks/useHls';
+import { useVideoPlayer } from '../hooks/useVideoPlayer';
+import { useSearchParams } from 'react-router-dom';
+
+interface PipContent {
+    src: string;
+    title: string;
+    poster?: string;
+    contentId?: string;
+    contentType?: 'movie' | 'series' | 'live';
+    currentTime?: number;
+    seasonNumber?: number;
+    episodeNumber?: number;
+}
+
+export function PipWindow() {
+    const [searchParams] = useSearchParams();
+    const [content, setContent] = useState<PipContent | null>(null);
+    const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+    const { videoRef, state, controls } = useVideoPlayer();
+
+    // Parse content from URL
+    useEffect(() => {
+        const dataParam = searchParams.get('data');
+        if (dataParam) {
+            try {
+                const parsed = JSON.parse(decodeURIComponent(dataParam));
+                setContent(parsed);
+            } catch (error) {
+                console.error('Failed to parse PiP content:', error);
+            }
+        }
+    }, [searchParams]);
+
+    // Initialize HLS only when we have content
+    useHls({ src: content?.src || '', videoRef });
+
+    // Set initial time and auto-play
+    useEffect(() => {
+        if (content?.currentTime && videoRef.current) {
+            const setTime = () => {
+                if (videoRef.current && content.currentTime) {
+                    videoRef.current.currentTime = content.currentTime;
+                    videoRef.current.play().catch(console.error);
+                }
+            };
+            if (videoRef.current.readyState >= 2) {
+                setTime();
+            } else {
+                videoRef.current.addEventListener('canplay', setTime, { once: true });
+            }
+        }
+    }, [content?.currentTime]);
+
+    // Send state updates to main window
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        const sendState = () => {
+            if (window.ipcRenderer) {
+                window.ipcRenderer.send('pip:state', {
+                    playing: !video.paused,
+                    currentTime: video.currentTime,
+                    duration: video.duration || 0
+                });
+            }
+        };
+
+        video.addEventListener('timeupdate', sendState);
+        video.addEventListener('play', sendState);
+        video.addEventListener('pause', sendState);
+
+        return () => {
+            video.removeEventListener('timeupdate', sendState);
+            video.removeEventListener('play', sendState);
+            video.removeEventListener('pause', sendState);
+        };
+    }, []);
+
+    // Listen for control commands from main window
+    useEffect(() => {
+        if (!window.ipcRenderer) return;
+
+        const handleControl = (_event: unknown, action: string, value?: number) => {
+            switch (action) {
+                case 'play':
+                    videoRef.current?.play();
+                    break;
+                case 'pause':
+                    videoRef.current?.pause();
+                    break;
+                case 'togglePlay':
+                    controls.togglePlay();
+                    break;
+                case 'mute':
+                    controls.toggleMute();
+                    break;
+                case 'seek':
+                    if (typeof value === 'number') controls.seek(value);
+                    break;
+                case 'volume':
+                    if (typeof value === 'number') controls.setVolume(value);
+                    break;
+            }
+        };
+
+        window.ipcRenderer.on('pip:control', handleControl);
+        return () => {
+            window.ipcRenderer?.off('pip:control', handleControl);
+        };
+    }, [controls]);
+
+    const handleClose = () => {
+        if (window.ipcRenderer) {
+            window.ipcRenderer.invoke('pip:close', {});
+        }
+    };
+
+    const handleExpand = () => {
+        if (window.ipcRenderer && content) {
+            window.ipcRenderer.invoke('pip:expand', {
+                ...content,
+                currentTime: videoRef.current?.currentTime || 0
+            });
+        }
+    };
+
+    if (!content) {
+        return (
+            <div style={{
+                width: '100vw',
+                height: '100vh',
+                background: '#000',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white'
+            }}>
+                Carregando...
+            </div>
+        );
+    }
+
+    return (
+        <div style={{
+            width: '100vw',
+            height: '100vh',
+            background: '#000',
+            borderRadius: 12,
+            overflow: 'hidden',
+            position: 'relative',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.6)',
+            border: '1px solid rgba(139, 92, 246, 0.4)',
+        }}>
+            {/* Video */}
+            <video
+                ref={videoRef}
+                style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover'
+                }}
+                poster={content.poster}
+            />
+
+            {/* Title Bar - Draggable zone */}
+            <div
+                style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    padding: '8px 12px',
+                    background: 'linear-gradient(180deg, rgba(0,0,0,0.8) 0%, transparent 100%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    WebkitAppRegion: 'drag' as any, // Make title bar draggable
+                    cursor: 'grab'
+                }}
+            >
+                <span style={{
+                    color: 'white',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    maxWidth: 200,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap'
+                }}>
+                    {content.title}
+                </span>
+                <div style={{ display: 'flex', gap: 4, WebkitAppRegion: 'no-drag' as any }}>
+                    <button
+                        onClick={handleExpand}
+                        style={{
+                            background: 'rgba(255,255,255,0.2)',
+                            border: 'none',
+                            borderRadius: 4,
+                            padding: 6,
+                            cursor: 'pointer',
+                            display: 'flex'
+                        }}
+                        title="Expandir"
+                    >
+                        <FaExpand size={12} color="white" />
+                    </button>
+                    <button
+                        onClick={handleClose}
+                        style={{
+                            background: 'rgba(239, 68, 68, 0.6)',
+                            border: 'none',
+                            borderRadius: 4,
+                            padding: 6,
+                            cursor: 'pointer',
+                            display: 'flex'
+                        }}
+                        title="Fechar"
+                    >
+                        <FaTimes size={12} color="white" />
+                    </button>
+                </div>
+            </div>
+
+            {/* Controls Bar */}
+            <div style={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                padding: '8px 12px',
+                background: 'linear-gradient(0deg, rgba(0,0,0,0.8) 0%, transparent 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8
+            }}>
+                <button
+                    onClick={controls.togglePlay}
+                    style={{
+                        background: 'rgba(139, 92, 246, 0.8)',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: 8,
+                        cursor: 'pointer',
+                        display: 'flex'
+                    }}
+                >
+                    {state.playing ? <FaPause size={12} color="white" /> : <FaPlay size={12} color="white" />}
+                </button>
+
+                {/* Progress bar */}
+                <div
+                    style={{
+                        flex: 1,
+                        height: 4,
+                        background: 'rgba(255,255,255,0.3)',
+                        borderRadius: 2,
+                        cursor: 'pointer',
+                        overflow: 'hidden'
+                    }}
+                    onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const pos = (e.clientX - rect.left) / rect.width;
+                        controls.seek(pos * state.duration);
+                    }}
+                >
+                    <div style={{
+                        width: `${(state.currentTime / state.duration) * 100 || 0}%`,
+                        height: '100%',
+                        background: 'linear-gradient(90deg, #8b5cf6, #a855f7)',
+                        borderRadius: 2
+                    }} />
+                </div>
+
+                {/* Volume control */}
+                <div
+                    onMouseEnter={() => setShowVolumeSlider(true)}
+                    onMouseLeave={() => setShowVolumeSlider(false)}
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        position: 'relative'
+                    }}
+                >
+                    <button
+                        onClick={controls.toggleMute}
+                        style={{
+                            background: 'transparent',
+                            border: 'none',
+                            padding: 4,
+                            cursor: 'pointer',
+                            display: 'flex'
+                        }}
+                    >
+                        {state.muted ? <FaVolumeMute size={14} color="white" /> : <FaVolumeUp size={14} color="white" />}
+                    </button>
+
+                    <div style={{
+                        width: showVolumeSlider ? 60 : 0,
+                        overflow: 'hidden',
+                        transition: 'width 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center'
+                    }}>
+                        <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.05"
+                            value={state.muted ? 0 : state.volume}
+                            onChange={(e) => controls.setVolume(parseFloat(e.target.value))}
+                            style={{
+                                width: 55,
+                                height: 4,
+                                cursor: 'pointer',
+                                accentColor: '#8b5cf6'
+                            }}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Loading indicator */}
+            {state.loading && (
+                <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(0,0,0,0.5)'
+                }}>
+                    <div style={{
+                        width: 24,
+                        height: 24,
+                        border: '2px solid rgba(255,255,255,0.3)',
+                        borderTopColor: '#8b5cf6',
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                    }} />
+                </div>
+            )}
+
+            <style>{`
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
+        </div>
+    );
+}
+
+export default PipWindow;

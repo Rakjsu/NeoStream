@@ -58,6 +58,11 @@ export function MiniPlayerProvider({ children }: { children: React.ReactNode }) 
                 newContent.title
             );
         }
+
+        // Open external PiP window via IPC
+        if (window.ipcRenderer) {
+            window.ipcRenderer.invoke('pip:open', newContent).catch(console.error);
+        }
     }, []);
 
     const stopMiniPlayer = useCallback(() => {
@@ -65,12 +70,68 @@ export function MiniPlayerProvider({ children }: { children: React.ReactNode }) 
         setIsActive(false);
         setContent(null);
         videoTimeRef.current = 0;
+
+        // Close external PiP window
+        if (window.ipcRenderer) {
+            window.ipcRenderer.invoke('pip:close', {}).catch(console.error);
+        }
     }, []);
 
     const getCurrentTime = useCallback(() => videoTimeRef.current, []);
 
     const updateTime = useCallback((time: number) => {
         videoTimeRef.current = time;
+    }, []);
+
+    // Listen for PiP closed event from external window
+    React.useEffect(() => {
+        if (!window.ipcRenderer) return;
+
+        const handlePipClosed = () => {
+            usageStatsService.endSession();
+            setIsActive(false);
+            setContent(null);
+            videoTimeRef.current = 0;
+        };
+
+        const handlePipState = (_event: any, state: { currentTime: number }) => {
+            videoTimeRef.current = state.currentTime;
+        };
+
+        const handlePipExpand = (_event: any, expandContent: MiniPlayerContent) => {
+            // Emit event for pages to handle expansion
+            const expandEvent = new CustomEvent('miniPlayerExpand', {
+                detail: {
+                    src: expandContent.src,
+                    title: expandContent.title,
+                    poster: expandContent.poster,
+                    contentId: expandContent.contentId,
+                    contentType: expandContent.contentType,
+                    currentTime: expandContent.currentTime,
+                    seasonNumber: expandContent.seasonNumber,
+                    episodeNumber: expandContent.episodeNumber
+                }
+            });
+            window.dispatchEvent(expandEvent);
+
+            // Also call the callback if provided
+            if (expandContent.onExpand && expandContent.currentTime) {
+                expandContent.onExpand(expandContent.currentTime);
+            }
+
+            setIsActive(false);
+            setContent(null);
+        };
+
+        window.ipcRenderer.on('pip:closed', handlePipClosed);
+        window.ipcRenderer.on('pip:state', handlePipState);
+        window.ipcRenderer.on('pip:expand', handlePipExpand);
+
+        return () => {
+            window.ipcRenderer?.off('pip:closed', handlePipClosed);
+            window.ipcRenderer?.off('pip:state', handlePipState);
+            window.ipcRenderer?.off('pip:expand', handlePipExpand);
+        };
     }, []);
 
     // Expose context globally for VideoPlayer access
@@ -89,13 +150,7 @@ export function MiniPlayerProvider({ children }: { children: React.ReactNode }) 
     return (
         <MiniPlayerContext.Provider value={{ isActive, content, startMiniPlayer, stopMiniPlayer, getCurrentTime }}>
             {children}
-            {isActive && content && (
-                <MiniPlayerUI
-                    content={content}
-                    onClose={stopMiniPlayer}
-                    onTimeUpdate={updateTime}
-                />
-            )}
+            {/* External PiP window is now used instead of internal MiniPlayerUI */}
         </MiniPlayerContext.Provider>
     );
 }
