@@ -25,7 +25,12 @@ export function PipWindow() {
     const [content, setContent] = useState<PipContent | null>(null);
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
-    const { videoRef, state, controls } = useVideoPlayer();
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
+    const [volume, setVolume] = useState(1);
+    const [isMuted, setIsMuted] = useState(false);
+    const { videoRef } = useVideoPlayer();
 
     // Parse content from URL
     useEffect(() => {
@@ -88,6 +93,65 @@ export function PipWindow() {
         };
     }, [content]);
 
+    // Local playback state updates
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        const handlePlay = () => setIsPlaying(true);
+        const handlePause = () => setIsPlaying(false);
+        const handleTimeUpdate = () => setCurrentTime(video.currentTime);
+        const handleDurationChange = () => setDuration(video.duration || 0);
+        const handleVolumeChange = () => {
+            setVolume(video.volume);
+            setIsMuted(video.muted);
+        };
+
+        video.addEventListener('play', handlePlay);
+        video.addEventListener('pause', handlePause);
+        video.addEventListener('timeupdate', handleTimeUpdate);
+        video.addEventListener('durationchange', handleDurationChange);
+        video.addEventListener('volumechange', handleVolumeChange);
+
+        return () => {
+            video.removeEventListener('play', handlePlay);
+            video.removeEventListener('pause', handlePause);
+            video.removeEventListener('timeupdate', handleTimeUpdate);
+            video.removeEventListener('durationchange', handleDurationChange);
+            video.removeEventListener('volumechange', handleVolumeChange);
+        };
+    }, [content]);
+
+    // Local control handlers
+    const handleTogglePlay = () => {
+        if (videoRef.current) {
+            if (isPlaying) {
+                videoRef.current.pause();
+            } else {
+                videoRef.current.play();
+            }
+        }
+    };
+
+    const handleSeek = (time: number) => {
+        if (videoRef.current) {
+            videoRef.current.currentTime = time;
+        }
+    };
+
+    const handleToggleMute = () => {
+        if (videoRef.current) {
+            videoRef.current.muted = !videoRef.current.muted;
+        }
+    };
+
+    const handleSetVolume = (vol: number) => {
+        if (videoRef.current) {
+            videoRef.current.volume = vol;
+            if (vol > 0) videoRef.current.muted = false;
+        }
+    };
+
     // Send state updates to main window
     useEffect(() => {
         const video = videoRef.current;
@@ -127,16 +191,16 @@ export function PipWindow() {
                     videoRef.current?.pause();
                     break;
                 case 'togglePlay':
-                    controls.togglePlay();
+                    handleTogglePlay();
                     break;
                 case 'mute':
-                    controls.toggleMute();
+                    handleToggleMute();
                     break;
                 case 'seek':
-                    if (typeof value === 'number') controls.seek(value);
+                    if (typeof value === 'number') handleSeek(value);
                     break;
                 case 'volume':
-                    if (typeof value === 'number') controls.setVolume(value);
+                    if (typeof value === 'number') handleSetVolume(value);
                     break;
             }
         };
@@ -145,7 +209,7 @@ export function PipWindow() {
         return () => {
             window.ipcRenderer?.off('pip:control', handleControl);
         };
-    }, [controls]);
+    }, [isPlaying]);
 
     const handleClose = () => {
         if (window.ipcRenderer) {
@@ -272,7 +336,7 @@ export function PipWindow() {
                 gap: 8
             }}>
                 <button
-                    onClick={controls.togglePlay}
+                    onClick={handleTogglePlay}
                     style={{
                         background: 'rgba(139, 92, 246, 0.8)',
                         border: 'none',
@@ -282,7 +346,7 @@ export function PipWindow() {
                         display: 'flex'
                     }}
                 >
-                    {state.playing ? <FaPause size={12} color="white" /> : <FaPlay size={12} color="white" />}
+                    {isPlaying ? <FaPause size={12} color="white" /> : <FaPlay size={12} color="white" />}
                 </button>
 
                 {/* Progress bar */}
@@ -298,11 +362,11 @@ export function PipWindow() {
                     onClick={(e) => {
                         const rect = e.currentTarget.getBoundingClientRect();
                         const pos = (e.clientX - rect.left) / rect.width;
-                        controls.seek(pos * state.duration);
+                        handleSeek(pos * duration);
                     }}
                 >
                     <div style={{
-                        width: `${(state.currentTime / state.duration) * 100 || 0}%`,
+                        width: `${(currentTime / duration) * 100 || 0}%`,
                         height: '100%',
                         background: 'linear-gradient(90deg, #8b5cf6, #a855f7)',
                         borderRadius: 2
@@ -321,7 +385,7 @@ export function PipWindow() {
                     }}
                 >
                     <button
-                        onClick={controls.toggleMute}
+                        onClick={handleToggleMute}
                         style={{
                             background: 'transparent',
                             border: 'none',
@@ -330,7 +394,7 @@ export function PipWindow() {
                             display: 'flex'
                         }}
                     >
-                        {state.muted ? <FaVolumeMute size={14} color="white" /> : <FaVolumeUp size={14} color="white" />}
+                        {isMuted ? <FaVolumeMute size={14} color="white" /> : <FaVolumeUp size={14} color="white" />}
                     </button>
 
                     <div style={{
@@ -345,8 +409,8 @@ export function PipWindow() {
                             min="0"
                             max="1"
                             step="0.05"
-                            value={state.muted ? 0 : state.volume}
-                            onChange={(e) => controls.setVolume(parseFloat(e.target.value))}
+                            value={isMuted ? 0 : volume}
+                            onChange={(e) => handleSetVolume(parseFloat(e.target.value))}
                             style={{
                                 width: 55,
                                 height: 4,
