@@ -404,13 +404,13 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             updateInstalled: 'Atualização Instalada!',
             whatsNew: 'Novidades na',
             gotIt: 'Entendi, vamos lá!',
-            // Version 2.9.0
-            i18nTitle: 'Redesign de Interface',
-            i18nItems: 'Página Welcome redesenhada com animações|Página de Login premium com gradientes|Painel de Configurações deslizante|Telas de erro estilizadas para TV, Filmes e Séries',
-            profilesTitle: 'Traduções Aprimoradas',
-            profilesItems: 'Todas mensagens de erro traduzidas|Tradução de URL inválida|Badge de login traduzido',
+            // Version 3.0.0
+            i18nTitle: 'Sistema de Legendas Forçadas',
+            i18nItems: 'Toggle nas Configurações para ativar/desativar|Botão F no player para controle por sessão|Toggle sincroniza com configuração global|Carregamento automático ao ativar no player',
+            profilesTitle: 'Filtros de Edições Especiais',
+            profilesItems: 'Rejeita Extended e Directors Cut para forçadas|Suporte a padrões PT (Versão Estendida)|Aviso na tela quando só edições especiais|Filtros aplicados a séries também',
             fixesTitle: 'Correções',
-            fixesItems: 'Notificações removidas ao marcar como lida|Erros de escape em strings corrigidos'
+            fixesItems: 'Toggle sincroniza com localStorage correto|Leitura correta do perfil ativo|Traduções de playback completas em PT'
         },
         // Welcome page
         welcome: {
@@ -768,13 +768,13 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             updateInstalled: 'Update Installed!',
             whatsNew: "What's New in",
             gotIt: "Got it, let's go!",
-            // Version 2.9.0
-            i18nTitle: 'Interface Redesign',
-            i18nItems: 'Redesigned Welcome page with animations|Premium Login page with gradients|Slide-in Settings panel|Styled error screens for TV, Movies and Series',
-            profilesTitle: 'Enhanced Translations',
-            profilesItems: 'All error messages translated|Invalid URL translation|Login badge translated',
+            // Version 3.0.0
+            i18nTitle: 'Forced Subtitles System',
+            i18nItems: 'Toggle in Settings to enable/disable|F button in player for session control|Toggle syncs with global settings|Auto-load when enabled in player',
+            profilesTitle: 'Special Editions Filters',
+            profilesItems: 'Rejects Extended and Directors Cut for forced|Portuguese pattern support (Versão Estendida)|On-screen warning when only special editions|Filters applied to series too',
             fixesTitle: 'Fixes',
-            fixesItems: 'Notifications removed when marked as read|Escape errors in strings fixed'
+            fixesItems: 'Toggle syncs with correct localStorage|Correct active profile reading|Complete PT playback translations'
         },
         // Welcome page
         welcome: {
