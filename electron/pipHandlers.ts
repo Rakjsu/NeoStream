@@ -3,8 +3,13 @@
  * Manages IPC communication for the independent PiP window
  */
 
-import { BrowserWindow, ipcMain } from 'electron';
+import { BrowserWindow, ipcMain, screen } from 'electron';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 let pipWindow: BrowserWindow | null = null;
 let mainWindow: BrowserWindow | null = null;
@@ -54,7 +59,6 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
         });
 
         // Position in bottom-right corner of screen
-        const { screen } = require('electron');
         const primaryDisplay = screen.getPrimaryDisplay();
         const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
         pipWindow.setPosition(screenWidth - 420, screenHeight - 280);
