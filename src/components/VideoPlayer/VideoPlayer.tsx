@@ -120,8 +120,24 @@ export function VideoPlayer({
         // Skip if no title
         if (!title) return;
 
+        // Check if title contains [L] - already subtitled, skip Forced
+        if (title.includes('[L]')) {
+            console.log('ℹ️ Content marked [L] - skipping Forced subtitles');
+            return;
+        }
+
         const loadForcedSubtitles = async () => {
             try {
+                // Check if Forced subtitles are enabled in settings
+                const { playbackService } = await import('../../services/playbackService');
+                playbackService.reloadConfig();
+                const config = playbackService.getConfig();
+
+                if (!config.forcedSubtitlesEnabled) {
+                    console.log('ℹ️ Forced subtitles disabled in settings');
+                    return;
+                }
+
                 console.log('🎬 Auto-loading forced subtitles...');
                 const result = await autoFetchForcedSubtitle({
                     title,
@@ -139,7 +155,7 @@ export function VideoPlayer({
                     setIsForcedSubtitle(true);
                     console.log('✅ Forced subtitles loaded automatically');
                 } else {
-                    console.log('ℹ️ No forced subtitles available for this movie');
+                    console.log('ℹ️ No forced subtitles available');
                 }
             } catch (error) {
                 console.error('Error auto-loading forced subtitles:', error);

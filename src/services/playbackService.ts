@@ -15,6 +15,7 @@ export interface PlaybackConfig {
     autoPlayNextEpisode: boolean;
     subtitleLanguage: 'pt-br' | 'pt' | 'en' | 'es';
     subtitleLanguageUserSet?: boolean; // True if user manually changed subtitle language
+    forcedSubtitlesEnabled: boolean; // Auto-load forced subtitles (signs/foreign dialogue)
 }
 
 const STORAGE_KEY_PREFIX = 'playbackConfig';
@@ -38,7 +39,8 @@ function getDefaultConfig(): PlaybackConfig {
         quality: 'auto',
         autoPlayNextEpisode: true,
         subtitleLanguage: getDefaultSubtitleLanguage(),
-        subtitleLanguageUserSet: false
+        subtitleLanguageUserSet: false,
+        forcedSubtitlesEnabled: true // Enabled by default
     };
 }
 

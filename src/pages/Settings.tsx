@@ -442,6 +442,23 @@ export function Settings() {
                                         {saveAnimation === 'subtitleLanguage' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                                     </div>
 
+                                    {/* Forced Subtitles Setting */}
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>{t('playback', 'forcedSubtitles') || 'Legendas Forçadas'}</label>
+                                            <p>{t('playback', 'forcedSubtitlesDesc') || 'Carregar automaticamente legendas de placas e diálogos estrangeiros (não funciona em conteúdo [L] já legendado)'}</p>
+                                        </div>
+                                        <label className="toggle-switch">
+                                            <input
+                                                type="checkbox"
+                                                checked={playbackConfig.forcedSubtitlesEnabled}
+                                                onChange={(e) => handlePlaybackConfigChange('forcedSubtitlesEnabled', e.target.checked)}
+                                            />
+                                            <span className="toggle-slider"></span>
+                                        </label>
+                                        {saveAnimation === 'forcedSubtitlesEnabled' && <span className="save-indicator">{t('settings', 'saved')}</span>}
+                                    </div>
+
                                     <div className="setting-item">
                                         <div className="setting-info">
                                             <label>{t('playback', 'skipIntro')}</label>
