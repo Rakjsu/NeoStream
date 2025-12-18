@@ -89,16 +89,16 @@ export function VideoPlayer({
     const [subtitleWarning, setSubtitleWarning] = useState<string | null>(null);
     const [isForcedSubtitle, setIsForcedSubtitle] = useState(false); // Track if current subtitle is Forced type
     const [showSettingsMenu, setShowSettingsMenu] = useState(false); // Gear menu visibility
-    // Initialize session toggle from global config (disabled = setting is OFF)
-    const [forcedDisabledForSession, setForcedDisabledForSession] = useState(() => {
+    // Initialize session toggle from global config (enabled = setting is ON)
+    const [forcedEnabledForSession, setForcedEnabledForSession] = useState(() => {
         const saved = localStorage.getItem('playback_config');
         if (saved) {
             try {
                 const config = JSON.parse(saved);
-                return config.forcedSubtitlesEnabled === false;
-            } catch { return false; }
+                return config.forcedSubtitlesEnabled !== false; // default true if not set
+            } catch { return true; }
         }
-        return false;
+        return true; // default enabled
     });
     const containerRef = useRef<HTMLDivElement>(null);
     const progressRef = useRef<HTMLDivElement>(null);
@@ -141,7 +141,7 @@ export function VideoPlayer({
         const loadForcedSubtitles = async () => {
             try {
                 // Check if Forced subtitles are disabled for this session
-                if (forcedDisabledForSession) {
+                if (!forcedEnabledForSession) {
                     console.log('ℹ️ Forced subtitles disabled for this session');
                     return;
                 }
@@ -846,7 +846,7 @@ export function VideoPlayer({
                                     className="control-btn"
                                     onClick={() => setShowSettingsMenu(!showSettingsMenu)}
                                     title="Legendas Forçadas"
-                                    style={{ color: showSettingsMenu ? '#a855f7' : (forcedDisabledForSession ? 'rgba(255,255,255,0.4)' : 'white') }}
+                                    style={{ color: showSettingsMenu ? '#a855f7' : (!forcedEnabledForSession ? 'rgba(255,255,255,0.4)' : 'white') }}
                                 >
                                     <span style={{ fontSize: 14, fontWeight: 600 }}>F</span>
                                 </button>
@@ -886,10 +886,10 @@ export function VideoPlayer({
                                                 transition: 'background 0.2s'
                                             }}
                                             onClick={() => {
-                                                const newValue = !forcedDisabledForSession;
-                                                setForcedDisabledForSession(newValue);
-                                                // If re-enabling and no subtitles, we could reload but keeping it simple
-                                                if (newValue && isForcedSubtitle) {
+                                                const newValue = !forcedEnabledForSession;
+                                                setForcedEnabledForSession(newValue);
+                                                // If disabling and forced is active, remove it
+                                                if (!newValue && isForcedSubtitle) {
                                                     // Disable current forced subtitle
                                                     setSubtitlesEnabled(false);
                                                     setIsForcedSubtitle(false);
@@ -899,7 +899,7 @@ export function VideoPlayer({
                                                         setVttContent(null);
                                                     }
                                                 }
-                                                console.log(`🎯 Forced subtitles ${newValue ? 'disabled' : 'enabled'} for session`);
+                                                console.log(`🎯 Forced subtitles ${newValue ? 'enabled' : 'disabled'} for session`);
                                             }}
                                             onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
                                             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
@@ -917,7 +917,7 @@ export function VideoPlayer({
                                                     width: 36,
                                                     height: 20,
                                                     borderRadius: 10,
-                                                    background: forcedDisabledForSession ? 'rgba(255, 255, 255, 0.2)' : 'linear-gradient(135deg, #a855f7, #ec4899)',
+                                                    background: forcedEnabledForSession ? 'linear-gradient(135deg, #a855f7, #ec4899)' : 'rgba(255, 255, 255, 0.2)',
                                                     position: 'relative',
                                                     transition: 'background 0.3s'
                                                 }}
@@ -930,7 +930,7 @@ export function VideoPlayer({
                                                         background: 'white',
                                                         position: 'absolute',
                                                         top: 2,
-                                                        left: forcedDisabledForSession ? 2 : 18,
+                                                        left: forcedEnabledForSession ? 18 : 2,
                                                         transition: 'left 0.3s'
                                                     }}
                                                 />
