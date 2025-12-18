@@ -896,18 +896,42 @@ export function VideoPlayer({
                                                 cursor: 'pointer',
                                                 transition: 'background 0.2s'
                                             }}
-                                            onClick={() => {
+                                            onClick={async () => {
                                                 const newValue = !forcedEnabledForSession;
                                                 setForcedEnabledForSession(newValue);
-                                                // If disabling and forced is active, remove it
+
                                                 if (!newValue && isForcedSubtitle) {
-                                                    // Disable current forced subtitle
+                                                    // Disabling: remove current forced subtitle
                                                     setSubtitlesEnabled(false);
                                                     setIsForcedSubtitle(false);
                                                     if (subtitleUrl) {
                                                         cleanupSubtitleUrl(subtitleUrl);
                                                         setSubtitleUrl(null);
                                                         setVttContent(null);
+                                                    }
+                                                } else if (newValue && !subtitlesEnabled) {
+                                                    // Enabling: load forced subtitles now
+                                                    console.log('🔄 Loading forced subtitles after toggle enable...');
+                                                    try {
+                                                        const { autoFetchForcedSubtitle } = await import('../../services/subtitleService');
+                                                        const result = await autoFetchForcedSubtitle({
+                                                            title: title || '',
+                                                            tmdbId,
+                                                            imdbId,
+                                                            season: seasonNumber,
+                                                            episode: episodeNumber
+                                                        });
+                                                        if (result && result.vttContent) {
+                                                            const blob = new Blob([result.vttContent], { type: 'text/vtt' });
+                                                            const blobUrl = URL.createObjectURL(blob);
+                                                            setSubtitleUrl(blobUrl);
+                                                            setVttContent(result.vttContent);
+                                                            setSubtitlesEnabled(true);
+                                                            setIsForcedSubtitle(true);
+                                                            console.log('✅ Forced subtitles loaded after toggle enable');
+                                                        }
+                                                    } catch (e) {
+                                                        console.error('Failed to load forced subtitles:', e);
                                                     }
                                                 }
                                                 console.log(`🎯 Forced subtitles ${newValue ? 'enabled' : 'disabled'} for session`);
