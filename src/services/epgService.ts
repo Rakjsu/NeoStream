@@ -210,8 +210,14 @@ export const epgService = {
         // Debug: log HTML length and sample
         console.log('[EPG] mi.tv HTML length:', html.length);
         console.log('[EPG] mi.tv HTML sample:', html.substring(0, 300));
+        // Get today's date in Brazilian timezone (UTC-3) for proper time interpretation
+        // mi.tv times are in Brazilian time, we need to convert them to UTC
+        const BRAZIL_OFFSET_MS = 3 * 60 * 60 * 1000; // UTC-3 = +3 hours to convert to UTC
 
-        const today = new Date();
+        // Get current date in Brazil
+        const nowUTC = new Date();
+        const nowBrazil = new Date(nowUTC.getTime() - BRAZIL_OFFSET_MS);
+        const todayBrazil = new Date(nowBrazil.getFullYear(), nowBrazil.getMonth(), nowBrazil.getDate());
 
         let lastHour = -1;
         let dayOffset = 0;
@@ -222,7 +228,7 @@ export const epgService = {
         // Pattern: Look for time span followed by h2 title
         const programPattern = /<span[^>]*class="[^"]*time[^"]*"[^>]*>[\s\S]*?(\d{1,2}:\d{2})[\s\S]*?<\/span>[\s\S]*?<h2[^>]*>([\s\S]*?)<\/h2>/gi;
 
-        console.log('[EPG] Parsing with today:', today.toISOString());
+        console.log('[EPG] Parsing - Now (Brazil):', nowBrazil.toISOString(), 'Today (Brazil):', todayBrazil.toISOString());
 
         let match;
         while ((match = programPattern.exec(html)) !== null) {
@@ -244,9 +250,13 @@ export const epgService = {
             if (lastHour !== -1 && hours < lastHour - 2) dayOffset++;
             lastHour = hours;
 
-            const startDate = new Date(today);
-            startDate.setDate(startDate.getDate() + dayOffset);
-            startDate.setHours(hours, minutes, 0, 0);
+            // Create date in Brazilian time, then convert to UTC
+            const brazilTime = new Date(todayBrazil);
+            brazilTime.setDate(brazilTime.getDate() + dayOffset);
+            brazilTime.setHours(hours, minutes, 0, 0);
+
+            // Convert from Brazil time to UTC by adding 3 hours
+            const startDate = new Date(brazilTime.getTime() + BRAZIL_OFFSET_MS);
 
             const endDate = new Date(startDate);
             endDate.setHours(endDate.getHours() + 1);
@@ -287,9 +297,13 @@ export const epgService = {
                 if (lastHour !== -1 && hours < lastHour - 2) dayOffset++;
                 lastHour = hours;
 
-                const startDate = new Date(today);
-                startDate.setDate(startDate.getDate() + dayOffset);
-                startDate.setHours(hours, minutes, 0, 0);
+                // Create date in Brazilian time, then convert to UTC
+                const brazilTime = new Date(todayBrazil);
+                brazilTime.setDate(brazilTime.getDate() + dayOffset);
+                brazilTime.setHours(hours, minutes, 0, 0);
+
+                // Convert from Brazil time to UTC by adding 3 hours
+                const startDate = new Date(brazilTime.getTime() + BRAZIL_OFFSET_MS);
 
                 const endDate = new Date(startDate);
                 endDate.setHours(endDate.getHours() + 1);
