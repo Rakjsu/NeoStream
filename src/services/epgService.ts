@@ -12,34 +12,16 @@ interface EPGProgram {
 
 // Manual channel mappings for mi.tv
 const mitvMappings: Record<string, string> = {
-    // HBO channels (all variations)
+    // HBO channels
     'hbo': 'hbo',
-    'hbo hd': 'hbo',
-    'hbo fhd': 'hbo',
     'hbo 2': 'hbo-2',
-    'hbo 2 hd': 'hbo-2',
-    'hbo 2 fhd': 'hbo-2',
     'hbo2': 'hbo-2',
-    'hbo2 hd': 'hbo-2',
-    'hbo2 fhd': 'hbo-2',
     'hbo family': 'hbo-family-hd',
-    'hbo family hd': 'hbo-family-hd',
-    'hbo family fhd': 'hbo-family-hd',
     'hbo mundi': 'max-1',
-    'hbo mundi hd': 'max-1',
-    'hbo mundi fhd': 'max-1',
     'hbo plus': 'hbo-plus-brasil-hd',
-    'hbo plus hd': 'hbo-plus-brasil-hd',
-    'hbo plus fhd': 'hbo-plus-brasil-hd',
     'hbo pop': 'max-up',
-    'hbo pop hd': 'max-up',
-    'hbo pop fhd': 'max-up',
     'hbo xtreme': 'max-prime',
-    'hbo xtreme hd': 'max-prime',
-    'hbo xtreme fhd': 'max-prime',
     'hbo signature': 'hbo-signature',
-    'hbo signature hd': 'hbo-signature',
-    'hbo signature fhd': 'hbo-signature',
     // Globo regional
     'globo sp': 'globo-sao-paulo-hd',
     'globo rj': 'globo-rio-de-janeiro-hd',
@@ -113,7 +95,14 @@ export const epgService = {
 
     // Get mi.tv slug from channel name
     getMiTVSlug(channelName: string): string {
-        const normalized = channelName.toLowerCase().trim();
+        // Remove quality suffixes (FHD, HD, SD, 4K) from channel name
+        const normalized = channelName
+            .toLowerCase()
+            .trim()
+            .replace(/\s*(fhd|hd|sd|4k|uhd)\s*$/i, '')
+            .trim();
+
+        console.log('[EPG] Channel normalized:', channelName, '->', normalized);
 
         // Check manual mappings first
         if (mitvMappings[normalized]) {
@@ -134,7 +123,12 @@ export const epgService = {
 
     // Get meuguia.tv slug from channel name
     getMeuGuiaSlug(channelName: string): string | null {
-        const normalized = channelName.toLowerCase().trim();
+        // Remove quality suffixes
+        const normalized = channelName
+            .toLowerCase()
+            .trim()
+            .replace(/\s*(fhd|hd|sd|4k|uhd)\s*$/i, '')
+            .trim();
         return meuguiaMappings[normalized] || null;
     },
 
