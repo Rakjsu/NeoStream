@@ -74,22 +74,31 @@ export function PipWindow() {
     // Initialize HLS only when we have content
     useHls({ src: content?.src || '', videoRef });
 
-    // Set initial time and auto-play
+    // Set initial time and auto-play when content changes (including next episode)
     useEffect(() => {
-        if (content?.currentTime && videoRef.current) {
-            const setTime = () => {
-                if (videoRef.current && content.currentTime) {
+        if (!content?.src || !videoRef.current) return;
+
+        const autoPlay = () => {
+            if (videoRef.current) {
+                // Set time if specified (resuming), otherwise start from beginning
+                if (content.currentTime && content.currentTime > 0) {
                     videoRef.current.currentTime = content.currentTime;
-                    videoRef.current.play().catch(console.error);
                 }
-            };
-            if (videoRef.current.readyState >= 2) {
-                setTime();
-            } else {
-                videoRef.current.addEventListener('canplay', setTime, { once: true });
+                videoRef.current.play().catch(console.error);
+                setIsLoading(false);
             }
+        };
+
+        if (videoRef.current.readyState >= 2) {
+            autoPlay();
+        } else {
+            videoRef.current.addEventListener('canplay', autoPlay, { once: true });
         }
-    }, [content?.currentTime]);
+
+        return () => {
+            videoRef.current?.removeEventListener('canplay', autoPlay);
+        };
+    }, [content?.src, content?.currentTime]);
 
     // Local loading state management
     useEffect(() => {
