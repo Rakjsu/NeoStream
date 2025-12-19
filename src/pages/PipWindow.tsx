@@ -217,12 +217,14 @@ export function PipWindow() {
         }
     };
 
-    const handleExpand = () => {
+    const handleExpand = async () => {
         if (window.ipcRenderer && content) {
-            window.ipcRenderer.invoke('pip:expand', {
+            await window.ipcRenderer.invoke('pip:expand', {
                 ...content,
                 currentTime: videoRef.current?.currentTime || 0
             });
+            // Explicitly close PiP window as fallback
+            window.ipcRenderer.invoke('pip:close', {});
         }
     };
 
