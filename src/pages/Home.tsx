@@ -1009,8 +1009,8 @@ export function Home() {
                         gap: 16,
                         overflowX: 'auto',
                         overflowY: 'visible',
-                        paddingBottom: 16,
-                        paddingTop: 8,
+                        paddingBottom: 20,
+                        paddingTop: 20,
                         scrollBehavior: 'smooth',
                         scrollbarWidth: 'none',
                         msOverflowStyle: 'none'
