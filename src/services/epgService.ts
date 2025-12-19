@@ -59,7 +59,8 @@ export const epgService = {
             const slug = this.getMiTVSlug(channelName);
             console.log('[EPG] Fetching mi.tv:', slug);
 
-            const url = `https://mi.tv/br/async/channel/${slug}/events`;
+            // Use -300 timezone offset for Brazil (UTC-3 = -180 minutes, but site uses -300)
+            const url = `https://mi.tv/br/async/channel/${slug}/-300`;
             const response = await fetch(url);
 
             if (!response.ok) return [];
