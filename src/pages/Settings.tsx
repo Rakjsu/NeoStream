@@ -459,6 +459,23 @@ export function Settings() {
                                         {saveAnimation === 'forcedSubtitlesEnabled' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                                     </div>
 
+                                    {/* Click-Through Mode Setting */}
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>{t('playback', 'clickThrough')}</label>
+                                            <p>{t('playback', 'clickThroughDesc')}</p>
+                                        </div>
+                                        <label className="toggle-switch">
+                                            <input
+                                                type="checkbox"
+                                                checked={playbackConfig.clickThroughEnabled}
+                                                onChange={(e) => handlePlaybackConfigChange('clickThroughEnabled', e.target.checked)}
+                                            />
+                                            <span className="toggle-slider"></span>
+                                        </label>
+                                        {saveAnimation === 'clickThroughEnabled' && <span className="save-indicator">{t('settings', 'saved')}</span>}
+                                    </div>
+
                                     <div className="setting-item">
                                         <div className="setting-info">
                                             <label>{t('playback', 'skipIntro')}</label>
