@@ -68,28 +68,13 @@ export const epgService = {
         if (xcPrograms.length > 0) return xcPrograms;
 
         if (channelName) {
-            const normalized = channelName.toLowerCase().trim();
+            // Try mi.tv first (now has correct mappings for HBO channels too)
+            const mitvPrograms = await this.fetchFromMiTV(channelName);
+            if (mitvPrograms.length > 0) return mitvPrograms;
 
-            // For HBO channels, try meuguia.tv FIRST (mi.tv has outdated data)
-            const isHboChannel = normalized.includes('hbo');
-
-            if (isHboChannel) {
-                console.log('[EPG] HBO channel detected, trying meuguia.tv first');
-                const meuguiaPrograms = await this.fetchFromMeuGuia(channelName);
-                if (meuguiaPrograms.length > 0) return meuguiaPrograms;
-
-                // Fall back to mi.tv if meuguia.tv fails
-                const mitvPrograms = await this.fetchFromMiTV(channelName);
-                if (mitvPrograms.length > 0) return mitvPrograms;
-            } else {
-                // For other channels, try mi.tv first
-                const mitvPrograms = await this.fetchFromMiTV(channelName);
-                if (mitvPrograms.length > 0) return mitvPrograms;
-
-                // Try meuguia.tv as fallback
-                const meuguiaPrograms = await this.fetchFromMeuGuia(channelName);
-                if (meuguiaPrograms.length > 0) return meuguiaPrograms;
-            }
+            // Try meuguia.tv as fallback
+            const meuguiaPrograms = await this.fetchFromMeuGuia(channelName);
+            if (meuguiaPrograms.length > 0) return meuguiaPrograms;
         }
 
         return [];
@@ -120,6 +105,10 @@ export const epgService = {
         'record rs': 'record-tv-rs',
         // HBO channels with correct mi.tv slugs
         'hbo family': 'hbo-family-hd',
+        'hbo mundi': 'max-1',
+        'hbo plus': 'hbo-plus-brasil-hd',
+        'hbo pop': 'max-up',
+        'hbo xtreme': 'max-prime',
         // Add more mappings as needed
     } as Record<string, string>,
 
@@ -128,8 +117,6 @@ export const epgService = {
         'hbo': 'HBO',
         'hbo 2': 'HB2',
         'hbo2': 'HB2',
-        'hbo family': 'HFA',
-        'hbo plus': 'HPL',
         'hbo signature': 'HFE',
     } as Record<string, string>,
 
