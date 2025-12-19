@@ -34,6 +34,7 @@ export function PipWindow() {
     const [volume, setVolume] = useState(1);
     const [isMuted, setIsMuted] = useState(false);
     const [showControls, setShowControls] = useState(true);
+    const [clickThrough, setClickThrough] = useState(false);
     const { videoRef } = useVideoPlayer();
     const { t } = useLanguage();
     const hideControlsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -59,6 +60,23 @@ export function PipWindow() {
             }
         };
     }, []);
+
+    // Listen for click-through mode changes from main process
+    useEffect(() => {
+        const handleClickThroughChanged = (_event: any, enabled: boolean) => {
+            setClickThrough(enabled);
+        };
+        window.ipcRenderer.on('pip:clickThroughChanged', handleClickThroughChanged);
+        return () => {
+            window.ipcRenderer.off('pip:clickThroughChanged', handleClickThroughChanged);
+        };
+    }, []);
+
+    // Toggle click-through mode
+    const toggleClickThrough = async () => {
+        const newState = !clickThrough;
+        await window.ipcRenderer.invoke('pip:clickThrough', newState);
+    };
 
     // Parse content from URL
     useEffect(() => {
@@ -155,7 +173,7 @@ export function PipWindow() {
             if (!content || content.contentType !== 'series') return;
             if (!content.contentId || !content.seasonNumber || !content.episodeNumber) return;
 
-            
+
             // Mark current episode as watched
             watchProgressService.markEpisodeWatched(
                 content.contentId,
@@ -167,14 +185,14 @@ export function PipWindow() {
             if (window.ipcRenderer) {
                 try {
                     setIsLoading(true);
-                                        const nextEp = await window.ipcRenderer.invoke('pip:getNextEpisode', {
+                    const nextEp = await window.ipcRenderer.invoke('pip:getNextEpisode', {
                         seriesId: content.contentId,
                         currentSeason: content.seasonNumber,
                         currentEpisode: content.episodeNumber
                     });
-                    
+
                     if (nextEp && nextEp.src) {
-                                                // Update content with next episode
+                        // Update content with next episode
                         setContent({
                             ...content,
                             src: nextEp.src,
@@ -184,7 +202,7 @@ export function PipWindow() {
                             currentTime: 0
                         });
                     } else {
-                                                setIsLoading(false);
+                        setIsLoading(false);
                     }
                 } catch (error) {
                     console.error('[PiP] Error loading next episode:', error);
@@ -308,7 +326,7 @@ export function PipWindow() {
                 time,
                 dur
             );
-                    } else if (content.contentType === 'series' && content.contentId && content.seasonNumber && content.episodeNumber) {
+        } else if (content.contentType === 'series' && content.contentId && content.seasonNumber && content.episodeNumber) {
             watchProgressService.saveVideoTime(
                 content.contentId,
                 content.seasonNumber,
@@ -316,7 +334,7 @@ export function PipWindow() {
                 time,
                 dur
             );
-                    }
+        }
     };
 
     const handleClose = () => {
@@ -561,6 +579,26 @@ export function PipWindow() {
                         />
                     </div>
                 </div>
+
+                {/* Click-through toggle button */}
+                <button
+                    onClick={toggleClickThrough}
+                    className="pip-btn"
+                    title={clickThrough ? 'Click-Through: ON (F9)' : 'Click-Through: OFF (F9)'}
+                    style={{
+                        background: clickThrough ? 'rgba(139, 92, 246, 0.8)' : 'transparent',
+                        border: clickThrough ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.3)',
+                        padding: '2px 6px',
+                        cursor: 'pointer',
+                        borderRadius: 4,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: 'white',
+                        transition: 'all 0.2s ease'
+                    }}
+                >
+                    F9
+                </button>
             </div>
 
             {/* Loading indicator */}

@@ -3,7 +3,7 @@
  * Manages IPC communication for the independent PiP window
  */
 
-import { BrowserWindow, ipcMain, screen } from 'electron';
+import { BrowserWindow, ipcMain, screen, globalShortcut } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -14,6 +14,7 @@ const __dirname = path.dirname(__filename);
 let pipWindow: BrowserWindow | null = null;
 let mainWindow: BrowserWindow | null = null;
 let currentPipContent: PipContent | null = null;
+let clickThroughMode = false;
 
 interface PipContent {
     src: string;
@@ -200,6 +201,31 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
             });
         }
         return null;
+    });
+
+    // Toggle click-through mode (mouse passes through PiP window)
+    ipcMain.handle('pip:clickThrough', async (_event, enabled: boolean) => {
+        clickThroughMode = enabled;
+        if (pipWindow && !pipWindow.isDestroyed()) {
+            pipWindow.setIgnoreMouseEvents(enabled, { forward: true });
+            // Notify PiP window of state change
+            pipWindow.webContents.send('pip:clickThroughChanged', enabled);
+        }
+        return clickThroughMode;
+    });
+
+    // Get click-through state
+    ipcMain.handle('pip:getClickThrough', async () => {
+        return clickThroughMode;
+    });
+
+    // Register F9 global shortcut
+    globalShortcut.register('F9', () => {
+        if (pipWindow && !pipWindow.isDestroyed()) {
+            clickThroughMode = !clickThroughMode;
+            pipWindow.setIgnoreMouseEvents(clickThroughMode, { forward: true });
+            pipWindow.webContents.send('pip:clickThroughChanged', clickThroughMode);
+        }
     });
 }
 

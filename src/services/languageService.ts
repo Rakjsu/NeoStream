@@ -328,14 +328,16 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             seconds: 'segundos',
             videoCodec: 'Codificador de Vídeo',
             videoCodecDesc: 'Codec de vídeo preferido',
-            autoPlayNext: 'Reproduzir próximo episódio',
-            autoPlayNextDesc: 'Reproduzir automaticamente o próximo episódio',
             skipIntro: 'Pular intro automaticamente',
             skipIntroDesc: 'Pular abertura de séries quando disponível',
             subtitleLanguage: 'Idioma das Legendas',
             subtitleLanguageDesc: 'Idioma preferido para download automático de legendas',
             forcedSubtitles: 'Legendas Forçadas',
-            forcedSubtitlesDesc: 'Carregar automaticamente legendas de placas e diálogos estrangeiros (não funciona em conteúdo [L] já legendado)'
+            forcedSubtitlesDesc: 'Carregar automaticamente legendas de placas e diálogos estrangeiros (não funciona em conteúdo [L] já legendado)',
+            autoPlayNext: 'Reproduzir próximo episódio',
+            autoPlayNextDesc: 'Reproduzir automaticamente o próximo episódio',
+            clickThrough: 'Modo Click-Through (PiP)',
+            clickThroughDesc: 'Permite que o mouse passe pelo PiP sem interagir (F9 para alternar)'
         },
         // Dashboard / Main navigation
         dashboard: {
@@ -822,14 +824,16 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             seconds: 'seconds',
             videoCodec: 'Video Encoder',
             videoCodecDesc: 'Preferred video codec',
-            autoPlayNext: 'Auto-play next episode',
-            autoPlayNextDesc: 'Automatically play the next episode',
             skipIntro: 'Skip intro automatically',
             skipIntroDesc: 'Skip series opening when available',
             subtitleLanguage: 'Subtitle Language',
             subtitleLanguageDesc: 'Preferred language for automatic subtitle download',
             forcedSubtitles: 'Forced Subtitles',
-            forcedSubtitlesDesc: 'Automatically load sign and foreign dialogue subtitles (does not work on [L] content already subtitled)'
+            forcedSubtitlesDesc: 'Automatically load sign and foreign dialogue subtitles (does not work on [L] content already subtitled)',
+            autoPlayNext: 'Auto-play next episode',
+            autoPlayNextDesc: 'Automatically play the next episode',
+            clickThrough: 'Click-Through Mode (PiP)',
+            clickThroughDesc: 'Allows mouse to pass through PiP without interacting (F9 to toggle)'
         },
         stats: {
             title: 'Your Statistics',
@@ -1316,14 +1320,16 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             seconds: 'segundos',
             videoCodec: 'Codificador de Video',
             videoCodecDesc: 'Codec de video preferido',
-            autoPlayNext: 'Reproducir siguiente episodio',
-            autoPlayNextDesc: 'Reproducir automáticamente el siguiente episodio',
             skipIntro: 'Saltar intro automáticamente',
             skipIntroDesc: 'Saltar apertura de series cuando esté disponible',
             subtitleLanguage: 'Idioma de Subtítulos',
             subtitleLanguageDesc: 'Idioma preferido para descarga automática de subtítulos',
             forcedSubtitles: 'Subtítulos Forzados',
-            forcedSubtitlesDesc: 'Cargar automáticamente subtítulos de carteles y diálogos extranjeros (no funciona en contenido [L] ya subtitulado)'
+            forcedSubtitlesDesc: 'Cargar automáticamente subtítulos de carteles y diálogos extranjeros (no funciona en contenido [L] ya subtitulado)',
+            autoPlayNext: 'Reproducir siguiente episodio',
+            autoPlayNextDesc: 'Reproducir automáticamente el siguiente episodio',
+            clickThrough: 'Modo Click-Through (PiP)',
+            clickThroughDesc: 'Permite que el mouse pase por el PiP sin interactuar (F9 para alternar)'
         },
         stats: {
             title: 'Tus Estadísticas',

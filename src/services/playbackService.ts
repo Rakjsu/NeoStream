@@ -16,6 +16,7 @@ export interface PlaybackConfig {
     subtitleLanguage: 'pt-br' | 'pt' | 'en' | 'es';
     subtitleLanguageUserSet?: boolean; // True if user manually changed subtitle language
     forcedSubtitlesEnabled: boolean; // Auto-load forced subtitles (signs/foreign dialogue)
+    clickThroughEnabled: boolean; // PiP click-through mode (mouse passes through)
 }
 
 const STORAGE_KEY_PREFIX = 'playbackConfig';
@@ -40,7 +41,8 @@ function getDefaultConfig(): PlaybackConfig {
         autoPlayNextEpisode: true,
         subtitleLanguage: getDefaultSubtitleLanguage(),
         subtitleLanguageUserSet: false,
-        forcedSubtitlesEnabled: true // Enabled by default
+        forcedSubtitlesEnabled: true, // Enabled by default
+        clickThroughEnabled: false // Disabled by default
     };
 }
 
@@ -161,7 +163,7 @@ class PlaybackService {
                 timestamp: Date.now()
             };
 
-            
+
             return recommendedBufferSeconds;
         } catch (error) {
             console.error('Speed test failed:', error);
