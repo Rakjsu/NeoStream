@@ -365,7 +365,8 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             season: 'Temporada',
             episode: 'Episódio',
             minutes: 'min',
-            hours: 'h'
+            hours: 'h',
+            expand: 'Expandir'
         },
         // Video Player
         player: {
@@ -906,7 +907,8 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             season: 'Season',
             episode: 'Episode',
             minutes: 'min',
-            hours: 'h'
+            hours: 'h',
+            expand: 'Expand'
         },
         player: {
             quality: 'Quality',
@@ -1399,7 +1401,8 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             season: 'Temporada',
             episode: 'Episodio',
             minutes: 'min',
-            hours: 'h'
+            hours: 'h',
+            expand: 'Expandir'
         },
         player: {
             quality: 'Calidad',

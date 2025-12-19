@@ -10,6 +10,7 @@ import { useVideoPlayer } from '../hooks/useVideoPlayer';
 import { useSearchParams } from 'react-router-dom';
 import { movieProgressService } from '../services/movieProgressService';
 import { watchProgressService } from '../services/watchProgressService';
+import { useLanguage } from '../services/languageService';
 
 interface PipContent {
     src: string;
@@ -34,6 +35,7 @@ export function PipWindow() {
     const [isMuted, setIsMuted] = useState(false);
     const [showControls, setShowControls] = useState(true);
     const { videoRef } = useVideoPlayer();
+    const { t } = useLanguage();
     const hideControlsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Auto-hide controls after 3 seconds of inactivity
@@ -358,7 +360,7 @@ export function PipWindow() {
                 justifyContent: 'center',
                 color: 'white'
             }}>
-                Carregando...
+                {t('common', 'loading')}
             </div>
         );
     }
@@ -433,7 +435,7 @@ export function PipWindow() {
                             display: 'flex',
                             transition: 'all 0.2s ease'
                         }}
-                        title="Expandir"
+                        title={t('common', 'expand')}
                     >
                         <FaExpand size={12} color="white" />
                     </button>
@@ -449,7 +451,7 @@ export function PipWindow() {
                             display: 'flex',
                             transition: 'all 0.2s ease'
                         }}
-                        title="Fechar"
+                        title={t('common', 'close')}
                     >
                         <FaTimes size={12} color="white" />
                     </button>
