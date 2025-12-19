@@ -212,16 +212,19 @@ export const epgService = {
         console.log('[EPG] mi.tv HTML length:', html.length);
         console.log('[EPG] mi.tv HTML sample:', html.substring(0, 300));
 
-        // Brazil is UTC-3, we need to convert times to UTC for proper local display
-        const BRAZIL_OFFSET_HOURS = 3; // UTC-3
-        const today = new Date();
+        // Brazil is UTC-3
+        // The times in the EPG are Brazil times, we need to compare using Brazil time
+        const now = new Date();
 
-        // Get today's date components in UTC
-        const todayYear = today.getUTCFullYear();
-        const todayMonth = today.getUTCMonth();
-        const todayDate = today.getUTCDate();
+        // Calculate "today" in Brazil timezone
+        // Brazil is UTC-3, so we subtract 3 hours from UTC to get Brazil time
+        const brazilNow = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+        const brazilYear = brazilNow.getUTCFullYear();
+        const brazilMonth = brazilNow.getUTCMonth();
+        const brazilDate = brazilNow.getUTCDate();
 
-        console.log('[EPG] Parsing - Today UTC:', today.toISOString());
+        console.log('[EPG] Parsing - Brazil date:', `${brazilYear}-${brazilMonth + 1}-${brazilDate}`);
+        console.log('[EPG] Parsing - Brazil time now:', brazilNow.toISOString());
 
         let lastHour = -1;
         let dayOffset = 0;
@@ -252,17 +255,17 @@ export const epgService = {
             if (lastHour !== -1 && hours < lastHour - 2) dayOffset++;
             lastHour = hours;
 
-            // Create date in UTC, interpreting the parsed time as Brazilian time (UTC-3)
-            // Brazilian time = UTC - 3, so UTC = Brazilian time + 3
-            const utcHours = hours + BRAZIL_OFFSET_HOURS;
-            const startDate = new Date(Date.UTC(todayYear, todayMonth, todayDate + dayOffset, utcHours, minutes, 0, 0));
+            // Create date: the time shown is Brazil time
+            // We store it as Brazil time (not converting to UTC)
+            // We'll compare using Brazil time in getCurrentProgram
+            const startDate = new Date(brazilYear, brazilMonth, brazilDate + dayOffset, hours, minutes, 0, 0);
 
             const endDate = new Date(startDate);
-            endDate.setUTCHours(endDate.getUTCHours() + 1);
+            endDate.setHours(endDate.getHours() + 1);
 
             // Log first 3 programs for debugging
             if (programs.length < 3) {
-                console.log(`[EPG] Program ${programs.length + 1}: ${time} - ${title.substring(0, 30)}... -> ${startDate.toLocaleTimeString()}`);
+                console.log(`[EPG] Program ${programs.length + 1}: ${time} Brazil -> stored as ${startDate.toLocaleTimeString()}`);
             }
 
             programs.push({
@@ -296,12 +299,11 @@ export const epgService = {
                 if (lastHour !== -1 && hours < lastHour - 2) dayOffset++;
                 lastHour = hours;
 
-                // Create date in UTC, interpreting the parsed time as Brazilian time (UTC-3)
-                const utcHours = hours + BRAZIL_OFFSET_HOURS;
-                const startDate = new Date(Date.UTC(todayYear, todayMonth, todayDate + dayOffset, utcHours, minutes, 0, 0));
+                // Create date: the time shown is Brazil time
+                const startDate = new Date(brazilYear, brazilMonth, brazilDate + dayOffset, hours, minutes, 0, 0);
 
                 const endDate = new Date(startDate);
-                endDate.setUTCHours(endDate.getUTCHours() + 1);
+                endDate.setHours(endDate.getHours() + 1);
 
                 programs.push({
                     id: `mitv-${startDate.getTime()}`,
@@ -413,14 +415,12 @@ export const epgService = {
         // <div class="licontent"><h2>Title</h2>
         const pattern = /class=['"][^'"]*time[^'"]*['"][^>]*>(\d{1,2}:\d{2})<\/div>[\s\S]*?<h2[^>]*>([^<]+)<\/h2>/gi;
 
-        // Brazil is UTC-3, we need to convert times to UTC for proper local display
-        const BRAZIL_OFFSET_HOURS = 3;
-        const today = new Date();
-
-        // Get today's date components in UTC
-        const todayYear = today.getUTCFullYear();
-        const todayMonth = today.getUTCMonth();
-        const todayDate = today.getUTCDate();
+        // Calculate "today" in Brazil timezone (UTC-3)
+        const now = new Date();
+        const brazilNow = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+        const brazilYear = brazilNow.getUTCFullYear();
+        const brazilMonth = brazilNow.getUTCMonth();
+        const brazilDate = brazilNow.getUTCDate();
 
         let match;
         let lastHour = -1;
@@ -440,12 +440,11 @@ export const epgService = {
             if (lastHour !== -1 && hours < lastHour - 2) dayOffset++;
             lastHour = hours;
 
-            // Create date in UTC, interpreting the parsed time as Brazilian time (UTC-3)
-            const utcHours = hours + BRAZIL_OFFSET_HOURS;
-            const startDate = new Date(Date.UTC(todayYear, todayMonth, todayDate + dayOffset, utcHours, minutes, 0, 0));
+            // Create date: the time shown is Brazil time
+            const startDate = new Date(brazilYear, brazilMonth, brazilDate + dayOffset, hours, minutes, 0, 0);
 
             const endDate = new Date(startDate);
-            endDate.setUTCHours(endDate.getUTCHours() + 1);
+            endDate.setHours(endDate.getHours() + 1);
 
             programs.push({
                 id: `meuguia-${startDate.getTime()}`,
@@ -469,31 +468,38 @@ export const epgService = {
     getCurrentProgram(programs: EPGProgram[]): EPGProgram | null {
         if (programs.length === 0) return null;
 
-        // Times are now stored in proper UTC, so we just compare with current UTC time
-        const now = Date.now();
+        // Program times are stored as Brazil local time (UTC-3)
+        // We need to compare with the current Brazil time
+        const nowUTC = Date.now();
 
-        console.log('[EPG] getCurrentProgram - now:', new Date(now).toLocaleTimeString());
+        // Convert current UTC time to Brazil time for comparison
+        // Brazil is UTC-3, so we subtract 3 hours from UTC
+        const brazilOffsetMs = 3 * 60 * 60 * 1000;
+        const nowBrazil = nowUTC - brazilOffsetMs;
 
-        // Log first few programs for debugging (shows in user's local time)
+        console.log('[EPG] getCurrentProgram - now UTC:', new Date(nowUTC).toISOString());
+        console.log('[EPG] getCurrentProgram - now Brazil:', new Date(nowBrazil).toISOString());
+
+        // Log first few programs for debugging
         programs.slice(0, 3).forEach((p, i) => {
             const start = new Date(p.start);
             const end = new Date(p.end);
-            console.log(`[EPG] Program ${i + 1}: ${start.toLocaleTimeString()} - ${end.toLocaleTimeString()} = ${p.title.substring(0, 20)}`);
+            console.log(`[EPG] Program ${i + 1}: ${start.getHours()}:${start.getMinutes().toString().padStart(2, '0')} - ${end.getHours()}:${end.getMinutes().toString().padStart(2, '0')} Brazil = ${p.title.substring(0, 20)}`);
         });
 
         const current = programs.find(p => {
             const start = new Date(p.start).getTime();
             const end = new Date(p.end).getTime();
-            return now >= start && now <= end;
+            return nowBrazil >= start && nowBrazil <= end;
         });
 
         if (current) {
             console.log('[EPG] Found current program:', current.title);
         } else {
-            console.log('[EPG] No current program found! Falling back to first program.');
+            console.log('[EPG] No current program found! Now Brazil:', new Date(nowBrazil).toISOString());
         }
 
-        // If no current program found (timezone mismatch), use first program
+        // If no current program found, use first program
         return current || programs[0];
     },
 
