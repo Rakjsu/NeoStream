@@ -10,6 +10,7 @@ import { usageStatsService } from '../../services/usageStatsService';
 import { useMiniPlayer } from '../MiniPlayer';
 import { autoFetchSubtitle, autoFetchForcedSubtitle, cleanupSubtitleUrl } from '../../services/subtitleService';
 import { SubtitleOverlay } from './SubtitleOverlay';
+import { useLanguage } from '../../services/languageService';
 import './VideoPlayer.css';
 
 import type { MovieVersion } from '../../services/movieVersionService';
@@ -70,6 +71,7 @@ export function VideoPlayer({
 }: VideoPlayerProps) {
     const { videoRef, state, controls } = useVideoPlayer();
     useHls({ src, videoRef });
+    const { t } = useLanguage();
 
     // Chromecast integration
     const chromecast = useChromecast(src, title || 'Video');
@@ -698,7 +700,7 @@ export function VideoPlayer({
                                     {/* Movie Version Switcher - only show for movies with multiple versions */}
                                     {movieVersions && movieVersions.length > 1 && onSwitchVersion ? (
                                         <div className="settings-section">
-                                            <span className="settings-label">Versão</span>
+                                            <span className="settings-label">{t('player', 'version')}</span>
                                             <div className="settings-options">
                                                 {movieVersions.map(version => {
                                                     const isActive = version.movie.stream_id === currentMovieId;
@@ -722,7 +724,7 @@ export function VideoPlayer({
                                     ) : (
                                         /* Playback Speed - show for series or single-version movies */
                                         <div className="settings-section">
-                                            <span className="settings-label">Velocidade</span>
+                                            <span className="settings-label">{t('player', 'speed')}</span>
                                             <div className="settings-options">
                                                 {playbackRates.map(rate => (
                                                     <button
@@ -747,14 +749,14 @@ export function VideoPlayer({
                         {(onNextEpisode || onPreviousEpisode) && (
                             <>
                                 {canGoPrevious && onPreviousEpisode && (
-                                    <button className="control-btn" onClick={onPreviousEpisode} title="Episódio Anterior">
+                                    <button className="control-btn" onClick={onPreviousEpisode} title={t('player', 'previousEpisode')}>
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
                                             <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z" />
                                         </svg>
                                     </button>
                                 )}
                                 {canGoNext && onNextEpisode && (
-                                    <button className="control-btn" onClick={onNextEpisode} title="Próximo Episódio">
+                                    <button className="control-btn" onClick={onNextEpisode} title={t('player', 'nextEpisode')}>
                                         <svg width="20" height="20" viewBox="0 0 24 24" fill="white">
                                             <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z" />
                                         </svg>
@@ -796,7 +798,7 @@ export function VideoPlayer({
                                                 }
                                                 console.log('✅ Switched to full subtitles');
                                             } else {
-                                                setSubtitleWarning('Nenhuma legenda completa encontrada.');
+                                                setSubtitleWarning(t('player', 'noFullSubtitlesFound'));
                                                 setTimeout(() => setSubtitleWarning(null), 4000);
                                             }
                                         } catch (error) {
@@ -851,7 +853,7 @@ export function VideoPlayer({
                                                         setTimeout(() => setSubtitleWarning(null), 5000);
                                                     }
                                                 } else {
-                                                    setSubtitleWarning('Nenhuma legenda encontrada para este título.');
+                                                    setSubtitleWarning(t('player', 'noSubtitlesFound'));
                                                     setTimeout(() => setSubtitleWarning(null), 4000);
                                                     console.log('No subtitles found');
                                                 }
@@ -871,7 +873,7 @@ export function VideoPlayer({
                                         }
                                     }
                                 }}
-                                title={subtitleLoading ? 'Buscando legendas...' : (subtitlesEnabled ? `Desativar Legendas (${subtitleLanguage || 'PT'})` : 'Ativar Legendas')}
+                                title={subtitleLoading ? t('player', 'fetchingSubtitles') : (subtitlesEnabled ? `${t('player', 'disableSubtitles')} (${subtitleLanguage || 'PT'})` : t('player', 'enableSubtitles'))}
                                 style={{
                                     color: subtitlesEnabled && !isForcedSubtitle ? '#10b981' : (subtitleLoading ? '#f59e0b' : 'white'),
                                     opacity: subtitleLoading ? 0.7 : 1
@@ -892,7 +894,7 @@ export function VideoPlayer({
                                 <button
                                     className="control-btn"
                                     onClick={() => setShowSettingsMenu(!showSettingsMenu)}
-                                    title="Legendas Forçadas"
+                                    title={t('player', 'forcedSubtitles')}
                                     style={{ color: showSettingsMenu ? '#a855f7' : (!forcedEnabledForSession ? 'rgba(255,255,255,0.4)' : 'white') }}
                                 >
                                     <span style={{ fontSize: 14, fontWeight: 600 }}>F</span>
@@ -918,7 +920,7 @@ export function VideoPlayer({
                                     >
                                         <div style={{ padding: '0 16px 8px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', marginBottom: 8 }}>
                                             <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase' }}>
-                                                Sessão Atual
+                                                {t('player', 'currentSession')}
                                             </span>
                                         </div>
 
@@ -970,12 +972,12 @@ export function VideoPlayer({
                                                             setIsForcedSubtitle(true);
                                                             console.log('✅ Forced subtitles loaded after toggle enable');
                                                         } else {
-                                                            setSubtitleWarning('Nenhuma legenda forçada encontrada');
+                                                            setSubtitleWarning(t('player', 'noForcedSubtitlesFound'));
                                                             setTimeout(() => setSubtitleWarning(null), 4000);
                                                         }
                                                     } catch (e) {
                                                         console.error('Failed to load forced subtitles:', e);
-                                                        setSubtitleWarning('Erro ao carregar legendas forçadas');
+                                                        setSubtitleWarning(t('player', 'errorLoadingSubtitles'));
                                                         setTimeout(() => setSubtitleWarning(null), 4000);
                                                     }
                                                 }

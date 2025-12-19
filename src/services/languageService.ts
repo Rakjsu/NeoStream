@@ -377,7 +377,16 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             fullscreen: 'Tela cheia',
             exitFullscreen: 'Sair da tela cheia',
             nextEpisode: 'Próximo episódio',
-            previousEpisode: 'Episódio anterior'
+            previousEpisode: 'Episódio anterior',
+            forcedSubtitles: 'Legendas Forçadas',
+            currentSession: 'Sessão Atual',
+            noSubtitlesFound: 'Nenhuma legenda encontrada para este título.',
+            noFullSubtitlesFound: 'Nenhuma legenda completa encontrada.',
+            noForcedSubtitlesFound: 'Nenhuma legenda forçada encontrada',
+            fetchingSubtitles: 'Buscando legendas...',
+            enableSubtitles: 'Ativar Legendas',
+            disableSubtitles: 'Desativar Legendas',
+            errorLoadingSubtitles: 'Erro ao carregar legendas forçadas'
         },
         // Notifications
         notifications: {
@@ -908,7 +917,16 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             fullscreen: 'Fullscreen',
             exitFullscreen: 'Exit fullscreen',
             nextEpisode: 'Next episode',
-            previousEpisode: 'Previous episode'
+            previousEpisode: 'Previous episode',
+            forcedSubtitles: 'Forced Subtitles',
+            currentSession: 'Current Session',
+            noSubtitlesFound: 'No subtitles found for this title.',
+            noFullSubtitlesFound: 'No full subtitles found.',
+            noForcedSubtitlesFound: 'No forced subtitles found',
+            fetchingSubtitles: 'Fetching subtitles...',
+            enableSubtitles: 'Enable Subtitles',
+            disableSubtitles: 'Disable Subtitles',
+            errorLoadingSubtitles: 'Error loading forced subtitles'
         },
         home: {
             goodMorning: 'Good morning',
@@ -1392,7 +1410,16 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             fullscreen: 'Pantalla completa',
             exitFullscreen: 'Salir de pantalla completa',
             nextEpisode: 'Siguiente episodio',
-            previousEpisode: 'Episodio anterior'
+            previousEpisode: 'Episodio anterior',
+            forcedSubtitles: 'Subtítulos Forzados',
+            currentSession: 'Sesión Actual',
+            noSubtitlesFound: 'No se encontraron subtítulos para este título.',
+            noFullSubtitlesFound: 'No se encontraron subtítulos completos.',
+            noForcedSubtitlesFound: 'No se encontraron subtítulos forzados',
+            fetchingSubtitles: 'Buscando subtítulos...',
+            enableSubtitles: 'Activar Subtítulos',
+            disableSubtitles: 'Desactivar Subtítulos',
+            errorLoadingSubtitles: 'Error al cargar subtítulos forzados'
         },
         home: {
             goodMorning: 'Buenos días',
