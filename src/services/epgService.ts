@@ -12,16 +12,34 @@ interface EPGProgram {
 
 // Manual channel mappings for mi.tv
 const mitvMappings: Record<string, string> = {
-    // HBO channels
+    // HBO channels (all variations)
     'hbo': 'hbo',
+    'hbo hd': 'hbo',
+    'hbo fhd': 'hbo',
     'hbo 2': 'hbo-2',
+    'hbo 2 hd': 'hbo-2',
+    'hbo 2 fhd': 'hbo-2',
     'hbo2': 'hbo-2',
+    'hbo2 hd': 'hbo-2',
+    'hbo2 fhd': 'hbo-2',
     'hbo family': 'hbo-family-hd',
+    'hbo family hd': 'hbo-family-hd',
+    'hbo family fhd': 'hbo-family-hd',
     'hbo mundi': 'max-1',
+    'hbo mundi hd': 'max-1',
+    'hbo mundi fhd': 'max-1',
     'hbo plus': 'hbo-plus-brasil-hd',
+    'hbo plus hd': 'hbo-plus-brasil-hd',
+    'hbo plus fhd': 'hbo-plus-brasil-hd',
     'hbo pop': 'max-up',
+    'hbo pop hd': 'max-up',
+    'hbo pop fhd': 'max-up',
     'hbo xtreme': 'max-prime',
+    'hbo xtreme hd': 'max-prime',
+    'hbo xtreme fhd': 'max-prime',
     'hbo signature': 'hbo-signature',
+    'hbo signature hd': 'hbo-signature',
+    'hbo signature fhd': 'hbo-signature',
     // Globo regional
     'globo sp': 'globo-sao-paulo-hd',
     'globo rj': 'globo-rio-de-janeiro-hd',
