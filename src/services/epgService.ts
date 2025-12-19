@@ -141,16 +141,15 @@ export const epgService = {
     parseHTML(html: string, channelId: string): EPGProgram[] {
         const programs: EPGProgram[] = [];
 
-        // Pattern to match time, title, and optional episode info
-        // The HTML structure includes: time -> title -> optional "Temporada X Episódio Y - SubTitle"
-        const programPattern = /<span[^>]*class="[^"]*time[^"]*"[^>]*>[\s\S]*?(\d{1,2}:\d{2})[\s\S]*?<\/span>[\s\S]*?<h2[^>]*>([\s\S]*?)<\/h2>[\s\S]*?(?:<[^>]*>[\s\S]*?)?(Temporada\s+\d+\s+Epis[óo]dio\s+\d+[^<]*)?/gi;
+        // Simple pattern to match time and title only
+        const pattern = /<span[^>]*class="[^"]*time[^"]*"[^>]*>[\s\S]*?(\d{1,2}:\d{2})[\s\S]*?<\/span>[\s\S]*?<h2[^>]*>([\s\S]*?)<\/h2>/gi;
 
         const today = new Date();
         let lastHour = -1;
         let dayOffset = 0;
 
         let match;
-        while ((match = programPattern.exec(html)) !== null) {
+        while ((match = pattern.exec(html)) !== null) {
             const time = match[1];
             let title = match[2]
                 .replace(/<[^>]+>/g, '')
@@ -160,20 +159,13 @@ export const epgService = {
                 .replace(/\s+/g, ' ')
                 .trim();
 
-            // Get episode info if available
-            let episodeInfo = match[3] || '';
-            if (episodeInfo) {
-                episodeInfo = episodeInfo
-                    .replace(/<[^>]+>/g, '')
-                    .replace(/&amp;/g, '&')
-                    .replace(/&nbsp;/g, ' ')
-                    .replace(/\s+/g, ' ')
-                    .trim();
+            // Search for episode info in the chunk after this match
+            const matchEnd = match.index + match[0].length;
+            const nextChunk = html.substring(matchEnd, matchEnd + 500);
+            const episodeMatch = nextChunk.match(/Temporada\s+\d+\s+Epis[oó]dio\s+\d+[^<\n]*/i);
 
-                // Combine title with episode info
-                if (episodeInfo) {
-                    title = `${title} - ${episodeInfo}`;
-                }
+            if (episodeMatch) {
+                title = `${title} - ${episodeMatch[0].trim()}`;
             }
 
             if (title.length < 2 || title.length > 200) continue;
