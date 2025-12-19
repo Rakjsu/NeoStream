@@ -104,6 +104,7 @@ export const epgService = {
         'record campinas': 'record-tv-campinas',
         'record rs': 'record-tv-rs',
         // HBO/Max channels (HBO rebranded to Max)
+        'hbo': 'hbo',
         'hbo mundi': 'max',
         'hbo pop': 'max-up',
         'hbo xtreme': 'max-prime',
