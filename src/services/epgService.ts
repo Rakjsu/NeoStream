@@ -106,6 +106,26 @@ export const epgService = {
         // Add more mappings as needed
     } as Record<string, string>,
 
+    // Category fallback mappings - if specific channel EPG not found, use main network EPG
+    categoryFallbacks: [
+        { pattern: /record/i, slug: 'record' },
+        { pattern: /sbt/i, slug: 'sbt' },
+        { pattern: /globo/i, slug: 'rede-globo' },
+        { pattern: /band/i, slug: 'band' },
+        { pattern: /redetv/i, slug: 'redetv' },
+    ],
+
+    // Get fallback slug based on category/channel name
+    getCategoryFallbackSlug(channelName: string): string | null {
+        const normalized = channelName.toLowerCase();
+        for (const fallback of this.categoryFallbacks) {
+            if (fallback.pattern.test(normalized)) {
+                return fallback.slug;
+            }
+        }
+        return null;
+    },
+
     // Generate mi.tv slug from channel name
     generateMiTVSlug(channelName: string): string {
         const normalized = channelName
@@ -150,18 +170,32 @@ export const epgService = {
             if (!slug) return [];
 
             console.log('[EPG] Trying mi.tv with slug:', slug);
-            const result = await window.ipcRenderer.invoke('epg:fetch-mitv', slug);
+            let result = await window.ipcRenderer.invoke('epg:fetch-mitv', slug);
 
+            // Try with -hd suffix if first attempt fails
             if (!result.success || !result.html) {
-                // Try with -hd suffix if first attempt fails
                 const hdSlug = slug + '-hd';
                 console.log('[EPG] Trying mi.tv with HD slug:', hdSlug);
-                const hdResult = await window.ipcRenderer.invoke('epg:fetch-mitv', hdSlug);
-                if (!hdResult.success || !hdResult.html) return [];
-                return this.parseMiTVHTML(hdResult.html, channelName);
+                result = await window.ipcRenderer.invoke('epg:fetch-mitv', hdSlug);
             }
 
-            return this.parseMiTVHTML(result.html, channelName);
+            // Parse if we got a result
+            if (result.success && result.html) {
+                const programs = this.parseMiTVHTML(result.html, channelName);
+                if (programs.length > 0) return programs;
+            }
+
+            // Try category fallback (main network EPG)
+            const fallbackSlug = this.getCategoryFallbackSlug(channelName);
+            if (fallbackSlug && fallbackSlug !== slug) {
+                console.log('[EPG] Trying mi.tv category fallback:', fallbackSlug);
+                const fallbackResult = await window.ipcRenderer.invoke('epg:fetch-mitv', fallbackSlug);
+                if (fallbackResult.success && fallbackResult.html) {
+                    return this.parseMiTVHTML(fallbackResult.html, channelName);
+                }
+            }
+
+            return [];
         } catch (error) {
             console.error('[EPG] mi.tv error:', error);
             return [];
