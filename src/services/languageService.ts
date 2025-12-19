@@ -414,13 +414,13 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             updateInstalled: 'Atualização Instalada!',
             whatsNew: 'Novidades na',
             gotIt: 'Entendi, vamos lá!',
-            // Version 3.1.0
-            i18nTitle: 'PiP Desktop Window',
-            i18nItems: 'Janela independente fora do app (sempre visível)|Arrastar livremente pelo desktop|Salva progresso ao fechar/expandir',
-            profilesTitle: 'Controles do PiP',
-            profilesItems: 'Play/Pause com animação|Barra de progresso clicável|Ícone de volume dinâmico (4 níveis)',
-            fixesTitle: 'Animações',
-            fixesItems: 'Hover e click nos botões (scale + brilho)|Botões Expandir, Fechar e Play animados|Transições suaves em todos controles'
+            // Version 3.2.0
+            i18nTitle: 'Sistema de Legendas Forçadas',
+            i18nItems: 'Toggle nas Configurações para ativar/desativar|Botão F no player para controle por sessão|Carregamento automático ao ativar no player',
+            profilesTitle: 'Filtros de Edições Especiais',
+            profilesItems: 'Rejeita Extended e Directors Cut para forçadas|Suporte a padrões PT (Versão Estendida)|Aviso na tela quando só edições especiais',
+            fixesTitle: 'Correções',
+            fixesItems: 'Toggle sincroniza com localStorage correto|Leitura correta do perfil ativo|Filtros aplicados a séries também'
         },
         // Welcome page
         welcome: {
@@ -778,13 +778,13 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             updateInstalled: 'Update Installed!',
             whatsNew: "What's New in",
             gotIt: "Got it, let's go!",
-            // Version 3.1.0
-            i18nTitle: 'PiP Desktop Window',
-            i18nItems: 'Independent window outside the app (always on top)|Freely draggable across desktop|Saves progress on close/expand',
-            profilesTitle: 'PiP Controls',
-            profilesItems: 'Play/Pause with animation|Clickable progress bar|Dynamic volume icon (4 levels)',
-            fixesTitle: 'Animations',
-            fixesItems: 'Hover and click on buttons (scale + brightness)|Animated Expand, Close and Play buttons|Smooth transitions on all controls'
+            // Version 3.2.0
+            i18nTitle: 'Forced Subtitles System',
+            i18nItems: 'Toggle in Settings to enable/disable|F button in player for session control|Auto-load when enabled in player',
+            profilesTitle: 'Special Edition Filters',
+            profilesItems: 'Rejects Extended and Directors Cut for forced|PT pattern support (Versão Estendida)|Screen warning when only special editions',
+            fixesTitle: 'Bug Fixes',
+            fixesItems: 'Toggle syncs with localStorage correctly|Correct active profile reading|Filters applied to series too'
         },
         // Welcome page
         welcome: {
@@ -1267,13 +1267,13 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             updateInstalled: '¡Actualización Instalada!',
             whatsNew: 'Novedades en',
             gotIt: '¡Entendido, vamos!',
-            // Version 2.9.0
-            i18nTitle: 'Rediseño de Interfaz',
-            i18nItems: 'Página Welcome rediseñada con animaciones|Página de Login premium con degradados|Panel de Configuración deslizante|Pantallas de error estilizadas para TV, Películas y Series',
-            profilesTitle: 'Traducciones Mejoradas',
-            profilesItems: 'Todos los mensajes de error traducidos|Traducción de URL inválida|Badge de login traducido',
+            // Version 3.2.0
+            i18nTitle: 'Sistema de Subtítulos Forzados',
+            i18nItems: 'Toggle en Configuración para activar/desactivar|Botón F en el reproductor para control por sesión|Carga automática al activar en el reproductor',
+            profilesTitle: 'Filtros de Ediciones Especiales',
+            profilesItems: 'Rechaza Extended y Directors Cut para forzados|Soporte a patrones PT (Versão Estendida)|Aviso en pantalla cuando solo ediciones especiales',
             fixesTitle: 'Correcciones',
-            fixesItems: 'Notificaciones eliminadas al marcar como leída|Errores de escape en cadenas corregidos'
+            fixesItems: 'Toggle sincroniza con localStorage correctamente|Lectura correcta del perfil activo|Filtros aplicados a series también'
         },
         // Welcome page
         welcome: {

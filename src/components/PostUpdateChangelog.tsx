@@ -7,282 +7,6 @@ interface ChangelogEntry {
     items: string[];
 }
 
-interface VersionChangelog {
-    [version: string]: ChangelogEntry[];
-}
-
-const changelogs: VersionChangelog = {
-    '3.1.0': [
-        {
-            icon: '🖼️',
-            title: 'PiP Desktop Window',
-            items: [
-                'Janela independente fora do app (sempre visível)',
-                'Arrastar livremente pelo desktop',
-                'Salva progresso ao fechar/expandir',
-            ]
-        },
-        {
-            icon: '🎮',
-            title: 'Controles do PiP',
-            items: [
-                'Play/Pause com animação',
-                'Barra de progresso clicável',
-                'Ícone de volume dinâmico (4 níveis)',
-            ]
-        },
-        {
-            icon: '✨',
-            title: 'Animações',
-            items: [
-                'Hover e click nos botões (scale + brilho)',
-                'Botões Expandir, Fechar e Play animados',
-            ]
-        },
-    ],
-    '3.0.0': [
-        {
-            icon: '🎬',
-            title: 'Sistema de Legendas Forçadas',
-            items: [
-                'Toggle nas Configurações para ativar/desativar',
-                'Botão F no player para controle por sessão',
-                'Carregamento automático ao ativar no player',
-            ]
-        },
-        {
-            icon: '🎭',
-            title: 'Filtros de Edições Especiais',
-            items: [
-                'Rejeita Extended e Directors Cut para forçadas',
-                'Suporte a padrões PT (Versão Estendida)',
-                'Aviso na tela quando só edições especiais',
-            ]
-        },
-        {
-            icon: '🔧',
-            title: 'Correções',
-            items: [
-                'Toggle sincroniza com localStorage correto',
-                'Leitura correta do perfil ativo',
-                'Filtros aplicados a séries também',
-            ]
-        },
-    ],
-    '2.8.0': [], // Dynamic from translations
-    '2.7.0': [
-        {
-            icon: '🖼️',
-            title: 'Picture-in-Picture (PiP)',
-            items: [
-                'Modo janela flutuante para assistir enquanto navega',
-                'Janela arrastável e redimensionável',
-                'Controles de play/pause, volume e barra de progresso',
-                'Botão de expandir para voltar ao player completo',
-            ]
-        },
-        {
-            icon: '📊',
-            title: 'Estatísticas de Uso',
-            items: [
-                'Rastreamento de tempo de visualização por perfil',
-                'Breakdown por tipo de conteúdo (Filmes, Séries, TV)',
-                'Sequência de dias assistindo (Watch Streak)',
-                'Gráfico semanal de tempo assistido',
-            ]
-        },
-        {
-            icon: '🔔',
-            title: 'Sistema de Notificações',
-            items: [
-                'Notificações de novos episódios de séries favoritas',
-                'Notificações de downloads concluídos/falhos',
-                'Painel de notificações no sidebar',
-            ]
-        },
-        {
-            icon: '📡',
-            title: 'Melhorias Gerais',
-            items: [
-                'Volume slider no mini player com hover',
-                'Correções de bugs no player de vídeo',
-            ]
-        },
-    ],
-    '2.6.0': [
-        {
-            icon: '🛡️',
-            title: 'Proteção contra Duplicados',
-            items: [
-                'Prevenção de downloads duplicados de filmes e episódios',
-                'Cada serie pode ser baixada apenas uma vez',
-                'Sistema inteligente de verificação de fila',
-            ]
-        },
-        {
-            icon: '📺',
-            title: 'Melhorias de Séries',
-            items: [
-                'Temporadas combinam com o modal de detalhes',
-                'Botão de deletar série diretamente no card',
-                'Modal atualiza automaticamente após exclusões',
-            ]
-        },
-        {
-            icon: '🖼️',
-            title: 'Otimização de Imagens',
-            items: [
-                'Capas otimizadas usando URL HTTP',
-                'Metadados de série aprimorados',
-                'Melhor carregamento de posters',
-            ]
-        },
-        {
-            icon: '⚙️',
-            title: 'Configurações',
-            items: [
-                'Seção de Atualizações reorganizada nas configurações',
-                'Última verificação de atualizações exibida',
-            ]
-        },
-    ],
-    '1.5.0': [
-        {
-            icon: '📥',
-            title: 'Downloads Offline',
-            items: [
-                'Baixe filmes e séries para assistir offline',
-                'Organização por pastas: Serie/Temporada/Episódio',
-                'Modal de série offline com temporadas e episódios',
-            ]
-        },
-        {
-            icon: '📂',
-            title: 'Gestão de Downloads',
-            items: [
-                'Botão para baixar temporada inteira ou episódio',
-                'Prevenção de downloads duplicados',
-                'Notificações nativas do Windows ao completar',
-            ]
-        },
-        {
-            icon: '🎬',
-            title: 'Playback Offline',
-            items: [
-                'Clique em conteúdo baixado para assistir offline',
-                'Player usa arquivo local automaticamente',
-                'Funciona sem conexão com internet',
-            ]
-        },
-    ],
-    '2.4.8': [
-        {
-            icon: '📺',
-            title: 'Próximo Episódio Inteligente',
-            items: [
-                'Auto-seleção do próximo episódio quando atual >90% completo',
-                'Toggle "Auto-play próximo episódio" nas configurações',
-                'Se desativado, próximo ep carrega mas fica pausado',
-            ]
-        },
-        {
-            icon: '🎬',
-            title: 'Codificador de Vídeo',
-            items: [
-                'Seleção de codec preferido (H.264, H.265, VP9)',
-                'Player prioriza streams com codec selecionado',
-            ]
-        },
-        {
-            icon: '🔤',
-            title: 'Legendas no Player',
-            items: [
-                'Botão de legendas (CC) nos controles',
-                'Changelog dinâmico por versão',
-            ]
-        },
-    ],
-    '2.4.7': [
-        {
-            icon: '🎬',
-            title: 'Correções do Player',
-            items: [
-                'Corrigido player reinicializando múltiplas vezes',
-                'Corrigido vídeo "voltando no tempo" ao retomar',
-                'Melhorada estabilidade do sistema de resume',
-            ]
-        },
-        {
-            icon: '🧠',
-            title: 'Buffer Inteligente',
-            items: [
-                'Sistema adaptativo baseado na velocidade da conexão',
-                'Menos travamentos em conexões instáveis',
-            ]
-        },
-    ],
-    '2.4.6': [
-        {
-            icon: '🧠',
-            title: 'Buffer Inteligente',
-            items: [
-                'Novo sistema de buffer adaptativo',
-                'Detecta velocidade da conexão automaticamente',
-                'Otimiza reprodução para sua internet',
-            ]
-        },
-    ],
-    '2.4.5': [
-        {
-            icon: '🔄',
-            title: 'Sistema de Atualização',
-            items: [
-                'Corrigido modal de atualização aparecendo em loop',
-                'Melhorada detecção de versão disponível',
-            ]
-        },
-    ],
-    '2.4.4': [
-        {
-            icon: '🔄',
-            title: 'Auto-Update',
-            items: [
-                'Corrigido download de atualizações',
-                'Melhor tratamento de erros de rede',
-            ]
-        },
-    ],
-    'default': [
-        {
-            icon: '🎬',
-            title: 'Sistema de Legendas Forçadas',
-            items: [
-                'Toggle nas Configurações para ativar/desativar',
-                'Botão F no player para controle por sessão',
-                'Carregamento automático ao ativar no player',
-            ]
-        },
-        {
-            icon: '🎭',
-            title: 'Filtros de Edições Especiais',
-            items: [
-                'Rejeita Extended e Directors Cut para forçadas',
-                'Suporte a padrões PT (Versão Estendida)',
-                'Aviso na tela quando só edições especiais',
-            ]
-        },
-        {
-            icon: '�',
-            title: 'Correções',
-            items: [
-                'Toggle sincroniza com localStorage correto',
-                'Leitura correta do perfil ativo',
-                'Filtros aplicados a séries também',
-            ]
-        },
-    ],
-};
-
 interface PostUpdateChangelogProps {
     // No props needed, it manages its own state
 }
@@ -311,28 +35,25 @@ export function PostUpdateChangelog({ }: PostUpdateChangelogProps) {
         setIsVisible(false);
     };
 
-    // Get changelog for current version - dynamic for 2.8.0, fallback for others
+    // Always get changelog from translations (supports PT/EN/ES)
     const getChangelog = (): ChangelogEntry[] => {
-        if (__APP_VERSION__ === '2.8.0') {
-            return [
-                {
-                    icon: '🌐',
-                    title: t('changelog', 'i18nTitle'),
-                    items: t('changelog', 'i18nItems').split('|')
-                },
-                {
-                    icon: '👥',
-                    title: t('changelog', 'profilesTitle'),
-                    items: t('changelog', 'profilesItems').split('|')
-                },
-                {
-                    icon: '🐛',
-                    title: t('changelog', 'fixesTitle'),
-                    items: t('changelog', 'fixesItems').split('|')
-                }
-            ];
-        }
-        return changelogs[__APP_VERSION__] || changelogs['default'];
+        return [
+            {
+                icon: '🌐',
+                title: t('changelog', 'i18nTitle'),
+                items: t('changelog', 'i18nItems').split('|')
+            },
+            {
+                icon: '👥',
+                title: t('changelog', 'profilesTitle'),
+                items: t('changelog', 'profilesItems').split('|')
+            },
+            {
+                icon: '🐛',
+                title: t('changelog', 'fixesTitle'),
+                items: t('changelog', 'fixesItems').split('|')
+            }
+        ];
     };
 
     const currentChangelog = getChangelog();
