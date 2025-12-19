@@ -222,6 +222,8 @@ export const epgService = {
         // Pattern: Look for time span followed by h2 title
         const programPattern = /<span[^>]*class="[^"]*time[^"]*"[^>]*>[\s\S]*?(\d{1,2}:\d{2})[\s\S]*?<\/span>[\s\S]*?<h2[^>]*>([\s\S]*?)<\/h2>/gi;
 
+        console.log('[EPG] Parsing with today:', today.toISOString());
+
         let match;
         while ((match = programPattern.exec(html)) !== null) {
             const time = match[1];
@@ -248,6 +250,11 @@ export const epgService = {
 
             const endDate = new Date(startDate);
             endDate.setHours(endDate.getHours() + 1);
+
+            // Log first 3 programs for debugging
+            if (programs.length < 3) {
+                console.log(`[EPG] Program ${programs.length + 1}: ${time} - ${title.substring(0, 30)}... -> ${startDate.toLocaleTimeString()}`);
+            }
 
             programs.push({
                 id: `mitv-${startDate.getTime()}`,
