@@ -68,13 +68,28 @@ export const epgService = {
         if (xcPrograms.length > 0) return xcPrograms;
 
         if (channelName) {
-            // Try mi.tv second (more reliable for Brazilian channels)
-            const mitvPrograms = await this.fetchFromMiTV(channelName);
-            if (mitvPrograms.length > 0) return mitvPrograms;
+            const normalized = channelName.toLowerCase().trim();
 
-            // Try meuguia.tv as fallback
-            const meuguiaPrograms = await this.fetchFromMeuGuia(channelName);
-            if (meuguiaPrograms.length > 0) return meuguiaPrograms;
+            // For HBO channels, try meuguia.tv FIRST (mi.tv has outdated data)
+            const isHboChannel = normalized.includes('hbo');
+
+            if (isHboChannel) {
+                console.log('[EPG] HBO channel detected, trying meuguia.tv first');
+                const meuguiaPrograms = await this.fetchFromMeuGuia(channelName);
+                if (meuguiaPrograms.length > 0) return meuguiaPrograms;
+
+                // Fall back to mi.tv if meuguia.tv fails
+                const mitvPrograms = await this.fetchFromMiTV(channelName);
+                if (mitvPrograms.length > 0) return mitvPrograms;
+            } else {
+                // For other channels, try mi.tv first
+                const mitvPrograms = await this.fetchFromMiTV(channelName);
+                if (mitvPrograms.length > 0) return mitvPrograms;
+
+                // Try meuguia.tv as fallback
+                const meuguiaPrograms = await this.fetchFromMeuGuia(channelName);
+                if (meuguiaPrograms.length > 0) return meuguiaPrograms;
+            }
         }
 
         return [];
