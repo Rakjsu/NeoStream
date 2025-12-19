@@ -1091,7 +1091,7 @@ export function Home() {
                 .content-card:hover {
                     transform: scale(1.08);
                     box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
-                    z-index: 100;
+                    z-index: 200;
                 }
                 .content-card .preview-overlay {
                     opacity: 0;
@@ -1102,10 +1102,12 @@ export function Home() {
                 }
                 .content-card .remove-btn {
                     opacity: 0;
-                    transition: opacity 0.2s;
+                    transition: opacity 0.2s, transform 0.2s;
+                    z-index: 300 !important;
                 }
                 .content-card:hover .remove-btn {
                     opacity: 1;
+                    transform: scale(1.1);
                 }
                 .kids-block-toast {
                     position: fixed;
