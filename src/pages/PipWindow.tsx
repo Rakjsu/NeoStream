@@ -327,13 +327,15 @@ export function PipWindow() {
                 <div style={{ display: 'flex', gap: 4, WebkitAppRegion: 'no-drag' as any }}>
                     <button
                         onClick={handleExpand}
+                        className="pip-btn pip-btn-expand"
                         style={{
                             background: 'rgba(255,255,255,0.2)',
                             border: 'none',
                             borderRadius: 4,
                             padding: 6,
                             cursor: 'pointer',
-                            display: 'flex'
+                            display: 'flex',
+                            transition: 'all 0.2s ease'
                         }}
                         title="Expandir"
                     >
@@ -341,13 +343,15 @@ export function PipWindow() {
                     </button>
                     <button
                         onClick={handleClose}
+                        className="pip-btn pip-btn-close"
                         style={{
                             background: 'rgba(239, 68, 68, 0.6)',
                             border: 'none',
                             borderRadius: 4,
                             padding: 6,
                             cursor: 'pointer',
-                            display: 'flex'
+                            display: 'flex',
+                            transition: 'all 0.2s ease'
                         }}
                         title="Fechar"
                     >
@@ -370,13 +374,15 @@ export function PipWindow() {
             }}>
                 <button
                     onClick={handleTogglePlay}
+                    className="pip-btn pip-btn-play"
                     style={{
                         background: 'rgba(139, 92, 246, 0.8)',
                         border: 'none',
                         borderRadius: 6,
                         padding: 8,
                         cursor: 'pointer',
-                        display: 'flex'
+                        display: 'flex',
+                        transition: 'all 0.2s ease'
                     }}
                 >
                     {isPlaying ? <FaPause size={12} color="white" /> : <FaPlay size={12} color="white" />}
@@ -479,6 +485,25 @@ export function PipWindow() {
             <style>{`
                 @keyframes spin {
                     to { transform: rotate(360deg); }
+                }
+                .pip-btn {
+                    transition: all 0.2s ease;
+                }
+                .pip-btn:hover {
+                    transform: scale(1.15);
+                    filter: brightness(1.2);
+                }
+                .pip-btn:active {
+                    transform: scale(0.95);
+                }
+                .pip-btn-close:hover {
+                    background: rgba(239, 68, 68, 0.9) !important;
+                }
+                .pip-btn-expand:hover {
+                    background: rgba(255,255,255,0.35) !important;
+                }
+                .pip-btn-play:hover {
+                    background: rgba(139, 92, 246, 1) !important;
                 }
             `}</style>
         </div>
