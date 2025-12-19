@@ -63,6 +63,18 @@ const mitvMappings: Record<string, string> = {
     // Arte1
     'arte1': 'arte-1',
     'arte 1': 'arte-1',
+    // RIT
+    'rit': 'rit',
+    'rit tv': 'rit',
+    // Canção Nova
+    'cancao nova': 'canc-o-nova',
+    'canção nova': 'canc-o-nova',
+    // Boa Vontade TV
+    'boa vontade tv': 'boa-vontade-tv',
+    'boa vontade': 'boa-vontade-tv',
+    // Rede CNT
+    'cnt': 'cnt',
+    'rede cnt': 'cnt',
 };
 
 // Manual channel mappings for meuguia.tv (fallback)
