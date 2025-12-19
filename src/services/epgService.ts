@@ -130,19 +130,22 @@ export const epgService = {
     parseMiTVHTML(html: string, channelId: string): EPGProgram[] {
         const programs: EPGProgram[] = [];
 
-        // mi.tv uses a structure like:
-        // <li class="program-link">...<time>HH:MM</time>...<h3>Title</h3>...</li>
-        // or embedded JSON data in script tags
-
-        // Try to find program data in the HTML
-        // Pattern 1: Look for time and title pairs
-        const programPattern = /<li[^>]*class="[^"]*program[^"]*"[^>]*>[\s\S]*?<time[^>]*>(\d{1,2}:\d{2})<\/time>[\s\S]*?<h[23][^>]*>([^<]+)<\/h[23]>/gi;
+        // mi.tv actual structure (discovered via browser):
+        // <a class="program-link">
+        //   <span><font><font>HH:MM</font></font></span>
+        //   <h2><img...><font><font>Title</font></font></h2>
+        // </a>
 
         const today = new Date();
-        let match;
         let lastHour = -1;
         let dayOffset = 0;
 
+        // Pattern 1: Look for program-link anchors with time in span and title in h2
+        // The time is in format: <span...><font><font>HH:MM</font></font></span>
+        // The title is in format: <h2...><font><font>Title</font></font></h2>
+        const programPattern = /<a[^>]*class="[^"]*program-link[^"]*"[^>]*>[\s\S]*?<span[^>]*>[\s\S]*?(\d{1,2}:\d{2})[\s\S]*?<\/span>[\s\S]*?<h2[^>]*>[\s\S]*?<font[^>]*>\s*<font[^>]*>([^<]+)<\/font>/gi;
+
+        let match;
         while ((match = programPattern.exec(html)) !== null) {
             const time = match[1];
             let title = match[2].trim()
@@ -154,6 +157,7 @@ export const epgService = {
             if (title.length < 2) continue;
 
             const [hours, minutes] = time.split(':').map(Number);
+            if (hours > 23 || minutes > 59) continue;
 
             // Handle day rollover
             if (lastHour !== -1 && hours < lastHour - 2) dayOffset++;
@@ -176,9 +180,10 @@ export const epgService = {
             });
         }
 
-        // If pattern 1 didn't work, try pattern 2: simpler time-title extraction
+        // If pattern 1 didn't work, try pattern 2: simpler extraction
         if (programs.length === 0) {
-            const simplePattern = /(\d{1,2}:\d{2})[\s\S]{0,100}?<[^>]*>([^<]{3,50})<\/[^>]+>/gi;
+            // Simpler pattern: look for any time followed by text within reasonable distance
+            const simplePattern = />(\d{1,2}:\d{2})<[\s\S]{0,200}?<font[^>]*>\s*<font[^>]*>([^<]{3,80})<\/font>/gi;
             let dayOffset2 = 0;
             let lastHour2 = -1;
 
@@ -187,7 +192,7 @@ export const epgService = {
                 let title = match[2].trim();
 
                 // Skip if looks like navigation/UI text
-                if (/^(hoje|amanhã|ontem|ver|mais|fechar)/i.test(title)) continue;
+                if (/^(hoje|amanhã|ontem|ver|mais|fechar|programação|canal)/i.test(title)) continue;
                 if (title.length < 3 || title.length > 100) continue;
 
                 const [hours, minutes] = time.split(':').map(Number);
