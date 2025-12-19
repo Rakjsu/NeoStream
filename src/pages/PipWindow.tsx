@@ -3,11 +3,13 @@
  * Rendered in the independent PiP BrowserWindow
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { FaPlay, FaPause, FaTimes, FaExpand, FaVolumeUp, FaVolumeMute } from 'react-icons/fa';
 import { useHls } from '../hooks/useHls';
 import { useVideoPlayer } from '../hooks/useVideoPlayer';
 import { useSearchParams } from 'react-router-dom';
+import { movieProgressService } from '../services/movieProgressService';
+import { watchProgressService } from '../services/watchProgressService';
 
 interface PipContent {
     src: string;
@@ -211,13 +213,42 @@ export function PipWindow() {
         };
     }, [isPlaying]);
 
+    // Save progress to localStorage
+    const saveProgress = () => {
+        if (!content || !videoRef.current) return;
+        const time = videoRef.current.currentTime;
+        const dur = videoRef.current.duration || 0;
+        if (time <= 0 || dur <= 0) return;
+
+        if (content.contentType === 'movie' && content.contentId) {
+            movieProgressService.saveMovieTime(
+                content.contentId,
+                content.title,
+                time,
+                dur
+            );
+            console.log('[PiP] Saved movie progress:', content.title, time, '/', dur);
+        } else if (content.contentType === 'series' && content.contentId && content.seasonNumber && content.episodeNumber) {
+            watchProgressService.saveVideoTime(
+                content.contentId,
+                content.seasonNumber,
+                content.episodeNumber,
+                time,
+                dur
+            );
+            console.log('[PiP] Saved series progress:', content.title, `S${content.seasonNumber}E${content.episodeNumber}`, time, '/', dur);
+        }
+    };
+
     const handleClose = () => {
+        saveProgress();
         if (window.ipcRenderer) {
             window.ipcRenderer.invoke('pip:close', {});
         }
     };
 
     const handleExpand = async () => {
+        saveProgress();
         if (window.ipcRenderer && content) {
             await window.ipcRenderer.invoke('pip:expand', {
                 ...content,
