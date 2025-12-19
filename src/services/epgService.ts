@@ -22,18 +22,39 @@ const mitvMappings: Record<string, string> = {
     'hbo pop': 'max-up',
     'hbo xtreme': 'max-prime',
     'hbo signature': 'hbo-signature',
-    // Globo regional
+    // Globo
+    'globo': 'rede-globo',
+    'rede globo': 'rede-globo',
     'globo sp': 'globo-sao-paulo-hd',
     'globo rj': 'globo-rio-de-janeiro-hd',
     // SBT
     'sbt sp': 'sbt-s-o-paulo',
     // Record
     'record sp': 'recordtv-s-o-paulo-hd',
+    // TV Gazeta
+    'tv gazeta': 'tv-gazeta-hd',
+    'gazeta': 'tv-gazeta-hd',
+    // TNT
+    'tnt series': 'tnt-series-hd',
+    // Discovery channels
+    'discovery': 'discovery',
+    'discovery channel': 'discovery',
+    'disc turbo': 'discovery-turbo',
+    'discovery turbo': 'discovery-turbo',
+    'disc home & health': 'discovery-home-health',
+    'discovery home & health': 'discovery-home-health',
+    'discovery home and health': 'discovery-home-health',
+    // Cartoon Network
+    'cartoon network': 'cartoon',
+    'cartoon': 'cartoon',
 };
 
 // Manual channel mappings for meuguia.tv (fallback)
 const meuguiaMappings: Record<string, string> = {
     'hbo signature': 'HFE',
+    'combate': '135',
+    'espn 5': 'ES5',
+    'espn5': 'ES5',
 };
 
 export const epgService = {
