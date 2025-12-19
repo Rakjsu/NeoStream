@@ -47,6 +47,22 @@ const mitvMappings: Record<string, string> = {
     // Cartoon Network
     'cartoon network': 'cartoon',
     'cartoon': 'cartoon',
+    // Play TV
+    'play tv': 'play-tv',
+    'playtv': 'play-tv',
+    // Lifetime
+    'lifetime': 'lifetime-brazil',
+    // Fish TV
+    'fish tv': 'fishtv',
+    'fishtv': 'fishtv',
+    // Cinebrasil TV
+    'cinebrasil tv': 'cinebrasil-tv',
+    'cinebrasil': 'cinebrasil-tv',
+    // Chef TV
+    'chef tv': 'chef-tv',
+    // Arte1
+    'arte1': 'arte-1',
+    'arte 1': 'arte-1',
 };
 
 // Manual channel mappings for meuguia.tv (fallback)
