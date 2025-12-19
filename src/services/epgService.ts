@@ -141,15 +141,16 @@ export const epgService = {
     parseHTML(html: string, channelId: string): EPGProgram[] {
         const programs: EPGProgram[] = [];
 
-        // Pattern to match time and title
-        const pattern = /<span[^>]*class="[^"]*time[^"]*"[^>]*>[\s\S]*?(\d{1,2}:\d{2})[\s\S]*?<\/span>[\s\S]*?<h2[^>]*>([\s\S]*?)<\/h2>/gi;
+        // Pattern to match time, title, and optional episode info
+        // The HTML structure includes: time -> title -> optional "Temporada X Episódio Y - SubTitle"
+        const programPattern = /<span[^>]*class="[^"]*time[^"]*"[^>]*>[\s\S]*?(\d{1,2}:\d{2})[\s\S]*?<\/span>[\s\S]*?<h2[^>]*>([\s\S]*?)<\/h2>[\s\S]*?(?:<[^>]*>[\s\S]*?)?(Temporada\s+\d+\s+Epis[óo]dio\s+\d+[^<]*)?/gi;
 
         const today = new Date();
         let lastHour = -1;
         let dayOffset = 0;
 
         let match;
-        while ((match = pattern.exec(html)) !== null) {
+        while ((match = programPattern.exec(html)) !== null) {
             const time = match[1];
             let title = match[2]
                 .replace(/<[^>]+>/g, '')
@@ -159,7 +160,23 @@ export const epgService = {
                 .replace(/\s+/g, ' ')
                 .trim();
 
-            if (title.length < 2 || title.length > 150) continue;
+            // Get episode info if available
+            let episodeInfo = match[3] || '';
+            if (episodeInfo) {
+                episodeInfo = episodeInfo
+                    .replace(/<[^>]+>/g, '')
+                    .replace(/&amp;/g, '&')
+                    .replace(/&nbsp;/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+
+                // Combine title with episode info
+                if (episodeInfo) {
+                    title = `${title} - ${episodeInfo}`;
+                }
+            }
+
+            if (title.length < 2 || title.length > 200) continue;
 
             const [hours, minutes] = time.split(':').map(Number);
             if (hours > 23 || minutes > 59) continue;
