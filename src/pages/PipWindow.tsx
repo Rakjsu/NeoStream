@@ -3,7 +3,7 @@
  * Rendered in the independent PiP BrowserWindow
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { FaPlay, FaPause, FaTimes, FaExpand, FaVolumeUp, FaVolumeMute, FaVolumeDown, FaVolumeOff } from 'react-icons/fa';
 import { useHls } from '../hooks/useHls';
 import { useVideoPlayer } from '../hooks/useVideoPlayer';
@@ -32,7 +32,31 @@ export function PipWindow() {
     const [duration, setDuration] = useState(0);
     const [volume, setVolume] = useState(1);
     const [isMuted, setIsMuted] = useState(false);
+    const [showControls, setShowControls] = useState(true);
     const { videoRef } = useVideoPlayer();
+    const hideControlsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Auto-hide controls after 3 seconds of inactivity
+    const resetHideTimeout = () => {
+        setShowControls(true);
+        if (hideControlsTimeout.current) {
+            clearTimeout(hideControlsTimeout.current);
+        }
+        hideControlsTimeout.current = setTimeout(() => {
+            if (isPlaying) {
+                setShowControls(false);
+            }
+        }, 3000);
+    };
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (hideControlsTimeout.current) {
+                clearTimeout(hideControlsTimeout.current);
+            }
+        };
+    }, []);
 
     // Parse content from URL
     useEffect(() => {
@@ -276,16 +300,21 @@ export function PipWindow() {
     }
 
     return (
-        <div style={{
-            width: '100vw',
-            height: '100vh',
-            background: '#000',
-            borderRadius: 12,
-            overflow: 'hidden',
-            position: 'relative',
-            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.6)',
-            border: '1px solid rgba(139, 92, 246, 0.4)',
-        }}>
+        <div
+            style={{
+                width: '100vw',
+                height: '100vh',
+                background: '#000',
+                borderRadius: 12,
+                overflow: 'hidden',
+                position: 'relative',
+                boxShadow: '0 10px 40px rgba(0, 0, 0, 0.6)',
+                border: '1px solid rgba(139, 92, 246, 0.4)',
+            }}
+            onMouseMove={resetHideTimeout}
+            onMouseEnter={() => setShowControls(true)}
+            onMouseLeave={() => isPlaying && setShowControls(false)}
+        >
             {/* Video */}
             <video
                 ref={videoRef}
@@ -310,7 +339,10 @@ export function PipWindow() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    cursor: 'grab'
+                    cursor: 'grab',
+                    opacity: showControls ? 1 : 0,
+                    transition: 'opacity 0.3s ease',
+                    pointerEvents: showControls ? 'auto' : 'none',
                 }}
             >
                 <span style={{
@@ -370,7 +402,10 @@ export function PipWindow() {
                 background: 'linear-gradient(0deg, rgba(0,0,0,0.8) 0%, transparent 100%)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8
+                gap: 8,
+                opacity: showControls ? 1 : 0,
+                transition: 'opacity 0.3s ease',
+                pointerEvents: showControls ? 'auto' : 'none',
             }}>
                 <button
                     onClick={handleTogglePlay}
