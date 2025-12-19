@@ -170,12 +170,15 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
 
     // Get next episode info for auto-advance in PiP
     ipcMain.handle('pip:getNextEpisode', async (_event, data: { seriesId: string; currentSeason: number; currentEpisode: number }) => {
+        console.log('[PiP Main] getNextEpisode request:', data);
         // Forward request to main window and wait for response
         if (mainWindow && !mainWindow.isDestroyed()) {
             return new Promise((resolve) => {
                 const responseChannel = `pip:nextEpisodeResponse:${Date.now()}`;
+                console.log('[PiP Main] Waiting for response on:', responseChannel);
 
                 const handler = (_event: any, response: any) => {
+                    console.log('[PiP Main] Received response:', response);
                     ipcMain.removeListener(responseChannel, handler);
                     resolve(response);
                 };
@@ -190,6 +193,7 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
 
                 // Timeout after 10 seconds
                 setTimeout(() => {
+                    console.log('[PiP Main] Timeout waiting for response');
                     ipcMain.removeListener(responseChannel, handler);
                     resolve(null);
                 }, 10000);
