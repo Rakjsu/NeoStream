@@ -10,15 +10,6 @@ const OPENSUBTITLES_PASSWORD = '05062981';
 let cachedToken: string | null = null;
 let tokenExpiry: number = 0;
 
-// Window type for IPC
-declare global {
-    interface Window {
-        ipcRenderer?: {
-            invoke: (channel: string, data: any) => Promise<any>;
-        };
-    }
-}
-
 interface SubtitleResult {
     id: string;
     language: string;

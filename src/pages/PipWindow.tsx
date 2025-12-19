@@ -299,6 +299,7 @@ export function PipWindow() {
 
             {/* Title Bar - Draggable zone */}
             <div
+                className="pip-title-bar"
                 style={{
                     position: 'absolute',
                     top: 0,
@@ -309,7 +310,6 @@ export function PipWindow() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    WebkitAppRegion: 'drag' as any, // Make title bar draggable
                     cursor: 'grab'
                 }}
             >
@@ -324,7 +324,7 @@ export function PipWindow() {
                 }}>
                     {content.title}
                 </span>
-                <div style={{ display: 'flex', gap: 4, WebkitAppRegion: 'no-drag' as any }}>
+                <div className="pip-title-buttons" style={{ display: 'flex', gap: 4 }}>
                     <button
                         onClick={handleExpand}
                         className="pip-btn pip-btn-expand"
@@ -516,6 +516,12 @@ export function PipWindow() {
                 }
                 .pip-btn-play:hover {
                     background: rgba(139, 92, 246, 1) !important;
+                }
+                .pip-title-bar {
+                    -webkit-app-region: drag;
+                }
+                .pip-title-buttons {
+                    -webkit-app-region: no-drag;
                 }
             `}</style>
         </div>
