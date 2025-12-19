@@ -100,6 +100,27 @@ const mitvMappings: Record<string, string> = {
     'discovery theater': 'discovery-theater-hd',
     'discovery theatre': 'discovery-theater-hd',
     'discovery world': 'discovery-world-hd',
+    // Band
+    'band': 'band',
+    'band sp': 'band',
+    'band minas': 'band-minas',
+    'band mg': 'band-minas',
+    'band rs': 'band-rio-grande-do-sul-hd',
+    'band rio grande do sul': 'band-rio-grande-do-sul-hd',
+    // Canal Futura
+    'canal futura': 'futura',
+    'futura': 'futura',
+    // Cultura
+    'cultura': 'cultura',
+    'tv cultura': 'cultura',
+    // Loading
+    'loading': 'loading',
+    // RedeTV
+    'redetv': 'rede-tv',
+    'rede tv': 'rede-tv',
+    // TV Justiça
+    'tv justica': 'tv-justica-1',
+    'tv justiça': 'tv-justica-1',
 };
 
 // Manual channel mappings for meuguia.tv (fallback)
@@ -176,8 +197,8 @@ export const epgService = {
             .trim()
             // Remove codec info: (H265), (H264), (HEVC), etc.
             .replace(/\s*\(?(h\.?265|h\.?264|hevc|avc)\)?/gi, '')
-            // Remove quality: [FHD], [HD], [SD], [4K], [UHD], [M] or FHD, HD, SD, 4K, UHD
-            .replace(/\s*\[?(fhd|hd|sd|4k|uhd|m)\]?\s*$/i, '')
+            // Remove quality/tags: [FHD], [HD], [SD], [4K], [UHD], [M], [P] etc.
+            .replace(/\s*\[?(fhd|hd|sd|4k|uhd|m|p)\]?\s*$/i, '')
             .trim();
 
         console.log('[EPG] Channel normalized:', channelName, '->', normalized);
@@ -206,7 +227,7 @@ export const epgService = {
             .toLowerCase()
             .trim()
             .replace(/\s*\(?(h\.?265|h\.?264|hevc|avc)\)?/gi, '')
-            .replace(/\s*\[?(fhd|hd|sd|4k|uhd|m)\]?\s*$/i, '')
+            .replace(/\s*\[?(fhd|hd|sd|4k|uhd|m|p)\]?\s*$/i, '')
             .trim();
         return meuguiaMappings[normalized] || null;
     },
