@@ -276,6 +276,16 @@ export const epgService = {
         return null;
     },
 
+    // Get upcoming programs (after current)
+    getUpcomingPrograms(programs: EPGProgram[], current: EPGProgram | null, count: number): EPGProgram[] {
+        if (!current || programs.length === 0) return [];
+
+        const currentIndex = programs.findIndex(p => p.id === current.id);
+        if (currentIndex < 0) return [];
+
+        return programs.slice(currentIndex + 1, currentIndex + 1 + count);
+    },
+
     // Format time for display (shows in local time)
     formatTime(isoString: string): string {
         const date = new Date(isoString);
