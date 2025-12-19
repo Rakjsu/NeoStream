@@ -97,6 +97,12 @@ export const epgService = {
         'globo minas': 'globo-belo-horizonte-hd',
         // SBT regional channels
         'sbt sp': 'sbt-s-o-paulo',
+        // Record TV regional channels
+        'record itapoan': 'record-tv-itapoan-hd',
+        'record sp': 'recordtv-s-o-paulo-hd',
+        'record belem': 'recordtv-belem',
+        'record campinas': 'record-tv-campinas',
+        'record rs': 'record-tv-rs',
         // Add more mappings as needed
     } as Record<string, string>,
 
