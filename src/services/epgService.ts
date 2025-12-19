@@ -132,53 +132,30 @@ export const epgService = {
 
         // Debug: log HTML length and sample
         console.log('[EPG] mi.tv HTML length:', html.length);
-        console.log('[EPG] mi.tv HTML sample:', html.substring(0, 500));
-
-        // First, try to extract embedded JSON data (some sites use __NEXT_DATA__ or similar)
-        const jsonPatterns = [
-            /__NEXT_DATA__[^>]*>([^<]+)</,
-            /window\.__INITIAL_STATE__\s*=\s*({[\s\S]+?});/,
-            /data-props="([^"]+)"/,
-        ];
-
-        for (const pattern of jsonPatterns) {
-            const jsonMatch = html.match(pattern);
-            if (jsonMatch) {
-                console.log('[EPG] Found embedded JSON data');
-                try {
-                    const jsonData = JSON.parse(jsonMatch[1].replace(/&quot;/g, '"'));
-                    console.log('[EPG] JSON keys:', Object.keys(jsonData));
-                } catch (e) {
-                    // Not valid JSON, continue
-                }
-            }
-        }
-
-        // mi.tv actual structure (discovered via browser):
-        // <a class="program-link">
-        //   <span><font><font>HH:MM</font></font></span>
-        //   <h2><img...><font><font>Title</font></font></h2>
-        // </a>
+        console.log('[EPG] mi.tv HTML sample:', html.substring(0, 300));
 
         const today = new Date();
         let lastHour = -1;
         let dayOffset = 0;
 
-        // Pattern 1: Look for program-link anchors with time in span and title in h2
-        // The time is in format: <span...><font><font>HH:MM</font></font></span>
-        // The title is in format: <h2...><font><font>Title</font></font></h2>
-        const programPattern = /<a[^>]*class="[^"]*program-link[^"]*"[^>]*>[\s\S]*?<span[^>]*>[\s\S]*?(\d{1,2}:\d{2})[\s\S]*?<\/span>[\s\S]*?<h2[^>]*>[\s\S]*?<font[^>]*>\s*<font[^>]*>([^<]+)<\/font>/gi;
+        // mi.tv async API structure:
+        // <span class="time">HH:MM</span>
+        // <h2>Program Title</h2>
+        // Pattern: Look for time span followed by h2 title
+        const programPattern = /<span[^>]*class="[^"]*time[^"]*"[^>]*>[\s\S]*?(\d{1,2}:\d{2})[\s\S]*?<\/span>[\s\S]*?<h2[^>]*>([\s\S]*?)<\/h2>/gi;
 
         let match;
         while ((match = programPattern.exec(html)) !== null) {
             const time = match[1];
-            let title = match[2].trim()
+            let title = match[2]
+                .replace(/<[^>]+>/g, '') // Remove inner HTML tags
                 .replace(/&amp;/g, '&')
                 .replace(/&nbsp;/g, ' ')
                 .replace(/&#\d+;/g, '')
-                .replace(/\s+/g, ' ');
+                .replace(/\s+/g, ' ')
+                .trim();
 
-            if (title.length < 2) continue;
+            if (title.length < 2 || title.length > 150) continue;
 
             const [hours, minutes] = time.split(':').map(Number);
             if (hours > 23 || minutes > 59) continue;
@@ -204,29 +181,29 @@ export const epgService = {
             });
         }
 
-        // If pattern 1 didn't work, try pattern 2: simpler extraction
+        // Fallback pattern if first didn't work: look for [HH:MM pattern from links
         if (programs.length === 0) {
-            // Simpler pattern: look for any time followed by text within reasonable distance
-            const simplePattern = />(\d{1,2}:\d{2})<[\s\S]{0,200}?<font[^>]*>\s*<font[^>]*>([^<]{3,80})<\/font>/gi;
-            let dayOffset2 = 0;
-            let lastHour2 = -1;
+            console.log('[EPG] Trying fallback pattern...');
+            const fallbackPattern = /\[(\d{1,2}:\d{2})[\s\S]{0,500}?<h2[^>]*>([\s\S]*?)<\/h2>/gi;
 
-            while ((match = simplePattern.exec(html)) !== null) {
+            while ((match = fallbackPattern.exec(html)) !== null) {
                 const time = match[1];
-                let title = match[2].trim();
+                let title = match[2]
+                    .replace(/<[^>]+>/g, '')
+                    .replace(/&amp;/g, '&')
+                    .replace(/\s+/g, ' ')
+                    .trim();
 
-                // Skip if looks like navigation/UI text
-                if (/^(hoje|amanhã|ontem|ver|mais|fechar|programação|canal)/i.test(title)) continue;
-                if (title.length < 3 || title.length > 100) continue;
+                if (title.length < 2 || title.length > 150) continue;
 
                 const [hours, minutes] = time.split(':').map(Number);
                 if (hours > 23 || minutes > 59) continue;
 
-                if (lastHour2 !== -1 && hours < lastHour2 - 2) dayOffset2++;
-                lastHour2 = hours;
+                if (lastHour !== -1 && hours < lastHour - 2) dayOffset++;
+                lastHour = hours;
 
                 const startDate = new Date(today);
-                startDate.setDate(startDate.getDate() + dayOffset2);
+                startDate.setDate(startDate.getDate() + dayOffset);
                 startDate.setHours(hours, minutes, 0, 0);
 
                 const endDate = new Date(startDate);
@@ -245,10 +222,6 @@ export const epgService = {
 
         console.log('[EPG] mi.tv parsed', programs.length, 'programs');
 
-        // Fix end times based on next program start
-        for (let i = 0; i < programs.length - 1; i++) {
-            programs[i].end = programs[i + 1].start;
-        }
 
         return programs;
     },
