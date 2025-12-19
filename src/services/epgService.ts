@@ -96,7 +96,7 @@ export const epgService = {
         'globo rede amazonica': 'globo-amazonas',
         'globo minas': 'globo-belo-horizonte-hd',
         // SBT regional channels
-        'sbt sp': 'sbt-sao-paulo',
+        'sbt sp': 'sbt-s-o-paulo',
         // Add more mappings as needed
     } as Record<string, string>,
 
