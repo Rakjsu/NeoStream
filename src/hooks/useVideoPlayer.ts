@@ -137,12 +137,10 @@ export function useVideoPlayer() {
             // Debounce the state change
             fullscreenChangeTimeout = setTimeout(() => {
                 const isFullscreen = isInFullscreen();
-                console.log('🔄 FS State:', isFullscreen);
-
+                
                 setState(prev => {
                     if (prev.fullscreen !== isFullscreen) {
-                        console.log(`✅ ${prev.fullscreen} → ${isFullscreen}`);
-                        return { ...prev, fullscreen: isFullscreen };
+                                                return { ...prev, fullscreen: isFullscreen };
                     }
                     return prev;
                 });

@@ -32,8 +32,7 @@ export function UpdateNotification({ }: UpdateNotificationProps) {
 
         // Listen for update available
         const cleanupAvailable = updateService.onUpdateAvailable((info) => {
-            console.log('Update available:', info);
-            setUpdateInfo(info);
+                        setUpdateInfo(info);
             setIsUpToDate(false);
             setIsVisible(true);
             setError(null);
@@ -42,8 +41,7 @@ export function UpdateNotification({ }: UpdateNotificationProps) {
         // Listen for no update available (already up to date)
         // Note: We don't auto-show modal here, only when user manually triggers check
         const cleanupNotAvailable = updateService.onUpdateNotAvailable(() => {
-            console.log('Already up to date');
-            // Only update state, don't show modal automatically
+                        // Only update state, don't show modal automatically
             // Modal will be shown when user clicks "Check for updates"
         });
 
@@ -54,8 +52,7 @@ export function UpdateNotification({ }: UpdateNotificationProps) {
 
         // Listen for update downloaded
         const cleanupDownloaded = updateService.onUpdateDownloaded((info) => {
-            console.log('Update downloaded:', info);
-            setIsDownloading(false);
+                        setIsDownloading(false);
             setIsDownloaded(true);
         });
 

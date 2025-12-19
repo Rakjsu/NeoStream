@@ -59,8 +59,7 @@ export function useDLNA(videoUrl: string, videoTitle: string) {
                     online: d.online !== false
                 }));
                 setDevices(dlnaDevices);
-                console.log('✅ Discovered', dlnaDevices.length, 'devices');
-            } else {
+                            } else {
                 setError(result.error || 'Discovery failed');
             }
         } catch (error: any) {
@@ -82,8 +81,7 @@ export function useDLNA(videoUrl: string, videoTitle: string) {
             });
 
             if (result.success) {
-                console.log('✅ Device added:', result.device);
-                await loadDevices();
+                                await loadDevices();
                 return true;
             }
             setError(result.error || 'Failed to add device');
@@ -128,8 +126,7 @@ export function useDLNA(videoUrl: string, videoTitle: string) {
             if (result.success) {
                 setIsCasting(true);
                 setCurrentDevice(device);
-                console.log('✅ Casting to DLNA device:', device.name);
-                return true;
+                                return true;
             } else {
                 setError(result.error || 'Cast failed');
                 return false;

@@ -22,8 +22,7 @@ export function useHls({ src, videoRef }: UseHlsOptions) {
         const timeSinceLastInit = Date.now() - lastInitTime;
 
         if (timeSinceLastInit < 500) {
-            console.log('⏭️ Skipping duplicate init (Strict Mode detected)');
-            return; // Don't cleanup on skip, just return without doing anything
+                        return; // Don't cleanup on skip, just return without doing anything
         }
 
         // Mark this src as being initialized NOW
@@ -41,8 +40,7 @@ export function useHls({ src, videoRef }: UseHlsOptions) {
             bufferSeconds = parseInt(config.bufferSize, 10);
         }
 
-        console.log('🎥 useHls: Loading video with buffer', bufferSeconds + 's');
-
+        
         // Clean up any existing HLS instance first
         if (hlsRef.current) {
             hlsRef.current.destroy();
@@ -52,8 +50,7 @@ export function useHls({ src, videoRef }: UseHlsOptions) {
         const isHls = src.includes('.m3u8');
 
         if (isHls && Hls.isSupported()) {
-            console.log('📺 Using HLS.js for m3u8');
-
+            
             const hls = new Hls({
                 enableWorker: true,
                 lowLatencyMode: false,
@@ -81,13 +78,11 @@ export function useHls({ src, videoRef }: UseHlsOptions) {
             hls.attachMedia(video);
 
             hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
-                console.log('✅ HLS manifest loaded with', data.levels.length, 'quality levels');
-
+                
                 // Apply video codec preference if set
                 if (config.videoCodec !== 'auto' && data.levels.length > 1) {
                     const preferredCodec = config.videoCodec;
-                    console.log(`🎬 Looking for ${preferredCodec} video codec`);
-
+                    
                     // Map codec setting to actual codec identifiers
                     const codecMap: { [key: string]: string[] } = {
                         'h264': ['avc1', 'avc', 'h264'],
@@ -103,8 +98,7 @@ export function useHls({ src, videoRef }: UseHlsOptions) {
                         const levelCodecs = (level.codecSet || level.videoCodec || '').toLowerCase();
                         if (targetCodecs.some(c => levelCodecs.includes(c))) {
                             matchingLevelIndices.push(index);
-                            console.log(`  ✓ Level ${index}: ${level.width}x${level.height} matches ${preferredCodec}`);
-                        }
+                                                    }
                     });
 
                     if (matchingLevelIndices.length > 0) {
@@ -112,10 +106,8 @@ export function useHls({ src, videoRef }: UseHlsOptions) {
                         // Start with highest quality matching level
                         const bestMatch = matchingLevelIndices[matchingLevelIndices.length - 1];
                         hls.currentLevel = bestMatch;
-                        console.log(`🔊 Set initial level to ${bestMatch} (${preferredCodec})`);
-                    } else {
-                        console.log(`ℹ️ No ${preferredCodec} levels found, using auto selection`);
-                    }
+                                            } else {
+                                            }
                 }
             });
 
@@ -145,11 +137,9 @@ export function useHls({ src, videoRef }: UseHlsOptions) {
                 hlsRef.current = null;
             };
         } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
-            console.log('🍎 Using native HLS (Safari)');
-            video.src = src;
+                        video.src = src;
         } else {
-            console.log('📹 Using direct video source (MP4/other)');
-            // Only set src if it's different to avoid reloading and resetting position
+                        // Only set src if it's different to avoid reloading and resetting position
             if (video.src !== src) {
                 video.src = src;
             }

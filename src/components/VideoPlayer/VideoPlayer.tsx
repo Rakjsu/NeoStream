@@ -106,11 +106,9 @@ export function VideoPlayer({
             if (saved) {
                 const config = JSON.parse(saved);
                 const result = config.forcedSubtitlesEnabled !== false;
-                console.log(`🔧 Forced init: ${result} (key: ${configKey}, value: ${config.forcedSubtitlesEnabled})`);
-                return result;
+                                return result;
             }
-            console.log(`🔧 Forced init: true (no config found at ${configKey})`);
-        } catch (e) { console.error('Error reading forced config:', e); }
+                    } catch (e) { console.error('Error reading forced config:', e); }
         return true; // default enabled
     });
     const containerRef = useRef<HTMLDivElement>(null);
@@ -147,8 +145,7 @@ export function VideoPlayer({
                         (src && state.content.src === src);
 
                     if (isSameContent && state.content.currentTime && state.content.currentTime > 0) {
-                        console.log('[VideoPlayer] Resuming from PiP at:', state.content.currentTime);
-                        setPipResumeTime(state.content.currentTime);
+                                                setPipResumeTime(state.content.currentTime);
                     }
                 }
             } catch (error) {
@@ -183,16 +180,14 @@ export function VideoPlayer({
 
         // Check if title contains [L] - already subtitled, skip Forced
         if (title.includes('[L]')) {
-            console.log('ℹ️ Content marked [L] - skipping Forced subtitles');
-            return;
+                        return;
         }
 
         const loadForcedSubtitles = async () => {
             try {
                 // Check if Forced subtitles are disabled for this session
                 if (!forcedEnabledForSession) {
-                    console.log('ℹ️ Forced subtitles disabled for this session');
-                    return;
+                                        return;
                 }
 
                 // Check if Forced subtitles are enabled in settings
@@ -201,12 +196,10 @@ export function VideoPlayer({
                 const config = playbackService.getConfig();
 
                 if (!config.forcedSubtitlesEnabled) {
-                    console.log('ℹ️ Forced subtitles disabled in settings');
-                    return;
+                                        return;
                 }
 
-                console.log('🎬 Auto-loading forced subtitles...');
-                const result = await autoFetchForcedSubtitle({
+                                const result = await autoFetchForcedSubtitle({
                     title,
                     tmdbId,
                     imdbId,
@@ -220,10 +213,8 @@ export function VideoPlayer({
                     setVttContent(result.vttContent);
                     setSubtitlesEnabled(true);
                     setIsForcedSubtitle(true);
-                    console.log('✅ Forced subtitles loaded automatically');
-                } else {
-                    console.log('ℹ️ No forced subtitles available');
-                }
+                                    } else {
+                                    }
             } catch (error) {
                 console.error('Error auto-loading forced subtitles:', error);
             }
@@ -246,11 +237,9 @@ export function VideoPlayer({
             localStorage.removeItem('shouldAutoPlayNextEpisode');
 
             if (shouldAutoPlay === 'true') {
-                console.log('▶️ Auto-playing next episode');
-                videoRef.current.play();
+                                videoRef.current.play();
             } else {
-                console.log('⏸️ Next episode loaded but paused (auto-play disabled)');
-                // Don't play, let user manually start
+                                // Don't play, let user manually start
             }
         } else if (autoPlay) {
             // Normal autoPlay behavior for initial video load
@@ -268,8 +257,7 @@ export function VideoPlayer({
             if (video && resumeTime) {
                 // Only seek if not already at or past the resume point
                 if (Math.abs(video.currentTime - resumeTime) > 5) {
-                    console.log(`Resuming playback at ${Math.floor(resumeTime)} seconds`);
-                    video.currentTime = resumeTime;
+                                        video.currentTime = resumeTime;
                 }
             }
         };
@@ -349,8 +337,7 @@ export function VideoPlayer({
             // The next video will check localStorage for shouldAutoPlay
             localStorage.setItem('shouldAutoPlayNextEpisode', config.autoPlayNextEpisode ? 'true' : 'false');
 
-            console.log(`📺 Video ended, going to next episode (auto-play: ${config.autoPlayNextEpisode})`);
-            onNextEpisode();
+                        onNextEpisode();
         };
 
         video.addEventListener('ended', handleEnded);
@@ -772,8 +759,7 @@ export function VideoPlayer({
                                 onClick={async () => {
                                     // If currently showing Forced subtitles, switch to full subtitles
                                     if (subtitlesEnabled && isForcedSubtitle) {
-                                        console.log('🔄 Switching from Forced to full subtitles...');
-                                        // Cleanup Forced subtitle
+                                                                                // Cleanup Forced subtitle
                                         if (subtitleUrl) {
                                             cleanupSubtitleUrl(subtitleUrl);
                                         }
@@ -796,8 +782,7 @@ export function VideoPlayer({
                                                     setSubtitleWarning(result.warning);
                                                     setTimeout(() => setSubtitleWarning(null), 5000);
                                                 }
-                                                console.log('✅ Switched to full subtitles');
-                                            } else {
+                                                                                            } else {
                                                 setSubtitleWarning(t('player', 'noFullSubtitlesFound'));
                                                 setTimeout(() => setSubtitleWarning(null), 4000);
                                             }
@@ -820,8 +805,7 @@ export function VideoPlayer({
                                             setSubtitleUrl(null);
                                             setSubtitleLanguage(null);
                                             setVttContent(null);
-                                            console.log('🗑️ Subtitles cleaned up from memory');
-                                        }
+                                                                                    }
 
                                         const video = videoRef.current;
                                         if (video && video.textTracks.length > 0) {
@@ -855,8 +839,7 @@ export function VideoPlayer({
                                                 } else {
                                                     setSubtitleWarning(t('player', 'noSubtitlesFound'));
                                                     setTimeout(() => setSubtitleWarning(null), 4000);
-                                                    console.log('No subtitles found');
-                                                }
+                                                                                                    }
                                             } catch (error) {
                                                 console.error('Error fetching subtitles:', error);
                                             } finally {
@@ -949,8 +932,7 @@ export function VideoPlayer({
                                                     }
                                                 } else if (newValue && !subtitlesEnabled) {
                                                     // Enabling: load forced subtitles now
-                                                    console.log('🔄 Loading forced subtitles after toggle enable...');
-                                                    try {
+                                                                                                        try {
                                                         const { autoFetchForcedSubtitle } = await import('../../services/subtitleService');
                                                         const result = await autoFetchForcedSubtitle({
                                                             title: title || '',
@@ -970,8 +952,7 @@ export function VideoPlayer({
                                                             setVttContent(result.vttContent);
                                                             setSubtitlesEnabled(true);
                                                             setIsForcedSubtitle(true);
-                                                            console.log('✅ Forced subtitles loaded after toggle enable');
-                                                        } else {
+                                                                                                                    } else {
                                                             setSubtitleWarning(t('player', 'noForcedSubtitlesFound'));
                                                             setTimeout(() => setSubtitleWarning(null), 4000);
                                                         }
@@ -981,8 +962,7 @@ export function VideoPlayer({
                                                         setTimeout(() => setSubtitleWarning(null), 4000);
                                                     }
                                                 }
-                                                console.log(`🎯 Forced subtitles ${newValue ? 'enabled' : 'disabled'} for session`);
-                                            }}
+                                                                                            }}
                                             onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
                                             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                                         >
@@ -1095,8 +1075,7 @@ export function VideoPlayer({
                         videoTitle={title || 'Video'}
                         onClose={() => setShowDeviceSelector(false)}
                         onDeviceSelected={(device) => {
-                            console.log('Selected device:', device);
-                        }}
+                                                    }}
                         chromecastAvailable={chromecast.isAvailable}
                         chromecastCasting={chromecast.isCasting}
                         onChromecastCast={() => {

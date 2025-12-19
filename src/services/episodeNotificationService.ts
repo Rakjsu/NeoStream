@@ -274,8 +274,7 @@ class AppNotificationService {
             const seriesToMonitor = await this.getSeriesToMonitor();
             const seriesData = this.getSeriesData();
 
-            console.log(`[Notifications] Checking ${seriesToMonitor.length} series for new episodes...`);
-
+            
             for (const series of seriesToMonitor) {
                 const currentInfo = await this.fetchSeriesInfo(series.id);
                 if (!currentInfo) continue;
@@ -303,8 +302,7 @@ class AppNotificationService {
                             }
                         });
                         newNotifications.push(notification);
-                        console.log(`[Notifications] New season for ${series.name}`);
-                    } else if (newEpisodes > 0) {
+                                            } else if (newEpisodes > 0) {
                         const notification = this.addNotification({
                             type: 'new_episodes',
                             title: '📺 Novos Episódios',
@@ -319,8 +317,7 @@ class AppNotificationService {
                             }
                         });
                         newNotifications.push(notification);
-                        console.log(`[Notifications] ${newEpisodes} new episodes for ${series.name}`);
-                    }
+                                            }
                 }
 
                 // Update stored data
@@ -337,8 +334,7 @@ class AppNotificationService {
             }
 
             this.saveSeriesData(seriesData);
-            console.log(`[Notifications] Check complete. Found ${newNotifications.length} new notifications.`);
-
+            
         } catch (error) {
             console.error('[Notifications] Error checking for new episodes:', error);
         } finally {

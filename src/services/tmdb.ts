@@ -165,8 +165,7 @@ export function clearTMDBCache(): void {
         localStorage.removeItem(key);
     });
 
-    console.log('TMDB cache cleared');
-}
+    }
 
 /**
  * Get high-quality backdrop image URL from TMDB

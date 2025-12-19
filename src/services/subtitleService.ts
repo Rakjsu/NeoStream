@@ -57,8 +57,7 @@ async function getAuthToken(): Promise<string | null> {
     }
 
     try {
-        console.log('🔐 Logging in to OpenSubtitles...');
-        const result = await openSubtitlesRequest('/login', 'POST', {
+                const result = await openSubtitlesRequest('/login', 'POST', {
             username: OPENSUBTITLES_USERNAME,
             password: OPENSUBTITLES_PASSWORD
         });
@@ -73,8 +72,7 @@ async function getAuthToken(): Promise<string | null> {
             cachedToken = data.token;
             // Token is valid for 24 hours, cache for 23 hours
             tokenExpiry = Date.now() + (23 * 60 * 60 * 1000);
-            console.log('✅ OpenSubtitles login successful');
-            return cachedToken;
+                        return cachedToken;
         }
 
         return null;
@@ -137,8 +135,7 @@ export async function searchSubtitles(params: SubtitleSearchParams): Promise<Sub
         // If looking for forced subtitles only (for auto-load on movie start)
         if (params.forcedOnly) {
             const forcedSubs = allSubs.filter((sub: SubtitleResult) => sub.foreignPartsOnly);
-            console.log(`🎯 Forced subtitles: ${forcedSubs.length} found`);
-            return forcedSubs;
+                        return forcedSubs;
         }
 
         // Prefer full subtitles (not HI, not foreign parts only)
@@ -147,8 +144,7 @@ export async function searchSubtitles(params: SubtitleSearchParams): Promise<Sub
         );
 
         // Return full subs if available, otherwise all subs
-        console.log(`📺 Subtitles: ${allSubs.length} total, ${fullSubs.length} full (not HI/forced)`);
-        return fullSubs.length > 0 ? fullSubs : allSubs;
+                return fullSubs.length > 0 ? fullSubs : allSubs;
     } catch (error) {
         console.error('Error searching subtitles:', error);
         return [];
@@ -263,9 +259,7 @@ export async function autoFetchSubtitle(params: {
                 preferredLanguages = ['pt-br', 'pt', 'en'];
         }
 
-        console.log(`🎯 Subtitle preference from settings: ${preferredLang}`);
-        console.log(`🎯 Language priority: ${preferredLanguages.join(' → ')}`);
-
+                
         // Clean the title - remove tags like [4K], [L], (2021), season/episode markers, etc.
         const cleanTitle = params.title
             .replace(/\s*\[.*?\]\s*/g, '') // Remove [anything]
@@ -278,8 +272,7 @@ export async function autoFetchSubtitle(params: {
             .replace(/\s*[-–—]\s*Season\s*\d+\s*Episode\s*\d+\s*/gi, '') // Remove "- Season 1 Episode 1"
             .trim();
 
-        console.log(`🔍 Searching subtitles for: ${cleanTitle}`);
-
+        
         // Extract sequel number from title (e.g., "9" from "Velozes & Furiosos 9")
         const extractSequelNumber = (title: string): string | null => {
             // Normalize dots/underscores to spaces for matching
@@ -310,15 +303,13 @@ export async function autoFetchSubtitle(params: {
         };
 
         const movieNumber = extractSequelNumber(cleanTitle);
-        console.log(`📌 Detected sequel number: ${movieNumber || 'none'}`);
-
+        
         // If no TMDB/IMDB IDs provided, try to look them up
         let tmdbId = params.tmdbId;
         let imdbId = params.imdbId;
 
         if (!tmdbId && !imdbId) {
-            console.log(`🔎 No IDs provided, searching TMDB for: ${cleanTitle}`);
-            try {
+                        try {
                 // Extract year from original title if present
                 const yearMatch = params.title.match(/\((\d{4})\)/);
                 const year = yearMatch ? yearMatch[1] : undefined;
@@ -331,16 +322,14 @@ export async function autoFetchSubtitle(params: {
                     if (series?.id) {
                         tmdbId = series.id;
                         imdbId = series.imdb_id;
-                        console.log(`✅ Found TMDB Series ID: ${tmdbId}, IMDB ID: ${imdbId || 'none'}`);
-                    }
+                                            }
                 } else {
                     // Search as movie
                     const movie = await searchMovieByName(cleanTitle, year);
                     if (movie?.id) {
                         tmdbId = movie.id;
                         imdbId = movie.imdb_id;
-                        console.log(`✅ Found TMDB ID: ${tmdbId}, IMDB ID: ${imdbId || 'none'}`);
-                    }
+                                            }
                 }
             } catch (error) {
                 console.warn('Failed to lookup TMDB IDs:', error);
@@ -351,49 +340,40 @@ export async function autoFetchSubtitle(params: {
 
         // Strategy 1: Search by TMDB ID (most accurate)
         if (tmdbId) {
-            console.log(`🔍 Searching by TMDB ID: ${tmdbId}`);
-            results = await searchSubtitles({
+                        results = await searchSubtitles({
                 tmdbId: tmdbId,
                 languages: preferredLanguages.join(','),
                 season: params.season,
                 episode: params.episode
             });
-            console.log(`   Found ${results.length} results by TMDB ID`);
-        }
+                    }
 
         // Strategy 2: Search by IMDB ID if TMDB didn't work
         if (results.length === 0 && imdbId) {
-            console.log(`🔍 Searching by IMDB ID: ${imdbId}`);
-            results = await searchSubtitles({
+                        results = await searchSubtitles({
                 imdbId: imdbId,
                 languages: preferredLanguages.join(','),
                 season: params.season,
                 episode: params.episode
             });
-            console.log(`   Found ${results.length} results by IMDB ID`);
-        }
+                    }
 
         // Strategy 3: Fall back to title search
         if (results.length === 0) {
-            console.log(`🔍 Searching by title: ${cleanTitle}`);
-            results = await searchSubtitles({
+                        results = await searchSubtitles({
                 query: cleanTitle,
                 languages: preferredLanguages.join(','),
                 season: params.season,
                 episode: params.episode
             });
-            console.log(`   Found ${results.length} results by title`);
-        }
+                    }
 
         if (results.length === 0) {
-            console.log('No subtitles found for:', cleanTitle);
-            return null;
+                        return null;
         }
 
-        console.log(`📃 Found ${results.length} subtitles`);
-        results.slice(0, 5).forEach((r, i) => {
-            console.log(`   ${i + 1}. [${r.language}] ${r.release} (${r.downloadCount} downloads)`);
-        });
+                results.slice(0, 5).forEach((r, i) => {
+                    });
 
         // Normalize language codes to lowercase for comparison
         const normalizedPreferredLang = preferredLang.toLowerCase();
@@ -418,8 +398,7 @@ export async function autoFetchSubtitle(params: {
 
             // If we have non-special exact matches, use those
             if (nonSpecialExactMatches.length > 0) {
-                console.log(`🎬 Exact sequel ${movieNumber} matches (non-special): ${nonSpecialExactMatches.length} results`);
-                filteredResults = nonSpecialExactMatches;
+                                filteredResults = nonSpecialExactMatches;
             } else if (exactMatches.length > 0) {
                 // All exact matches are special editions - try to find non-special releases without number
                 const nonSpecialNoNumber = filteredResults.filter(r => {
@@ -428,12 +407,10 @@ export async function autoFetchSubtitle(params: {
                 });
 
                 if (nonSpecialNoNumber.length > 0) {
-                    console.log(`🎬 Using non-special releases without sequel number: ${nonSpecialNoNumber.length} results`);
-                    filteredResults = nonSpecialNoNumber;
+                                        filteredResults = nonSpecialNoNumber;
                 } else {
                     // Last resort: use exact matches even if special edition
-                    console.log(`🎬 Exact sequel ${movieNumber} matches (special edition only): ${exactMatches.length} results`);
-                    filteredResults = exactMatches;
+                                        filteredResults = exactMatches;
                 }
             } else {
                 // No exact matches - exclude releases that have a DIFFERENT number
@@ -445,8 +422,7 @@ export async function autoFetchSubtitle(params: {
                 });
 
                 if (noConflictMatches.length > 0) {
-                    console.log(`🎬 No-conflict matches (no number): ${noConflictMatches.length} results`);
-                    filteredResults = noConflictMatches;
+                                        filteredResults = noConflictMatches;
                 }
             }
         }
@@ -454,8 +430,7 @@ export async function autoFetchSubtitle(params: {
         // If we have results in the primary language, use those
         let candidateResults = filteredResults.length > 0 ? filteredResults : results;
 
-        console.log(`📌 Filtered results count: ${filteredResults.length}`);
-
+        
         // Sort by preferred language, avoid special editions, and download count - case insensitive
         const sorted = candidateResults.sort((a, b) => {
             const aLangNorm = a.language.toLowerCase();
@@ -478,16 +453,14 @@ export async function autoFetchSubtitle(params: {
 
         // Get the best subtitle
         const best = sorted[0];
-        console.log(`✅ Selected subtitle: [${best.language}] ${best.release}`);
-
+        
         // Download the subtitle
         const downloadUrl = await downloadSubtitle(best.fileId);
         if (!downloadUrl) {
             console.error('Failed to get download URL');
             return null;
         }
-        console.log(`📥 Subtitle download URL: ${downloadUrl.substring(0, 100)}...`);
-
+        
         // Fetch and convert content
         const vttContent = await fetchSubtitleContent(downloadUrl);
         if (!vttContent) {
@@ -496,13 +469,11 @@ export async function autoFetchSubtitle(params: {
         }
 
         // Log first lines of VTT content for debugging
-        console.log(`📝 VTT content preview (first 500 chars):\n${vttContent.substring(0, 500)}`);
-
+        
         // Create a blob URL for the VTT content
         const blob = new Blob([vttContent], { type: 'text/vtt' });
         const blobUrl = URL.createObjectURL(blob);
-        console.log(`🔗 Created blob URL: ${blobUrl}`);
-
+        
         // Check if we got a fallback language
         const selectedLangNorm = best.language.toLowerCase();
         const isPreferredLang = selectedLangNorm === normalizedPreferredLang;
@@ -544,8 +515,7 @@ export async function autoFetchForcedSubtitle(params: {
     episode?: number;
 }): Promise<{ url: string; language: string; vttContent: string; warning?: string } | null> {
     try {
-        console.log(`🎯 Searching FORCED subtitles for: ${params.title}`);
-
+        
         // Clean the title
         const cleanTitle = params.title
             .replace(/\s*\[.*?\]\s*/g, '')
@@ -609,8 +579,7 @@ export async function autoFetchForcedSubtitle(params: {
         }
 
         if (results.length === 0) {
-            console.log('🎯 No forced subtitles found');
-            return null;
+                        return null;
         }
 
         // Sort by download count and get best
@@ -622,19 +591,15 @@ export async function autoFetchForcedSubtitle(params: {
         // Only use normal versions - reject special editions completely
         if (normalResults.length === 0) {
             if (specialResults.length > 0) {
-                console.log(`🎯 Only special editions found (${specialResults.length}), rejecting them for forced subtitles`);
-                return { url: '', language: '', vttContent: '', warning: 'Apenas edições especiais (Extended/Director\'s Cut) encontradas - ignorando' };
+                                return { url: '', language: '', vttContent: '', warning: 'Apenas edições especiais (Extended/Director\'s Cut) encontradas - ignorando' };
             }
-            console.log('🎯 No forced subtitles found');
-            return null;
+                        return null;
         }
 
         const sorted = normalResults.sort((a, b) => b.downloadCount - a.downloadCount);
-        console.log(`🎯 Using normal version (${normalResults.length} found, ${specialResults.length} special rejected)`);
-
+        
         const best = sorted[0];
-        console.log(`🎯 Selected forced subtitle: [${best.language}] ${best.release}`);
-
+        
         // Download the subtitle
         const downloadUrl = await downloadSubtitle(best.fileId);
         if (!downloadUrl) return null;
@@ -644,8 +609,7 @@ export async function autoFetchForcedSubtitle(params: {
         if (!vttContent) return null;
 
         // Log VTT content preview for debugging
-        console.log(`📝 Forced VTT content preview (first 500 chars):\n${vttContent.substring(0, 500)}`);
-
+        
         // Create blob URL
         const blob = new Blob([vttContent], { type: 'text/vtt' });
         const blobUrl = URL.createObjectURL(blob);

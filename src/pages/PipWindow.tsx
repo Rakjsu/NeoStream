@@ -155,8 +155,7 @@ export function PipWindow() {
             if (!content || content.contentType !== 'series') return;
             if (!content.contentId || !content.seasonNumber || !content.episodeNumber) return;
 
-            console.log('[PiP] Episode ended, marking as watched and loading next...');
-
+            
             // Mark current episode as watched
             watchProgressService.markEpisodeWatched(
                 content.contentId,
@@ -168,21 +167,14 @@ export function PipWindow() {
             if (window.ipcRenderer) {
                 try {
                     setIsLoading(true);
-                    console.log('[PiP] Requesting next episode for:', {
+                                        const nextEp = await window.ipcRenderer.invoke('pip:getNextEpisode', {
                         seriesId: content.contentId,
                         currentSeason: content.seasonNumber,
                         currentEpisode: content.episodeNumber
                     });
-                    const nextEp = await window.ipcRenderer.invoke('pip:getNextEpisode', {
-                        seriesId: content.contentId,
-                        currentSeason: content.seasonNumber,
-                        currentEpisode: content.episodeNumber
-                    });
-                    console.log('[PiP] Next episode response:', nextEp);
-
+                    
                     if (nextEp && nextEp.src) {
-                        console.log('[PiP] Loading next episode:', nextEp.title);
-                        // Update content with next episode
+                                                // Update content with next episode
                         setContent({
                             ...content,
                             src: nextEp.src,
@@ -192,8 +184,7 @@ export function PipWindow() {
                             currentTime: 0
                         });
                     } else {
-                        console.log('[PiP] No more episodes available');
-                        setIsLoading(false);
+                                                setIsLoading(false);
                     }
                 } catch (error) {
                     console.error('[PiP] Error loading next episode:', error);
@@ -317,8 +308,7 @@ export function PipWindow() {
                 time,
                 dur
             );
-            console.log('[PiP] Saved movie progress:', content.title, time, '/', dur);
-        } else if (content.contentType === 'series' && content.contentId && content.seasonNumber && content.episodeNumber) {
+                    } else if (content.contentType === 'series' && content.contentId && content.seasonNumber && content.episodeNumber) {
             watchProgressService.saveVideoTime(
                 content.contentId,
                 content.seasonNumber,
@@ -326,8 +316,7 @@ export function PipWindow() {
                 time,
                 dur
             );
-            console.log('[PiP] Saved series progress:', content.title, `S${content.seasonNumber}E${content.episodeNumber}`, time, '/', dur);
-        }
+                    }
     };
 
     const handleClose = () => {

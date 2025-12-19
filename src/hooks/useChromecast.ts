@@ -53,8 +53,7 @@ export function useChromecast(videoUrl: string, videoTitle: string) {
     };
 
     const onInitSuccess = () => {
-        console.log('✅ Cast API initialized');
-        setIsAvailable(true);
+                setIsAvailable(true);
     };
 
     const onInitError = (error: any) => {
@@ -63,8 +62,7 @@ export function useChromecast(videoUrl: string, videoTitle: string) {
     };
 
     const sessionListener = (session: any) => {
-        console.log('🔗 Session listener:', session);
-        sessionRef.current = session;
+                sessionRef.current = session;
         setIsCasting(true);
 
         session.addUpdateListener((isAlive: boolean) => {
@@ -81,8 +79,7 @@ export function useChromecast(videoUrl: string, videoTitle: string) {
     };
 
     const receiverListener = (availability: string) => {
-        console.log('📡 Receiver availability:', availability);
-        setIsAvailable(availability === 'available');
+                setIsAvailable(availability === 'available');
     };
 
     const loadMedia = (session: any) => {
@@ -99,8 +96,7 @@ export function useChromecast(videoUrl: string, videoTitle: string) {
 
         session.loadMedia(request).then(
             () => {
-                console.log('✅ Media loaded successfully');
-            },
+                            },
             (error: any) => {
                 console.error('❌ Media load error:', error);
             }
@@ -130,8 +126,7 @@ export function useChromecast(videoUrl: string, videoTitle: string) {
         if (sessionRef.current) {
             sessionRef.current.stop(
                 () => {
-                    console.log('✅ Session stopped');
-                    setIsCasting(false);
+                                        setIsCasting(false);
                     sessionRef.current = null;
                 },
                 (error: any) => {
@@ -146,10 +141,7 @@ export function useChromecast(videoUrl: string, videoTitle: string) {
         if (currentSession && currentSession.media && currentSession.media.length > 0) {
             currentSession.media[0].pause(
                 new window.chrome.cast.media.PauseRequest(),
-                () => console.log('⏸️ Paused'),
-                (error: any) => console.error('❌ Pause error:', error)
-            );
-        }
+                () =>         }
     };
 
     const playCast = () => {
@@ -157,10 +149,7 @@ export function useChromecast(videoUrl: string, videoTitle: string) {
         if (currentSession && currentSession.media && currentSession.media.length > 0) {
             currentSession.media[0].play(
                 new window.chrome.cast.media.PlayRequest(),
-                () => console.log('▶️ Playing'),
-                (error: any) => console.error('❌ Play error:', error)
-            );
-        }
+                () =>         }
     };
 
     const seekCast = (time: number) => {
@@ -170,10 +159,7 @@ export function useChromecast(videoUrl: string, videoTitle: string) {
             request.currentTime = time;
             currentSession.media[0].seek(
                 request,
-                () => console.log('⏩ Seeked to', time),
-                (error: any) => console.error('❌ Seek error:', error)
-            );
-        }
+                () =>         }
     };
 
     return {

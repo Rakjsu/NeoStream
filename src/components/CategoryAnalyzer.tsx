@@ -74,8 +74,7 @@ export function CategoryAnalyzer() {
             );
             const categories = await categoriesResponse.json();
 
-            console.log(`Analisando ${categories.length} categorias...`);
-
+            
             const analysis: CategoryAnalysis[] = [];
             let withIcons = 0;
             let withoutIcons = 0;
@@ -127,8 +126,7 @@ export function CategoryAnalyzer() {
                 empty
             });
 
-            console.log('\n' + reportText);
-
+            
         } catch (error) {
             console.error('Erro na análise:', error);
             alert('Erro ao analisar categorias: ' + (error as Error).message);

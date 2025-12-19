@@ -161,8 +161,7 @@ class PlaybackService {
                 timestamp: Date.now()
             };
 
-            console.log(`[Intelligent Buffer] Speed: ${speedMbps.toFixed(2)} Mbps → Buffer: ${recommendedBufferSeconds}s`);
-
+            
             return recommendedBufferSeconds;
         } catch (error) {
             console.error('Speed test failed:', error);

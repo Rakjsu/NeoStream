@@ -303,8 +303,7 @@ export function VOD() {
     const buildStreamUrl = async (movie: VODStream): Promise<string> => {
         // Check for offline URL first
         if (movie.offlineUrl) {
-            console.log('Using offline URL:', movie.offlineUrl);
-            return movie.offlineUrl;
+                        return movie.offlineUrl;
         }
 
         try {

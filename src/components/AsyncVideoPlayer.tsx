@@ -66,15 +66,13 @@ function AsyncVideoPlayer({
 
         // Reset urlLoadedRef if movie changed (for version switching)
         if (lastMovieIdRef.current !== null && lastMovieIdRef.current !== currentMovieId) {
-            console.log('[AsyncVideoPlayer] Movie ID changed, resetting URL loader');
-            urlLoadedRef.current = false;
+                        urlLoadedRef.current = false;
         }
         lastMovieIdRef.current = currentMovieId;
 
         // Reset urlLoadedRef if episode changed (for series navigation)
         if (currentEpisodeKey && lastEpisodeRef.current !== null && lastEpisodeRef.current !== currentEpisodeKey) {
-            console.log('[AsyncVideoPlayer] Episode changed, resetting URL loader:', currentEpisodeKey);
-            urlLoadedRef.current = false;
+                        urlLoadedRef.current = false;
         }
         lastEpisodeRef.current = currentEpisodeKey;
 

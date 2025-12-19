@@ -145,13 +145,11 @@ export function MiniPlayerProvider({ children }: { children: React.ReactNode }) 
             currentEpisode: number;
             responseChannel: string;
         }) => {
-            console.log('[MiniPlayer] Next episode request received:', data);
-            try {
+                        try {
                 // Get credentials for API call
                 const result = await window.ipcRenderer.invoke('auth:get-credentials');
                 if (!result.success) {
-                    console.log('[MiniPlayer] Failed to get credentials');
-                    window.ipcRenderer.send(data.responseChannel, null);
+                                        window.ipcRenderer.send(data.responseChannel, null);
                     return;
                 }
 
@@ -163,15 +161,13 @@ export function MiniPlayerProvider({ children }: { children: React.ReactNode }) 
                 );
 
                 if (!response.ok) {
-                    console.log('[MiniPlayer] API request failed:', response.status);
-                    window.ipcRenderer.send(data.responseChannel, null);
+                                        window.ipcRenderer.send(data.responseChannel, null);
                     return;
                 }
 
                 const seriesData = await response.json();
                 const episodes = seriesData.episodes || {};
-                console.log('[MiniPlayer] Series episodes structure:', Object.keys(episodes));
-
+                
                 // Find next episode
                 let nextSeason = data.currentSeason;
                 let nextEpisode = data.currentEpisode + 1;
@@ -179,29 +175,23 @@ export function MiniPlayerProvider({ children }: { children: React.ReactNode }) 
 
                 // Check if next episode exists in current season
                 const currentSeasonEps = episodes[String(data.currentSeason)] || [];
-                console.log(`[MiniPlayer] Season ${data.currentSeason} has ${currentSeasonEps.length} episodes`);
-                console.log('[MiniPlayer] Looking for episode_num:', nextEpisode);
-
+                                
                 // episode_num might be string or number, handle both
                 nextEpData = currentSeasonEps.find((ep: any) => Number(ep.episode_num) === nextEpisode);
-                console.log('[MiniPlayer] Found in current season:', nextEpData ? 'yes' : 'no');
-
+                
                 // If not found, try first episode of next season
                 if (!nextEpData) {
                     nextSeason = data.currentSeason + 1;
                     nextEpisode = 1;
                     const nextSeasonEps = episodes[String(nextSeason)] || [];
-                    console.log(`[MiniPlayer] Trying season ${nextSeason} with ${nextSeasonEps.length} episodes`);
-                    nextEpData = nextSeasonEps.find((ep: any) => Number(ep.episode_num) === 1);
-                    console.log('[MiniPlayer] Found in next season:', nextEpData ? 'yes' : 'no');
-                }
+                                        nextEpData = nextSeasonEps.find((ep: any) => Number(ep.episode_num) === 1);
+                                    }
 
                 if (nextEpData) {
                     // Build stream URL
                     const streamUrl = `${url}/series/${username}/${password}/${nextEpData.id}.${nextEpData.container_extension || 'mp4'}`;
                     const title = `${seriesData.info?.name || 'Series'} - S${nextSeason}E${nextEpisode}`;
-                    console.log('[MiniPlayer] Sending next episode:', title);
-
+                    
                     window.ipcRenderer.send(data.responseChannel, {
                         src: streamUrl,
                         title,
@@ -209,8 +199,7 @@ export function MiniPlayerProvider({ children }: { children: React.ReactNode }) 
                         episodeNumber: nextEpisode
                     });
                 } else {
-                    console.log('[MiniPlayer] No next episode found, sending null');
-                    window.ipcRenderer.send(data.responseChannel, null);
+                                        window.ipcRenderer.send(data.responseChannel, null);
                 }
             } catch (error) {
                 console.error('[MiniPlayer] Error fetching next episode:', error);

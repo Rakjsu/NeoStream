@@ -21,8 +21,7 @@ export function EpisodeToast({ onNavigateToSeries }: EpisodeToastProps) {
 
         // Delay check to allow app to fully load
         const checkTimeout = setTimeout(async () => {
-            console.log('[EpisodeToast] Starting check for new episodes...');
-            const newNotifications = await episodeNotificationService.checkForNewEpisodes();
+                        const newNotifications = await episodeNotificationService.checkForNewEpisodes();
 
             if (newNotifications.length > 0) {
                 // Show toasts for new notifications (max 3)

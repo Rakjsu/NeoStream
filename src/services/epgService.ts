@@ -179,8 +179,7 @@ export const epgService = {
             });
         }
 
-        console.log('[EPG Parser] Found programs:', programs.length);
-
+        
         // Fix end times
         for (let i = 0; i < programs.length - 1; i++) {
             programs[i].end = programs[i + 1].start;

@@ -99,8 +99,7 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
     const cues = useMemo(() => {
         if (!vttContent) return [];
         const parsed = parseVTT(vttContent);
-        console.log(`📝 Parsed ${parsed.length} subtitle cues`);
-        return parsed;
+                return parsed;
     }, [vttContent]);
 
     // Find and display the correct cue based on current time

@@ -121,8 +121,7 @@ class UsageStatsService {
             this.saveCurrentProgress();
         }, 30000);
 
-        console.log(`[UsageStats] Session started: ${contentName} (${contentType})`);
-    }
+            }
 
     // Save current progress without ending session
     private saveCurrentProgress(): void {
@@ -169,8 +168,7 @@ class UsageStatsService {
             );
         }
 
-        console.log(`[UsageStats] Session ended: ${this.currentSession.contentName}`);
-        this.currentSession = null;
+                this.currentSession = null;
     }
 
     // Add watch time to stats

@@ -219,8 +219,7 @@ export const profileService = {
 
                 // Remove old data
                 localStorage.removeItem('watchLater');
-                console.log('Migrated existing Watch Later data to Default profile');
-            }
+                            }
         } catch (error) {
             console.error('Error migrating existing data:', error);
         }
@@ -246,7 +245,6 @@ export const profileService = {
             };
             data.profiles.push(kidsProfile);
             saveStorageData(data);
-            console.log('Created default Kids profile');
-        }
+                    }
     }
 };

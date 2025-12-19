@@ -679,12 +679,10 @@ export function Downloads() {
                                                         await downloadService.resumeDownload(selectedEp.id);
                                                     } else if (selectedEp.status === 'pending') {
                                                         // Already pending, just process queue
-                                                        console.log('Episode is pending, processing queue...');
-                                                    } else {
+                                                                                                            } else {
                                                         // Not in queue - need to start fresh download
                                                         // This shouldn't happen as cards only show downloaded eps
-                                                        console.log('Episode status:', selectedEp.status);
-                                                    }
+                                                                                                            }
                                                 }
                                             }}
                                             style={{

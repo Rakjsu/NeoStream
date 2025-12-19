@@ -56,8 +56,7 @@ export function useAirPlay(videoUrl: string, videoTitle: string) {
             if (result.success) {
                 setIsCasting(true);
                 setCurrentDevice(device);
-                console.log('✅ Casting to AirPlay device:', device.name);
-            }
+                            }
         } catch (error) {
             console.error('❌ AirPlay cast error:', error);
         }
