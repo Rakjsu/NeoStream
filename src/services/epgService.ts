@@ -104,6 +104,9 @@ export const epgService = {
         'record campinas': 'record-tv-campinas',
         'record rs': 'record-tv-rs',
         // HBO channels with correct mi.tv slugs
+        'hbo': 'hbo',
+        'hbo 2': 'hbo-2',
+        'hbo2': 'hbo-2',
         'hbo family': 'hbo-family-hd',
         'hbo mundi': 'max-1',
         'hbo plus': 'hbo-plus-brasil-hd',
@@ -114,9 +117,6 @@ export const epgService = {
 
     // Meuguia.tv manual mappings (for channels not on mi.tv or as fallback)
     meuguiaManualMappings: {
-        'hbo': 'HBO',
-        'hbo 2': 'HB2',
-        'hbo2': 'HB2',
         'hbo signature': 'HFE',
     } as Record<string, string>,
 
