@@ -86,6 +86,20 @@ const mitvMappings: Record<string, string> = {
     'agromais': 'agromais-hd',
     // Record News
     'record news': 'record-news-hd',
+    // Cartoonito (maps to Boomerang on mi.tv)
+    'cartoonito': 'boomerang',
+    // TV Ra-Tim-Bum
+    'tv ra-tim-bum': 'tv-ra-tim-bum-hd',
+    'ra-tim-bum': 'tv-ra-tim-bum-hd',
+    'ratimbum': 'tv-ra-tim-bum-hd',
+    // History 2
+    'history 2': 'h2',
+    'h2': 'h2',
+    // Discovery channels
+    'discovery h&h': 'discovery-home-health',
+    'discovery theater': 'discovery-theater-hd',
+    'discovery theatre': 'discovery-theater-hd',
+    'discovery world': 'discovery-world-hd',
 };
 
 // Manual channel mappings for meuguia.tv (fallback)
