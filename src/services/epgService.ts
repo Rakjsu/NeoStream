@@ -63,15 +63,165 @@ const channelMappings: Record<string, string> = {
 
 export const epgService = {
     async fetchChannelEPG(epgChannelId: string, channelName?: string): Promise<EPGProgram[]> {
+        // Try Xtream Codes API first
         const xcPrograms = await this.fetchFromXCAPI(epgChannelId);
         if (xcPrograms.length > 0) return xcPrograms;
 
         if (channelName) {
+            // Try mi.tv second (more reliable for Brazilian channels)
+            const mitvPrograms = await this.fetchFromMiTV(channelName);
+            if (mitvPrograms.length > 0) return mitvPrograms;
+
+            // Try meuguia.tv as fallback
             const meuguiaPrograms = await this.fetchFromMeuGuia(channelName);
             if (meuguiaPrograms.length > 0) return meuguiaPrograms;
         }
 
         return [];
+    },
+
+    // Generate mi.tv slug from channel name
+    generateMiTVSlug(channelName: string): string {
+        return channelName
+            .toLowerCase()
+            .replace(/\s*\[.*?\]\s*/g, '') // Remove [HD], [FHD], etc.
+            .replace(/\s*\(.*?\)\s*/g, '') // Remove (anything)
+            .replace(/\s+hd$/i, '') // Remove trailing HD
+            .replace(/\s+fhd$/i, '') // Remove trailing FHD
+            .replace(/\s+4k$/i, '') // Remove trailing 4K
+            .replace(/\s+sd$/i, '') // Remove trailing SD
+            .trim()
+            .replace(/[áàâã]/g, 'a')
+            .replace(/[éèê]/g, 'e')
+            .replace(/[íìî]/g, 'i')
+            .replace(/[óòôõ]/g, 'o')
+            .replace(/[úùû]/g, 'u')
+            .replace(/ç/g, 'c')
+            .replace(/[^a-z0-9\s-]/g, '') // Remove special chars
+            .replace(/\s+/g, '-') // Spaces to hyphens
+            .replace(/-+/g, '-') // Multiple hyphens to single
+            .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+    },
+
+    async fetchFromMiTV(channelName: string): Promise<EPGProgram[]> {
+        try {
+            const slug = this.generateMiTVSlug(channelName);
+            if (!slug) return [];
+
+            console.log('[EPG] Trying mi.tv with slug:', slug);
+            const result = await window.ipcRenderer.invoke('epg:fetch-mitv', slug);
+
+            if (!result.success || !result.html) {
+                // Try with -hd suffix if first attempt fails
+                const hdSlug = slug + '-hd';
+                console.log('[EPG] Trying mi.tv with HD slug:', hdSlug);
+                const hdResult = await window.ipcRenderer.invoke('epg:fetch-mitv', hdSlug);
+                if (!hdResult.success || !hdResult.html) return [];
+                return this.parseMiTVHTML(hdResult.html, channelName);
+            }
+
+            return this.parseMiTVHTML(result.html, channelName);
+        } catch (error) {
+            console.error('[EPG] mi.tv error:', error);
+            return [];
+        }
+    },
+
+    parseMiTVHTML(html: string, channelId: string): EPGProgram[] {
+        const programs: EPGProgram[] = [];
+
+        // mi.tv uses a structure like:
+        // <li class="program-link">...<time>HH:MM</time>...<h3>Title</h3>...</li>
+        // or embedded JSON data in script tags
+
+        // Try to find program data in the HTML
+        // Pattern 1: Look for time and title pairs
+        const programPattern = /<li[^>]*class="[^"]*program[^"]*"[^>]*>[\s\S]*?<time[^>]*>(\d{1,2}:\d{2})<\/time>[\s\S]*?<h[23][^>]*>([^<]+)<\/h[23]>/gi;
+
+        const today = new Date();
+        let match;
+        let lastHour = -1;
+        let dayOffset = 0;
+
+        while ((match = programPattern.exec(html)) !== null) {
+            const time = match[1];
+            let title = match[2].trim()
+                .replace(/&amp;/g, '&')
+                .replace(/&nbsp;/g, ' ')
+                .replace(/&#\d+;/g, '')
+                .replace(/\s+/g, ' ');
+
+            if (title.length < 2) continue;
+
+            const [hours, minutes] = time.split(':').map(Number);
+
+            // Handle day rollover
+            if (lastHour !== -1 && hours < lastHour - 2) dayOffset++;
+            lastHour = hours;
+
+            const startDate = new Date(today);
+            startDate.setDate(startDate.getDate() + dayOffset);
+            startDate.setHours(hours, minutes, 0, 0);
+
+            const endDate = new Date(startDate);
+            endDate.setHours(endDate.getHours() + 1);
+
+            programs.push({
+                id: `mitv-${startDate.getTime()}`,
+                start: startDate.toISOString(),
+                end: endDate.toISOString(),
+                title: title,
+                description: '',
+                channel_id: channelId
+            });
+        }
+
+        // If pattern 1 didn't work, try pattern 2: simpler time-title extraction
+        if (programs.length === 0) {
+            const simplePattern = /(\d{1,2}:\d{2})[\s\S]{0,100}?<[^>]*>([^<]{3,50})<\/[^>]+>/gi;
+            let dayOffset2 = 0;
+            let lastHour2 = -1;
+
+            while ((match = simplePattern.exec(html)) !== null) {
+                const time = match[1];
+                let title = match[2].trim();
+
+                // Skip if looks like navigation/UI text
+                if (/^(hoje|amanhã|ontem|ver|mais|fechar)/i.test(title)) continue;
+                if (title.length < 3 || title.length > 100) continue;
+
+                const [hours, minutes] = time.split(':').map(Number);
+                if (hours > 23 || minutes > 59) continue;
+
+                if (lastHour2 !== -1 && hours < lastHour2 - 2) dayOffset2++;
+                lastHour2 = hours;
+
+                const startDate = new Date(today);
+                startDate.setDate(startDate.getDate() + dayOffset2);
+                startDate.setHours(hours, minutes, 0, 0);
+
+                const endDate = new Date(startDate);
+                endDate.setHours(endDate.getHours() + 1);
+
+                programs.push({
+                    id: `mitv-${startDate.getTime()}`,
+                    start: startDate.toISOString(),
+                    end: endDate.toISOString(),
+                    title: title,
+                    description: '',
+                    channel_id: channelId
+                });
+            }
+        }
+
+        console.log('[EPG] mi.tv parsed', programs.length, 'programs');
+
+        // Fix end times based on next program start
+        for (let i = 0; i < programs.length - 1; i++) {
+            programs[i].end = programs[i + 1].start;
+        }
+
+        return programs;
     },
 
     async fetchFromXCAPI(epgChannelId: string): Promise<EPGProgram[]> {
@@ -179,7 +329,7 @@ export const epgService = {
             });
         }
 
-        
+
         // Fix end times
         for (let i = 0; i < programs.length - 1; i++) {
             programs[i].end = programs[i + 1].start;

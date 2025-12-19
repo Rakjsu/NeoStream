@@ -189,7 +189,31 @@ export function setupIpcHandlers() {
         }
     })
 
-    // Get VOD stream URL
+    // Fetch EPG from mi.tv (bypasses CORS)
+    ipcMain.handle('epg:fetch-mitv', async (_, channelSlug: string) => {
+        try {
+            const fetch = (await import('node-fetch')).default
+            const url = `https://mi.tv/br/canais/${channelSlug}`
+            console.log('[EPG IPC] Fetching mi.tv:', url)
+            const response = await fetch(url, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+            })
+
+            if (!response.ok) {
+                console.log('[EPG IPC] mi.tv returned:', response.status)
+                return { success: false, error: `HTTP ${response.status}` }
+            }
+
+            const html = await response.text()
+            console.log('[EPG IPC] mi.tv Response length:', html.length)
+            return { success: true, html }
+        } catch (error: any) {
+            console.error('[EPG IPC] mi.tv Error:', error.message)
+            return { success: false, error: error.message }
+        }
+    })
     ipcMain.handle('streams:get-vod-url', async (_, { streamId, container }) => {
         try {
             console.log('[Download] get-vod-url called with:', { streamId, container })
