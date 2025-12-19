@@ -145,10 +145,12 @@ export function MiniPlayerProvider({ children }: { children: React.ReactNode }) 
             currentEpisode: number;
             responseChannel: string;
         }) => {
+            console.log('[MiniPlayer] Next episode request received:', data);
             try {
                 // Get credentials for API call
                 const result = await window.ipcRenderer.invoke('auth:get-credentials');
                 if (!result.success) {
+                    console.log('[MiniPlayer] Failed to get credentials');
                     window.ipcRenderer.send(data.responseChannel, null);
                     return;
                 }
@@ -161,12 +163,14 @@ export function MiniPlayerProvider({ children }: { children: React.ReactNode }) 
                 );
 
                 if (!response.ok) {
+                    console.log('[MiniPlayer] API request failed:', response.status);
                     window.ipcRenderer.send(data.responseChannel, null);
                     return;
                 }
 
                 const seriesData = await response.json();
                 const episodes = seriesData.episodes || {};
+                console.log('[MiniPlayer] Series episodes structure:', Object.keys(episodes));
 
                 // Find next episode
                 let nextSeason = data.currentSeason;

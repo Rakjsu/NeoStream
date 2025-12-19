@@ -166,11 +166,17 @@ export function PipWindow() {
             if (window.ipcRenderer) {
                 try {
                     setIsLoading(true);
+                    console.log('[PiP] Requesting next episode for:', {
+                        seriesId: content.contentId,
+                        currentSeason: content.seasonNumber,
+                        currentEpisode: content.episodeNumber
+                    });
                     const nextEp = await window.ipcRenderer.invoke('pip:getNextEpisode', {
                         seriesId: content.contentId,
                         currentSeason: content.seasonNumber,
                         currentEpisode: content.episodeNumber
                     });
+                    console.log('[PiP] Next episode response:', nextEp);
 
                     if (nextEp && nextEp.src) {
                         console.log('[PiP] Loading next episode:', nextEp.title);
