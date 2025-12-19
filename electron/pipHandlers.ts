@@ -50,6 +50,10 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
             resizable: true,
             skipTaskbar: false, // Show in taskbar
             hasShadow: true,
+            focusable: true, // Can receive focus independently
+            movable: true, // Can be moved
+            parent: undefined, // No parent - completely independent window
+            modal: false, // Not a modal
             webPreferences: {
                 preload: path.join(__dirname, 'preload.mjs'),
                 nodeIntegration: false,
