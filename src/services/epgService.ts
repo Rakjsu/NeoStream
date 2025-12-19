@@ -445,11 +445,26 @@ export const epgService = {
         if (programs.length === 0) return null;
 
         const now = new Date().getTime();
+        console.log('[EPG] getCurrentProgram - now:', new Date(now).toLocaleTimeString());
+
+        // Log first few programs for debugging
+        programs.slice(0, 3).forEach((p, i) => {
+            const start = new Date(p.start);
+            const end = new Date(p.end);
+            console.log(`[EPG] Program ${i + 1}: ${start.toLocaleTimeString()} - ${end.toLocaleTimeString()} = ${p.title.substring(0, 20)}`);
+        });
+
         const current = programs.find(p => {
             const start = new Date(p.start).getTime();
             const end = new Date(p.end).getTime();
             return now >= start && now <= end;
         });
+
+        if (current) {
+            console.log('[EPG] Found current program:', current.title);
+        } else {
+            console.log('[EPG] No current program found! Falling back to first program.');
+        }
 
         // If no current program found (timezone mismatch), use first program
         return current || programs[0];
