@@ -80,9 +80,27 @@ export const epgService = {
         return [];
     },
 
+    // Manual mi.tv slug mappings for channels that don't match automatic generation
+    mitvManualMappings: {
+        // Globo regional channels
+        'globo tv anhanguera araguaina tocantins': 'globo-anhanguera',
+        'globo tv anhanguera': 'globo-anhanguera',
+        'globo anhanguera': 'globo-anhanguera',
+        'globo tv tribuna santos': 'globo-tv-tribuna',
+        'globo tv tribuna': 'globo-tv-tribuna',
+        'globo tv nordeste': 'globo-nordeste-hd',
+        'globo nordeste': 'globo-nordeste-hd',
+        'globo rede amazonica manaus': 'globo-amazonas',
+        'globo rede amazonica itacoatiara': 'globo-amazonas',
+        'globo rede amazonica rondonia': 'globo-amazonas',
+        'globo rede amazonica': 'globo-amazonas',
+        'globo minas': 'globo-belo-horizonte-hd',
+        // Add more mappings as needed
+    } as Record<string, string>,
+
     // Generate mi.tv slug from channel name
     generateMiTVSlug(channelName: string): string {
-        return channelName
+        const normalized = channelName
             .toLowerCase()
             .replace(/\s*\[.*?\]\s*/g, '') // Remove [HD], [FHD], etc.
             .replace(/\s*\(.*?\)\s*/g, '') // Remove (anything)
@@ -90,7 +108,22 @@ export const epgService = {
             .replace(/\s+fhd$/i, '') // Remove trailing FHD
             .replace(/\s+4k$/i, '') // Remove trailing 4K
             .replace(/\s+sd$/i, '') // Remove trailing SD
-            .trim()
+            .trim();
+
+        // Check manual mappings first
+        if (this.mitvManualMappings[normalized]) {
+            return this.mitvManualMappings[normalized];
+        }
+
+        // Check if any mapping key is contained in the channel name
+        for (const [key, value] of Object.entries(this.mitvManualMappings)) {
+            if (normalized.includes(key) || key.includes(normalized)) {
+                return value;
+            }
+        }
+
+        // Generate slug automatically
+        return normalized
             .replace(/[áàâã]/g, 'a')
             .replace(/[éèê]/g, 'e')
             .replace(/[íìî]/g, 'i')
