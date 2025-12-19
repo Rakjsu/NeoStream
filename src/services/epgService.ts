@@ -75,6 +75,17 @@ const mitvMappings: Record<string, string> = {
     // Rede CNT
     'cnt': 'cnt',
     'rede cnt': 'cnt',
+    // Woohoo
+    'woohoo': 'woohoo',
+    'canal woohoo': 'woohoo',
+    // Music Box Brasil
+    'music box brasil': 'music-box-brasil',
+    'musicbox brasil': 'music-box-brasil',
+    // Agro Mais
+    'agro mais': 'agromais-hd',
+    'agromais': 'agromais-hd',
+    // Record News
+    'record news': 'record-news-hd',
 };
 
 // Manual channel mappings for meuguia.tv (fallback)
@@ -151,8 +162,8 @@ export const epgService = {
             .trim()
             // Remove codec info: (H265), (H264), (HEVC), etc.
             .replace(/\s*\(?(h\.?265|h\.?264|hevc|avc)\)?/gi, '')
-            // Remove quality: [FHD], [HD], [SD], [4K], [UHD] or FHD, HD, SD, 4K, UHD
-            .replace(/\s*\[?(fhd|hd|sd|4k|uhd)\]?\s*$/i, '')
+            // Remove quality: [FHD], [HD], [SD], [4K], [UHD], [M] or FHD, HD, SD, 4K, UHD
+            .replace(/\s*\[?(fhd|hd|sd|4k|uhd|m)\]?\s*$/i, '')
             .trim();
 
         console.log('[EPG] Channel normalized:', channelName, '->', normalized);
@@ -181,7 +192,7 @@ export const epgService = {
             .toLowerCase()
             .trim()
             .replace(/\s*\(?(h\.?265|h\.?264|hevc|avc)\)?/gi, '')
-            .replace(/\s*\[?(fhd|hd|sd|4k|uhd)\]?\s*$/i, '')
+            .replace(/\s*\[?(fhd|hd|sd|4k|uhd|m)\]?\s*$/i, '')
             .trim();
         return meuguiaMappings[normalized] || null;
     },
