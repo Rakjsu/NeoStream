@@ -415,12 +415,12 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             whatsNew: 'Novidades na',
             gotIt: 'Entendi, vamos lá!',
             // Version 3.2.0
-            i18nTitle: 'Sistema de Legendas Forçadas',
-            i18nItems: 'Toggle nas Configurações para ativar/desativar|Botão F no player para controle por sessão|Carregamento automático ao ativar no player',
-            profilesTitle: 'Filtros de Edições Especiais',
-            profilesItems: 'Rejeita Extended e Directors Cut para forçadas|Suporte a padrões PT (Versão Estendida)|Aviso na tela quando só edições especiais',
-            fixesTitle: 'Correções',
-            fixesItems: 'Toggle sincroniza com localStorage correto|Leitura correta do perfil ativo|Filtros aplicados a séries também'
+            i18nTitle: 'Player Multilíngue',
+            i18nItems: 'VideoPlayer completamente traduzido (PT/EN/ES)|Legendas: mensagens e tooltips traduzidos|Controles de episódio e velocidade traduzidos',
+            profilesTitle: 'PiP Multilíngue',
+            profilesItems: 'Botão expandir traduzido|Botão fechar traduzido|Loading traduzido',
+            fixesTitle: 'Animações Home',
+            fixesItems: 'Animação do botão X nos cards Continue Assistindo|Animação do botão Play no hover|Z-index corrigido para melhor visibilidade'
         },
         // Welcome page
         welcome: {
@@ -779,12 +779,12 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             whatsNew: "What's New in",
             gotIt: "Got it, let's go!",
             // Version 3.2.0
-            i18nTitle: 'Forced Subtitles System',
-            i18nItems: 'Toggle in Settings to enable/disable|F button in player for session control|Auto-load when enabled in player',
-            profilesTitle: 'Special Edition Filters',
-            profilesItems: 'Rejects Extended and Directors Cut for forced|PT pattern support (Versão Estendida)|Screen warning when only special editions',
-            fixesTitle: 'Bug Fixes',
-            fixesItems: 'Toggle syncs with localStorage correctly|Correct active profile reading|Filters applied to series too'
+            i18nTitle: 'Multilingual Player',
+            i18nItems: 'VideoPlayer fully translated (PT/EN/ES)|Subtitles: messages and tooltips translated|Episode and speed controls translated',
+            profilesTitle: 'Multilingual PiP',
+            profilesItems: 'Expand button translated|Close button translated|Loading translated',
+            fixesTitle: 'Home Animations',
+            fixesItems: 'X button animation on Continue Watching cards|Play button hover animation|Z-index fixed for better visibility'
         },
         // Welcome page
         welcome: {
@@ -1268,12 +1268,12 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             whatsNew: 'Novedades en',
             gotIt: '¡Entendido, vamos!',
             // Version 3.2.0
-            i18nTitle: 'Sistema de Subtítulos Forzados',
-            i18nItems: 'Toggle en Configuración para activar/desactivar|Botón F en el reproductor para control por sesión|Carga automática al activar en el reproductor',
-            profilesTitle: 'Filtros de Ediciones Especiales',
-            profilesItems: 'Rechaza Extended y Directors Cut para forzados|Soporte a patrones PT (Versão Estendida)|Aviso en pantalla cuando solo ediciones especiales',
-            fixesTitle: 'Correcciones',
-            fixesItems: 'Toggle sincroniza con localStorage correctamente|Lectura correcta del perfil activo|Filtros aplicados a series también'
+            i18nTitle: 'Player Multilingüe',
+            i18nItems: 'VideoPlayer completamente traducido (PT/EN/ES)|Subtítulos: mensajes y tooltips traducidos|Controles de episodio y velocidad traducidos',
+            profilesTitle: 'PiP Multilingüe',
+            profilesItems: 'Botón expandir traducido|Botón cerrar traducido|Cargando traducido',
+            fixesTitle: 'Animaciones Home',
+            fixesItems: 'Animación del botón X en tarjetas Continuar Viendo|Animación del botón Play al pasar el mouse|Z-index corregido para mejor visibilidad'
         },
         // Welcome page
         welcome: {
