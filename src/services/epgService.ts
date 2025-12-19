@@ -103,6 +103,8 @@ export const epgService = {
         'record belem': 'recordtv-belem',
         'record campinas': 'record-tv-campinas',
         'record rs': 'record-tv-rs',
+        // HBO channels with correct mi.tv slugs
+        'hbo family': 'hbo-family-hd',
         // Add more mappings as needed
     } as Record<string, string>,
 
