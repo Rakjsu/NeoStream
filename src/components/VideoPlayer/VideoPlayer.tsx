@@ -106,9 +106,9 @@ export function VideoPlayer({
             if (saved) {
                 const config = JSON.parse(saved);
                 const result = config.forcedSubtitlesEnabled !== false;
-                                return result;
+                return result;
             }
-                    } catch (e) { console.error('Error reading forced config:', e); }
+        } catch (e) { console.error('Error reading forced config:', e); }
         return true; // default enabled
     });
     const containerRef = useRef<HTMLDivElement>(null);
@@ -145,7 +145,7 @@ export function VideoPlayer({
                         (src && state.content.src === src);
 
                     if (isSameContent && state.content.currentTime && state.content.currentTime > 0) {
-                                                setPipResumeTime(state.content.currentTime);
+                        setPipResumeTime(state.content.currentTime);
                     }
                 }
             } catch (error) {
@@ -180,14 +180,14 @@ export function VideoPlayer({
 
         // Check if title contains [L] - already subtitled, skip Forced
         if (title.includes('[L]')) {
-                        return;
+            return;
         }
 
         const loadForcedSubtitles = async () => {
             try {
                 // Check if Forced subtitles are disabled for this session
                 if (!forcedEnabledForSession) {
-                                        return;
+                    return;
                 }
 
                 // Check if Forced subtitles are enabled in settings
@@ -196,10 +196,10 @@ export function VideoPlayer({
                 const config = playbackService.getConfig();
 
                 if (!config.forcedSubtitlesEnabled) {
-                                        return;
+                    return;
                 }
 
-                                const result = await autoFetchForcedSubtitle({
+                const result = await autoFetchForcedSubtitle({
                     title,
                     tmdbId,
                     imdbId,
@@ -213,8 +213,8 @@ export function VideoPlayer({
                     setVttContent(result.vttContent);
                     setSubtitlesEnabled(true);
                     setIsForcedSubtitle(true);
-                                    } else {
-                                    }
+                } else {
+                }
             } catch (error) {
                 console.error('Error auto-loading forced subtitles:', error);
             }
@@ -237,9 +237,9 @@ export function VideoPlayer({
             localStorage.removeItem('shouldAutoPlayNextEpisode');
 
             if (shouldAutoPlay === 'true') {
-                                videoRef.current.play();
+                videoRef.current.play();
             } else {
-                                // Don't play, let user manually start
+                // Don't play, let user manually start
             }
         } else if (autoPlay) {
             // Normal autoPlay behavior for initial video load
@@ -257,7 +257,7 @@ export function VideoPlayer({
             if (video && resumeTime) {
                 // Only seek if not already at or past the resume point
                 if (Math.abs(video.currentTime - resumeTime) > 5) {
-                                        video.currentTime = resumeTime;
+                    video.currentTime = resumeTime;
                 }
             }
         };
@@ -337,7 +337,7 @@ export function VideoPlayer({
             // The next video will check localStorage for shouldAutoPlay
             localStorage.setItem('shouldAutoPlayNextEpisode', config.autoPlayNextEpisode ? 'true' : 'false');
 
-                        onNextEpisode();
+            onNextEpisode();
         };
 
         video.addEventListener('ended', handleEnded);
@@ -642,95 +642,98 @@ export function VideoPlayer({
                     </div>
 
                     <div className="controls-right">
-                        <div className="settings-menu-container">
-                            <button
-                                className="control-btn settings-btn"
-                                onClick={() => setShowSettings(!showSettings)}
-                                style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '4px' }}
-                            >
-                                <FaCog />
-                                {/* Quality Badge - show current quality when movie versions available */}
-                                {movieVersions && movieVersions.length > 0 && (() => {
-                                    const currentVersion = movieVersions.find(v => v.movie.stream_id === currentMovieId);
-                                    if (currentVersion) {
-                                        const qualityText = currentVersion.quality === '4k' ? '4K' : '1080p';
-                                        const audioText = currentVersion.audio === 'subtitled' ? 'LEG' : 'DUB';
-                                        return (
-                                            <span style={{
-                                                fontSize: '9px',
-                                                fontWeight: 700,
-                                                padding: '2px 5px',
-                                                borderRadius: '4px',
-                                                background: currentVersion.quality === '4k'
-                                                    ? 'linear-gradient(135deg, #f59e0b, #d97706)'
-                                                    : 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
-                                                color: 'white',
-                                                textTransform: 'uppercase',
-                                                letterSpacing: '0.5px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '3px',
-                                                boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
-                                            }}>
-                                                {qualityText}
-                                                <span style={{ opacity: 0.7, fontSize: '7px' }}>•</span>
-                                                <span style={{ fontSize: '7px', opacity: 0.9 }}>{audioText}</span>
-                                            </span>
-                                        );
-                                    }
-                                    return null;
-                                })()}
-                            </button>
+                        {/* Settings/Quality button - hide on live TV */}
+                        {contentType !== 'live' && (
+                            <div className="settings-menu-container">
+                                <button
+                                    className="control-btn settings-btn"
+                                    onClick={() => setShowSettings(!showSettings)}
+                                    style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                    <FaCog />
+                                    {/* Quality Badge - show current quality when movie versions available */}
+                                    {movieVersions && movieVersions.length > 0 && (() => {
+                                        const currentVersion = movieVersions.find(v => v.movie.stream_id === currentMovieId);
+                                        if (currentVersion) {
+                                            const qualityText = currentVersion.quality === '4k' ? '4K' : '1080p';
+                                            const audioText = currentVersion.audio === 'subtitled' ? 'LEG' : 'DUB';
+                                            return (
+                                                <span style={{
+                                                    fontSize: '9px',
+                                                    fontWeight: 700,
+                                                    padding: '2px 5px',
+                                                    borderRadius: '4px',
+                                                    background: currentVersion.quality === '4k'
+                                                        ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+                                                        : 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                                                    color: 'white',
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: '0.5px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '3px',
+                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                                                }}>
+                                                    {qualityText}
+                                                    <span style={{ opacity: 0.7, fontSize: '7px' }}>•</span>
+                                                    <span style={{ fontSize: '7px', opacity: 0.9 }}>{audioText}</span>
+                                                </span>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+                                </button>
 
-                            {showSettings && (
-                                <div className="settings-menu">
-                                    {/* Movie Version Switcher - only show for movies with multiple versions */}
-                                    {movieVersions && movieVersions.length > 1 && onSwitchVersion ? (
-                                        <div className="settings-section">
-                                            <span className="settings-label">{t('player', 'version')}</span>
-                                            <div className="settings-options">
-                                                {movieVersions.map(version => {
-                                                    const isActive = version.movie.stream_id === currentMovieId;
-                                                    return (
+                                {showSettings && (
+                                    <div className="settings-menu">
+                                        {/* Movie Version Switcher - only show for movies with multiple versions */}
+                                        {movieVersions && movieVersions.length > 1 && onSwitchVersion ? (
+                                            <div className="settings-section">
+                                                <span className="settings-label">{t('player', 'version')}</span>
+                                                <div className="settings-options">
+                                                    {movieVersions.map(version => {
+                                                        const isActive = version.movie.stream_id === currentMovieId;
+                                                        return (
+                                                            <button
+                                                                key={version.movie.stream_id}
+                                                                className={`settings-option ${isActive ? 'active' : ''}`}
+                                                                onClick={() => {
+                                                                    if (!isActive) {
+                                                                        onSwitchVersion(version.movie, state.currentTime);
+                                                                    }
+                                                                    setShowSettings(false);
+                                                                }}
+                                                            >
+                                                                {version.label}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            /* Playback Speed - show for series or single-version movies */
+                                            <div className="settings-section">
+                                                <span className="settings-label">{t('player', 'speed')}</span>
+                                                <div className="settings-options">
+                                                    {playbackRates.map(rate => (
                                                         <button
-                                                            key={version.movie.stream_id}
-                                                            className={`settings-option ${isActive ? 'active' : ''}`}
+                                                            key={rate}
+                                                            className={`settings-option ${state.playbackRate === rate ? 'active' : ''}`}
                                                             onClick={() => {
-                                                                if (!isActive) {
-                                                                    onSwitchVersion(version.movie, state.currentTime);
-                                                                }
+                                                                controls.setPlaybackRate(rate);
                                                                 setShowSettings(false);
                                                             }}
                                                         >
-                                                            {version.label}
+                                                            {rate}x
                                                         </button>
-                                                    );
-                                                })}
+                                                    ))}
+                                                </div>
                                             </div>
-                                        </div>
-                                    ) : (
-                                        /* Playback Speed - show for series or single-version movies */
-                                        <div className="settings-section">
-                                            <span className="settings-label">{t('player', 'speed')}</span>
-                                            <div className="settings-options">
-                                                {playbackRates.map(rate => (
-                                                    <button
-                                                        key={rate}
-                                                        className={`settings-option ${state.playbackRate === rate ? 'active' : ''}`}
-                                                        onClick={() => {
-                                                            controls.setPlaybackRate(rate);
-                                                            setShowSettings(false);
-                                                        }}
-                                                    >
-                                                        {rate}x
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Episode Navigation - Only show for series */}
                         {(onNextEpisode || onPreviousEpisode) && (
@@ -752,14 +755,14 @@ export function VideoPlayer({
                             </>
                         )}
 
-                        {/* Subtitles toggle - only show for dubbed movies (not already subtitled) */}
-                        {!isSubtitled && (
+                        {/* Subtitles toggle - only show for dubbed movies (not already subtitled) and not live */}
+                        {!isSubtitled && contentType !== 'live' && (
                             <button
                                 className="control-btn"
                                 onClick={async () => {
                                     // If currently showing Forced subtitles, switch to full subtitles
                                     if (subtitlesEnabled && isForcedSubtitle) {
-                                                                                // Cleanup Forced subtitle
+                                        // Cleanup Forced subtitle
                                         if (subtitleUrl) {
                                             cleanupSubtitleUrl(subtitleUrl);
                                         }
@@ -782,7 +785,7 @@ export function VideoPlayer({
                                                     setSubtitleWarning(result.warning);
                                                     setTimeout(() => setSubtitleWarning(null), 5000);
                                                 }
-                                                                                            } else {
+                                            } else {
                                                 setSubtitleWarning(t('player', 'noFullSubtitlesFound'));
                                                 setTimeout(() => setSubtitleWarning(null), 4000);
                                             }
@@ -805,7 +808,7 @@ export function VideoPlayer({
                                             setSubtitleUrl(null);
                                             setSubtitleLanguage(null);
                                             setVttContent(null);
-                                                                                    }
+                                        }
 
                                         const video = videoRef.current;
                                         if (video && video.textTracks.length > 0) {
@@ -839,7 +842,7 @@ export function VideoPlayer({
                                                 } else {
                                                     setSubtitleWarning(t('player', 'noSubtitlesFound'));
                                                     setTimeout(() => setSubtitleWarning(null), 4000);
-                                                                                                    }
+                                                }
                                             } catch (error) {
                                                 console.error('Error fetching subtitles:', error);
                                             } finally {
@@ -871,8 +874,8 @@ export function VideoPlayer({
                             </button>
                         )}
 
-                        {/* Settings Button - Only show for non-[L] content */}
-                        {title && !title.includes('[L]') && (
+                        {/* Forced Subtitles Button - Only show for non-[L] content and not live */}
+                        {title && !title.includes('[L]') && contentType !== 'live' && (
                             <div style={{ position: 'relative' }}>
                                 <button
                                     className="control-btn"
@@ -932,7 +935,7 @@ export function VideoPlayer({
                                                     }
                                                 } else if (newValue && !subtitlesEnabled) {
                                                     // Enabling: load forced subtitles now
-                                                                                                        try {
+                                                    try {
                                                         const { autoFetchForcedSubtitle } = await import('../../services/subtitleService');
                                                         const result = await autoFetchForcedSubtitle({
                                                             title: title || '',
@@ -952,7 +955,7 @@ export function VideoPlayer({
                                                             setVttContent(result.vttContent);
                                                             setSubtitlesEnabled(true);
                                                             setIsForcedSubtitle(true);
-                                                                                                                    } else {
+                                                        } else {
                                                             setSubtitleWarning(t('player', 'noForcedSubtitlesFound'));
                                                             setTimeout(() => setSubtitleWarning(null), 4000);
                                                         }
@@ -962,7 +965,7 @@ export function VideoPlayer({
                                                         setTimeout(() => setSubtitleWarning(null), 4000);
                                                     }
                                                 }
-                                                                                            }}
+                                            }}
                                             onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
                                             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                                         >
@@ -1075,7 +1078,7 @@ export function VideoPlayer({
                         videoTitle={title || 'Video'}
                         onClose={() => setShowDeviceSelector(false)}
                         onDeviceSelected={(device) => {
-                                                    }}
+                        }}
                         chromecastAvailable={chromecast.isAvailable}
                         chromecastCasting={chromecast.isCasting}
                         onChromecastCast={() => {
