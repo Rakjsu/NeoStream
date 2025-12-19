@@ -11,6 +11,7 @@ import { useSearchParams } from 'react-router-dom';
 import { movieProgressService } from '../services/movieProgressService';
 import { watchProgressService } from '../services/watchProgressService';
 import { useLanguage } from '../services/languageService';
+import { playbackService } from '../services/playbackService';
 
 interface PipContent {
     src: string;
@@ -77,6 +78,14 @@ export function PipWindow() {
         const newState = !clickThrough;
         await window.ipcRenderer.invoke('pip:clickThrough', newState);
     };
+
+    // Auto-enable click-through mode if setting is enabled
+    useEffect(() => {
+        const config = playbackService.getConfig();
+        if (config.clickThroughEnabled) {
+            window.ipcRenderer.invoke('pip:clickThrough', true);
+        }
+    }, []);
 
     // Parse content from URL
     useEffect(() => {

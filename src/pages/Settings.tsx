@@ -407,22 +407,6 @@ export function Settings() {
                                         {saveAnimation === 'videoCodec' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                                     </div>
 
-                                    <div className="setting-item">
-                                        <div className="setting-info">
-                                            <label>{t('playback', 'autoPlayNext')}</label>
-                                            <p>{t('playback', 'autoPlayNextDesc')}</p>
-                                        </div>
-                                        <label className="toggle-switch">
-                                            <input
-                                                type="checkbox"
-                                                checked={playbackConfig.autoPlayNextEpisode}
-                                                onChange={(e) => handlePlaybackConfigChange('autoPlayNextEpisode', e.target.checked)}
-                                            />
-                                            <span className="toggle-slider"></span>
-                                        </label>
-                                        {saveAnimation === 'autoPlayNextEpisode' && <span className="save-indicator">{t('settings', 'saved')}</span>}
-                                    </div>
-
                                     {/* Subtitle Language Setting */}
                                     <div className="setting-item">
                                         <div className="setting-info">
@@ -459,6 +443,35 @@ export function Settings() {
                                         {saveAnimation === 'forcedSubtitlesEnabled' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                                     </div>
 
+                                    {/* Auto Play Next Episode Setting */}
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>{t('playback', 'autoPlayNext')}</label>
+                                            <p>{t('playback', 'autoPlayNextDesc')}</p>
+                                        </div>
+                                        <label className="toggle-switch">
+                                            <input
+                                                type="checkbox"
+                                                checked={playbackConfig.autoPlayNextEpisode}
+                                                onChange={(e) => handlePlaybackConfigChange('autoPlayNextEpisode', e.target.checked)}
+                                            />
+                                            <span className="toggle-slider"></span>
+                                        </label>
+                                        {saveAnimation === 'autoPlayNextEpisode' && <span className="save-indicator">{t('settings', 'saved')}</span>}
+                                    </div>
+
+                                    {/* Skip Intro Setting */}
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>{t('playback', 'skipIntro')}</label>
+                                            <p>{t('playback', 'skipIntroDesc')}</p>
+                                        </div>
+                                        <label className="toggle-switch">
+                                            <input type="checkbox" defaultChecked />
+                                            <span className="toggle-slider"></span>
+                                        </label>
+                                    </div>
+
                                     {/* Click-Through Mode Setting */}
                                     <div className="setting-item">
                                         <div className="setting-info">
@@ -474,17 +487,6 @@ export function Settings() {
                                             <span className="toggle-slider"></span>
                                         </label>
                                         {saveAnimation === 'clickThroughEnabled' && <span className="save-indicator">{t('settings', 'saved')}</span>}
-                                    </div>
-
-                                    <div className="setting-item">
-                                        <div className="setting-info">
-                                            <label>{t('playback', 'skipIntro')}</label>
-                                            <p>{t('playback', 'skipIntroDesc')}</p>
-                                        </div>
-                                        <label className="toggle-switch">
-                                            <input type="checkbox" defaultChecked />
-                                            <span className="toggle-slider"></span>
-                                        </label>
                                     </div>
                                 </div>
                             </div>
