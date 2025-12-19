@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { FaPlay, FaPause, FaTimes, FaExpand, FaVolumeUp, FaVolumeMute } from 'react-icons/fa';
+import { FaPlay, FaPause, FaTimes, FaExpand, FaVolumeUp, FaVolumeMute, FaVolumeDown, FaVolumeOff } from 'react-icons/fa';
 import { useHls } from '../hooks/useHls';
 import { useVideoPlayer } from '../hooks/useVideoPlayer';
 import { useSearchParams } from 'react-router-dom';
@@ -425,15 +425,27 @@ export function PipWindow() {
                 >
                     <button
                         onClick={handleToggleMute}
+                        className="pip-btn"
                         style={{
                             background: 'transparent',
                             border: 'none',
                             padding: 4,
                             cursor: 'pointer',
-                            display: 'flex'
+                            display: 'flex',
+                            transition: 'all 0.2s ease'
                         }}
                     >
-                        {isMuted ? <FaVolumeMute size={14} color="white" /> : <FaVolumeUp size={14} color="white" />}
+                        {(() => {
+                            if (isMuted || volume === 0) {
+                                return <FaVolumeMute size={14} color="white" style={{ transition: 'transform 0.2s ease' }} />;
+                            } else if (volume < 0.33) {
+                                return <FaVolumeOff size={14} color="white" style={{ transition: 'transform 0.2s ease' }} />;
+                            } else if (volume < 0.66) {
+                                return <FaVolumeDown size={14} color="white" style={{ transition: 'transform 0.2s ease' }} />;
+                            } else {
+                                return <FaVolumeUp size={14} color="white" style={{ transition: 'transform 0.2s ease' }} />;
+                            }
+                        })()}
                     </button>
 
                     <div style={{
