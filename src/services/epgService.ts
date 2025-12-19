@@ -114,9 +114,14 @@ export const epgService = {
         // Add more mappings as needed
     } as Record<string, string>,
 
-    // Meuguia.tv manual mappings (for channels not on mi.tv)
+    // Meuguia.tv manual mappings (for channels not on mi.tv or as fallback)
     meuguiaManualMappings: {
+        'hbo': 'HBO',
+        'hbo 2': 'HB2',
+        'hbo2': 'HB2',
+        'hbo family': 'HFA',
         'hbo plus': 'HPL',
+        'hbo signature': 'HFE',
     } as Record<string, string>,
 
     // Category fallback mappings - if specific channel EPG not found, use main network EPG
