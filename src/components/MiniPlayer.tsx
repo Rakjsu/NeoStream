@@ -138,10 +138,80 @@ export function MiniPlayerProvider({ children }: { children: React.ReactNode }) 
         window.ipcRenderer.on('pip:state', handlePipState);
         window.ipcRenderer.on('pip:expand', handlePipExpand);
 
+        // Handle request for next episode (from PiP window)
+        const handleNextEpisodeRequest = async (_event: any, data: {
+            seriesId: string;
+            currentSeason: number;
+            currentEpisode: number;
+            responseChannel: string;
+        }) => {
+            try {
+                // Get credentials for API call
+                const result = await window.ipcRenderer.invoke('auth:get-credentials');
+                if (!result.success) {
+                    window.ipcRenderer.send(data.responseChannel, null);
+                    return;
+                }
+
+                const { url, username, password } = result.credentials;
+
+                // Fetch series info to get episodes
+                const response = await fetch(
+                    `${url}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${data.seriesId}`
+                );
+
+                if (!response.ok) {
+                    window.ipcRenderer.send(data.responseChannel, null);
+                    return;
+                }
+
+                const seriesData = await response.json();
+                const episodes = seriesData.episodes || {};
+
+                // Find next episode
+                let nextSeason = data.currentSeason;
+                let nextEpisode = data.currentEpisode + 1;
+                let nextEpData = null;
+
+                // Check if next episode exists in current season
+                const currentSeasonEps = episodes[String(data.currentSeason)] || [];
+                nextEpData = currentSeasonEps.find((ep: any) => ep.episode_num === nextEpisode);
+
+                // If not found, try first episode of next season
+                if (!nextEpData) {
+                    nextSeason = data.currentSeason + 1;
+                    nextEpisode = 1;
+                    const nextSeasonEps = episodes[String(nextSeason)] || [];
+                    nextEpData = nextSeasonEps.find((ep: any) => ep.episode_num === 1);
+                }
+
+                if (nextEpData) {
+                    // Build stream URL
+                    const streamUrl = `${url}/series/${username}/${password}/${nextEpData.id}.${nextEpData.container_extension || 'mp4'}`;
+                    const title = `${seriesData.info?.name || 'Series'} - S${nextSeason}E${nextEpisode}`;
+
+                    window.ipcRenderer.send(data.responseChannel, {
+                        src: streamUrl,
+                        title,
+                        seasonNumber: nextSeason,
+                        episodeNumber: nextEpisode
+                    });
+                } else {
+                    window.ipcRenderer.send(data.responseChannel, null);
+                }
+            } catch (error) {
+                console.error('[MiniPlayer] Error fetching next episode:', error);
+                window.ipcRenderer.send(data.responseChannel, null);
+            }
+        };
+
+        window.ipcRenderer.on('pip:requestNextEpisode', handleNextEpisodeRequest);
+
         return () => {
             window.ipcRenderer?.off('pip:closed', handlePipClosed);
             window.ipcRenderer?.off('pip:state', handlePipState);
             window.ipcRenderer?.off('pip:expand', handlePipExpand);
+            window.ipcRenderer?.off('pip:requestNextEpisode', handleNextEpisodeRequest);
         };
     }, []);
 

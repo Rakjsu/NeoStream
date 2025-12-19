@@ -167,6 +167,36 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
         }
         return true;
     });
+
+    // Get next episode info for auto-advance in PiP
+    ipcMain.handle('pip:getNextEpisode', async (_event, data: { seriesId: string; currentSeason: number; currentEpisode: number }) => {
+        // Forward request to main window and wait for response
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            return new Promise((resolve) => {
+                const responseChannel = `pip:nextEpisodeResponse:${Date.now()}`;
+
+                const handler = (_event: any, response: any) => {
+                    ipcMain.removeListener(responseChannel, handler);
+                    resolve(response);
+                };
+
+                ipcMain.once(responseChannel, handler);
+
+                // Request next episode from main window
+                mainWindow!.webContents.send('pip:requestNextEpisode', {
+                    ...data,
+                    responseChannel
+                });
+
+                // Timeout after 10 seconds
+                setTimeout(() => {
+                    ipcMain.removeListener(responseChannel, handler);
+                    resolve(null);
+                }, 10000);
+            });
+        }
+        return null;
+    });
 }
 
 export function closePipWindow() {

@@ -139,12 +139,61 @@ export function PipWindow() {
         video.addEventListener('durationchange', handleDurationChange);
         video.addEventListener('volumechange', handleVolumeChange);
 
+        // Handle video ended - auto advance to next episode for series
+        const handleEnded = async () => {
+            if (!content || content.contentType !== 'series') return;
+            if (!content.contentId || !content.seasonNumber || !content.episodeNumber) return;
+
+            console.log('[PiP] Episode ended, marking as watched and loading next...');
+
+            // Mark current episode as watched
+            watchProgressService.markEpisodeWatched(
+                content.contentId,
+                content.seasonNumber,
+                content.episodeNumber
+            );
+
+            // Request next episode from main process
+            if (window.ipcRenderer) {
+                try {
+                    setIsLoading(true);
+                    const nextEp = await window.ipcRenderer.invoke('pip:getNextEpisode', {
+                        seriesId: content.contentId,
+                        currentSeason: content.seasonNumber,
+                        currentEpisode: content.episodeNumber
+                    });
+
+                    if (nextEp && nextEp.src) {
+                        console.log('[PiP] Loading next episode:', nextEp.title);
+                        // Update content with next episode
+                        setContent({
+                            ...content,
+                            src: nextEp.src,
+                            title: nextEp.title,
+                            seasonNumber: nextEp.seasonNumber,
+                            episodeNumber: nextEp.episodeNumber,
+                            currentTime: 0
+                        });
+                    } else {
+                        console.log('[PiP] No more episodes available');
+                        setIsLoading(false);
+                    }
+                } catch (error) {
+                    console.error('[PiP] Error loading next episode:', error);
+                    setIsLoading(false);
+                }
+            }
+        };
+
+        video.addEventListener('ended', handleEnded);
+
         return () => {
             video.removeEventListener('play', handlePlay);
             video.removeEventListener('pause', handlePause);
             video.removeEventListener('timeupdate', handleTimeUpdate);
             video.removeEventListener('durationchange', handleDurationChange);
             video.removeEventListener('volumechange', handleVolumeChange);
+            video.removeEventListener('ended', handleEnded);
         };
     }, [content]);
 
