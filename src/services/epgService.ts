@@ -95,11 +95,11 @@ export const epgService = {
 
     // Get mi.tv slug from channel name
     getMiTVSlug(channelName: string): string {
-        // Remove quality suffixes (FHD, HD, SD, 4K) from channel name
+        // Remove quality suffixes: [FHD], [HD], [SD], [4K], [UHD] or FHD, HD, SD, 4K, UHD
         const normalized = channelName
             .toLowerCase()
             .trim()
-            .replace(/\s*(fhd|hd|sd|4k|uhd)\s*$/i, '')
+            .replace(/\s*\[?(fhd|hd|sd|4k|uhd)\]?\s*$/i, '')
             .trim();
 
         console.log('[EPG] Channel normalized:', channelName, '->', normalized);
@@ -123,11 +123,11 @@ export const epgService = {
 
     // Get meuguia.tv slug from channel name
     getMeuGuiaSlug(channelName: string): string | null {
-        // Remove quality suffixes
+        // Remove quality suffixes: [FHD], [HD], etc.
         const normalized = channelName
             .toLowerCase()
             .trim()
-            .replace(/\s*(fhd|hd|sd|4k|uhd)\s*$/i, '')
+            .replace(/\s*\[?(fhd|hd|sd|4k|uhd)\]?\s*$/i, '')
             .trim();
         return meuguiaMappings[normalized] || null;
     },
