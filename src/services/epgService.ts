@@ -380,11 +380,19 @@ export const epgService = {
 
             if (!slug) return [];
 
+            console.log('[EPG] Fetching meuguia.tv with slug:', slug);
             const result = await window.ipcRenderer.invoke('epg:fetch-meuguia', slug);
-            if (!result.success || !result.html) return [];
+            if (!result.success || !result.html) {
+                console.log('[EPG] meuguia.tv fetch failed');
+                return [];
+            }
+
+            console.log('[EPG] meuguia.tv HTML length:', result.html.length);
+            console.log('[EPG] meuguia.tv HTML sample:', result.html.substring(0, 500));
 
             return this.parseMeuGuiaHTML(result.html, channelName);
-        } catch {
+        } catch (error) {
+            console.error('[EPG] meuguia.tv error:', error);
             return [];
         }
     },
