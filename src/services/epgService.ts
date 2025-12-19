@@ -103,7 +103,16 @@ export const epgService = {
         'record belem': 'recordtv-belem',
         'record campinas': 'record-tv-campinas',
         'record rs': 'record-tv-rs',
+        // HBO/Max channels (HBO rebranded to Max)
+        'hbo mundi': 'max',
+        'hbo pop': 'max-up',
+        'hbo xtreme': 'max-prime',
         // Add more mappings as needed
+    } as Record<string, string>,
+
+    // Meuguia.tv manual mappings (for channels not on mi.tv)
+    meuguiaManualMappings: {
+        'hbo plus': 'HPL',
     } as Record<string, string>,
 
     // Category fallback mappings - if specific channel EPG not found, use main network EPG
@@ -330,14 +339,30 @@ export const epgService = {
                 .replace(/4k$/i, '')
                 .trim();
 
-            const sortedMappings = Object.entries(channelMappings)
-                .sort((a, b) => b[0].length - a[0].length);
-
+            // Check manual meuguia mappings first
             let slug = '';
-            for (const [key, value] of sortedMappings) {
-                if (normalized.includes(key)) {
-                    slug = value;
-                    break;
+            if (this.meuguiaManualMappings[normalized]) {
+                slug = this.meuguiaManualMappings[normalized];
+            } else {
+                // Check if any manual mapping key is contained in the channel name
+                for (const [key, value] of Object.entries(this.meuguiaManualMappings)) {
+                    if (normalized.includes(key)) {
+                        slug = value;
+                        break;
+                    }
+                }
+            }
+
+            // Fall back to global channelMappings if no manual mapping found
+            if (!slug) {
+                const sortedMappings = Object.entries(channelMappings)
+                    .sort((a, b) => b[0].length - a[0].length);
+
+                for (const [key, value] of sortedMappings) {
+                    if (normalized.includes(key)) {
+                        slug = value;
+                        break;
+                    }
                 }
             }
 
