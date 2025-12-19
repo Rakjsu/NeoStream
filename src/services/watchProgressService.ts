@@ -292,24 +292,14 @@ class WatchProgressService {
         this.saveProgress(filtered);
     }
 
-    // Check if a series is completed (any episode >= 95% and marked as completed)
-    isSeriesCompleted(seriesId: string): boolean {
-        const activeProfile = profileService.getActiveProfile();
-        if (!activeProfile) return false;
-
-        const progress = this.getProgress();
-        const seriesEpisodes = progress.filter(
-            (p) => p.seriesId === seriesId && p.profileId === activeProfile.id
-        );
-
-        if (seriesEpisodes.length === 0) return false;
-
-        // Check if any episode is >= 95% (likely the last one)
-        return seriesEpisodes.some((ep) => {
-            if (!ep.currentTime || !ep.duration) return false;
-            const progression = (ep.currentTime / ep.duration) * 100;
-            return progression >= 95 || ep.completed;
-        });
+    // Check if a series is completed
+    // NOTE: Without knowing the total number of episodes, we cannot reliably determine
+    // if a series is completed. This function now returns false to prevent premature
+    // "completed" marking. Use getSeriesProgress with total episode count instead.
+    isSeriesCompleted(_seriesId: string): boolean {
+        // Always return false - we cannot determine completion without total episode count
+        // The UI should use a different method that receives the total episode count
+        return false;
     }
 
     // Clear progress for a series
