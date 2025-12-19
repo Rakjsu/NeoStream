@@ -121,6 +121,19 @@ const mitvMappings: Record<string, string> = {
     // TV Justiça
     'tv justica': 'tv-justica-1',
     'tv justiça': 'tv-justica-1',
+    // Conmebol TV / Paramount+
+    'conmebol tv 1': 'conmebol-tv-1',
+    'conmebol paramount+ 1': 'conmebol-tv-1',
+    'conmebol paramount 1': 'conmebol-tv-1',
+    'conmebol tv 2': 'conmebol-tv-2',
+    'conmebol paramount+ 2': 'conmebol-tv-2',
+    'conmebol paramount 2': 'conmebol-tv-2',
+    'conmebol tv 3': 'conmebol-tv-3',
+    'conmebol paramount+ 3': 'conmebol-tv-3',
+    'conmebol paramount 3': 'conmebol-tv-3',
+    'conmebol tv 4': 'conmebol-tv-4',
+    'conmebol paramount+ 4': 'conmebol-tv-4',
+    'conmebol paramount 4': 'conmebol-tv-4',
 };
 
 // Manual channel mappings for meuguia.tv (fallback)
@@ -191,13 +204,15 @@ export const epgService = {
 
     // Get mi.tv slug from channel name
     getMiTVSlug(channelName: string): string {
-        // Remove quality/codec suffixes from channel name
+        // Remove quality/codec/tag suffixes from channel name
         const normalized = channelName
             .toLowerCase()
             .trim()
             // Remove codec info: (H265), (H264), (HEVC), etc.
             .replace(/\s*\(?(h\.?265|h\.?264|hevc|avc)\)?/gi, '')
-            // Remove quality/tags: [FHD], [HD], [SD], [4K], [UHD], [M], [P] etc.
+            // Remove quality in parentheses: (FHD), (HD), (SD), (PPV), etc.
+            .replace(/\s*\((fhd|hd|sd|4k|uhd|ppv)\)/gi, '')
+            // Remove quality/tags in brackets: [FHD], [HD], [SD], [4K], [UHD], [M], [P] etc.
             .replace(/\s*\[?(fhd|hd|sd|4k|uhd|m|p)\]?\s*$/i, '')
             .trim();
 
@@ -222,11 +237,12 @@ export const epgService = {
 
     // Get meuguia.tv slug from channel name
     getMeuGuiaSlug(channelName: string): string | null {
-        // Remove quality/codec suffixes
+        // Remove quality/codec/tag suffixes
         const normalized = channelName
             .toLowerCase()
             .trim()
             .replace(/\s*\(?(h\.?265|h\.?264|hevc|avc)\)?/gi, '')
+            .replace(/\s*\((fhd|hd|sd|4k|uhd|ppv)\)/gi, '')
             .replace(/\s*\[?(fhd|hd|sd|4k|uhd|m|p)\]?\s*$/i, '')
             .trim();
         return meuguiaMappings[normalized] || null;
