@@ -13,6 +13,7 @@ const __dirname = path.dirname(__filename);
 
 let pipWindow: BrowserWindow | null = null;
 let mainWindow: BrowserWindow | null = null;
+let currentPipContent: PipContent | null = null;
 
 interface PipContent {
     src: string;
@@ -30,6 +31,9 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
 
     // Open PiP window
     ipcMain.handle('pip:open', async (_event, content: PipContent) => {
+        // Store current content
+        currentPipContent = content;
+
         // Close existing PiP window if any
         if (pipWindow && !pipWindow.isDestroyed()) {
             pipWindow.close();
@@ -99,7 +103,34 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
             pipWindow.close();
             pipWindow = null;
         }
+        currentPipContent = null;
         return true;
+    });
+
+    // Get current PiP state (if open)
+    ipcMain.handle('pip:getState', async () => {
+        if (pipWindow && !pipWindow.isDestroyed() && currentPipContent) {
+            return {
+                isOpen: true,
+                content: currentPipContent
+            };
+        }
+        return { isOpen: false, content: null };
+    });
+
+    // Close PiP and return its current state (for resuming in main player)
+    ipcMain.handle('pip:close-and-get', async () => {
+        let state = { isOpen: false, content: null as PipContent | null };
+        if (pipWindow && !pipWindow.isDestroyed() && currentPipContent) {
+            state = {
+                isOpen: true,
+                content: { ...currentPipContent }
+            };
+            pipWindow.close();
+            pipWindow = null;
+        }
+        currentPipContent = null;
+        return state;
     });
 
     // Forward control commands from main window to PiP
@@ -109,8 +140,12 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
         }
     });
 
-    // Forward state updates from PiP to main window
+    // Forward state updates from PiP to main window and keep currentTime synced
     ipcMain.on('pip:state', (_event, state: { playing: boolean; currentTime: number; duration: number }) => {
+        // Update currentPipContent with latest time
+        if (currentPipContent && state.currentTime) {
+            currentPipContent.currentTime = state.currentTime;
+        }
         if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('pip:state', state);
         }

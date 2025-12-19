@@ -128,6 +128,42 @@ export function VideoPlayer({
         }, 3000);
     };
 
+    // State for PiP resume time (if same content was in PiP)
+    const [pipResumeTime, setPipResumeTime] = useState<number | null>(null);
+
+    // Close PiP when VideoPlayer opens and get resume time if same content
+    useEffect(() => {
+        const closePipAndGetTime = async () => {
+            if (!window.ipcRenderer) return;
+
+            try {
+                const state = await window.ipcRenderer.invoke('pip:close-and-get');
+                if (state.isOpen && state.content) {
+                    // Check if same content was in PiP
+                    const isSameContent =
+                        (contentId && state.content.contentId === contentId) ||
+                        (src && state.content.src === src);
+
+                    if (isSameContent && state.content.currentTime && state.content.currentTime > 0) {
+                        console.log('[VideoPlayer] Resuming from PiP at:', state.content.currentTime);
+                        setPipResumeTime(state.content.currentTime);
+                    }
+                }
+            } catch (error) {
+                console.error('[VideoPlayer] Error closing PiP:', error);
+            }
+        };
+
+        closePipAndGetTime();
+    }, [contentId, src]);
+
+    // Apply PiP resume time when video is ready
+    useEffect(() => {
+        if (pipResumeTime !== null && videoRef.current && state.duration > 0) {
+            videoRef.current.currentTime = pipResumeTime;
+            setPipResumeTime(null); // Clear after applying
+        }
+    }, [pipResumeTime, state.duration]);
 
     useEffect(() => {
         resetHideControlsTimer();
