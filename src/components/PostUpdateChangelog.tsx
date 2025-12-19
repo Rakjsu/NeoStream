@@ -12,6 +12,34 @@ interface VersionChangelog {
 }
 
 const changelogs: VersionChangelog = {
+    '3.1.0': [
+        {
+            icon: '🖼️',
+            title: 'PiP Desktop Window',
+            items: [
+                'Janela independente fora do app (sempre visível)',
+                'Arrastar livremente pelo desktop',
+                'Salva progresso ao fechar/expandir',
+            ]
+        },
+        {
+            icon: '🎮',
+            title: 'Controles do PiP',
+            items: [
+                'Play/Pause com animação',
+                'Barra de progresso clicável',
+                'Ícone de volume dinâmico (4 níveis)',
+            ]
+        },
+        {
+            icon: '✨',
+            title: 'Animações',
+            items: [
+                'Hover e click nos botões (scale + brilho)',
+                'Botões Expandir, Fechar e Play animados',
+            ]
+        },
+    ],
     '3.0.0': [
         {
             icon: '🎬',

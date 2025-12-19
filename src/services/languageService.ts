@@ -404,13 +404,13 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             updateInstalled: 'Atualização Instalada!',
             whatsNew: 'Novidades na',
             gotIt: 'Entendi, vamos lá!',
-            // Version 3.0.0
-            i18nTitle: 'Sistema de Legendas Forçadas',
-            i18nItems: 'Toggle nas Configurações para ativar/desativar|Botão F no player para controle por sessão|Toggle sincroniza com configuração global|Carregamento automático ao ativar no player',
-            profilesTitle: 'Filtros de Edições Especiais',
-            profilesItems: 'Rejeita Extended e Directors Cut para forçadas|Suporte a padrões PT (Versão Estendida)|Aviso na tela quando só edições especiais|Filtros aplicados a séries também',
-            fixesTitle: 'Correções',
-            fixesItems: 'Toggle sincroniza com localStorage correto|Leitura correta do perfil ativo|Traduções de playback completas em PT'
+            // Version 3.1.0
+            i18nTitle: 'PiP Desktop Window',
+            i18nItems: 'Janela independente fora do app (sempre visível)|Arrastar livremente pelo desktop|Salva progresso ao fechar/expandir',
+            profilesTitle: 'Controles do PiP',
+            profilesItems: 'Play/Pause com animação|Barra de progresso clicável|Ícone de volume dinâmico (4 níveis)',
+            fixesTitle: 'Animações',
+            fixesItems: 'Hover e click nos botões (scale + brilho)|Botões Expandir, Fechar e Play animados|Transições suaves em todos controles'
         },
         // Welcome page
         welcome: {
@@ -768,13 +768,13 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             updateInstalled: 'Update Installed!',
             whatsNew: "What's New in",
             gotIt: "Got it, let's go!",
-            // Version 3.0.0
-            i18nTitle: 'Forced Subtitles System',
-            i18nItems: 'Toggle in Settings to enable/disable|F button in player for session control|Toggle syncs with global settings|Auto-load when enabled in player',
-            profilesTitle: 'Special Editions Filters',
-            profilesItems: 'Rejects Extended and Directors Cut for forced|Portuguese pattern support (Versão Estendida)|On-screen warning when only special editions|Filters applied to series too',
-            fixesTitle: 'Fixes',
-            fixesItems: 'Toggle syncs with correct localStorage|Correct active profile reading|Complete PT playback translations'
+            // Version 3.1.0
+            i18nTitle: 'PiP Desktop Window',
+            i18nItems: 'Independent window outside the app (always on top)|Freely draggable across desktop|Saves progress on close/expand',
+            profilesTitle: 'PiP Controls',
+            profilesItems: 'Play/Pause with animation|Clickable progress bar|Dynamic volume icon (4 levels)',
+            fixesTitle: 'Animations',
+            fixesItems: 'Hover and click on buttons (scale + brightness)|Animated Expand, Close and Play buttons|Smooth transitions on all controls'
         },
         // Welcome page
         welcome: {
