@@ -105,6 +105,9 @@ export const epgService = {
         'record rs': 'record-tv-rs',
         // HBO/Max channels (HBO rebranded to Max)
         'hbo': 'hbo',
+        'hbo 2': 'hbo-2',
+        'hbo2': 'hbo-2',
+        'hbo family': 'hbo-family-hd',
         'hbo mundi': 'max',
         'hbo pop': 'max-up',
         'hbo xtreme': 'max-prime',
