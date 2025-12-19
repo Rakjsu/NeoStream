@@ -237,6 +237,23 @@ export const epgService = {
 
         const pattern = /class=['"][^'"]*time[^'"]*['"][^>]*>(\d{1,2}:\d{2})<\/div>[\s\S]*?<h2[^>]*>([^<]+)<\/h2>/gi;
 
+        // meuguia.tv shows Brazil time (UTC-3)
+        // We need to convert to user's local time
+        // Brazil offset: -3 hours from UTC (-180 minutes)
+        const brazilOffsetMinutes = -180;
+        const localOffsetMinutes = new Date().getTimezoneOffset(); // e.g. 300 for EST (UTC-5)
+        // Difference: how many minutes ahead is Brazil from user's local time
+        // If user is EST (300), Brazil is (-180), difference = 300 - (-180) = 480 minutes = 8 hours? No...
+        // Actually: Brazil is UTC-3, EST is UTC-5, so Brazil is 2 hours AHEAD of EST
+        // To convert Brazil time to EST: subtract 2 hours
+        // brazilOffset is -180, localOffset is 300 (for EST)
+        // Brazil is at UTC-3, EST is at UTC-5
+        // Difference = (-3) - (-5) = 2 hours, Brazil is 2 hours ahead
+        const brazilVsLocalHours = (brazilOffsetMinutes - (-localOffsetMinutes)) / 60;
+        // For EST: brazilVsLocalHours = (-180 - (-300)) / 60 = 120 / 60 = 2 hours ahead
+
+        console.log('[EPG] meuguia timezone offset:', brazilVsLocalHours, 'hours');
+
         const today = new Date();
         let lastHour = -1;
         let dayOffset = 0;
@@ -256,6 +273,7 @@ export const epgService = {
             if (lastHour !== -1 && hours < lastHour - 2) dayOffset++;
             lastHour = hours;
 
+            // Create date and adjust for timezone difference
             const startDate = new Date(
                 today.getFullYear(),
                 today.getMonth(),
@@ -265,6 +283,9 @@ export const epgService = {
                 0,
                 0
             );
+
+            // Subtract the Brazil offset to convert to user's local time
+            startDate.setHours(startDate.getHours() - brazilVsLocalHours);
 
             const endDate = new Date(startDate);
             endDate.setHours(endDate.getHours() + 1);
