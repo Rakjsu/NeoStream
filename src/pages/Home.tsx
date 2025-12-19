@@ -741,11 +741,11 @@ export function Home() {
                                 borderRadius: '12px 12px 0 0'
                             }}>
                             {/* Play button */}
-                            <div style={{
+                            <div className="play-btn" style={{
                                 position: 'absolute',
                                 top: '40%',
                                 left: '50%',
-                                transform: 'translate(-50%, -50%)',
+                                transform: 'translate(-50%, -50%) scale(0)',
                                 width: 48,
                                 height: 48,
                                 borderRadius: '50%',
@@ -755,7 +755,8 @@ export function Home() {
                                 justifyContent: 'center',
                                 fontSize: 18,
                                 color: 'white',
-                                boxShadow: '0 4px 20px rgba(168, 85, 247, 0.5)'
+                                boxShadow: '0 4px 20px rgba(168, 85, 247, 0.5)',
+                                cursor: 'pointer'
                             }}>▶</div>
 
                             {/* Rating badge */}
@@ -1102,12 +1103,39 @@ export function Home() {
                 }
                 .content-card .remove-btn {
                     opacity: 0;
-                    transition: opacity 0.2s, transform 0.2s;
+                    transform: scale(0) rotate(-90deg);
+                    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
                     z-index: 300 !important;
                 }
                 .content-card:hover .remove-btn {
                     opacity: 1;
-                    transform: scale(1.1);
+                    transform: scale(1) rotate(0deg);
+                    animation: bounceIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+                }
+                .content-card .remove-btn:hover {
+                    transform: scale(1.2) rotate(90deg) !important;
+                    background: #ef4444 !important;
+                }
+                .content-card .play-btn {
+                    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+                }
+                .content-card:hover .play-btn {
+                    transform: translate(-50%, -50%) scale(1) !important;
+                    animation: playBounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+                }
+                .content-card .play-btn:hover {
+                    transform: translate(-50%, -50%) scale(1.15) !important;
+                    box-shadow: 0 8px 30px rgba(168, 85, 247, 0.7) !important;
+                }
+                @keyframes bounceIn {
+                    0% { transform: scale(0) rotate(-90deg); }
+                    50% { transform: scale(1.2) rotate(10deg); }
+                    100% { transform: scale(1) rotate(0deg); }
+                }
+                @keyframes playBounce {
+                    0% { transform: translate(-50%, -50%) scale(0); }
+                    50% { transform: translate(-50%, -50%) scale(1.2); }
+                    100% { transform: translate(-50%, -50%) scale(1); }
                 }
                 .kids-block-toast {
                     position: fixed;
