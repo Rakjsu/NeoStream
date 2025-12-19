@@ -181,18 +181,7 @@ export const epgService = {
 
             // Parse if we got a result
             if (result.success && result.html) {
-                const programs = this.parseMiTVHTML(result.html, channelName);
-                if (programs.length > 0) return programs;
-            }
-
-            // Try category fallback (main network EPG)
-            const fallbackSlug = this.getCategoryFallbackSlug(channelName);
-            if (fallbackSlug && fallbackSlug !== slug) {
-                console.log('[EPG] Trying mi.tv category fallback:', fallbackSlug);
-                const fallbackResult = await window.ipcRenderer.invoke('epg:fetch-mitv', fallbackSlug);
-                if (fallbackResult.success && fallbackResult.html) {
-                    return this.parseMiTVHTML(fallbackResult.html, channelName);
-                }
+                return this.parseMiTVHTML(result.html, channelName);
             }
 
             return [];
@@ -210,10 +199,6 @@ export const epgService = {
         console.log('[EPG] mi.tv HTML sample:', html.substring(0, 300));
 
         const today = new Date();
-        // Get current date in Brazilian timezone (UTC-3)
-        const brazilOffset = -3 * 60; // Brazil is UTC-3 in minutes
-        const localOffset = today.getTimezoneOffset(); // Local timezone offset in minutes
-        const offsetDiff = (localOffset + brazilOffset) * 60 * 1000; // Difference in milliseconds
 
         let lastHour = -1;
         let dayOffset = 0;
@@ -244,12 +229,9 @@ export const epgService = {
             if (lastHour !== -1 && hours < lastHour - 2) dayOffset++;
             lastHour = hours;
 
-            // Create date in Brazilian time, then convert to local
             const startDate = new Date(today);
             startDate.setDate(startDate.getDate() + dayOffset);
             startDate.setHours(hours, minutes, 0, 0);
-            // Adjust for timezone difference (Brazil -> Local)
-            startDate.setTime(startDate.getTime() + offsetDiff);
 
             const endDate = new Date(startDate);
             endDate.setHours(endDate.getHours() + 1);
@@ -288,8 +270,6 @@ export const epgService = {
                 const startDate = new Date(today);
                 startDate.setDate(startDate.getDate() + dayOffset);
                 startDate.setHours(hours, minutes, 0, 0);
-                // Adjust for timezone difference (Brazil -> Local)
-                startDate.setTime(startDate.getTime() + offsetDiff);
 
                 const endDate = new Date(startDate);
                 endDate.setHours(endDate.getHours() + 1);
