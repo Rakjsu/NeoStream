@@ -189,30 +189,74 @@ export function setupIpcHandlers() {
         }
     })
 
-    // Fetch EPG from mi.tv (bypasses CORS)
+    // Fetch EPG from mi.tv using hidden BrowserWindow (allows JavaScript to execute)
     ipcMain.handle('epg:fetch-mitv', async (_, channelSlug: string) => {
-        try {
-            const fetch = (await import('node-fetch')).default
+        const { BrowserWindow } = await import('electron')
+
+        return new Promise((resolve) => {
             const url = `https://mi.tv/br/canais/${channelSlug}`
-            console.log('[EPG IPC] Fetching mi.tv:', url)
-            const response = await fetch(url, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            console.log('[EPG IPC] Loading mi.tv with BrowserWindow:', url)
+
+            // Create hidden browser window
+            const win = new BrowserWindow({
+                width: 800,
+                height: 600,
+                show: false,
+                webPreferences: {
+                    nodeIntegration: false,
+                    contextIsolation: true
                 }
             })
 
-            if (!response.ok) {
-                console.log('[EPG IPC] mi.tv returned:', response.status)
-                return { success: false, error: `HTTP ${response.status}` }
-            }
+            let resolved = false
 
-            const html = await response.text()
-            console.log('[EPG IPC] mi.tv Response length:', html.length)
-            return { success: true, html }
-        } catch (error: any) {
-            console.error('[EPG IPC] mi.tv Error:', error.message)
-            return { success: false, error: error.message }
-        }
+            // Timeout after 10 seconds
+            const timeout = setTimeout(() => {
+                if (!resolved) {
+                    resolved = true
+                    console.log('[EPG IPC] mi.tv timeout')
+                    win.destroy()
+                    resolve({ success: false, error: 'Timeout' })
+                }
+            }, 10000)
+
+            win.webContents.on('did-finish-load', async () => {
+                // Wait 2 seconds for JavaScript to render content
+                await new Promise(r => setTimeout(r, 2000))
+
+                try {
+                    // Extract the rendered HTML
+                    const html = await win.webContents.executeJavaScript('document.documentElement.outerHTML')
+                    console.log('[EPG IPC] mi.tv rendered HTML length:', html.length)
+
+                    if (!resolved) {
+                        resolved = true
+                        clearTimeout(timeout)
+                        win.destroy()
+                        resolve({ success: true, html })
+                    }
+                } catch (error: any) {
+                    if (!resolved) {
+                        resolved = true
+                        clearTimeout(timeout)
+                        win.destroy()
+                        resolve({ success: false, error: error.message })
+                    }
+                }
+            })
+
+            win.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
+                if (!resolved) {
+                    resolved = true
+                    clearTimeout(timeout)
+                    win.destroy()
+                    console.log('[EPG IPC] mi.tv load failed:', errorDescription)
+                    resolve({ success: false, error: errorDescription })
+                }
+            })
+
+            win.loadURL(url)
+        })
     })
     ipcMain.handle('streams:get-vod-url', async (_, { streamId, container }) => {
         try {

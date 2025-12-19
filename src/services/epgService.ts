@@ -130,6 +130,30 @@ export const epgService = {
     parseMiTVHTML(html: string, channelId: string): EPGProgram[] {
         const programs: EPGProgram[] = [];
 
+        // Debug: log HTML length and sample
+        console.log('[EPG] mi.tv HTML length:', html.length);
+        console.log('[EPG] mi.tv HTML sample:', html.substring(0, 500));
+
+        // First, try to extract embedded JSON data (some sites use __NEXT_DATA__ or similar)
+        const jsonPatterns = [
+            /__NEXT_DATA__[^>]*>([^<]+)</,
+            /window\.__INITIAL_STATE__\s*=\s*({[\s\S]+?});/,
+            /data-props="([^"]+)"/,
+        ];
+
+        for (const pattern of jsonPatterns) {
+            const jsonMatch = html.match(pattern);
+            if (jsonMatch) {
+                console.log('[EPG] Found embedded JSON data');
+                try {
+                    const jsonData = JSON.parse(jsonMatch[1].replace(/&quot;/g, '"'));
+                    console.log('[EPG] JSON keys:', Object.keys(jsonData));
+                } catch (e) {
+                    // Not valid JSON, continue
+                }
+            }
+        }
+
         // mi.tv actual structure (discovered via browser):
         // <a class="program-link">
         //   <span><font><font>HH:MM</font></font></span>
