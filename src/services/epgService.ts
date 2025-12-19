@@ -319,5 +319,10 @@ export const epgService = {
         if (now > end) return 100;
 
         return Math.round(((now - start) / (end - start)) * 100);
+    },
+
+    // Alias for getProgress (used by LiveTV.tsx)
+    getProgramProgress(program: EPGProgram): number {
+        return this.getProgress(program);
     }
 };
