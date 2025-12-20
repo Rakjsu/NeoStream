@@ -241,6 +241,7 @@ const openEpgPortugalMappings: Record<string, string> = {
     'cnn portugal': 'CNN Portugal HD.pt',
     'cnn portugal hd': 'CNN Portugal HD.pt',
     // Sport TV channels
+    'sport tv': 'SPORT TV1 HD.pt',
     'sport tv 1': 'SPORT TV1 HD.pt',
     'sport tv1': 'SPORT TV1 HD.pt',
     'sporttv 1': 'SPORT TV1 HD.pt',
@@ -307,6 +308,7 @@ const openEpgPortugalMappings: Record<string, string> = {
     // Discovery / National Geographic
     'discovery': 'Discovery HD.pt',
     'discovery hd': 'Discovery HD.pt',
+    'discovery channel': 'Discovery HD.pt',
     'national geographic': 'National Geographic HD.pt',
     'nat geo': 'National Geographic HD.pt',
     'national geographic wild': 'National Geographic WILD HD.pt',
@@ -402,6 +404,7 @@ const openEpgPortugalMappings: Record<string, string> = {
     'cinemundo': 'Cinemundo.pt',
     // Clubbing TV
     'clubbing tv': 'Clubbing TV.pt',
+    'clubbing': 'Clubbing TV.pt',
     // CNBC
     'cnbc': 'CNBC.pt',
     'cnbc europe': 'CNBC.pt',
@@ -424,44 +427,50 @@ const openEpgPortugalMappings: Record<string, string> = {
     'fox life': 'Star Life HD.pt',
     'fox movies': 'Star Movies HD.pt',
     // Fuel TV
-    'fuel tv': 'Fuel TV.pt',
+    'fuel tv': 'Fuel TV HD.pt',
     // Globo Now
     'globo now': 'Globo Now.pt',
     // Jim Jam
     'jim jam': 'Jim Jam.pt',
     'jimjam': 'Jim Jam.pt',
     // Kuriakos TV
-    'kuriakos tv': 'Kuriakos.pt',
-    'kuriakos': 'Kuriakos.pt',
+    'kuriakos tv': 'Kuriakos TV.pt',
+    'kuriakos': 'Kuriakos TV.pt',
     // Lolly Kids
-    'lolly kids': 'Lolly Kids.pt',
+    'lolly kids': 'Lolly kids.pt',
     // MCM channels
     'mcm pop': 'MCM Pop.pt',
     'mcm top': 'MCM Top.pt',
     // Mezzo
     'mezzo': 'Mezzo.pt',
     // Motorvision
-    'motorvision': 'Motorvision.pt',
-    'motorvision tv': 'Motorvision.pt',
+    'motorvision': 'Motorvision HD.pt',
+    'motorvision tv': 'Motorvision HD.pt',
     // Localvisao
-    'localvisao': 'Localvisao.pt',
+    'localvisao': 'Localvisao TV HD.pt',
+    'localvisao tv': 'Localvisao TV HD.pt',
+    // Canal Historia
+    'historia': 'Canal Historia HD.pt',
+    'canal historia': 'Canal Historia HD.pt',
+    // DAZN 6
+    'dazn 6': 'DAZN 6.pt',
     // Panda Kids
     'panda kids': 'Panda Kids.pt',
     // PFC
     'pfc': 'PFC.pt',
     // Record channels
     'record news': 'Record News.pt',
-    'record tv': 'Record TV.pt',
-    'record': 'Record TV.pt',
+    'record tv': 'Record.pt',
+    'record': 'Record.pt',
     // Red Bull TV
     'red bull tv': 'Red Bull TV.pt',
     'redbull tv': 'Red Bull TV.pt',
     // S+
     's+': 'S+.pt',
     // TCV International
-    'tcv internacional': 'TCV International.pt',
-    'tcv internactional': 'TCV International.pt',
-    'tcv': 'TCV International.pt',
+    'tcv internacional': 'TCV Internacional.pt',
+    'tcv internactional': 'TCV Internacional.pt',
+    'tcv': 'TCV Internacional.pt',
     // The Qyou
     'the qyou': 'The QYOU.pt',
     'qyou': 'The QYOU.pt',
@@ -481,8 +490,8 @@ const openEpgPortugalMappings: Record<string, string> = {
     // TVE channels
     'tve 24h': 'TVE 24H.pt',
     'tve24h': 'TVE 24H.pt',
-    'tve internacional': 'TVE Internacional.pt',
-    'tve': 'TVE Internacional.pt',
+    'tve internacional': 'TVEi.pt',
+    'tve': 'TVEi.pt',
     // TVI channels
     'tvi 24': 'TVI 24 HD.pt',
     'tvi24': 'TVI 24 HD.pt',
@@ -496,7 +505,7 @@ const openEpgPortugalMappings: Record<string, string> = {
     // VH1
     'vh1': 'VH1.pt',
     // Zap Viva
-    'zap viva': 'Zap Viva.pt',
+    'zap viva': 'ZAP Viva HD.pt',
 };
 
 // Open-EPG Argentina channel mappings (channel name -> Open-EPG ID)
@@ -525,10 +534,10 @@ const openEpgArgentinaMappings: Record<string, string> = {
     // Regional
     'canal 10 rio negro': 'CANAL 10 RIO NEGRO.ar',
     // Movies
-    'cine argentino': 'CINE ARGENTINO.ar',
+    'cine argentino': 'CINE.AR.ar',
     'cinemundo': 'CINEMUNDO.ar',
-    'ciudad magazine': 'CIUDAD MAGAZINE.ar',
-    'ciudad magaczine': 'CIUDAD MAGAZINE.ar',
+    'ciudad magazine': 'Ciudad Magazine.ar',
+    'ciudad magaczine': 'Ciudad Magazine.ar',
     // Sports
     'directv sports': 'DIRECTV SPORTS.ar',
     'espn': 'ESPN.ar',
@@ -537,8 +546,8 @@ const openEpgArgentinaMappings: Record<string, string> = {
     'fox sports': 'FOX SPORTS.ar',
     'fox sports 2': 'FOX SPORTS 2.ar',
     'fox sports 3': 'FOX SPORTS 3.ar',
-    'fox sports premium': 'FOX SPORTS PREMIUM.ar',
-    'fox sports premiun': 'FOX SPORTS PREMIUM.ar',
+    'fox sports premium': 'FOX Sports Premium.ar',
+    'fox sports premiun': 'FOX Sports Premium.ar',
     'tnt sports': 'TNT SPORTS.ar',
     'tyc sports': 'TYC SPORTS.ar',
     // Entertainment
@@ -549,16 +558,16 @@ const openEpgArgentinaMappings: Record<string, string> = {
     'mas chic': 'MAS CHIC.ar',
     'volver': 'VOLVER.ar',
     // Star channels
-    'star action': 'STAR ACTION.ar',
+    'star action': 'Star Action HD.ar',
     'star channel': 'STAR CHANNEL.ar',
     'star channel fox': 'STAR CHANNEL.ar',
     'star channel fox hd': 'STAR CHANNEL.ar',
-    'star comedy': 'STAR COMEDY.ar',
-    'star comedy fox': 'STAR COMEDY.ar',
-    'star comedy fox hd': 'STAR COMEDY.ar',
-    'star fun': 'STAR FUN.ar',
-    'star fun b': 'STAR FUN.ar',
-    'star series': 'STAR SERIES.ar',
+    'star comedy': 'Star Comedy HD.ar',
+    'star comedy fox': 'Star Comedy HD.ar',
+    'star comedy fox hd': 'Star Comedy HD.ar',
+    'star fun': 'Star Fun HD.ar',
+    'star fun b': 'Star Fun HD.ar',
+    'star series': 'Star Series HD.ar',
     // HBO channels
     'hbo': 'HBO.ar',
     'hbo hd': 'HBO.ar',
@@ -1184,14 +1193,17 @@ export const epgService = {
         // Remove country prefixes: PT:, PT |, PT-, BR:, etc.
         normalized = normalized.replace(/^(pt|br|portugal|brasil)\s*[:|]\s*/i, '');
 
-        // Remove codec info
-        normalized = normalized.replace(/\s*\(?(h\.?265|h\.?264|hevc|avc)\)?/gi, '');
+        // Remove quality in brackets first: [FHD], [HD], [SD], [4K], [UHD], [M], [P]
+        normalized = normalized.replace(/\s*\[(fhd|hd|sd|4k|uhd|m|p)\]/gi, '');
 
-        // Remove quality in parentheses
+        // Remove codec info in parentheses: (H265), (H264), (H266), (HEVC), (AVC)
+        normalized = normalized.replace(/\s*\((h\.?265|h\.?264|h\.?266|hevc|avc)\)/gi, '');
+
+        // Remove quality in parentheses: (FHD), (HD), (SD), (PPV), (4K), (UHD)
         normalized = normalized.replace(/\s*\((fhd|hd|sd|4k|uhd|ppv)\)/gi, '');
 
-        // Remove quality/tags in brackets
-        normalized = normalized.replace(/\s*\[?(fhd|hd|sd|4k|uhd|m|p)\]?\s*$/i, '');
+        // Remove remaining quality/tags at end without brackets
+        normalized = normalized.replace(/\s+(fhd|hd|sd|4k|uhd)\s*$/gi, '');
 
         normalized = normalized.trim();
 
@@ -1264,14 +1276,17 @@ export const epgService = {
         // Remove country prefixes: ARG |, ARG:, AR:, etc.
         normalized = normalized.replace(/^(arg|ar|argentina)\s*[:|]\s*/i, '');
 
-        // Remove codec info
-        normalized = normalized.replace(/\s*\(?(h\.?265|h\.?264|hevc|avc)\)?/gi, '');
+        // Remove quality in brackets first: [FHD], [HD], [SD], [4K], [UHD], [M], [P]
+        normalized = normalized.replace(/\s*\[(fhd|hd|sd|4k|uhd|m|p)\]/gi, '');
 
-        // Remove quality in parentheses
+        // Remove codec info in parentheses: (H265), (H264), (H266), (HEVC), (AVC)
+        normalized = normalized.replace(/\s*\((h\.?265|h\.?264|h\.?266|hevc|avc)\)/gi, '');
+
+        // Remove quality in parentheses: (FHD), (HD), (SD), (PPV), (4K), (UHD)
         normalized = normalized.replace(/\s*\((fhd|hd|sd|4k|uhd|ppv)\)/gi, '');
 
-        // Remove quality/tags in brackets
-        normalized = normalized.replace(/\s*\[?(fhd|hd|sd|4k|uhd|m|p)\]?\s*$/i, '');
+        // Remove remaining quality/tags at end without brackets
+        normalized = normalized.replace(/\s+(fhd|hd|sd|4k|uhd)\s*$/gi, '');
 
         normalized = normalized.trim();
 
@@ -1342,14 +1357,17 @@ export const epgService = {
         // Remove country prefixes: USA:, USA |, US:, etc.
         normalized = normalized.replace(/^(usa|us)\s*[:|]\s*/i, '');
 
-        // Remove codec info
-        normalized = normalized.replace(/\s*\(?(h\.?265|h\.?264|hevc|avc)\)?/gi, '');
+        // Remove quality in brackets first: [FHD], [HD], [SD], [4K], [UHD], [M], [P]
+        normalized = normalized.replace(/\s*\[(fhd|hd|sd|4k|uhd|m|p)\]/gi, '');
 
-        // Remove quality in parentheses
+        // Remove codec info in parentheses: (H265), (H264), (H266), (HEVC), (AVC)
+        normalized = normalized.replace(/\s*\((h\.?265|h\.?264|h\.?266|hevc|avc)\)/gi, '');
+
+        // Remove quality in parentheses: (FHD), (HD), (SD), (PPV), (4K), (UHD)
         normalized = normalized.replace(/\s*\((fhd|hd|sd|4k|uhd|ppv)\)/gi, '');
 
-        // Remove quality/tags in brackets
-        normalized = normalized.replace(/\s*\[?(fhd|hd|sd|4k|uhd|m|p)\]?\s*$/i, '');
+        // Remove remaining quality/tags at end without brackets
+        normalized = normalized.replace(/\s+(fhd|hd|sd|4k|uhd)\s*$/gi, '');
 
         normalized = normalized.trim();
 
