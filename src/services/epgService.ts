@@ -610,7 +610,7 @@ const openEpgUSAMappings: Record<string, string> = {
     'a & e': 'AandE Network (East).us',
     'aande': 'AandE Network (East).us',
     // ABC
-    'abc': 'ABC (East).us',
+    'abc': 'ABC.us',
     // ACC Network
     'acc network': 'ACC Network.us',
     // ActionMax
@@ -625,7 +625,7 @@ const openEpgUSAMappings: Record<string, string> = {
     // AMC
     'amc': 'AMC (East).us',
     'amc presents': 'AMC (East).us',
-    'amc+': 'AMC+.us',
+    'amc+': 'AMC.us',
     // American Heroes Channel
     'american heroes channel': 'American Heroes Channel.us',
     // Animal Planet
@@ -638,7 +638,7 @@ const openEpgUSAMappings: Record<string, string> = {
     // AWE
     'awe': 'AWE.us',
     // AXS TV
-    'axs tv': 'AXS TV.us',
+    'axs tv': 'AXSTV.us',
     // BabyFirst
     'baby first': 'BabyFirst TV.us',
     'babyfirst': 'BabyFirst TV.us',
@@ -654,7 +654,7 @@ const openEpgUSAMappings: Record<string, string> = {
     // BET
     'bet': 'Black Entertainment Television (East).us',
     'bet (east)': 'Black Entertainment Television (East).us',
-    'bet (west)': 'Black Entertainment Television (West).us',
+    'bet (west)': 'BET.us',
     'bet gospel': 'BET Gospel.us',
     'bet her': 'BET Her.us',
     'bet jams': 'BET Jams.us',
@@ -666,7 +666,7 @@ const openEpgUSAMappings: Record<string, string> = {
     // Boomerang
     'boomerang': 'Boomerang.us',
     // Bounce
-    'bounce': 'Bounce.us',
+    'bounce': 'Bounce TV.us',
     // Bravo
     'bravo': 'Bravo (East).us',
     'bravo (east)': 'Bravo (East).us',
@@ -689,14 +689,14 @@ const openEpgUSAMappings: Record<string, string> = {
     // Catholic TV
     'catholic tv': 'Catholic TV.us',
     // CBS
-    'cbs news': 'CBS News.us',
-    'cbs news national': 'CBS News.us',
+    'cbs news': 'CBS News 24/7.us',
+    'cbs news national': 'CBS News 24/7.us',
     'cbs sports network': 'CBS Sports Network.us',
     // Charge!
-    'charge!': 'Charge.us',
-    'charge': 'Charge.us',
+    'charge!': 'Charge!.us',
+    'charge': 'Charge!.us',
     // Cheddar News
-    'cheddar news': 'Cheddar News.us',
+    'cheddar news': 'Cheddar.us',
     // Cinemax
     'cinemax': 'Cinemax (East).us',
     'cinemax (east)': 'Cinemax (East).us',
@@ -712,7 +712,7 @@ const openEpgUSAMappings: Record<string, string> = {
     'cnbc world': 'Consumer News and Business Channel World HDTV.us',
     // CNN
     'cnn': 'Cable News Network.us',
-    'cnn espanol': 'CNN en Espanol.us',
+    'cnn espanol': 'CNN Español (3110).us',
     // Comedy Central
     'comedy central': 'Comedy Central (East).us',
     // Comet TV
@@ -725,10 +725,10 @@ const openEpgUSAMappings: Record<string, string> = {
     // Cozi TV
     'cozi tv': 'Cozi TV.us',
     // Crime & Investigation
-    'crime & investigation': 'Crime and Investigation (East).us',
-    'crime investigation': 'Crime and Investigation (East).us',
+    'crime & investigation': 'Crime and Investigation Network.us',
+    'crime investigation': 'Crime and Investigation Network.us',
     // CW
-    'cw': 'CW (East).us',
+    'cw': 'The CW.us',
     // Dabl
     'dabl': 'Dabl.us',
     // Daystar Network
@@ -737,9 +737,9 @@ const openEpgUSAMappings: Record<string, string> = {
     // Destination America
     'destination america': 'Destination America.us',
     // Discovery Channel
-    'discovery channel': 'Discovery Channel (East).us',
-    'discovery channel (east)': 'Discovery Channel (East).us',
-    'discovery channel (west)': 'Discovery Channel (West).us',
+    'discovery channel': 'Discovery Channel.us',
+    'discovery channel (east)': 'The Discovery Channel (East).us',
+    'discovery channel (west)': 'The Discovery Channel (West).us',
     // Discovery Family
     'discovery family': 'Discovery Family.us',
     // Discovery ID
@@ -749,12 +749,12 @@ const openEpgUSAMappings: Record<string, string> = {
     'discovery life': 'Discovery Life Channel.us',
     // Disney Channel
     'disney channel': 'Disney Channel (East).us',
-    'disney channel (east)': 'Disney Channel (East).us',
-    'disney channel (west)': 'Disney Channel (West).us',
+    'disney channel (east)': 'The Disney Channel (East).us',
+    'disney channel (west)': 'The Disney Channel (West).us',
     // Disney Jr
     'disney jr': 'Disney Junior (East).us',
-    'disney jr (east)': 'Disney Junior (East).us',
-    'disney jr (west)': 'Disney Junior (West).us',
+    'disney jr (east)': 'Disney Jr. SD East.us',
+    'disney jr (west)': 'Disney Jr. SD West.us',
     'disney junior': 'Disney Junior (East).us',
     // Disney XD
     'disney xd': 'Disney XD (East).us',
@@ -762,8 +762,8 @@ const openEpgUSAMappings: Record<string, string> = {
     'disney xd (west)': 'Disney XD (West).us',
     // E! Entertainment
     'e! entertainment': 'E! (East).us',
-    'e! entertainment (east)': 'E! (East).us',
-    'e! entertainment (west)': 'E! (West).us',
+    'e! entertainment (east)': 'E! Entertainment Television (East).us',
+    'e! entertainment (west)': 'E! Entertainment Television (West).us',
     'e!': 'E! (East).us',
     // EPIX (now MGM+)
     'epix': 'Epix (East).us',
@@ -771,8 +771,8 @@ const openEpgUSAMappings: Record<string, string> = {
     'epix hits': 'Epix Hits.us',
     // ESPN
     'espn': 'ESPN.us',
-    'espn 2': 'ESPN 2.us',
-    'espn2': 'ESPN 2.us',
+    'espn 2': 'espn2.us',
+    'espn2': 'espn2.us',
     'espn 3': 'ESPN 3.us',
     'espn3': 'ESPN 3.us',
     'espn 4': 'ESPN.us',
@@ -1075,12 +1075,14 @@ const openEpgUSAMappings: Record<string, string> = {
     'tlc': 'TLC (East).us',
     'tlc (east)': 'TLC (East).us',
     'tlc (west)': 'TLC (West).us',
-    // TNT
-    'tnt': 'TNT (East).us',
+    // TNT (USA specific - need east/west suffix to avoid conflict with Brazil)
     'tnt (east)': 'TNT (East).us',
     'tnt (west)': 'TNT (East).us',
+    'tnt us': 'TNT.us',
     // Trace Sport Stars
-    'trace sport stars': 'Trace Sport Stars.us',
+    'trace sport stars': 'Trace Sport Stars HDTV.us',
+    // VH1
+    'vh1': 'VH1.us',
     // Travel Channel
     'travel channel': 'Travel Channel (East).us',
     'travel channel (east)': 'Travel Channel (East).us',
