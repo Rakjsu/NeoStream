@@ -316,7 +316,26 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             filterARG: 'Argentina',
             filterUS: 'EUA',
             filterPT: 'Portugal',
-            searchChannel: 'Buscar canal...'
+            searchChannel: 'Buscar canal...',
+            // New translations for redesigned layout
+            playlistChannels: 'Canais na Playlist',
+            channelsLabel: 'Canais',
+            availableForTest: 'disponíveis para teste',
+            testingBackground: 'Testando em segundo plano...',
+            testAllChannels: 'Testar Todos os Canais',
+            pauseTest: 'Pausar Teste',
+            successRate: 'Taxa de Sucesso',
+            workingLabel: 'Funcionando',
+            noDataLabel: 'Sem Dados',
+            showing: 'Mostrando',
+            of: 'de',
+            channelsCount: 'canais',
+            limitedResults: 'Limitado a 100 resultados',
+            prog: 'prog',
+            failed: 'Falhos',
+            previous: 'Anterior',
+            next: 'Próximo',
+            page: 'Página'
         },
         // Stats section
         stats: {
@@ -939,7 +958,26 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             filterARG: 'Argentina',
             filterUS: 'USA',
             filterPT: 'Portugal',
-            searchChannel: 'Search channel...'
+            searchChannel: 'Search channel...',
+            // New translations for redesigned layout
+            playlistChannels: 'Playlist Channels',
+            channelsLabel: 'Channels',
+            availableForTest: 'available for testing',
+            testingBackground: 'Testing in background...',
+            testAllChannels: 'Test All Channels',
+            pauseTest: 'Pause Test',
+            successRate: 'Success Rate',
+            workingLabel: 'Working',
+            noDataLabel: 'No Data',
+            showing: 'Showing',
+            of: 'of',
+            channelsCount: 'channels',
+            limitedResults: 'Limited to 100 results',
+            prog: 'prog',
+            failed: 'Failed',
+            previous: 'Previous',
+            next: 'Next',
+            page: 'Page'
         },
         stats: {
             title: 'Your Statistics',
@@ -1488,7 +1526,26 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             filterARG: 'Argentina',
             filterUS: 'EE.UU.',
             filterPT: 'Portugal',
-            searchChannel: 'Buscar canal...'
+            searchChannel: 'Buscar canal...',
+            // New translations for redesigned layout
+            playlistChannels: 'Canales en la Playlist',
+            channelsLabel: 'Canales',
+            availableForTest: 'disponibles para prueba',
+            testingBackground: 'Probando en segundo plano...',
+            testAllChannels: 'Probar Todos los Canales',
+            pauseTest: 'Pausar Prueba',
+            successRate: 'Tasa de Éxito',
+            workingLabel: 'Funcionando',
+            noDataLabel: 'Sin Datos',
+            showing: 'Mostrando',
+            of: 'de',
+            channelsCount: 'canales',
+            limitedResults: 'Limitado a 100 resultados',
+            prog: 'prog',
+            failed: 'Fallidos',
+            previous: 'Anterior',
+            next: 'Siguiente',
+            page: 'Página'
         },
         stats: {
             title: 'Tus Estadísticas',

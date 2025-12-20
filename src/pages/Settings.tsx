@@ -52,6 +52,8 @@ export function Settings() {
     const [epgResultsFilter, setEpgResultsFilter] = useState<'all' | 'working' | 'notWorking'>('all');
     const [epgCountryFilter, setEpgCountryFilter] = useState<'all' | 'BR' | 'ARG' | 'US' | 'PT'>('all');
     const [epgSearchTerm, setEpgSearchTerm] = useState('');
+    const [epgCurrentPage, setEpgCurrentPage] = useState(1);
+    const EPG_ITEMS_PER_PAGE = 50;
     const epgResultsRef = useRef<HTMLDivElement>(null);
 
     // Subscribe to EPG test service state changes (runs in background even when navigating away)
@@ -643,7 +645,7 @@ export function Settings() {
                                     {playlistChannelCounts.total > 0 && (
                                         <div style={{ marginBottom: '24px' }}>
                                             <label style={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', marginBottom: '12px', display: 'block', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                                                📺 Canais na Playlist
+                                                📺 {t('epg', 'playlistChannels')}
                                             </label>
                                             {/* Featured Total Card */}
                                             <div className="setting-item epg-grid-item" style={{
@@ -658,8 +660,8 @@ export function Settings() {
                                                         {playlistChannelCounts.total}
                                                     </div>
                                                     <div style={{ textAlign: 'left' }}>
-                                                        <div style={{ color: 'white', fontSize: '16px', fontWeight: 600 }}>Canais</div>
-                                                        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>disponíveis para teste</div>
+                                                        <div style={{ color: 'white', fontSize: '16px', fontWeight: 600 }}>{t('epg', 'channelsLabel')}</div>
+                                                        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>{t('epg', 'availableForTest')}</div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -692,7 +694,7 @@ export function Settings() {
                                     {lastEpgTestDate && !testingEpg && (
                                         <div className="last-check">
                                             <span className="check-icon">📅</span>
-                                            <span>Último teste: <strong>{lastEpgTestDate}</strong></span>
+                                            <span>{t('epg', 'lastTest')} <strong>{lastEpgTestDate}</strong></span>
                                         </div>
                                     )}
 
@@ -705,7 +707,7 @@ export function Settings() {
                                             <div style={{ flex: 1 }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                                                     <label className="epg-testing-badge" style={{ color: '#06b6d4', fontWeight: 700 }}>
-                                                        ⏳ Testando em segundo plano...
+                                                        ⏳ {t('epg', 'testingBackground')}
                                                     </label>
                                                     <span style={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>
                                                         {epgTestProgress.current} / {epgTestProgress.total}
@@ -738,14 +740,14 @@ export function Settings() {
                                             background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'
                                         }}>
                                             <span>🧪</span>
-                                            <span>Testar Todos os Canais</span>
+                                            <span>{t('epg', 'testAllChannels')}</span>
                                         </button>
                                     ) : (
                                         <button className="check-btn" onClick={handleEpgPause} style={{
                                             background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
                                         }}>
                                             <span>⏸️</span>
-                                            <span>Pausar Teste</span>
+                                            <span>{t('epg', 'pauseTest')}</span>
                                         </button>
                                     )}
 
@@ -758,7 +760,7 @@ export function Settings() {
                                                     background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
                                                 }}>
                                                     <span>▶️</span>
-                                                    <span>Continuar ({epgTestResults.lastScannedIndex}/{epgTestResults.summary?.total})</span>
+                                                    <span>{t('epg', 'continueFrom')} ({epgTestResults.lastScannedIndex}/{epgTestResults.summary?.total})</span>
                                                 </button>
                                             )}
                                             {epgTestResults.notWorking.length > 0 && (
@@ -767,7 +769,7 @@ export function Settings() {
                                                     background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
                                                 }}>
                                                     <span>🔁</span>
-                                                    <span>Retestar {epgTestResults.notWorking.length} Falhos</span>
+                                                    <span>{t('epg', 'retryFailed')} ({epgTestResults.notWorking.length})</span>
                                                 </button>
                                             )}
                                             <button className="check-btn" onClick={handleClearEpgCache} style={{
@@ -776,7 +778,7 @@ export function Settings() {
                                                 color: 'rgba(255,255,255,0.7)'
                                             }}>
                                                 <span>🗑️</span>
-                                                <span>Limpar Cache</span>
+                                                <span>{t('epg', 'clearCache')}</span>
                                             </button>
                                         </div>
                                     )}
@@ -786,7 +788,7 @@ export function Settings() {
                                             {/* Success Rate Bar */}
                                             <div style={{ marginBottom: '20px' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                                                    <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>Taxa de Sucesso</span>
+                                                    <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: '12px' }}>{t('epg', 'successRate')}</span>
                                                     <span style={{ color: '#22c55e', fontWeight: 700, fontSize: '14px' }}>
                                                         {Math.round((epgTestResults.working.length / (epgTestResults.working.length + epgTestResults.notWorking.length || 1)) * 100)}%
                                                     </span>
@@ -832,7 +834,7 @@ export function Settings() {
                                                         <div style={{ fontSize: '28px', fontWeight: 800, color: '#22c55e' }}>
                                                             {epgTestResults.working.length}
                                                         </div>
-                                                        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>Funcionando</div>
+                                                        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>{t('epg', 'workingLabel')}</div>
                                                     </div>
                                                 </div>
                                                 <div className="setting-item epg-grid-item" style={{
@@ -858,7 +860,7 @@ export function Settings() {
                                                         <div style={{ fontSize: '28px', fontWeight: 800, color: '#ef4444' }}>
                                                             {epgTestResults.notWorking.length}
                                                         </div>
-                                                        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>Sem Dados</div>
+                                                        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>{t('epg', 'noDataLabel')}</div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -905,7 +907,7 @@ export function Settings() {
                                                             <button
                                                                 key={filter}
                                                                 className="epg-filter-btn"
-                                                                onClick={() => setEpgResultsFilter(filter)}
+                                                                onClick={() => { setEpgResultsFilter(filter); setEpgCurrentPage(1); }}
                                                                 style={{
                                                                     padding: '8px 14px',
                                                                     borderRadius: '8px',
@@ -925,7 +927,7 @@ export function Settings() {
                                                         type="text"
                                                         placeholder="🔍 Buscar canal..."
                                                         value={epgSearchTerm}
-                                                        onChange={(e) => setEpgSearchTerm(e.target.value)}
+                                                        onChange={(e) => { setEpgSearchTerm(e.target.value); setEpgCurrentPage(1); }}
                                                         className="setting-select"
                                                         style={{ padding: '10px 14px', fontSize: '13px' }}
                                                     />
@@ -940,7 +942,7 @@ export function Settings() {
                                                             <button
                                                                 key={country}
                                                                 className="epg-filter-btn"
-                                                                onClick={() => setEpgCountryFilter(country)}
+                                                                onClick={() => { setEpgCountryFilter(country); setEpgCurrentPage(1); }}
                                                                 style={{
                                                                     padding: '6px 12px',
                                                                     borderRadius: '8px',
@@ -959,7 +961,7 @@ export function Settings() {
                                                 </div>
                                             </div>
 
-                                            {/* Channel List with Counter */}
+                                            {/* Channel List with Pagination */}
                                             {(() => {
                                                 const filteredItems = [...epgTestResults.working.map(w => ({ ...w, type: 'working' as const })),
                                                 ...epgTestResults.notWorking.map(n => ({ ...n, type: 'notWorking' as const }))]
@@ -968,11 +970,16 @@ export function Settings() {
                                                         (epgCountryFilter === 'all' || item.country === epgCountryFilter) &&
                                                         (epgSearchTerm === '' || item.channel.toLowerCase().includes(epgSearchTerm.toLowerCase()))
                                                     );
-                                                const displayedItems = filteredItems.slice(0, 100);
+
+                                                const totalPages = Math.ceil(filteredItems.length / EPG_ITEMS_PER_PAGE);
+                                                const currentPage = Math.min(epgCurrentPage, totalPages || 1);
+                                                const startIndex = (currentPage - 1) * EPG_ITEMS_PER_PAGE;
+                                                const endIndex = startIndex + EPG_ITEMS_PER_PAGE;
+                                                const displayedItems = filteredItems.slice(startIndex, endIndex);
 
                                                 return (
                                                     <>
-                                                        {/* Counter Header */}
+                                                        {/* Counter Header with Pagination Info */}
                                                         <div style={{
                                                             display: 'flex',
                                                             justifyContent: 'space-between',
@@ -982,18 +989,18 @@ export function Settings() {
                                                             borderBottom: '1px solid rgba(255,255,255,0.1)'
                                                         }}>
                                                             <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>
-                                                                📋 Mostrando <strong style={{ color: 'white' }}>{Math.min(displayedItems.length, filteredItems.length)}</strong> de <strong style={{ color: 'white' }}>{filteredItems.length}</strong> canais
+                                                                📋 {t('epg', 'showing')} <strong style={{ color: 'white' }}>{startIndex + 1}-{Math.min(endIndex, filteredItems.length)}</strong> {t('epg', 'of')} <strong style={{ color: 'white' }}>{filteredItems.length}</strong> {t('epg', 'channelsCount')}
                                                             </span>
-                                                            {filteredItems.length > 100 && (
-                                                                <span style={{ color: '#f59e0b', fontSize: '11px' }}>
-                                                                    ⚠️ Limitado a 100 resultados
+                                                            {totalPages > 1 && (
+                                                                <span style={{ color: '#06b6d4', fontSize: '11px', fontWeight: 600 }}>
+                                                                    📄 {currentPage} / {totalPages}
                                                                 </span>
                                                             )}
                                                         </div>
 
                                                         {/* List */}
                                                         <div style={{
-                                                            maxHeight: '380px',
+                                                            maxHeight: '350px',
                                                             overflowY: 'auto',
                                                             display: 'flex',
                                                             flexDirection: 'column',
@@ -1001,7 +1008,7 @@ export function Settings() {
                                                             paddingRight: '8px'
                                                         }}>
                                                             {displayedItems.map((item, i) => (
-                                                                <div key={i} className="setting-item epg-channel-item" style={{
+                                                                <div key={startIndex + i} className="setting-item epg-channel-item" style={{
                                                                     padding: '14px 16px',
                                                                     background: item.type === 'working'
                                                                         ? 'linear-gradient(135deg, rgba(34, 197, 94, 0.08), rgba(34, 197, 94, 0.02))'
@@ -1032,6 +1039,90 @@ export function Settings() {
                                                                 </div>
                                                             ))}
                                                         </div>
+
+                                                        {/* Pagination Controls */}
+                                                        {totalPages > 1 && (
+                                                            <div style={{
+                                                                display: 'flex',
+                                                                justifyContent: 'center',
+                                                                alignItems: 'center',
+                                                                gap: '12px',
+                                                                marginTop: '16px',
+                                                                paddingTop: '12px',
+                                                                borderTop: '1px solid rgba(255,255,255,0.1)'
+                                                            }}>
+                                                                <button
+                                                                    onClick={() => setEpgCurrentPage(1)}
+                                                                    disabled={currentPage === 1}
+                                                                    style={{
+                                                                        padding: '8px 12px',
+                                                                        borderRadius: '8px',
+                                                                        border: 'none',
+                                                                        background: currentPage === 1 ? 'rgba(255,255,255,0.05)' : 'rgba(6, 182, 212, 0.2)',
+                                                                        color: currentPage === 1 ? 'rgba(255,255,255,0.3)' : '#67e8f9',
+                                                                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                                                                        fontWeight: 600,
+                                                                        fontSize: '12px',
+                                                                        transition: 'all 0.2s ease'
+                                                                    }}
+                                                                >⏮️</button>
+                                                                <button
+                                                                    onClick={() => setEpgCurrentPage(p => Math.max(1, p - 1))}
+                                                                    disabled={currentPage === 1}
+                                                                    style={{
+                                                                        padding: '8px 16px',
+                                                                        borderRadius: '8px',
+                                                                        border: 'none',
+                                                                        background: currentPage === 1 ? 'rgba(255,255,255,0.05)' : 'rgba(6, 182, 212, 0.2)',
+                                                                        color: currentPage === 1 ? 'rgba(255,255,255,0.3)' : '#67e8f9',
+                                                                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                                                                        fontWeight: 600,
+                                                                        fontSize: '12px',
+                                                                        transition: 'all 0.2s ease'
+                                                                    }}
+                                                                >◀ {t('epg', 'previous')}</button>
+                                                                <span style={{
+                                                                    color: 'white',
+                                                                    fontWeight: 700,
+                                                                    fontSize: '14px',
+                                                                    padding: '8px 16px',
+                                                                    background: 'rgba(99, 102, 241, 0.2)',
+                                                                    borderRadius: '8px'
+                                                                }}>
+                                                                    {currentPage} / {totalPages}
+                                                                </span>
+                                                                <button
+                                                                    onClick={() => setEpgCurrentPage(p => Math.min(totalPages, p + 1))}
+                                                                    disabled={currentPage === totalPages}
+                                                                    style={{
+                                                                        padding: '8px 16px',
+                                                                        borderRadius: '8px',
+                                                                        border: 'none',
+                                                                        background: currentPage === totalPages ? 'rgba(255,255,255,0.05)' : 'rgba(6, 182, 212, 0.2)',
+                                                                        color: currentPage === totalPages ? 'rgba(255,255,255,0.3)' : '#67e8f9',
+                                                                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                                                                        fontWeight: 600,
+                                                                        fontSize: '12px',
+                                                                        transition: 'all 0.2s ease'
+                                                                    }}
+                                                                >{t('epg', 'next')} ▶</button>
+                                                                <button
+                                                                    onClick={() => setEpgCurrentPage(totalPages)}
+                                                                    disabled={currentPage === totalPages}
+                                                                    style={{
+                                                                        padding: '8px 12px',
+                                                                        borderRadius: '8px',
+                                                                        border: 'none',
+                                                                        background: currentPage === totalPages ? 'rgba(255,255,255,0.05)' : 'rgba(6, 182, 212, 0.2)',
+                                                                        color: currentPage === totalPages ? 'rgba(255,255,255,0.3)' : '#67e8f9',
+                                                                        cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                                                                        fontWeight: 600,
+                                                                        fontSize: '12px',
+                                                                        transition: 'all 0.2s ease'
+                                                                    }}
+                                                                >⏭️</button>
+                                                            </div>
+                                                        )}
                                                     </>
                                                 );
                                             })()}
