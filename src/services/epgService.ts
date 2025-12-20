@@ -25,8 +25,11 @@ const mitvMappings: Record<string, string> = {
     // Globo
     'globo': 'rede-globo',
     'rede globo': 'rede-globo',
-    'globo sp': 'globo-sao-paulo-hd',
+    'globo sp': 'globo-s-o-paulo-hd',
     'globo rj': 'globo-rio-de-janeiro-hd',
+    'globo minas': 'globo-belo-horizonte',
+    'globo mg': 'globo-belo-horizonte',
+    'globo belo horizonte': 'globo-belo-horizonte',
     // SBT
     'sbt sp': 'sbt-s-o-paulo',
     // Record
@@ -134,6 +137,40 @@ const mitvMappings: Record<string, string> = {
     'conmebol tv 4': 'conmebol-tv-4',
     'conmebol paramount+ 4': 'conmebol-tv-4',
     'conmebol paramount 4': 'conmebol-tv-4',
+    // Venus TV
+    'venus': 'venus-tv-sd',
+    'venus tv': 'venus-tv-sd',
+    // Sextreme
+    'sextreme': 'sextreme-brazil',
+    // SexPrive
+    'sex prive': 'sexprive-brasileirinhas',
+    'sexprive': 'sexprive-brasileirinhas',
+    // Travel Box
+    'travel box': 'travel-box-brazil',
+    'travel box brazil': 'travel-box-brazil',
+    // Prime Box Brasil
+    'prime box brasil': 'prime-box-brazil',
+    'prime box brazil': 'prime-box-brazil',
+    // SporTV
+    'sportv 3': 'sportv3',
+    'sportv3': 'sportv3',
+    'sportv 2': 'sportv2',
+    'sportv2': 'sportv2',
+    // ESPN Brasil
+    'espn brasil': 'espn',
+    // Canal Sony
+    'canal sony': 'sony-hd',
+    'sony': 'sony-hd',
+    // BandSports
+    'band sports': 'bandsports',
+    'bandsports': 'bandsports',
+    // Canal Off
+    'canal off': 'off',
+    'off': 'off',
+    // Record Belém
+    'record belem': 'recordtv-belem',
+    'record belém': 'recordtv-belem',
+    'recordtv belem': 'recordtv-belem',
 };
 
 // Manual channel mappings for meuguia.tv (fallback)
@@ -1503,12 +1540,14 @@ export const epgService = {
         const normalized = channelName
             .toLowerCase()
             .trim()
-            // Remove codec info: (H265), (H264), (HEVC), etc.
-            .replace(/\s*\(?(h\.?265|h\.?264|hevc|avc)\)?/gi, '')
-            // Remove quality in parentheses: (FHD), (HD), (SD), (PPV), etc.
+            // Remove quality in brackets first: [FHD], [HD], [SD], [4K], [UHD], [M], [P]
+            .replace(/\s*\[(fhd|hd|sd|4k|uhd|m|p)\]/gi, '')
+            // Remove codec info in parentheses: (H265), (H264), (H266), (HEVC), (AVC)
+            .replace(/\s*\((h\.?265|h\.?264|h\.?266|hevc|avc)\)/gi, '')
+            // Remove quality in parentheses: (FHD), (HD), (SD), (PPV), (4K), (UHD)
             .replace(/\s*\((fhd|hd|sd|4k|uhd|ppv)\)/gi, '')
-            // Remove quality/tags in brackets: [FHD], [HD], [SD], [4K], [UHD], [M], [P] etc.
-            .replace(/\s*\[?(fhd|hd|sd|4k|uhd|m|p)\]?\s*$/i, '')
+            // Remove remaining quality/tags at end without brackets: FHD, HD, SD at end
+            .replace(/\s+(fhd|hd|sd|4k|uhd)\s*$/gi, '')
             .trim();
 
         // Check manual mappings first
@@ -1534,9 +1573,14 @@ export const epgService = {
         const normalized = channelName
             .toLowerCase()
             .trim()
-            .replace(/\s*\(?(h\.?265|h\.?264|hevc|avc)\)?/gi, '')
+            // Remove quality in brackets first: [FHD], [HD], [SD], [4K], [UHD], [M], [P]
+            .replace(/\s*\[(fhd|hd|sd|4k|uhd|m|p)\]/gi, '')
+            // Remove codec info in parentheses: (H265), (H264), (H266), (HEVC), (AVC)
+            .replace(/\s*\((h\.?265|h\.?264|h\.?266|hevc|avc)\)/gi, '')
+            // Remove quality in parentheses: (FHD), (HD), (SD), (PPV), (4K), (UHD)
             .replace(/\s*\((fhd|hd|sd|4k|uhd|ppv)\)/gi, '')
-            .replace(/\s*\[?(fhd|hd|sd|4k|uhd|m|p)\]?\s*$/i, '')
+            // Remove remaining quality/tags at end without brackets
+            .replace(/\s+(fhd|hd|sd|4k|uhd)\s*$/gi, '')
             .trim();
         return meuguiaMappings[normalized] || null;
     },
