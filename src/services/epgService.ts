@@ -773,26 +773,26 @@ const openEpgUSAMappings: Record<string, string> = {
     'espn': 'ESPN.us',
     'espn 2': 'espn2.us',
     'espn2': 'espn2.us',
-    'espn 3': 'ESPN 3.us',
-    'espn3': 'ESPN 3.us',
+    'espn 3': 'ESPN3 North (418A) HD.us',
+    'espn3': 'ESPN3 North (418A) HD.us',
     'espn 4': 'ESPN.us',
     'espn fhd': 'ESPN.us',
     'espn news': 'ESPN News.us',
     'espnews': 'ESPN News.us',
-    'espn u': 'ESPN U.us',
-    'espnu': 'ESPN U.us',
+    'espn u': 'ESPNU.us',
+    'espnu': 'ESPNU.us',
     // EWTN
-    'ewtn': 'EWTN.us',
+    'ewtn': 'EWTN USA HD.us',
     // FETV
     'fetv': 'FETV.us',
     // Fight Network
-    'fight network': 'Fight Network.us',
+    'fight network': 'Fight Network USA HD.us',
     // Food Network
     'food network': 'Food Network (East).us',
     // Fox Business
     'fox business': 'Fox Business Network.us',
     // Fox News
-    'fox news': 'Fox News Channel.us',
+    'fox news': 'Fox News HD.us',
     // Fox Soul
     'fox soul': 'Fox Soul.us',
     // Fox Sports
@@ -800,7 +800,7 @@ const openEpgUSAMappings: Record<string, string> = {
     'fox sports 1': 'Fox Sports 1.us',
     'fox sports 2': 'Fox Sports 2.us',
     'fox sports 4k': 'Fox Sports 1.us',
-    'fox sports racing': 'Fox Sports Racing.us',
+    'fox sports racing': 'Fox Sports Racing HD.us',
     // Fox Weather
     'fox weather': 'Fox Weather.us',
     // Freeform
@@ -820,14 +820,14 @@ const openEpgUSAMappings: Record<string, string> = {
     // FYI
     'fyi': 'FYI.us',
     // Game Show Network
-    'game show network': 'GSN.us',
-    'game show network (gsn)': 'GSN.us',
-    'gsn': 'GSN.us',
+    'game show network': 'Game Show Network HDTV (EAST).us',
+    'game show network (gsn)': 'Game Show Network HDTV (EAST).us',
+    'gsn': 'Game Show Network HDTV (EAST).us',
     // GEB TV
     'geb tv': 'GEB America.us',
     // Get TV
-    'get tv': 'GetTV.us',
-    'gettv': 'GetTV.us',
+    'get tv': 'getTV.us',
+    'gettv': 'getTV.us',
     // GINX Esports
     'ginx esports': 'GINX Esports TV.us',
     // Golf Channel
@@ -854,8 +854,8 @@ const openEpgUSAMappings: Record<string, string> = {
     'hbo signature': 'HBO Signature (East).us',
     'hbo zone': 'HBO Zone (East).us',
     // Heroes & Icons
-    'heroes & icons': 'Heroes and Icons.us',
-    'heroes and icons': 'Heroes and Icons.us',
+    'heroes & icons': 'HAndI  Heroes And Icons Network HD.us',
+    'heroes and icons': 'HAndI  Heroes And Icons Network HD.us',
     // HGTV
     'hgtv': 'Home and Garden Television (East).us',
     // Hi-Yah!
@@ -864,7 +864,7 @@ const openEpgUSAMappings: Record<string, string> = {
     // HLN
     'hln': 'HLN.us',
     // Hope Channel
-    'hope channel': 'Hope Channel.us',
+    'hope channel': 'Hope Channel HD.us',
     // IFC
     'ifc': 'IFC (East).us',
     // IGN
@@ -873,7 +873,7 @@ const openEpgUSAMappings: Record<string, string> = {
     'insp': 'Inspirational Network East.us',
     // ION
     'ion': 'ION.us',
-    'ion mystery': 'Mystery.us',
+    'ion mystery': 'ION Mystery.us',
     // Law and Crime
     'law and crime': 'Law and Crime.us',
     // Lifetime
@@ -883,7 +883,7 @@ const openEpgUSAMappings: Record<string, string> = {
     // Longhorn Network
     'longhorn network': 'Longhorn Network.us',
     // Marquee Sports Network
-    'marquee sports network': 'Marquee Sports Network.us',
+    'marquee sports network': 'Marquee Sports Network HD.us',
     // MASN
     'masn': 'MASN.us',
     'masn 2': 'MASN 2.us',
@@ -891,7 +891,7 @@ const openEpgUSAMappings: Record<string, string> = {
     'mav tv': 'MAVTV.us',
     'mavtv': 'MAVTV.us',
     // MeTV
-    'metv': 'MeTV.us',
+    'metv': 'WJLP MeTV.us',
     'metv+': 'MeTV+.us',
     // MLB Network
     'mlb network': 'MLB Network.us',
@@ -1082,7 +1082,8 @@ const openEpgUSAMappings: Record<string, string> = {
     'tlc': 'TLC (East).us',
     'tlc (east)': 'TLC (East).us',
     'tlc (west)': 'TLC (West).us',
-    // TNT (USA specific - need east/west suffix to avoid conflict with Brazil)
+    // TNT (USA specific - prefix detection handles conflict with Brazil)
+    'tnt': 'TNT.us',
     'tnt (east)': 'TNT (East).us',
     'tnt (west)': 'TNT (East).us',
     'tnt us': 'TNT.us',
