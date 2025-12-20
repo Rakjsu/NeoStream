@@ -1052,7 +1052,9 @@ const openEpgUSAMappings: Record<string, string> = {
     'tbn enlace tv': 'Enlace.us',
     // TBS
     'tbs': 'TBS Superstation (East).us',
-    // TCM
+    // TCM (USA specific - avoid conflict with Brazil)
+    // Channels with USA: prefix will have it stripped, so 'tcm' will match
+    // Brazil 'TCM' without prefix will go to mi.tv since we check prefix first now
     'tcm': 'TCM.us',
     // Teen Nick
     'teen nick': 'TeenNick (East).us',
@@ -1354,10 +1356,13 @@ export const epgService = {
 
     // Get Open-EPG USA ID from channel name
     getOpenEpgUSAId(channelName: string): string | null {
-        let normalized = channelName.toLowerCase().trim();
+        const original = channelName.toLowerCase().trim();
+
+        // Check if channel has USA prefix
+        const hasUSAPrefix = /^(usa|us)\s*[:|]/i.test(original);
 
         // Remove country prefixes: USA:, USA |, US:, etc.
-        normalized = normalized.replace(/^(usa|us)\s*[:|]\s*/i, '');
+        let normalized = original.replace(/^(usa|us)\s*[:|]\s*/i, '');
 
         // Remove quality in brackets first: [FHD], [HD], [SD], [4K], [UHD], [M], [P]
         normalized = normalized.replace(/\s*\[(fhd|hd|sd|4k|uhd|m|p)\]/gi, '');
@@ -1372,6 +1377,12 @@ export const epgService = {
         normalized = normalized.replace(/\s+(fhd|hd|sd|4k|uhd)\s*$/gi, '');
 
         normalized = normalized.trim();
+
+        // Channels that conflict with Brazil (mi.tv) - only match if has USA prefix
+        const conflictingChannels = ['tcm', 'tnt', 'tbs', 'amc', 'vh1', 'discovery channel', 'axn', 'mtv', 'fox sports', 'espn', 'espn 2', 'espn 3', 'cartoon network', 'nickelodeon', 'disney channel', 'disney jr', 'disney xd', 'cnn', 'hbo', 'fox'];
+        if (conflictingChannels.includes(normalized) && !hasUSAPrefix) {
+            return null; // Let it fall through to Brazil (mi.tv)
+        }
 
         const result = openEpgUSAMappings[normalized] || null;
 
