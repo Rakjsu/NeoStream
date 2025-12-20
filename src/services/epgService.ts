@@ -1313,7 +1313,7 @@ export const epgService = {
         normalized = normalized.trim();
 
         // Channels that conflict with Brazil (mi.tv) - only match if has ARG prefix
-        const conflictingChannels = ['hbo', 'hbo 2', 'hbo mundi', 'hbo plus', 'hbo pop', 'hbo signature', 'espn', 'espn 2', 'espn 3', 'fox sports', 'fox sports 2', 'fox sports 3', 'tnt', 'tnt sports', 'axn', 'discovery', 'cartoon network', 'nickelodeon', 'disney channel', 'disney jr', 'mtv', 'cnn', 'vh1'];
+        const conflictingChannels = ['hbo', 'hbo 2', 'hbo mundi', 'hbo plus', 'hbo pop', 'hbo signature', 'espn', 'espn 2', 'espn 3', 'fox sports', 'fox sports 2', 'fox sports 3', 'tnt', 'tnt sports', 'axn', 'discovery', 'cartoon network', 'nickelodeon', 'disney channel', 'disney jr', 'mtv', 'cnn', 'vh1', 'studio universal', 'universal channel', 'star channel'];
         if (conflictingChannels.includes(normalized) && !hasARGPrefix) {
             return null; // Let it fall through to Brazil (mi.tv)
         }
@@ -1403,7 +1403,7 @@ export const epgService = {
         normalized = normalized.trim();
 
         // Channels that conflict with Brazil (mi.tv) - only match if has USA prefix
-        const conflictingChannels = ['tcm', 'tnt', 'tbs', 'amc', 'vh1', 'discovery channel', 'axn', 'mtv', 'fox sports', 'espn', 'espn 2', 'espn 3', 'cartoon network', 'nickelodeon', 'disney channel', 'disney jr', 'disney xd', 'cnn', 'hbo', 'hbo 2', 'hbo comedy', 'hbo family', 'hbo signature', 'hbo zone', 'fox'];
+        const conflictingChannels = ['tcm', 'tnt', 'tbs', 'amc', 'vh1', 'discovery channel', 'axn', 'mtv', 'fox sports', 'espn', 'espn 2', 'espn 3', 'espn 4', 'cartoon network', 'nickelodeon', 'disney channel', 'disney jr', 'disney xd', 'cnn', 'hbo', 'hbo 2', 'hbo comedy', 'hbo family', 'hbo signature', 'hbo zone', 'fox', 'a&e', 'a & e', 'aande', 'cinemax', 'paramount channel', 'syfy', 'animal planet', 'hgtv', 'tlc', 'trutv', 'boomerang', 'nick jr', 'bloomberg', 'comedy central', 'e!', 'e! entertainment', 'food network', 'lifetime', 'lifetime movies', 'discovery id'];
         if (conflictingChannels.includes(normalized) && !hasUSAPrefix) {
             return null; // Let it fall through to Brazil (mi.tv)
         }
