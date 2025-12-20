@@ -124,7 +124,8 @@ export function LiveTV() {
 
     // Fetch EPG when channel is selected
     useEffect(() => {
-        if (!selectedChannel || !selectedChannel.epg_channel_id) {
+        // Allow EPG fetch if we have any identifier (epg_channel_id OR name)
+        if (!selectedChannel || (!selectedChannel.epg_channel_id && !selectedChannel.name)) {
             setEpgData([]);
             setCurrentProgram(null);
             setUpcomingPrograms([]);
@@ -134,8 +135,10 @@ export function LiveTV() {
         let intervalId: number;
 
         const fetchEPG = async () => {
-            // Pass both EPG ID and channel name (for meuguia.tv fallback)
-            const programs = await epgService.fetchChannelEPG(selectedChannel.epg_channel_id, selectedChannel.name);
+            console.log('[EPG] Fetching EPG for channel:', selectedChannel.name, 'EPG ID:', selectedChannel.epg_channel_id);
+            // Pass both EPG ID and channel name (for Open-EPG Portugal and meuguia.tv fallback)
+            const programs = await epgService.fetchChannelEPG(selectedChannel.epg_channel_id || '', selectedChannel.name);
+            console.log('[EPG] Got programs:', programs.length);
             setEpgData(programs);
 
             const current = epgService.getCurrentProgram(programs);

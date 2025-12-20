@@ -216,6 +216,153 @@ export function setupIpcHandlers() {
             return { success: false, error: error.message }
         }
     })
+
+    // Generic fetch URL handler (bypasses CORS for external URLs)
+    ipcMain.handle('fetch-url', async (_, url: string) => {
+        try {
+            const fetch = (await import('node-fetch')).default
+            console.log('[Fetch URL] Fetching:', url.substring(0, 100))
+            const response = await fetch(url, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': '*/*'
+                }
+            })
+
+            if (!response.ok) {
+                console.log('[Fetch URL] Response failed:', response.status)
+                return { success: false, error: `HTTP ${response.status}` }
+            }
+
+            const text = await response.text()
+            console.log('[Fetch URL] Response length:', text.length)
+            return { success: true, data: text }
+        } catch (error: any) {
+            console.error('[Fetch URL] Error:', error.message)
+            return { success: false, error: error.message }
+        }
+    })
+
+    // EPG Cache System - Downloads EPG XML files on app start
+    // Downloads fresh on every app restart, caches during session only
+    ipcMain.handle('epg:get-cached', async (_, { url, cacheKey, forceRefresh = false }) => {
+        try {
+            const fs = await import('fs/promises')
+            const path = await import('path')
+            const { app } = await import('electron')
+
+            // Get app data directory for cache storage
+            const cacheDir = path.join(app.getPath('userData'), 'epg_cache')
+            const cacheFile = path.join(cacheDir, `${cacheKey}.xml`)
+            const metaFile = path.join(cacheDir, `${cacheKey}.meta.json`)
+
+            // Ensure cache directory exists
+            await fs.mkdir(cacheDir, { recursive: true })
+
+            // Check if we have valid cache (downloaded within last 24 hours)
+            // Files are cached for 24 hours to avoid unnecessary re-downloads
+            const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
+
+            let cacheValid = false
+            if (!forceRefresh) {
+                try {
+                    const metaContent = await fs.readFile(metaFile, 'utf-8')
+                    const meta = JSON.parse(metaContent)
+                    const cacheAge = Date.now() - meta.timestamp
+
+                    if (cacheAge < CACHE_TTL_MS) {
+                        // Cache is still valid (within 24 hours)
+                        console.log('[EPG Cache] Cache valid, age:', Math.round(cacheAge / 3600000), 'hours')
+                        cacheValid = true
+                    } else {
+                        console.log('[EPG Cache] Cache old, downloading fresh (age:', Math.round(cacheAge / 60000), 'min)')
+                    }
+                } catch (e) {
+                    console.log('[EPG Cache] No cache found, will download fresh')
+                }
+            } else {
+                console.log('[EPG Cache] Force refresh requested')
+            }
+
+            // If cache is valid (within 24 hours), return cached data
+            if (cacheValid) {
+                try {
+                    const data = await fs.readFile(cacheFile, 'utf-8')
+                    console.log('[EPG Cache] Returning cached data, length:', data.length)
+                    return { success: true, data, fromCache: true }
+                } catch (e) {
+                    console.log('[EPG Cache] Cache file read failed, will download fresh')
+                }
+            }
+
+            // Download fresh data
+            console.log('[EPG Cache] Downloading from:', url)
+            const fetch = (await import('node-fetch')).default
+            const response = await fetch(url, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'application/xml, text/xml, */*'
+                }
+            })
+
+            if (!response.ok) {
+                console.error('[EPG Cache] Download failed:', response.status)
+
+                // Try to return stale cache if download fails
+                try {
+                    const data = await fs.readFile(cacheFile, 'utf-8')
+                    console.log('[EPG Cache] Returning stale cache due to download failure')
+                    return { success: true, data, fromCache: true, stale: true }
+                } catch (e) {
+                    return { success: false, error: `Download failed: HTTP ${response.status}` }
+                }
+            }
+
+            const data = await response.text()
+            console.log('[EPG Cache] Downloaded data, length:', data.length)
+
+            // Save to cache
+            await fs.writeFile(cacheFile, data, 'utf-8')
+            await fs.writeFile(metaFile, JSON.stringify({
+                timestamp: Date.now(),
+                url: url,
+                size: data.length
+            }), 'utf-8')
+
+            console.log('[EPG Cache] Saved to cache:', cacheFile)
+            return { success: true, data, fromCache: false }
+
+        } catch (error: any) {
+            console.error('[EPG Cache] Error:', error.message)
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Get EPG cache info (for UI display)
+    ipcMain.handle('epg:get-cache-info', async (_, cacheKey: string) => {
+        try {
+            const fs = await import('fs/promises')
+            const path = await import('path')
+            const { app } = await import('electron')
+
+            const cacheDir = path.join(app.getPath('userData'), 'epg_cache')
+            const metaFile = path.join(cacheDir, `${cacheKey}.meta.json`)
+
+            const metaContent = await fs.readFile(metaFile, 'utf-8')
+            const meta = JSON.parse(metaContent)
+
+            return {
+                success: true,
+                info: {
+                    lastUpdate: new Date(meta.timestamp).toISOString(),
+                    age: Date.now() - meta.timestamp,
+                    size: meta.size
+                }
+            }
+        } catch (error: any) {
+            return { success: false, error: error.message }
+        }
+    })
     ipcMain.handle('streams:get-vod-url', async (_, { streamId, container }) => {
         try {
             console.log('[Download] get-vod-url called with:', { streamId, container })
