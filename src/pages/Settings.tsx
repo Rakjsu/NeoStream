@@ -631,6 +631,25 @@ export function Settings() {
                                     .epg-filter-btn:active {
                                         transform: scale(0.95);
                                     }
+                                    .epg-page-btn {
+                                        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+                                        position: relative;
+                                        overflow: hidden;
+                                    }
+                                    .epg-page-btn:hover:not(:disabled) {
+                                        transform: translateY(-3px) scale(1.05);
+                                        box-shadow: 0 6px 20px rgba(6, 182, 212, 0.4);
+                                    }
+                                    .epg-page-btn:active:not(:disabled) {
+                                        transform: scale(0.92);
+                                    }
+                                    .epg-page-btn:disabled {
+                                        opacity: 0.5;
+                                    }
+                                    .epg-page-indicator {
+                                        transition: all 0.3s ease;
+                                        animation: epgPulse 2s ease-in-out infinite;
+                                    }
                                 `}</style>
                                 <div className="section-header">
                                     <div className="section-icon" style={{ background: 'linear-gradient(135deg, #06b6d4, #0891b2)' }}>📡</div>
@@ -1052,6 +1071,7 @@ export function Settings() {
                                                                 borderTop: '1px solid rgba(255,255,255,0.1)'
                                                             }}>
                                                                 <button
+                                                                    className="epg-page-btn"
                                                                     onClick={() => setEpgCurrentPage(1)}
                                                                     disabled={currentPage === 1}
                                                                     style={{
@@ -1067,6 +1087,7 @@ export function Settings() {
                                                                     }}
                                                                 >⏮️</button>
                                                                 <button
+                                                                    className="epg-page-btn"
                                                                     onClick={() => setEpgCurrentPage(p => Math.max(1, p - 1))}
                                                                     disabled={currentPage === 1}
                                                                     style={{
@@ -1081,7 +1102,7 @@ export function Settings() {
                                                                         transition: 'all 0.2s ease'
                                                                     }}
                                                                 >◀ {t('epg', 'previous')}</button>
-                                                                <span style={{
+                                                                <span className="epg-page-indicator" style={{
                                                                     color: 'white',
                                                                     fontWeight: 700,
                                                                     fontSize: '14px',
@@ -1092,6 +1113,7 @@ export function Settings() {
                                                                     {currentPage} / {totalPages}
                                                                 </span>
                                                                 <button
+                                                                    className="epg-page-btn"
                                                                     onClick={() => setEpgCurrentPage(p => Math.min(totalPages, p + 1))}
                                                                     disabled={currentPage === totalPages}
                                                                     style={{
@@ -1107,6 +1129,7 @@ export function Settings() {
                                                                     }}
                                                                 >{t('epg', 'next')} ▶</button>
                                                                 <button
+                                                                    className="epg-page-btn"
                                                                     onClick={() => setEpgCurrentPage(totalPages)}
                                                                     disabled={currentPage === totalPages}
                                                                     style={{
