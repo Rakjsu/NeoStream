@@ -1198,10 +1198,13 @@ export const epgService = {
 
     // Get Open-EPG Portugal ID from channel name
     getOpenEpgPortugalId(channelName: string): string | null {
-        let normalized = channelName.toLowerCase().trim();
+        const original = channelName.toLowerCase().trim();
+
+        // Check if channel has PT prefix
+        const hasPTPrefix = /^(pt|portugal)\s*[:|]/i.test(original);
 
         // Remove country prefixes: PT:, PT |, PT-, BR:, etc.
-        normalized = normalized.replace(/^(pt|br|portugal|brasil)\s*[:|]\s*/i, '');
+        let normalized = original.replace(/^(pt|br|portugal|brasil)\s*[:|]\s*/i, '');
 
         // Remove quality in brackets first: [FHD], [HD], [SD], [4K], [UHD], [M], [P]
         normalized = normalized.replace(/\s*\[(fhd|hd|sd|4k|uhd|m|p)\]/gi, '');
@@ -1216,6 +1219,12 @@ export const epgService = {
         normalized = normalized.replace(/\s+(fhd|hd|sd|4k|uhd)\s*$/gi, '');
 
         normalized = normalized.trim();
+
+        // Channels that conflict with Brazil (mi.tv) - only match if has PT prefix
+        const conflictingChannels = ['vh1', 'mtv', 'mtv live', 'axn', 'fox', 'fox comedy', 'fox crime', 'fox life', 'fox movies', 'discovery', 'discovery channel', 'national geographic', 'nat geo wild', 'cartoon network', 'cartoonito', 'nickelodeon', 'disney channel', 'disney junior', 'cnn', 'syfy', 'amc', 'blaze', 'record', 'record tv', 'record news', 'globo', 'globo news', 'fashion tv', 'dog tv', 'dogtv', 'cancao nova', 'canção nova', 'tve', 'tve internacional', 'dazn 1', 'dazn 2', 'dazn 3', 'dazn 4', 'dazn 5', 'dazn 6'];
+        if (conflictingChannels.includes(normalized) && !hasPTPrefix) {
+            return null; // Let it fall through to Argentina/USA/Brazil checks
+        }
 
         const result = openEpgPortugalMappings[normalized] || null;
 
