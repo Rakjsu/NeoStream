@@ -1281,10 +1281,13 @@ export const epgService = {
 
     // Get Open-EPG Argentina ID from channel name
     getOpenEpgArgentinaId(channelName: string): string | null {
-        let normalized = channelName.toLowerCase().trim();
+        const original = channelName.toLowerCase().trim();
+
+        // Check if channel has ARG prefix
+        const hasARGPrefix = /^(arg|ar|argentina)\s*[:|]/i.test(original);
 
         // Remove country prefixes: ARG |, ARG:, AR:, etc.
-        normalized = normalized.replace(/^(arg|ar|argentina)\s*[:|]\s*/i, '');
+        let normalized = original.replace(/^(arg|ar|argentina)\s*[:|]\s*/i, '');
 
         // Remove quality in brackets first: [FHD], [HD], [SD], [4K], [UHD], [M], [P]
         normalized = normalized.replace(/\s*\[(fhd|hd|sd|4k|uhd|m|p)\]/gi, '');
@@ -1299,6 +1302,12 @@ export const epgService = {
         normalized = normalized.replace(/\s+(fhd|hd|sd|4k|uhd)\s*$/gi, '');
 
         normalized = normalized.trim();
+
+        // Channels that conflict with Brazil (mi.tv) - only match if has ARG prefix
+        const conflictingChannels = ['hbo', 'hbo 2', 'hbo mundi', 'hbo plus', 'hbo pop', 'hbo signature', 'espn', 'espn 2', 'espn 3', 'fox sports', 'fox sports 2', 'fox sports 3', 'tnt', 'tnt sports', 'axn', 'discovery', 'cartoon network', 'nickelodeon', 'disney channel', 'disney jr', 'mtv', 'cnn'];
+        if (conflictingChannels.includes(normalized) && !hasARGPrefix) {
+            return null; // Let it fall through to Brazil (mi.tv)
+        }
 
         const result = openEpgArgentinaMappings[normalized] || null;
 
@@ -1385,7 +1394,7 @@ export const epgService = {
         normalized = normalized.trim();
 
         // Channels that conflict with Brazil (mi.tv) - only match if has USA prefix
-        const conflictingChannels = ['tcm', 'tnt', 'tbs', 'amc', 'vh1', 'discovery channel', 'axn', 'mtv', 'fox sports', 'espn', 'espn 2', 'espn 3', 'cartoon network', 'nickelodeon', 'disney channel', 'disney jr', 'disney xd', 'cnn', 'hbo', 'fox'];
+        const conflictingChannels = ['tcm', 'tnt', 'tbs', 'amc', 'vh1', 'discovery channel', 'axn', 'mtv', 'fox sports', 'espn', 'espn 2', 'espn 3', 'cartoon network', 'nickelodeon', 'disney channel', 'disney jr', 'disney xd', 'cnn', 'hbo', 'hbo 2', 'hbo comedy', 'hbo family', 'hbo signature', 'hbo zone', 'fox'];
         if (conflictingChannels.includes(normalized) && !hasUSAPrefix) {
             return null; // Let it fall through to Brazil (mi.tv)
         }
