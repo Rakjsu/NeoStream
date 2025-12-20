@@ -182,12 +182,18 @@ class EpgTestService {
                 }
                 channelsToTest = allChannels;
             } else if (mode === 'retryFailed') {
-                if (this._results) {
+                if (this._results && this._results.notWorking.length > 0) {
                     working = [...this._results.working];
                     scannedChannels = this._results.scannedChannels || [];
-                    const failedChannelNames = this._results.notWorking.map(c => c.channel);
-                    channelsToTest = allChannels.filter(c => failedChannelNames.includes(c.name));
-                    notWorking = [];
+                    const failedChannelNames = this._results.notWorking.map(c => c.channel.toLowerCase());
+                    channelsToTest = allChannels.filter(c => failedChannelNames.includes(c.name.toLowerCase()));
+                    console.log(`[EPG Test] Retry mode: ${this._results.notWorking.length} failed channels, ${channelsToTest.length} found to retest`);
+                    notWorking = []; // Clear only if we have channels to test
+                } else {
+                    console.log('[EPG Test] No failed channels to retry');
+                    this._status = 'idle';
+                    this.notifyListeners();
+                    return;
                 }
             }
 
