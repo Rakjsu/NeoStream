@@ -892,7 +892,7 @@ const openEpgUSAMappings: Record<string, string> = {
     'mavtv': 'MAVTV.us',
     // MeTV
     'metv': 'MeTV.us',
-    'metv+': 'MeTV.us',
+    'metv+': 'MeTV+.us',
     // MLB Network
     'mlb network': 'MLB Network.us',
     'mlbstrike zone': 'MLB Network.us',
@@ -901,10 +901,10 @@ const openEpgUSAMappings: Record<string, string> = {
     // Moremax
     'moremax': 'More Max (East).us',
     // Motor Trend
-    'motor trend': 'MotorTrend.us',
+    'motor trend': 'Motor Trend HD.us',
     // Movies!
-    'movies!': 'Movies.us',
-    'movies': 'Movies.us',
+    'movies!': 'WNYW Movies!.us',
+    'movies': 'WNYW Movies!.us',
     // MSG
     'msg': 'Madison Square Garden (Zone 1).us',
     'msg 2': 'Madison Square Garden (Zone 1).us',
@@ -915,13 +915,13 @@ const openEpgUSAMappings: Record<string, string> = {
     // MTV
     'mtv': 'MTV (East).us',
     'mtv (east)': 'MTV (East).us',
-    'mtv (west)': 'MTV (West).us',
+    'mtv (west)': 'MTV.us',
     'mtv u': 'MTV-U.us',
     'mtvu': 'MTV-U.us',
     'mtv2': 'MTV2 (East).us',
     // NASA
-    'nasa': 'NASA Television.us',
-    'nasa 2': 'NASA Television.us',
+    'nasa': 'NASA TV.us',
+    'nasa 2': 'NASA TV.us',
     // Nat Geo
     'nat geo wild': 'NatGeo WILD.us',
     'national geographic': 'National Geographic Channel.us',
@@ -955,26 +955,31 @@ const openEpgUSAMappings: Record<string, string> = {
     // Outdoor Channel
     'outdoor channel': 'Outdoor Channel.us',
     // Outermax
-    'outermax': 'OuterMAX.us',
+    'outermax': 'OuterMax HD  Pacific.us',
     // Outside TV
-    'outside tv': 'Outside TV.us',
+    'outside tv': 'Outside Television HD.us',
     // OWN
     'own': 'OWN.us',
     // Oxygen
     'oxygen': 'Oxygen (East).us',
     'oxygen (east)': 'Oxygen (East).us',
-    'oxygen (west)': 'Oxygen (West).us',
+    'oxygen (west)': 'Oxygen.us',
     // Paramount Channel
     'paramount channel': 'Paramount Network (East).us',
     // PBS
-    'pbs america': 'PBS America.us',
+    'pbs': 'PBS.us',
+    'pbs america': 'PBS.us',
     'pbs kids': 'PBS Kids.us',
     // People TV
     'people tv': 'People TV.us',
     // Pixl
     'pixl': 'Pixl.us',
     // Pop
-    'pop': 'Pop.us',
+    'pop': 'POP.us',
+    // Root Sports
+    'root sports northwest': 'Root Sports Northwest.us',
+    // Scripps News
+    'scripps news': 'Scripps News.us',
     // Pursuit
     'pursuit': 'Pursuit Channel.us',
     // Reelz
@@ -1008,16 +1013,16 @@ const openEpgUSAMappings: Record<string, string> = {
     'smithsonian (east)': 'Smithsonian Channel (East).us',
     'smithsonian (west)': 'Smithsonian Channel (East).us',
     // Spectrum
-    'spectrum news 1': 'Spectrum News 1.us',
-    'spectrum sportsnet la dodgers': 'Spectrum SportsNet LA.us',
-    'spectrum sportsnet la lakers': 'Spectrum SportsNet LA.us',
+    'spectrum news 1': 'Spectrum News HD.us',
+    'spectrum sportsnet la dodgers': 'Spectrum SportsNet LA HD.us',
+    'spectrum sportsnet la lakers': 'Spectrum SportsNet LA HD.us',
     // Sportsnet NY
     'sportsnet ny': 'SportsNet New York.us',
     'sportsnet ny (sny)': 'SportsNet New York.us',
     'sny': 'SportsNet New York.us',
     // Stadium
-    'stadium vip': 'Stadium.us',
-    'stadium': 'Stadium.us',
+    'stadium vip': 'Stadium HD.us',
+    'stadium': 'Stadium HD.us',
     // Start TV
     'start tv': 'Start TV.us',
     // Starz
@@ -1027,16 +1032,16 @@ const openEpgUSAMappings: Record<string, string> = {
     'starz cinema': 'Starz Cinema.us',
     'starz comedy': 'Starz Comedy.us',
     'starz edge': 'Starz Edge.us',
-    'starz encore': 'Starz Encore (East).us',
-    'starz encore (east)': 'Starz Encore (East).us',
-    'starz encore (west)': 'Starz Encore (West).us',
+    'starz encore': 'Starz Encore.us',
+    'starz encore (east)': 'STARZ ENCORE (East).us',
+    'starz encore (west)': 'STARZ ENCORE (West).us',
     'starz encore action': 'Starz Encore Action.us',
     'starz encore classic': 'Starz Encore Classic.us',
     'starz encore suspense': 'Starz Encore Suspense.us',
     'starz encore westerns': 'Starz Encore Westerns.us',
-    'starz in black': 'Starz in Black.us',
-    'starz kids & family': 'Starz Kids and Family.us',
-    'starz kids and family': 'Starz Kids and Family.us',
+    'starz in black': 'Starz In Black.us',
+    'starz kids & family': 'Starz Kids And Family.us',
+    'starz kids and family': 'Starz Kids And Family.us',
     'starzencore family': 'Starz Encore Family.us',
     // Sundance
     'sundance': 'SundanceTV (East).us',
