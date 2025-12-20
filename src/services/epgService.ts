@@ -1304,7 +1304,7 @@ export const epgService = {
         normalized = normalized.trim();
 
         // Channels that conflict with Brazil (mi.tv) - only match if has ARG prefix
-        const conflictingChannels = ['hbo', 'hbo 2', 'hbo mundi', 'hbo plus', 'hbo pop', 'hbo signature', 'espn', 'espn 2', 'espn 3', 'fox sports', 'fox sports 2', 'fox sports 3', 'tnt', 'tnt sports', 'axn', 'discovery', 'cartoon network', 'nickelodeon', 'disney channel', 'disney jr', 'mtv', 'cnn'];
+        const conflictingChannels = ['hbo', 'hbo 2', 'hbo mundi', 'hbo plus', 'hbo pop', 'hbo signature', 'espn', 'espn 2', 'espn 3', 'fox sports', 'fox sports 2', 'fox sports 3', 'tnt', 'tnt sports', 'axn', 'discovery', 'cartoon network', 'nickelodeon', 'disney channel', 'disney jr', 'mtv', 'cnn', 'vh1'];
         if (conflictingChannels.includes(normalized) && !hasARGPrefix) {
             return null; // Let it fall through to Brazil (mi.tv)
         }
