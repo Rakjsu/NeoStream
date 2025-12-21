@@ -1221,7 +1221,7 @@ export const epgService = {
         normalized = normalized.trim();
 
         // Channels that conflict with Brazil (mi.tv) - only match if has PT prefix
-        const conflictingChannels = ['vh1', 'mtv', 'mtv live', 'axn', 'fox', 'fox comedy', 'fox crime', 'fox life', 'fox movies', 'discovery', 'discovery channel', 'national geographic', 'nat geo wild', 'cartoon network', 'cartoonito', 'nickelodeon', 'disney channel', 'disney junior', 'cnn', 'syfy', 'amc', 'blaze', 'record', 'record tv', 'record news', 'globo', 'globo news', 'fashion tv', 'dog tv', 'dogtv', 'cancao nova', 'canção nova', 'tve', 'tve internacional', 'dazn 1', 'dazn 2', 'dazn 3', 'dazn 4', 'dazn 5', 'dazn 6'];
+        const conflictingChannels = ['vh1', 'mtv', 'mtv live', 'axn', 'fox', 'fox comedy', 'fox crime', 'fox life', 'fox movies', 'discovery', 'discovery channel', 'national geographic', 'nat geo wild', 'cartoon network', 'cartoonito', 'nickelodeon', 'disney channel', 'disney junior', 'cnn', 'syfy', 'amc', 'blaze', 'record', 'record tv', 'record news', 'globo', 'globo news', 'fashion tv', 'dog tv', 'dogtv', 'cancao nova', 'canção nova', 'tve', 'tve internacional', 'dazn 1', 'dazn 2', 'dazn 3', 'dazn 4', 'dazn 5', 'dazn 6', 'tlc', 'nick jr', 'bloomberg', 'e!', 'food network', 'star channel', 'star life', 'star movies', 'star crime', 'star comedy'];
         if (conflictingChannels.includes(normalized) && !hasPTPrefix) {
             return null; // Let it fall through to Argentina/USA/Brazil checks
         }
