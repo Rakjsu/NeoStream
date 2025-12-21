@@ -80,6 +80,90 @@ const mitvMappings: Record<string, string> = {
     'globo rede amazonica rondonia': 'globo-amazonas',
     'globo rondonia': 'globo-amazonas',
     'globo rondônia': 'globo-amazonas',
+    'globo roraima': 'globo-amazonas',
+    // Globo RPC stations
+    'globo rpc curitiba': 'globo-rbs-tv-poa',
+    'globo rpc foz do iguacu': 'globo-s-o-paulo-hd',
+    'globo rpc foz do iguaçu': 'globo-s-o-paulo-hd',
+    'globo rpc maringa': 'globo-s-o-paulo-hd',
+    'globo rpc maringá': 'globo-s-o-paulo-hd',
+    'globo rpc paranavai': 'globo-s-o-paulo-hd',
+    'globo rpc paranavaí': 'globo-s-o-paulo-hd',
+    'globo rpc tv ponta grossa': 'globo-s-o-paulo-hd',
+    // Globo TV stations - SP region
+    'globo sjrp': 'globo-s-o-paulo-hd',
+    'globo tv diario': 'globo-s-o-paulo-hd',
+    'globo tv diário': 'globo-s-o-paulo-hd',
+    'globo tv fronteira': 'globo-s-o-paulo-hd',
+    'globo tv morena': 'globo-s-o-paulo-hd',
+    // Globo TV Anhanguera
+    'globo tv anhanguera': 'globo-anhanguera',
+    'globo tv anhanguera goiania': 'globo-anhanguera',
+    'globo tv anhanguera goiânia': 'globo-anhanguera',
+    'globo tv anhanguera catalao': 'globo-anhanguera',
+    'globo tv anhanguera catalão': 'globo-anhanguera',
+    // Globo TV Cabo Branco / Recife
+    'globo tv cabo branco': 'globo-recife',
+    'globo tv recife': 'globo-recife',
+    // Globo TV Clube / Mirante - Teresina
+    'globo tv clube': 'globo-teresina',
+    'globo tv mirante': 'globo-teresina',
+    // Globo TV Gazeta / Integração - BH
+    'globo tv gazeta sul': 'globo-belo-horizonte',
+    'globo tv gazeta vitoria': 'globo-belo-horizonte',
+    'globo tv gazeta vitória': 'globo-belo-horizonte',
+    'globo tv integ juiz de fora': 'globo-belo-horizonte',
+    'globo tv integ. juiz de fora': 'globo-belo-horizonte',
+    'globo tv integ. araxa': 'globo-belo-horizonte',
+    'globo tv integ. araxá': 'globo-belo-horizonte',
+    // Globo TV Nordeste / Paraiba
+    'globo tv nordeste': 'globo-nordeste-hd',
+    'globo tv paraiba': 'globo-nordeste-hd',
+    'globo tv paraíba': 'globo-nordeste-hd',
+    // Globo TV Rio Sul
+    'globo tv rio sul': 'globo-rio-hd',
+    // Globo TV Santa Cruz - Bahia
+    'globo tv santa cruz': 'globo-tv-bahia',
+    'globo tv santa cruz itabuna bahia': 'globo-tv-bahia',
+    // Globo TV Sergipe
+    'globo tv sergipe': 'globo-aracaju',
+    // Globo TV Serra Mar / Vitória - RJ
+    'globo tv serra mar': 'globo-rio-hd',
+    'globo vitoria': 'globo-rio-hd',
+    'globo vitória': 'globo-rio-hd',
+    // Globo TV TEM stations - SP
+    'globo tv tem bauru': 'globo-s-o-paulo-hd',
+    'globo tv tem sjrp': 'globo-s-o-paulo-hd',
+    'globo tv tem sorocaba': 'globo-s-o-paulo-hd',
+    'globo tv tem itapetininga e regiao': 'globo-s-o-paulo-hd',
+    'globo tv tem itapetininga e região': 'globo-s-o-paulo-hd',
+    'globo tv tribuna santos': 'globo-s-o-paulo-hd',
+    'globo tv vang. s.j. campos': 'globo-s-o-paulo-hd',
+    'globo tv vang. taubate': 'globo-s-o-paulo-hd',
+    'globo tv vang. taubaté': 'globo-s-o-paulo-hd',
+    'globo tv vanguarda sjdc': 'globo-s-o-paulo-hd',
+    // Globo TV Verdes Mares / TV Asa Branca - Nordeste
+    'globo tv verdes mares': 'globo-nordeste-hd',
+    'tv asa branca': 'globo-nordeste-hd',
+    'globo verdes mares cariri': 'globo-nordeste-hd',
+    'globo verdes mares fortaleza': 'globo-nordeste-hd',
+    // Inter TV / TV Integração - BH
+    'inter tv grande minas': 'globo-belo-horizonte',
+    'globo tv integracao uberlandia': 'globo-belo-horizonte',
+    'globo tv integração uberlândia': 'globo-belo-horizonte',
+    'globo tv integracao uberaba': 'globo-belo-horizonte',
+    'globo tv integração uberaba': 'globo-belo-horizonte',
+    // Globo TV Anhanguera Tocantins
+    'globo tv anhanguera araguaina tocantins': 'globo-anhanguera',
+    'globo tv anhanguera araguaína tocantins': 'globo-anhanguera',
+    'globo tv anhanguera gurupi tocantins': 'globo-anhanguera',
+    'globo tv anhanguera palmas tocantins': 'globo-anhanguera',
+    // Globo Rede Amazonica Ariquemes
+    'globo rede amazonica ariquemes': 'globo-amazonas',
+    // Globo RBS TV more stations
+    'globo rbs tv bage': 'globo-rbs-tv-poa',
+    'globo rbs tv bagé': 'globo-rbs-tv-poa',
+    'globo rbs cruz alta': 'globo-rbs-tv-poa',
     // SBT
     'sbt sp': 'sbt-s-o-paulo',
     // Record
@@ -1217,6 +1301,12 @@ const openEpgUSAMappings: Record<string, string> = {
 const openEpgBrazilMappings: Record<string, string> = {
     // Star Channel
     'star channel': 'Star Channel HD.br',
+    // Globo regional - Open-EPG Brazil
+    'globo tv alagoas': 'Globo Maceio.br',
+    'globo tv liberal belem': 'Globo Belem Liberal.br',
+    'globo tv liberal belém': 'Globo Belem Liberal.br',
+    // Globoplay
+    'globoplay novelas': 'Globoplay Novelas.br',
 };
 
 export const epgService = {
