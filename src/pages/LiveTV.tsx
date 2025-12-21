@@ -256,10 +256,10 @@ export function LiveTV() {
         setBrokenImages(prev => new Set(prev).add(streamId));
     };
 
-    // Find quality variants for a channel (e.g., Globo Belem [FHD], Globo Belem [FHD] (H265))
+    // Find quality variants for a channel (e.g., Globo SP matches Globo [4K])
     const getChannelQualityVariants = (channel: LiveStream) => {
         // Function to extract base name, quality and codec from a channel name
-        const extractInfo = (name: string): { baseName: string; quality: string; codec: string; label: string; priority: number } => {
+        const extractInfo = (name: string): { baseName: string; quality: string; codec: string; label: string; priority: number; hasOnlyQuality: boolean } => {
             let workingName = name.trim();
             let quality = '';
             let codec = '';
@@ -307,12 +307,16 @@ export function LiveTV() {
                 .replace(/\s+/g, ' ')
                 .trim();
 
-            return { baseName, quality, codec, label, priority };
+            // Check if channel only has quality indicator (e.g., "Globo [4K]" -> baseName is "Globo")
+            const hasOnlyQuality = !!(quality || codec) && baseName.length < workingName.length * 0.7;
+
+            return { baseName, quality, codec, label, priority, hasOnlyQuality };
         };
 
-        const { baseName } = extractInfo(channel.name);
+        const currentInfo = extractInfo(channel.name);
+        const { baseName } = currentInfo;
 
-        // Find all channels that match this base name EXACTLY
+        // Find all channels that match this base name
         const variants: Array<{
             channel: LiveStream;
             quality: string;
@@ -322,12 +326,22 @@ export function LiveTV() {
 
         for (const stream of streams) {
             const info = extractInfo(stream.name);
+            const streamBaseLower = info.baseName.toLowerCase();
+            const currentBaseLower = baseName.toLowerCase();
 
-            // Only match if base names are EXACTLY the same
-            if (info.baseName.toLowerCase() === baseName.toLowerCase()) {
+            // Match conditions:
+            // 1. Exact base name match (e.g., "Globo SP" === "Globo SP")
+            // 2. Current channel's base starts with stream's base AND stream only has quality
+            //    (e.g., "Globo SP" starts with "Globo" and stream is "Globo [4K]")
+            // 3. Stream's base starts with current's base AND current only has quality
+            const isExactMatch = streamBaseLower === currentBaseLower;
+            const isQualityVariant = currentBaseLower.startsWith(streamBaseLower) && info.hasOnlyQuality && streamBaseLower.length >= 3;
+            const isCurrentQualityVariant = streamBaseLower.startsWith(currentBaseLower) && currentInfo.hasOnlyQuality && currentBaseLower.length >= 3;
+
+            if (isExactMatch || isQualityVariant || isCurrentQualityVariant) {
                 // If no quality/codec detected, use "SD" as default label
                 const label = (info.quality || info.codec) ? info.label : 'SD';
-                const priority = (info.quality || info.codec) ? info.priority : 4; // Lower than SD (3)
+                const priority = (info.quality || info.codec) ? info.priority : 4;
 
                 variants.push({
                     channel: stream,
@@ -340,9 +354,6 @@ export function LiveTV() {
 
         // Sort by priority (4K first, then FHD H.265, then FHD, then HD, then SD, then unmarked)
         variants.sort((a, b) => a.priority - b.priority);
-
-        // Debug log
-        console.log('[Quality] Channel:', channel.name, '| Base:', baseName, '| Variants:', variants.map(v => v.label));
 
         // Only return variants if there's more than one option
         return variants.length > 1 ? variants : [];

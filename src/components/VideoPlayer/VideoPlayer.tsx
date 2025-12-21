@@ -774,6 +774,14 @@ export function VideoPlayer({
                                                 <div className="settings-options">
                                                     {movieVersions.map(version => {
                                                         const isActive = version.movie.stream_id === currentMovieId;
+                                                        // Get icon based on quality
+                                                        const getQualityIcon = (label: string) => {
+                                                            const l = label.toLowerCase();
+                                                            if (l.includes('4k') || l.includes('uhd')) return '🔵';
+                                                            if (l.includes('fhd') || l.includes('h.265') || l.includes('1080')) return '🟢';
+                                                            if (l.includes('hd') || l.includes('720')) return '🟡';
+                                                            return '⚪'; // SD or unknown
+                                                        };
                                                         return (
                                                             <button
                                                                 key={version.movie.stream_id}
@@ -784,7 +792,9 @@ export function VideoPlayer({
                                                                     }
                                                                     setShowSettings(false);
                                                                 }}
+                                                                style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
                                                             >
+                                                                <span style={{ fontSize: '10px' }}>{getQualityIcon(version.label)}</span>
                                                                 {version.label}
                                                             </button>
                                                         );
