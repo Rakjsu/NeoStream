@@ -166,8 +166,27 @@ const mitvMappings: Record<string, string> = {
     'globo rbs cruz alta': 'globo-rbs-tv-poa',
     // SBT
     'sbt sp': 'sbt-s-o-paulo',
+    // SBT regional - use SBT SP
+    'sbt tv jangadeiro': 'sbt-s-o-paulo',
+    'sbt interior': 'sbt-s-o-paulo',
+    'sbt rbs': 'sbt-s-o-paulo',
+    'sbt rede massa': 'sbt-s-o-paulo',
+    'sbt sao luiz ma': 'sbt-s-o-paulo',
+    'sbt são luiz ma': 'sbt-s-o-paulo',
+    'sbt tv difusora caxias': 'sbt-s-o-paulo',
+    'sbt vtv campinas': 'sbt-s-o-paulo',
+    // SBT Serra Dourada - Goiania
+    'sbt serra dourada': 'sbt-goiania-tv-serra-dourada',
     // Record
     'record sp': 'recordtv-s-o-paulo-hd',
+    // Record regional - mi.tv
+    'record itapoan': 'recordtv-itapoan-hd',
+    'record manaus': 'recordtv-s-o-paulo-hd',
+    'record tv acritica': 'recordtv-s-o-paulo-hd',
+    'record tv guararapes': 'recordtv-s-o-paulo-hd',
+    'record rs': 'recordtv-rs',
+    'record vila real': 'recordtv-cuiaba',
+    'record ndtv joinville': 'recordtv-florianopolis',
     // TV Gazeta
     'tv gazeta': 'tv-gazeta-hd',
     'gazeta': 'tv-gazeta-hd',
@@ -1307,6 +1326,18 @@ const openEpgBrazilMappings: Record<string, string> = {
     'globo tv liberal belém': 'Globo Belem Liberal.br',
     // Globoplay
     'globoplay novelas': 'Globoplay Novelas.br',
+    // SBT regional - Open-EPG Brazil
+    'sbt itapoan': 'SBT Salvador.br',
+    'sbt tv aratu': 'SBT Salvador.br',
+    'sbt tv jornal recife': 'SBT Salvador.br',
+    // TV Alterosa
+    'sbt tv alterosa': 'TV Alterosa.br',
+    // Record TV regional - Open-EPG Brazil
+    'record campinas': 'Record TV Campinas.br',
+    'record tv correios': 'Record TV Joao Pessoa.br',
+    'record tv tropical': 'Record TV Natal.br',
+    'record litoral vale do parnaiba': 'Record TV Santos.br',
+    'record litoral vale do parnaíba': 'Record TV Santos.br',
 };
 
 export const epgService = {
