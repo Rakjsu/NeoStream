@@ -461,7 +461,9 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             fetchingSubtitles: 'Buscando legendas...',
             enableSubtitles: 'Ativar Legendas',
             disableSubtitles: 'Desativar Legendas',
-            errorLoadingSubtitles: 'Erro ao carregar legendas forçadas'
+            errorLoadingSubtitles: 'Erro ao carregar legendas forçadas',
+            streamFallback: 'Alternando para',
+            streamUnavailable: 'Stream indisponível. Nenhuma alternativa encontrada.'
         },
         // Notifications
         notifications: {
@@ -1076,7 +1078,9 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             fetchingSubtitles: 'Fetching subtitles...',
             enableSubtitles: 'Enable Subtitles',
             disableSubtitles: 'Disable Subtitles',
-            errorLoadingSubtitles: 'Error loading forced subtitles'
+            errorLoadingSubtitles: 'Error loading forced subtitles',
+            streamFallback: 'Switching to',
+            streamUnavailable: 'Stream unavailable. No alternative found.'
         },
         home: {
             goodMorning: 'Good morning',
@@ -1644,7 +1648,9 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             fetchingSubtitles: 'Buscando subtítulos...',
             enableSubtitles: 'Activar Subtítulos',
             disableSubtitles: 'Desactivar Subtítulos',
-            errorLoadingSubtitles: 'Error al cargar subtítulos forzados'
+            errorLoadingSubtitles: 'Error al cargar subtítulos forzados',
+            streamFallback: 'Cambiando a',
+            streamUnavailable: 'Stream no disponible. No se encontró alternativa.'
         },
         home: {
             goodMorning: 'Buenos días',

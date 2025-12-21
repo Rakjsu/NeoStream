@@ -83,6 +83,7 @@ export function VideoPlayer({
     currentQualityIndex = 0
 }: VideoPlayerProps) {
     const { videoRef, state, controls } = useVideoPlayer();
+    const { t } = useLanguage();
     const [streamErrorToast, setStreamErrorToast] = useState<string | null>(null);
 
     // Handle stream error for fallback
@@ -93,19 +94,18 @@ export function VideoPlayer({
             if (nextIndex < liveQualityVariants.length && onSwitchVersion) {
                 const nextVariant = liveQualityVariants[nextIndex];
                 console.log(`[Fallback] Switching from index ${currentQualityIndex} to ${nextIndex}: ${nextVariant.label}`);
-                setStreamErrorToast(`Alternando para ${nextVariant.label}...`);
+                setStreamErrorToast(`${t('player', 'streamFallback')} ${nextVariant.label}...`);
                 setTimeout(() => setStreamErrorToast(null), 3000);
                 onSwitchVersion(nextVariant.channel, 0);
             } else {
                 console.warn('[Fallback] No more quality variants available');
-                setStreamErrorToast('Stream indisponível. Nenhuma alternativa encontrada.');
+                setStreamErrorToast(t('player', 'streamUnavailable'));
                 setTimeout(() => setStreamErrorToast(null), 5000);
             }
         }
-    }, [contentType, liveQualityVariants, currentQualityIndex, onSwitchVersion]);
+    }, [contentType, liveQualityVariants, currentQualityIndex, onSwitchVersion, t]);
 
     useHls({ src, videoRef, onStreamError: handleStreamError });
-    const { t } = useLanguage();
 
     // Chromecast integration
     const chromecast = useChromecast(src, title || 'Video');
@@ -593,7 +593,7 @@ export function VideoPlayer({
                             gap: '10px'
                         }}
                     >
-                        {streamErrorToast.includes('indisponível') ? '⚠️' : '🔄'} {streamErrorToast}
+                        {streamErrorToast === t('player', 'streamUnavailable') ? '⚠️' : '🔄'} {streamErrorToast}
                     </div>
                 )}
             </div>
