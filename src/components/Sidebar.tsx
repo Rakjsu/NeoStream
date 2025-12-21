@@ -420,7 +420,23 @@ const sidebarStyles = `
     display: flex;
     flex-direction: column;
     z-index: 100;
-    overflow: visible;
+    overflow-x: visible;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(168, 85, 247, 0.4) transparent;
+}
+
+.sidebar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #a855f7, #ec4899);
+    border-radius: 2px;
 }
 
 /* Background */

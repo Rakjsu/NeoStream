@@ -36,8 +36,8 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
     };
 
     const handleMarkAllAsRead = () => {
-        appNotificationService.markAllAsRead();
-        setNotifications(appNotificationService.getNotifications());
+        appNotificationService.clearAll();
+        setNotifications([]);
         setUnreadCount(0);
     };
 
@@ -126,11 +126,11 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
     // Fix poster URL - handle relative paths and file:// URLs
     const fixPosterUrl = (url: string | undefined): string | undefined => {
         if (!url) {
-                        return undefined;
+            return undefined;
         }
 
         // Log for debugging
-        
+
         // If it's a file:// URL (local cached image), return as-is
         if (url.startsWith('file://')) return url;
 
@@ -143,7 +143,7 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
         if (url.startsWith('http://') || url.startsWith('https://')) return url;
 
         // Otherwise it's invalid
-                return undefined;
+        return undefined;
     };
 
     return (
