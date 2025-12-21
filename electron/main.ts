@@ -42,12 +42,18 @@ function createWindow() {
         icon: path.join(process.env.VITE_PUBLIC || '', 'neostream-logo.png'),
         backgroundColor: '#0f0f23',
         frame: false, // Frameless window for custom title bar
+        maximizable: false, // Disable native maximize to prevent taskbar overlap
         webPreferences: {
             preload: path.join(__dirname, 'preload.mjs'),
             nodeIntegration: false,
             contextIsolation: true,
             webSecurity: false,
         },
+    })
+
+    // Prevent any native maximize attempts (Win+Up, etc.)
+    win.on('maximize', () => {
+        win?.unmaximize()
     })
 
     // Test active push message to Renderer-process.

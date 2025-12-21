@@ -1,6 +1,9 @@
-import { ipcMain, BrowserWindow } from 'electron'
+import { ipcMain, BrowserWindow, screen } from 'electron'
 import { XtreamClient } from './xtreamClient'
 import store from './store'
+
+// Store for window state (for custom maximize)
+let savedWindowBounds: Electron.Rectangle | null = null
 
 export function setupIpcHandlers() {
     ipcMain.handle('ping', () => 'pong')
@@ -11,14 +14,34 @@ export function setupIpcHandlers() {
         if (win) win.minimize()
     })
 
+    // Custom maximize that respects taskbar (doesn't use native maximize)
     ipcMain.handle('window:maximize', () => {
         const win = BrowserWindow.getFocusedWindow()
-        if (win) {
-            if (win.isMaximized()) {
-                win.unmaximize()
-            } else {
-                win.maximize()
-            }
+        if (!win) return
+
+        const display = screen.getPrimaryDisplay()
+        const workArea = display.workArea
+        const currentBounds = win.getBounds()
+
+        // Check if currently "maximized" (bounds match workArea)
+        const isMaxed = currentBounds.x === workArea.x &&
+            currentBounds.y === workArea.y &&
+            currentBounds.width === workArea.width &&
+            currentBounds.height === workArea.height
+
+        if (isMaxed && savedWindowBounds) {
+            // Restore to saved bounds
+            win.setBounds(savedWindowBounds)
+            savedWindowBounds = null
+        } else {
+            // Save current bounds and "maximize" to workArea
+            savedWindowBounds = currentBounds
+            win.setBounds({
+                x: workArea.x,
+                y: workArea.y,
+                width: workArea.width,
+                height: workArea.height
+            })
         }
     })
 
@@ -29,7 +52,17 @@ export function setupIpcHandlers() {
 
     ipcMain.handle('window:is-maximized', () => {
         const win = BrowserWindow.getFocusedWindow()
-        return win ? win.isMaximized() : false
+        if (!win) return false
+
+        const display = screen.getPrimaryDisplay()
+        const workArea = display.workArea
+        const currentBounds = win.getBounds()
+
+        // Check if currently "maximized" (bounds match workArea)
+        return currentBounds.x === workArea.x &&
+            currentBounds.y === workArea.y &&
+            currentBounds.width === workArea.width &&
+            currentBounds.height === workArea.height
     })
 
     ipcMain.handle('auth:login', async (_, { url, username, password }) => {
