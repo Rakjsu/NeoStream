@@ -510,7 +510,7 @@ export function VideoPlayer({
 
     return (
         <div ref={containerRef} className="video-player-container" onMouseMove={resetHideControlsTimer}>
-            {onClose && (
+            {onClose && showControls && (
                 <button className="video-player-close" onClick={onClose}>✕</button>
             )}
 
