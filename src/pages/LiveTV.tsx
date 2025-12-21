@@ -359,6 +359,37 @@ export function LiveTV() {
         return variants.length > 1 ? variants : [];
     };
 
+    // Get best variant based on user preference
+    const getBestVariantForPreference = (channel: LiveStream): LiveStream => {
+        const variants = getChannelQualityVariants(channel);
+        if (variants.length === 0) return channel;
+
+        const preference = profileService.getPreferredQuality();
+
+        // If auto or no preference, return best available (first in sorted list)
+        if (preference === 'auto') {
+            return variants[0].channel;
+        }
+
+        // Find matching preference
+        const preferenceMap: Record<string, string[]> = {
+            '4k': ['4K', 'UHD', '4k'],
+            'fhd': ['FHD', 'FHD H.265', '1080p', '1080'],
+            'hd': ['HD', '720p', '720'],
+            'sd': ['SD', '480p', '480']
+        };
+
+        const targetLabels = preferenceMap[preference] || [];
+
+        // Find first variant matching preference
+        const preferred = variants.find(v =>
+            targetLabels.some(label => v.label.toLowerCase().includes(label.toLowerCase()))
+        );
+
+        // Return preferred or best available
+        return preferred?.channel || variants[0].channel;
+    };
+
 
     const buildLiveStreamUrl = async (channel: LiveStream): Promise<string> => {
         try {
@@ -1204,6 +1235,21 @@ export function LiveTV() {
                         liveQualityVariants={getChannelQualityVariants(playingChannel)}
                         onSwitchQuality={(channel: any) => {
                             setPlayingChannel(channel);
+                            // Save quality preference based on selected variant
+                            const variants = getChannelQualityVariants(channel);
+                            const selectedVariant = variants.find(v => v.channel.stream_id === channel.stream_id);
+                            if (selectedVariant) {
+                                const label = selectedVariant.label.toLowerCase();
+                                if (label.includes('4k') || label.includes('uhd')) {
+                                    profileService.setPreferredQuality('4k');
+                                } else if (label.includes('fhd') || label.includes('1080')) {
+                                    profileService.setPreferredQuality('fhd');
+                                } else if (label.includes('hd') || label.includes('720')) {
+                                    profileService.setPreferredQuality('hd');
+                                } else if (label.includes('sd') || label.includes('480')) {
+                                    profileService.setPreferredQuality('sd');
+                                }
+                            }
                         }}
                     />
                 )

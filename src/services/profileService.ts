@@ -146,8 +146,25 @@ export const profileService = {
             }
         }
 
+        if (updates.preferredQuality !== undefined) {
+            profile.preferredQuality = updates.preferredQuality;
+        }
+
         saveStorageData(data);
         return true;
+    },
+
+    // Get preferred quality for active profile
+    getPreferredQuality(): '4k' | 'fhd' | 'hd' | 'sd' | 'auto' {
+        const profile = this.getActiveProfile();
+        return profile?.preferredQuality || 'auto';
+    },
+
+    // Set preferred quality for active profile
+    async setPreferredQuality(quality: '4k' | 'fhd' | 'hd' | 'sd' | 'auto'): Promise<boolean> {
+        const profile = this.getActiveProfile();
+        if (!profile) return false;
+        return this.updateProfile(profile.id, { preferredQuality: quality });
     },
 
     // Delete profile
@@ -219,7 +236,7 @@ export const profileService = {
 
                 // Remove old data
                 localStorage.removeItem('watchLater');
-                            }
+            }
         } catch (error) {
             console.error('Error migrating existing data:', error);
         }
@@ -245,6 +262,6 @@ export const profileService = {
             };
             data.profiles.push(kidsProfile);
             saveStorageData(data);
-                    }
+        }
     }
 };

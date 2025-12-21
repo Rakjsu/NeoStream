@@ -27,6 +27,7 @@ export interface Profile {
     avatar: string; // Base64 image data or emoji
     pin?: string; // SHA-256 hash (optional)
     isKids?: boolean; // Kids profile with content filtering
+    preferredQuality?: '4k' | 'fhd' | 'hd' | 'sd' | 'auto'; // Preferred quality for live TV
     watchLater: WatchLaterItem[];
     continueWatching: ContinueWatchingItem[];
     createdAt: string; // ISO date string
@@ -50,4 +51,5 @@ export interface UpdateProfileData {
     avatar?: string;
     pin?: string | null; // null to remove PIN
     isKids?: boolean;
+    preferredQuality?: '4k' | 'fhd' | 'hd' | 'sd' | 'auto';
 }
