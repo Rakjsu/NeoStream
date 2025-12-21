@@ -16,5 +16,11 @@
     "playback": {
         "forcedSubtitles": "Forced Subtitles",
         "forcedSubtitlesDesc": "Automatically load sign and foreign dialogue subtitles (does not work on [L] content already subtitled)"
+    },
+    "window": {
+        "minimize": "Minimize",
+        "maximize": "Maximize",
+        "restore": "Restore",
+        "close": "Close"
     }
 }

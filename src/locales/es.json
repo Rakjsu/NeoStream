@@ -16,5 +16,11 @@
     "playback": {
         "forcedSubtitles": "Subtítulos Forzados",
         "forcedSubtitlesDesc": "Cargar automáticamente subtítulos de carteles y diálogos extranjeros (no funciona en contenido [L] ya subtitulado)"
+    },
+    "window": {
+        "minimize": "Minimizar",
+        "maximize": "Maximizar",
+        "restore": "Restaurar",
+        "close": "Cerrar"
     }
 }

@@ -19,24 +19,18 @@ export function setupIpcHandlers() {
         const win = BrowserWindow.getFocusedWindow()
         if (!win) return
 
-        const currentBounds = win.getBounds()
-        // Get the display where the window currently is (not primary)
-        const display = screen.getDisplayMatching(currentBounds)
-        const workArea = display.workArea
-
-        // Check if currently "maximized" (bounds match workArea)
-        const isMaxed = currentBounds.x === workArea.x &&
-            currentBounds.y === workArea.y &&
-            currentBounds.width === workArea.width &&
-            currentBounds.height === workArea.height
-
-        if (isMaxed && savedWindowBounds) {
-            // Restore to saved bounds
+        // If we have saved bounds, we're maximized - restore
+        if (savedWindowBounds) {
             win.setBounds(savedWindowBounds)
             savedWindowBounds = null
         } else {
-            // Save current bounds and "maximize" to workArea
+            // Save current bounds and maximize to workArea
+            const currentBounds = win.getBounds()
             savedWindowBounds = currentBounds
+
+            const display = screen.getDisplayMatching(currentBounds)
+            const workArea = display.workArea
+
             win.setBounds({
                 x: workArea.x,
                 y: workArea.y,
@@ -52,19 +46,8 @@ export function setupIpcHandlers() {
     })
 
     ipcMain.handle('window:is-maximized', () => {
-        const win = BrowserWindow.getFocusedWindow()
-        if (!win) return false
-
-        const currentBounds = win.getBounds()
-        // Get the display where the window currently is (not primary)
-        const display = screen.getDisplayMatching(currentBounds)
-        const workArea = display.workArea
-
-        // Check if currently "maximized" (bounds match workArea)
-        return currentBounds.x === workArea.x &&
-            currentBounds.y === workArea.y &&
-            currentBounds.width === workArea.width &&
-            currentBounds.height === workArea.height
+        // Simply check if we have saved bounds (meaning we're in custom maximized state)
+        return savedWindowBounds !== null
     })
 
     ipcMain.handle('auth:login', async (_, { url, username, password }) => {

@@ -16,5 +16,11 @@
     "playback": {
         "forcedSubtitles": "Legendas Forçadas",
         "forcedSubtitlesDesc": "Carregar automaticamente legendas de placas e diálogos estrangeiros (não funciona em conteúdo [L] já legendado)"
+    },
+    "window": {
+        "minimize": "Minimizar",
+        "maximize": "Maximizar",
+        "restore": "Restaurar",
+        "close": "Fechar"
     }
 }
