@@ -48,6 +48,38 @@ const mitvMappings: Record<string, string> = {
     'globo eptv sao carlos': 'rede-globo',
     'globo florianópolis': 'rede-globo',
     'globo florianopolis': 'rede-globo',
+    // Globo regional - specific stations
+    'globo belem': 'globo-belem-liberal',
+    'globo belém': 'globo-belem-liberal',
+    'globo eptv sul de minas': 'globo-belo-horizonte',
+    'globo inter tv alto litoral': 'globo-rio-hd',
+    'globo inter tv cabugi': 'globo-natal',
+    'globo inter tv dos vales': 'globo-belo-horizonte',
+    'globo inter tv grande minas': 'globo-belo-horizonte',
+    'globo maranhão': 'globo-teresina',
+    'globo maranhao': 'globo-teresina',
+    'globo nordeste': 'globo-nordeste-hd',
+    'globo nsc blumenau': 'globo-s-o-paulo-hd',
+    'globo nsc joinville': 'globo-s-o-paulo-hd',
+    'globo nsc chapeco': 'globo-rbs-tv-poa',
+    'globo nsc chapecó': 'globo-rbs-tv-poa',
+    'globo nsc criciuma': 'globo-rbs-tv-poa',
+    'globo nsc criciúma': 'globo-rbs-tv-poa',
+    'globo nsc florianopolis': 'globo-rbs-tv-poa',
+    'globo nsc florianópolis': 'globo-rbs-tv-poa',
+    'globo porto alegre': 'globo-rbs-tv-poa',
+    'globo rbs porto alegre': 'globo-rbs-tv-poa',
+    'globo rbs tv caxias do sul': 'globo-rbs-tv-poa',
+    'globo rbs tv passo fundo': 'globo-rbs-tv-poa',
+    'globo rbs tv pelotas': 'globo-rbs-tv-poa',
+    'globo rbs tv santa maria': 'globo-rbs-tv-poa',
+    'globo pernambuco': 'globo-recife',
+    'globo rede amazonica itacoatiara': 'globo-amazonas',
+    'globo rede amazonica manaus': 'globo-amazonas',
+    'globo rede amazonica parintins': 'globo-amazonas',
+    'globo rede amazonica rondonia': 'globo-amazonas',
+    'globo rondonia': 'globo-amazonas',
+    'globo rondônia': 'globo-amazonas',
     // SBT
     'sbt sp': 'sbt-s-o-paulo',
     // Record
@@ -1115,8 +1147,6 @@ const openEpgUSAMappings: Record<string, string> = {
     'tnt us': 'TNT.us',
     // Trace Sport Stars
     'trace sport stars': 'Trace Sport Stars HDTV.us',
-    // VH1
-    'vh1': 'VH1.us',
     // Travel Channel
     'travel channel': 'Travel Channel (East).us',
     'travel channel (east)': 'Travel Channel (East).us',
@@ -1185,8 +1215,8 @@ const openEpgUSAMappings: Record<string, string> = {
 // Used as fallback for Brazilian channels not in mi.tv or meuguia.tv
 // IDs use format: "Channel Name.br"
 const openEpgBrazilMappings: Record<string, string> = {
-    // User will provide specific mappings
-    // Example: 'channel name': 'Channel Name.br'
+    // Star Channel
+    'star channel': 'Star Channel HD.br',
 };
 
 export const epgService = {
@@ -1555,19 +1585,28 @@ export const epgService = {
             if (ipcRenderer?.invoke) {
                 for (let i = 0; i < OPEN_EPG_BRAZIL_URLS.length; i++) {
                     const url = OPEN_EPG_BRAZIL_URLS[i];
+                    const cacheKey = `brazil${i + 1}`;
+
                     try {
-                        const xml = await ipcRenderer.invoke('fetch-epg-xml', url);
-                        if (xml && typeof xml === 'string') {
-                            combinedXml += xml;
+                        const result = await ipcRenderer.invoke('epg:get-cached', {
+                            url: url,
+                            cacheKey: cacheKey,
+                            forceRefresh: false
+                        });
+
+                        if (result.success && result.data) {
+                            combinedXml += result.data;
+                        } else {
+                            console.error(`[EPG] Failed to download ${cacheKey}:`, result.error);
                         }
-                    } catch (fileError) {
-                        console.warn(`[EPG] Failed to fetch Open-EPG Brazil file ${i + 1}:`, fileError);
+                    } catch (err) {
+                        console.error(`[EPG] Error downloading ${cacheKey}:`, err);
                     }
                 }
             }
 
             if (!combinedXml) {
-                console.warn('[EPG] No Open-EPG Brazil data available');
+                console.error('[EPG] No Brazil XML data received');
                 return [];
             }
 
