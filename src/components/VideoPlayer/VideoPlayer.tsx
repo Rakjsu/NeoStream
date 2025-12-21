@@ -570,36 +570,39 @@ export function VideoPlayer({
             )}
 
             <div className={`video-player-controls ${showControls ? 'visible' : 'hidden'}`}>
-                <div
-                    ref={progressRef}
-                    className="progress-container"
-                    onClick={handleProgressBarClick}
-                    onMouseDown={handleProgressMouseDown}
-                    onMouseMove={(e) => {
-                        handleProgressMouseMove(e);
-                        handleProgressHover(e);
-                    }}
-                    onMouseUp={handleProgressMouseUp}
-                    onMouseLeave={() => {
-                        handleProgressMouseUp();
-                        setHoverTime(null);
-                    }}
-                >
-                    {/* Time Preview Tooltip */}
-                    {hoverTime !== null && (
-                        <div
-                            className="time-preview-tooltip"
-                            style={{ left: `${hoverPosition}px` }}
-                        >
-                            {formatTime(hoverTime)}
+                {/* Progress bar - hide for live TV */}
+                {contentType !== 'live' && (
+                    <div
+                        ref={progressRef}
+                        className="progress-container"
+                        onClick={handleProgressBarClick}
+                        onMouseDown={handleProgressMouseDown}
+                        onMouseMove={(e) => {
+                            handleProgressMouseMove(e);
+                            handleProgressHover(e);
+                        }}
+                        onMouseUp={handleProgressMouseUp}
+                        onMouseLeave={() => {
+                            handleProgressMouseUp();
+                            setHoverTime(null);
+                        }}
+                    >
+                        {/* Time Preview Tooltip */}
+                        {hoverTime !== null && (
+                            <div
+                                className="time-preview-tooltip"
+                                style={{ left: `${hoverPosition}px` }}
+                            >
+                                {formatTime(hoverTime)}
+                            </div>
+                        )}
+                        <div className="progress-bar">
+                            <div className="progress-buffered" style={{ width: `${bufferedPercent}%` }} />
+                            <div className="progress-played" style={{ width: `${currentTimePercent}%` }} />
+                            <div className="progress-handle" style={{ left: `${currentTimePercent}%` }} />
                         </div>
-                    )}
-                    <div className="progress-bar">
-                        <div className="progress-buffered" style={{ width: `${bufferedPercent}%` }} />
-                        <div className="progress-played" style={{ width: `${currentTimePercent}%` }} />
-                        <div className="progress-handle" style={{ left: `${currentTimePercent}%` }} />
                     </div>
-                </div>
+                )}
 
                 <div className="controls-row">
                     <div className="controls-left">
@@ -636,9 +639,35 @@ export function VideoPlayer({
                             )}
                         </div>
 
-                        <span className="time-display">
-                            {formatTime(state.currentTime)} / {formatTime(state.duration)}
-                        </span>
+                        {contentType === 'live' ? (
+                            <span className="live-badge" style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '4px 12px',
+                                background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                color: 'white',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)'
+                            }}>
+                                <span style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    backgroundColor: 'white',
+                                    animation: 'pulse 1.5s ease-in-out infinite'
+                                }} />
+                                {t('liveTV', 'live')}
+                            </span>
+                        ) : (
+                            <span className="time-display">
+                                {formatTime(state.currentTime)} / {formatTime(state.duration)}
+                            </span>
+                        )}
                     </div>
 
                     <div className="controls-right">
