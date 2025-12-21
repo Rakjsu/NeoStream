@@ -20,6 +20,9 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
     const hlsRef = useRef<Hls | null>(null);
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const hasStartedPlaying = useRef(false);
+    // Use ref for callback to avoid re-running useEffect when callback changes
+    const onStreamErrorRef = useRef(onStreamError);
+    onStreamErrorRef.current = onStreamError;
 
     useEffect(() => {
         const video = videoRef.current;
@@ -94,11 +97,11 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
 
             // Set timeout for fallback - if stream doesn't start playing in 10 seconds, trigger fallback
             timeoutRef.current = setTimeout(() => {
-                if (!hasStartedPlaying.current && onStreamError) {
+                if (!hasStartedPlaying.current && onStreamErrorRef.current) {
                     console.warn(`[HLS] Stream timeout after ${STREAM_TIMEOUT_MS / 1000}s, triggering fallback`);
                     hls.destroy();
                     hlsRef.current = null;
-                    onStreamError();
+                    onStreamErrorRef.current();
                 }
             }, STREAM_TIMEOUT_MS);
 
@@ -162,8 +165,8 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
                             timeoutRef.current = null;
                         }
                         hls.destroy();
-                        if (onStreamError) {
-                            onStreamError();
+                        if (onStreamErrorRef.current) {
+                            onStreamErrorRef.current();
                         }
                         return;
                     }
@@ -186,8 +189,8 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
                                 timeoutRef.current = null;
                             }
                             hls.destroy();
-                            if (onStreamError) {
-                                onStreamError();
+                            if (onStreamErrorRef.current) {
+                                onStreamErrorRef.current();
                             }
                             break;
                     }
@@ -224,7 +227,7 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
             setTimeout(() => srcInitTimes.delete(src), 1000);
             // DON'T clear video.src - this causes AbortError
         };
-    }, [src, videoRef, onStreamError]);
+    }, [src, videoRef]); // Removed onStreamError - using ref instead
 
     return hlsRef;
 }
