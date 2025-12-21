@@ -15,6 +15,14 @@ import './VideoPlayer.css';
 
 import type { MovieVersion } from '../../services/movieVersionService';
 
+// Live TV quality variant type (matches LiveTV.tsx structure)
+export interface QualityVariant {
+    channel: any;
+    quality: string;
+    priority: number;
+    label: string;
+}
+
 export interface VideoPlayerProps {
     src: string;
     title?: string;
@@ -43,6 +51,9 @@ export interface VideoPlayerProps {
     imdbId?: string;
     // If true, movie is already subtitled (has [L] in name), hide subtitle button
     isSubtitled?: boolean;
+    // Live TV quality fallback
+    liveQualityVariants?: QualityVariant[];
+    currentQualityIndex?: number;
 }
 
 export function VideoPlayer({
@@ -67,10 +78,33 @@ export function VideoPlayer({
     onSwitchVersion,
     tmdbId,
     imdbId,
-    isSubtitled
+    isSubtitled,
+    liveQualityVariants,
+    currentQualityIndex = 0
 }: VideoPlayerProps) {
     const { videoRef, state, controls } = useVideoPlayer();
-    useHls({ src, videoRef });
+    const [streamErrorToast, setStreamErrorToast] = useState<string | null>(null);
+
+    // Handle stream error for fallback
+    const handleStreamError = useCallback(() => {
+        if (contentType === 'live' && liveQualityVariants && liveQualityVariants.length > 1) {
+            // Find next lower quality variant
+            const nextIndex = currentQualityIndex + 1;
+            if (nextIndex < liveQualityVariants.length && onSwitchVersion) {
+                const nextVariant = liveQualityVariants[nextIndex];
+                console.log(`[Fallback] Switching from index ${currentQualityIndex} to ${nextIndex}: ${nextVariant.label}`);
+                setStreamErrorToast(`Alternando para ${nextVariant.label}...`);
+                setTimeout(() => setStreamErrorToast(null), 3000);
+                onSwitchVersion(nextVariant.channel, 0);
+            } else {
+                console.warn('[Fallback] No more quality variants available');
+                setStreamErrorToast('Stream indisponível. Nenhuma alternativa encontrada.');
+                setTimeout(() => setStreamErrorToast(null), 5000);
+            }
+        }
+    }, [contentType, liveQualityVariants, currentQualityIndex, onSwitchVersion]);
+
+    useHls({ src, videoRef, onStreamError: handleStreamError });
     const { t } = useLanguage();
 
     // Chromecast integration
@@ -532,6 +566,34 @@ export function VideoPlayer({
                         }}
                     >
                         ⚠️ {subtitleWarning}
+                    </div>
+                )}
+
+                {/* Stream Fallback Toast */}
+                {streamErrorToast && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: '80px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            padding: '12px 24px',
+                            background: streamErrorToast.includes('indisponível')
+                                ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                                : 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                            borderRadius: '10px',
+                            color: 'white',
+                            fontSize: '0.95rem',
+                            fontWeight: 600,
+                            zIndex: 1000,
+                            animation: 'fadeIn 0.3s ease-in-out',
+                            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px'
+                        }}
+                    >
+                        {streamErrorToast.includes('indisponível') ? '⚠️' : '🔄'} {streamErrorToast}
                     </div>
                 )}
             </div>

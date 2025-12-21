@@ -28,7 +28,7 @@ interface AsyncVideoPlayerProps {
     allMovies?: any[];
     onSwitchVersion?: (movie: any, currentTime: number) => void;
     // For live TV quality switching
-    liveQualityVariants?: Array<{ channel: any; quality: string; label: string }>;
+    liveQualityVariants?: Array<{ channel: any; quality: string; priority: number; label: string }>;
     onSwitchQuality?: (channel: any) => void;
 }
 
@@ -384,6 +384,8 @@ function AsyncVideoPlayer({
                         tmdbId={movie.tmdb_id || movie.tmdb || movie.tmdbId}
                         imdbId={movie.imdb_id || movie.imdb || movie.imdbId}
                         isSubtitled={/\[L\]/i.test(movie.name || customTitle || '')}
+                        liveQualityVariants={liveQualityVariants}
+                        currentQualityIndex={liveQualityVariants ? liveQualityVariants.findIndex(v => v.channel.stream_id === movie.stream_id) : 0}
                         onTimeUpdate={(currentTime, duration) => {
                             // Call external onTimeUpdate if provided
                             if (externalOnTimeUpdate) {
