@@ -13,10 +13,13 @@ const srcInitTimes = new Map<string, number>();
 
 // Track retry attempts per source to trigger fallback after max retries
 const retryAttempts = new Map<string, number>();
-const MAX_RETRY_ATTEMPTS = 3;
+const MAX_RETRY_ATTEMPTS = 2; // Reduced from 3 for faster fallback
+const STREAM_TIMEOUT_MS = 10000; // 10 seconds timeout
 
 export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
     const hlsRef = useRef<Hls | null>(null);
+    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hasStartedPlaying = useRef(false);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -32,6 +35,7 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
 
         // Mark this src as being initialized NOW
         srcInitTimes.set(src, Date.now());
+        hasStartedPlaying.current = false;
 
         // Get buffer settings synchronously
         const config = playbackService.getConfig();
@@ -50,6 +54,12 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
         if (hlsRef.current) {
             hlsRef.current.destroy();
             hlsRef.current = null;
+        }
+
+        // Clear any previous timeout
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
         }
 
         const isHls = src.includes('.m3u8');
@@ -72,15 +82,36 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
                 abrBandWidthFactor: 0.95, // Use 95% of estimated bandwidth (was implicit 0.8)
                 abrBandWidthUpFactor: 0.7, // Be more aggressive switching to higher quality
                 startLevel: -1, // Auto-select best quality based on bandwidth
-                // Loader settings - faster network usage
-                fragLoadingTimeOut: 20000, // 20s timeout for fragments
-                fragLoadingMaxRetry: 6,
-                manifestLoadingTimeOut: 10000,
-                levelLoadingTimeOut: 10000,
+                // Loader settings - faster failure detection
+                fragLoadingTimeOut: 8000, // 8s timeout for fragments (reduced from 20s)
+                fragLoadingMaxRetry: 2, // Reduced from 6 for faster fallback
+                manifestLoadingTimeOut: 8000, // 8s timeout (reduced from 10s)
+                levelLoadingTimeOut: 8000, // 8s timeout (reduced from 10s)
             });
 
             hls.loadSource(src);
             hls.attachMedia(video);
+
+            // Set timeout for fallback - if stream doesn't start playing in 10 seconds, trigger fallback
+            timeoutRef.current = setTimeout(() => {
+                if (!hasStartedPlaying.current && onStreamError) {
+                    console.warn(`[HLS] Stream timeout after ${STREAM_TIMEOUT_MS / 1000}s, triggering fallback`);
+                    hls.destroy();
+                    hlsRef.current = null;
+                    onStreamError();
+                }
+            }, STREAM_TIMEOUT_MS);
+
+            // Listen for successful playback to clear timeout
+            const handlePlaying = () => {
+                hasStartedPlaying.current = true;
+                if (timeoutRef.current) {
+                    clearTimeout(timeoutRef.current);
+                    timeoutRef.current = null;
+                }
+                retryAttempts.delete(src); // Reset retry counter on success
+            };
+            video.addEventListener('playing', handlePlaying);
 
             hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
 
@@ -126,6 +157,10 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
                     if (currentAttempts >= MAX_RETRY_ATTEMPTS) {
                         console.warn(`[HLS] Max retry attempts (${MAX_RETRY_ATTEMPTS}) reached, triggering fallback`);
                         retryAttempts.delete(src); // Reset for next attempt
+                        if (timeoutRef.current) {
+                            clearTimeout(timeoutRef.current);
+                            timeoutRef.current = null;
+                        }
                         hls.destroy();
                         if (onStreamError) {
                             onStreamError();
@@ -146,6 +181,10 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
                             // Unrecoverable error - trigger fallback immediately
                             console.error('[HLS] Unrecoverable error type:', data.type);
                             retryAttempts.delete(src);
+                            if (timeoutRef.current) {
+                                clearTimeout(timeoutRef.current);
+                                timeoutRef.current = null;
+                            }
                             hls.destroy();
                             if (onStreamError) {
                                 onStreamError();
@@ -158,6 +197,11 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
             hlsRef.current = hls;
 
             return () => {
+                video.removeEventListener('playing', handlePlaying);
+                if (timeoutRef.current) {
+                    clearTimeout(timeoutRef.current);
+                    timeoutRef.current = null;
+                }
                 // Allow re-initialization after 1 second (for genuine source changes)
                 setTimeout(() => srcInitTimes.delete(src), 1000);
                 hls.destroy();
@@ -172,11 +216,16 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
             }
         }
         return () => {
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+                timeoutRef.current = null;
+            }
             // Allow re-initialization after 1 second
             setTimeout(() => srcInitTimes.delete(src), 1000);
             // DON'T clear video.src - this causes AbortError
         };
-    }, [src, videoRef]);
+    }, [src, videoRef, onStreamError]);
 
     return hlsRef;
 }
+
