@@ -422,7 +422,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                 className={`toggle-btn ${isOpen ? 'hamburger-open' : ''}`}
                 style={{
                     position: 'absolute',
-                    top: '20px',
+                    top: '56px',
                     left: '4px',
                     zIndex: 90,
                     width: '48px',
@@ -493,7 +493,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                 className={`category-panel ${!isOpen ? 'closing' : ''}`}
                 style={{
                     position: 'fixed',
-                    top: 0,
+                    top: '36px',
                     left: 0,
                     bottom: 0,
                     width: '380px',

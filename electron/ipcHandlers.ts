@@ -19,9 +19,10 @@ export function setupIpcHandlers() {
         const win = BrowserWindow.getFocusedWindow()
         if (!win) return
 
-        const display = screen.getPrimaryDisplay()
-        const workArea = display.workArea
         const currentBounds = win.getBounds()
+        // Get the display where the window currently is (not primary)
+        const display = screen.getDisplayMatching(currentBounds)
+        const workArea = display.workArea
 
         // Check if currently "maximized" (bounds match workArea)
         const isMaxed = currentBounds.x === workArea.x &&
@@ -54,9 +55,10 @@ export function setupIpcHandlers() {
         const win = BrowserWindow.getFocusedWindow()
         if (!win) return false
 
-        const display = screen.getPrimaryDisplay()
-        const workArea = display.workArea
         const currentBounds = win.getBounds()
+        // Get the display where the window currently is (not primary)
+        const display = screen.getDisplayMatching(currentBounds)
+        const workArea = display.workArea
 
         // Check if currently "maximized" (bounds match workArea)
         return currentBounds.x === workArea.x &&
