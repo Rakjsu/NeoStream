@@ -490,13 +490,13 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             updateInstalled: 'Atualização Instalada!',
             whatsNew: 'Novidades na',
             gotIt: 'Entendi, vamos lá!',
-            // Version 3.2.0
-            i18nTitle: 'Player Multilíngue',
-            i18nItems: 'VideoPlayer completamente traduzido (PT/EN/ES)|Legendas: mensagens e tooltips traduzidos|Controles de episódio e velocidade traduzidos',
-            profilesTitle: 'PiP Multilíngue',
-            profilesItems: 'Botão expandir traduzido|Botão fechar traduzido|Loading traduzido',
-            fixesTitle: 'Animações Home',
-            fixesItems: 'Animação do botão X nos cards Continue Assistindo|Animação do botão Play no hover|Z-index corrigido para melhor visibilidade'
+            // Version 3.7.0
+            i18nTitle: 'Fallback Automático de Stream',
+            i18nItems: 'Troca automática de qualidade quando stream falha|Timeout de 10s para detecção rápida de falha|Notificações traduzidas (PT/EN/ES)',
+            profilesTitle: 'Qualidade ao Vivo',
+            profilesItems: 'Variantes regionais corrigidas (Globo [4K] só mostra Globo SP, RJ, etc)|Não mostra mais canais diferentes (Globo News, Minas)|Ícones de qualidade no menu',
+            fixesTitle: 'Correções',
+            fixesItems: 'Botão X esconde junto com controles|Player HLS estabilizado (sem loop de reinício)|Tradução das mensagens de fallback'
         },
         // Welcome page
         welcome: {
@@ -855,13 +855,13 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             updateInstalled: 'Update Installed!',
             whatsNew: "What's New in",
             gotIt: "Got it, let's go!",
-            // Version 3.2.0
-            i18nTitle: 'Multilingual Player',
-            i18nItems: 'VideoPlayer fully translated (PT/EN/ES)|Subtitles: messages and tooltips translated|Episode and speed controls translated',
-            profilesTitle: 'Multilingual PiP',
-            profilesItems: 'Expand button translated|Close button translated|Loading translated',
-            fixesTitle: 'Home Animations',
-            fixesItems: 'X button animation on Continue Watching cards|Play button hover animation|Z-index fixed for better visibility'
+            // Version 3.7.0
+            i18nTitle: 'Automatic Stream Fallback',
+            i18nItems: 'Auto-switch quality when stream fails|10s timeout for fast failure detection|Translated notifications (PT/EN/ES)',
+            profilesTitle: 'Live Quality',
+            profilesItems: 'Regional variants fixed (Globo [4K] only shows Globo SP, RJ, etc)|No longer shows different channels (Globo News, Minas)|Quality icons in menu',
+            fixesTitle: 'Bug Fixes',
+            fixesItems: 'X button hides with controls|HLS player stabilized (no restart loop)|Fallback messages translated'
         },
         // Welcome page
         welcome: {
@@ -1420,13 +1420,13 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             updateInstalled: '¡Actualización Instalada!',
             whatsNew: 'Novedades en',
             gotIt: '¡Entendido, vamos!',
-            // Version 3.2.0
-            i18nTitle: 'Player Multilingüe',
-            i18nItems: 'VideoPlayer completamente traducido (PT/EN/ES)|Subtítulos: mensajes y tooltips traducidos|Controles de episodio y velocidad traducidos',
-            profilesTitle: 'PiP Multilingüe',
-            profilesItems: 'Botón expandir traducido|Botón cerrar traducido|Cargando traducido',
-            fixesTitle: 'Animaciones Home',
-            fixesItems: 'Animación del botón X en tarjetas Continuar Viendo|Animación del botón Play al pasar el mouse|Z-index corregido para mejor visibilidad'
+            // Version 3.7.0
+            i18nTitle: 'Fallback Automático de Stream',
+            i18nItems: 'Cambio automático de calidad cuando el stream falla|Timeout de 10s para detección rápida de fallo|Notificaciones traducidas (PT/EN/ES)',
+            profilesTitle: 'Calidad en Vivo',
+            profilesItems: 'Variantes regionales corregidas (Globo [4K] solo muestra Globo SP, RJ, etc)|Ya no muestra canales diferentes (Globo News, Minas)|Íconos de calidad en el menú',
+            fixesTitle: 'Correcciones',
+            fixesItems: 'Botón X se oculta con los controles|Player HLS estabilizado (sin loop de reinicio)|Traducción de mensajes de fallback'
         },
         // Welcome page
         welcome: {
