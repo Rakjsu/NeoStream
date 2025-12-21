@@ -640,20 +640,47 @@ export function VideoPlayer({
                         </div>
 
                         {contentType === 'live' ? (
-                            <span className="live-badge" style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                padding: '4px 12px',
-                                background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-                                borderRadius: '4px',
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                color: 'white',
-                                textTransform: 'uppercase',
-                                letterSpacing: '0.5px',
-                                boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)'
-                            }}>
+                            <span
+                                className="live-badge"
+                                onClick={() => {
+                                    // Seek to live edge (end of buffer)
+                                    if (videoRef.current) {
+                                        const video = videoRef.current;
+                                        // For HLS live streams, seek to the end
+                                        if (video.duration && isFinite(video.duration)) {
+                                            video.currentTime = video.duration - 0.5;
+                                        } else if (video.seekable && video.seekable.length > 0) {
+                                            // Use seekable range for live streams
+                                            video.currentTime = video.seekable.end(video.seekable.length - 1) - 0.5;
+                                        }
+                                    }
+                                }}
+                                style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    padding: '4px 12px',
+                                    background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    color: 'white',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px',
+                                    boxShadow: '0 2px 8px rgba(239, 68, 68, 0.4)',
+                                    cursor: 'pointer',
+                                    transition: 'transform 0.2s ease, box-shadow 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1.05)';
+                                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(239, 68, 68, 0.6)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.currentTarget.style.transform = 'scale(1)';
+                                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(239, 68, 68, 0.4)';
+                                }}
+                                title={t('liveTV', 'watchNow')}
+                            >
                                 <span style={{
                                     width: '8px',
                                     height: '8px',
