@@ -420,7 +420,7 @@ const sidebarStyles = `
     display: flex;
     flex-direction: column;
     z-index: 100;
-    overflow-x: visible;
+    overflow-x: hidden;
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: rgba(168, 85, 247, 0.4) transparent;

@@ -68,10 +68,22 @@ export function CustomTitleBar() {
         }, 200);
     };
 
+    // Handle drag start on maximized window - restore first
+    const handleDragStart = async (e: React.MouseEvent) => {
+        if (isMaximized && window.ipcRenderer) {
+            // Get mouse X position relative to window
+            const mouseX = e.clientX;
+            const restored = await window.ipcRenderer.invoke('window:start-drag', { mouseX });
+            if (restored) {
+                setIsMaximized(false);
+            }
+        }
+    };
+
     return (
         <div className="custom-title-bar">
             {/* Drag region - allows window dragging */}
-            <div className="title-bar-drag-region">
+            <div className="title-bar-drag-region" onMouseDown={handleDragStart}>
                 <div className="title-bar-logo">
                     <img src="/neostream-logo.png" alt="NeoStream" className="title-bar-icon" />
                     <span className="title-bar-text">NeoStream</span>
