@@ -258,8 +258,15 @@ export function LiveTV() {
 
     // Find quality variants for a channel (e.g., Globo SP matches Globo [4K])
     const getChannelQualityVariants = (channel: LiveStream) => {
+        // Brazilian state abbreviations for regional channels
+        const stateAbbreviations = new Set([
+            'sp', 'rj', 'mg', 'rs', 'pr', 'sc', 'ba', 'pe', 'ce', 'pa',
+            'go', 'ma', 'pb', 'am', 'rn', 'pi', 'al', 'mt', 'ms', 'se',
+            'ro', 'to', 'ac', 'ap', 'rr', 'es', 'df'
+        ]);
+
         // Function to extract base name, quality and codec from a channel name
-        const extractInfo = (name: string): { baseName: string; quality: string; codec: string; label: string; priority: number; hasOnlyQuality: boolean } => {
+        const extractInfo = (name: string): { baseName: string; quality: string; codec: string; label: string; priority: number; hasOnlyQuality: boolean; regionSuffix: string } => {
             let workingName = name.trim();
             let quality = '';
             let codec = '';
@@ -310,7 +317,12 @@ export function LiveTV() {
             // Check if channel only has quality indicator (e.g., "Globo [4K]" -> baseName is "Globo")
             const hasOnlyQuality = !!(quality || codec) && baseName.length < workingName.length * 0.7;
 
-            return { baseName, quality, codec, label, priority, hasOnlyQuality };
+            // Extract regional suffix (last word if it's a state abbreviation)
+            const words = baseName.split(' ');
+            const lastWord = words[words.length - 1]?.toLowerCase() || '';
+            const regionSuffix = stateAbbreviations.has(lastWord) ? lastWord : '';
+
+            return { baseName, quality, codec, label, priority, hasOnlyQuality, regionSuffix };
         };
 
         const currentInfo = extractInfo(channel.name);
@@ -331,14 +343,35 @@ export function LiveTV() {
 
             // Match conditions:
             // 1. Exact base name match (e.g., "Globo SP" === "Globo SP")
-            // 2. Current channel's base starts with stream's base AND stream only has quality
-            //    (e.g., "Globo SP" starts with "Globo" and stream is "Globo [4K]")
-            // 3. Stream's base starts with current's base AND current only has quality
             const isExactMatch = streamBaseLower === currentBaseLower;
-            const isQualityVariant = currentBaseLower.startsWith(streamBaseLower) && info.hasOnlyQuality && streamBaseLower.length >= 3;
-            const isCurrentQualityVariant = streamBaseLower.startsWith(currentBaseLower) && currentInfo.hasOnlyQuality && currentBaseLower.length >= 3;
 
-            if (isExactMatch || isQualityVariant || isCurrentQualityVariant) {
+            // 2. For quality-only channels (e.g., "Globo [4K]"):
+            //    Only match channels with same core name + state abbreviation (e.g., "Globo SP", "Globo RJ")
+            //    NOT channels with different names (e.g., "Globo News", "Globo Minas")
+            let isQualityVariant = false;
+            if (currentInfo.hasOnlyQuality && currentBaseLower.length >= 3) {
+                // Stream must have a state suffix and core name must match
+                if (info.regionSuffix) {
+                    const streamCoreWords = info.baseName.toLowerCase().split(' ');
+                    streamCoreWords.pop(); // Remove state suffix
+                    const streamCore = streamCoreWords.join(' ');
+                    isQualityVariant = streamCore === currentBaseLower;
+                }
+            }
+
+            // 3. For regional channels (e.g., "Globo SP"):
+            //    Match quality-only channels with same core name (e.g., "Globo [4K]")
+            let isCurrentRegionalVariant = false;
+            if (currentInfo.regionSuffix && !currentInfo.hasOnlyQuality) {
+                if (info.hasOnlyQuality) {
+                    const currentCoreWords = currentBaseLower.split(' ');
+                    currentCoreWords.pop(); // Remove state suffix
+                    const currentCore = currentCoreWords.join(' ');
+                    isCurrentRegionalVariant = info.baseName.toLowerCase() === currentCore;
+                }
+            }
+
+            if (isExactMatch || isQualityVariant || isCurrentRegionalVariant) {
                 // If no quality/codec detected, use "SD" as default label
                 const label = (info.quality || info.codec) ? info.label : 'SD';
                 const priority = (info.quality || info.codec) ? info.priority : 4;
