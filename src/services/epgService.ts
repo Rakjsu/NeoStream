@@ -263,11 +263,30 @@ const mitvMappings: Record<string, string> = {
     'band mg': 'band-minas',
     'band rs': 'band-rio-grande-do-sul-hd',
     'band rio grande do sul': 'band-rio-grande-do-sul-hd',
+    // Band regional
+    'band campinas': 'band',
+    'band vale': 'band',
+    'band ceara': 'band',
+    'band ceará': 'band',
+    'band presidente prudente': 'band',
+    'band tv manaira': 'band',
+    'band tv manaíra': 'band',
+    'band tv tribuna recife': 'band',
+    'band poa': 'band-rio-grande-do-sul-hd',
+    'band pr': 'band-curitiba',
     // Canal Futura
     'canal futura': 'futura',
     'futura': 'futura',
     // Cultura
     'cultura': 'cultura',
+    // AMC
+    'amc': 'amc-hd',
+    // Universal Channel
+    'universal channel': 'universal-hd',
+    // RedeTV regional
+    'rede tv espirito santo': 'redetv-s-o-paulo-hd',
+    'rede tv espírito santo': 'redetv-s-o-paulo-hd',
+    'rede tv tocantins': 'redetv-s-o-paulo-hd',
     'tv cultura': 'cultura',
     // Loading
     'loading': 'loading',
@@ -332,6 +351,10 @@ const meuguiaMappings: Record<string, string> = {
     'combate': '135',
     'espn 5': 'ES5',
     'espn5': 'ES5',
+    'espn 3': 'ES3',
+    'espn3': 'ES3',
+    'espn 4': 'ES4',
+    'espn4': 'ES4',
 };
 
 // Open-EPG Portugal sources (both files contain different channels)
@@ -1338,6 +1361,29 @@ const openEpgBrazilMappings: Record<string, string> = {
     'record tv tropical': 'Record TV Natal.br',
     'record litoral vale do parnaiba': 'Record TV Santos.br',
     'record litoral vale do parnaíba': 'Record TV Santos.br',
+    // I.SAT
+    'i sat': 'I.SAT.br',
+    'isat': 'I.SAT.br',
+    // TNT Novelas
+    'tnt novelas': 'TNT NOVELAS.br',
+    // Canal UOL
+    'canal uol': 'CANAL UOL.br',
+    // NSports
+    'nsports': 'Nsports HD.br',
+    // Adult Swim
+    'adult swim': 'Adult Swim HD.br',
+    'adult swin': 'Adult Swim HD.br',
+    // CNN Brasil Money
+    'cnn brasil money': 'CNN Brasil Money HD.br',
+    // MTV 00
+    "mtv '00": 'MTVs_00.br',
+    'mtv 00': 'MTVs_00.br',
+    // TV Evangelizar
+    'tv evangelizar': 'TV Evangelizar.br',
+    // Markket
+    'markket': 'Markket.br',
+    // Modo Viagem
+    'modo viagem': 'Modo Viagem.br',
 };
 
 export const epgService = {
