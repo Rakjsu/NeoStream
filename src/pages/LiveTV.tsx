@@ -1124,7 +1124,7 @@ export function LiveTV() {
                     </div>
                 )}
 
-                <div ref={scrollContainerRef} onScroll={handleScroll} className="p-8" style={{ paddingLeft: '60px', position: 'relative', zIndex: 1, height: 'calc(100vh - 120px)', overflowY: 'auto' }}>
+                <div ref={scrollContainerRef} onScroll={handleScroll} className="livetv-scroll-container p-8" style={{ paddingLeft: '60px', position: 'relative', zIndex: 1, height: 'calc(100vh - 120px)', overflowY: 'auto', paddingRight: '8px', scrollbarWidth: 'thin', scrollbarColor: 'rgba(168, 85, 247, 0.4) transparent' }}>
                     <style>{`
                         .channel-card {
                             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1148,6 +1148,8 @@ export function LiveTV() {
                             display: grid;
                             grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
                             gap: 16px;
+                            overflow: hidden;
+                            padding-right: 8px;
                         }
                         @media (max-width: 1200px) {
                             .channels-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
@@ -1157,6 +1159,17 @@ export function LiveTV() {
                         }
                         @media (max-width: 480px) {
                             .channels-grid { grid-template-columns: 1fr; }
+                        }
+                        /* LiveTV Scrollbar Styling */
+                        .livetv-scroll-container::-webkit-scrollbar {
+                            width: 6px;
+                        }
+                        .livetv-scroll-container::-webkit-scrollbar-track {
+                            background: transparent;
+                        }
+                        .livetv-scroll-container::-webkit-scrollbar-thumb {
+                            background: linear-gradient(180deg, #a855f7, #ec4899);
+                            border-radius: 3px;
                         }
                     `}</style>
 

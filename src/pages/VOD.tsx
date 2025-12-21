@@ -303,7 +303,7 @@ export function VOD() {
     const buildStreamUrl = async (movie: VODStream): Promise<string> => {
         // Check for offline URL first
         if (movie.offlineUrl) {
-                        return movie.offlineUrl;
+            return movie.offlineUrl;
         }
 
         try {
@@ -1060,6 +1060,7 @@ const vodStyles = `
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 24px;
+    padding: 16px;
     padding-bottom: 32px;
 }
 

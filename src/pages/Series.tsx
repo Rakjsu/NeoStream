@@ -1759,6 +1759,7 @@ const seriesStyles = `
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     gap: 24px;
+    padding: 16px;
     padding-bottom: 32px;
 }
 

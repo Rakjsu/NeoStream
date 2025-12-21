@@ -1165,6 +1165,17 @@ export function Home() {
                     opacity: 0.6;
                     pointer-events: none;
                 }
+                /* Home Scrollbar Styling */
+                .home-scroll-container::-webkit-scrollbar {
+                    width: 6px;
+                }
+                .home-scroll-container::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .home-scroll-container::-webkit-scrollbar-thumb {
+                    background: linear-gradient(180deg, #a855f7, #ec4899);
+                    border-radius: 3px;
+                }
             `}</style>
 
             {/* Kids Block Toast */}
@@ -1174,12 +1185,16 @@ export function Home() {
                     <span>{blockMessage}</span>
                 </div>
             )}
-            <div style={{
-                minHeight: '100vh',
+            <div className="home-scroll-container" style={{
+                height: '100%',
                 background: 'linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%)',
                 padding: '40px 40px 40px 40px',
                 position: 'relative',
-                overflow: 'auto'
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                paddingRight: '8px',
+                scrollbarWidth: 'thin',
+                scrollbarColor: 'rgba(168, 85, 247, 0.4) transparent'
             }}>
                 {/* Background decorations */}
                 <div style={{
