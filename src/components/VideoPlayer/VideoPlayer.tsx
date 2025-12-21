@@ -698,8 +698,8 @@ export function VideoPlayer({
                     </div>
 
                     <div className="controls-right">
-                        {/* Settings/Quality button - hide on live TV */}
-                        {contentType !== 'live' && (
+                        {/* Settings/Quality button - show for movies/series OR for live TV with quality variants */}
+                        {(contentType !== 'live' || (movieVersions && movieVersions.length > 1)) && (
                             <div className="settings-menu-container">
                                 <button
                                     className="control-btn settings-btn"
@@ -711,6 +711,31 @@ export function VideoPlayer({
                                     {movieVersions && movieVersions.length > 0 && (() => {
                                         const currentVersion = movieVersions.find(v => v.movie.stream_id === currentMovieId);
                                         if (currentVersion) {
+                                            // For live TV, just show the quality label directly
+                                            if (contentType === 'live') {
+                                                return (
+                                                    <span style={{
+                                                        fontSize: '10px',
+                                                        fontWeight: 700,
+                                                        padding: '2px 6px',
+                                                        borderRadius: '4px',
+                                                        background: currentVersion.label === '4K' || currentVersion.label === 'UHD'
+                                                            ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+                                                            : currentVersion.label === 'FHD' || currentVersion.label === 'H.265'
+                                                                ? 'linear-gradient(135deg, #10b981, #059669)'
+                                                                : currentVersion.label === 'SD'
+                                                                    ? 'linear-gradient(135deg, #6b7280, #4b5563)'
+                                                                    : 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                                                        color: 'white',
+                                                        textTransform: 'uppercase',
+                                                        letterSpacing: '0.5px',
+                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+                                                    }}>
+                                                        {currentVersion.label}
+                                                    </span>
+                                                );
+                                            }
+                                            // For movies/series
                                             const qualityText = currentVersion.quality === '4k' ? '4K' : '1080p';
                                             const audioText = currentVersion.audio === 'subtitled' ? 'LEG' : 'DUB';
                                             return (

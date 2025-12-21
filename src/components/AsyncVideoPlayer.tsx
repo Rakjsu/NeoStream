@@ -27,6 +27,9 @@ interface AsyncVideoPlayerProps {
     // For movie version switching
     allMovies?: any[];
     onSwitchVersion?: (movie: any, currentTime: number) => void;
+    // For live TV quality switching
+    liveQualityVariants?: Array<{ channel: any; quality: string; label: string }>;
+    onSwitchQuality?: (channel: any) => void;
 }
 
 function AsyncVideoPlayer({
@@ -47,7 +50,9 @@ function AsyncVideoPlayer({
     contentId,
     contentType,
     allMovies,
-    onSwitchVersion
+    onSwitchVersion,
+    liveQualityVariants,
+    onSwitchQuality
 }: AsyncVideoPlayerProps) {
     const [streamUrl, setStreamUrl] = useState<string>('');
     const [loading, setLoading] = useState(true);
@@ -66,13 +71,13 @@ function AsyncVideoPlayer({
 
         // Reset urlLoadedRef if movie changed (for version switching)
         if (lastMovieIdRef.current !== null && lastMovieIdRef.current !== currentMovieId) {
-                        urlLoadedRef.current = false;
+            urlLoadedRef.current = false;
         }
         lastMovieIdRef.current = currentMovieId;
 
         // Reset urlLoadedRef if episode changed (for series navigation)
         if (currentEpisodeKey && lastEpisodeRef.current !== null && lastEpisodeRef.current !== currentEpisodeKey) {
-                        urlLoadedRef.current = false;
+            urlLoadedRef.current = false;
         }
         lastEpisodeRef.current = currentEpisodeKey;
 
@@ -360,9 +365,22 @@ function AsyncVideoPlayer({
                         contentType={contentType || (seriesId ? 'series' : 'movie')}
                         seasonNumber={seasonNumber}
                         episodeNumber={episodeNumber}
-                        movieVersions={allMovies && !seriesId ? findMovieVersions(movie, allMovies) : undefined}
+                        movieVersions={
+                            // For live TV, convert quality variants to MovieVersion format
+                            liveQualityVariants && liveQualityVariants.length > 0
+                                ? liveQualityVariants.map(v => ({
+                                    movie: v.channel,
+                                    quality: v.quality.toLowerCase().includes('4k') || v.quality.toLowerCase().includes('uhd') ? '4k' : '1080p',
+                                    audio: 'dubbed' as const,
+                                    label: v.label
+                                }))
+                                : allMovies && !seriesId ? findMovieVersions(movie, allMovies) : undefined
+                        }
                         currentMovieId={movie.stream_id || Number(movie.id)}
-                        onSwitchVersion={onSwitchVersion}
+                        onSwitchVersion={contentType === 'live' && onSwitchQuality
+                            ? (channel: any) => onSwitchQuality(channel)
+                            : onSwitchVersion
+                        }
                         tmdbId={movie.tmdb_id || movie.tmdb || movie.tmdbId}
                         imdbId={movie.imdb_id || movie.imdb || movie.imdbId}
                         isSubtitled={/\[L\]/i.test(movie.name || customTitle || '')}

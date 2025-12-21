@@ -256,6 +256,98 @@ export function LiveTV() {
         setBrokenImages(prev => new Set(prev).add(streamId));
     };
 
+    // Find quality variants for a channel (e.g., Globo Belem [FHD], Globo Belem [FHD] (H265))
+    const getChannelQualityVariants = (channel: LiveStream) => {
+        // Function to extract base name, quality and codec from a channel name
+        const extractInfo = (name: string): { baseName: string; quality: string; codec: string; label: string; priority: number } => {
+            let workingName = name.trim();
+            let quality = '';
+            let codec = '';
+            let priority = 2; // Default HD priority
+
+            // Detect resolution quality
+            if (/\[4K\]|\(4K\)|2160p/i.test(workingName)) {
+                quality = '4K';
+                priority = 0;
+            } else if (/\[UHD\]|\(UHD\)/i.test(workingName)) {
+                quality = 'UHD';
+                priority = 0;
+            } else if (/\[FHD\]|\(FHD\)|1080p/i.test(workingName)) {
+                quality = 'FHD';
+                priority = 1;
+            } else if (/\[HD\]|\(HD\)|720p/i.test(workingName)) {
+                quality = 'HD';
+                priority = 2;
+            } else if (/\[SD\]|\(SD\)|480p/i.test(workingName)) {
+                quality = 'SD';
+                priority = 3;
+            }
+
+            // Detect codec (H.265/HEVC)
+            if (/\[H\.?265\]|\(H\.?265\)|HEVC/i.test(workingName)) {
+                codec = 'H.265';
+                // H.265 gives slightly higher priority within same quality
+                priority = Math.max(0, priority - 0.5);
+            }
+
+            // Create label
+            let label = quality || 'HD';
+            if (codec) {
+                label = quality ? `${quality} ${codec}` : codec;
+            }
+
+            // Strip ALL quality/codec indicators to get base name
+            const baseName = workingName
+                .replace(/\s*\[(?:FHD|HD|SD|4K|UHD|H\.?265|HEVC)\]\s*/gi, ' ')
+                .replace(/\s*\((?:FHD|HD|SD|4K|UHD|H\.?265|HEVC)\)\s*/gi, ' ')
+                .replace(/\s*(?:2160|1080|720|480)p?\s*/gi, ' ')
+                .replace(/\s+FHD\s+/gi, ' ')
+                .replace(/\s+HD\s+/gi, ' ')
+                .replace(/\s+SD\s+/gi, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            return { baseName, quality, codec, label, priority };
+        };
+
+        const { baseName } = extractInfo(channel.name);
+
+        // Find all channels that match this base name EXACTLY
+        const variants: Array<{
+            channel: LiveStream;
+            quality: string;
+            priority: number;
+            label: string;
+        }> = [];
+
+        for (const stream of streams) {
+            const info = extractInfo(stream.name);
+
+            // Only match if base names are EXACTLY the same
+            if (info.baseName.toLowerCase() === baseName.toLowerCase()) {
+                // If no quality/codec detected, use "SD" as default label
+                const label = (info.quality || info.codec) ? info.label : 'SD';
+                const priority = (info.quality || info.codec) ? info.priority : 4; // Lower than SD (3)
+
+                variants.push({
+                    channel: stream,
+                    quality: info.quality || 'SD',
+                    priority: priority,
+                    label: label
+                });
+            }
+        }
+
+        // Sort by priority (4K first, then FHD H.265, then FHD, then HD, then SD, then unmarked)
+        variants.sort((a, b) => a.priority - b.priority);
+
+        // Debug log
+        console.log('[Quality] Channel:', channel.name, '| Base:', baseName, '| Variants:', variants.map(v => v.label));
+
+        // Only return variants if there's more than one option
+        return variants.length > 1 ? variants : [];
+    };
+
 
     const buildLiveStreamUrl = async (channel: LiveStream): Promise<string> => {
         try {
@@ -1098,6 +1190,10 @@ export function LiveTV() {
                         contentId={playingChannel.stream_id.toString()}
                         contentType="live"
                         resumeTime={pipResumeTime}
+                        liveQualityVariants={getChannelQualityVariants(playingChannel)}
+                        onSwitchQuality={(channel: any) => {
+                            setPlayingChannel(channel);
+                        }}
                     />
                 )
             }
