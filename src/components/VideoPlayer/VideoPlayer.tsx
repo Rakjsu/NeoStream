@@ -767,10 +767,12 @@ export function VideoPlayer({
 
                                 {showSettings && (
                                     <div className="settings-menu">
-                                        {/* Movie Version Switcher - only show for movies with multiple versions */}
+                                        {/* Movie Version Switcher / Live TV Quality Switcher */}
                                         {movieVersions && movieVersions.length > 1 && onSwitchVersion ? (
                                             <div className="settings-section">
-                                                <span className="settings-label">{t('player', 'version')}</span>
+                                                <span className="settings-label">
+                                                    {contentType === 'live' ? t('player', 'quality') : t('player', 'version')}
+                                                </span>
                                                 <div className="settings-options">
                                                     {movieVersions.map(version => {
                                                         const isActive = version.movie.stream_id === currentMovieId;
