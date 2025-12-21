@@ -16,6 +16,7 @@ import { UpdateNotification } from './components/UpdateNotification';
 import { PostUpdateChangelog } from './components/PostUpdateChangelog';
 import { EpisodeToast } from './components/EpisodeToast';
 import { MiniPlayerProvider } from './components/MiniPlayer';
+import { CustomTitleBar } from './components/CustomTitleBar';
 import { profileService } from './services/profileService';
 import { useState, useEffect } from 'react';
 
@@ -78,6 +79,7 @@ function App() {
 
   return (
     <MiniPlayerProvider>
+      <CustomTitleBar />
       <UpdateNotification />
       <PostUpdateChangelog />
       <HashRouter>

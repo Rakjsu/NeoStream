@@ -1,9 +1,36 @@
-import { ipcMain } from 'electron'
+import { ipcMain, BrowserWindow } from 'electron'
 import { XtreamClient } from './xtreamClient'
 import store from './store'
 
 export function setupIpcHandlers() {
     ipcMain.handle('ping', () => 'pong')
+
+    // Window controls for custom title bar
+    ipcMain.handle('window:minimize', () => {
+        const win = BrowserWindow.getFocusedWindow()
+        if (win) win.minimize()
+    })
+
+    ipcMain.handle('window:maximize', () => {
+        const win = BrowserWindow.getFocusedWindow()
+        if (win) {
+            if (win.isMaximized()) {
+                win.unmaximize()
+            } else {
+                win.maximize()
+            }
+        }
+    })
+
+    ipcMain.handle('window:close', () => {
+        const win = BrowserWindow.getFocusedWindow()
+        if (win) win.close()
+    })
+
+    ipcMain.handle('window:is-maximized', () => {
+        const win = BrowserWindow.getFocusedWindow()
+        return win ? win.isMaximized() : false
+    })
 
     ipcMain.handle('auth:login', async (_, { url, username, password }) => {
         try {

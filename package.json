@@ -89,6 +89,7 @@
         "portable",
         "nsis"
       ],
+      "icon": "build/icon.svg",
       "signAndEditExecutable": false,
       "sign": null,
       "verifyUpdateCodeSignature": false

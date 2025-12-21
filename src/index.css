@@ -9,14 +9,22 @@
     box-sizing: border-box;
 }
 
+html,
 body {
-    background: #1f2937;
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    background: #0f0f23;
     color: white;
     font-family: system-ui, -apple-system, sans-serif;
+    padding-top: 36px;
 }
 
 #root {
-    min-height: 100vh;
+    height: calc(100vh - 36px);
+    overflow: hidden;
 }
 
 /* Custom Scrollbar - Grudada na lateral direita */

@@ -39,12 +39,14 @@ function createWindow() {
     win = new BrowserWindow({
         width: 1200,
         height: 800,
-        icon: path.join(process.env.VITE_PUBLIC || '', 'electron-vite.svg'),
+        icon: path.join(process.env.VITE_PUBLIC || '', 'neostream-logo.png'),
+        backgroundColor: '#0f0f23',
+        frame: false, // Frameless window for custom title bar
         webPreferences: {
             preload: path.join(__dirname, 'preload.mjs'),
             nodeIntegration: false,
             contextIsolation: true,
-            webSecurity: false, // Allow loading local file:// URLs for cached images
+            webSecurity: false,
         },
     })
 

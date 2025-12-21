@@ -416,7 +416,7 @@ const sidebarStyles = `
     width: 80px;
     min-width: 80px;
     max-width: 80px;
-    height: 100vh;
+    height: 100%;
     display: flex;
     flex-direction: column;
     z-index: 100;

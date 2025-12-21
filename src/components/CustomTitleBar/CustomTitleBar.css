@@ -1,0 +1,173 @@
+.custom-title-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 36px;
+    background: linear-gradient(180deg, #1a1a2e 0%, #0f0f23 100%);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 99999;
+    user-select: none;
+    border-bottom: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+.title-bar-drag-region {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    padding-left: 12px;
+    -webkit-app-region: drag;
+}
+
+.title-bar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    -webkit-app-region: no-drag;
+}
+
+.title-bar-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+}
+
+.title-bar-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, #a855f7, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Window Controls */
+.window-controls {
+    display: flex;
+    height: 100%;
+    -webkit-app-region: no-drag;
+}
+
+.window-control-btn {
+    width: 46px;
+    height: 100%;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Ripple effect container */
+.window-control-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.4s ease, height 0.4s ease;
+}
+
+.window-control-btn:hover::before {
+    width: 80px;
+    height: 80px;
+}
+
+/* Minimize button */
+.window-control-btn.minimize:hover {
+    background: rgba(168, 85, 247, 0.3);
+    color: #fff;
+}
+
+.window-control-btn.minimize:hover svg {
+    animation: minimizeBounce 0.3s ease;
+}
+
+@keyframes minimizeBounce {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(2px);
+    }
+}
+
+/* Maximize button */
+.window-control-btn.maximize:hover {
+    background: rgba(59, 130, 246, 0.3);
+    color: #fff;
+}
+
+.window-control-btn.maximize:hover svg {
+    animation: maximizeScale 0.3s ease;
+}
+
+@keyframes maximizeScale {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+}
+
+/* Close button */
+.window-control-btn.close:hover {
+    background: #e81123;
+    color: #fff;
+}
+
+.window-control-btn.close:hover svg {
+    animation: closeRotate 0.3s ease;
+}
+
+@keyframes closeRotate {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(90deg);
+    }
+}
+
+/* Active states */
+.window-control-btn:active {
+    transform: scale(0.95);
+}
+
+.window-control-btn.minimize:active {
+    background: rgba(168, 85, 247, 0.5);
+}
+
+.window-control-btn.maximize:active {
+    background: rgba(59, 130, 246, 0.5);
+}
+
+.window-control-btn.close:active {
+    background: #c01020;
+}
+
+/* SVG icons */
+.window-control-btn svg {
+    transition: transform 0.2s ease;
+}
