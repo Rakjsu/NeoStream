@@ -31,6 +31,23 @@ const mitvMappings: Record<string, string> = {
     'globo minas': 'globo-belo-horizonte',
     'globo mg': 'globo-belo-horizonte',
     'globo belo horizonte': 'globo-belo-horizonte',
+    // Globo regional channels - use Globo HD
+    'globo acre rio branco': 'rede-globo',
+    'globo acre': 'rede-globo',
+    'globo amapá': 'rede-globo',
+    'globo amapa': 'rede-globo',
+    'globo ceará': 'rede-globo',
+    'globo ceara': 'rede-globo',
+    'globo centro america': 'rede-globo',
+    'globo centro américa': 'rede-globo',
+    'globo curitiba': 'rede-globo',
+    'globo eptv campinas': 'rede-globo',
+    'globo eptv ribeirão preto': 'rede-globo',
+    'globo eptv ribeirao preto': 'rede-globo',
+    'globo eptv são carlos': 'rede-globo',
+    'globo eptv sao carlos': 'rede-globo',
+    'globo florianópolis': 'rede-globo',
+    'globo florianopolis': 'rede-globo',
     // SBT
     'sbt sp': 'sbt-s-o-paulo',
     // Record
@@ -197,6 +214,15 @@ const OPEN_EPG_ARGENTINA_URLS = [
     'https://www.open-epg.com/files/argentina5.xml',
     'https://www.open-epg.com/files/argentina6.xml',
     'https://www.open-epg.com/files/argentina7.xml'
+];
+
+// Open-EPG Brazil sources (5 files - fallback for channels not in mi.tv)
+const OPEN_EPG_BRAZIL_URLS = [
+    'https://www.open-epg.com/files/brazil1.xml',
+    'https://www.open-epg.com/files/brazil2.xml',
+    'https://www.open-epg.com/files/brazil3.xml',
+    'https://www.open-epg.com/files/brazil4.xml',
+    'https://www.open-epg.com/files/brazil5.xml'
 ];
 
 // Open-EPG Portugal channel mappings (channel name -> Open-EPG ID)
@@ -1155,6 +1181,14 @@ const openEpgUSAMappings: Record<string, string> = {
     'amg': 'AMG TV.us',
 };
 
+// Open-EPG Brazil channel mappings (channel name -> Open-EPG ID)
+// Used as fallback for Brazilian channels not in mi.tv or meuguia.tv
+// IDs use format: "Channel Name.br"
+const openEpgBrazilMappings: Record<string, string> = {
+    // User will provide specific mappings
+    // Example: 'channel name': 'Channel Name.br'
+};
+
 export const epgService = {
 
     // Main function to fetch EPG for a channel
@@ -1189,9 +1223,16 @@ export const epgService = {
         const mitvPrograms = await this.fetchFromMiTV(channelName);
         if (mitvPrograms.length > 0) return mitvPrograms;
 
-        // Try meuguia.tv as final fallback
+        // Try meuguia.tv as fallback
         const meuguiaPrograms = await this.fetchFromMeuGuia(channelName);
         if (meuguiaPrograms.length > 0) return meuguiaPrograms;
+
+        // Try Open-EPG Brazil as final fallback (for channels not in mi.tv/meuguia)
+        const openEpgBrId = this.getOpenEpgBrazilId(channelName);
+        if (openEpgBrId) {
+            const openEpgPrograms = await this.fetchFromOpenEpgBrazil(channelName, openEpgBrId);
+            if (openEpgPrograms.length > 0) return openEpgPrograms;
+        }
 
         return [];
     },
@@ -1464,6 +1505,75 @@ export const epgService = {
             return this.parseXMLTV(combinedXml, channelId, channelName);
         } catch (error) {
             console.error('[EPG] Open-EPG USA error:', error);
+            return [];
+        }
+    },
+
+    // Get Open-EPG Brazil ID from channel name (for channels not in mi.tv)
+    getOpenEpgBrazilId(channelName: string): string | null {
+        let normalized = channelName.toLowerCase().trim();
+
+        // Remove quality in brackets first: [FHD], [HD], [SD], [4K], [UHD], [M], [P]
+        normalized = normalized.replace(/\s*\[(fhd|hd|sd|4k|uhd|m|p)\]/gi, '');
+
+        // Remove codec info in parentheses: (H265), (H264), (H266), (HEVC), (AVC)
+        normalized = normalized.replace(/\s*\((h\.?265|h\.?264|h\.?266|hevc|avc)\)/gi, '');
+
+        // Remove quality in parentheses: (FHD), (HD), (SD), (PPV), (4K), (UHD)
+        normalized = normalized.replace(/\s*\((fhd|hd|sd|4k|uhd|ppv)\)/gi, '');
+
+        // Remove remaining quality/tags at end without brackets
+        normalized = normalized.replace(/\s+(fhd|hd|sd|4k|uhd)\s*$/gi, '');
+
+        normalized = normalized.trim();
+
+        const result = openEpgBrazilMappings[normalized] || null;
+
+        // Try variations if not found
+        if (!result) {
+            const variations = [
+                normalized.replace(/\s+/g, ''),  // no spaces
+                normalized.replace(/-/g, ' '),  // hyphens to spaces
+            ];
+            for (const variant of variations) {
+                const varResult = openEpgBrazilMappings[variant];
+                if (varResult) return varResult;
+            }
+        }
+
+        return result;
+    },
+
+    // Fetch from Open-EPG Brazil using the cache system (downloads all 5 files)
+    async fetchFromOpenEpgBrazil(channelName: string, channelId: string): Promise<EPGProgram[]> {
+        try {
+            let combinedXml = '';
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ipcRenderer = (window as any).ipcRenderer;
+
+            // Download all 5 EPG files and combine them
+            if (ipcRenderer?.invoke) {
+                for (let i = 0; i < OPEN_EPG_BRAZIL_URLS.length; i++) {
+                    const url = OPEN_EPG_BRAZIL_URLS[i];
+                    try {
+                        const xml = await ipcRenderer.invoke('fetch-epg-xml', url);
+                        if (xml && typeof xml === 'string') {
+                            combinedXml += xml;
+                        }
+                    } catch (fileError) {
+                        console.warn(`[EPG] Failed to fetch Open-EPG Brazil file ${i + 1}:`, fileError);
+                    }
+                }
+            }
+
+            if (!combinedXml) {
+                console.warn('[EPG] No Open-EPG Brazil data available');
+                return [];
+            }
+
+            return this.parseXMLTV(combinedXml, channelId, channelName);
+        } catch (error) {
+            console.error('[EPG] Open-EPG Brazil error:', error);
             return [];
         }
     },
