@@ -29,20 +29,64 @@
     -webkit-app-region: no-drag;
 }
 
-.title-bar-icon {
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
+.title-bar-svg {
+    filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.4));
+}
+
+/* Animated bars inside SVG */
+.title-bar-bar {
+    animation: titleBarBounce 1.2s ease-in-out infinite;
+    transform-origin: center bottom;
+}
+
+.title-bar-bar-1 {
+    animation-delay: 0s;
+}
+
+.title-bar-bar-2 {
+    animation-delay: 0.2s;
+}
+
+.title-bar-bar-3 {
+    animation-delay: 0.4s;
+}
+
+@keyframes titleBarBounce {
+
+    0%,
+    100% {
+        transform: scaleY(1);
+    }
+
+    50% {
+        transform: scaleY(0.6);
+    }
 }
 
 .title-bar-text {
     font-size: 13px;
     font-weight: 600;
     color: #fff;
-    background: linear-gradient(135deg, #a855f7, #ec4899);
+    background: linear-gradient(90deg, #a855f7, #ec4899, #a855f7);
+    background-size: 200% 100%;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    animation: titleTextShimmer 3s ease infinite;
+}
+
+@keyframes titleTextShimmer {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
 }
 
 /* Window Controls */

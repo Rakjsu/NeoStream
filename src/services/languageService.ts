@@ -50,6 +50,13 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             // Logout
             logout: 'Sair'
         },
+        // Window controls
+        window: {
+            minimize: 'Minimizar',
+            maximize: 'Maximizar',
+            restore: 'Restaurar',
+            close: 'Fechar'
+        },
         // Login page
         login: {
             serverAddress: 'Endereço do servidor',
@@ -490,13 +497,13 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             updateInstalled: 'Atualização Instalada!',
             whatsNew: 'Novidades na',
             gotIt: 'Entendi, vamos lá!',
-            // Version 3.7.0
-            i18nTitle: 'Fallback Automático de Stream',
-            i18nItems: 'Troca automática de qualidade quando stream falha|Timeout de 10s para detecção rápida de falha|Notificações traduzidas (PT/EN/ES)',
-            profilesTitle: 'Qualidade ao Vivo',
-            profilesItems: 'Variantes regionais corrigidas (Globo [4K] só mostra Globo SP, RJ, etc)|Não mostra mais canais diferentes (Globo News, Minas)|Ícones de qualidade no menu',
-            fixesTitle: 'Correções',
-            fixesItems: 'Botão X esconde junto com controles|Player HLS estabilizado (sem loop de reinício)|Tradução das mensagens de fallback'
+            // Version 3.9.0
+            i18nTitle: 'Animações na Interface',
+            i18nItems: 'Logo animado na barra de título com barras equalizadoras|Texto "NeoStream" com gradiente brilhante|Saudação animada com mãozinha acenando na Home',
+            profilesTitle: 'Navegação Melhorada',
+            profilesItems: 'Setinhas dos carrosséis com animações interativas|Efeito glow roxo no hover|Bordas dos cards de hover corrigidas',
+            fixesTitle: 'Melhorias Gerais',
+            fixesItems: 'Traduções de controles da janela (minimizar, maximizar, fechar)|Scrollbars consistentes em todas as páginas|Notificações agora limpam corretamente'
         },
         // Welcome page
         welcome: {
@@ -649,6 +656,13 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             enter: 'Enter',
             // Logout
             logout: 'Logout'
+        },
+        // Window controls
+        window: {
+            minimize: 'Minimize',
+            maximize: 'Maximize',
+            restore: 'Restore',
+            close: 'Close'
         },
         // Login page
         login: {
@@ -855,13 +869,13 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             updateInstalled: 'Update Installed!',
             whatsNew: "What's New in",
             gotIt: "Got it, let's go!",
-            // Version 3.7.0
-            i18nTitle: 'Automatic Stream Fallback',
-            i18nItems: 'Auto-switch quality when stream fails|10s timeout for fast failure detection|Translated notifications (PT/EN/ES)',
-            profilesTitle: 'Live Quality',
-            profilesItems: 'Regional variants fixed (Globo [4K] only shows Globo SP, RJ, etc)|No longer shows different channels (Globo News, Minas)|Quality icons in menu',
-            fixesTitle: 'Bug Fixes',
-            fixesItems: 'X button hides with controls|HLS player stabilized (no restart loop)|Fallback messages translated'
+            // Version 3.9.0
+            i18nTitle: 'Interface Animations',
+            i18nItems: 'Animated logo in title bar with equalizer bars|"NeoStream" text with shimmering gradient|Animated waving hand greeting on Home',
+            profilesTitle: 'Improved Navigation',
+            profilesItems: 'Carousel arrows with interactive animations|Purple glow effect on hover|Card hover borders fixed',
+            fixesTitle: 'General Improvements',
+            fixesItems: 'Window control translations (minimize, maximize, close)|Consistent scrollbars across all pages|Notifications now clear properly'
         },
         // Welcome page
         welcome: {
@@ -1220,6 +1234,13 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             // Logout
             logout: 'Salir'
         },
+        // Window controls
+        window: {
+            minimize: 'Minimizar',
+            maximize: 'Maximizar',
+            restore: 'Restaurar',
+            close: 'Cerrar'
+        },
         // Login page
         login: {
             serverAddress: 'Dirección del servidor',
@@ -1420,13 +1441,13 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             updateInstalled: '¡Actualización Instalada!',
             whatsNew: 'Novedades en',
             gotIt: '¡Entendido, vamos!',
-            // Version 3.7.0
-            i18nTitle: 'Fallback Automático de Stream',
-            i18nItems: 'Cambio automático de calidad cuando el stream falla|Timeout de 10s para detección rápida de fallo|Notificaciones traducidas (PT/EN/ES)',
-            profilesTitle: 'Calidad en Vivo',
-            profilesItems: 'Variantes regionales corregidas (Globo [4K] solo muestra Globo SP, RJ, etc)|Ya no muestra canales diferentes (Globo News, Minas)|Íconos de calidad en el menú',
-            fixesTitle: 'Correcciones',
-            fixesItems: 'Botón X se oculta con los controles|Player HLS estabilizado (sin loop de reinicio)|Traducción de mensajes de fallback'
+            // Version 3.9.0
+            i18nTitle: 'Animaciones de Interfaz',
+            i18nItems: 'Logo animado en barra de título con barras ecualizadoras|Texto "NeoStream" con gradiente brillante|Saludo animado con mano saludando en Home',
+            profilesTitle: 'Navegación Mejorada',
+            profilesItems: 'Flechas de carrusel con animaciones interactivas|Efecto glow púrpura en hover|Bordes de cards de hover corregidos',
+            fixesTitle: 'Mejoras Generales',
+            fixesItems: 'Traducciones de controles de ventana (minimizar, maximizar, cerrar)|Scrollbars consistentes en todas las páginas|Las notificaciones ahora se limpian correctamente'
         },
         // Welcome page
         welcome: {

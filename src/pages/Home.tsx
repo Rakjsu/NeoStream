@@ -958,6 +958,7 @@ export function Home() {
                     {/* Navigation arrows */}
                     <div style={{ display: 'flex', gap: 8 }}>
                         <button
+                            className="nav-arrow nav-arrow-left"
                             onClick={() => scroll('left')}
                             style={{
                                 width: 36,
@@ -976,9 +977,10 @@ export function Home() {
                             onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(168, 85, 247, 0.4)'}
                             onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
                         >
-                            ←
+                            <span className="arrow-icon">←</span>
                         </button>
                         <button
+                            className="nav-arrow nav-arrow-right"
                             onClick={() => scroll('right')}
                             style={{
                                 width: 36,
@@ -997,7 +999,7 @@ export function Home() {
                             onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(168, 85, 247, 0.4)'}
                             onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
                         >
-                            →
+                            <span className="arrow-icon">→</span>
                         </button>
                     </div>
                 </div>
@@ -1062,7 +1064,7 @@ export function Home() {
                     background: 'linear-gradient(270deg, rgba(15, 15, 35, 1) 0%, transparent 100%)',
                     pointerEvents: 'none'
                 }} />
-            </div>
+            </div >
         );
     };
 
@@ -1077,11 +1079,72 @@ export function Home() {
                     0% { transform: translateX(-100%); }
                     100% { transform: translateX(100%); }
                 }
+                .waving-hand {
+                    display: inline-block;
+                    animation: wave 2.5s ease-in-out infinite;
+                    transform-origin: 70% 70%;
+                    -webkit-text-fill-color: initial;
+                    background: none;
+                }
+                @keyframes wave {
+                    0%, 60%, 100% { transform: rotate(0deg); }
+                    10%, 30% { transform: rotate(14deg); }
+                    20% { transform: rotate(-8deg); }
+                    40% { transform: rotate(-4deg); }
+                    50% { transform: rotate(10deg); }
+                }
                 #carousel-continue::-webkit-scrollbar,
                 #carousel-series::-webkit-scrollbar,
                 #carousel-movie::-webkit-scrollbar,
                 #carousel-recommendations::-webkit-scrollbar {
                     display: none;
+                }
+                /* Navigation arrow animations */
+                .nav-arrow {
+                    position: relative;
+                    overflow: hidden;
+                }
+                .nav-arrow::before {
+                    content: '';
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    width: 0;
+                    height: 0;
+                    background: radial-gradient(circle, rgba(168, 85, 247, 0.6) 0%, transparent 70%);
+                    border-radius: 50%;
+                    transform: translate(-50%, -50%);
+                    transition: width 0.3s, height 0.3s;
+                }
+                .nav-arrow:hover::before {
+                    width: 60px;
+                    height: 60px;
+                }
+                .nav-arrow:hover {
+                    transform: scale(1.1);
+                    border-color: rgba(168, 85, 247, 0.5) !important;
+                    box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
+                }
+                .nav-arrow:active {
+                    transform: scale(0.9);
+                }
+                .nav-arrow .arrow-icon {
+                    display: inline-block;
+                    transition: transform 0.2s;
+                }
+                .nav-arrow-left:hover .arrow-icon {
+                    animation: arrowBounceLeft 0.5s ease infinite;
+                }
+                .nav-arrow-right:hover .arrow-icon {
+                    animation: arrowBounceRight 0.5s ease infinite;
+                }
+                @keyframes arrowBounceLeft {
+                    0%, 100% { transform: translateX(0); }
+                    50% { transform: translateX(-3px); }
+                }
+                @keyframes arrowBounceRight {
+                    0%, 100% { transform: translateX(0); }
+                    50% { transform: translateX(3px); }
                 }
                 .content-card {
                     transform: scale(1);
@@ -1237,7 +1300,7 @@ export function Home() {
                             WebkitTextFillColor: 'transparent',
                             marginBottom: '6px'
                         }}>
-                            {getGreeting()}! 👋
+                            {getGreeting()}! <span className="waving-hand">👋</span>
                         </h1>
                         <p style={{
                             fontSize: '14px',
@@ -1259,18 +1322,19 @@ export function Home() {
                             {formatTime(currentTime)}
                         </div>
                     </div>
-                </div>
+                </div >
 
                 {/* Stats Cards */}
-                <div style={{
+                < div style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(3, 1fr)',
                     gap: '16px',
                     marginBottom: '32px',
                     maxWidth: '700px'
-                }}>
+                }
+                }>
                     {/* Live TV Card */}
-                    <a href="#/dashboard/live" style={{
+                    < a href="#/dashboard/live" style={{
                         background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 100%)',
                         borderRadius: '16px',
                         padding: '20px',
@@ -1294,10 +1358,10 @@ export function Home() {
                         <div style={{ fontSize: '12px', color: 'rgba(239, 68, 68, 0.9)', fontWeight: '600' }}>
                             {t('home', 'channels')}
                         </div>
-                    </a>
+                    </a >
 
                     {/* VOD Card */}
-                    <a href="#/dashboard/vod" style={{
+                    < a href="#/dashboard/vod" style={{
                         background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.05) 100%)',
                         borderRadius: '16px',
                         padding: '20px',
@@ -1321,10 +1385,10 @@ export function Home() {
                         <div style={{ fontSize: '12px', color: 'rgba(59, 130, 246, 0.9)', fontWeight: '600' }}>
                             {t('home', 'movies')}
                         </div>
-                    </a>
+                    </a >
 
                     {/* Series Card */}
-                    <a href="#/dashboard/series" style={{
+                    < a href="#/dashboard/series" style={{
                         background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)',
                         borderRadius: '16px',
                         padding: '20px',
@@ -1348,11 +1412,11 @@ export function Home() {
                         <div style={{ fontSize: '12px', color: 'rgba(139, 92, 246, 0.9)', fontWeight: '600' }}>
                             {t('home', 'seriesCount')}
                         </div>
-                    </a>
-                </div>
+                    </a >
+                </div >
 
                 {/* Continue Watching Section */}
-                <ContentSection
+                < ContentSection
                     title={`⏯️ ${t('home', 'continueWatching')}`}
                     items={continueWatching}
                     type="continue"
@@ -1361,7 +1425,7 @@ export function Home() {
                 />
 
                 {/* Recommendations Section */}
-                <ContentSection
+                < ContentSection
                     title={`💡 ${t('home', 'recommendations')}`}
                     items={recommendations}
                     type="recommendations"
@@ -1369,7 +1433,7 @@ export function Home() {
                 />
 
                 {/* Recently Added Series */}
-                <ContentSection
+                < ContentSection
                     title={`🆕 ${t('home', 'recentSeries')}`}
                     items={recentSeries}
                     type="series"
@@ -1377,7 +1441,7 @@ export function Home() {
                 />
 
                 {/* Recently Added Movies */}
-                <ContentSection
+                < ContentSection
                     title={`🎬 ${t('home', 'recentMovies')}`}
                     items={recentMovies}
                     type="movie"
@@ -1385,7 +1449,7 @@ export function Home() {
                 />
 
                 {/* Quick Access */}
-                <div style={{ marginTop: 40 }}>
+                < div style={{ marginTop: 40 }}>
                     <h2 style={{
                         fontSize: '16px',
                         fontWeight: '600',
@@ -1506,10 +1570,10 @@ export function Home() {
                             <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>{t('home', 'settings')}</div>
                         </a>
                     </div>
-                </div>
+                </div >
 
                 {/* Footer */}
-                <div style={{
+                < div style={{
                     marginTop: '60px',
                     paddingTop: '20px',
                     borderTop: '1px solid rgba(255, 255, 255, 0.05)',
@@ -1521,176 +1585,182 @@ export function Home() {
                 }}>
                     <span>NeoStream IPTV</span>
                     <span>v2.3.0</span>
-                </div>
-            </div>
+                </div >
+            </div >
 
             {/* Content Detail Modal */}
-            {selectedContent && (
-                <ContentDetailModal
-                    isOpen={!!selectedContent}
-                    onClose={() => setSelectedContent(null)}
-                    contentId={selectedContent.id}
-                    contentType={selectedContent.type}
-                    contentData={selectedContent}
-                    onPlay={(season, episode) => {
-                        // Check for existing progress
-                        if (selectedContent) {
-                            if (selectedContent.type === 'series') {
-                                const progress = watchProgressService.getEpisodeProgress(
-                                    selectedContent.id,
-                                    season || 1,
-                                    episode || 1
-                                );
-                                const progressPercent = progress ? Math.round((progress.currentTime / progress.duration) * 100) : 0;
+            {
+                selectedContent && (
+                    <ContentDetailModal
+                        isOpen={!!selectedContent}
+                        onClose={() => setSelectedContent(null)}
+                        contentId={selectedContent.id}
+                        contentType={selectedContent.type}
+                        contentData={selectedContent}
+                        onPlay={(season, episode) => {
+                            // Check for existing progress
+                            if (selectedContent) {
+                                if (selectedContent.type === 'series') {
+                                    const progress = watchProgressService.getEpisodeProgress(
+                                        selectedContent.id,
+                                        season || 1,
+                                        episode || 1
+                                    );
+                                    const progressPercent = progress ? Math.round((progress.currentTime / progress.duration) * 100) : 0;
 
-                                if (progress && progress.currentTime > 10 && progressPercent < 95) {
-                                    // Show resume modal
-                                    setPendingPlay({
-                                        id: selectedContent.id,
-                                        type: 'series',
-                                        name: selectedContent.name,
-                                        season: season,
-                                        episode: episode,
-                                        currentTime: progress.currentTime,
-                                        duration: progress.duration
-                                    });
-                                    setShowResumeModal(true);
-                                    setSelectedContent(null);
+                                    if (progress && progress.currentTime > 10 && progressPercent < 95) {
+                                        // Show resume modal
+                                        setPendingPlay({
+                                            id: selectedContent.id,
+                                            type: 'series',
+                                            name: selectedContent.name,
+                                            season: season,
+                                            episode: episode,
+                                            currentTime: progress.currentTime,
+                                            duration: progress.duration
+                                        });
+                                        setShowResumeModal(true);
+                                        setSelectedContent(null);
+                                    } else {
+                                        // No progress, play directly
+                                        setPlayingContent({
+                                            id: selectedContent.id,
+                                            type: 'series',
+                                            name: selectedContent.name,
+                                            season: season,
+                                            episode: episode
+                                        });
+                                        setSelectedContent(null);
+                                    }
                                 } else {
-                                    // No progress, play directly
+                                    // Movie - auto resume without modal
+                                    const movieProgress = movieProgressService.getMoviePositionById(selectedContent.id);
+
+                                    // Always play, with resumeTime if exists
                                     setPlayingContent({
                                         id: selectedContent.id,
-                                        type: 'series',
+                                        type: 'movie',
                                         name: selectedContent.name,
-                                        season: season,
-                                        episode: episode
+                                        resumeTime: movieProgress?.currentTime || 0
                                     });
                                     setSelectedContent(null);
                                 }
-                            } else {
-                                // Movie - auto resume without modal
-                                const movieProgress = movieProgressService.getMoviePositionById(selectedContent.id);
-
-                                // Always play, with resumeTime if exists
-                                setPlayingContent({
-                                    id: selectedContent.id,
-                                    type: 'movie',
-                                    name: selectedContent.name,
-                                    resumeTime: movieProgress?.currentTime || 0
-                                });
-                                setSelectedContent(null);
                             }
-                        }
-                    }}
-                />
-            )}
+                        }}
+                    />
+                )
+            }
 
             {/* Video Player */}
-            {playingContent && (
-                <AsyncVideoPlayer
-                    movie={playingContent}
-                    buildStreamUrl={async (content) => {
-                        const result = await window.ipcRenderer.invoke('auth:get-credentials');
-                        if (result.success) {
-                            const { url, username, password } = result.credentials;
-                            if (content.type === 'series') {
-                                // Fetch episode info for series
-                                const seriesInfoRes = await fetch(`${url}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${content.id}`);
-                                const seriesInfo = await seriesInfoRes.json();
+            {
+                playingContent && (
+                    <AsyncVideoPlayer
+                        movie={playingContent}
+                        buildStreamUrl={async (content) => {
+                            const result = await window.ipcRenderer.invoke('auth:get-credentials');
+                            if (result.success) {
+                                const { url, username, password } = result.credentials;
+                                if (content.type === 'series') {
+                                    // Fetch episode info for series
+                                    const seriesInfoRes = await fetch(`${url}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${content.id}`);
+                                    const seriesInfo = await seriesInfoRes.json();
 
-                                // Store episode data for navigation
-                                if (seriesInfo?.episodes) {
-                                    setSeriesEpisodeData({
-                                        seriesId: content.id,
-                                        episodes: seriesInfo.episodes
-                                    });
-                                }
+                                    // Store episode data for navigation
+                                    if (seriesInfo?.episodes) {
+                                        setSeriesEpisodeData({
+                                            seriesId: content.id,
+                                            episodes: seriesInfo.episodes
+                                        });
+                                    }
 
-                                const episodes = seriesInfo?.episodes?.[content.season || 1];
-                                const episode = episodes?.find((ep: any) => Number(ep.episode_num) === (content.episode || 1));
-                                if (episode) {
-                                    const ext = episode.container_extension || 'mp4';
-                                    return `${url}/series/${username}/${password}/${episode.id}.${ext}`;
+                                    const episodes = seriesInfo?.episodes?.[content.season || 1];
+                                    const episode = episodes?.find((ep: any) => Number(ep.episode_num) === (content.episode || 1));
+                                    if (episode) {
+                                        const ext = episode.container_extension || 'mp4';
+                                        return `${url}/series/${username}/${password}/${episode.id}.${ext}`;
+                                    }
+                                    throw new Error('Episode not found');
+                                } else {
+                                    // Movie stream
+                                    const movieInfoRes = await fetch(`${url}/player_api.php?username=${username}&password=${password}&action=get_vod_info&vod_id=${content.id}`);
+                                    const movieInfo = await movieInfoRes.json();
+                                    const ext = movieInfo?.movie_data?.container_extension || 'mp4';
+                                    return `${url}/movie/${username}/${password}/${content.id}.${ext}`;
                                 }
-                                throw new Error('Episode not found');
-                            } else {
-                                // Movie stream
-                                const movieInfoRes = await fetch(`${url}/player_api.php?username=${username}&password=${password}&action=get_vod_info&vod_id=${content.id}`);
-                                const movieInfo = await movieInfoRes.json();
-                                const ext = movieInfo?.movie_data?.container_extension || 'mp4';
-                                return `${url}/movie/${username}/${password}/${content.id}.${ext}`;
                             }
+                            throw new Error('Credentials not found');
+                        }}
+                        onClose={() => {
+                            setPlayingContent(null);
+                            setSeriesEpisodeData(null);
+                            // Refresh continue watching list to show updated progress
+                            setRefreshTrigger(prev => prev + 1);
+                        }}
+                        customTitle={playingContent.type === 'series'
+                            ? `${playingContent.name} - T${playingContent.season} E${playingContent.episode}`
+                            : playingContent.name
                         }
-                        throw new Error('Credentials not found');
-                    }}
-                    onClose={() => {
-                        setPlayingContent(null);
-                        setSeriesEpisodeData(null);
-                        // Refresh continue watching list to show updated progress
-                        setRefreshTrigger(prev => prev + 1);
-                    }}
-                    customTitle={playingContent.type === 'series'
-                        ? `${playingContent.name} - T${playingContent.season} E${playingContent.episode}`
-                        : playingContent.name
-                    }
-                    seriesId={playingContent.type === 'series' ? playingContent.id : undefined}
-                    seasonNumber={playingContent.season}
-                    episodeNumber={playingContent.episode}
-                    resumeTime={playingContent.resumeTime || null}
-                    onNextEpisode={playingContent.type === 'series' ? handleNextEpisode : undefined}
-                    onPreviousEpisode={playingContent.type === 'series' ? handlePreviousEpisode : undefined}
-                    canGoNext={playingContent.type === 'series' ? canGoNextEpisode() : false}
-                    canGoPrevious={playingContent.type === 'series' ? canGoPreviousEpisode() : false}
-                    allMovies={playingContent.type === 'movie' ? allMovies : undefined}
-                    onSwitchVersion={playingContent.type === 'movie' ? (newMovie, currentTime) => {
-                        setPlayingContent({
-                            id: String(newMovie.stream_id),
-                            type: 'movie',
-                            name: newMovie.name,
-                            resumeTime: currentTime
-                        });
-                    } : undefined}
-                />
-            )}
+                        seriesId={playingContent.type === 'series' ? playingContent.id : undefined}
+                        seasonNumber={playingContent.season}
+                        episodeNumber={playingContent.episode}
+                        resumeTime={playingContent.resumeTime || null}
+                        onNextEpisode={playingContent.type === 'series' ? handleNextEpisode : undefined}
+                        onPreviousEpisode={playingContent.type === 'series' ? handlePreviousEpisode : undefined}
+                        canGoNext={playingContent.type === 'series' ? canGoNextEpisode() : false}
+                        canGoPrevious={playingContent.type === 'series' ? canGoPreviousEpisode() : false}
+                        allMovies={playingContent.type === 'movie' ? allMovies : undefined}
+                        onSwitchVersion={playingContent.type === 'movie' ? (newMovie, currentTime) => {
+                            setPlayingContent({
+                                id: String(newMovie.stream_id),
+                                type: 'movie',
+                                name: newMovie.name,
+                                resumeTime: currentTime
+                            });
+                        } : undefined}
+                    />
+                )
+            }
 
             {/* Resume Modal */}
-            {showResumeModal && pendingPlay && (
-                <ResumeModal
-                    seriesName={pendingPlay.name}
-                    seasonNumber={pendingPlay.season || 1}
-                    episodeNumber={pendingPlay.episode || 1}
-                    currentTime={pendingPlay.currentTime}
-                    duration={pendingPlay.duration}
-                    onResume={() => {
-                        setPlayingContent({
-                            id: pendingPlay.id,
-                            type: pendingPlay.type,
-                            name: pendingPlay.name,
-                            season: pendingPlay.season,
-                            episode: pendingPlay.episode,
-                            resumeTime: pendingPlay.currentTime
-                        });
-                        setShowResumeModal(false);
-                        setPendingPlay(null);
-                    }}
-                    onRestart={() => {
-                        setPlayingContent({
-                            id: pendingPlay.id,
-                            type: pendingPlay.type,
-                            name: pendingPlay.name,
-                            season: pendingPlay.season,
-                            episode: pendingPlay.episode,
-                            resumeTime: 0
-                        });
-                        setShowResumeModal(false);
-                        setPendingPlay(null);
-                    }}
-                    onCancel={() => {
-                        setShowResumeModal(false);
-                        setPendingPlay(null);
-                    }}
-                />
-            )}
+            {
+                showResumeModal && pendingPlay && (
+                    <ResumeModal
+                        seriesName={pendingPlay.name}
+                        seasonNumber={pendingPlay.season || 1}
+                        episodeNumber={pendingPlay.episode || 1}
+                        currentTime={pendingPlay.currentTime}
+                        duration={pendingPlay.duration}
+                        onResume={() => {
+                            setPlayingContent({
+                                id: pendingPlay.id,
+                                type: pendingPlay.type,
+                                name: pendingPlay.name,
+                                season: pendingPlay.season,
+                                episode: pendingPlay.episode,
+                                resumeTime: pendingPlay.currentTime
+                            });
+                            setShowResumeModal(false);
+                            setPendingPlay(null);
+                        }}
+                        onRestart={() => {
+                            setPlayingContent({
+                                id: pendingPlay.id,
+                                type: pendingPlay.type,
+                                name: pendingPlay.name,
+                                season: pendingPlay.season,
+                                episode: pendingPlay.episode,
+                                resumeTime: 0
+                            });
+                            setShowResumeModal(false);
+                            setPendingPlay(null);
+                        }}
+                        onCancel={() => {
+                            setShowResumeModal(false);
+                            setPendingPlay(null);
+                        }}
+                    />
+                )
+            }
         </>
     );
 }

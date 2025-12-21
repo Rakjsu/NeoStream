@@ -50,36 +50,6 @@ export function setupIpcHandlers() {
         return savedWindowBounds !== null
     })
 
-    // Handle drag start on maximized window - restore and position under cursor
-    ipcMain.handle('window:start-drag', (_, { mouseX }) => {
-        const win = BrowserWindow.getFocusedWindow()
-        if (!win || !savedWindowBounds) return false
-
-        // Get the percentage of where the mouse is on the screen
-        const currentBounds = win.getBounds()
-        const percentX = mouseX / currentBounds.width
-
-        // Restore window to saved bounds
-        const newWidth = savedWindowBounds.width
-        const newHeight = savedWindowBounds.height
-
-        // Calculate new X position to keep mouse in same relative position
-        const display = screen.getDisplayMatching(currentBounds)
-        const cursorPoint = screen.getCursorScreenPoint()
-        const newX = cursorPoint.x - (newWidth * percentX)
-        const newY = cursorPoint.y - 18 // Position title bar under cursor
-
-        win.setBounds({
-            x: Math.max(display.workArea.x, Math.round(newX)),
-            y: Math.max(display.workArea.y, Math.round(newY)),
-            width: newWidth,
-            height: newHeight
-        })
-
-        savedWindowBounds = null
-        return true
-    })
-
     ipcMain.handle('auth:login', async (_, { url, username, password }) => {
         try {
             const client = new XtreamClient(url, username, password)

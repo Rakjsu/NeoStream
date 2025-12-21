@@ -68,24 +68,23 @@ export function CustomTitleBar() {
         }, 200);
     };
 
-    // Handle drag start on maximized window - restore first
-    const handleDragStart = async (e: React.MouseEvent) => {
-        if (isMaximized && window.ipcRenderer) {
-            // Get mouse X position relative to window
-            const mouseX = e.clientX;
-            const restored = await window.ipcRenderer.invoke('window:start-drag', { mouseX });
-            if (restored) {
-                setIsMaximized(false);
-            }
-        }
-    };
-
     return (
         <div className="custom-title-bar">
             {/* Drag region - allows window dragging */}
-            <div className="title-bar-drag-region" onMouseDown={handleDragStart}>
+            <div className="title-bar-drag-region">
                 <div className="title-bar-logo">
-                    <img src="/neostream-logo.png" alt="NeoStream" className="title-bar-icon" />
+                    <svg className="title-bar-svg" width="22" height="22" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="titleBarGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" stopColor="#a855f7" />
+                                <stop offset="100%" stopColor="#ec4899" />
+                            </linearGradient>
+                        </defs>
+                        <path d="M 10,10 L 10,90 L 90,50 Z" fill="none" stroke="url(#titleBarGradient)" strokeWidth="6" strokeLinejoin="round" />
+                        <rect className="title-bar-bar title-bar-bar-1" x="35" y="35" width="6" height="30" fill="url(#titleBarGradient)" rx="3" />
+                        <rect className="title-bar-bar title-bar-bar-2" x="45" y="25" width="6" height="50" fill="url(#titleBarGradient)" rx="3" />
+                        <rect className="title-bar-bar title-bar-bar-3" x="55" y="40" width="6" height="20" fill="url(#titleBarGradient)" rx="3" />
+                    </svg>
                     <span className="title-bar-text">NeoStream</span>
                 </div>
             </div>
