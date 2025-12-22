@@ -1,11 +1,18 @@
 ; ═══════════════════════════════════════════════════════════════════════
 ; NeoStream IPTV - Custom NSIS Installer Script
 ; Design baseado no app: cores #a855f7 (purple) → #ec4899 (pink)
-; Compatible with electron-builder
+; Background: #0f0f1a (dark)
 ; ═══════════════════════════════════════════════════════════════════════
 
-; NOTE: MUI_ICON, MUI_UNICON, MUI_LANGUAGE are managed by electron-builder
-; Only add customizations that don't conflict with builder defaults
+; NOTE: MUI_ICON, MUI_UNICON are managed by electron-builder
+
+; ═══════════════════════════════════════════════════════════════════════
+; UI COLORS - Matching NeoStream app design
+; Background: #0f0f1a = RGB(15, 15, 26) 
+; ═══════════════════════════════════════════════════════════════════════
+
+!define MUI_BGCOLOR "0F0F1A"
+!define MUI_TEXTCOLOR "FFFFFF"
 
 ; ═══════════════════════════════════════════════════════════════════════
 ; WELCOME PAGE CUSTOMIZATION

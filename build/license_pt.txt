@@ -1,38 +1,38 @@
 TERMOS DE USO - NEOSTREAM IPTV
 ==============================
 
-Ao instalar e utilizar o NeoStream IPTV, você concorda com os seguintes termos:
+Ao instalar e utilizar o NeoStream IPTV, voce concorda com os seguintes termos:
 
 1. NATUREZA DO SOFTWARE
-O NeoStream IPTV é um reprodutor de mídia que permite visualizar conteúdo IPTV. 
-O software NÃO fornece, distribui ou hospeda qualquer conteúdo de mídia.
+O NeoStream IPTV e um reprodutor de midia que permite visualizar conteudo IPTV. 
+O software NAO fornece, distribui ou hospeda qualquer conteudo de midia.
 
-2. RESPONSABILIDADE DO USUÁRIO
-Você é inteiramente responsável pelo conteúdo que acessa através deste software.
-Certifique-se de que possui os direitos legais para acessar qualquer conteúdo.
+2. RESPONSABILIDADE DO USUARIO
+Voce e inteiramente responsavel pelo conteudo que acessa atraves deste software.
+Certifique-se de que possui os direitos legais para acessar qualquer conteudo.
 
-3. ISENÇÃO DE RESPONSABILIDADE
-Os desenvolvedores do NeoStream IPTV não se responsabilizam por:
-- Conteúdo acessado pelos usuários
+3. ISENCAO DE RESPONSABILIDADE
+Os desenvolvedores do NeoStream IPTV nao se responsabilizam por:
+- Conteudo acessado pelos usuarios
 - Uso indevido do software
-- Violações de direitos autorais por terceiros
+- Violacoes de direitos autorais por terceiros
 
-4. USO ACEITÁVEL
-Este software deve ser utilizado apenas para acessar conteúdo legal, como:
-- Sua própria assinatura IPTV legítima
-- Conteúdo de domínio público
+4. USO ACEITAVEL
+Este software deve ser utilizado apenas para acessar conteudo legal, como:
+- Sua propria assinatura IPTV legitima
+- Conteudo de dominio publico
 - Streams autorizados pelo detentor dos direitos
 
 5. PRIVACIDADE
-O NeoStream IPTV não coleta dados pessoais. Todas as configurações são 
+O NeoStream IPTV nao coleta dados pessoais. Todas as configuracoes sao 
 armazenadas localmente no seu dispositivo.
 
-6. ATUALIZAÇÕES
-O software pode verificar automaticamente por atualizações para melhorar 
-sua experiência e segurança.
+6. ATUALIZACOES
+O software pode verificar automaticamente por atualizacoes para melhorar 
+sua experiencia e seguranca.
 
-Ao clicar em "Aceito", você confirma que leu e concorda com estes termos.
+Ao clicar em "Aceito", voce confirma que leu e concorda com estes termos.
 
 ---
-NeoStream IPTV © 2024 Rakjsu
-Versão 3.9.0
+NeoStream IPTV - 2024 Rakjsu
+Versao 3.9.0
