@@ -7,12 +7,10 @@
 ; NOTE: MUI_ICON, MUI_UNICON are managed by electron-builder
 
 ; ═══════════════════════════════════════════════════════════════════════
-; UI COLORS - Matching NeoStream app design
-; Background: #0f0f1a = RGB(15, 15, 26) 
+; BRANDING TEXT
 ; ═══════════════════════════════════════════════════════════════════════
 
-!define MUI_BGCOLOR "0F0F1A"
-!define MUI_TEXTCOLOR "FFFFFF"
+BrandingText "NeoStream IPTV v3.9.0"
 
 ; ═══════════════════════════════════════════════════════════════════════
 ; WELCOME PAGE CUSTOMIZATION
@@ -28,11 +26,13 @@
 !define MUI_DIRECTORYPAGE_TEXT_TOP "O NeoStream IPTV sera instalado na pasta abaixo.$\r$\n$\r$\nPara instalar em uma pasta diferente, clique em Procurar."
 
 ; ═══════════════════════════════════════════════════════════════════════
-; FINISH PAGE
+; FINISH PAGE - With proper text visibility
 ; ═══════════════════════════════════════════════════════════════════════
 
 !define MUI_FINISHPAGE_TITLE "Instalacao Concluida!"
 !define MUI_FINISHPAGE_TEXT "O NeoStream IPTV foi instalado com sucesso no seu computador.$\r$\n$\r$\nAproveite sua experiencia de streaming!$\r$\n$\r$\nClique em Concluir para fechar o instalador."
+!define MUI_FINISHPAGE_RUN_TEXT "Iniciar NeoStream IPTV"
+!define MUI_FINISHPAGE_SHOWREADME_TEXT "Criar atalho na Area de Trabalho"
 
 ; ═══════════════════════════════════════════════════════════════════════
 ; CHECK IF APP IS RUNNING (for uninstaller)
@@ -58,4 +58,24 @@
     MessageBox MB_OK|MB_ICONEXCLAMATION "O NeoStream IPTV esta em execucao.$\r$\n$\r$\nFeche o aplicativo e tente novamente." /SD IDOK
     Abort
   ${EndIf}
+!macroend
+
+; ═══════════════════════════════════════════════════════════════════════
+; CUSTOM SHORTCUT - Use app icon properly
+; ═══════════════════════════════════════════════════════════════════════
+
+!macro customInstall
+  ; Create desktop shortcut with correct icon
+  CreateShortCut "$DESKTOP\NeoStream IPTV.lnk" "$INSTDIR\NeoStream IPTV.exe" "" "$INSTDIR\NeoStream IPTV.exe" 0
+  
+  ; Create start menu shortcut with correct icon
+  CreateDirectory "$SMPROGRAMS\NeoStream IPTV"
+  CreateShortCut "$SMPROGRAMS\NeoStream IPTV\NeoStream IPTV.lnk" "$INSTDIR\NeoStream IPTV.exe" "" "$INSTDIR\NeoStream IPTV.exe" 0
+  CreateShortCut "$SMPROGRAMS\NeoStream IPTV\Desinstalar.lnk" "$INSTDIR\Uninstall NeoStream IPTV.exe" "" "$INSTDIR\Uninstall NeoStream IPTV.exe" 0
+!macroend
+
+!macro customUnInstall
+  ; Remove shortcuts
+  Delete "$DESKTOP\NeoStream IPTV.lnk"
+  RMDir /r "$SMPROGRAMS\NeoStream IPTV"
 !macroend
