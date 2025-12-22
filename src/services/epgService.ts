@@ -633,11 +633,6 @@ const openEpgPortugalMappings: Record<string, string> = {
     // Localvisao
     'localvisao': 'Localvisao TV HD.pt',
     'localvisao tv': 'Localvisao TV HD.pt',
-    // Canal Historia
-    'historia': 'Canal Historia HD.pt',
-    'canal historia': 'Canal Historia HD.pt',
-    // DAZN 6
-    'dazn 6': 'DAZN 6.pt',
     // Panda Kids
     'panda kids': 'Panda Kids.pt',
     // PFC
@@ -1174,8 +1169,6 @@ const openEpgUSAMappings: Record<string, string> = {
     'revolt': 'Revolt.us',
     // RFD TV
     'rfd tv': 'RFD TV.us',
-    // Root Sports
-    'root sports northwest': 'ROOT Sports Northwest.us',
     // RT America
     'rt america': 'RT America.us',
     // Science
