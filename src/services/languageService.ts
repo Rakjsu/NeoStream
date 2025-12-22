@@ -256,23 +256,6 @@ const translations: Record<SupportedLanguage, Record<string, Record<string, stri
             checkNow: 'Verificar Atualizações Agora',
             checking: 'Verificando...'
         },
-        // Playback section
-        playback: {
-            title: 'Reprodução',
-            description: 'Ajuste a reprodução de vídeo e áudio',
-            bufferSize: 'Tamanho do Buffer',
-            bufferSizeDesc: 'Tempo de buffer antes de iniciar a reprodução',
-            intelligent: '🧠 Inteligente (Adaptativo)',
-            seconds: 'segundos',
-            videoCodec: 'Codificador de Vídeo',
-            videoCodecDesc: 'Codec de vídeo preferencial',
-            autoPlayNext: 'Auto-play próximo episódio',
-            autoPlayNextDesc: 'Reproduzir automaticamente o próximo episódio',
-            skipIntro: 'Pular intro automaticamente',
-            skipIntroDesc: 'Pular abertura de séries quando disponível',
-            subtitleLanguage: 'Idioma das Legendas',
-            subtitleLanguageDesc: 'Idioma preferido para download automático de legendas'
-        },
         // EPG section
         epg: {
             title: 'Guia de Programação (EPG)',
