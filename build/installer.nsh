@@ -1,98 +1,39 @@
 ; ═══════════════════════════════════════════════════════════════════════
 ; NeoStream IPTV - Custom NSIS Installer Script
-; Modern MUI2 Configuration matching app design
+; Compatible with electron-builder
 ; ═══════════════════════════════════════════════════════════════════════
 
-!include "MUI2.nsh"
-!include "nsDialogs.nsh"
-!include "LogicLib.nsh"
+; NOTE: MUI_ICON, MUI_UNICON are already defined by electron-builder
+; Do NOT redefine them here!
 
 ; ═══════════════════════════════════════════════════════════════════════
-; GENERAL SETTINGS
+; WELCOME/FINISH PAGE - SIDEBAR (only if not already defined)
 ; ═══════════════════════════════════════════════════════════════════════
 
-!define MUI_ABORTWARNING
-!define MUI_UNABORTWARNING
+!ifndef MUI_WELCOMEFINISHPAGE_BITMAP
+  !define MUI_WELCOMEFINISHPAGE_BITMAP "${BUILD_RESOURCES_DIR}\installer-sidebar.bmp"
+!endif
+
+!ifndef MUI_UNWELCOMEFINISHPAGE_BITMAP
+  !define MUI_UNWELCOMEFINISHPAGE_BITMAP "${BUILD_RESOURCES_DIR}\uninstaller-sidebar.bmp"
+!endif
 
 ; ═══════════════════════════════════════════════════════════════════════
-; ICON CONFIGURATION
-; ═══════════════════════════════════════════════════════════════════════
-
-!define MUI_ICON "${BUILD_RESOURCES_DIR}\icons\icon.ico"
-!define MUI_UNICON "${BUILD_RESOURCES_DIR}\icons\icon.ico"
-
-; ═══════════════════════════════════════════════════════════════════════
-; HEADER CONFIGURATION  
-; ═══════════════════════════════════════════════════════════════════════
-
-!define MUI_HEADERIMAGE
-!define MUI_HEADERIMAGE_RIGHT
-!define MUI_HEADERIMAGE_BITMAP "${BUILD_RESOURCES_DIR}\installer-header.bmp"
-!define MUI_HEADERIMAGE_UNBITMAP "${BUILD_RESOURCES_DIR}\installer-header.bmp"
-
-; ═══════════════════════════════════════════════════════════════════════
-; WELCOME/FINISH PAGE - SIDEBAR
-; ═══════════════════════════════════════════════════════════════════════
-
-!define MUI_WELCOMEFINISHPAGE_BITMAP "${BUILD_RESOURCES_DIR}\installer-sidebar.bmp"
-!define MUI_UNWELCOMEFINISHPAGE_BITMAP "${BUILD_RESOURCES_DIR}\uninstaller-sidebar.bmp"
-
-; ═══════════════════════════════════════════════════════════════════════
-; WELCOME PAGE
+; WELCOME PAGE TEXT
 ; ═══════════════════════════════════════════════════════════════════════
 
 !define MUI_WELCOMEPAGE_TITLE "Bem-vindo ao NeoStream IPTV"
-!define MUI_WELCOMEPAGE_TEXT "Este assistente irá guiá-lo através da instalação do NeoStream IPTV.$\r$\n$\r$\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$\r$\n$\r$\n✨ Recursos principais:$\r$\n$\r$\n    📺  TV ao vivo com EPG integrado$\r$\n    🎬  Filmes e Séries on-demand$\r$\n    📥  Download para assistir offline$\r$\n    👥  Múltiplos perfis de usuário$\r$\n    🔄  Atualizações automáticas$\r$\n$\r$\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$\r$\n$\r$\nClique em Avançar para continuar."
+!define MUI_WELCOMEPAGE_TEXT "Este assistente ira guia-lo atraves da instalacao do NeoStream IPTV.$\r$\n$\r$\nRecursos principais:$\r$\n$\r$\n  - TV ao vivo com EPG integrado$\r$\n  - Filmes e Series on-demand$\r$\n  - Download para assistir offline$\r$\n  - Multiplos perfis de usuario$\r$\n  - Atualizacoes automaticas$\r$\n$\r$\nClique em Avancar para continuar."
 
 ; ═══════════════════════════════════════════════════════════════════════
-; DIRECTORY PAGE
+; DIRECTORY PAGE TEXT
 ; ═══════════════════════════════════════════════════════════════════════
 
-!define MUI_DIRECTORYPAGE_TEXT_TOP "O NeoStream IPTV será instalado na pasta abaixo.$\r$\n$\r$\nPara instalar em uma pasta diferente, clique em Procurar.$\r$\n$\r$\n📁 Espaço necessário: aproximadamente 200 MB"
+!define MUI_DIRECTORYPAGE_TEXT_TOP "O NeoStream IPTV sera instalado na pasta abaixo.$\r$\n$\r$\nPara instalar em uma pasta diferente, clique em Procurar."
 
 ; ═══════════════════════════════════════════════════════════════════════
-; INSTALL PAGE
+; FINISH PAGE 
 ; ═══════════════════════════════════════════════════════════════════════
 
-!define MUI_INSTFILESPAGE_FINISHHEADER_TEXT "Instalação Concluída"
-!define MUI_INSTFILESPAGE_FINISHHEADER_SUBTEXT "O NeoStream IPTV foi instalado com sucesso."
-
-; ═══════════════════════════════════════════════════════════════════════
-; FINISH PAGE
-; ═══════════════════════════════════════════════════════════════════════
-
-!define MUI_FINISHPAGE_TITLE "Instalação Concluída! 🎉"
-!define MUI_FINISHPAGE_TEXT "O NeoStream IPTV foi instalado com sucesso no seu computador.$\r$\n$\r$\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$\r$\n$\r$\n🚀 Próximos passos:$\r$\n$\r$\n    1. Inicie o aplicativo$\r$\n    2. Adicione sua playlist IPTV$\r$\n    3. Aproveite o conteúdo!$\r$\n$\r$\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$\r$\n$\r$\nClique em Concluir para fechar o instalador."
-
-!define MUI_FINISHPAGE_RUN "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
-!define MUI_FINISHPAGE_RUN_TEXT "🎬 Iniciar NeoStream IPTV"
-
-!define MUI_FINISHPAGE_SHOWREADME ""
-!define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
-!define MUI_FINISHPAGE_SHOWREADME_TEXT "📌 Criar atalho na Área de Trabalho"
-!define MUI_FINISHPAGE_SHOWREADME_FUNCTION CreateDesktopShortcutFromFinish
-
-; ═══════════════════════════════════════════════════════════════════════
-; UNINSTALLER PAGES
-; ═══════════════════════════════════════════════════════════════════════
-
-!define MUI_UNCONFIRMPAGE_TEXT_TOP "O NeoStream IPTV será desinstalado do seu computador.$\r$\n$\r$\n⚠️ O aplicativo será removido, mas suas configurações e dados de usuário serão mantidos.$\r$\n$\r$\nClique em Desinstalar para continuar."
-
-!define MUI_UNFINISHPAGE_NOAUTOCLOSE
-
-; ═══════════════════════════════════════════════════════════════════════
-; CUSTOM FUNCTIONS
-; ═══════════════════════════════════════════════════════════════════════
-
-Function CreateDesktopShortcutFromFinish
-  CreateShortcut "$DESKTOP\NeoStream IPTV.lnk" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" "" "$INSTDIR\${APP_EXECUTABLE_FILENAME}" 0
-FunctionEnd
-
-; ═══════════════════════════════════════════════════════════════════════
-; LANGUAGE STRINGS (Português)
-; ═══════════════════════════════════════════════════════════════════════
-
-LangString DESC_SecMain ${LANG_PORTUGUESE} "Arquivos principais do NeoStream IPTV"
-LangString DESC_SecMain ${LANG_PORTUGUESEBR} "Arquivos principais do NeoStream IPTV"
-LangString DESC_SecMain ${LANG_ENGLISH} "NeoStream IPTV main files"
-LangString DESC_SecMain ${LANG_SPANISH} "Archivos principales de NeoStream IPTV"
+!define MUI_FINISHPAGE_TITLE "Instalacao Concluida!"
+!define MUI_FINISHPAGE_TEXT "O NeoStream IPTV foi instalado com sucesso no seu computador.$\r$\n$\r$\nClique em Concluir para fechar o instalador."
