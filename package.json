@@ -9,10 +9,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && electron-builder",
-    "build:win": "tsc -b && vite build && electron-builder --win",
-    "build:mac": "tsc -b && vite build && electron-builder --mac",
-    "build:linux": "tsc -b && vite build && electron-builder --linux",
+    "build": "node build/generate-installer-images.js && tsc -b && vite build && electron-builder",
+    "build:win": "node build/generate-installer-images.js && tsc -b && vite build && electron-builder --win",
+    "build:mac": "node build/generate-installer-images.js && tsc -b && vite build && electron-builder --mac",
+    "build:linux": "node build/generate-installer-images.js && tsc -b && vite build && electron-builder --linux",
+    "build:installer-images": "node build/generate-installer-images.js",
     "package:win": "vite build && npx @electron/packager . \"NeoStream IPTV\" --platform=win32 --arch=x64 --out=release --overwrite --asar --executable-name=\"NeoStream IPTV\" --icon=public/app-icon.png",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -106,7 +107,17 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "NeoStream IPTV"
+      "shortcutName": "NeoStream IPTV",
+      "include": "build/installer.nsh",
+      "installerIcon": "build/icons/icon.ico",
+      "uninstallerIcon": "build/icons/icon.ico",
+      "installerSidebar": "build/installer-sidebar.bmp",
+      "uninstallerSidebar": "build/uninstaller-sidebar.bmp",
+      "installerHeader": "build/installer-header.bmp",
+      "installerHeaderIcon": "build/icons/icon.ico",
+      "license": null,
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
     }
   }
 }
