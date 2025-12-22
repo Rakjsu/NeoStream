@@ -1,0 +1,38 @@
+TERMS OF USE - NEOSTREAM IPTV
+=============================
+
+By installing and using NeoStream IPTV, you agree to the following terms:
+
+1. NATURE OF THE SOFTWARE
+NeoStream IPTV is a media player that allows viewing IPTV content.
+The software does NOT provide, distribute, or host any media content.
+
+2. USER RESPONSIBILITY
+You are entirely responsible for the content you access through this software.
+Make sure you have the legal rights to access any content.
+
+3. DISCLAIMER
+The developers of NeoStream IPTV are not responsible for:
+- Content accessed by users
+- Misuse of the software
+- Copyright violations by third parties
+
+4. ACCEPTABLE USE
+This software should only be used to access legal content, such as:
+- Your own legitimate IPTV subscription
+- Public domain content
+- Streams authorized by the rights holder
+
+5. PRIVACY
+NeoStream IPTV does not collect personal data. All settings are
+stored locally on your device.
+
+6. UPDATES
+The software may automatically check for updates to improve
+your experience and security.
+
+By clicking "I Agree", you confirm that you have read and agree to these terms.
+
+---
+NeoStream IPTV © 2024 Rakjsu
+Version 3.9.0
