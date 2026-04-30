@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { profileService } from '../services/profileService';
 import type { Profile } from '../types/profile';
 import { ProfileCard } from '../components/ProfileCard';
@@ -23,11 +23,7 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
     const [isLoading, setIsLoading] = useState(true);
     const { t } = useLanguage();
 
-    useEffect(() => {
-        loadProfiles();
-    }, []);
-
-    const loadProfiles = () => {
+    const loadProfiles = useCallback(() => {
         setIsLoading(true);
         // Simulate loading delay for animation
         setTimeout(() => {
@@ -35,7 +31,16 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
             setProfiles(allProfiles);
             setIsLoading(false);
         }, 500);
-    };
+    }, []);
+
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            setProfiles(profileService.getAllProfiles());
+            setIsLoading(false);
+        }, 500);
+
+        return () => clearTimeout(timeout);
+    }, []);
 
     const handleProfileClick = async (profile: Profile) => {
         if (isManaging) {

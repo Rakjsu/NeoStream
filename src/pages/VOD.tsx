@@ -44,21 +44,19 @@ interface VODStream {
 // Dynamic card sizing based on container
 const CARD_MIN_WIDTH = 180;
 const CARD_GAP = 24;
+const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'er\u00f3tico'];
 
 export function VOD() {
     const [streams, setStreams] = useState<VODStream[]>([]);
-    const [_categories, setCategories] = useState<Array<{ category_id: string; category_name: string; parent_id: number }>>([]);
     const [selectedCategory, setSelectedCategory] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
-    const [brokenImages, setBrokenImages] = useState<Set<number>>(new Set());
     const [selectedMovie, setSelectedMovie] = useState<VODStream | null>(null);
     const [tmdbData, setTmdbData] = useState<TMDBMovieDetails | null>(null);
-    const [loadingTmdb, setLoadingTmdb] = useState(false);
     const [playingMovie, setPlayingMovie] = useState<VODStream | null>(null);
     const [pipResumeTime, setPipResumeTime] = useState<number | null>(null);
-    const [, _setRefresh] = useState(0);
+    const [, setRefresh] = useState(0);
     const [visibleCount, setVisibleCount] = useState(0);
     const [itemsPerPage, setItemsPerPage] = useState(36);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -124,12 +122,7 @@ export function VOD() {
         };
     }, []);
 
-    useEffect(() => {
-        fetchStreams();
-        fetchCategories();
-    }, []);
-
-    const fetchStreams = async () => {
+    const fetchStreams = useCallback(async () => {
         setLoading(true);
         setError('');
         try {
@@ -139,22 +132,17 @@ export function VOD() {
             } else {
                 setError(result.error || 'Failed to load movies');
             }
-        } catch (err: any) {
-            setError(err?.message || 'Failed to connect to server');
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Failed to connect to server');
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    // Blocked category patterns for Kids profile and Parental Control
-    const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'erótico'];
-
-    const fetchCategories = async () => {
+    const fetchCategories = useCallback(async () => {
         try {
             const result = await window.ipcRenderer.invoke('categories:get-vod');
             if (result.success) {
-                setCategories(result.data || []);
-
                 // Extract blocked category IDs for Kids profile OR Parental Control
                 const parentalConfig = parentalService.getConfig();
                 const shouldBlockCategories = isKidsProfile || (parentalConfig.enabled && parentalConfig.blockAdultCategories && !parentalService.isSessionUnlocked());
@@ -175,7 +163,12 @@ export function VOD() {
         } catch (err) {
             console.error('Failed to load categories:', err);
         }
-    };
+    }, [isKidsProfile]);
+
+    useEffect(() => {
+        fetchStreams();
+        fetchCategories();
+    }, [fetchCategories, fetchStreams]);
 
     // Load hidden items from IndexedDB on mount (for Kids profile)
     useEffect(() => {
@@ -266,7 +259,6 @@ export function VOD() {
             return;
         }
 
-        setLoadingTmdb(true);
         const fetchTmdb = async () => {
             try {
                 let data: TMDBMovieDetails | null = null;
@@ -287,16 +279,10 @@ export function VOD() {
                 setTmdbData(data);
             } catch (err) {
                 console.error('Failed to fetch TMDB data:', err);
-            } finally {
-                setLoadingTmdb(false);
             }
         };
         fetchTmdb();
     }, [selectedMovie]);
-
-    const handleImageError = useCallback((streamId: number) => {
-        setBrokenImages(prev => new Set(prev).add(streamId));
-    }, []);
 
     const fixImageUrl = (url: string): string => url?.replace(/\/\/+/g, '/').replace(':/', '://') || '';
 
@@ -600,7 +586,7 @@ export function VOD() {
                                                             streamId: stream.stream_id
                                                         });
                                                     }
-                                                    _setRefresh(r => r + 1);
+                                                    setRefresh(r => r + 1);
                                                 }}
                                             >
                                                 {/* Saved Badge */}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { type TMDBSeriesDetails, fetchEpisodeDetails, getBackdropUrl, searchSeriesByName } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
 import { favoritesService } from '../services/favoritesService';
@@ -7,11 +7,9 @@ import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { ResumeModal } from '../components/ResumeModal';
-import { ProgressBar } from '../components/ProgressBar';
 import { ContentDetailModal } from '../components/ContentDetailModal';
 import { profileService } from '../services/profileService';
 import { indexedDBCache } from '../services/indexedDBCache';
-import { downloadService } from '../services/downloadService';
 import { searchSeriesByName as searchSeries, isKidsFriendly } from '../services/tmdb';
 import { parentalService } from '../services/parentalService';
 import { HoverPreviewCard, closeAllPreviews } from '../components/HoverPreviewCard';
@@ -38,8 +36,23 @@ interface Series {
     tmdb_id: string;
 }
 
+interface SeriesEpisode {
+    id: number | string;
+    episode_num: number | string;
+    title?: string;
+    info?: {
+        duration?: string;
+    };
+    container_extension?: string;
+}
+
+interface SeriesInfo {
+    episodes?: Record<string, SeriesEpisode[]>;
+}
+
 const CARD_MIN_WIDTH = 180;
 const CARD_GAP = 24;
+const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'er\u00f3tico'];
 
 export function Series() {
     const [series, setSeries] = useState<Series[]>([]);
@@ -47,7 +60,6 @@ export function Series() {
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-    const [brokenImages, setBrokenImages] = useState<Set<number>>(new Set());
     const [selectedSeries, setSelectedSeries] = useState<Series | null>(null);
     const [tmdbData, setTmdbData] = useState<TMDBSeriesDetails | null>(null);
     const [loadingTmdb, setLoadingTmdb] = useState(false);
@@ -55,7 +67,7 @@ export function Series() {
     const [pipResumeTime, setPipResumeTime] = useState<number | null>(null);
     const [selectedSeason, setSelectedSeason] = useState<number>(1);
     const [selectedEpisode, setSelectedEpisode] = useState<number>(1);
-    const [seriesInfo, setSeriesInfo] = useState<any>(null);
+    const [seriesInfo, setSeriesInfo] = useState<SeriesInfo | null>(null);
     const [tmdbEpisodeCache, setTmdbEpisodeCache] = useState<Map<string, string>>(new Map());
     const [, setRefresh] = useState(0);
     const [visibleCount, setVisibleCount] = useState(0);
@@ -83,9 +95,6 @@ export function Series() {
     const [cachedRatings, setCachedRatings] = useState<Map<string, string | null>>(new Map());
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const { t } = useLanguage();
-
-    // Blocked category patterns for Kids profile
-    const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'erótico'];
 
     // Close any open previews when this page mounts
     useEffect(() => {
@@ -155,8 +164,8 @@ export function Series() {
             } else {
                 setError(result.error || 'Failed to load series');
             }
-        } catch (err: any) {
-            setError(err?.message || 'Failed to connect to server');
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Failed to connect to server');
         } finally {
             setLoading(false);
         }
@@ -274,10 +283,6 @@ export function Series() {
         setSelectedSeries(null);
     }, [searchQuery, selectedCategory, itemsPerPage]);
 
-    const handleImageError = useCallback((seriesId: number) => {
-        setBrokenImages(prev => new Set(prev).add(seriesId));
-    }, []);
-
     const fixImageUrl = (url: string): string => url && url.startsWith('http') ? url : `https://${url}`;
 
     const extractYearFromName = (name: string): string => {
@@ -335,9 +340,9 @@ export function Series() {
     };
 
     const getEpisodeTitle = (fullTitle: string, episodeNum: number, season: number = selectedSeason): string => {
-        let cleanTitle = fullTitle
-            .replace(/^(.*?)[\s\-–—]*S\d+[\s\-:\.]*E\d+[\s\-:\.–—]*/i, '')
-            .replace(/\s*[\[\(]?S\d+[\s\.\-]*E\d+[\]\)]?\s*/gi, '')
+        const cleanTitle = fullTitle
+            .replace(/^(.*?)[\s\-–—]*S\d+[\s\-:.]*E\d+[\s\-:.–—]*/i, '')
+            .replace(/\s*(?:\[|\()?S\d+[\s.-]*E\d+(?:\]|\))?\s*/gi, '')
             .replace(/\s*-\s*Temporada\s*\d+\s*Epis[oó]dio\s*\d+\s*/gi, '')
             .replace(/\s*Temp\s*\d+\s*Ep\s*\d+\s*/gi, '')
             .trim();
@@ -367,13 +372,14 @@ export function Series() {
         return `Episódio ${episodeNum}`;
     };
 
-    const buildSeriesStreamUrl = async (_seriesItem: Series): Promise<string> => {
+    const buildSeriesStreamUrl = async (seriesItem: Series): Promise<string> => {
+        void seriesItem;
         try {
             const credResult = await window.ipcRenderer.invoke('auth:get-credentials');
             if (credResult.success) {
                 const { url, username, password } = credResult.credentials;
                 const episodes = seriesInfo?.episodes?.[selectedSeason];
-                const episode = episodes?.find((ep: any) => Number(ep.episode_num) === selectedEpisode);
+                const episode = episodes?.find((ep) => Number(ep.episode_num) === selectedEpisode);
 
                 if (episode) {
                     const ext = episode.container_extension || 'mp4';
@@ -737,7 +743,7 @@ export function Series() {
                                 {/* Episode List */}
                                 <div className="episode-list-container">
                                     <div className="episode-list">
-                                        {seriesInfo?.episodes?.[selectedSeason] ? seriesInfo.episodes[selectedSeason].map((episode: any, index: number) => {
+                                        {seriesInfo?.episodes?.[selectedSeason] ? seriesInfo.episodes[selectedSeason].map((episode: SeriesEpisode, index: number) => {
                                             const episodeNum = Number(episode.episode_num);
                                             const progress = watchProgressService.getEpisodeProgress(String(selectedSeries.series_id), selectedSeason, episodeNum);
                                             const isSelected = selectedEpisode === episodeNum;
@@ -756,7 +762,7 @@ export function Series() {
                                                     </div>
                                                     <div className="episode-info">
                                                         <div className="episode-title-row">
-                                                            <span className="episode-title">{getEpisodeTitle(episode.title, episodeNum)}</span>
+                                                            <span className="episode-title">{getEpisodeTitle(episode.title || '', episodeNum)}</span>
                                                         </div>
                                                         {episode.info?.duration && (
                                                             <span className="episode-duration">{episode.info.duration}</span>
@@ -1029,9 +1035,9 @@ export function Series() {
                     currentEpisode={selectedEpisode}
                     customTitle={(() => {
                         const currentEp = seriesInfo?.episodes?.[selectedSeason]?.find(
-                            (ep: any) => Number(ep.episode_num) === selectedEpisode
+                            (ep: SeriesEpisode) => Number(ep.episode_num) === selectedEpisode
                         );
-                        const episodeName = currentEp ? getEpisodeTitle(currentEp.title, selectedEpisode, selectedSeason) : `Episódio ${selectedEpisode}`;
+                        const episodeName = currentEp ? getEpisodeTitle(currentEp.title || '', selectedEpisode, selectedSeason) : `Episódio ${selectedEpisode}`;
                         return `${playingSeries.name} - ${episodeName}`;
                     })()}
                 />

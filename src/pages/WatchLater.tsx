@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { watchLaterService, type WatchLaterItem } from '../services/watchLater';
 import { ContentDetailModal } from '../components/ContentDetailModal';
@@ -9,7 +9,7 @@ import { movieProgressService } from '../services/movieProgressService';
 import { useLanguage } from '../services/languageService';
 
 export function WatchLater() {
-    const [items, setItems] = useState<WatchLaterItem[]>([]);
+    const [items, setItems] = useState<WatchLaterItem[]>(() => watchLaterService.getAll());
     const [removingId, setRemovingId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'all' | 'movies' | 'series'>('all');
     const navigate = useNavigate();
@@ -41,13 +41,9 @@ export function WatchLater() {
         duration: number;
     } | null>(null);
 
-    useEffect(() => {
-        loadItems();
-    }, []);
-
-    const loadItems = () => {
+    const loadItems = useCallback(() => {
         setItems(watchLaterService.getAll());
-    };
+    }, []);
 
     const removeItem = useCallback((id: string, type: 'series' | 'movie') => {
         setRemovingId(`${type}-${id}`);
@@ -56,7 +52,7 @@ export function WatchLater() {
             loadItems();
             setRemovingId(null);
         }, 300);
-    }, []);
+    }, [loadItems]);
 
     const getMovieProgress = (movieId: string) => {
         return movieProgressService.getMoviePositionById(movieId);
@@ -353,7 +349,7 @@ export function WatchLater() {
                                 const seriesInfoRes = await fetch(`${url}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${content.id}`);
                                 const seriesInfo = await seriesInfoRes.json();
                                 const episodes = seriesInfo?.episodes?.[content.season || 1];
-                                const episode = episodes?.find((ep: any) => Number(ep.episode_num) === (content.episode || 1));
+                                const episode = episodes?.find((ep: { episode_num: number | string }) => Number(ep.episode_num) === (content.episode || 1));
                                 if (episode) {
                                     const ext = episode.container_extension || 'mp4';
                                     return `${url}/series/${username}/${password}/${episode.id}.${ext}`;

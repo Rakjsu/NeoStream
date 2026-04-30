@@ -297,6 +297,7 @@ class WatchProgressService {
     // if a series is completed. This function now returns false to prevent premature
     // "completed" marking. Use getSeriesProgress with total episode count instead.
     isSeriesCompleted(_seriesId: string): boolean {
+        void _seriesId;
         // Always return false - we cannot determine completion without total episode count
         // The UI should use a different method that receives the total episode count
         return false;

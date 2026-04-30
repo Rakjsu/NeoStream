@@ -2050,7 +2050,7 @@ export const epgService = {
         let match;
         while ((match = pattern.exec(html)) !== null) {
             const time = match[1];
-            let title = match[2].trim()
+            const title = match[2].trim()
                 .replace(/&amp;/g, '&')
                 .replace(/&nbsp;/g, ' ')
                 .replace(/\s+/g, ' ');
