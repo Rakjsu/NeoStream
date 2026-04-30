@@ -5,14 +5,14 @@ interface StoreSchema {
         url?: string
         username?: string
         password?: string
-        userInfo?: any
+        userInfo?: unknown
     }
-    favorites: any[]
-    history: any[]
+    favorites: unknown[]
+    history: unknown[]
     settings: {
         theme?: string
         language?: string
-        player?: any
+        player?: unknown
         allowInvalidProviderCertificates?: boolean
         approvedProviderHosts?: string[]
     }

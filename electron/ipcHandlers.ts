@@ -6,6 +6,13 @@ import { getCertificateSettings, getProviderHttpsAgent, registerApprovedProvider
 // Store for window state (for custom maximize)
 let savedWindowBounds: Electron.Rectangle | null = null
 
+const getErrorMessage = (error: unknown): string =>
+    error instanceof Error ? error.message : String(error)
+
+type OpenSubtitlesBody = Record<string, unknown> & {
+    authToken?: string
+}
+
 export function setupIpcHandlers() {
     ipcMain.handle('ping', () => 'pong')
 
@@ -60,8 +67,8 @@ export function setupIpcHandlers() {
             store.set('auth', { url, username, password, userInfo: data.user_info })
 
             return { success: true, data }
-        } catch (error: any) {
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -118,8 +125,8 @@ export function setupIpcHandlers() {
                     series: Array.isArray(series) ? series.length : 0
                 }
             }
-        } catch (error: any) {
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -135,8 +142,8 @@ export function setupIpcHandlers() {
             const streams = await client.getLiveStreams()
 
             return { success: true, data: streams }
-        } catch (error: any) {
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -152,8 +159,8 @@ export function setupIpcHandlers() {
             const streams = await client.getVODStreams()
 
             return { success: true, data: streams }
-        } catch (error: any) {
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -169,8 +176,8 @@ export function setupIpcHandlers() {
             const streams = await client.getSeries()
 
             return { success: true, data: streams }
-        } catch (error: any) {
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -186,8 +193,8 @@ export function setupIpcHandlers() {
             const categories = await client.getLiveCategories()
 
             return { success: true, data: categories }
-        } catch (error: any) {
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -203,8 +210,8 @@ export function setupIpcHandlers() {
             const categories = await client.getVodCategories()
 
             return { success: true, data: categories }
-        } catch (error: any) {
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -220,8 +227,8 @@ export function setupIpcHandlers() {
             const categories = await client.getSeriesCategories()
 
             return { success: true, data: categories }
-        } catch (error: any) {
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -237,9 +244,9 @@ export function setupIpcHandlers() {
             const html = await response.text()
             console.log('[EPG IPC] Response length:', html.length)
             return { success: true, html }
-        } catch (error: any) {
-            console.error('[EPG IPC] Error:', error.message)
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            console.error('[EPG IPC] Error:', getErrorMessage(error))
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -265,9 +272,9 @@ export function setupIpcHandlers() {
             const html = await response.text()
             console.log('[EPG IPC] mi.tv Response length:', html.length)
             return { success: true, html }
-        } catch (error: any) {
-            console.error('[EPG IPC] mi.tv Error:', error.message)
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            console.error('[EPG IPC] mi.tv Error:', getErrorMessage(error))
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -293,9 +300,9 @@ export function setupIpcHandlers() {
             registerApprovedProviderUrl(response.url || url)
             console.log('[Fetch URL] Response length:', text.length)
             return { success: true, data: text }
-        } catch (error: any) {
-            console.error('[Fetch URL] Error:', error.message)
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            console.error('[Fetch URL] Error:', getErrorMessage(error))
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -333,7 +340,7 @@ export function setupIpcHandlers() {
                     } else {
                         console.log('[EPG Cache] Cache old, downloading fresh (age:', Math.round(cacheAge / 60000), 'min)')
                     }
-                } catch (e) {
+                } catch {
                     console.log('[EPG Cache] No cache found, will download fresh')
                 }
             } else {
@@ -346,7 +353,7 @@ export function setupIpcHandlers() {
                     const data = await fs.readFile(cacheFile, 'utf-8')
                     console.log('[EPG Cache] Returning cached data, length:', data.length)
                     return { success: true, data, fromCache: true }
-                } catch (e) {
+                } catch {
                     console.log('[EPG Cache] Cache file read failed, will download fresh')
                 }
             }
@@ -370,7 +377,7 @@ export function setupIpcHandlers() {
                     const data = await fs.readFile(cacheFile, 'utf-8')
                     console.log('[EPG Cache] Returning stale cache due to download failure')
                     return { success: true, data, fromCache: true, stale: true }
-                } catch (e) {
+                } catch {
                     return { success: false, error: `Download failed: HTTP ${response.status}` }
                 }
             }
@@ -390,9 +397,9 @@ export function setupIpcHandlers() {
             console.log('[EPG Cache] Saved to cache:', cacheFile)
             return { success: true, data, fromCache: false }
 
-        } catch (error: any) {
-            console.error('[EPG Cache] Error:', error.message)
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            console.error('[EPG Cache] Error:', getErrorMessage(error))
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -417,8 +424,8 @@ export function setupIpcHandlers() {
                     size: meta.size
                 }
             }
-        } catch (error: any) {
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
         }
     })
     ipcMain.handle('streams:get-vod-url', async (_, { streamId, container }) => {
@@ -437,8 +444,8 @@ export function setupIpcHandlers() {
             console.log('[Download] Generated VOD URL:', url.replace(auth.password, '***'))
 
             return { success: true, url }
-        } catch (error: any) {
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -455,8 +462,8 @@ export function setupIpcHandlers() {
             registerApprovedProviderUrl(url, auth.url)
 
             return { success: true, url }
-        } catch (error: any) {
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -473,13 +480,13 @@ export function setupIpcHandlers() {
             registerApprovedProviderUrl(url, auth.url)
 
             return { success: true, url }
-        } catch (error: any) {
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
     // OpenSubtitles API proxy (bypass CORS)
-    ipcMain.handle('opensubtitles:request', async (_, { endpoint, method, body }) => {
+    ipcMain.handle('opensubtitles:request', async (_, { endpoint, method, body }: { endpoint: string; method?: string; body?: OpenSubtitlesBody }) => {
         try {
             const fetch = (await import('node-fetch')).default
             const baseUrl = 'https://api.opensubtitles.com/api/v1'
@@ -497,7 +504,7 @@ export function setupIpcHandlers() {
                 delete body.authToken
             }
 
-            const options: any = {
+            const options: { method: string; headers: Record<string, string>; body?: string } = {
                 method: method || 'GET',
                 headers
             }
@@ -517,9 +524,9 @@ export function setupIpcHandlers() {
                 status: response.status,
                 data
             }
-        } catch (error: any) {
-            console.error('[OpenSubtitles] Error:', error.message)
-            return { success: false, error: error.message }
+        } catch (error: unknown) {
+            console.error('[OpenSubtitles] Error:', getErrorMessage(error))
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 

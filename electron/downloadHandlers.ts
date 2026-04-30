@@ -17,6 +17,9 @@ const activeDownloads: Map<string, ActiveDownload> = new Map();
 // Number of parallel connections for faster downloads
 const PARALLEL_CONNECTIONS = 4;
 
+const getErrorMessage = (error: unknown): string =>
+    error instanceof Error ? error.message : String(error);
+
 function getDownloadsPath(): string {
     const userDataPath = app.getPath('userData');
     const downloadsPath = path.join(userDataPath, 'downloads');
@@ -346,9 +349,9 @@ export function setupDownloadHandlers() {
 
             return { success: true, filePath, size: totalBytes };
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[Download] Error:', error);
-            return { success: false, error: error.message };
+            return { success: false, error: getErrorMessage(error) };
         }
     });
 
@@ -381,8 +384,8 @@ export function setupDownloadHandlers() {
         try {
             if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
             return { success: true };
-        } catch (error: any) {
-            return { success: false, error: error.message };
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) };
         }
     });
 
@@ -400,7 +403,7 @@ export function setupDownloadHandlers() {
                 const stats = fs.statfsSync(downloadsPath);
                 total = stats.bsize * stats.blocks;
                 available = stats.bsize * stats.bavail;
-            } catch (e) {
+            } catch {
                 // Fallback: try to estimate from userData path
                 console.warn('[Download] statfs not available, using fallback');
             }
@@ -412,8 +415,8 @@ export function setupDownloadHandlers() {
                 available,
                 downloadsPath
             };
-        } catch (error: any) {
-            return { success: false, error: error.message };
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) };
         }
     });
 
@@ -422,8 +425,8 @@ export function setupDownloadHandlers() {
         try {
             shell.openPath(getDownloadsPath());
             return { success: true };
-        } catch (error: any) {
-            return { success: false, error: error.message };
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) };
         }
     });
 
@@ -435,8 +438,8 @@ export function setupDownloadHandlers() {
             }
             shell.openPath(filePath);
             return { success: true };
-        } catch (error: any) {
-            return { success: false, error: error.message };
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) };
         }
     });
 
@@ -449,8 +452,8 @@ export function setupDownloadHandlers() {
                 fs.rmSync(folderPath, { recursive: true, force: true });
             }
             return { success: true };
-        } catch (error: any) {
-            return { success: false, error: error.message };
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) };
         }
     });
 
@@ -470,8 +473,8 @@ export function setupDownloadHandlers() {
                 }
             }
             return { success: true, files };
-        } catch (error: any) {
-            return { success: false, error: error.message };
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) };
         }
     });
 
@@ -541,8 +544,8 @@ export function setupDownloadHandlers() {
                     resolve({ success: false, error: 'Timeout' });
                 });
             });
-        } catch (error: any) {
-            return { success: false, error: error.message };
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) };
         }
     });
 

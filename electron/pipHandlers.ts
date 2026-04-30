@@ -4,6 +4,7 @@
  */
 
 import { BrowserWindow, ipcMain, screen, globalShortcut } from 'electron';
+import type { IpcMainEvent } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -178,7 +179,7 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
                 const responseChannel = `pip:nextEpisodeResponse:${Date.now()}`;
                 console.log('[PiP Main] Waiting for response on:', responseChannel);
 
-                const handler = (_event: any, response: any) => {
+                const handler = (_event: IpcMainEvent, response: unknown) => {
                     console.log('[PiP Main] Received response:', response);
                     ipcMain.removeListener(responseChannel, handler);
                     resolve(response);

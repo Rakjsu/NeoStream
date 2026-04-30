@@ -8,9 +8,18 @@ export interface XtreamAccount {
 }
 
 export interface XtreamResponse {
-    user_info: any
-    server_info: any
+    user_info: Record<string, unknown>
+    server_info: Record<string, unknown>
 }
+
+interface NetworkError extends Error {
+    code?: string
+    request?: unknown
+    response?: unknown
+}
+
+const isNetworkError = (error: unknown): error is NetworkError =>
+    error instanceof Error
 
 export class XtreamClient {
     private baseUrl: string
@@ -23,7 +32,7 @@ export class XtreamClient {
         this.password = password
     }
 
-    private async makeRequest(action: string, params: Record<string, string> = {}) {
+    private async makeRequest(action: string, params: Record<string, string> = {}): Promise<unknown> {
         const url = new URL(`${this.baseUrl}/player_api.php`)
         url.searchParams.append('username', this.username)
         url.searchParams.append('password', this.password)
@@ -41,7 +50,7 @@ export class XtreamClient {
                 validateStatus: () => true,  // Don't throw on any status
                 httpsAgent: getProviderHttpsAgent(requestUrl, this.baseUrl)
             })
-        } catch (error: any) {
+        } catch (error: unknown) {
             if (isTlsCertificateError(error)) {
                 throw new Error(getInvalidCertificateGuidance())
             }
@@ -90,19 +99,19 @@ export class XtreamClient {
 
             console.log('[XtreamClient] Authentication successful');
             return data;
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[XtreamClient] Authentication error:', error);
 
             // Mensagens de erro mais específicas
-            if (error.code === 'ENOTFOUND' || error.message?.includes('ENOTFOUND')) {
+            if (isNetworkError(error) && (error.code === 'ENOTFOUND' || error.message.includes('ENOTFOUND'))) {
                 throw new Error(`Servidor não encontrado: ${this.baseUrl}\n\nVerifique se a URL está correta.`);
             }
 
-            if (error.code === 'ECONNREFUSED' || error.message?.includes('ECONNREFUSED')) {
+            if (isNetworkError(error) && (error.code === 'ECONNREFUSED' || error.message.includes('ECONNREFUSED'))) {
                 throw new Error(`Conexão recusada: ${this.baseUrl}\n\nO servidor pode estar offline.`);
             }
 
-            if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+            if (isNetworkError(error) && (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED' || error.message.includes('timeout'))) {
                 throw new Error(`Tempo esgotado ao conectar em: ${this.baseUrl}\n\nO servidor demorou muito para responder.`);
             }
 
@@ -111,7 +120,7 @@ export class XtreamClient {
             }
 
             // Erro de rede genérico
-            if (error.request && !error.response) {
+            if (isNetworkError(error) && error.request && !error.response) {
                 throw new Error(`Falha na conexão com: ${this.baseUrl}\n\nVerifique sua internet e se o servidor está acessível.`);
             }
 

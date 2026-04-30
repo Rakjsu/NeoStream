@@ -15,6 +15,9 @@ const DEFAULT_CONFIG: UpdateConfig = {
     lastCheck: 0
 };
 
+const getErrorMessage = (error: unknown): string =>
+    error instanceof Error ? error.message : String(error);
+
 export function initializeAutoUpdater(mainWindow: BrowserWindow) {
     // Get or initialize config
     const getConfig = (): UpdateConfig => {
@@ -134,12 +137,12 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
                 updateAvailable: false,
                 currentVersion: autoUpdater.currentVersion.version
             };
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error checking for updates:', error);
             return {
                 updateAvailable: false,
                 currentVersion: autoUpdater.currentVersion.version,
-                error: error.message
+                error: getErrorMessage(error)
             };
         }
     });
@@ -148,9 +151,9 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
         try {
             await autoUpdater.downloadUpdate();
             return { success: true };
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error downloading update:', error);
-            return { success: false, error: error.message };
+            return { success: false, error: getErrorMessage(error) };
         }
     });
 
@@ -159,9 +162,9 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
             // Quit and install immediately
             autoUpdater.quitAndInstall(false, true);
             return { success: true };
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error installing update:', error);
-            return { success: false, error: error.message };
+            return { success: false, error: getErrorMessage(error) };
         }
     });
 

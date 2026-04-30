@@ -7,12 +7,39 @@ import { createRequire } from 'module';
 // Create require for CommonJS modules in ES module context
 const require = createRequire(import.meta.url);
 
-let airplayBrowser: any = null;
-let discoveredDevices: Map<string, any> = new Map();
+interface AirPlayDevice {
+    id: string
+    name?: string
+    host: string
+    port?: number
+    model?: string
+    features?: unknown
+}
+
+interface AirPlayBrowser {
+    on(event: 'deviceOn' | 'deviceOff', callback: (device: AirPlayDevice) => void): void
+    start(): void
+}
+
+interface AirPlayClient {
+    play(url: string, startPosition: number, callback: (error?: Error | null) => void): void
+    stop(callback: (error?: Error | null) => void): void
+}
+
+interface AirPlayModule {
+    createBrowser(): AirPlayBrowser
+    createDevice(host: string, port?: number): AirPlayClient
+}
+
+const getErrorMessage = (error: unknown): string =>
+    error instanceof Error ? error.message : String(error);
+
+let airplayBrowser: AirPlayBrowser | null = null;
+const discoveredDevices: Map<string, AirPlayDevice> = new Map();
 
 // Initialize airplay
 try {
-    const airplay = require('airplay-protocol');
+    const airplay = require('airplay-protocol') as AirPlayModule;
     airplayBrowser = airplay.createBrowser();
     console.log('[AirPlay] airplay-protocol loaded successfully');
 } catch (error) {
@@ -22,12 +49,12 @@ try {
 export function setupAirPlayHandlers() {
     // Setup device discovery if browser exists
     if (airplayBrowser) {
-        airplayBrowser.on('deviceOn', (device: any) => {
+        airplayBrowser.on('deviceOn', (device) => {
             console.log('[AirPlay] Device found:', device.name);
             discoveredDevices.set(device.id, device);
         });
 
-        airplayBrowser.on('deviceOff', (device: any) => {
+        airplayBrowser.on('deviceOff', (device) => {
             console.log('[AirPlay] Device offline:', device.name);
             discoveredDevices.delete(device.id);
         });
@@ -51,7 +78,7 @@ export function setupAirPlayHandlers() {
             // Wait a bit for discovery
             await new Promise(resolve => setTimeout(resolve, 2000));
 
-            const devices = Array.from(discoveredDevices.values()).map((device: any) => ({
+            const devices = Array.from(discoveredDevices.values()).map((device) => ({
                 id: device.id,
                 name: device.name || 'AirPlay Device',
                 host: device.host,
@@ -66,11 +93,11 @@ export function setupAirPlayHandlers() {
                 success: true,
                 devices
             };
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[AirPlay] Discovery error:', error);
             return {
                 success: false,
-                error: error.message,
+                error: getErrorMessage(error),
                 devices: []
             };
         }
@@ -91,12 +118,12 @@ export function setupAirPlayHandlers() {
             }
 
             // Create device client
-            const airplay = require('airplay-protocol');
+            const airplay = require('airplay-protocol') as AirPlayModule;
             const client = airplay.createDevice(device.host, device.port);
 
             // Play video
             await new Promise((resolve, reject) => {
-                client.play(url, 0, (err: any) => {
+                client.play(url, 0, (err) => {
                     if (err) {
                         console.error('[AirPlay] Play error:', err);
                         reject(err);
@@ -110,11 +137,11 @@ export function setupAirPlayHandlers() {
             return {
                 success: true
             };
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[AirPlay] Cast error:', error);
             return {
                 success: false,
-                error: error.message
+                error: getErrorMessage(error)
             };
         }
     });
@@ -133,11 +160,11 @@ export function setupAirPlayHandlers() {
                 throw new Error('Device not found');
             }
 
-            const airplay = require('airplay-protocol');
+            const airplay = require('airplay-protocol') as AirPlayModule;
             const client = airplay.createDevice(device.host, device.port);
 
             await new Promise((resolve, reject) => {
-                client.stop((err: any) => {
+                client.stop((err) => {
                     if (err) {
                         console.error('[AirPlay] Stop error:', err);
                         reject(err);
@@ -151,11 +178,11 @@ export function setupAirPlayHandlers() {
             return {
                 success: true
             };
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[AirPlay] Stop error:', error);
             return {
                 success: false,
-                error: error.message
+                error: getErrorMessage(error)
             };
         }
     });

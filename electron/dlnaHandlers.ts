@@ -6,22 +6,55 @@ import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
 
-let MediaRendererClient: any = null;
-let ssdp: any = null;
-let discoveredDevices: Map<string, any> = new Map();
-let manualDevices: any[] = [];
+interface DlnaDevice {
+    id: string
+    name: string
+    host: string
+    port?: number
+    location?: string
+    type?: string
+    online?: boolean
+    source?: string
+}
+
+interface SsdpHeaders {
+    ST?: string
+    SERVER?: string
+    LOCATION?: string
+}
+
+interface SsdpPeer {
+    on(event: 'found', callback: (headers: SsdpHeaders, address: string) => void): void
+    search(target: string): void
+}
+
+interface MediaRendererClientInstance {
+    on(event: 'error', callback: (error: Error) => void): void
+    load(url: string, options: unknown, callback: (error?: Error | null) => void): void
+    stop(callback: (error?: Error | null) => void): void
+}
+
+type MediaRendererClientConstructor = new (location: string) => MediaRendererClientInstance;
+
+const getErrorMessage = (error: unknown): string =>
+    error instanceof Error ? error.message : String(error);
+
+let MediaRendererClient: MediaRendererClientConstructor | null = null;
+let ssdp: SsdpPeer | null = null;
+const discoveredDevices: Map<string, DlnaDevice> = new Map();
+let manualDevices: DlnaDevice[] = [];
 let isDiscovering = false;
 
 // Initialize dependencies
 try {
-    MediaRendererClient = require('upnp-mediarenderer-client');
+    MediaRendererClient = require('upnp-mediarenderer-client') as MediaRendererClientConstructor;
     console.log('[DLNA] upnp-mediarenderer-client loaded successfully');
 } catch (error) {
     console.error('[DLNA] Failed to load upnp-mediarenderer-client:', error);
 }
 
 try {
-    const SSDP = require('peer-ssdp').Peer;
+    const SSDP = require('peer-ssdp').Peer as new () => SsdpPeer;
     ssdp = new SSDP();
     console.log('[DLNA] SSDP peer loaded successfully');
 } catch (error) {
@@ -62,7 +95,7 @@ function saveDevices(): void {
 }
 
 // Discover DLNA devices using SSDP
-async function discoverDevices(): Promise<any[]> {
+async function discoverDevices(): Promise<DlnaDevice[]> {
     return new Promise((resolve) => {
         if (!ssdp || isDiscovering) {
             resolve(Array.from(discoveredDevices.values()));
@@ -73,7 +106,7 @@ async function discoverDevices(): Promise<any[]> {
         discoveredDevices.clear();
 
         try {
-            ssdp.on('found', (headers: any, address: string) => {
+            ssdp.on('found', (headers, address) => {
                 if (headers.ST && headers.ST.includes('MediaRenderer')) {
                     const device = {
                         id: `discovered-${address}`,
@@ -125,11 +158,11 @@ export function setupDLNAHandlers() {
                 success: true,
                 devices: allDevices
             };
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[DLNA] Discover error:', error);
             return {
                 success: false,
-                error: error.message,
+                error: getErrorMessage(error),
                 devices: manualDevices.map(d => ({ ...d, source: 'manual', online: true }))
             };
         }
@@ -177,11 +210,11 @@ export function setupDLNAHandlers() {
                     port: device.port
                 }
             };
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[DLNA] Add device error:', error);
             return {
                 success: false,
-                error: error.message
+                error: getErrorMessage(error)
             };
         }
     });
@@ -192,8 +225,8 @@ export function setupDLNAHandlers() {
             manualDevices = manualDevices.filter(d => d.id !== deviceId);
             saveDevices();
             return { success: true };
-        } catch (error: any) {
-            return { success: false, error: error.message };
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) };
         }
     });
 
@@ -244,12 +277,12 @@ export function setupDLNAHandlers() {
                     reject(new Error('Connection timeout - Check if TV is on and DLNA is enabled'));
                 }, 10000);
 
-                client.on('error', (err: any) => {
+                client.on('error', (err) => {
                     clearTimeout(timeout);
                     reject(err);
                 });
 
-                client.load(url, options, (err: any) => {
+                client.load(url, options, (err) => {
                     clearTimeout(timeout);
                     if (err) {
                         console.error('[DLNA] Cast error:', err);
@@ -262,11 +295,11 @@ export function setupDLNAHandlers() {
             });
 
             return { success: true };
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[DLNA] Cast error:', error);
             return {
                 success: false,
-                error: error.message || 'Failed to cast'
+                error: error instanceof Error ? error.message : 'Failed to cast'
             };
         }
     });
@@ -289,7 +322,7 @@ export function setupDLNAHandlers() {
             const client = new MediaRendererClient(location);
 
             await new Promise((resolve, reject) => {
-                client.stop((err: any) => {
+                client.stop((err) => {
                     if (err) {
                         reject(err);
                     } else {
@@ -299,11 +332,11 @@ export function setupDLNAHandlers() {
             });
 
             return { success: true };
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('[DLNA] Stop error:', error);
             return {
                 success: false,
-                error: error.message
+                error: getErrorMessage(error)
             };
         }
     });
