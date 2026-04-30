@@ -19,7 +19,6 @@ export function Settings() {
     });
     const [playbackConfig, setPlaybackConfig] = useState<PlaybackConfig>(playbackService.getConfig());
     const [parentalConfig, setParentalConfig] = useState<ParentalConfig>(parentalService.getConfig());
-    const [bufferInfo, setBufferInfo] = useState<string>('');
     const [checking, setChecking] = useState(false);
     const [lastCheckDate, setLastCheckDate] = useState<string>('');
     const [activeSection, setActiveSection] = useState<string>('updates');
@@ -56,6 +55,10 @@ export function Settings() {
     const [epgCurrentPage, setEpgCurrentPage] = useState(1);
     const EPG_ITEMS_PER_PAGE = 50;
     const epgResultsRef = useRef<HTMLDivElement>(null);
+
+    type EpgCountryFilter = typeof epgCountryFilter;
+    type EpgWorkingItem = EpgTestResult['working'][number] & { type: 'working' };
+    type EpgNotWorkingItem = EpgTestResult['notWorking'][number] & { type: 'notWorking' };
 
     // Subscribe to EPG test service state changes (runs in background even when navigating away)
     useEffect(() => {
@@ -123,7 +126,6 @@ export function Settings() {
     useEffect(() => {
         loadUpdateConfig();
         loadCertificateSettings();
-        updateBufferInfo();
         // Load usage stats
         setUsageStats(usageStatsService.getStats());
         setWeeklyStats(usageStatsService.getWeeklyStats());
@@ -165,7 +167,7 @@ export function Settings() {
         }
     };
 
-    const handleUpdateConfigChange = async (key: keyof UpdateConfig, value: any) => {
+    const handleUpdateConfigChange = async <K extends keyof UpdateConfig>(key: K, value: UpdateConfig[K]) => {
         const newConfig = { ...updateConfig, [key]: value };
         setUpdateConfig(newConfig);
         await updateService.setConfig(newConfig);
@@ -175,27 +177,17 @@ export function Settings() {
         setTimeout(() => setSaveAnimation(null), 1500);
     };
 
-    const updateBufferInfo = async () => {
-        const description = playbackService.getBufferDescription();
-        setBufferInfo(description);
-    };
-
-    const handlePlaybackConfigChange = async (key: keyof PlaybackConfig, value: any) => {
+    const handlePlaybackConfigChange = <K extends keyof PlaybackConfig>(key: K, value: PlaybackConfig[K]) => {
         const newConfig = { ...playbackConfig, [key]: value };
         setPlaybackConfig(newConfig);
         playbackService.setConfig({ [key]: value });
-
-        // Update buffer info display when buffer changes
-        if (key === 'bufferSize') {
-            await updateBufferInfo();
-        }
 
         // Show save animation
         setSaveAnimation(key);
         setTimeout(() => setSaveAnimation(null), 1500);
     };
 
-    const handleParentalConfigChange = (key: keyof ParentalConfig, value: any) => {
+    const handleParentalConfigChange = <K extends keyof ParentalConfig>(key: K, value: ParentalConfig[K]) => {
         // When trying to disable parental control, require PIN verification
         if (key === 'enabled' && value === false && parentalService.hasPin()) {
             resetPinModal();
@@ -484,7 +476,7 @@ export function Settings() {
                                         <select
                                             className="setting-select"
                                             value={playbackConfig.bufferSize}
-                                            onChange={(e) => handlePlaybackConfigChange('bufferSize', e.target.value)}
+                                            onChange={(e) => handlePlaybackConfigChange('bufferSize', e.target.value as PlaybackConfig['bufferSize'])}
                                         >
                                             <option value="intelligent">{t('playback', 'intelligent')}</option>
                                             <option value="5">5 {t('playback', 'seconds')}</option>
@@ -969,7 +961,7 @@ export function Settings() {
                                                             border: `1px solid rgba(${color === '#22c55e' ? '34, 197, 94' : color === '#60a5fa' ? '96, 165, 250' : color === '#f59e0b' ? '245, 158, 11' : '239, 68, 68'}, 0.2)`,
                                                             justifyContent: 'center'
                                                         }}
-                                                            onClick={() => setEpgCountryFilter(code as any)}
+                                                            onClick={() => setEpgCountryFilter(code as EpgCountryFilter)}
                                                         >
                                                             <div style={{ textAlign: 'center' }}>
                                                                 <div style={{ fontSize: '24px', marginBottom: '4px' }}>{flag}</div>
@@ -1050,8 +1042,10 @@ export function Settings() {
 
                                             {/* Channel List with Pagination */}
                                             {(() => {
-                                                const filteredItems = [...epgTestResults.working.map(w => ({ ...w, type: 'working' as const })),
-                                                ...epgTestResults.notWorking.map(n => ({ ...n, type: 'notWorking' as const }))]
+                                                const filteredItems = [
+                                                    ...epgTestResults.working.map((w): EpgWorkingItem => ({ ...w, type: 'working' })),
+                                                    ...epgTestResults.notWorking.map((n): EpgNotWorkingItem => ({ ...n, type: 'notWorking' }))
+                                                ]
                                                     .filter(item =>
                                                         (epgResultsFilter === 'all' || item.type === epgResultsFilter) &&
                                                         (epgCountryFilter === 'all' || item.country === epgCountryFilter) &&
@@ -1115,7 +1109,7 @@ export function Settings() {
                                                                             padding: '4px 10px',
                                                                             borderRadius: '6px'
                                                                         }}>
-                                                                            {item.type === 'working' ? `${(item as any).programCount} prog` : (item as any).reason}
+                                                                            {item.type === 'working' ? `${item.programCount} prog` : item.reason}
                                                                         </span>
                                                                     </div>
                                                                     <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>
@@ -1425,7 +1419,7 @@ export function Settings() {
                                         <select
                                             className="setting-select"
                                             value={parentalConfig.maxRating}
-                                            onChange={(e) => handleParentalConfigChange('maxRating', e.target.value)}
+                                            onChange={(e) => handleParentalConfigChange('maxRating', e.target.value as ParentalConfig['maxRating'])}
                                             disabled={!parentalConfig.enabled}
                                         >
                                             <option value="L">{t('parental', 'free')}</option>

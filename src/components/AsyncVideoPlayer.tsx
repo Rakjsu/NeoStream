@@ -1,12 +1,38 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { VideoPlayer } from './VideoPlayer/VideoPlayer';
 import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
-import { findMovieVersions, type MovieVersion } from '../services/movieVersionService';
+import { findMovieVersions } from '../services/movieVersionService';
 
-interface AsyncVideoPlayerProps {
-    movie: any;
-    buildStreamUrl: (movie: any) => Promise<string>;
+interface MediaItem {
+    id?: number | string;
+    stream_id?: number | string;
+    series_id?: number | string;
+    type?: string;
+    season?: number;
+    episode?: number;
+    name?: string;
+    title?: string;
+    cover?: string;
+    stream_icon?: string;
+    tmdb_id?: string | number;
+    tmdb?: string | number;
+    tmdbId?: string | number;
+    imdb_id?: string;
+    imdb?: string;
+    imdbId?: string;
+}
+
+interface LiveQualityVariant<TVersion extends MediaItem> {
+    channel: TVersion;
+    quality: string;
+    priority: number;
+    label: string;
+}
+
+interface AsyncVideoPlayerProps<TMovie extends MediaItem, TVersion extends MediaItem = TMovie> {
+    movie: TMovie;
+    buildStreamUrl: (movie: TMovie) => Promise<string>;
     onClose: () => void;
     onNextEpisode?: () => void;
     onPreviousEpisode?: () => void;
@@ -25,14 +51,14 @@ interface AsyncVideoPlayerProps {
     contentId?: string;
     contentType?: 'movie' | 'series' | 'live';
     // For movie version switching
-    allMovies?: any[];
-    onSwitchVersion?: (movie: any, currentTime: number) => void;
+    allMovies?: TVersion[];
+    onSwitchVersion?: (movie: TVersion, currentTime: number) => void;
     // For live TV quality switching
-    liveQualityVariants?: Array<{ channel: any; quality: string; priority: number; label: string }>;
-    onSwitchQuality?: (channel: any) => void;
+    liveQualityVariants?: LiveQualityVariant<TVersion>[];
+    onSwitchQuality?: (channel: TVersion) => void;
 }
 
-function AsyncVideoPlayer({
+function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem = TMovie>({
     movie,
     buildStreamUrl,
     onClose,
@@ -53,20 +79,19 @@ function AsyncVideoPlayer({
     onSwitchVersion,
     liveQualityVariants,
     onSwitchQuality
-}: AsyncVideoPlayerProps) {
+}: AsyncVideoPlayerProps<TMovie, TVersion>) {
     const [streamUrl, setStreamUrl] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isAnimating, setIsAnimating] = useState(true);
-    const [resumeTime, setResumeTime] = useState<number | null>(null);
     const urlLoadedRef = useRef(false);
-    const lastMovieIdRef = useRef<number | null>(null);
+    const lastMovieIdRef = useRef<string | number | null>(null);
     const lastEpisodeRef = useRef<string | null>(null);
 
     // Effect 1: Load stream URL (only triggers on movie/episode changes, NOT resumeTime)
     useEffect(() => {
         // Create a unique key for current content (movie ID + episode info for series)
-        const currentMovieId = movie.stream_id || movie.id;
+        const currentMovieId = movie.stream_id || movie.id || null;
         const currentEpisodeKey = seriesId ? `${seriesId}-S${seasonNumber}-E${episodeNumber}` : null;
 
         // Reset urlLoadedRef if movie changed (for version switching)
@@ -86,50 +111,54 @@ function AsyncVideoPlayer({
             return;
         }
 
-        setLoading(true);
-        setError(null);
+        let cancelled = false;
 
-        buildStreamUrl(movie)
-            .then(url => {
-                if (!url) {
-                    setError('Não foi possível carregar o vídeo. URL inválida.');
+        queueMicrotask(() => {
+            if (cancelled) return;
+            setLoading(true);
+            setError(null);
+
+            buildStreamUrl(movie)
+                .then(url => {
+                    if (cancelled) return;
+                    if (!url) {
+                        setError('Nao foi possivel carregar o video. URL invalida.');
+                        setLoading(false);
+                        return;
+                    }
+                    setStreamUrl(url);
                     setLoading(false);
-                    return;
-                }
-                setStreamUrl(url);
-                setLoading(false);
-                urlLoadedRef.current = true;
-            })
-            .catch((err) => {
-                console.error('Error building stream URL:', err);
-                setError('Erro ao carregar o vídeo. Tente novamente.');
-                setLoading(false);
-            });
-    }, [movie, buildStreamUrl, currentEpisode, seriesId, seasonNumber, episodeNumber]);
+                    urlLoadedRef.current = true;
+                })
+                .catch((err) => {
+                    if (cancelled) return;
+                    console.error('Error building stream URL:', err);
+                    setError('Erro ao carregar o video. Tente novamente.');
+                    setLoading(false);
+                });
+        });
 
-    // Effect 2: Set resume time (separate from URL loading to avoid remounting)
-    useEffect(() => {
-        if (!streamUrl || loading) return; // Wait for URL to load
+        return () => {
+            cancelled = true;
+        };
+    }, [movie, buildStreamUrl, currentEpisode, seriesId, seasonNumber, episodeNumber, streamUrl]);
 
-        // Use external resume time if provided (from ResumeModal)
+    const resumeTime = useMemo(() => {
+        if (!streamUrl || loading) return null;
+
         if (externalResumeTime !== undefined && externalResumeTime !== null && externalResumeTime > 0) {
-            setResumeTime(externalResumeTime);
-        } else if (seriesId && seasonNumber !== undefined && episodeNumber !== undefined) {
-            // Fall back to saved video time for resume
-            const savedTime = watchProgressService.getVideoTime(
-                seriesId,
-                seasonNumber,
-                episodeNumber
-            );
-            if (savedTime) {
-                setResumeTime(savedTime);
-            } else {
-                setResumeTime(null);
-            }
-        } else if (externalResumeTime !== undefined) {
-            // For movies with explicit resume time (even 0)
-            setResumeTime(externalResumeTime);
+            return externalResumeTime;
         }
+
+        if (seriesId && seasonNumber !== undefined && episodeNumber !== undefined) {
+            return watchProgressService.getVideoTime(seriesId, seasonNumber, episodeNumber) || null;
+        }
+
+        if (externalResumeTime !== undefined) {
+            return externalResumeTime;
+        }
+
+        return null;
     }, [streamUrl, loading, externalResumeTime, seriesId, seasonNumber, episodeNumber]);
 
     // Disable animation after it completes
@@ -376,9 +405,9 @@ function AsyncVideoPlayer({
                                 }))
                                 : allMovies && !seriesId ? findMovieVersions(movie, allMovies) : undefined
                         }
-                        currentMovieId={movie.stream_id || Number(movie.id)}
+                        currentMovieId={Number(movie.stream_id || movie.id)}
                         onSwitchVersion={contentType === 'live' && onSwitchQuality
-                            ? (channel: any) => onSwitchQuality(channel)
+                            ? (channel: TVersion) => onSwitchQuality(channel)
                             : onSwitchVersion
                         }
                         tmdbId={movie.tmdb_id || movie.tmdb || movie.tmdbId}
@@ -425,4 +454,3 @@ function AsyncVideoPlayer({
 }
 
 export default AsyncVideoPlayer;
-

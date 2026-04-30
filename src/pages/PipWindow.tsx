@@ -3,7 +3,7 @@
  * Rendered in the independent PiP BrowserWindow
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { FaPlay, FaPause, FaTimes, FaExpand, FaVolumeUp, FaVolumeMute, FaVolumeDown, FaVolumeOff } from 'react-icons/fa';
 import { useHls } from '../hooks/useHls';
 import { useVideoPlayer } from '../hooks/useVideoPlayer';
@@ -24,6 +24,13 @@ interface PipContent {
     episodeNumber?: number;
 }
 
+interface NextEpisodeContent {
+    src: string;
+    title: string;
+    seasonNumber: number;
+    episodeNumber: number;
+}
+
 export function PipWindow() {
     const [searchParams] = useSearchParams();
     const [content, setContent] = useState<PipContent | null>(null);
@@ -41,7 +48,7 @@ export function PipWindow() {
     const hideControlsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Auto-hide controls after 3 seconds of inactivity
-    const resetHideTimeout = () => {
+    const resetHideTimeout = useCallback(() => {
         setShowControls(true);
         if (hideControlsTimeout.current) {
             clearTimeout(hideControlsTimeout.current);
@@ -51,7 +58,7 @@ export function PipWindow() {
                 setShowControls(false);
             }
         }, 3000);
-    };
+    }, [isPlaying]);
 
     // Cleanup timeout on unmount
     useEffect(() => {
@@ -64,7 +71,7 @@ export function PipWindow() {
 
     // Listen for click-through mode changes from main process
     useEffect(() => {
-        const handleClickThroughChanged = (_event: any, enabled: boolean) => {
+        const handleClickThroughChanged = (_event: unknown, enabled: boolean) => {
             setClickThrough(enabled);
         };
         window.ipcRenderer.on('pip:clickThroughChanged', handleClickThroughChanged);
@@ -87,18 +94,23 @@ export function PipWindow() {
         }
     }, []);
 
-    // Parse content from URL
-    useEffect(() => {
+    const parsedContent = useMemo((): PipContent | null => {
         const dataParam = searchParams.get('data');
-        if (dataParam) {
-            try {
-                const parsed = JSON.parse(decodeURIComponent(dataParam));
-                setContent(parsed);
-            } catch (error) {
-                console.error('Failed to parse PiP content:', error);
-            }
+        if (!dataParam) return null;
+
+        try {
+            return JSON.parse(decodeURIComponent(dataParam)) as PipContent;
+        } catch (error) {
+            console.error('Failed to parse PiP content:', error);
+            return null;
         }
     }, [searchParams]);
+
+    useEffect(() => {
+        if (parsedContent) {
+            queueMicrotask(() => setContent(parsedContent));
+        }
+    }, [parsedContent]);
 
     // Initialize HLS only when we have content
     useHls({ src: content?.src || '', videoRef });
@@ -107,27 +119,28 @@ export function PipWindow() {
     useEffect(() => {
         if (!content?.src || !videoRef.current) return;
 
+        const video = videoRef.current;
         const autoPlay = () => {
-            if (videoRef.current) {
+            if (video) {
                 // Set time if specified (resuming), otherwise start from beginning
                 if (content.currentTime && content.currentTime > 0) {
-                    videoRef.current.currentTime = content.currentTime;
+                    video.currentTime = content.currentTime;
                 }
-                videoRef.current.play().catch(console.error);
+                video.play().catch(console.error);
                 setIsLoading(false);
             }
         };
 
-        if (videoRef.current.readyState >= 2) {
+        if (video.readyState >= 2) {
             autoPlay();
         } else {
-            videoRef.current.addEventListener('canplay', autoPlay, { once: true });
+            video.addEventListener('canplay', autoPlay, { once: true });
         }
 
         return () => {
-            videoRef.current?.removeEventListener('canplay', autoPlay);
+            video.removeEventListener('canplay', autoPlay);
         };
-    }, [content?.src, content?.currentTime]);
+    }, [content?.src, content?.currentTime, videoRef]);
 
     // Local loading state management
     useEffect(() => {
@@ -136,7 +149,7 @@ export function PipWindow() {
 
         // Check if video is already playing
         if (video.readyState >= 3 && !video.paused) {
-            setIsLoading(false);
+            queueMicrotask(() => setIsLoading(false));
         }
 
         const handleCanPlay = () => setIsLoading(false);
@@ -155,7 +168,7 @@ export function PipWindow() {
             video.removeEventListener('waiting', handleWaiting);
             video.removeEventListener('loadeddata', handleLoadedData);
         };
-    }, [content]);
+    }, [content, videoRef]);
 
     // Local playback state updates
     useEffect(() => {
@@ -198,7 +211,7 @@ export function PipWindow() {
                         seriesId: content.contentId,
                         currentSeason: content.seasonNumber,
                         currentEpisode: content.episodeNumber
-                    });
+                    }) as NextEpisodeContent | null;
 
                     if (nextEp && nextEp.src) {
                         // Update content with next episode
@@ -230,10 +243,10 @@ export function PipWindow() {
             video.removeEventListener('volumechange', handleVolumeChange);
             video.removeEventListener('ended', handleEnded);
         };
-    }, [content]);
+    }, [content, videoRef]);
 
     // Local control handlers
-    const handleTogglePlay = () => {
+    const handleTogglePlay = useCallback(() => {
         if (videoRef.current) {
             if (isPlaying) {
                 videoRef.current.pause();
@@ -241,26 +254,26 @@ export function PipWindow() {
                 videoRef.current.play();
             }
         }
-    };
+    }, [isPlaying, videoRef]);
 
-    const handleSeek = (time: number) => {
+    const handleSeek = useCallback((time: number) => {
         if (videoRef.current) {
             videoRef.current.currentTime = time;
         }
-    };
+    }, [videoRef]);
 
-    const handleToggleMute = () => {
+    const handleToggleMute = useCallback(() => {
         if (videoRef.current) {
             videoRef.current.muted = !videoRef.current.muted;
         }
-    };
+    }, [videoRef]);
 
-    const handleSetVolume = (vol: number) => {
+    const handleSetVolume = useCallback((vol: number) => {
         if (videoRef.current) {
             videoRef.current.volume = vol;
             if (vol > 0) videoRef.current.muted = false;
         }
-    };
+    }, [videoRef]);
 
     // Send state updates to main window
     useEffect(() => {
@@ -286,7 +299,7 @@ export function PipWindow() {
             video.removeEventListener('play', sendState);
             video.removeEventListener('pause', sendState);
         };
-    }, []);
+    }, [videoRef]);
 
     // Listen for control commands from main window
     useEffect(() => {
@@ -319,7 +332,7 @@ export function PipWindow() {
         return () => {
             window.ipcRenderer?.off('pip:control', handleControl);
         };
-    }, [isPlaying]);
+    }, [handleSeek, handleSetVolume, handleToggleMute, handleTogglePlay, videoRef]);
 
     // Save progress to localStorage
     const saveProgress = () => {

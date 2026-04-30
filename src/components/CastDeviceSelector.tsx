@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useDLNA } from '../hooks/useDLNA';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useDLNA, type DLNADevice } from '../hooks/useDLNA';
 import { useAirPlay } from '../hooks/useAirPlay';
 import { useLanguage } from '../services/languageService';
 
@@ -33,7 +33,8 @@ export function CastDeviceSelector({
 }: CastDeviceSelectorProps) {
     const dlna = useDLNA(videoUrl, videoTitle);
     const airplay = useAirPlay(videoUrl, videoTitle);
-    const [allDevices, setAllDevices] = useState<CastDevice[]>([]);
+    const { devices: dlnaDevices, discoverDevices, castToDevice, addDevice, error: dlnaError, isDiscovering } = dlna;
+    const { devices: airplayDevices, castToDevice: castToAirPlayDevice } = airplay;
     const [view, setView] = useState<'list' | 'add'>('list');
     const [deviceName, setDeviceName] = useState('');
     const [deviceIP, setDeviceIP] = useState('');
@@ -42,59 +43,11 @@ export function CastDeviceSelector({
     const [castError, setCastError] = useState<string | null>(null);
     const { t } = useLanguage();
 
-    // Auto-discover on mount
-    useEffect(() => {
-        dlna.discoverDevices();
-    }, []);
-
-    // Combine all devices
-    useEffect(() => {
-        const devices: CastDevice[] = [];
-
-        // Add Chromecast
-        if (chromecastAvailable) {
-            devices.push({
-                id: 'chromecast-default',
-                name: chromecastCasting ? 'Chromecast (' + t('cast', 'connected') + ')' : 'Chromecast',
-                type: 'chromecast',
-                available: true,
-                source: 'discovered',
-                cast: onChromecastCast
-            });
-        }
-
-        // Add DLNA devices
-        dlna.devices.forEach(device => {
-            devices.push({
-                id: device.id,
-                name: device.name,
-                type: 'dlna',
-                available: device.online,
-                source: device.source,
-                cast: () => handleCast(device)
-            });
-        });
-
-        // Add AirPlay devices
-        airplay.devices.forEach(device => {
-            devices.push({
-                id: device.id,
-                name: device.name,
-                type: 'airplay',
-                available: device.available,
-                source: 'discovered',
-                cast: () => airplay.castToDevice(device)
-            });
-        });
-
-        setAllDevices(devices);
-    }, [chromecastAvailable, chromecastCasting, dlna.devices, airplay.devices]);
-
-    const handleCast = async (device: any) => {
+    const handleCast = useCallback(async (device: DLNADevice) => {
         setCasting(true);
         setCastError(null);
 
-        const success = await dlna.castToDevice(device);
+        const success = await castToDevice(device);
 
         if (success) {
             onDeviceSelected({
@@ -106,10 +59,54 @@ export function CastDeviceSelector({
             });
             setTimeout(() => onClose(), 500);
         } else {
-            setCastError(dlna.error || t('cast', 'failedToTransmit'));
+            setCastError(dlnaError || t('cast', 'failedToTransmit'));
         }
         setCasting(false);
-    };
+    }, [castToDevice, dlnaError, onClose, onDeviceSelected, t]);
+
+    // Auto-discover on mount
+    useEffect(() => {
+        discoverDevices();
+    }, [discoverDevices]);
+
+    const allDevices = useMemo(() => {
+        const devices: CastDevice[] = [];
+
+        if (chromecastAvailable) {
+            devices.push({
+                id: 'chromecast-default',
+                name: chromecastCasting ? 'Chromecast (' + t('cast', 'connected') + ')' : 'Chromecast',
+                type: 'chromecast',
+                available: true,
+                source: 'discovered',
+                cast: onChromecastCast
+            });
+        }
+
+        dlnaDevices.forEach(device => {
+            devices.push({
+                id: device.id,
+                name: device.name,
+                type: 'dlna',
+                available: device.online,
+                source: device.source,
+                cast: () => handleCast(device)
+            });
+        });
+
+        airplayDevices.forEach(device => {
+            devices.push({
+                id: device.id,
+                name: device.name,
+                type: 'airplay',
+                available: device.available,
+                source: 'discovered',
+                cast: () => castToAirPlayDevice(device)
+            });
+        });
+
+        return devices;
+    }, [airplayDevices, castToAirPlayDevice, chromecastAvailable, chromecastCasting, dlnaDevices, handleCast, onChromecastCast, t]);
 
     const handleAddDevice = async () => {
         if (!deviceIP) {
@@ -117,7 +114,7 @@ export function CastDeviceSelector({
             return;
         }
 
-        const success = await dlna.addDevice(
+        const success = await addDevice(
             deviceName || `TV (${deviceIP})`,
             deviceIP,
             parseInt(devicePort) || 8080
@@ -130,7 +127,7 @@ export function CastDeviceSelector({
             setDevicePort('8080');
             setCastError(null);
         } else {
-            setCastError(dlna.error || t('cast', 'errorAddingDevice'));
+            setCastError(dlnaError || t('cast', 'errorAddingDevice'));
         }
     };
 
@@ -176,12 +173,12 @@ export function CastDeviceSelector({
                         <div className="cast-content">
                             {/* Scan Button */}
                             <button
-                                className={`scan-btn ${dlna.isDiscovering ? 'scanning' : ''}`}
-                                onClick={() => dlna.discoverDevices()}
-                                disabled={dlna.isDiscovering}
+                                className={`scan-btn ${isDiscovering ? 'scanning' : ''}`}
+                                onClick={() => discoverDevices()}
+                                disabled={isDiscovering}
                             >
-                                <span className="scan-icon">{dlna.isDiscovering ? '⏳' : '🔍'}</span>
-                                <span>{dlna.isDiscovering ? t('cast', 'searching') : t('cast', 'searchNetwork')}</span>
+                                <span className="scan-icon">{isDiscovering ? '⏳' : '🔍'}</span>
+                                <span>{isDiscovering ? t('cast', 'searching') : t('cast', 'searchNetwork')}</span>
                             </button>
 
                             {/* Error */}
