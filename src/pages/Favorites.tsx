@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { favoritesService, type FavoriteItem } from '../services/favoritesService';
 import { ContentDetailModal } from '../components/ContentDetailModal';
@@ -8,8 +8,14 @@ import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
 import { useLanguage } from '../services/languageService';
 
+interface ProviderEpisode {
+    id: string | number;
+    episode_num: string | number;
+    container_extension?: string;
+}
+
 export function Favorites() {
-    const [items, setItems] = useState<FavoriteItem[]>([]);
+    const [items, setItems] = useState<FavoriteItem[]>(() => favoritesService.getAll());
     const [removingId, setRemovingId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'all' | 'movies' | 'series'>('all');
     const navigate = useNavigate();
@@ -41,13 +47,9 @@ export function Favorites() {
         duration: number;
     } | null>(null);
 
-    useEffect(() => {
-        loadItems();
-    }, []);
-
-    const loadItems = () => {
+    const loadItems = useCallback(() => {
         setItems(favoritesService.getAll());
-    };
+    }, []);
 
     const removeItem = useCallback((id: string, type: 'series' | 'movie') => {
         setRemovingId(`${type}-${id}`);
@@ -56,7 +58,7 @@ export function Favorites() {
             loadItems();
             setRemovingId(null);
         }, 300);
-    }, []);
+    }, [loadItems]);
 
     const getMovieProgress = (movieId: string) => {
         return movieProgressService.getMoviePositionById(movieId);
@@ -316,7 +318,7 @@ export function Favorites() {
                                 const seriesInfoRes = await fetch(`${url}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${content.id}`);
                                 const seriesInfo = await seriesInfoRes.json();
                                 const episodes = seriesInfo?.episodes?.[content.season || 1];
-                                const episode = episodes?.find((ep: any) => Number(ep.episode_num) === (content.episode || 1));
+                                const episode = episodes?.find((ep: ProviderEpisode) => Number(ep.episode_num) === (content.episode || 1));
                                 if (episode) {
                                     const ext = episode.container_extension || 'mp4';
                                     return `${url}/series/${username}/${password}/${episode.id}.${ext}`;

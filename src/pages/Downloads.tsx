@@ -60,7 +60,9 @@ export function Downloads() {
     }, []);
 
     useEffect(() => {
-        loadData();
+        queueMicrotask(() => {
+            void loadData();
+        });
 
         // Subscribe to download events
         const handleUpdate = () => loadData();
@@ -86,13 +88,17 @@ export function Downloads() {
                 (s: SeriesGroup) => s.seriesName === seriesModal.series?.seriesName
             );
             if (updatedSeries) {
-                setSeriesModal(prev => ({
-                    ...prev,
-                    series: updatedSeries
-                }));
+                queueMicrotask(() => {
+                    setSeriesModal(prev => ({
+                        ...prev,
+                        series: updatedSeries
+                    }));
+                });
             } else {
                 // Series no longer exists (all episodes deleted), close modal
-                setSeriesModal({ isOpen: false, series: null, selectedSeason: 1, selectedEpisode: 1 });
+                queueMicrotask(() => {
+                    setSeriesModal({ isOpen: false, series: null, selectedSeason: 1, selectedEpisode: 1 });
+                });
             }
         }
     }, [groupedData, seriesModal.isOpen, seriesModal.series?.seriesName]);
