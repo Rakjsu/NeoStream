@@ -26,9 +26,9 @@ interface CacheStore<T> {
 
 // In-memory cache (fast access)
 const memoryCache: {
-    movieDetails: CacheStore<any>;
-    seriesDetails: CacheStore<any>;
-    episodeDetails: CacheStore<any>;
+    movieDetails: CacheStore<TMDBMovieDetails>;
+    seriesDetails: CacheStore<TMDBSeriesDetails>;
+    episodeDetails: CacheStore<TMDBEpisodeDetails>;
     movieTrailers: CacheStore<string | null>;
     seriesTrailers: CacheStore<string | null>;
     movieSearch: CacheStore<string | null>; // name -> tmdbId
@@ -41,6 +41,49 @@ const memoryCache: {
     seriesTrailers: {},
     movieSearch: {},
     seriesSearch: {}
+};
+
+interface TMDBReleaseDateEntry {
+    certification?: string;
+}
+
+interface TMDBReleaseResult {
+    iso_3166_1: string;
+    release_dates?: TMDBReleaseDateEntry[];
+}
+
+interface TMDBReleaseDates {
+    results?: TMDBReleaseResult[];
+}
+
+interface TMDBExternalIds {
+    imdb_id?: string;
+}
+
+interface TMDBSearchResult {
+    id: number;
+}
+
+interface TMDBSearchResponse {
+    results?: TMDBSearchResult[];
+}
+
+interface TMDBVideo {
+    type?: string;
+    site?: string;
+    key?: string;
+}
+
+interface TMDBVideosResponse {
+    results?: TMDBVideo[];
+}
+
+type TMDBMovieDetailsResponse = TMDBMovieDetails & {
+    release_dates?: TMDBReleaseDates;
+};
+
+type TMDBSeriesDetailsResponse = TMDBSeriesDetails & {
+    external_ids?: TMDBExternalIds;
 };
 
 // Load cache from localStorage on init
@@ -227,14 +270,14 @@ export async function fetchMovieDetails(tmdbId: string): Promise<TMDBMovieDetail
             `${TMDB_BASE_URL}/movie/${tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=release_dates,external_ids`
         );
         if (!response.ok) return null;
-        const data = await response.json();
+        const data = await response.json() as TMDBMovieDetailsResponse;
 
         // Extract certification from release_dates
         let certification: string | undefined;
         if (data.release_dates?.results) {
             // Priority: BR (Brazil) > US > any other
-            const brRelease = data.release_dates.results.find((r: any) => r.iso_3166_1 === 'BR');
-            const usRelease = data.release_dates.results.find((r: any) => r.iso_3166_1 === 'US');
+            const brRelease = data.release_dates.results.find((r) => r.iso_3166_1 === 'BR');
+            const usRelease = data.release_dates.results.find((r) => r.iso_3166_1 === 'US');
             const releaseData = brRelease || usRelease || data.release_dates.results[0];
 
             if (releaseData?.release_dates?.[0]?.certification) {
@@ -245,7 +288,7 @@ export async function fetchMovieDetails(tmdbId: string): Promise<TMDBMovieDetail
         const result = { ...data, certification };
         setCache(memoryCache.movieDetails, tmdbId, result, CACHE_KEYS.MOVIE_DETAILS);
         return result;
-    } catch (error) {
+    } catch {
         return null;
     }
 }
@@ -266,14 +309,14 @@ export async function fetchSeriesDetails(tmdbId: string): Promise<TMDBSeriesDeta
             `${TMDB_BASE_URL}/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=content_ratings,external_ids`
         );
         if (!response.ok) return null;
-        const data = await response.json();
+        const data = await response.json() as TMDBSeriesDetailsResponse;
 
         // Extract certification from content_ratings
         let certification: string | undefined;
         if (data.content_ratings?.results) {
             // Priority: BR (Brazil) > US > any other
-            const brRating = data.content_ratings.results.find((r: any) => r.iso_3166_1 === 'BR');
-            const usRating = data.content_ratings.results.find((r: any) => r.iso_3166_1 === 'US');
+            const brRating = data.content_ratings.results.find((r) => r.iso_3166_1 === 'BR');
+            const usRating = data.content_ratings.results.find((r) => r.iso_3166_1 === 'US');
             const ratingData = brRating || usRating || data.content_ratings.results[0];
 
             if (ratingData?.rating) {
@@ -286,7 +329,7 @@ export async function fetchSeriesDetails(tmdbId: string): Promise<TMDBSeriesDeta
         const result = { ...data, certification, imdb_id };
         setCache(memoryCache.seriesDetails, tmdbId, result, CACHE_KEYS.SERIES_DETAILS);
         return result;
-    } catch (error) {
+    } catch {
         return null;
     }
 }
@@ -318,7 +361,7 @@ export async function searchMovieByName(movieName: string, year?: string): Promi
         const response = await fetch(searchUrl);
         if (!response.ok) return null;
 
-        const data = await response.json();
+        const data = await response.json() as TMDBSearchResponse;
 
         if (data.results && data.results.length > 0) {
             const tmdbId = data.results[0].id.toString();
@@ -329,7 +372,7 @@ export async function searchMovieByName(movieName: string, year?: string): Promi
         // Cache "not found" to avoid repeated searches
         setCache(memoryCache.movieSearch, searchKey, '', CACHE_KEYS.MOVIE_SEARCH);
         return null;
-    } catch (error) {
+    } catch {
         return null;
     }
 }
@@ -357,7 +400,7 @@ export async function searchSeriesByName(seriesName: string, year?: string): Pro
         const response = await fetch(searchUrl);
         if (!response.ok) return null;
 
-        const data = await response.json();
+        const data = await response.json() as TMDBSearchResponse;
 
         if (data.results && data.results.length > 0) {
             const tmdbId = data.results[0].id.toString();
@@ -368,7 +411,7 @@ export async function searchSeriesByName(seriesName: string, year?: string): Pro
         // Cache "not found" to avoid repeated searches
         setCache(memoryCache.seriesSearch, searchKey, '', CACHE_KEYS.SERIES_SEARCH);
         return null;
-    } catch (error) {
+    } catch {
         return null;
     }
 }
@@ -405,7 +448,7 @@ export async function fetchMovieTrailer(movieName: string, year?: string): Promi
             return null;
         }
 
-        const searchData = await searchResponse.json();
+        const searchData = await searchResponse.json() as TMDBSearchResponse;
         if (!searchData.results || searchData.results.length === 0) {
             setCache(memoryCache.movieTrailers, cacheKey, '', CACHE_KEYS.MOVIE_TRAILERS);
             return null;
@@ -419,7 +462,7 @@ export async function fetchMovieTrailer(movieName: string, year?: string): Promi
             `${TMDB_BASE_URL}/movie/${movieId}/videos?api_key=${TMDB_API_KEY}&language=pt-BR`
         );
 
-        let videosData = await videosResponse.json();
+        let videosData = await videosResponse.json() as TMDBVideosResponse;
 
         // If no videos in Portuguese, try English
         if (!videosData.results || videosData.results.length === 0) {
@@ -427,7 +470,7 @@ export async function fetchMovieTrailer(movieName: string, year?: string): Promi
             const videosResponseEn = await fetch(
                 `${TMDB_BASE_URL}/movie/${movieId}/videos?api_key=${TMDB_API_KEY}&language=en-US`
             );
-            videosData = await videosResponseEn.json();
+            videosData = await videosResponseEn.json() as TMDBVideosResponse;
         }
 
         if (!videosData.results || videosData.results.length === 0) {
@@ -436,9 +479,9 @@ export async function fetchMovieTrailer(movieName: string, year?: string): Promi
         }
 
         // Prefer official trailer, then teaser, then any video
-        const trailer = videosData.results.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube') ||
-            videosData.results.find((v: any) => v.type === 'Teaser' && v.site === 'YouTube') ||
-            videosData.results.find((v: any) => v.site === 'YouTube');
+        const trailer = videosData.results.find((v) => v.type === 'Trailer' && v.site === 'YouTube') ||
+            videosData.results.find((v) => v.type === 'Teaser' && v.site === 'YouTube') ||
+            videosData.results.find((v) => v.site === 'YouTube');
 
         if (trailer?.key) {
             const trailerUrl = `https://www.youtube.com/watch?v=${trailer.key}`;
@@ -486,7 +529,7 @@ export async function fetchSeriesTrailer(seriesName: string, year?: string): Pro
             return null;
         }
 
-        const searchData = await searchResponse.json();
+        const searchData = await searchResponse.json() as TMDBSearchResponse;
         if (!searchData.results || searchData.results.length === 0) {
             setCache(memoryCache.seriesTrailers, cacheKey, '', CACHE_KEYS.SERIES_TRAILERS);
             return null;
@@ -500,7 +543,7 @@ export async function fetchSeriesTrailer(seriesName: string, year?: string): Pro
             `${TMDB_BASE_URL}/tv/${seriesId}/videos?api_key=${TMDB_API_KEY}&language=pt-BR`
         );
 
-        let videosData = await videosResponse.json();
+        let videosData = await videosResponse.json() as TMDBVideosResponse;
 
         // If no videos in Portuguese, try English
         if (!videosData.results || videosData.results.length === 0) {
@@ -508,7 +551,7 @@ export async function fetchSeriesTrailer(seriesName: string, year?: string): Pro
             const videosResponseEn = await fetch(
                 `${TMDB_BASE_URL}/tv/${seriesId}/videos?api_key=${TMDB_API_KEY}&language=en-US`
             );
-            videosData = await videosResponseEn.json();
+            videosData = await videosResponseEn.json() as TMDBVideosResponse;
         }
 
         if (!videosData.results || videosData.results.length === 0) {
@@ -517,9 +560,9 @@ export async function fetchSeriesTrailer(seriesName: string, year?: string): Pro
         }
 
         // Prefer official trailer, then teaser, then any video
-        const trailer = videosData.results.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube') ||
-            videosData.results.find((v: any) => v.type === 'Teaser' && v.site === 'YouTube') ||
-            videosData.results.find((v: any) => v.site === 'YouTube');
+        const trailer = videosData.results.find((v) => v.type === 'Trailer' && v.site === 'YouTube') ||
+            videosData.results.find((v) => v.type === 'Teaser' && v.site === 'YouTube') ||
+            videosData.results.find((v) => v.site === 'YouTube');
 
         if (trailer?.key) {
             const trailerUrl = `https://www.youtube.com/watch?v=${trailer.key}`;
@@ -563,7 +606,7 @@ export async function fetchEpisodeDetails(
             `${TMDB_BASE_URL}/tv/${tmdbSeriesId}/season/${seasonNumber}/episode/${episodeNumber}?api_key=${TMDB_API_KEY}&language=pt-BR`
         );
         if (!response.ok) return null;
-        const data = await response.json();
+        const data = await response.json() as TMDBEpisodeDetails;
         setCache(memoryCache.episodeDetails, cacheKey, data, CACHE_KEYS.EPISODE_DETAILS);
         return data;
     } catch (error) {
