@@ -1,7 +1,7 @@
 import { ipcMain, BrowserWindow, screen } from 'electron'
 import { XtreamClient } from './xtreamClient'
 import store from './store'
-import { getCertificateSettings, getProviderHttpsAgent, setAllowInvalidProviderCertificates } from './certificatePolicy'
+import { getCertificateSettings, getProviderHttpsAgent, registerApprovedProviderUrl, setAllowInvalidProviderCertificates } from './certificatePolicy'
 
 // Store for window state (for custom maximize)
 let savedWindowBounds: Electron.Rectangle | null = null
@@ -290,6 +290,7 @@ export function setupIpcHandlers() {
             }
 
             const text = await response.text()
+            registerApprovedProviderUrl(response.url || url)
             console.log('[Fetch URL] Response length:', text.length)
             return { success: true, data: text }
         } catch (error: any) {
@@ -375,6 +376,7 @@ export function setupIpcHandlers() {
             }
 
             const data = await response.text()
+            registerApprovedProviderUrl(response.url || url)
             console.log('[EPG Cache] Downloaded data, length:', data.length)
 
             // Save to cache
@@ -431,6 +433,7 @@ export function setupIpcHandlers() {
             const containerExt = container || 'mp4'
             console.log('[Download] Using container extension:', containerExt)
             const url = client.getVodStreamUrl(Number(streamId), containerExt)
+            registerApprovedProviderUrl(url, auth.url)
             console.log('[Download] Generated VOD URL:', url.replace(auth.password, '***'))
 
             return { success: true, url }
@@ -449,6 +452,7 @@ export function setupIpcHandlers() {
 
             const client = new XtreamClient(auth.url, auth.username, auth.password)
             const url = client.getSeriesStreamUrl(streamId, container || 'mp4')
+            registerApprovedProviderUrl(url, auth.url)
 
             return { success: true, url }
         } catch (error: any) {
@@ -466,6 +470,7 @@ export function setupIpcHandlers() {
 
             const client = new XtreamClient(auth.url, auth.username, auth.password)
             const url = client.getLiveStreamUrl(streamId)
+            registerApprovedProviderUrl(url, auth.url)
 
             return { success: true, url }
         } catch (error: any) {

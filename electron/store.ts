@@ -14,6 +14,7 @@ interface StoreSchema {
         language?: string
         player?: any
         allowInvalidProviderCertificates?: boolean
+        approvedProviderHosts?: string[]
     }
 }
 
@@ -25,7 +26,8 @@ const store = new Store<StoreSchema>({
         settings: {
             theme: 'dark',
             language: 'en',
-            allowInvalidProviderCertificates: true
+            allowInvalidProviderCertificates: true,
+            approvedProviderHosts: []
         }
     }
 })

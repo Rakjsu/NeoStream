@@ -605,7 +605,7 @@ export function Settings() {
                                     <div className="section-icon" style={{ background: 'linear-gradient(135deg, #14b8a6, #0f766e)' }}>🔐</div>
                                     <div>
                                         <h2>Rede e certificados</h2>
-                                        <p>Controle de compatibilidade para provedores IPTV com TLS antigo ou mal configurado.</p>
+                                        <p>Controle de compatibilidade para provedores IPTV com TLS ou CORS antigo ou mal configurado.</p>
                                     </div>
                                 </div>
 
@@ -613,7 +613,7 @@ export function Settings() {
                                     <div className="setting-item">
                                         <div className="setting-info">
                                             <label>Modo compatível com certificados inválidos</label>
-                                            <p>Permite certificados inválidos somente para o host IPTV configurado. Útil para provedores antigos, mas reduz a segurança dessa conexão.</p>
+                                            <p>Permite certificados inválidos e compatibilidade CORS somente para o provedor IPTV configurado e subdomínios relacionados. Útil para provedores antigos, mas reduz a segurança dessa conexão.</p>
                                         </div>
                                         <label className="toggle-switch">
                                             <input
@@ -630,7 +630,7 @@ export function Settings() {
 
                                     {allowInvalidProviderCertificates && (
                                         <div className="certificate-warning">
-                                            <strong>Atenção:</strong> este modo não libera certificados inválidos para TMDB, atualizações, GitHub ou domínios externos. Ele vale apenas para o servidor IPTV salvo no app.
+                                            <strong>Atenção:</strong> este modo não libera certificados inválidos nem CORS para TMDB, atualizações, GitHub ou domínios externos independentes. Ele vale apenas para o servidor IPTV salvo no app e hosts relacionados aprovados.
                                         </div>
                                     )}
                                 </div>
