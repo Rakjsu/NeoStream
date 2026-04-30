@@ -118,6 +118,8 @@
     "nsis": {
       "artifactName": "NeoStream-IPTV-Setup-${version}.${ext}",
       "oneClick": false,
+      "perMachine": true,
+      "allowElevation": true,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
