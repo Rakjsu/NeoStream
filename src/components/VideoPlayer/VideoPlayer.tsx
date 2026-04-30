@@ -22,7 +22,11 @@ export interface QualityVariant<TChannel = unknown> {
     label: string;
 }
 
-export interface VideoPlayerProps<TSwitchContent = unknown> {
+interface SwitchableContent {
+    stream_id?: string | number;
+}
+
+export interface VideoPlayerProps<TSwitchContent extends SwitchableContent = SwitchableContent> {
     src: string;
     title?: string;
     poster?: string;
@@ -42,7 +46,7 @@ export interface VideoPlayerProps<TSwitchContent = unknown> {
     seasonNumber?: number;
     episodeNumber?: number;
     // Movie version switching
-    movieVersions?: MovieVersion[];
+    movieVersions?: MovieVersion<TSwitchContent>[];
     currentMovieId?: number;
     onSwitchVersion?: (movie: TSwitchContent, currentTime: number) => void;
     // Subtitle search
@@ -55,7 +59,7 @@ export interface VideoPlayerProps<TSwitchContent = unknown> {
     currentQualityIndex?: number;
 }
 
-export function VideoPlayer<TSwitchContent = unknown>({
+export function VideoPlayer<TSwitchContent extends SwitchableContent = SwitchableContent>({
     src,
     title,
     poster,

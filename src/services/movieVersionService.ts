@@ -3,8 +3,13 @@
  * Detects and manages different versions of the same movie (1080p, 4K, Legendado, etc.)
  */
 
-export interface MovieVersion {
-    movie: any; // VODStream
+export interface MovieLike {
+    name?: string;
+    stream_id?: string | number;
+}
+
+export interface MovieVersion<TMovie = MovieLike> {
+    movie: TMovie;
     quality: '1080p' | '4k';
     audio: 'dubbed' | 'subtitled'; // dublado or legendado
     label: string; // Display label e.g., "1080p Dublado", "4K Legendado"
@@ -148,21 +153,19 @@ export function isSameMovie(name1: string, name2: string): boolean {
 /**
  * Find all versions of a movie from the full movie list
  */
-export function findMovieVersions(currentMovie: any, allMovies: any[]): MovieVersion[] {
-    if (!currentMovie || !allMovies || allMovies.length === 0) {
+export function findMovieVersions<TMovie extends MovieLike>(currentMovie: TMovie, allMovies: TMovie[]): MovieVersion<TMovie>[] {
+    if (!currentMovie?.name || !allMovies || allMovies.length === 0) {
         return [];
     }
 
-    const currentBaseName = getMovieBaseName(currentMovie.name);
-
     // Find all movies with the same base name
     const relatedMovies = allMovies.filter(movie =>
-        isSameMovie(movie.name, currentMovie.name)
+        movie.name ? isSameMovie(movie.name, currentMovie.name!) : false
     );
 
     // Convert to MovieVersion objects
-    const versions: MovieVersion[] = relatedMovies.map(movie => {
-        const info = getVersionInfo(movie.name);
+    const versions: MovieVersion<TMovie>[] = relatedMovies.map(movie => {
+        const info = getVersionInfo(movie.name!);
         return {
             movie,
             quality: info.quality,
@@ -197,6 +200,6 @@ export function findMovieVersions(currentMovie: any, allMovies: any[]): MovieVer
 /**
  * Check if a movie matches a specific version
  */
-export function isCurrentVersion(movie: any, version: MovieVersion): boolean {
+export function isCurrentVersion<TMovie extends MovieLike>(movie: TMovie, version: MovieVersion<TMovie>): boolean {
     return movie.stream_id === version.movie.stream_id;
 }

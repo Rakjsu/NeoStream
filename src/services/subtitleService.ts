@@ -31,20 +31,59 @@ interface SubtitleSearchParams {
     forcedOnly?: boolean; // For auto-loading "foreign parts only" subtitles
 }
 
+interface OpenSubtitlesFile {
+    file_id?: number;
+    file_name?: string;
+}
+
+interface OpenSubtitlesAttributes {
+    language?: string;
+    release?: string;
+    download_count?: number;
+    url?: string;
+    files?: OpenSubtitlesFile[];
+    hearing_impaired?: boolean;
+    foreign_parts_only?: boolean;
+}
+
+interface OpenSubtitlesItem {
+    id: string;
+    attributes?: OpenSubtitlesAttributes;
+}
+
+interface OpenSubtitlesSearchData {
+    data?: OpenSubtitlesItem[];
+}
+
+interface OpenSubtitlesLoginData {
+    token?: string;
+}
+
+interface OpenSubtitlesDownloadData {
+    link?: string;
+}
+
+interface OpenSubtitlesResponse<TData = unknown> {
+    success: boolean;
+    status?: number;
+    data?: TData;
+    error?: string;
+}
+
 /**
  * Make request to OpenSubtitles via IPC (bypasses CORS)
  */
 async function openSubtitlesRequest(
     endpoint: string,
     method: 'GET' | 'POST' = 'GET',
-    body?: any
-): Promise<{ success: boolean; status?: number; data?: any; error?: string }> {
+    body?: unknown
+): Promise<OpenSubtitlesResponse> {
     if (!window.ipcRenderer) {
         console.error('IPC not available - not running in Electron');
         return { success: false, error: 'IPC not available' };
     }
 
-    return window.ipcRenderer.invoke('opensubtitles:request', { endpoint, method, body });
+    return window.ipcRenderer.invoke('opensubtitles:request', { endpoint, method, body }) as Promise<OpenSubtitlesResponse>;
 }
 
 /**
@@ -67,7 +106,7 @@ async function getAuthToken(): Promise<string | null> {
             return null;
         }
 
-        const data = result.data;
+        const data = result.data as OpenSubtitlesLoginData | undefined;
         if (data?.token) {
             cachedToken = data.token;
             // Token is valid for 24 hours, cache for 23 hours
@@ -114,14 +153,14 @@ export async function searchSubtitles(params: SubtitleSearchParams): Promise<Sub
             return [];
         }
 
-        const data = result.data;
+        const data = result.data as OpenSubtitlesSearchData | undefined;
 
         if (!data?.data || !Array.isArray(data.data)) {
             return [];
         }
 
         // Map to simpler format
-        const allSubs = data.data.map((item: any) => ({
+        const allSubs = data.data.map((item) => ({
             id: item.id,
             language: item.attributes?.language || 'unknown',
             release: item.attributes?.release || item.attributes?.files?.[0]?.file_name || 'Unknown',
@@ -173,7 +212,8 @@ export async function downloadSubtitle(fileId: number): Promise<string | null> {
             return null;
         }
 
-        return result.data?.link || null;
+        const data = result.data as OpenSubtitlesDownloadData | undefined;
+        return data?.link || null;
     } catch (error) {
         console.error('Error downloading subtitle:', error);
         return null;
@@ -372,9 +412,6 @@ export async function autoFetchSubtitle(params: {
                         return null;
         }
 
-                results.slice(0, 5).forEach((r, i) => {
-                    });
-
         // Normalize language codes to lowercase for comparison
         const normalizedPreferredLang = preferredLang.toLowerCase();
         const normalizedPreferredLanguages = preferredLanguages.map(l => l.toLowerCase());
@@ -428,7 +465,7 @@ export async function autoFetchSubtitle(params: {
         }
 
         // If we have results in the primary language, use those
-        let candidateResults = filteredResults.length > 0 ? filteredResults : results;
+        const candidateResults = filteredResults.length > 0 ? filteredResults : results;
 
         
         // Sort by preferred language, avoid special editions, and download count - case insensitive
@@ -540,7 +577,7 @@ export async function autoFetchForcedSubtitle(params: {
 
                 // Search as series if season/episode provided
                 if (params.season !== undefined && params.episode !== undefined) {
-                    const series = await searchSeriesByName(cleanTitle, year);
+                const series = await searchSeriesByName(cleanTitle, year);
                     if (series?.id) {
                         tmdbId = series.id;
                         imdbId = series.imdb_id;
@@ -552,7 +589,9 @@ export async function autoFetchForcedSubtitle(params: {
                         imdbId = movie.imdb_id;
                     }
                 }
-            } catch { }
+            } catch {
+                return null;
+            }
         }
 
         // Search for forced subtitles only

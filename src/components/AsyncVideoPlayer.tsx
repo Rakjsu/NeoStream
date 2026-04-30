@@ -403,7 +403,7 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
                                     audio: 'dubbed' as const,
                                     label: v.label
                                 }))
-                                : allMovies && !seriesId ? findMovieVersions(movie, allMovies) : undefined
+                                : allMovies && !seriesId ? findMovieVersions(movie as unknown as TVersion, allMovies) : undefined
                         }
                         currentMovieId={Number(movie.stream_id || movie.id)}
                         onSwitchVersion={contentType === 'live' && onSwitchQuality
