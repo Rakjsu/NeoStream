@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FaPlay, FaPause, FaVolumeUp, FaVolumeDown, FaVolumeOff, FaVolumeMute, FaExpand, FaCompress, FaCog, FaChromecast, FaClosedCaptioning } from 'react-icons/fa';
-import { RiPictureInPictureExitLine, RiPictureInPictureLine } from 'react-icons/ri';
+import { RiPictureInPictureLine } from 'react-icons/ri';
 import { useVideoPlayer } from '../../hooks/useVideoPlayer';
 import { useHls } from '../../hooks/useHls';
 import { useChromecast } from '../../hooks/useChromecast';
@@ -15,14 +15,14 @@ import './VideoPlayer.css';
 import type { MovieVersion } from '../../services/movieVersionService';
 
 // Live TV quality variant type (matches LiveTV.tsx structure)
-export interface QualityVariant {
-    channel: any;
+export interface QualityVariant<TChannel = unknown> {
+    channel: TChannel;
     quality: string;
     priority: number;
     label: string;
 }
 
-export interface VideoPlayerProps {
+export interface VideoPlayerProps<TSwitchContent = unknown> {
     src: string;
     title?: string;
     poster?: string;
@@ -44,18 +44,18 @@ export interface VideoPlayerProps {
     // Movie version switching
     movieVersions?: MovieVersion[];
     currentMovieId?: number;
-    onSwitchVersion?: (movie: any, currentTime: number) => void;
+    onSwitchVersion?: (movie: TSwitchContent, currentTime: number) => void;
     // Subtitle search
     tmdbId?: string | number;
     imdbId?: string;
     // If true, movie is already subtitled (has [L] in name), hide subtitle button
     isSubtitled?: boolean;
     // Live TV quality fallback
-    liveQualityVariants?: QualityVariant[];
+    liveQualityVariants?: QualityVariant<TSwitchContent>[];
     currentQualityIndex?: number;
 }
 
-export function VideoPlayer({
+export function VideoPlayer<TSwitchContent = unknown>({
     src,
     title,
     poster,
@@ -80,7 +80,7 @@ export function VideoPlayer({
     isSubtitled,
     liveQualityVariants,
     currentQualityIndex = 0
-}: VideoPlayerProps) {
+}: VideoPlayerProps<TSwitchContent>) {
     const { videoRef, state, controls } = useVideoPlayer();
     const { t } = useLanguage();
     const [streamErrorToast, setStreamErrorToast] = useState<string | null>(null);
@@ -246,7 +246,6 @@ export function VideoPlayer({
                     setVttContent(result.vttContent);
                     setSubtitlesEnabled(true);
                     setIsForcedSubtitle(true);
-                } else {
                 }
             } catch (error) {
                 console.error('Error auto-loading forced subtitles:', error);
@@ -483,14 +482,14 @@ export function VideoPlayer({
         controls.seek(clickPosition * state.duration);
     };
 
-    const handleProgressMouseDown = (e: React.MouseEvent) => {
+    const handleProgressMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
         setSeeking(true);
-        handleProgressBarClick(e as any);
+        handleProgressBarClick(e);
     };
 
-    const handleProgressMouseMove = (e: React.MouseEvent) => {
+    const handleProgressMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
         if (seeking) {
-            handleProgressBarClick(e as any);
+            handleProgressBarClick(e);
         }
     };
 
@@ -1166,7 +1165,7 @@ export function VideoPlayer({
                             onClick={() => {
                                 if (src && title) {
                                     try {
-                                        const miniPlayer = (window as any).__miniPlayerContext;
+                                        const miniPlayer = window.__miniPlayerContext;
                                         if (miniPlayer) {
                                             miniPlayer.startMiniPlayer({
                                                 src,
@@ -1186,7 +1185,7 @@ export function VideoPlayer({
                                             });
                                             if (onClose) onClose();
                                         }
-                                    } catch (e) {
+                                    } catch {
                                         // Fallback to native PiP if available
                                         if (videoRef.current && document.pictureInPictureEnabled) {
                                             videoRef.current.requestPictureInPicture();
@@ -1231,8 +1230,7 @@ export function VideoPlayer({
                         videoUrl={src}
                         videoTitle={title || 'Video'}
                         onClose={() => setShowDeviceSelector(false)}
-                        onDeviceSelected={(device) => {
-                        }}
+                        onDeviceSelected={() => undefined}
                         chromecastAvailable={chromecast.isAvailable}
                         chromecastCasting={chromecast.isCasting}
                         onChromecastCast={() => {
