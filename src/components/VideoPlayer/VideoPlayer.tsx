@@ -7,7 +7,6 @@ import { useChromecast } from '../../hooks/useChromecast';
 import { CastDeviceSelector } from '../CastDeviceSelector';
 import { formatTime, percentage } from '../../utils/videoHelpers';
 import { usageStatsService } from '../../services/usageStatsService';
-import { useMiniPlayer } from '../MiniPlayer';
 import { autoFetchSubtitle, autoFetchForcedSubtitle, cleanupSubtitleUrl } from '../../services/subtitleService';
 import { SubtitleOverlay } from './SubtitleOverlay';
 import { useLanguage } from '../../services/languageService';

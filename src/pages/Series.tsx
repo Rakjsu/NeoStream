@@ -12,7 +12,8 @@ import { profileService } from '../services/profileService';
 import { indexedDBCache } from '../services/indexedDBCache';
 import { searchSeriesByName as searchSeries, isKidsFriendly } from '../services/tmdb';
 import { parentalService } from '../services/parentalService';
-import { HoverPreviewCard, closeAllPreviews } from '../components/HoverPreviewCard';
+import { HoverPreviewCard } from '../components/HoverPreviewCard';
+import { closeAllPreviews } from '../components/hoverPreviewActions';
 import { useLanguage } from '../services/languageService';
 
 interface Series {

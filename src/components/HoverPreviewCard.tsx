@@ -20,11 +20,6 @@ interface HoverPreviewCardProps {
     children?: React.ReactNode;
 }
 
-// Simplified export - no-op function for backward compatibility
-export function closeAllPreviews() {
-    // No-op - simplified version doesn't need this
-}
-
 export function HoverPreviewCard({
     cover,
     title,
