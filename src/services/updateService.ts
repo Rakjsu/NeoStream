@@ -99,7 +99,7 @@ export const updateService = {
      * Register callback for when an update is available
      */
     onUpdateAvailable: (callback: (info: UpdateInfo) => void): (() => void) => {
-        const handler = (_: any, info: UpdateInfo) => callback(info);
+        const handler = (_: unknown, info: UpdateInfo) => callback(info);
         window.ipcRenderer.on('update:available', handler);
 
         return () => window.ipcRenderer.off('update:available', handler);
@@ -119,7 +119,7 @@ export const updateService = {
      * Register callback for download progress updates
      */
     onDownloadProgress: (callback: (progress: DownloadProgress) => void): (() => void) => {
-        const handler = (_: any, progress: DownloadProgress) => callback(progress);
+        const handler = (_: unknown, progress: DownloadProgress) => callback(progress);
         window.ipcRenderer.on('update:download-progress', handler);
 
         return () => window.ipcRenderer.off('update:download-progress', handler);
@@ -129,7 +129,7 @@ export const updateService = {
      * Register callback for when update is downloaded
      */
     onUpdateDownloaded: (callback: (info: UpdateInfo) => void): (() => void) => {
-        const handler = (_: any, info: UpdateInfo) => callback(info);
+        const handler = (_: unknown, info: UpdateInfo) => callback(info);
         window.ipcRenderer.on('update:downloaded', handler);
 
         return () => window.ipcRenderer.off('update:downloaded', handler);
@@ -139,7 +139,7 @@ export const updateService = {
      * Register callback for update errors
      */
     onUpdateError: (callback: (error: Error) => void): (() => void) => {
-        const handler = (_: any, error: Error) => callback(error);
+        const handler = (_: unknown, error: Error) => callback(error);
         window.ipcRenderer.on('update:error', handler);
 
         return () => window.ipcRenderer.off('update:error', handler);

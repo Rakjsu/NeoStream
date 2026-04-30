@@ -1,6 +1,6 @@
 // Watch Later localStorage utility (adapted for profiles)
 import { profileService } from './profileService';
-import type { WatchLaterItem } from '../types/profile';
+import type { Profile, WatchLaterItem } from '../types/profile';
 
 // Re-export type for compatibility
 export type { WatchLaterItem };
@@ -70,7 +70,7 @@ export const watchLaterService = {
     },
 
     // Helper to save profile back to storage
-    saveProfile(profile: any): void {
+    saveProfile(profile: Profile): void {
         const allProfiles = profileService.getAllProfiles();
         const data = {
             profiles: allProfiles.map(p => p.id === profile.id ? profile : p),

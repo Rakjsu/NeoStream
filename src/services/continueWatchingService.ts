@@ -1,4 +1,4 @@
-import type { ContinueWatchingItem } from '../types/profile';
+import type { ContinueWatchingItem, Profile } from '../types/profile';
 import { profileService } from './profileService';
 
 const CLEANUP_DAYS = 7; // Remove completed items after 7 days
@@ -79,7 +79,7 @@ export const continueWatchingService = {
     },
 
     // Helper to save profile back to storage
-    saveProfile(profile: any): void {
+    saveProfile(profile: Profile): void {
         const allProfiles = profileService.getAllProfiles();
         const data = {
             profiles: allProfiles.map(p => p.id === profile.id ? profile : p),
