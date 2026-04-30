@@ -22,6 +22,45 @@ interface LiveStream {
     tv_archive_duration: number;
 }
 
+interface LiveCategory {
+    category_id: string;
+    category_name: string;
+    parent_id: number;
+}
+
+interface EPGProgram {
+    id: string;
+    start: string;
+    end: string;
+    title: string;
+    description?: string;
+    channel_id: string;
+}
+
+interface MiniPlayerExpandDetail {
+    contentId?: string;
+    contentType?: string;
+    currentTime?: number;
+}
+
+interface HlsInstance {
+    loadSource: (url: string) => void;
+    attachMedia: (media: HTMLMediaElement) => void;
+    on: (event: string, callback: () => void) => void;
+}
+
+interface HlsConstructor {
+    new (config?: Record<string, unknown>): HlsInstance;
+    isSupported: () => boolean;
+    Events: {
+        MANIFEST_PARSED: string;
+    };
+}
+
+interface HlsWindow extends Window {
+    Hls?: HlsConstructor;
+}
+
 // Channel card approximate dimensions
 const CARD_WIDTH = 200; // min-width of grid column
 const CARD_HEIGHT = 80; // approximate card height with gap
@@ -30,7 +69,7 @@ const GRID_GAP = 16; // gap between cards
 // LiveTV Component - Icons: 6px - Updated 2025-11-26 00:29
 export function LiveTV() {
     const [streams, setStreams] = useState<LiveStream[]>([]);
-    const [_categories, setCategories] = useState<Array<{ category_id: string; category_name: string; parent_id: number }>>([]);
+    const [, setCategories] = useState<LiveCategory[]>([]);
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -38,9 +77,9 @@ export function LiveTV() {
     const [brokenImages, setBrokenImages] = useState<Set<number>>(new Set());
     const [selectedChannel, setSelectedChannel] = useState<LiveStream | null>(null);
     const [playingChannel, setPlayingChannel] = useState<LiveStream | null>(null);
-    const [_epgData, setEpgData] = useState<any[]>([]);
-    const [currentProgram, setCurrentProgram] = useState<any | null>(null);
-    const [upcomingPrograms, setUpcomingPrograms] = useState<any[]>([]);
+    const [, setEpgData] = useState<EPGProgram[]>([]);
+    const [currentProgram, setCurrentProgram] = useState<EPGProgram | null>(null);
+    const [upcomingPrograms, setUpcomingPrograms] = useState<EPGProgram[]>([]);
     const [visibleCount, setVisibleCount] = useState(0);
     const [itemsPerPage, setItemsPerPage] = useState(48); // Default fallback
     const [progressTick, setProgressTick] = useState(0);
@@ -91,7 +130,7 @@ export function LiveTV() {
 
     // Listen for mini player expand event to reopen full player
     useEffect(() => {
-        const handleMiniPlayerExpand = (e: CustomEvent) => {
+        const handleMiniPlayerExpand = (e: CustomEvent<MiniPlayerExpandDetail>) => {
             const { contentId, contentType, currentTime } = e.detail;
             if (contentType === 'live' && contentId) {
                 // Find the channel in our list
@@ -132,8 +171,6 @@ export function LiveTV() {
             return;
         }
 
-        let intervalId: number;
-
         const fetchEPG = async () => {
             console.log('[EPG] Fetching EPG for channel:', selectedChannel.name, 'EPG ID:', selectedChannel.epg_channel_id);
             // Pass both EPG ID and channel name (for Open-EPG Portugal and meuguia.tv fallback)
@@ -150,7 +187,7 @@ export function LiveTV() {
 
         fetchEPG();
         // Refresh EPG every 60 seconds
-        intervalId = setInterval(fetchEPG, 60000);
+        const intervalId = setInterval(fetchEPG, 60000);
 
         return () => {
             if (intervalId) clearInterval(intervalId);
@@ -169,8 +206,8 @@ export function LiveTV() {
             } else {
                 setError(result.error || 'Failed to load channels');
             }
-        } catch (err: any) {
-            setError(err?.message || 'Failed to connect to server');
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Failed to connect to server');
         } finally {
             setLoading(false);
         }
@@ -267,7 +304,7 @@ export function LiveTV() {
 
         // Function to extract base name, quality and codec from a channel name
         const extractInfo = (name: string): { baseName: string; quality: string; codec: string; label: string; priority: number; hasOnlyQuality: boolean; regionSuffix: string } => {
-            let workingName = name.trim();
+            const workingName = name.trim();
             let quality = '';
             let codec = '';
             let priority = 2; // Default HD priority
@@ -391,38 +428,6 @@ export function LiveTV() {
         // Only return variants if there's more than one option
         return variants.length > 1 ? variants : [];
     };
-
-    // Get best variant based on user preference
-    const getBestVariantForPreference = (channel: LiveStream): LiveStream => {
-        const variants = getChannelQualityVariants(channel);
-        if (variants.length === 0) return channel;
-
-        const preference = profileService.getPreferredQuality();
-
-        // If auto or no preference, return best available (first in sorted list)
-        if (preference === 'auto') {
-            return variants[0].channel;
-        }
-
-        // Find matching preference
-        const preferenceMap: Record<string, string[]> = {
-            '4k': ['4K', 'UHD', '4k'],
-            'fhd': ['FHD', 'FHD H.265', '1080p', '1080'],
-            'hd': ['HD', '720p', '720'],
-            'sd': ['SD', '480p', '480']
-        };
-
-        const targetLabels = preferenceMap[preference] || [];
-
-        // Find first variant matching preference
-        const preferred = variants.find(v =>
-            targetLabels.some(label => v.label.toLowerCase().includes(label.toLowerCase()))
-        );
-
-        // Return preferred or best available
-        return preferred?.channel || variants[0].channel;
-    };
-
 
     const buildLiveStreamUrl = async (channel: LiveStream): Promise<string> => {
         try {
@@ -866,7 +871,8 @@ export function LiveTV() {
                                                 const loadVideo = async () => {
                                                     try {
                                                         const url = await buildLiveStreamUrl(selectedChannel);
-                                                        if (url.includes('.m3u8') && !(window as any).Hls) {
+                                                        const hlsWindow = window as HlsWindow;
+                                                        if (url.includes('.m3u8') && !hlsWindow.Hls) {
                                                             await new Promise((resolve, reject) => {
                                                                 const script = document.createElement('script');
                                                                 script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
@@ -876,7 +882,7 @@ export function LiveTV() {
                                                             });
                                                         }
                                                         if (url.includes('.m3u8')) {
-                                                            const Hls = (window as any).Hls;
+                                                            const Hls = hlsWindow.Hls;
                                                             if (Hls && Hls.isSupported()) {
                                                                 const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
                                                                 hls.loadSource(url);
@@ -1268,7 +1274,7 @@ export function LiveTV() {
             {
                 playingChannel && (
                     <AsyncVideoPlayer
-                        movie={playingChannel as any}
+                        movie={playingChannel}
                         buildStreamUrl={buildLiveStreamUrl}
                         onClose={() => {
                             setPlayingChannel(null);
@@ -1279,7 +1285,7 @@ export function LiveTV() {
                         contentType="live"
                         resumeTime={pipResumeTime}
                         liveQualityVariants={getChannelQualityVariants(playingChannel)}
-                        onSwitchQuality={(channel: any) => {
+                        onSwitchQuality={(channel: LiveStream) => {
                             setPlayingChannel(channel);
                             // Save quality preference based on selected variant
                             const variants = getChannelQualityVariants(channel);

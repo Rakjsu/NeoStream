@@ -73,15 +73,16 @@ export function Login() {
                     setError(errorMessage);
                 }
             }
-        } catch (err: any) {
-            if (err?.message?.includes('Invalid URL') || err?.message?.includes('invalid url')) {
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : '';
+            if (message.includes('Invalid URL') || message.includes('invalid url')) {
                 setError(t('login', 'invalidUrl'));
-            } else if (err?.message?.includes('fetch')) {
+            } else if (message.includes('fetch')) {
                 setError(t('login', 'connectionError'));
-            } else if (err?.message?.includes('timeout')) {
+            } else if (message.includes('timeout')) {
                 setError(t('login', 'timeoutError'));
-            } else if (err?.message?.includes('Certificado inválido') || err?.message?.includes('Certificado invalido') || err?.message?.includes('certificate')) {
-                setError(err.message);
+            } else if (message.includes('Certificado inválido') || message.includes('certificate')) {
+                setError(message);
             } else {
                 setError(t('login', 'unexpectedError'));
             }

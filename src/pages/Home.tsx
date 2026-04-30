@@ -44,6 +44,14 @@ interface ContinueWatchingItem {
     hasNewEpisode?: boolean;
 }
 
+interface SeriesEpisode {
+    id: string | number;
+    episode_num: string | number;
+    container_extension?: string;
+}
+
+type HomeContentItem = ContinueWatchingItem | SeriesData | MovieData;
+
 // Simple in-memory cache for data
 const dataCache = {
     series: null as SeriesData[] | null,
@@ -74,7 +82,6 @@ export function Home() {
     // Language
     const { t } = useLanguage();
     const [hiddenItems, setHiddenItems] = useState<Set<string>>(new Set());
-    const [checkingItem, setCheckingItem] = useState<string | null>(null);
     const [blockMessage, setBlockMessage] = useState<string | null>(null);
 
     // Filtered counts for Kids profile
@@ -106,7 +113,7 @@ export function Home() {
         name: string;
         season?: number;
         episode?: number;
-        episodeData?: any;
+        episodeData?: SeriesEpisode;
         resumeTime?: number;
     } | null>(null);
 
@@ -125,7 +132,7 @@ export function Home() {
     // Series episode data for navigation
     const [seriesEpisodeData, setSeriesEpisodeData] = useState<{
         seriesId: string;
-        episodes: { [season: string]: any[] };
+        episodes: { [season: string]: SeriesEpisode[] };
     } | null>(null);
 
     useEffect(() => {
@@ -466,9 +473,6 @@ export function Home() {
             return;
         }
 
-        // Need to fetch from TMDB
-        setCheckingItem(itemKey);
-
         try {
             const tmdbResult = contentType === 'movie'
                 ? await searchMovieByName(name)
@@ -495,7 +499,6 @@ export function Home() {
                     setHiddenItems(prev => new Set([...prev, itemKey]));
                     setBlockMessage(`"${name}" ${t('home', 'notSuitableForKids')}`);
                     setTimeout(() => setBlockMessage(null), 3000);
-                    setCheckingItem(null);
                     return;
                 }
             }
@@ -506,8 +509,6 @@ export function Home() {
             console.error('Error checking content rating:', error);
             // On error, allow access but don't cache
             setSelectedContent({ id: contentId, type: contentType, name, cover, rating });
-        } finally {
-            setCheckingItem(null);
         }
     };
 
@@ -528,7 +529,7 @@ export function Home() {
         if (!season || !episode) return false;
 
         const currentSeasonEpisodes = seriesEpisodeData.episodes[season] || [];
-        const currentEpIndex = currentSeasonEpisodes.findIndex((ep: any) => Number(ep.episode_num) === episode);
+        const currentEpIndex = currentSeasonEpisodes.findIndex((ep) => Number(ep.episode_num) === episode);
 
         // Check if there's a next episode in current season
         if (currentEpIndex >= 0 && currentEpIndex < currentSeasonEpisodes.length - 1) return true;
@@ -549,7 +550,7 @@ export function Home() {
         if (!season || !episode) return false;
 
         const currentSeasonEpisodes = seriesEpisodeData.episodes[season] || [];
-        const currentEpIndex = currentSeasonEpisodes.findIndex((ep: any) => Number(ep.episode_num) === episode);
+        const currentEpIndex = currentSeasonEpisodes.findIndex((ep) => Number(ep.episode_num) === episode);
 
         // Check if there's a previous episode in current season
         if (currentEpIndex > 0) return true;
@@ -570,7 +571,7 @@ export function Home() {
         if (!season || !episode) return;
 
         const currentSeasonEpisodes = seriesEpisodeData.episodes[season] || [];
-        const currentEpIndex = currentSeasonEpisodes.findIndex((ep: any) => Number(ep.episode_num) === episode);
+        const currentEpIndex = currentSeasonEpisodes.findIndex((ep) => Number(ep.episode_num) === episode);
 
         // Go to next episode in current season
         if (currentEpIndex >= 0 && currentEpIndex < currentSeasonEpisodes.length - 1) {
@@ -598,7 +599,7 @@ export function Home() {
         if (!season || !episode) return;
 
         const currentSeasonEpisodes = seriesEpisodeData.episodes[season] || [];
-        const currentEpIndex = currentSeasonEpisodes.findIndex((ep: any) => Number(ep.episode_num) === episode);
+        const currentEpIndex = currentSeasonEpisodes.findIndex((ep) => Number(ep.episode_num) === episode);
 
         // Go to previous episode in current season
         if (currentEpIndex > 0) {
@@ -885,7 +886,7 @@ export function Home() {
     // Carousel Section component with drag scroll
     const ContentSection = ({ title, items, type, showProgress = false, sectionIndex = 0 }: {
         title: string;
-        items: any[];
+        items: HomeContentItem[];
         type: 'continue' | 'series' | 'movie' | 'recommendations';
         showProgress?: boolean;
         sectionIndex?: number;
@@ -1674,7 +1675,7 @@ export function Home() {
                                     }
 
                                     const episodes = seriesInfo?.episodes?.[content.season || 1];
-                                    const episode = episodes?.find((ep: any) => Number(ep.episode_num) === (content.episode || 1));
+                                    const episode = episodes?.find((ep: SeriesEpisode) => Number(ep.episode_num) === (content.episode || 1));
                                     if (episode) {
                                         const ext = episode.container_extension || 'mp4';
                                         return `${url}/series/${username}/${password}/${episode.id}.${ext}`;
