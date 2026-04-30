@@ -1,14 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { watchProgressService } from '../services/watchProgressService';
 
+interface SeriesItem {
+    series_id: string | number;
+    name: string;
+    cover?: string;
+    stream_icon?: string;
+}
+
 interface ContinueWatchingProps {
-    allSeries: any[];
-    onSeriesClick: (series: any) => void;
+    allSeries: SeriesItem[];
+    onSeriesClick: (series: SeriesItem) => void;
     fixImageUrl: (url: string) => string;
 }
 
 interface SeriesWithProgress {
-    series: any;
+    series: SeriesItem;
     progress: {
         seriesId: string;
         seriesName: string;
@@ -20,9 +27,7 @@ interface SeriesWithProgress {
 }
 
 export function ContinueWatching({ allSeries, onSeriesClick, fixImageUrl }: ContinueWatchingProps) {
-    const [continueWatching, setContinueWatching] = useState<SeriesWithProgress[]>([]);
-
-    useEffect(() => {
+    const continueWatching = useMemo(() => {
         const progressMap = watchProgressService.getContinueWatching();
 
         const seriesWithProgress: SeriesWithProgress[] = [];
@@ -41,7 +46,7 @@ export function ContinueWatching({ allSeries, onSeriesClick, fixImageUrl }: Cont
         });
 
         seriesWithProgress.sort((a, b) => b.progress.lastWatchedAt - a.progress.lastWatchedAt);
-        setContinueWatching(seriesWithProgress);
+        return seriesWithProgress;
     }, [allSeries]);
 
     if (continueWatching.length === 0) {
@@ -104,7 +109,7 @@ export function ContinueWatching({ allSeries, onSeriesClick, fixImageUrl }: Cont
                             >
                                 <div className="aspect-[2/3] relative">
                                     <img
-                                        src={series.cover || fixImageUrl(series.stream_icon)}
+                                        src={series.cover || (series.stream_icon ? fixImageUrl(series.stream_icon) : '')}
                                         alt={series.name}
                                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                         style={{ borderTopLeftRadius: '16px', borderTopRightRadius: '16px' }}

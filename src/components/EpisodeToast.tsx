@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Tv } from 'lucide-react';
 import { episodeNotificationService, type AppNotification } from '../services/episodeNotificationService';
 
@@ -8,7 +8,7 @@ interface EpisodeToastProps {
 
 export function EpisodeToast({ onNavigateToSeries }: EpisodeToastProps) {
     const [toasts, setToasts] = useState<AppNotification[]>([]);
-    const [hasChecked, setHasChecked] = useState(false);
+    const hasCheckedRef = useRef(false);
 
     const removeToast = useCallback((id: string) => {
         setToasts(prev => prev.filter(t => t.id !== id));
@@ -16,8 +16,8 @@ export function EpisodeToast({ onNavigateToSeries }: EpisodeToastProps) {
 
     useEffect(() => {
         // Only check once when component mounts
-        if (hasChecked) return;
-        setHasChecked(true);
+        if (hasCheckedRef.current) return;
+        hasCheckedRef.current = true;
 
         // Delay check to allow app to fully load
         const checkTimeout = setTimeout(async () => {
@@ -30,7 +30,7 @@ export function EpisodeToast({ onNavigateToSeries }: EpisodeToastProps) {
         }, 3000); // Wait 3 seconds after app starts
 
         return () => clearTimeout(checkTimeout);
-    }, [hasChecked]);
+    }, []);
 
     // Auto-dismiss toasts after 8 seconds
     useEffect(() => {

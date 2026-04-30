@@ -4,7 +4,7 @@ import { playbackService } from '../services/playbackService';
 import type { PlaybackConfig } from '../services/playbackService';
 import { parentalService } from '../services/parentalService';
 import type { ParentalConfig } from '../services/parentalService';
-import { showUpToDateModal } from '../components/UpdateNotification';
+import { showUpToDateModal } from '../components/updateNotificationBus';
 import type { UpdateConfig } from '../types/update';
 import { usageStatsService, type UsageStats, type DailyStats } from '../services/usageStatsService';
 import { useLanguage, type SupportedLanguage } from '../services/languageService';

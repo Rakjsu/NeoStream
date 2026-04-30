@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, X, Check, CheckCheck, ExternalLink, Download, Tv, Film, AlertCircle } from 'lucide-react';
+import { Bell, X, Check, CheckCheck, Download, Tv, AlertCircle } from 'lucide-react';
 import { appNotificationService, type AppNotification } from '../services/episodeNotificationService';
 import { useLanguage } from '../services/languageService';
 
@@ -10,16 +10,12 @@ interface NotificationsPanelProps {
 
 export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }: NotificationsPanelProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const [notifications, setNotifications] = useState<AppNotification[]>([]);
-    const [unreadCount, setUnreadCount] = useState(0);
+    const [notifications, setNotifications] = useState<AppNotification[]>(() => appNotificationService.getNotifications());
+    const [unreadCount, setUnreadCount] = useState(() => appNotificationService.getUnreadCount());
     const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
     const { t } = useLanguage();
 
     useEffect(() => {
-        // Initial load
-        setNotifications(appNotificationService.getNotifications());
-        setUnreadCount(appNotificationService.getUnreadCount());
-
         // Subscribe to changes
         const unsubscribe = appNotificationService.subscribe((newNotifications) => {
             setNotifications(newNotifications);

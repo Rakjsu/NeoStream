@@ -7,11 +7,7 @@ interface ChangelogEntry {
     items: string[];
 }
 
-interface PostUpdateChangelogProps {
-    // No props needed, it manages its own state
-}
-
-export function PostUpdateChangelog({ }: PostUpdateChangelogProps) {
+export function PostUpdateChangelog() {
     const [isVisible, setIsVisible] = useState(false);
     const [previousVersion, setPreviousVersion] = useState<string>('');
     const { t } = useLanguage();
@@ -23,8 +19,10 @@ export function PostUpdateChangelog({ }: PostUpdateChangelogProps) {
 
         if (lastVersion && lastVersion !== currentVersion) {
             // Version changed - show changelog
-            setPreviousVersion(lastVersion);
-            setIsVisible(true);
+            queueMicrotask(() => {
+                setPreviousVersion(lastVersion);
+                setIsVisible(true);
+            });
         }
 
         // Always update stored version

@@ -8,15 +8,22 @@ interface CategoryAnalysis {
     matchedKeywords: string[];
 }
 
+interface CategorySummary {
+    total: number;
+    withIcons: number;
+    withoutIcons: number;
+    empty: number;
+}
+
+interface ProviderCategory {
+    category_id: string;
+    category_name: string;
+}
+
 export function CategoryAnalyzer() {
     const [analyzing, setAnalyzing] = useState(false);
     const [report, setReport] = useState<CategoryAnalysis[]>([]);
-    const [summary, setSummary] = useState<{
-        total: number;
-        withIcons: number;
-        withoutIcons: number;
-        empty: number;
-    } | null>(null);
+    const [summary, setSummary] = useState<CategorySummary | null>(null);
 
     // Lista de todas as keywords implementadas no código
     const implementedKeywords = [
@@ -72,7 +79,7 @@ export function CategoryAnalyzer() {
             const categoriesResponse = await fetch(
                 `${url}/player_api.php?username=${username}&password=${password}&action=get_series_categories`
             );
-            const categories = await categoriesResponse.json();
+            const categories = await categoriesResponse.json() as ProviderCategory[];
 
             
             const analysis: CategoryAnalysis[] = [];
@@ -117,16 +124,6 @@ export function CategoryAnalyzer() {
                 withoutIcons,
                 empty
             });
-
-            // Salvar relatório em arquivo
-            const reportText = generateReportText(analysis, {
-                total: categories.length,
-                withIcons,
-                withoutIcons,
-                empty
-            });
-
-            
         } catch (error) {
             console.error('Erro na análise:', error);
             alert('Erro ao analisar categorias: ' + (error as Error).message);
@@ -135,7 +132,7 @@ export function CategoryAnalyzer() {
         }
     };
 
-    const generateReportText = (analysis: CategoryAnalysis[], stats: any): string => {
+    const generateReportText = (analysis: CategoryAnalysis[], stats: CategorySummary): string => {
         let text = '═══════════════════════════════════════════════════════\n';
         text += '       RELATÓRIO DE ANÁLISE DE CATEGORIAS IPTV        \n';
         text += '═══════════════════════════════════════════════════════\n\n';

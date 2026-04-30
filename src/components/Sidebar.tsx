@@ -20,7 +20,7 @@ export function Sidebar() {
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
     const [showProfilePopup, setShowProfilePopup] = useState(false);
     const [showProfileManager, setShowProfileManager] = useState(false);
-    const [profiles, setProfiles] = useState<Profile[]>([]);
+    const [profiles, setProfiles] = useState<Profile[]>(() => profileService.getAllProfiles());
 
     // PIN verification states
     const [pendingProfile, setPendingProfile] = useState<Profile | null>(null);
@@ -29,8 +29,6 @@ export function Sidebar() {
     const { t } = useLanguage();
 
     useEffect(() => {
-        setProfiles(profileService.getAllProfiles());
-
         // Listen for update available to store updateInfo
         const cleanup = updateService.onUpdateAvailable((info) => {
             setUpdateInfo(info);

@@ -1,17 +1,9 @@
 import { useState, useEffect } from 'react';
 import { updateService } from '../services/updateService';
+import { SHOW_UP_TO_DATE_MODAL_EVENT } from './updateNotificationBus';
 import type { UpdateInfo, DownloadProgress } from '../types/update';
 
-// Global function to show "up to date" modal
-export function showUpToDateModal() {
-    window.dispatchEvent(new CustomEvent('showUpToDateModal'));
-}
-
-interface UpdateNotificationProps {
-    // Optional: can be controlled externally
-}
-
-export function UpdateNotification({ }: UpdateNotificationProps) {
+export function UpdateNotification() {
     const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
     const [isVisible, setIsVisible] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -28,7 +20,7 @@ export function UpdateNotification({ }: UpdateNotificationProps) {
             setCurrentVersion(__APP_VERSION__);
             setIsVisible(true);
         };
-        window.addEventListener('showUpToDateModal', handleShowUpToDate);
+        window.addEventListener(SHOW_UP_TO_DATE_MODAL_EVENT, handleShowUpToDate);
 
         // Listen for update available
         const cleanupAvailable = updateService.onUpdateAvailable((info) => {
@@ -51,7 +43,7 @@ export function UpdateNotification({ }: UpdateNotificationProps) {
         });
 
         // Listen for update downloaded
-        const cleanupDownloaded = updateService.onUpdateDownloaded((info) => {
+        const cleanupDownloaded = updateService.onUpdateDownloaded(() => {
                         setIsDownloading(false);
             setIsDownloaded(true);
         });
@@ -64,7 +56,7 @@ export function UpdateNotification({ }: UpdateNotificationProps) {
         });
 
         return () => {
-            window.removeEventListener('showUpToDateModal', handleShowUpToDate);
+            window.removeEventListener(SHOW_UP_TO_DATE_MODAL_EVENT, handleShowUpToDate);
             cleanupAvailable();
             cleanupNotAvailable();
             cleanupProgress();
