@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 // Extend Window interface for Chromecast
 declare global {
@@ -12,15 +12,156 @@ export interface CastDevice {
     capabilities: string[];
 }
 
+interface CastError {
+    code?: string;
+    description?: string;
+    details?: unknown;
+}
+
+interface CastMediaSession {
+    pause: (request: CastPauseRequest, success: () => void, error: (error: CastError) => void) => void;
+    play: (request: CastPlayRequest, success: () => void, error: (error: CastError) => void) => void;
+    seek: (request: CastSeekRequest, success: () => void, error: (error: CastError) => void) => void;
+}
+
+interface CastSession {
+    media?: CastMediaSession[];
+    addUpdateListener: (listener: (isAlive: boolean) => void) => void;
+    loadMedia: (request: CastLoadRequest) => Promise<void>;
+    stop: (success: () => void, error: (error: CastError) => void) => void;
+}
+
+interface CastMediaInfo {
+    metadata?: CastGenericMediaMetadata;
+}
+
+interface CastGenericMediaMetadata {
+    title?: string;
+    subtitle?: string;
+}
+
+interface CastLoadRequest {
+    autoplay?: boolean;
+    currentTime?: number;
+}
+
+interface CastSeekRequest {
+    currentTime?: number;
+}
+
+type CastPauseRequest = object;
+type CastPlayRequest = object;
+
+type CastApiConfig = object;
+
+interface CastApi {
+    media: {
+        DEFAULT_MEDIA_RECEIVER_APP_ID: string;
+        MediaInfo: new (contentId: string, contentType: string) => CastMediaInfo;
+        GenericMediaMetadata: new () => CastGenericMediaMetadata;
+        LoadRequest: new (mediaInfo: CastMediaInfo) => CastLoadRequest;
+        PauseRequest: new () => CastPauseRequest;
+        PlayRequest: new () => CastPlayRequest;
+        SeekRequest: new () => CastSeekRequest;
+    };
+    SessionRequest: new (applicationId: string) => object;
+    ApiConfig: new (
+        sessionRequest: object,
+        sessionListener: (session: CastSession) => void,
+        receiverListener: (availability: string) => void
+    ) => CastApiConfig;
+    initialize: (
+        config: CastApiConfig,
+        success: () => void,
+        error: (error: CastError) => void
+    ) => void;
+    requestSession: (
+        success: (session: CastSession) => void,
+        error: (error: CastError) => void
+    ) => void;
+}
+
+interface ChromeCastWindow {
+    cast?: CastApi;
+}
+
+function getCastApi(): CastApi | undefined {
+    return (window.chrome as unknown as ChromeCastWindow | undefined)?.cast;
+}
+
 export function useChromecast(videoUrl: string, videoTitle: string) {
     const [isAvailable, setIsAvailable] = useState(false);
     const [isCasting, setIsCasting] = useState(false);
-    const sessionRef = useRef<any>(null);
+    const sessionRef = useRef<CastSession | null>(null);
     const [currentTime, setCurrentTime] = useState(0);
+
+    const onInitSuccess = useCallback(() => {
+        setIsAvailable(true);
+    }, []);
+
+    const onInitError = useCallback((error: CastError) => {
+        console.error('Cast API initialization error:', error);
+        setIsAvailable(false);
+    }, []);
+
+    const receiverListener = useCallback((availability: string) => {
+        setIsAvailable(availability === 'available');
+    }, []);
+
+    const loadMedia = useCallback((session: CastSession) => {
+        const cast = getCastApi();
+        if (!session || !videoUrl || !cast) return;
+
+        const mediaInfo = new cast.media.MediaInfo(videoUrl, 'video/mp4');
+        mediaInfo.metadata = new cast.media.GenericMediaMetadata();
+        mediaInfo.metadata.title = videoTitle;
+        mediaInfo.metadata.subtitle = 'NeoStream IPTV';
+
+        const request = new cast.media.LoadRequest(mediaInfo);
+        request.autoplay = true;
+        request.currentTime = currentTime;
+
+        session.loadMedia(request).then(
+            () => undefined,
+            (error: CastError) => {
+                console.error('Media load error:', error);
+            }
+        );
+    }, [currentTime, videoTitle, videoUrl]);
+
+    const sessionListener = useCallback((session: CastSession) => {
+        sessionRef.current = session;
+        setIsCasting(true);
+
+        session.addUpdateListener((isAlive: boolean) => {
+            if (!isAlive) {
+                setIsCasting(false);
+                sessionRef.current = null;
+            }
+        });
+
+        if (videoUrl) {
+            loadMedia(session);
+        }
+    }, [loadMedia, videoUrl]);
+
+    const initializeCastApi = useCallback(() => {
+        const cast = getCastApi();
+        if (!cast) return;
+
+        const applicationID = cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID;
+        const sessionRequest = new cast.SessionRequest(applicationID);
+        const apiConfig = new cast.ApiConfig(
+            sessionRequest,
+            sessionListener,
+            receiverListener
+        );
+
+        cast.initialize(apiConfig, onInitSuccess, onInitError);
+    }, [onInitError, onInitSuccess, receiverListener, sessionListener]);
 
     // Load Google Cast SDK
     useEffect(() => {
-        // Add Google Cast SDK script
         const script = document.createElement('script');
         script.src = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1';
         script.async = true;
@@ -33,74 +174,10 @@ export function useChromecast(videoUrl: string, videoTitle: string) {
         };
 
         return () => {
-            document.body.removeChild(script);
+            delete window.__onGCastApiAvailable;
+            script.remove();
         };
-    }, []);
-
-    const initializeCastApi = () => {
-        const cast = window.chrome?.cast;
-        if (!cast) return;
-
-        const applicationID = cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID;
-        const sessionRequest = new cast.SessionRequest(applicationID);
-        const apiConfig = new cast.ApiConfig(
-            sessionRequest,
-            sessionListener,
-            receiverListener
-        );
-
-        cast.initialize(apiConfig, onInitSuccess, onInitError);
-    };
-
-    const onInitSuccess = () => {
-        setIsAvailable(true);
-    };
-
-    const onInitError = (error: any) => {
-        console.error('❌ Cast API initialization error:', error);
-        setIsAvailable(false);
-    };
-
-    const sessionListener = (session: any) => {
-        sessionRef.current = session;
-        setIsCasting(true);
-
-        session.addUpdateListener((isAlive: boolean) => {
-            if (!isAlive) {
-                setIsCasting(false);
-                sessionRef.current = null;
-            }
-        });
-
-        // Load media if session is active
-        if (session && videoUrl) {
-            loadMedia(session);
-        }
-    };
-
-    const receiverListener = (availability: string) => {
-        setIsAvailable(availability === 'available');
-    };
-
-    const loadMedia = (session: any) => {
-        if (!session || !videoUrl) return;
-
-        const mediaInfo = new window.chrome.cast.media.MediaInfo(videoUrl, 'video/mp4');
-        mediaInfo.metadata = new window.chrome.cast.media.GenericMediaMetadata();
-        mediaInfo.metadata.title = videoTitle;
-        mediaInfo.metadata.subtitle = 'NeoStream IPTV';
-
-        const request = new window.chrome.cast.media.LoadRequest(mediaInfo);
-        request.autoplay = true;
-        request.currentTime = currentTime;
-
-        session.loadMedia(request).then(
-            () => { /* success */ },
-            (error: any) => {
-                console.error('❌ Media load error:', error);
-            }
-        );
-    };
+    }, [initializeCastApi]);
 
     const startCasting = () => {
         if (!isAvailable) {
@@ -108,15 +185,15 @@ export function useChromecast(videoUrl: string, videoTitle: string) {
             return;
         }
 
-        const cast = window.chrome?.cast;
+        const cast = getCastApi();
         if (!cast) return;
 
         cast.requestSession(
-            (session: any) => {
+            (session: CastSession) => {
                 sessionListener(session);
             },
-            (error: any) => {
-                console.error('❌ Request session error:', error);
+            (error: CastError) => {
+                console.error('Request session error:', error);
             }
         );
     };
@@ -128,8 +205,8 @@ export function useChromecast(videoUrl: string, videoTitle: string) {
                     setIsCasting(false);
                     sessionRef.current = null;
                 },
-                (error: any) => {
-                    console.error('❌ Stop error:', error);
+                (error: CastError) => {
+                    console.error('Stop error:', error);
                 }
             );
         }
@@ -137,35 +214,38 @@ export function useChromecast(videoUrl: string, videoTitle: string) {
 
     const pauseCast = () => {
         const currentSession = sessionRef.current;
-        if (currentSession && currentSession.media && currentSession.media.length > 0) {
+        const cast = getCastApi();
+        if (currentSession && currentSession.media && currentSession.media.length > 0 && cast) {
             currentSession.media[0].pause(
-                new window.chrome.cast.media.PauseRequest(),
-                () => { /* paused */ },
-                (error: any) => console.error('Pause error:', error)
+                new cast.media.PauseRequest(),
+                () => undefined,
+                (error: CastError) => console.error('Pause error:', error)
             );
         }
     };
 
     const playCast = () => {
         const currentSession = sessionRef.current;
-        if (currentSession && currentSession.media && currentSession.media.length > 0) {
+        const cast = getCastApi();
+        if (currentSession && currentSession.media && currentSession.media.length > 0 && cast) {
             currentSession.media[0].play(
-                new window.chrome.cast.media.PlayRequest(),
-                () => { /* playing */ },
-                (error: any) => console.error('Play error:', error)
+                new cast.media.PlayRequest(),
+                () => undefined,
+                (error: CastError) => console.error('Play error:', error)
             );
         }
     };
 
     const seekCast = (time: number) => {
         const currentSession = sessionRef.current;
-        if (currentSession && currentSession.media && currentSession.media.length > 0) {
-            const request = new window.chrome.cast.media.SeekRequest();
+        const cast = getCastApi();
+        if (currentSession && currentSession.media && currentSession.media.length > 0 && cast) {
+            const request = new cast.media.SeekRequest();
             request.currentTime = time;
             currentSession.media[0].seek(
                 request,
-                () => { /* seeked */ },
-                (error: any) => console.error('Seek error:', error)
+                () => undefined,
+                (error: CastError) => console.error('Seek error:', error)
             );
         }
     };
