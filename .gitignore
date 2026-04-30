@@ -24,6 +24,9 @@ dist-electron
 *.sln
 *.sw?
 
+# Local assistant rules
+.clinerules-*
+
 # Environment variables
 .env
 .env.local
