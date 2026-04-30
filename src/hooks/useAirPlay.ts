@@ -10,6 +10,19 @@ export interface AirPlayDevice {
     available: boolean;
 }
 
+interface AirPlayDeviceResult {
+    id: string;
+    name: string;
+    host: string;
+    port?: number;
+    model?: string;
+}
+
+interface AirPlayDiscoverResult {
+    success: boolean;
+    devices: AirPlayDeviceResult[];
+}
+
 export function useAirPlay(videoUrl: string, videoTitle: string) {
     const [devices, setDevices] = useState<AirPlayDevice[]>([]);
     const [isCasting, setIsCasting] = useState(false);
@@ -18,9 +31,9 @@ export function useAirPlay(videoUrl: string, videoTitle: string) {
     // Discover AirPlay devices via IPC
     const discoverDevices = useCallback(async () => {
         try {
-            const result = await window.ipcRenderer.invoke('airplay:discover');
+            const result = await window.ipcRenderer.invoke('airplay:discover') as AirPlayDiscoverResult;
             if (result.success) {
-                const airplayDevices: AirPlayDevice[] = result.devices.map((d: any) => ({
+                const airplayDevices: AirPlayDevice[] = result.devices.map((d) => ({
                     id: d.id,
                     name: d.name,
                     type: 'airplay' as const,
@@ -38,11 +51,16 @@ export function useAirPlay(videoUrl: string, videoTitle: string) {
 
     // Start discovery on mount
     useEffect(() => {
-        discoverDevices();
+        const discoveryTimeout = setTimeout(() => {
+            void discoverDevices();
+        }, 0);
 
         // Refresh every 30 seconds
         const interval = setInterval(discoverDevices, 30000);
-        return () => clearInterval(interval);
+        return () => {
+            clearTimeout(discoveryTimeout);
+            clearInterval(interval);
+        };
     }, [discoverDevices]);
 
     const castToDevice = async (device: AirPlayDevice) => {

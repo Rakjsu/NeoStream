@@ -123,7 +123,7 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
     useEffect(() => {
         const video = videoRef.current;
         if (!video || !enabled) {
-            setCurrentText('');
+            queueMicrotask(() => setCurrentText(''));
             return;
         }
 
@@ -134,7 +134,7 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
         video.addEventListener('seeked', updateSubtitle);
 
         // Initial update
-        updateSubtitle();
+        queueMicrotask(updateSubtitle);
 
         return () => {
             video.removeEventListener('timeupdate', updateSubtitle);
