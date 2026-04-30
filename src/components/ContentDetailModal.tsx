@@ -27,6 +27,34 @@ interface ContentDetailModalProps {
     onPlay: (season?: number, episode?: number, offlineUrl?: string) => void;
 }
 
+interface SeriesEpisode {
+    id: number | string;
+    episode_num: number | string;
+    title?: string;
+    container_extension?: string;
+}
+
+interface SeriesInfo {
+    episodes?: Record<string, SeriesEpisode[]>;
+}
+
+interface TmdbGenre {
+    name: string;
+}
+
+type TmdbDetails = (TMDBSeriesDetails | TMDBMovieDetails) & {
+    overview?: string;
+    vote_average?: number;
+    release_date?: string;
+    genres?: TmdbGenre[];
+}
+
+interface DownloadProgressItem {
+    id: string;
+    progress: number;
+    status?: string;
+}
+
 export function ContentDetailModal({
     isOpen,
     onClose,
@@ -35,7 +63,7 @@ export function ContentDetailModal({
     contentData,
     onPlay
 }: ContentDetailModalProps) {
-    const [seriesInfo, setSeriesInfo] = useState<any>(null);
+    const [seriesInfo, setSeriesInfo] = useState<SeriesInfo | null>(null);
     const [tmdbData, setTmdbData] = useState<TMDBSeriesDetails | TMDBMovieDetails | null>(null);
     const [selectedSeason, setSelectedSeason] = useState(1);
     const [selectedEpisode, setSelectedEpisode] = useState(1);
@@ -53,13 +81,13 @@ export function ContentDetailModal({
     useEffect(() => {
         if (!isOpen || contentType !== 'series') return;
 
-        setLoading(true);
+        queueMicrotask(() => setLoading(true));
         window.ipcRenderer.invoke('auth:get-credentials').then(result => {
             if (result.success) {
                 const { url, username, password } = result.credentials;
                 fetch(`${url}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${contentId}`)
                     .then(res => res.json())
-                    .then(data => {
+                    .then((data: SeriesInfo) => {
                         setSeriesInfo(data);
 
                         // Check for existing progress
@@ -140,19 +168,19 @@ export function ContentDetailModal({
         if (!isOpen) return;
         if (contentType === 'movie') {
             const isAlreadyInQueue = downloadService.isMovieInQueue(contentData.name);
-            setDownloadStatus(isAlreadyInQueue ? 'completed' : 'idle');
+            queueMicrotask(() => setDownloadStatus(isAlreadyInQueue ? 'completed' : 'idle'));
         }
     }, [isOpen, contentData.name, contentType]);
 
     // Helper function to get clean episode title
-    const getEpisodeTitle = (ep: any): string => {
+    const getEpisodeTitle = (ep: SeriesEpisode): string => {
         const epNum = Number(ep.episode_num);
         const rawTitle = ep.title || '';
 
         // Clean the title - remove series name, season/episode markers, etc.
-        let cleanTitle = rawTitle
-            .replace(/^(.*?)[\s\-–—]*S\d+[\s\-:\.]*E\d+[\s\-:\.–—]*/i, '') // Remove "SeriesName S01E01 -"
-            .replace(/\s*[\[\(]?S\d+[\s\.\-]*E\d+[\]\)]?\s*/gi, '') // Remove [S01E01] or (S01.E01)
+        const cleanTitle = rawTitle
+            .replace(/^(.*?)[\s\-–—]*S\d+[\s\-:.]*E\d+[\s\-:.–—]*/i, '') // Remove "SeriesName S01E01 -"
+            .replace(/\s*(?:\[|\()?S\d+[\s.-]*E\d+(?:\]|\))?\s*/gi, '') // Remove [S01E01] or (S01.E01)
             .replace(/\s*-\s*Temporada\s*\d+\s*Epis[óo]dio\s*\d+\s*/gi, '') // Remove "Temporada X Epi..."
             .replace(/\s*Temp\s*\d+\s*Ep\s*\d+\s*/gi, '') // Remove "Temp X Ep Y"
             .replace(/Episode\s*\d+/gi, '') // Remove "Episode X"
@@ -181,7 +209,7 @@ export function ContentDetailModal({
 
         // If API provided a trailer, use it
         if (contentData.youtube_trailer) {
-            setTrailerUrl(contentData.youtube_trailer);
+            queueMicrotask(() => setTrailerUrl(contentData.youtube_trailer || null));
             return;
         }
 
@@ -225,7 +253,7 @@ export function ContentDetailModal({
         }
 
         const episodeData = seriesInfo?.episodes?.[seasonNum]?.find(
-            (ep: any) => Number(ep.episode_num) === episodeNum
+            (ep) => Number(ep.episode_num) === episodeNum
         );
         if (!episodeData) return;
 
@@ -250,14 +278,14 @@ export function ContentDetailModal({
                         episode: episodeNum
                     },
                     {
-                        plot: (tmdbData as any)?.overview || contentData.plot,
-                        rating: contentData.rating || (tmdbData as any)?.vote_average?.toFixed(1),
+                        plot: (tmdbData as TmdbDetails | null)?.overview || contentData.plot,
+                        rating: contentData.rating || (tmdbData as TmdbDetails | null)?.vote_average?.toFixed(1),
                         year: contentData.release_date?.split('-')[0],
-                        genres: (tmdbData as any)?.genres?.map((g: any) => g.name)
+                        genres: (tmdbData as TmdbDetails | null)?.genres?.map((g) => g.name)
                     }
                 );
 
-                const handleProgress = (item: any) => {
+                const handleProgress = (item: DownloadProgressItem) => {
                     if (item.id === download.id) {
                         setDownloadProgress(item.progress);
                         if (item.status === 'completed') {
@@ -276,9 +304,10 @@ export function ContentDetailModal({
 
     if (!isOpen) return null;
 
-    const overview = (tmdbData as any)?.overview || contentData.plot || t('contentModal', 'noDescription');
-    const rating = contentData.rating || (tmdbData as any)?.vote_average?.toFixed(1);
-    const genres = contentData.genre || (tmdbData as any)?.genres?.map((g: any) => g.name).join(', ');
+    const tmdbDetails = tmdbData as TmdbDetails | null;
+    const overview = tmdbDetails?.overview || contentData.plot || t('contentModal', 'noDescription');
+    const rating = contentData.rating || tmdbDetails?.vote_average?.toFixed(1);
+    const genres = contentData.genre || tmdbDetails?.genres?.map((g) => g.name).join(', ');
     const seasons = seriesInfo?.episodes ? Object.keys(seriesInfo.episodes).sort((a, b) => Number(a) - Number(b)) : [];
     const episodes = seriesInfo?.episodes?.[selectedSeason] || [];
 
@@ -538,7 +567,7 @@ export function ContentDetailModal({
                                 borderRadius: 12,
                                 padding: 8
                             }}>
-                                {episodes.map((ep: any, index: number) => {
+                                {episodes.map((ep: SeriesEpisode, index: number) => {
                                     const epNum = Number(ep.episode_num);
                                     const isSelected = epNum === selectedEpisode;
                                     const isWatched = watchProgressService.isEpisodeWatched(contentId, selectedSeason, epNum);
@@ -758,7 +787,7 @@ export function ContentDetailModal({
                                         });
                                     } else {
                                         // Get series episode stream URL
-                                        const episodeData = episodes.find((ep: any) => Number(ep.episode_num) === selectedEpisode);
+                                        const episodeData = episodes.find((ep) => Number(ep.episode_num) === selectedEpisode);
                                         if (episodeData) {
                                             result = await window.ipcRenderer.invoke('streams:get-series-url', {
                                                 streamId: episodeData.id,
@@ -784,15 +813,15 @@ export function ContentDetailModal({
                                             contentData.cover,
                                             seriesInfo,
                                             {
-                                                plot: (tmdbData as any)?.overview || contentData.plot,
-                                                rating: contentData.rating || (tmdbData as any)?.vote_average?.toFixed(1),
-                                                year: contentData.release_date?.split('-')[0] || (tmdbData as any)?.release_date?.split('-')[0],
-                                                genres: (tmdbData as any)?.genres?.map((g: any) => g.name)
+                                                plot: tmdbDetails?.overview || contentData.plot,
+                                                rating: contentData.rating || tmdbDetails?.vote_average?.toFixed(1),
+                                                year: contentData.release_date?.split('-')[0] || tmdbDetails?.release_date?.split('-')[0],
+                                                genres: tmdbDetails?.genres?.map((g) => g.name)
                                             }
                                         );
 
                                         // Listen for progress
-                                        const handleProgress = (item: any) => {
+                                        const handleProgress = (item: DownloadProgressItem) => {
                                             if (item.id === download.id) {
                                                 setDownloadProgress(item.progress);
                                                 if (item.status === 'completed') {
@@ -883,7 +912,7 @@ export function ContentDetailModal({
                                     type: contentType,
                                     title: contentData.name,
                                     poster: contentData.cover,
-                                    rating: (tmdbData as any)?.vote_average?.toFixed(1)
+                                    rating: tmdbDetails?.vote_average?.toFixed(1)
                                 });
                                 setRefresh(r => r + 1); // Force UI update
                             }}
@@ -948,7 +977,7 @@ export function ContentDetailModal({
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                             {(() => {
                                 const allEps = seriesInfo?.episodes?.[selectedSeason] || [];
-                                const remainingEps = allEps.filter((ep: any) =>
+                                const remainingEps = allEps.filter((ep) =>
                                     !downloadService.isEpisodeInQueue(contentData.name, selectedSeason, Number(ep.episode_num))
                                 );
                                 const downloadedCount = allEps.length - remainingEps.length;
@@ -973,7 +1002,7 @@ export function ContentDetailModal({
                                 return (
                                     <button
                                         onClick={() => {
-                                            remainingEps.forEach((ep: any, idx: number) => {
+                                            remainingEps.forEach((ep, idx: number) => {
                                                 setTimeout(() => {
                                                     downloadSingleEpisode(selectedSeason, Number(ep.episode_num));
                                                 }, idx * 2000);
@@ -1114,7 +1143,7 @@ export function ContentDetailModal({
                             src={(() => {
                                 // Extract video ID from URL
                                 const patterns = [
-                                    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+                                    /(?:youtube.com\/watch\?v=|youtu.be\/|youtube.com\/embed\/)([^&\n?#]+)/,
                                     /^([a-zA-Z0-9_-]{11})$/
                                 ];
                                 for (const pattern of patterns) {

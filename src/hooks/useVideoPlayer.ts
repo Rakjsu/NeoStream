@@ -21,13 +21,15 @@ const getSavedVolume = (): number => {
             const vol = parseFloat(saved);
             return isNaN(vol) ? 1 : Math.max(0, Math.min(1, vol));
         }
-    } catch { }
+    } catch {
+        return 1;
+    }
     return 1;
 };
 
 export function useVideoPlayer() {
     const videoRef = useRef<HTMLVideoElement>(null);
-    const [state, setState] = useState<VideoPlayerState>({
+    const [state, setState] = useState<VideoPlayerState>(() => ({
         playing: false,
         currentTime: 0,
         duration: 0,
@@ -38,7 +40,7 @@ export function useVideoPlayer() {
         loading: true,
         fullscreen: false,
         playbackRate: 1
-    });
+    }));
 
     // Play/Pause
     const togglePlay = useCallback(() => {
@@ -65,7 +67,9 @@ export function useVideoPlayer() {
         // Save volume to localStorage
         try {
             localStorage.setItem('playerVolume', clampedVolume.toString());
-        } catch { }
+        } catch {
+            // Ignore storage write failures, e.g. private mode or blocked storage.
+        }
     }, []);
 
     // Mute
@@ -122,9 +126,9 @@ export function useVideoPlayer() {
             // Check multiple APIs for better compatibility
             return !!(
                 document.fullscreenElement ||
-                (document as any).webkitFullscreenElement ||
-                (document as any).mozFullScreenElement ||
-                (document as any).msFullscreenElement
+                (document as Document & { webkitFullscreenElement?: Element }).webkitFullscreenElement ||
+                (document as Document & { mozFullScreenElement?: Element }).mozFullScreenElement ||
+                (document as Document & { msFullscreenElement?: Element }).msFullscreenElement
             );
         };
 
@@ -175,7 +179,7 @@ export function useVideoPlayer() {
             video.removeEventListener('progress', handleProgress);
             document.removeEventListener('fullscreenchange', handleFullscreenChange);
         };
-    }, []);
+    }, [state.volume]);
 
     // Keyboard Shortcuts
     useEffect(() => {

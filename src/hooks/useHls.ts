@@ -22,7 +22,10 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
     const hasStartedPlaying = useRef(false);
     // Use ref for callback to avoid re-running useEffect when callback changes
     const onStreamErrorRef = useRef(onStreamError);
-    onStreamErrorRef.current = onStreamError;
+
+    useEffect(() => {
+        onStreamErrorRef.current = onStreamError;
+    }, [onStreamError]);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -47,7 +50,7 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
             const cached = playbackService.getCachedBufferSeconds();
             bufferSeconds = cached || 15;
             // Pre-fetch for future videos silently
-            playbackService.getBufferSeconds().catch(() => { });
+            playbackService.getBufferSeconds().catch(() => undefined);
         } else {
             bufferSeconds = parseInt(config.bufferSize, 10);
         }
@@ -145,7 +148,6 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
                         // Start with highest quality matching level
                         const bestMatch = matchingLevelIndices[matchingLevelIndices.length - 1];
                         hls.currentLevel = bestMatch;
-                    } else {
                     }
                 }
             });
