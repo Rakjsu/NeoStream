@@ -43,6 +43,29 @@ export interface StorageInfo {
 
 type DownloadEventCallback = (item: DownloadItem) => void;
 
+interface CacheImageResult {
+    success: boolean;
+    localPath?: string;
+}
+
+interface DownloadStartResult {
+    success: boolean;
+    filePath?: string;
+    size?: number;
+    error?: string;
+}
+
+interface DownloadProgressPayload {
+    id: string;
+    progress: number;
+    downloadedBytes: number;
+    totalBytes: number;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
+}
+
 class DownloadService {
     private downloads: Map<string, DownloadItem> = new Map();
     private queue: string[] = [];
@@ -192,7 +215,7 @@ class DownloadService {
                 const cacheResult = await window.ipcRenderer.invoke('download:cache-image', {
                     url: cover,
                     id: cacheKey
-                });
+                }) as CacheImageResult;
                 if (cacheResult.success) {
                     localCover = cacheResult.localPath;
                 }
@@ -260,9 +283,9 @@ class DownloadService {
 
         try {
             await this.downloadFile(item);
-        } catch (error: any) {
+        } catch (error: unknown) {
             item.status = 'failed';
-            item.error = error.message || 'Download failed';
+            item.error = getErrorMessage(error, 'Download failed');
             this.emit('error', item);
             await this.saveDownload(item);
             // Send failed notification
@@ -295,7 +318,7 @@ class DownloadService {
                 seriesName: item.seriesName,
                 season: item.season,
                 episode: item.episode
-            }).then((result: any) => {
+            }).then((result: DownloadStartResult) => {
                 if (result.success) {
                     item.filePath = result.filePath;
                     item.size = result.size || 0;
@@ -323,7 +346,7 @@ class DownloadService {
             }).catch(reject);
 
             // Listen for progress updates
-            const progressHandler = (_event: any, data: { id: string; progress: number; downloadedBytes: number; totalBytes: number }) => {
+            const progressHandler = (_event: unknown, data: DownloadProgressPayload) => {
                 if (data.id === item.id) {
                     item.progress = data.progress;
                     item.downloadedBytes = data.downloadedBytes;
@@ -434,7 +457,7 @@ class DownloadService {
     // Get storage info
     async getStorageInfo(): Promise<StorageInfo> {
         try {
-            const result = await window.ipcRenderer.invoke('download:get-storage-info');
+            const result = await window.ipcRenderer.invoke('download:get-storage-info') as StorageInfo;
             return result;
         } catch {
             return {

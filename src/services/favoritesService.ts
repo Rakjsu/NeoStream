@@ -14,6 +14,10 @@ export interface FavoriteItem {
     streamId?: number;
 }
 
+interface FavoriteProfileData {
+    favorites?: FavoriteItem[];
+}
+
 export const favoritesService = {
     // Get all favorites for active profile
     getAll(): FavoriteItem[] {
@@ -98,21 +102,21 @@ export const favoritesService = {
     },
 
     // Get profile data from localStorage
-    getProfileData(): any {
+    getProfileData(): FavoriteProfileData {
         const activeProfile = profileService.getActiveProfile();
         if (!activeProfile) return {};
 
         try {
             const key = `neostream_profile_${activeProfile.id}`;
             const data = localStorage.getItem(key);
-            return data ? JSON.parse(data) : {};
+            return data ? JSON.parse(data) as FavoriteProfileData : {};
         } catch {
             return {};
         }
     },
 
     // Save profile data to localStorage
-    saveProfileData(data: any): void {
+    saveProfileData(data: FavoriteProfileData): void {
         const activeProfile = profileService.getActiveProfile();
         if (!activeProfile) return;
 
