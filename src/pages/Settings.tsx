@@ -24,6 +24,7 @@ export function Settings() {
     const [lastCheckDate, setLastCheckDate] = useState<string>('');
     const [activeSection, setActiveSection] = useState<string>('updates');
     const [saveAnimation, setSaveAnimation] = useState<string | null>(null);
+    const [allowInvalidProviderCertificates, setAllowInvalidProviderCertificates] = useState(true);
 
     // PIN Modal states
     const [showPinModal, setShowPinModal] = useState(false);
@@ -121,6 +122,7 @@ export function Settings() {
 
     useEffect(() => {
         loadUpdateConfig();
+        loadCertificateSettings();
         updateBufferInfo();
         // Load usage stats
         setUsageStats(usageStatsService.getStats());
@@ -134,6 +136,32 @@ export function Settings() {
         if (config.lastCheck) {
             const date = new Date(config.lastCheck);
             setLastCheckDate(date.toLocaleString('pt-BR'));
+        }
+    };
+
+    const loadCertificateSettings = async () => {
+        try {
+            const result = await window.ipcRenderer.invoke('security:get-certificate-settings');
+            if (result.success && result.settings) {
+                setAllowInvalidProviderCertificates(Boolean(result.settings.allowInvalidProviderCertificates));
+            }
+        } catch (error) {
+            console.error('Failed to load certificate settings:', error);
+        }
+    };
+
+    const handleAllowInvalidProviderCertificatesChange = async (value: boolean) => {
+        setAllowInvalidProviderCertificates(value);
+        try {
+            const result = await window.ipcRenderer.invoke('security:set-allow-invalid-provider-certificates', value);
+            if (result.success && result.settings) {
+                setAllowInvalidProviderCertificates(Boolean(result.settings.allowInvalidProviderCertificates));
+            }
+            setSaveAnimation('allowInvalidProviderCertificates');
+            setTimeout(() => setSaveAnimation(null), 1500);
+        } catch (error) {
+            console.error('Failed to save certificate settings:', error);
+            setAllowInvalidProviderCertificates(prev => !prev);
         }
     };
 
@@ -272,6 +300,7 @@ export function Settings() {
     const sections = [
         { id: 'updates', icon: '🔄', label: t('nav', 'updates'), color: '#10b981' },
         { id: 'playback', icon: '⏯️', label: t('nav', 'playback') || 'Reprodução', color: '#3b82f6' },
+        { id: 'network', icon: '🔐', label: 'Rede', color: '#14b8a6' },
         { id: 'epg', icon: '📡', label: 'EPG', color: '#06b6d4' },
         { id: 'stats', icon: '📊', label: t('nav', 'stats'), color: '#8b5cf6' },
         { id: 'parental', icon: '👨‍👩‍👧', label: t('nav', 'parental'), color: '#ef4444' },
@@ -565,6 +594,45 @@ export function Settings() {
                                         </label>
                                         {saveAnimation === 'clickThroughEnabled' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                                     </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Network Section */}
+                        {activeSection === 'network' && (
+                            <div className="section-card">
+                                <div className="section-header">
+                                    <div className="section-icon" style={{ background: 'linear-gradient(135deg, #14b8a6, #0f766e)' }}>🔐</div>
+                                    <div>
+                                        <h2>Rede e certificados</h2>
+                                        <p>Controle de compatibilidade para provedores IPTV com TLS antigo ou mal configurado.</p>
+                                    </div>
+                                </div>
+
+                                <div className="settings-group">
+                                    <div className="setting-item">
+                                        <div className="setting-info">
+                                            <label>Modo compatível com certificados inválidos</label>
+                                            <p>Permite certificados inválidos somente para o host IPTV configurado. Útil para provedores antigos, mas reduz a segurança dessa conexão.</p>
+                                        </div>
+                                        <label className="toggle-switch">
+                                            <input
+                                                type="checkbox"
+                                                checked={allowInvalidProviderCertificates}
+                                                onChange={(e) => handleAllowInvalidProviderCertificatesChange(e.target.checked)}
+                                            />
+                                            <span className="toggle-slider"></span>
+                                        </label>
+                                        {saveAnimation === 'allowInvalidProviderCertificates' && (
+                                            <span className="save-indicator">{t('settings', 'saved')}</span>
+                                        )}
+                                    </div>
+
+                                    {allowInvalidProviderCertificates && (
+                                        <div className="certificate-warning">
+                                            <strong>Atenção:</strong> este modo não libera certificados inválidos para TMDB, atualizações, GitHub ou domínios externos. Ele vale apenas para o servidor IPTV salvo no app.
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -2391,6 +2459,20 @@ const settingsStyles = `
 
 .last-check strong {
     color: white;
+}
+
+.certificate-warning {
+    padding: 16px 20px;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.28);
+    border-radius: 12px;
+    color: rgba(255, 255, 255, 0.72);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.certificate-warning strong {
+    color: #fbbf24;
 }
 
 /* Check Button */

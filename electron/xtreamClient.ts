@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getInvalidCertificateGuidance, getProviderHttpsAgent, isTlsCertificateError } from './certificatePolicy'
 
 export interface XtreamAccount {
     username: string
@@ -32,10 +33,21 @@ export class XtreamClient {
             url.searchParams.append(key, value)
         }
 
-        const response = await axios.get(url.toString(), {
-            timeout: 15000,
-            validateStatus: () => true  // Don't throw on any status
-        })
+        const requestUrl = url.toString()
+        let response
+        try {
+            response = await axios.get(requestUrl, {
+                timeout: 15000,
+                validateStatus: () => true,  // Don't throw on any status
+                httpsAgent: getProviderHttpsAgent(requestUrl, this.baseUrl)
+            })
+        } catch (error: any) {
+            if (isTlsCertificateError(error)) {
+                throw new Error(getInvalidCertificateGuidance())
+            }
+
+            throw error
+        }
 
         if (response.status !== 200) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -55,7 +67,8 @@ export class XtreamClient {
 
             const response = await axios.get(fullUrl, {
                 timeout: 15000,
-                validateStatus: () => true  // Don't throw on any status
+                validateStatus: () => true,  // Don't throw on any status
+                httpsAgent: getProviderHttpsAgent(fullUrl, this.baseUrl)
             });
 
             console.log('[XtreamClient] Response status:', response.status, response.statusText);
@@ -91,6 +104,10 @@ export class XtreamClient {
 
             if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
                 throw new Error(`Tempo esgotado ao conectar em: ${this.baseUrl}\n\nO servidor demorou muito para responder.`);
+            }
+
+            if (isTlsCertificateError(error)) {
+                throw new Error(getInvalidCertificateGuidance());
             }
 
             // Erro de rede genérico

@@ -13,6 +13,7 @@ interface StoreSchema {
         theme?: string
         language?: string
         player?: any
+        allowInvalidProviderCertificates?: boolean
     }
 }
 
@@ -23,7 +24,8 @@ const store = new Store<StoreSchema>({
         history: [],
         settings: {
             theme: 'dark',
-            language: 'en'
+            language: 'en',
+            allowInvalidProviderCertificates: true
         }
     }
 })

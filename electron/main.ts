@@ -7,6 +7,7 @@ import { setupAirPlayHandlers } from './airplayHandlers'
 import { setupDownloadHandlers } from './downloadHandlers'
 import { initializeAutoUpdater } from './autoUpdater'
 import { setupPipHandlers } from './pipHandlers'
+import { setupCertificateErrorHandler } from './certificatePolicy'
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url)
@@ -19,14 +20,11 @@ app.commandLine.appendSwitch('enable-zero-copy')
 app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,VaapiVideoEncoder') // Linux/Mac mostly, but good to have
 // Windows HEVC support relies on OS extensions, but we can try to force some flags if needed.
 
-// Network permissions - allow external requests
-app.commandLine.appendSwitch('disable-features', 'OutOfBlinkCors')
-app.commandLine.appendSwitch('ignore-certificate-errors')
-
 setupIpcHandlers()
 setupDLNAHandlers()
 setupAirPlayHandlers()
 setupDownloadHandlers()
+setupCertificateErrorHandler()
 
 process.env.DIST = path.join(__dirname, '../dist')
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public')
@@ -47,7 +45,7 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.mjs'),
             nodeIntegration: false,
             contextIsolation: true,
-            webSecurity: false,
+            webSecurity: true,
         },
     })
 

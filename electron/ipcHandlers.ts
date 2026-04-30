@@ -1,6 +1,7 @@
 import { ipcMain, BrowserWindow, screen } from 'electron'
 import { XtreamClient } from './xtreamClient'
 import store from './store'
+import { getCertificateSettings, getProviderHttpsAgent, setAllowInvalidProviderCertificates } from './certificatePolicy'
 
 // Store for window state (for custom maximize)
 let savedWindowBounds: Electron.Rectangle | null = null
@@ -83,6 +84,14 @@ export function setupIpcHandlers() {
     ipcMain.handle('auth:logout', () => {
         store.set('auth', {})
         return { success: true }
+    })
+
+    ipcMain.handle('security:get-certificate-settings', () => {
+        return { success: true, settings: getCertificateSettings() }
+    })
+
+    ipcMain.handle('security:set-allow-invalid-provider-certificates', (_, value: boolean) => {
+        return { success: true, settings: setAllowInvalidProviderCertificates(Boolean(value)) }
     })
 
     // Get content counts
@@ -268,6 +277,7 @@ export function setupIpcHandlers() {
             const fetch = (await import('node-fetch')).default
             console.log('[Fetch URL] Fetching:', url.substring(0, 100))
             const response = await fetch(url, {
+                agent: getProviderHttpsAgent(url),
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Accept': '*/*'
@@ -344,6 +354,7 @@ export function setupIpcHandlers() {
             console.log('[EPG Cache] Downloading from:', url)
             const fetch = (await import('node-fetch')).default
             const response = await fetch(url, {
+                agent: getProviderHttpsAgent(url),
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Accept': 'application/xml, text/xml, */*'

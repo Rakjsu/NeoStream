@@ -67,6 +67,8 @@ export function Login() {
                     setError(t('login', 'authError'));
                 } else if (errorMessage.includes('timeout')) {
                     setError(t('login', 'timeoutError'));
+                } else if (errorMessage.includes('Certificado inválido') || errorMessage.includes('Certificado invalido') || errorMessage.includes('certificate')) {
+                    setError(errorMessage);
                 } else {
                     setError(errorMessage);
                 }
@@ -78,6 +80,8 @@ export function Login() {
                 setError(t('login', 'connectionError'));
             } else if (err?.message?.includes('timeout')) {
                 setError(t('login', 'timeoutError'));
+            } else if (err?.message?.includes('Certificado inválido') || err?.message?.includes('Certificado invalido') || err?.message?.includes('certificate')) {
+                setError(err.message);
             } else {
                 setError(t('login', 'unexpectedError'));
             }
