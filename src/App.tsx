@@ -1,24 +1,33 @@
+import { lazy, Suspense, useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { Welcome } from './pages/Welcome';
-import { Login } from './pages/Login';
-import { Dashboard } from './pages/Dashboard';
-import { Home } from './pages/Home';
-import { LiveTV } from './pages/LiveTV';
-import { VOD } from './pages/VOD';
-import { Series } from './pages/Series';
-import { Settings } from './pages/Settings';
-import { WatchLater } from './pages/WatchLater';
-import { Favorites } from './pages/Favorites';
-import { Downloads } from './pages/Downloads';
-import { PipWindow } from './pages/PipWindow';
-import { ProfileSelector } from './pages/ProfileSelector';
 import { UpdateNotification } from './components/UpdateNotification';
 import { PostUpdateChangelog } from './components/PostUpdateChangelog';
 import { EpisodeToast } from './components/EpisodeToast';
 import { MiniPlayerProvider } from './components/MiniPlayer';
 import { CustomTitleBar } from './components/CustomTitleBar';
 import { profileService } from './services/profileService';
-import { useState, useEffect } from 'react';
+
+const Welcome = lazy(() => import('./pages/Welcome').then(module => ({ default: module.Welcome })));
+const Login = lazy(() => import('./pages/Login').then(module => ({ default: module.Login })));
+const Dashboard = lazy(() => import('./pages/Dashboard').then(module => ({ default: module.Dashboard })));
+const Home = lazy(() => import('./pages/Home').then(module => ({ default: module.Home })));
+const LiveTV = lazy(() => import('./pages/LiveTV').then(module => ({ default: module.LiveTV })));
+const VOD = lazy(() => import('./pages/VOD').then(module => ({ default: module.VOD })));
+const Series = lazy(() => import('./pages/Series').then(module => ({ default: module.Series })));
+const Settings = lazy(() => import('./pages/Settings').then(module => ({ default: module.Settings })));
+const WatchLater = lazy(() => import('./pages/WatchLater').then(module => ({ default: module.WatchLater })));
+const Favorites = lazy(() => import('./pages/Favorites').then(module => ({ default: module.Favorites })));
+const Downloads = lazy(() => import('./pages/Downloads').then(module => ({ default: module.Downloads })));
+const PipWindow = lazy(() => import('./pages/PipWindow').then(module => ({ default: module.PipWindow })));
+const ProfileSelector = lazy(() => import('./pages/ProfileSelector').then(module => ({ default: module.ProfileSelector })));
+
+function AppLoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0c0c0cff' }}>
+      <div className="text-white text-xl">Carregando...</div>
+    </div>
+  );
+}
 
 // Wrapper component to use navigate hook inside App
 function EpisodeToastWithNavigation() {
@@ -65,16 +74,16 @@ function App() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0c0c0cff' }}>
-        <div className="text-white text-xl">Carregando...</div>
-      </div>
-    );
+    return <AppLoadingFallback />;
   }
 
   // If authenticated but no profile selected, show ProfileSelector
   if (isAuthenticated && !profileSelected) {
-    return <ProfileSelector onProfileSelected={handleProfileSelected} />;
+    return (
+      <Suspense fallback={<AppLoadingFallback />}>
+        <ProfileSelector onProfileSelected={handleProfileSelected} />
+      </Suspense>
+    );
   }
 
   return (
@@ -84,29 +93,31 @@ function App() {
       <PostUpdateChangelog />
       <HashRouter>
         <EpisodeToastWithNavigation />
-        <Routes>
-          <Route path="/welcome" element={<Welcome />} />
-          <Route path="/pip" element={<PipWindow />} />
-          <Route path="/login" element={<Login />} />
-          <Route
-            path="/dashboard"
-            element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />}
-          >
-            <Route index element={<Navigate to="home" replace />} />
-            <Route path="home" element={<Home />} />
-            <Route path="live" element={<LiveTV />} />
-            <Route path="vod" element={<VOD />} />
-            <Route path="series" element={<Series />} />
-            <Route path="watch-later" element={<WatchLater />} />
-            <Route path="favorites" element={<Favorites />} />
-            <Route path="downloads" element={<Downloads />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-          <Route
-            path="/"
-            element={isAuthenticated ? <Navigate to="/dashboard" /> : <Navigate to="/welcome" />}
-          />
-        </Routes>
+        <Suspense fallback={<AppLoadingFallback />}>
+          <Routes>
+            <Route path="/welcome" element={<Welcome />} />
+            <Route path="/pip" element={<PipWindow />} />
+            <Route path="/login" element={<Login />} />
+            <Route
+              path="/dashboard"
+              element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />}
+            >
+              <Route index element={<Navigate to="home" replace />} />
+              <Route path="home" element={<Home />} />
+              <Route path="live" element={<LiveTV />} />
+              <Route path="vod" element={<VOD />} />
+              <Route path="series" element={<Series />} />
+              <Route path="watch-later" element={<WatchLater />} />
+              <Route path="favorites" element={<Favorites />} />
+              <Route path="downloads" element={<Downloads />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+            <Route
+              path="/"
+              element={isAuthenticated ? <Navigate to="/dashboard" /> : <Navigate to="/welcome" />}
+            />
+          </Routes>
+        </Suspense>
       </HashRouter>
     </MiniPlayerProvider>
   );
