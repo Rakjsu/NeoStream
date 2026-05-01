@@ -81,11 +81,13 @@ export function Downloads() {
         };
     }, [loadData]);
 
+    const selectedSeriesName = seriesModal.series?.seriesName;
+
     // Sync modal data when groupedData changes (e.g., after delete)
     useEffect(() => {
-        if (seriesModal.isOpen && seriesModal.series) {
+        if (seriesModal.isOpen && selectedSeriesName) {
             const updatedSeries = groupedData.series.find(
-                (s: SeriesGroup) => s.seriesName === seriesModal.series?.seriesName
+                (s: SeriesGroup) => s.seriesName === selectedSeriesName
             );
             if (updatedSeries) {
                 queueMicrotask(() => {
@@ -101,7 +103,7 @@ export function Downloads() {
                 });
             }
         }
-    }, [groupedData, seriesModal.isOpen, seriesModal.series?.seriesName]);
+    }, [groupedData, seriesModal.isOpen, selectedSeriesName]);
 
     const handleDeleteClick = (item: DownloadItem) => {
         setDeleteModal({ isOpen: true, item });

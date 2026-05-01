@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
@@ -65,6 +65,8 @@ interface HlsWindow extends Window {
 const CARD_WIDTH = 200; // min-width of grid column
 const CARD_HEIGHT = 80; // approximate card height with gap
 const GRID_GAP = 16; // gap between cards
+const KIDS_ALLOWED_PATTERNS = ['infantil', 'infantis', 'kids', 'criança', '24 horas infantis'];
+const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'erotic', 'erótico'];
 
 // LiveTV Component - Icons: 6px - Updated 2025-11-26 00:29
 export function LiveTV() {
@@ -89,12 +91,6 @@ export function LiveTV() {
     const [blockedCategoryIds, setBlockedCategoryIds] = useState<Set<string>>(new Set());
     const [pipResumeTime, setPipResumeTime] = useState<number | null>(null);
     const { t } = useLanguage();
-
-    // For Kids profiles: only allow 'infantis' and '24 horas infantis' categories
-    const KIDS_ALLOWED_PATTERNS = ['infantil', 'infantis', 'kids', 'criança', '24 horas infantis'];
-
-    // Blocked category patterns for Parental Control
-    const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'erotic', 'erótico'];
 
     // Calculate items per page based on window dimensions
     useEffect(() => {
@@ -145,11 +141,6 @@ export function LiveTV() {
         window.addEventListener('miniPlayerExpand', handleMiniPlayerExpand as EventListener);
         return () => window.removeEventListener('miniPlayerExpand', handleMiniPlayerExpand as EventListener);
     }, [streams]);
-
-    useEffect(() => {
-        fetchStreams();
-        fetchCategories();
-    }, []);
 
     // Update progress bar every 10 seconds
     useEffect(() => {
@@ -213,7 +204,7 @@ export function LiveTV() {
         }
     };
 
-    const fetchCategories = async () => {
+    const fetchCategories = useCallback(async () => {
         try {
             const result = await window.ipcRenderer.invoke('categories:get-live');
             if (result.success) {
@@ -249,7 +240,12 @@ export function LiveTV() {
         } catch (err) {
             console.error('Failed to load categories:', err);
         }
-    };
+    }, [isKidsProfile]);
+
+    useEffect(() => {
+        void fetchStreams();
+        void fetchCategories();
+    }, [fetchCategories]);
 
     const filteredStreams = streams.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -287,7 +283,7 @@ export function LiveTV() {
     useEffect(() => {
         setVisibleCount(itemsPerPage);
         setSelectedChannel(null);
-    }, [searchQuery, selectedCategory]);
+    }, [searchQuery, selectedCategory, itemsPerPage]);
 
     const handleImageError = (streamId: number) => {
         setBrokenImages(prev => new Set(prev).add(streamId));

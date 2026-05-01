@@ -153,7 +153,7 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
 
     const hideControlsTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>(undefined);
 
-    const resetHideControlsTimer = () => {
+    const resetHideControlsTimer = useCallback(() => {
         setShowControls(true);
         if (hideControlsTimeoutRef.current) {
             clearTimeout(hideControlsTimeoutRef.current);
@@ -163,7 +163,7 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
                 setShowControls(false);
             }
         }, 3000);
-    };
+    }, [state.playing, seeking]);
 
     // State for PiP resume time (if same content was in PiP)
     const [pipResumeTime, setPipResumeTime] = useState<number | null>(null);
@@ -199,7 +199,7 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
             videoRef.current.currentTime = pipResumeTime;
             setPipResumeTime(null); // Clear after applying
         }
-    }, [pipResumeTime, state.duration]);
+    }, [pipResumeTime, state.duration, videoRef]);
 
     useEffect(() => {
         resetHideControlsTimer();
@@ -208,7 +208,7 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
                 clearTimeout(hideControlsTimeoutRef.current);
             }
         };
-    }, [state.playing, seeking, state.fullscreen]); // Added fullscreen to dependencies
+    }, [resetHideControlsTimer, state.fullscreen]);
 
     // Auto-load Forced subtitles when content starts (movies and series)
     useEffect(() => {
@@ -259,11 +259,12 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
         // Small delay to let video player initialize
         const timer = setTimeout(loadForcedSubtitles, 1000);
         return () => clearTimeout(timer);
-    }, [title, tmdbId, imdbId, seasonNumber, episodeNumber]);
+    }, [title, tmdbId, imdbId, seasonNumber, episodeNumber, forcedEnabledForSession]);
 
     // Handle auto-play (respects the shouldAutoPlayNextEpisode setting)
     useEffect(() => {
-        if (!videoRef.current) return;
+        const video = videoRef.current;
+        if (!video) return;
 
         // Check if we should auto-play (either autoPlay prop or from episode transition)
         const shouldAutoPlay = localStorage.getItem('shouldAutoPlayNextEpisode');
@@ -273,15 +274,15 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
             localStorage.removeItem('shouldAutoPlayNextEpisode');
 
             if (shouldAutoPlay === 'true') {
-                videoRef.current.play();
+                video.play();
             } else {
                 // Don't play, let user manually start
             }
         } else if (autoPlay) {
             // Normal autoPlay behavior for initial video load
-            videoRef.current.play();
+            video.play();
         }
-    }, [autoPlay, src]);
+    }, [autoPlay, src, videoRef]);
 
     // Resume from saved time
     useEffect(() => {
@@ -311,21 +312,21 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
             video.removeEventListener('loadedmetadata', setResumeTime);
             video.removeEventListener('canplay', setResumeTime);
         };
-    }, [resumeTime, src]);
+    }, [resumeTime, src, videoRef]);
 
     // Time update tracker
     useEffect(() => {
         if (!onTimeUpdate || !videoRef.current) return;
 
+        const video = videoRef.current;
+
         const handleTimeUpdate = () => {
-            if (videoRef.current) {
-                onTimeUpdate(videoRef.current.currentTime, videoRef.current.duration || 0);
-            }
+            onTimeUpdate(video.currentTime, video.duration || 0);
         };
 
-        videoRef.current.addEventListener('timeupdate', handleTimeUpdate);
-        return () => videoRef.current?.removeEventListener('timeupdate', handleTimeUpdate);
-    }, [onTimeUpdate]);
+        video.addEventListener('timeupdate', handleTimeUpdate);
+        return () => video.removeEventListener('timeupdate', handleTimeUpdate);
+    }, [onTimeUpdate, videoRef]);
 
     // Usage stats tracking - start session on play, end on pause/unmount
     useEffect(() => {
@@ -355,7 +356,7 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
                 video.removeEventListener('ended', handlePause);
             }
         };
-    }, [contentId, contentType, title, genre]);
+    }, [contentId, contentType, title, genre, videoRef]);
 
 
     // Go to next episode when video ends
@@ -378,7 +379,7 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
 
         video.addEventListener('ended', handleEnded);
         return () => video.removeEventListener('ended', handleEnded);
-    }, [onNextEpisode, canGoNext]);
+    }, [onNextEpisode, canGoNext, videoRef]);
 
     // Add mousemove listener - works both in and out of fullscreen
     useEffect(() => {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { parentalService } from '../services/parentalService';
 import { useLanguage } from '../services/languageService';
 import netflixLogo from '../assets/logos/netflix.png';
@@ -68,13 +68,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
         return false;
     };
 
-    useEffect(() => {
-        if (isOpen && categories.length === 0) {
-            fetchCategories();
-        }
-    }, [isOpen]);
-
-    const fetchCategories = async () => {
+    const fetchCategories = useCallback(async () => {
         setLoading(true);
         try {
             // Use IPC handler based on type
@@ -91,7 +85,13 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
         } finally {
             setLoading(false);
         }
-    };
+    }, [type]);
+
+    useEffect(() => {
+        if (isOpen && categories.length === 0) {
+            void fetchCategories();
+        }
+    }, [isOpen, categories.length, fetchCategories]);
 
     const getCategoryIcon = (categoryName: string): React.ReactElement => {
         const name = categoryName.toLowerCase();

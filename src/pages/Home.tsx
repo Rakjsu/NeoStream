@@ -379,7 +379,10 @@ export function Home() {
         }
 
         setRecommendations(recs.slice(0, 30));
-    }, [continueWatching.length, allSeries.length, allMovies.length]); // Use .length instead of arrays
+    // This intentionally depends on list sizes only to avoid rebuilding recommendations
+    // every time array identities change during the Home page refresh cycle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [continueWatching.length, allSeries.length, allMovies.length]);
 
     const formatTime = (date: Date) => {
         return date.toLocaleTimeString(t('home', 'locale'), { hour: '2-digit', minute: '2-digit' });
