@@ -3,9 +3,6 @@
  * Fetches subtitles from OpenSubtitles API via IPC (bypasses CORS)
  */
 
-import { playbackService } from './playbackService';
-import { searchMovieByName, searchSeriesByName } from './tmdb';
-
 const OPENSUBTITLES_USERNAME = 'Rakjsu';
 const OPENSUBTITLES_PASSWORD = '05062981';
 
@@ -274,6 +271,9 @@ export async function autoFetchSubtitle(params: {
     episode?: number;
 }): Promise<{ url: string; language: string; vttContent: string; warning?: string } | null> {
     try {
+        // Get user's preferred subtitle language from settings
+        const { playbackService } = await import('./playbackService');
+
         // Reload config to ensure we have latest profile settings
         playbackService.reloadConfig();
         const config = playbackService.getConfig();
@@ -353,6 +353,8 @@ export async function autoFetchSubtitle(params: {
                 // Extract year from original title if present
                 const yearMatch = params.title.match(/\((\d{4})\)/);
                 const year = yearMatch ? yearMatch[1] : undefined;
+
+                const { searchMovieByName, searchSeriesByName } = await import('./tmdb');
 
                 // For series with season/episode, search as series
                 if (params.season !== undefined && params.episode !== undefined) {
@@ -558,6 +560,7 @@ export async function autoFetchForcedSubtitle(params: {
             .trim();
 
         // Get preferred language
+        const { playbackService } = await import('./playbackService');
         playbackService.reloadConfig();
         const config = playbackService.getConfig();
         const preferredLang = config.subtitleLanguage || 'pt-br';
@@ -568,6 +571,7 @@ export async function autoFetchForcedSubtitle(params: {
 
         if (!tmdbId && !imdbId) {
             try {
+                const { searchMovieByName, searchSeriesByName } = await import('./tmdb');
                 const yearMatch = params.title.match(/\((\d{4})\)/);
                 const year = yearMatch ? yearMatch[1] : undefined;
 

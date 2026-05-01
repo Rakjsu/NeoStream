@@ -7,7 +7,6 @@ import { useChromecast } from '../../hooks/useChromecast';
 import { CastDeviceSelector } from '../CastDeviceSelector';
 import { formatTime, percentage } from '../../utils/videoHelpers';
 import { usageStatsService } from '../../services/usageStatsService';
-import { playbackService } from '../../services/playbackService';
 import { autoFetchSubtitle, autoFetchForcedSubtitle, cleanupSubtitleUrl } from '../../services/subtitleService';
 import { SubtitleOverlay } from './SubtitleOverlay';
 import { useLanguage } from '../../services/languageService';
@@ -229,6 +228,7 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
                 }
 
                 // Check if Forced subtitles are enabled in settings
+                const { playbackService } = await import('../../services/playbackService');
                 playbackService.reloadConfig();
                 const config = playbackService.getConfig();
 
@@ -367,6 +367,7 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
 
         const handleEnded = async () => {
             // Check if auto-play is enabled to determine if we should auto-start
+            const { playbackService } = await import('../../services/playbackService');
             const config = playbackService.getConfig();
 
             // Always go to next episode, but store the auto-play preference
@@ -1093,6 +1094,7 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
                                                 } else if (newValue && !subtitlesEnabled) {
                                                     // Enabling: load forced subtitles now
                                                     try {
+                                                        const { autoFetchForcedSubtitle } = await import('../../services/subtitleService');
                                                         const result = await autoFetchForcedSubtitle({
                                                             title: title || '',
                                                             tmdbId,
