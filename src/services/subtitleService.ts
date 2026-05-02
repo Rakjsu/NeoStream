@@ -3,9 +3,6 @@
  * Fetches subtitles from OpenSubtitles API via IPC (bypasses CORS)
  */
 
-const OPENSUBTITLES_USERNAME = 'Rakjsu';
-const OPENSUBTITLES_PASSWORD = '05062981';
-
 // JWT token cache
 let cachedToken: string | null = null;
 let tokenExpiry: number = 0;
@@ -96,10 +93,7 @@ async function getAuthToken(): Promise<string | null> {
     }
 
     try {
-                const result = await openSubtitlesRequest('/login', 'POST', {
-            username: OPENSUBTITLES_USERNAME,
-            password: OPENSUBTITLES_PASSWORD
-        });
+        const result = await openSubtitlesRequest('/login', 'POST');
 
         if (!result.success) {
             console.error('OpenSubtitles login failed:', result.status, result.error);

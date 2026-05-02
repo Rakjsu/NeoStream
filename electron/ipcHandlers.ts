@@ -13,6 +13,10 @@ type OpenSubtitlesBody = Record<string, unknown> & {
     authToken?: string
 }
 
+const OPEN_SUBTITLES_API_KEY = process.env.OPEN_SUBTITLES_API_KEY
+const OPEN_SUBTITLES_USERNAME = process.env.OPEN_SUBTITLES_USERNAME
+const OPEN_SUBTITLES_PASSWORD = process.env.OPEN_SUBTITLES_PASSWORD
+
 export function setupIpcHandlers() {
     ipcMain.handle('ping', () => 'pong')
 
@@ -430,7 +434,6 @@ export function setupIpcHandlers() {
     })
     ipcMain.handle('streams:get-vod-url', async (_, { streamId, container }) => {
         try {
-            console.log('[Download] get-vod-url called with:', { streamId, container })
             const auth = store.get('auth')
             if (!auth.url || !auth.username || !auth.password) {
                 return { success: false, error: 'Not authenticated' }
@@ -438,10 +441,8 @@ export function setupIpcHandlers() {
 
             const client = new XtreamClient(auth.url, auth.username, auth.password)
             const containerExt = container || 'mp4'
-            console.log('[Download] Using container extension:', containerExt)
             const url = client.getVodStreamUrl(Number(streamId), containerExt)
             registerApprovedProviderUrl(url, auth.url)
-            console.log('[Download] Generated VOD URL:', url.replace(auth.password, '***'))
 
             return { success: true, url }
         } catch (error: unknown) {
@@ -488,20 +489,33 @@ export function setupIpcHandlers() {
     // OpenSubtitles API proxy (bypass CORS)
     ipcMain.handle('opensubtitles:request', async (_, { endpoint, method, body }: { endpoint: string; method?: string; body?: OpenSubtitlesBody }) => {
         try {
+            if (!OPEN_SUBTITLES_API_KEY) {
+                return { success: false, error: 'OpenSubtitles API key is not configured' }
+            }
+            if (endpoint === '/login' && (!OPEN_SUBTITLES_USERNAME || !OPEN_SUBTITLES_PASSWORD)) {
+                return { success: false, error: 'OpenSubtitles credentials are not configured' }
+            }
+
             const fetch = (await import('node-fetch')).default
             const baseUrl = 'https://api.opensubtitles.com/api/v1'
-            const apiKey = 'SG2i7zzvvhSdqYbgFRVDPqb8vQkJMDs9'
+            const requestBody = endpoint === '/login'
+                ? {
+                    ...body,
+                    username: OPEN_SUBTITLES_USERNAME,
+                    password: OPEN_SUBTITLES_PASSWORD
+                }
+                : { ...body }
 
             const headers: Record<string, string> = {
-                'Api-Key': apiKey,
+                'Api-Key': OPEN_SUBTITLES_API_KEY,
                 'Content-Type': 'application/json',
                 'User-Agent': 'NeoStream IPTV v2.9.0'
             }
 
             // Add Authorization header if provided in body
-            if (body?.authToken) {
-                headers['Authorization'] = `Bearer ${body.authToken}`
-                delete body.authToken
+            if (requestBody?.authToken) {
+                headers['Authorization'] = `Bearer ${requestBody.authToken}`
+                delete requestBody.authToken
             }
 
             const options: { method: string; headers: Record<string, string>; body?: string } = {
@@ -509,8 +523,8 @@ export function setupIpcHandlers() {
                 headers
             }
 
-            if (body && method === 'POST') {
-                options.body = JSON.stringify(body)
+            if (requestBody && method === 'POST') {
+                options.body = JSON.stringify(requestBody)
             }
 
             const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`
