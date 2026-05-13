@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { memo, useState, useCallback } from 'react';
 import { Play } from 'lucide-react';
 import './HoverPreviewCard.css';
 
@@ -20,7 +20,7 @@ interface HoverPreviewCardProps {
     children?: React.ReactNode;
 }
 
-export function HoverPreviewCard({
+function HoverPreviewCardComponent({
     cover,
     title,
     onMoreInfo,
@@ -70,3 +70,5 @@ export function HoverPreviewCard({
         </div>
     );
 }
+
+export const HoverPreviewCard = memo(HoverPreviewCardComponent);
