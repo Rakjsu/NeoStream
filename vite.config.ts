@@ -3,18 +3,14 @@ import electron from 'vite-plugin-electron/simple'
 import react from '@vitejs/plugin-react'
 import pkg from './package.json'
 
-// Native / Node-only deps that must NOT be bundled into the main process.
-// They stay in node_modules and are loaded at runtime by Electron.
-const MAIN_EXTERNALS = [
-  'electron',
-  'electron-log',
-  'electron-store',
-  'electron-updater',
-  'peer-ssdp',
-  'upnp-mediarenderer-client',
-  'airplay-protocol',
-  'node-fetch',
-]
+// NOTE: do NOT externalize CJS deps like `electron-updater` here.
+// `electron-updater` exposes `module.exports.autoUpdater = getCurrentAutoUpdater()`
+// — a dynamic assignment that Node's ESM↔CJS interop can't see as a named
+// export. Bundling lets Rollup rewrite the named import as a require()+pick.
+// Externalizing crashed v3.9.4 at launch with:
+//   SyntaxError: Named export 'autoUpdater' not found.
+// If you want to externalize again, first rewrite affected files to
+//   import pkg from 'electron-updater'; const { autoUpdater } = pkg;
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -39,23 +35,9 @@ export default defineConfig({
     electron({
       main: {
         entry: 'electron/main.ts',
-        vite: {
-          build: {
-            rollupOptions: {
-              external: MAIN_EXTERNALS,
-            },
-          },
-        },
       },
       preload: {
         input: 'electron/preload.ts',
-        vite: {
-          build: {
-            rollupOptions: {
-              external: MAIN_EXTERNALS,
-            },
-          },
-        },
       },
       // Polyfill Electron and Node.js built-in modules for the renderer.
       // See https://github.com/electron-vite/vite-plugin-electron-renderer
