@@ -3,6 +3,7 @@ import { XtreamClient } from './xtreamClient'
 import store from './store'
 import { getCertificateSettings, getProviderHttpsAgent, registerApprovedProviderUrl, setAllowInvalidProviderCertificates } from './certificatePolicy'
 
+import log from './logger'
 // Store for window state (for custom maximize)
 let savedWindowBounds: Electron.Rectangle | null = null
 
@@ -243,13 +244,13 @@ export function setupIpcHandlers() {
             // URL encode the channel slug to handle spaces
             const encodedSlug = encodeURIComponent(channelSlug)
             const url = `https://meuguia.tv/programacao/canal/${encodedSlug}`
-            console.log('[EPG IPC] Fetching:', url)
+            log.info('[EPG IPC] Fetching:', url)
             const response = await fetch(url)
             const html = await response.text()
-            console.log('[EPG IPC] Response length:', html.length)
+            log.info('[EPG IPC] Response length:', html.length)
             return { success: true, html }
         } catch (error: unknown) {
-            console.error('[EPG IPC] Error:', getErrorMessage(error))
+            log.error('[EPG IPC] Error:', getErrorMessage(error))
             return { success: false, error: getErrorMessage(error) }
         }
     })
@@ -260,7 +261,7 @@ export function setupIpcHandlers() {
             const fetch = (await import('node-fetch')).default
             // Use the async API endpoint that returns rendered HTML content
             const url = `https://mi.tv/br/async/channel/${channelSlug}/-300`
-            console.log('[EPG IPC] Fetching mi.tv async API:', url)
+            log.info('[EPG IPC] Fetching mi.tv async API:', url)
             const response = await fetch(url, {
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -269,15 +270,15 @@ export function setupIpcHandlers() {
             })
 
             if (!response.ok) {
-                console.log('[EPG IPC] mi.tv returned:', response.status)
+                log.info('[EPG IPC] mi.tv returned:', response.status)
                 return { success: false, error: `HTTP ${response.status}` }
             }
 
             const html = await response.text()
-            console.log('[EPG IPC] mi.tv Response length:', html.length)
+            log.info('[EPG IPC] mi.tv Response length:', html.length)
             return { success: true, html }
         } catch (error: unknown) {
-            console.error('[EPG IPC] mi.tv Error:', getErrorMessage(error))
+            log.error('[EPG IPC] mi.tv Error:', getErrorMessage(error))
             return { success: false, error: getErrorMessage(error) }
         }
     })
@@ -286,7 +287,7 @@ export function setupIpcHandlers() {
     ipcMain.handle('fetch-url', async (_, url: string) => {
         try {
             const fetch = (await import('node-fetch')).default
-            console.log('[Fetch URL] Fetching:', url.substring(0, 100))
+            log.info('[Fetch URL] Fetching:', url.substring(0, 100))
             const response = await fetch(url, {
                 agent: getProviderHttpsAgent(url),
                 headers: {
@@ -296,16 +297,16 @@ export function setupIpcHandlers() {
             })
 
             if (!response.ok) {
-                console.log('[Fetch URL] Response failed:', response.status)
+                log.info('[Fetch URL] Response failed:', response.status)
                 return { success: false, error: `HTTP ${response.status}` }
             }
 
             const text = await response.text()
             registerApprovedProviderUrl(response.url || url)
-            console.log('[Fetch URL] Response length:', text.length)
+            log.info('[Fetch URL] Response length:', text.length)
             return { success: true, data: text }
         } catch (error: unknown) {
-            console.error('[Fetch URL] Error:', getErrorMessage(error))
+            log.error('[Fetch URL] Error:', getErrorMessage(error))
             return { success: false, error: getErrorMessage(error) }
         }
     })
@@ -339,31 +340,31 @@ export function setupIpcHandlers() {
 
                     if (cacheAge < CACHE_TTL_MS) {
                         // Cache is still valid (within 24 hours)
-                        console.log('[EPG Cache] Cache valid, age:', Math.round(cacheAge / 3600000), 'hours')
+                        log.info('[EPG Cache] Cache valid, age:', Math.round(cacheAge / 3600000), 'hours')
                         cacheValid = true
                     } else {
-                        console.log('[EPG Cache] Cache old, downloading fresh (age:', Math.round(cacheAge / 60000), 'min)')
+                        log.info('[EPG Cache] Cache old, downloading fresh (age:', Math.round(cacheAge / 60000), 'min)')
                     }
                 } catch {
-                    console.log('[EPG Cache] No cache found, will download fresh')
+                    log.info('[EPG Cache] No cache found, will download fresh')
                 }
             } else {
-                console.log('[EPG Cache] Force refresh requested')
+                log.info('[EPG Cache] Force refresh requested')
             }
 
             // If cache is valid (within 24 hours), return cached data
             if (cacheValid) {
                 try {
                     const data = await fs.readFile(cacheFile, 'utf-8')
-                    console.log('[EPG Cache] Returning cached data, length:', data.length)
+                    log.info('[EPG Cache] Returning cached data, length:', data.length)
                     return { success: true, data, fromCache: true }
                 } catch {
-                    console.log('[EPG Cache] Cache file read failed, will download fresh')
+                    log.info('[EPG Cache] Cache file read failed, will download fresh')
                 }
             }
 
             // Download fresh data
-            console.log('[EPG Cache] Downloading from:', url)
+            log.info('[EPG Cache] Downloading from:', url)
             const fetch = (await import('node-fetch')).default
             const response = await fetch(url, {
                 agent: getProviderHttpsAgent(url),
@@ -374,12 +375,12 @@ export function setupIpcHandlers() {
             })
 
             if (!response.ok) {
-                console.error('[EPG Cache] Download failed:', response.status)
+                log.error('[EPG Cache] Download failed:', response.status)
 
                 // Try to return stale cache if download fails
                 try {
                     const data = await fs.readFile(cacheFile, 'utf-8')
-                    console.log('[EPG Cache] Returning stale cache due to download failure')
+                    log.info('[EPG Cache] Returning stale cache due to download failure')
                     return { success: true, data, fromCache: true, stale: true }
                 } catch {
                     return { success: false, error: `Download failed: HTTP ${response.status}` }
@@ -388,7 +389,7 @@ export function setupIpcHandlers() {
 
             const data = await response.text()
             registerApprovedProviderUrl(response.url || url)
-            console.log('[EPG Cache] Downloaded data, length:', data.length)
+            log.info('[EPG Cache] Downloaded data, length:', data.length)
 
             // Save to cache
             await fs.writeFile(cacheFile, data, 'utf-8')
@@ -398,11 +399,11 @@ export function setupIpcHandlers() {
                 size: data.length
             }), 'utf-8')
 
-            console.log('[EPG Cache] Saved to cache:', cacheFile)
+            log.info('[EPG Cache] Saved to cache:', cacheFile)
             return { success: true, data, fromCache: false }
 
         } catch (error: unknown) {
-            console.error('[EPG Cache] Error:', getErrorMessage(error))
+            log.error('[EPG Cache] Error:', getErrorMessage(error))
             return { success: false, error: getErrorMessage(error) }
         }
     })
@@ -528,7 +529,7 @@ export function setupIpcHandlers() {
             }
 
             const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`
-            console.log(`[OpenSubtitles] ${method} ${endpoint}`)
+            log.info(`[OpenSubtitles] ${method} ${endpoint}`)
 
             const response = await fetch(url, options)
             const data = await response.json()
@@ -539,10 +540,10 @@ export function setupIpcHandlers() {
                 data
             }
         } catch (error: unknown) {
-            console.error('[OpenSubtitles] Error:', getErrorMessage(error))
+            log.error('[OpenSubtitles] Error:', getErrorMessage(error))
             return { success: false, error: getErrorMessage(error) }
         }
     })
 
-    console.log('IPC Handlers initialized')
+    log.info('IPC Handlers initialized')
 }

@@ -1,6 +1,7 @@
 import { autoUpdater } from 'electron-updater';
 import { BrowserWindow, ipcMain } from 'electron';
 import store from './store';
+import log from './logger';
 
 interface UpdateConfig {
     checkFrequency: 'on-open' | '1-day' | '1-week' | '1-month';
@@ -61,18 +62,18 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
 
     // Setup event handlers
     autoUpdater.on('checking-for-update', () => {
-        console.log('Checking for updates...');
+        log.info('Checking for updates...');
         mainWindow.webContents.send('update:checking');
     });
 
     autoUpdater.on('update-available', (info) => {
-        console.log('Update available:', info.version);
+        log.info('Update available:', info.version);
 
         const config = getConfig();
 
         // Skip if user marked this version to skip
         if (config.skippedVersion === info.version) {
-            console.log('Skipping version:', info.version);
+            log.info('Skipping version:', info.version);
             return;
         }
 
@@ -80,38 +81,38 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
 
         // Auto-download if configured
         if (config.autoInstall) {
-            console.log('Auto-downloading update...');
+            log.info('Auto-downloading update...');
             autoUpdater.downloadUpdate();
         }
     });
 
     autoUpdater.on('update-not-available', () => {
-        console.log('No updates available');
+        log.info('No updates available');
         mainWindow.webContents.send('update:not-available');
         updateLastCheck();
     });
 
     autoUpdater.on('download-progress', (progress) => {
-        console.log(`Download progress: ${progress.percent}%`);
+        log.info(`Download progress: ${progress.percent}%`);
         mainWindow.webContents.send('update:download-progress', progress);
     });
 
     autoUpdater.on('update-downloaded', (info) => {
-        console.log('Update downloaded:', info.version);
+        log.info('Update downloaded:', info.version);
         mainWindow.webContents.send('update:downloaded', info);
 
         const config = getConfig();
         if (config.autoInstall) {
             // Give user 5 seconds before auto-installing
             setTimeout(() => {
-                console.log('Auto-installing update...');
+                log.info('Auto-installing update...');
                 autoUpdater.quitAndInstall(false, true);
             }, 5000);
         }
     });
 
     autoUpdater.on('error', (error) => {
-        console.error('Auto-updater error:', error);
+        log.error('Auto-updater error:', error);
         mainWindow.webContents.send('update:error', {
             message: error.message,
             stack: error.stack
@@ -138,7 +139,7 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
                 currentVersion: autoUpdater.currentVersion.version
             };
         } catch (error: unknown) {
-            console.error('Error checking for updates:', error);
+            log.error('Error checking for updates:', error);
             return {
                 updateAvailable: false,
                 currentVersion: autoUpdater.currentVersion.version,
@@ -152,7 +153,7 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
             await autoUpdater.downloadUpdate();
             return { success: true };
         } catch (error: unknown) {
-            console.error('Error downloading update:', error);
+            log.error('Error downloading update:', error);
             return { success: false, error: getErrorMessage(error) };
         }
     });
@@ -163,7 +164,7 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
             autoUpdater.quitAndInstall(false, true);
             return { success: true };
         } catch (error: unknown) {
-            console.error('Error installing update:', error);
+            log.error('Error installing update:', error);
             return { success: false, error: getErrorMessage(error) };
         }
     });
@@ -186,9 +187,9 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
     if (shouldCheckForUpdates()) {
         // Wait 5 seconds after app starts to check for updates
         setTimeout(() => {
-            console.log('Checking for updates (scheduled)...');
+            log.info('Checking for updates (scheduled)...');
             autoUpdater.checkForUpdates().catch(err => {
-                console.error('Scheduled update check failed:', err);
+                log.error('Scheduled update check failed:', err);
             });
         }, 5000);
     }
@@ -196,12 +197,12 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
     // Set up periodic checking (every hour)
     setInterval(() => {
         if (shouldCheckForUpdates()) {
-            console.log('Checking for updates (periodic)...');
+            log.info('Checking for updates (periodic)...');
             autoUpdater.checkForUpdates().catch(err => {
-                console.error('Periodic update check failed:', err);
+                log.error('Periodic update check failed:', err);
             });
         }
     }, 60 * 60 * 1000); // Every hour
 
-    console.log('Auto-updater initialized');
+    log.info('Auto-updater initialized');
 }

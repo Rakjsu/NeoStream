@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { getInvalidCertificateGuidance, getProviderHttpsAgent, isTlsCertificateError } from './certificatePolicy'
 
+import log from './logger'
 export interface XtreamAccount {
     username: string
     password: string
@@ -72,7 +73,7 @@ export class XtreamClient {
             url.searchParams.append('password', this.password);
 
             const fullUrl = url.toString();
-            console.log('[XtreamClient] Authenticating to:', fullUrl.replace(this.password, '***'));
+            log.info('[XtreamClient] Authenticating to:', fullUrl.replace(this.password, '***'));
 
             const response = await axios.get(fullUrl, {
                 timeout: 15000,
@@ -80,8 +81,8 @@ export class XtreamClient {
                 httpsAgent: getProviderHttpsAgent(fullUrl, this.baseUrl)
             });
 
-            console.log('[XtreamClient] Response status:', response.status, response.statusText);
-            console.log('[XtreamClient] Response data:', response.data);
+            log.info('[XtreamClient] Response status:', response.status, response.statusText);
+            log.info('[XtreamClient] Response data:', response.data);
 
             if (response.status !== 200) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -97,10 +98,10 @@ export class XtreamClient {
                 throw new Error('Resposta inválida do servidor - sem informações de usuário');
             }
 
-            console.log('[XtreamClient] Authentication successful');
+            log.info('[XtreamClient] Authentication successful');
             return data;
         } catch (error: unknown) {
-            console.error('[XtreamClient] Authentication error:', error);
+            log.error('[XtreamClient] Authentication error:', error);
 
             // Mensagens de erro mais específicas
             if (isNetworkError(error) && (error.code === 'ENOTFOUND' || error.message.includes('ENOTFOUND'))) {

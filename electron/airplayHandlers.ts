@@ -4,6 +4,7 @@
 import { ipcMain } from 'electron';
 import { createRequire } from 'module';
 
+import log from './logger'
 // Create require for CommonJS modules in ES module context
 const require = createRequire(import.meta.url);
 
@@ -41,21 +42,21 @@ const discoveredDevices: Map<string, AirPlayDevice> = new Map();
 try {
     const airplay = require('airplay-protocol') as AirPlayModule;
     airplayBrowser = airplay.createBrowser();
-    console.log('[AirPlay] airplay-protocol loaded successfully');
+    log.info('[AirPlay] airplay-protocol loaded successfully');
 } catch (error) {
-    console.error('[AirPlay] Failed to load airplay-protocol:', error);
+    log.error('[AirPlay] Failed to load airplay-protocol:', error);
 }
 
 export function setupAirPlayHandlers() {
     // Setup device discovery if browser exists
     if (airplayBrowser) {
         airplayBrowser.on('deviceOn', (device) => {
-            console.log('[AirPlay] Device found:', device.name);
+            log.info('[AirPlay] Device found:', device.name);
             discoveredDevices.set(device.id, device);
         });
 
         airplayBrowser.on('deviceOff', (device) => {
-            console.log('[AirPlay] Device offline:', device.name);
+            log.info('[AirPlay] Device offline:', device.name);
             discoveredDevices.delete(device.id);
         });
 
@@ -65,10 +66,10 @@ export function setupAirPlayHandlers() {
     // Discover AirPlay devices
     ipcMain.handle('airplay:discover', async () => {
         try {
-            console.log('[AirPlay] Discovery requested');
+            log.info('[AirPlay] Discovery requested');
 
             if (!airplayBrowser) {
-                console.warn('[AirPlay] AirPlay not available');
+                log.warn('[AirPlay] AirPlay not available');
                 return {
                     success: true,
                     devices: []
@@ -87,14 +88,14 @@ export function setupAirPlayHandlers() {
                 features: device.features
             }));
 
-            console.log(`[AirPlay] Found ${devices.length} devices`);
+            log.info(`[AirPlay] Found ${devices.length} devices`);
 
             return {
                 success: true,
                 devices
             };
         } catch (error: unknown) {
-            console.error('[AirPlay] Discovery error:', error);
+            log.error('[AirPlay] Discovery error:', error);
             return {
                 success: false,
                 error: getErrorMessage(error),
@@ -106,7 +107,7 @@ export function setupAirPlayHandlers() {
     // Cast media to AirPlay device
     ipcMain.handle('airplay:cast', async (_, { deviceId, url, title }) => {
         try {
-            console.log('[AirPlay] Cast requested:', { deviceId, title });
+            log.info('[AirPlay] Cast requested:', { deviceId, title });
 
             if (!airplayBrowser) {
                 throw new Error('AirPlay not available');
@@ -125,10 +126,10 @@ export function setupAirPlayHandlers() {
             await new Promise((resolve, reject) => {
                 client.play(url, 0, (err) => {
                     if (err) {
-                        console.error('[AirPlay] Play error:', err);
+                        log.error('[AirPlay] Play error:', err);
                         reject(err);
                     } else {
-                        console.log('[AirPlay] Playing on device');
+                        log.info('[AirPlay] Playing on device');
                         resolve(true);
                     }
                 });
@@ -138,7 +139,7 @@ export function setupAirPlayHandlers() {
                 success: true
             };
         } catch (error: unknown) {
-            console.error('[AirPlay] Cast error:', error);
+            log.error('[AirPlay] Cast error:', error);
             return {
                 success: false,
                 error: getErrorMessage(error)
@@ -149,7 +150,7 @@ export function setupAirPlayHandlers() {
     // Stop AirPlay casting
     ipcMain.handle('airplay:stop', async (_, { deviceId }) => {
         try {
-            console.log('[AirPlay] Stop requested:', deviceId);
+            log.info('[AirPlay] Stop requested:', deviceId);
 
             if (!airplayBrowser) {
                 throw new Error('AirPlay not available');
@@ -166,10 +167,10 @@ export function setupAirPlayHandlers() {
             await new Promise((resolve, reject) => {
                 client.stop((err) => {
                     if (err) {
-                        console.error('[AirPlay] Stop error:', err);
+                        log.error('[AirPlay] Stop error:', err);
                         reject(err);
                     } else {
-                        console.log('[AirPlay] Stopped successfully');
+                        log.info('[AirPlay] Stopped successfully');
                         resolve(true);
                     }
                 });
@@ -179,7 +180,7 @@ export function setupAirPlayHandlers() {
                 success: true
             };
         } catch (error: unknown) {
-            console.error('[AirPlay] Stop error:', error);
+            log.error('[AirPlay] Stop error:', error);
             return {
                 success: false,
                 error: getErrorMessage(error)
@@ -187,5 +188,5 @@ export function setupAirPlayHandlers() {
         }
     });
 
-    console.log('[AirPlay] IPC Handlers initialized');
+    log.info('[AirPlay] IPC Handlers initialized');
 }

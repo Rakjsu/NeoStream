@@ -3,6 +3,7 @@ import path from 'path'
 import fs from 'fs'
 import https from 'https'
 import http from 'http'
+import log from './logger'
 
 interface ActiveDownload {
     id: string;
@@ -253,7 +254,7 @@ function singleDownload(id: string, url: string, filePath: string): Promise<{ su
 export function setupDownloadHandlers() {
     // Start download with parallel connections
     ipcMain.handle('download:start', async (event, { id, url, name, type, seriesName, season, episode }) => {
-        console.log('[Download] Starting parallel download:', { id, name, type, seriesName, season, episode });
+        log.info('[Download] Starting parallel download:', { id, name, type, seriesName, season, episode });
         try {
             const downloadsPath = getDownloadsPath();
             let filePath: string;
@@ -285,16 +286,16 @@ export function setupDownloadHandlers() {
             // Get file size first
             const fileInfo = await getFileSize(url);
             const { size: totalBytes, supportsRange } = fileInfo;
-            console.log('[Download] File info:', { totalBytes, supportsRange });
+            log.info('[Download] File info:', { totalBytes, supportsRange });
 
             // If no range support, use single connection
             if (!supportsRange || totalBytes === 0) {
-                console.log('[Download] Using single connection');
+                log.info('[Download] Using single connection');
                 return await singleDownload(id, url, filePath);
             }
 
             // Use parallel downloads
-            console.log(`[Download] Using ${PARALLEL_CONNECTIONS} parallel connections`);
+            log.info(`[Download] Using ${PARALLEL_CONNECTIONS} parallel connections`);
             const chunkSize = Math.ceil(totalBytes / PARALLEL_CONNECTIONS);
             const chunks: { start: number; end: number; index: number }[] = [];
 
@@ -324,7 +325,7 @@ export function setupDownloadHandlers() {
             clearInterval(progressInterval);
 
             // Merge chunks (streamed to avoid loading whole parts into memory)
-            console.log('[Download] Merging chunks...');
+            log.info('[Download] Merging chunks...');
             const writeStream = fs.createWriteStream(filePath);
 
             for (let i = 0; i < PARALLEL_CONNECTIONS; i++) {
@@ -348,7 +349,7 @@ export function setupDownloadHandlers() {
                 win.webContents.send('download:progress', { id, progress: 100, downloadedBytes: totalBytes, totalBytes });
             });
 
-            console.log('[Download] Complete:', filePath);
+            log.info('[Download] Complete:', filePath);
 
             // Show native notification
             showDownloadNotification(name, filePath);
@@ -356,7 +357,7 @@ export function setupDownloadHandlers() {
             return { success: true, filePath, size: totalBytes };
 
         } catch (error: unknown) {
-            console.error('[Download] Error:', error);
+            log.error('[Download] Error:', error);
             return { success: false, error: getErrorMessage(error) };
         }
     });
@@ -411,7 +412,7 @@ export function setupDownloadHandlers() {
                 available = stats.bsize * stats.bavail;
             } catch {
                 // Fallback: try to estimate from userData path
-                console.warn('[Download] statfs not available, using fallback');
+                log.warn('[Download] statfs not available, using fallback');
             }
 
             return {
@@ -555,5 +556,5 @@ export function setupDownloadHandlers() {
         }
     });
 
-    console.log('Download Handlers initialized with parallel connections');
+    log.info('Download Handlers initialized with parallel connections');
 }
