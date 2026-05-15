@@ -1,7 +1,10 @@
 import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import log from './logger'
 import { setupIpcHandlers } from './ipcHandlers'
+
+log.info('NeoStream main process starting')
 import { setupDLNAHandlers } from './dlnaHandlers'
 import { setupAirPlayHandlers } from './airplayHandlers'
 import { setupDownloadHandlers } from './downloadHandlers'

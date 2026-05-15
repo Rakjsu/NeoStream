@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { FaPlay, FaPause, FaVolumeUp, FaVolumeDown, FaVolumeOff, FaVolumeMute, FaExpand, FaCompress, FaCog, FaChromecast, FaClosedCaptioning } from 'react-icons/fa';
-import { RiPictureInPictureLine } from 'react-icons/ri';
+import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
+import { Play, Pause, Volume2, Volume1, Volume, VolumeX, Maximize, Minimize, Settings, Cast, Captions, PictureInPicture2 } from 'lucide-react';
 import { useVideoPlayer } from '../../hooks/useVideoPlayer';
 import { useHls } from '../../hooks/useHls';
 import { useChromecast } from '../../hooks/useChromecast';
@@ -59,7 +58,7 @@ export interface VideoPlayerProps<TSwitchContent extends SwitchableContent = Swi
     currentQualityIndex?: number;
 }
 
-export function VideoPlayer<TSwitchContent extends SwitchableContent = SwitchableContent>({
+function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableContent>({
     src,
     title,
     poster,
@@ -605,7 +604,7 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
             {!state.playing && !state.loading && !state.error && (
                 <div className="central-play-button" onClick={controls.togglePlay}>
                     <div className="central-play-icon">
-                        <FaPlay />
+                        <Play size="1em" />
                     </div>
                 </div>
             )}
@@ -672,7 +671,7 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
                 <div className="controls-row">
                     <div className="controls-left">
                         <button className="control-btn" onClick={controls.togglePlay}>
-                            {state.playing ? <FaPause /> : <FaPlay />}
+                            {state.playing ? <Pause size="1em" /> : <Play size="1em" />}
                         </button>
 
                         <div
@@ -682,13 +681,13 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
                         >
                             <button className="control-btn volume-btn" onClick={controls.toggleMute}>
                                 {state.muted || state.volume === 0 ? (
-                                    <FaVolumeMute />
+                                    <VolumeX size="1em" />
                                 ) : state.volume < 0.33 ? (
-                                    <FaVolumeOff />
+                                    <Volume size="1em" />
                                 ) : state.volume < 0.66 ? (
-                                    <FaVolumeDown />
+                                    <Volume1 size="1em" />
                                 ) : (
-                                    <FaVolumeUp />
+                                    <Volume2 size="1em" />
                                 )}
                             </button>
                             {showVolumeSlider && (
@@ -771,7 +770,7 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
                                     onClick={() => setShowSettings(!showSettings)}
                                     style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '4px' }}
                                 >
-                                    <FaCog />
+                                    <Settings size="1em" />
                                     {/* Quality Badge - show current quality when movie versions available */}
                                     {movieVersions && movieVersions.length > 0 && (() => {
                                         const currentVersion = movieVersions.find(v => v.movie.stream_id === currentMovieId);
@@ -1027,7 +1026,7 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
                                 {subtitleLoading ? (
                                     <span style={{ fontSize: '10px', fontWeight: 600 }}>...</span>
                                 ) : (
-                                    <FaClosedCaptioning />
+                                    <Captions size="1em" />
                                 )}
                             </button>
                         )}
@@ -1200,7 +1199,7 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
                             }}
                             title="Picture-in-Picture"
                         >
-                            <RiPictureInPictureLine size={18} />
+                            <PictureInPicture2 size={18} />
                         </button>
 
                         <button
@@ -1212,7 +1211,7 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
                                 opacity: 1
                             }}
                         >
-                            <FaChromecast />
+                            <Cast size="1em" />
                         </button>
 
                         <button className="control-btn" onClick={() => {
@@ -1222,7 +1221,7 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
                                 document.exitFullscreen();
                             }
                         }}>
-                            {state.fullscreen ? <FaCompress /> : <FaExpand />}
+                            {state.fullscreen ? <Minimize size="1em" /> : <Maximize size="1em" />}
                         </button>
                     </div>
                 </div>
@@ -1248,3 +1247,6 @@ export function VideoPlayer<TSwitchContent extends SwitchableContent = Switchabl
         </div >
     );
 }
+
+// Memoize while preserving the generic signature via cast.
+export const VideoPlayer = memo(VideoPlayerImpl) as typeof VideoPlayerImpl;

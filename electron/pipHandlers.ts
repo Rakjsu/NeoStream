@@ -8,6 +8,7 @@ import type { IpcMainEvent } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+import log from './logger'
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -85,7 +86,7 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
 
         // Forward state updates from PiP to main window
         pipWindow.webContents.on('did-finish-load', () => {
-            console.log('PiP window loaded');
+            log.info('PiP window loaded');
         });
 
         pipWindow.on('closed', () => {
@@ -172,15 +173,15 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
 
     // Get next episode info for auto-advance in PiP
     ipcMain.handle('pip:getNextEpisode', async (_event, data: { seriesId: string; currentSeason: number; currentEpisode: number }) => {
-        console.log('[PiP Main] getNextEpisode request:', data);
+        log.info('[PiP Main] getNextEpisode request:', data);
         // Forward request to main window and wait for response
         if (mainWindow && !mainWindow.isDestroyed()) {
             return new Promise((resolve) => {
                 const responseChannel = `pip:nextEpisodeResponse:${Date.now()}`;
-                console.log('[PiP Main] Waiting for response on:', responseChannel);
+                log.info('[PiP Main] Waiting for response on:', responseChannel);
 
                 const handler = (_event: IpcMainEvent, response: unknown) => {
-                    console.log('[PiP Main] Received response:', response);
+                    log.info('[PiP Main] Received response:', response);
                     ipcMain.removeListener(responseChannel, handler);
                     resolve(response);
                 };
@@ -195,7 +196,7 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
 
                 // Timeout after 10 seconds
                 setTimeout(() => {
-                    console.log('[PiP Main] Timeout waiting for response');
+                    log.info('[PiP Main] Timeout waiting for response');
                     ipcMain.removeListener(responseChannel, handler);
                     resolve(null);
                 }, 10000);

@@ -2,6 +2,7 @@ import { app, session } from 'electron'
 import https from 'https'
 import store from './store'
 
+import log from './logger'
 const DEFAULT_ALLOW_INVALID_PROVIDER_CERTIFICATES = true
 
 let certificateHandlerRegistered = false
@@ -138,7 +139,7 @@ export function getInvalidCertificateGuidance(): string {
 
 function logCertificateCompatibility(url: string, error: string, source: string) {
     const host = getHostname(url) || 'unknown-host'
-    console.warn('[Certificate Compatibility]', { host, error, source })
+    log.warn('[Certificate Compatibility]', { host, error, source })
 }
 
 export function setupCertificateErrorHandler() {
