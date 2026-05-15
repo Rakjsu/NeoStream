@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { FaPlay, FaPause, FaTimes, FaExpand, FaVolumeUp, FaVolumeMute, FaVolumeDown, FaVolumeOff } from 'react-icons/fa';
+import { Play, Pause, X, Maximize, Volume2, VolumeX, Volume1, Volume } from 'lucide-react';
 import { useHls } from '../hooks/useHls';
 import { useVideoPlayer } from '../hooks/useVideoPlayer';
 import { useSearchParams } from 'react-router-dom';
@@ -466,7 +466,7 @@ export function PipWindow() {
                         }}
                         title={t('common', 'expand')}
                     >
-                        <FaExpand size={12} color="white" />
+                        <Maximize size={12} color="white" />
                     </button>
                     <button
                         onClick={handleClose}
@@ -482,7 +482,7 @@ export function PipWindow() {
                         }}
                         title={t('common', 'close')}
                     >
-                        <FaTimes size={12} color="white" />
+                        <X size={12} color="white" />
                     </button>
                 </div>
             </div>
@@ -515,7 +515,7 @@ export function PipWindow() {
                         transition: 'all 0.2s ease'
                     }}
                 >
-                    {isPlaying ? <FaPause size={12} color="white" /> : <FaPlay size={12} color="white" />}
+                    {isPlaying ? <Pause size={12} color="white" /> : <Play size={12} color="white" />}
                 </button>
 
                 {/* Progress bar */}
@@ -567,13 +567,13 @@ export function PipWindow() {
                     >
                         {(() => {
                             if (isMuted || volume === 0) {
-                                return <FaVolumeMute size={14} color="white" style={{ transition: 'transform 0.2s ease' }} />;
+                                return <VolumeX size={14} color="white" style={{ transition: 'transform 0.2s ease' }} />;
                             } else if (volume < 0.33) {
-                                return <FaVolumeOff size={14} color="white" style={{ transition: 'transform 0.2s ease' }} />;
+                                return <Volume size={14} color="white" style={{ transition: 'transform 0.2s ease' }} />;
                             } else if (volume < 0.66) {
-                                return <FaVolumeDown size={14} color="white" style={{ transition: 'transform 0.2s ease' }} />;
+                                return <Volume1 size={14} color="white" style={{ transition: 'transform 0.2s ease' }} />;
                             } else {
-                                return <FaVolumeUp size={14} color="white" style={{ transition: 'transform 0.2s ease' }} />;
+                                return <Volume2 size={14} color="white" style={{ transition: 'transform 0.2s ease' }} />;
                             }
                         })()}
                     </button>
