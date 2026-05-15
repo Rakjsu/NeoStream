@@ -3,6 +3,19 @@ import electron from 'vite-plugin-electron/simple'
 import react from '@vitejs/plugin-react'
 import pkg from './package.json'
 
+// Native / Node-only deps that must NOT be bundled into the main process.
+// They stay in node_modules and are loaded at runtime by Electron.
+const MAIN_EXTERNALS = [
+  'electron',
+  'electron-log',
+  'electron-store',
+  'electron-updater',
+  'peer-ssdp',
+  'upnp-mediarenderer-client',
+  'airplay-protocol',
+  'node-fetch',
+]
+
 // https://vitejs.dev/config/
 export default defineConfig({
   define: {
@@ -25,15 +38,27 @@ export default defineConfig({
     react(),
     electron({
       main: {
-        // Shortcut of `build.lib.entry`.
         entry: 'electron/main.ts',
+        vite: {
+          build: {
+            rollupOptions: {
+              external: MAIN_EXTERNALS,
+            },
+          },
+        },
       },
       preload: {
-        // Shortcut of `build.rollupOptions.input`.
         input: 'electron/preload.ts',
+        vite: {
+          build: {
+            rollupOptions: {
+              external: MAIN_EXTERNALS,
+            },
+          },
+        },
       },
-      // Ployfill the Electron and Node.js built-in modules for Renderer process.
-      // See 👉 https://github.com/electron-vite/vite-plugin-electron-renderer
+      // Polyfill Electron and Node.js built-in modules for the renderer.
+      // See https://github.com/electron-vite/vite-plugin-electron-renderer
       renderer: {},
     }),
   ],
