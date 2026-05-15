@@ -1382,7 +1382,7 @@ const openEpgBrazilMappings: Record<string, string> = {
 export const epgService = {
 
     // Main function to fetch EPG for a channel
-    async fetchChannelEPG(epgChannelId: string, channelName?: string): Promise<EPGProgram[]> {
+    async fetchChannelEPG(_epgChannelId: string, channelName?: string): Promise<EPGProgram[]> {
         if (!channelName) return [];
 
         // Check if this is a Portuguese channel (has mapping in Open-EPG Portugal)

@@ -2,15 +2,6 @@ import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-d
 import { Welcome } from './pages/Welcome';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
-import { Home } from './pages/Home';
-import { LiveTV } from './pages/LiveTV';
-import { VOD } from './pages/VOD';
-import { Series } from './pages/Series';
-import { Settings } from './pages/Settings';
-import { WatchLater } from './pages/WatchLater';
-import { Favorites } from './pages/Favorites';
-import { Downloads } from './pages/Downloads';
-import { PipWindow } from './pages/PipWindow';
 import { ProfileSelector } from './pages/ProfileSelector';
 import { UpdateNotification } from './components/UpdateNotification';
 import { PostUpdateChangelog } from './components/PostUpdateChangelog';
@@ -18,7 +9,25 @@ import { EpisodeToast } from './components/EpisodeToast';
 import { MiniPlayerProvider } from './components/MiniPlayer';
 import { CustomTitleBar } from './components/CustomTitleBar';
 import { profileService } from './services/profileService';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
+
+const Home = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })));
+const LiveTV = lazy(() => import('./pages/LiveTV').then(m => ({ default: m.LiveTV })));
+const VOD = lazy(() => import('./pages/VOD').then(m => ({ default: m.VOD })));
+const Series = lazy(() => import('./pages/Series').then(m => ({ default: m.Series })));
+const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
+const WatchLater = lazy(() => import('./pages/WatchLater').then(m => ({ default: m.WatchLater })));
+const Favorites = lazy(() => import('./pages/Favorites').then(m => ({ default: m.Favorites })));
+const Downloads = lazy(() => import('./pages/Downloads').then(m => ({ default: m.Downloads })));
+const PipWindow = lazy(() => import('./pages/PipWindow').then(m => ({ default: m.PipWindow })));
+
+function PageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: '#0c0c0cff' }}>
+      <div className="text-white text-xl">Carregando...</div>
+    </div>
+  );
+}
 
 // Wrapper component to use navigate hook inside App
 function EpisodeToastWithNavigation() {
@@ -84,29 +93,31 @@ function App() {
       <PostUpdateChangelog />
       <HashRouter>
         <EpisodeToastWithNavigation />
-        <Routes>
-          <Route path="/welcome" element={<Welcome />} />
-          <Route path="/pip" element={<PipWindow />} />
-          <Route path="/login" element={<Login />} />
-          <Route
-            path="/dashboard"
-            element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />}
-          >
-            <Route index element={<Navigate to="home" replace />} />
-            <Route path="home" element={<Home />} />
-            <Route path="live" element={<LiveTV />} />
-            <Route path="vod" element={<VOD />} />
-            <Route path="series" element={<Series />} />
-            <Route path="watch-later" element={<WatchLater />} />
-            <Route path="favorites" element={<Favorites />} />
-            <Route path="downloads" element={<Downloads />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-          <Route
-            path="/"
-            element={isAuthenticated ? <Navigate to="/dashboard" /> : <Navigate to="/welcome" />}
-          />
-        </Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/welcome" element={<Welcome />} />
+            <Route path="/pip" element={<PipWindow />} />
+            <Route path="/login" element={<Login />} />
+            <Route
+              path="/dashboard"
+              element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />}
+            >
+              <Route index element={<Navigate to="home" replace />} />
+              <Route path="home" element={<Home />} />
+              <Route path="live" element={<LiveTV />} />
+              <Route path="vod" element={<VOD />} />
+              <Route path="series" element={<Series />} />
+              <Route path="watch-later" element={<WatchLater />} />
+              <Route path="favorites" element={<Favorites />} />
+              <Route path="downloads" element={<Downloads />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+            <Route
+              path="/"
+              element={isAuthenticated ? <Navigate to="/dashboard" /> : <Navigate to="/welcome" />}
+            />
+          </Routes>
+        </Suspense>
       </HashRouter>
     </MiniPlayerProvider>
   );

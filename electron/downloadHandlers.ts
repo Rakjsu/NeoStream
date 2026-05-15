@@ -323,16 +323,22 @@ export function setupDownloadHandlers() {
             await Promise.all(downloadPromises);
             clearInterval(progressInterval);
 
-            // Merge chunks
+            // Merge chunks (streamed to avoid loading whole parts into memory)
             console.log('[Download] Merging chunks...');
             const writeStream = fs.createWriteStream(filePath);
 
             for (let i = 0; i < PARALLEL_CONNECTIONS; i++) {
                 const partPath = `${filePath}.part${i}`;
                 if (fs.existsSync(partPath)) {
-                    const data = fs.readFileSync(partPath);
-                    writeStream.write(data);
-                    fs.unlinkSync(partPath);
+                    await new Promise<void>((resolve, reject) => {
+                        const readStream = fs.createReadStream(partPath);
+                        readStream.on('error', reject);
+                        readStream.on('end', () => {
+                            fs.unlinkSync(partPath);
+                            resolve();
+                        });
+                        readStream.pipe(writeStream, { end: false });
+                    });
                 }
             }
             writeStream.end();

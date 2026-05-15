@@ -161,55 +161,6 @@ function normalizeSearchKey(name: string, year?: string): string {
     return year ? `${cleanName}:${year}` : cleanName;
 }
 
-// API call counter for debugging
-let apiCallCount = 0;
-export function getTMDBApiCallCount(): number {
-    return apiCallCount;
-}
-
-export function resetTMDBApiCallCount(): void {
-    apiCallCount = 0;
-}
-
-// Get cache statistics
-export function getTMDBCacheStats(): {
-    movieDetails: number;
-    seriesDetails: number;
-    episodeDetails: number;
-    movieTrailers: number;
-    seriesTrailers: number;
-    movieSearch: number;
-    seriesSearch: number;
-    apiCalls: number;
-} {
-    return {
-        movieDetails: Object.keys(memoryCache.movieDetails).length,
-        seriesDetails: Object.keys(memoryCache.seriesDetails).length,
-        episodeDetails: Object.keys(memoryCache.episodeDetails).length,
-        movieTrailers: Object.keys(memoryCache.movieTrailers).length,
-        seriesTrailers: Object.keys(memoryCache.seriesTrailers).length,
-        movieSearch: Object.keys(memoryCache.movieSearch).length,
-        seriesSearch: Object.keys(memoryCache.seriesSearch).length,
-        apiCalls: apiCallCount
-    };
-}
-
-// Clear all TMDB cache
-export function clearTMDBCache(): void {
-    memoryCache.movieDetails = {};
-    memoryCache.seriesDetails = {};
-    memoryCache.episodeDetails = {};
-    memoryCache.movieTrailers = {};
-    memoryCache.seriesTrailers = {};
-    memoryCache.movieSearch = {};
-    memoryCache.seriesSearch = {};
-
-    Object.values(CACHE_KEYS).forEach(key => {
-        localStorage.removeItem(key);
-    });
-
-    }
-
 /**
  * Get high-quality backdrop image URL from TMDB
  * @param backdropPath - The backdrop path from TMDB API
@@ -264,7 +215,6 @@ export async function fetchMovieDetails(tmdbId: string): Promise<TMDBMovieDetail
     }
 
     try {
-        apiCallCount++;
         // Fetch movie details with release dates for certification and external_ids for IMDB
         const response = await fetch(
             `${TMDB_BASE_URL}/movie/${tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=release_dates,external_ids`
@@ -303,7 +253,6 @@ export async function fetchSeriesDetails(tmdbId: string): Promise<TMDBSeriesDeta
     }
 
     try {
-        apiCallCount++;
         // Fetch series details with content ratings and external_ids for IMDB
         const response = await fetch(
             `${TMDB_BASE_URL}/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=content_ratings,external_ids`
@@ -334,10 +283,6 @@ export async function fetchSeriesDetails(tmdbId: string): Promise<TMDBSeriesDeta
     }
 }
 
-export function formatGenres(genres: { id: number; name: string }[]): string {
-    return genres.map(g => g.name).join(', ');
-}
-
 export async function searchMovieByName(movieName: string, year?: string): Promise<TMDBMovieDetails | null> {
     const searchKey = normalizeSearchKey(movieName, year);
 
@@ -357,7 +302,6 @@ export async function searchMovieByName(movieName: string, year?: string): Promi
             ? `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&language=pt-BR&query=${encodeURIComponent(cleanName)}&year=${year}`
             : `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&language=pt-BR&query=${encodeURIComponent(cleanName)}`;
 
-        apiCallCount++;
         const response = await fetch(searchUrl);
         if (!response.ok) return null;
 
@@ -396,7 +340,6 @@ export async function searchSeriesByName(seriesName: string, year?: string): Pro
             ? `${TMDB_BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&language=pt-BR&query=${encodeURIComponent(cleanName)}&first_air_date_year=${year}`
             : `${TMDB_BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&language=pt-BR&query=${encodeURIComponent(cleanName)}`;
 
-        apiCallCount++;
         const response = await fetch(searchUrl);
         if (!response.ok) return null;
 
@@ -441,7 +384,6 @@ export async function fetchMovieTrailer(movieName: string, year?: string): Promi
             ? `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanName)}&year=${year}`
             : `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanName)}`;
 
-        apiCallCount++;
         const searchResponse = await fetch(searchUrl);
         if (!searchResponse.ok) {
             setCache(memoryCache.movieTrailers, cacheKey, '', CACHE_KEYS.MOVIE_TRAILERS);
@@ -457,7 +399,6 @@ export async function fetchMovieTrailer(movieName: string, year?: string): Promi
         const movieId = searchData.results[0].id;
 
         // Fetch videos for the movie
-        apiCallCount++;
         const videosResponse = await fetch(
             `${TMDB_BASE_URL}/movie/${movieId}/videos?api_key=${TMDB_API_KEY}&language=pt-BR`
         );
@@ -466,7 +407,6 @@ export async function fetchMovieTrailer(movieName: string, year?: string): Promi
 
         // If no videos in Portuguese, try English
         if (!videosData.results || videosData.results.length === 0) {
-            apiCallCount++;
             const videosResponseEn = await fetch(
                 `${TMDB_BASE_URL}/movie/${movieId}/videos?api_key=${TMDB_API_KEY}&language=en-US`
             );
@@ -522,7 +462,6 @@ export async function fetchSeriesTrailer(seriesName: string, year?: string): Pro
             ? `${TMDB_BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanName)}&first_air_date_year=${year}`
             : `${TMDB_BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanName)}`;
 
-        apiCallCount++;
         const searchResponse = await fetch(searchUrl);
         if (!searchResponse.ok) {
             setCache(memoryCache.seriesTrailers, cacheKey, '', CACHE_KEYS.SERIES_TRAILERS);
@@ -538,7 +477,6 @@ export async function fetchSeriesTrailer(seriesName: string, year?: string): Pro
         const seriesId = searchData.results[0].id;
 
         // Fetch videos for the series
-        apiCallCount++;
         const videosResponse = await fetch(
             `${TMDB_BASE_URL}/tv/${seriesId}/videos?api_key=${TMDB_API_KEY}&language=pt-BR`
         );
@@ -547,7 +485,6 @@ export async function fetchSeriesTrailer(seriesName: string, year?: string): Pro
 
         // If no videos in Portuguese, try English
         if (!videosData.results || videosData.results.length === 0) {
-            apiCallCount++;
             const videosResponseEn = await fetch(
                 `${TMDB_BASE_URL}/tv/${seriesId}/videos?api_key=${TMDB_API_KEY}&language=en-US`
             );
@@ -601,7 +538,6 @@ export async function fetchEpisodeDetails(
     }
 
     try {
-        apiCallCount++;
         const response = await fetch(
             `${TMDB_BASE_URL}/tv/${tmdbSeriesId}/season/${seasonNumber}/episode/${episodeNumber}?api_key=${TMDB_API_KEY}&language=pt-BR`
         );
@@ -646,10 +582,5 @@ export function isKidsFriendly(certification: string | undefined | null): boolea
 
     const isKidsFriendlyContent = kidsFriendlyRatings.includes(cert);
     return isKidsFriendlyContent;
-}
-
-// Check if content is adult-only (helper for reference)
-export function isAdultContent(certification: string | undefined | null): boolean {
-    return !isKidsFriendly(certification);
 }
 

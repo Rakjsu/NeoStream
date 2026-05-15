@@ -8,6 +8,19 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
+  build: {
+    chunkSizeWarningLimit: 700,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('hls.js')) return 'vendor-hls';
+            if (id.includes('vidstack')) return 'vendor-vidstack';
+          }
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     electron({
