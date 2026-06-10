@@ -58,7 +58,21 @@ function getErrorMessage(error: unknown, fallback: string): string {
     return error instanceof Error ? error.message : fallback;
 }
 
-export function useDLNA(videoUrl: string, videoTitle: string) {
+export interface CastStatus {
+    state: string;
+    position: number;
+    duration: number;
+    volume: number | null;
+    title: string;
+    deviceId: string;
+}
+
+interface CastStatusResult extends Partial<CastStatus> {
+    success: boolean;
+    error?: string;
+}
+
+export function useDLNA(videoUrl: string, videoTitle: string, subtitleVtt?: string | null) {
     const [devices, setDevices] = useState<DLNADevice[]>([]);
     const [isCasting, setIsCasting] = useState(false);
     const [isDiscovering, setIsDiscovering] = useState(false);
@@ -150,7 +164,8 @@ export function useDLNA(videoUrl: string, videoTitle: string) {
             const result = await window.ipcRenderer.invoke('dlna:cast', {
                 deviceId: device.id,
                 url: videoUrl,
-                title: videoTitle
+                title: videoTitle,
+                subtitleVtt: subtitleVtt || undefined
             }) as DLNACommandResult;
 
             if (result.success) {
@@ -197,3 +212,14 @@ export function useDLNA(videoUrl: string, videoTitle: string) {
         loadDevices
     };
 }
+
+// ===== Cast remote-control helpers (active session lives in the main process) =====
+
+export const castControls = {
+    pause: () => window.ipcRenderer.invoke('dlna:pause') as Promise<DLNACommandResult>,
+    resume: () => window.ipcRenderer.invoke('dlna:resume') as Promise<DLNACommandResult>,
+    seek: (seconds: number) => window.ipcRenderer.invoke('dlna:seek', { seconds }) as Promise<DLNACommandResult>,
+    setVolume: (volume: number) => window.ipcRenderer.invoke('dlna:set-volume', { volume }) as Promise<DLNACommandResult>,
+    stop: (deviceId: string) => window.ipcRenderer.invoke('dlna:stop', { deviceId }) as Promise<DLNACommandResult>,
+    getStatus: () => window.ipcRenderer.invoke('dlna:get-status') as Promise<CastStatusResult>,
+};

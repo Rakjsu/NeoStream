@@ -4,6 +4,7 @@ import { useVideoPlayer } from '../../hooks/useVideoPlayer';
 import { useHls } from '../../hooks/useHls';
 import { useChromecast } from '../../hooks/useChromecast';
 import { CastDeviceSelector } from '../CastDeviceSelector';
+import { CastControls } from '../CastControls';
 import { formatTime, percentage } from '../../utils/videoHelpers';
 import { usageStatsService } from '../../services/usageStatsService';
 import { autoFetchSubtitle, autoFetchForcedSubtitle, cleanupSubtitleUrl } from '../../services/subtitleService';
@@ -117,6 +118,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [showDeviceSelector, setShowDeviceSelector] = useState(false);
+    const [castingDevice, setCastingDevice] = useState<{ id: string; name: string } | null>(null);
     const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     const [hoverPosition, setHoverPosition] = useState(0);
@@ -1233,14 +1235,32 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     <CastDeviceSelector
                         videoUrl={src}
                         videoTitle={title || 'Video'}
+                        subtitleVtt={vttContent}
                         onClose={() => setShowDeviceSelector(false)}
-                        onDeviceSelected={() => undefined}
+                        onDeviceSelected={(device) => {
+                            if (device.type === 'dlna') {
+                                setCastingDevice({ id: device.id, name: device.name });
+                                // Pause local playback — the TV took over.
+                                if (state.playing) controls.togglePlay();
+                            }
+                        }}
                         chromecastAvailable={chromecast.isAvailable}
                         chromecastCasting={chromecast.isCasting}
                         onChromecastCast={() => {
                             chromecast.setCurrentTime(state.currentTime);
                             chromecast.startCasting();
                         }}
+                    />
+                )
+            }
+
+            {/* Mini remote while a DLNA cast session is active */}
+            {
+                castingDevice && (
+                    <CastControls
+                        deviceId={castingDevice.id}
+                        deviceName={castingDevice.name}
+                        onSessionEnded={() => setCastingDevice(null)}
                     />
                 )
             }

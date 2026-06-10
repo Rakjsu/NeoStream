@@ -16,6 +16,8 @@ export interface CastDevice {
 interface CastDeviceSelectorProps {
     videoUrl: string;
     videoTitle: string;
+    /** Current subtitle as WebVTT text — forwarded to the TV as SRT. */
+    subtitleVtt?: string | null;
     onClose: () => void;
     onDeviceSelected: (device: CastDevice) => void;
     chromecastAvailable: boolean;
@@ -26,13 +28,14 @@ interface CastDeviceSelectorProps {
 export function CastDeviceSelector({
     videoUrl,
     videoTitle,
+    subtitleVtt,
     onClose,
     onDeviceSelected,
     chromecastAvailable,
     chromecastCasting,
     onChromecastCast
 }: CastDeviceSelectorProps) {
-    const dlna = useDLNA(videoUrl, videoTitle);
+    const dlna = useDLNA(videoUrl, videoTitle, subtitleVtt);
     const airplay = useAirPlay(videoUrl, videoTitle);
     const { devices: dlnaDevices, discoverDevices, castToDevice, addDevice, error: dlnaError, isDiscovering } = dlna;
     const { devices: airplayDevices, castToDevice: castToAirPlayDevice } = airplay;
