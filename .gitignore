@@ -9,6 +9,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+build-log.txt
+commits*.txt
+nsis-*.txt
+nsis-*.log
 
 node_modules
 dist
