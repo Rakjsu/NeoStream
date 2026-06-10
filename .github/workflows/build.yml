@@ -34,17 +34,19 @@ jobs:
       - name: Run lint
         run: npm run lint
       
+      # --publish never: this workflow only produces artifacts. Without it,
+      # electron-builder sees the publish config + CI env and demands GH_TOKEN.
       - name: Build Electron app (Windows)
         if: matrix.os == 'windows-latest'
-        run: npm run build:win
-        
+        run: npm run build:win -- --publish never
+
       - name: Build Electron app (macOS)
         if: matrix.os == 'macos-latest'
-        run: npm run build:mac
-        
+        run: npm run build:mac -- --publish never
+
       - name: Build Electron app (Linux)
         if: matrix.os == 'ubuntu-latest'
-        run: npm run build:linux
+        run: npm run build:linux -- --publish never
       
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
