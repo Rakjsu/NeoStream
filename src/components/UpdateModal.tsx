@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import { updateService } from '../services/updateService';
 import type { UpdateInfo, DownloadProgress } from '../types/update';
 
@@ -188,7 +189,7 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
                         </h3>
                         <div
                             style={{ color: '#cbd5e1', fontSize: '14px', lineHeight: '1.6' }}
-                            dangerouslySetInnerHTML={{ __html: updateInfo.releaseNotes }}
+                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(updateInfo.releaseNotes) }}
                         />
                     </div>
                 )}
