@@ -7,6 +7,9 @@ export interface DLNADevice {
     host: string;
     port?: number;
     location?: string;
+    manufacturer?: string;
+    modelName?: string;
+    isSamsung?: boolean;
     source: 'discovered' | 'manual';
     online: boolean;
 }
@@ -17,6 +20,9 @@ interface DLNADeviceResult {
     host: string;
     port?: number;
     location?: string;
+    manufacturer?: string;
+    modelName?: string;
+    isSamsung?: boolean;
     source?: 'discovered' | 'manual';
     online?: boolean;
 }
@@ -40,6 +46,9 @@ function toDLNADevice(device: DLNADeviceResult, fallbackSource: DLNADevice['sour
         host: device.host,
         port: device.port,
         location: device.location,
+        manufacturer: device.manufacturer,
+        modelName: device.modelName,
+        isSamsung: device.isSamsung,
         source: device.source || fallbackSource,
         online: device.online !== false
     };
@@ -91,7 +100,7 @@ export function useDLNA(videoUrl: string, videoTitle: string) {
     }, []);
 
     // Add manual device
-    const addDevice = async (name: string, ip: string, port: number = 8080) => {
+    const addDevice = async (name: string, ip: string, port: number = 9197) => {
         setError(null);
         try {
             const result = await window.ipcRenderer.invoke('dlna:add-device', {

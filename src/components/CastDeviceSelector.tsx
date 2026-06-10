@@ -9,6 +9,7 @@ export interface CastDevice {
     type: 'chromecast' | 'dlna' | 'airplay';
     available: boolean;
     source?: 'discovered' | 'manual';
+    isSamsung?: boolean;
     cast: () => void;
 }
 
@@ -38,7 +39,7 @@ export function CastDeviceSelector({
     const [view, setView] = useState<'list' | 'add'>('list');
     const [deviceName, setDeviceName] = useState('');
     const [deviceIP, setDeviceIP] = useState('');
-    const [devicePort, setDevicePort] = useState('8080');
+    const [devicePort, setDevicePort] = useState('9197');
     const [casting, setCasting] = useState(false);
     const [castError, setCastError] = useState<string | null>(null);
     const { t } = useLanguage();
@@ -55,6 +56,7 @@ export function CastDeviceSelector({
                 name: device.name,
                 type: 'dlna',
                 available: true,
+                isSamsung: device.isSamsung,
                 cast: () => { }
             });
             setTimeout(() => onClose(), 500);
@@ -90,6 +92,7 @@ export function CastDeviceSelector({
                 type: 'dlna',
                 available: device.online,
                 source: device.source,
+                isSamsung: device.isSamsung,
                 cast: () => handleCast(device)
             });
         });
@@ -117,14 +120,14 @@ export function CastDeviceSelector({
         const success = await addDevice(
             deviceName || `TV (${deviceIP})`,
             deviceIP,
-            parseInt(devicePort) || 8080
+            parseInt(devicePort) || 9197
         );
 
         if (success) {
             setView('list');
             setDeviceName('');
             setDeviceIP('');
-            setDevicePort('8080');
+            setDevicePort('9197');
             setCastError(null);
         } else {
             setCastError(dlnaError || t('cast', 'errorAddingDevice'));
@@ -212,7 +215,7 @@ export function CastDeviceSelector({
                                             <div className="device-info">
                                                 <span className="device-name">{device.name}</span>
                                                 <span className="device-type">
-                                                    {getDeviceTypeName(device.type)}
+                                                    {device.isSamsung ? 'Samsung TV' : getDeviceTypeName(device.type)}
                                                     {device.source === 'discovered' && ' • ' + t('cast', 'discovered')}
                                                 </span>
                                             </div>
@@ -285,7 +288,7 @@ export function CastDeviceSelector({
                                     type="text"
                                     value={devicePort}
                                     onChange={(e) => setDevicePort(e.target.value)}
-                                    placeholder="8080"
+                                    placeholder="9197"
                                     className="form-input"
                                 />
                             </div>
