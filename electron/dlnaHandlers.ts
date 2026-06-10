@@ -168,6 +168,22 @@ async function fetchUpstream(url: string, range?: string) {
     })
 }
 
+// DLNA "features" advertised both in the AVTransport protocolInfo and in the
+// HTTP responses. OP=01 (range seek), CI=0 (no conversion), FLAGS bits for
+// streaming-mode + background transfer. Samsung/LG renderers probe for these
+// (HEAD or GET with getcontentFeatures.dlna.org: 1) and refuse with UPnP 704
+// when the server doesn't answer like a DLNA media server.
+const DLNA_FEATURES = 'DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000'
+
+function dlnaHeaders(extra: Record<string, string | undefined>): Record<string, string | undefined> {
+    return {
+        'transferMode.dlna.org': 'Streaming',
+        'contentFeatures.dlna.org': DLNA_FEATURES,
+        'Access-Control-Allow-Origin': '*',
+        ...extra
+    }
+}
+
 async function ensureProxyServer(): Promise<number> {
     if (proxyServer && proxyPort) return proxyPort
 
@@ -176,10 +192,29 @@ async function ensureProxyServer(): Promise<number> {
             const requestUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
             const token = requestUrl.pathname.replace('/dlna-proxy/', '')
             const upstreamUrl = proxyUrls.get(token)?.url
+            console.log(`[DLNA] Proxy ${request.method} token=${token.slice(0, 8)}… range=${request.headers.range || '-'} known=${Boolean(upstreamUrl)}`)
 
             if (!upstreamUrl) {
                 response.writeHead(404)
                 response.end('Not found')
+                return
+            }
+
+            // TVs probe with HEAD (often with getcontentFeatures.dlna.org: 1)
+            // before committing to play. Answer headers-only without pulling
+            // the whole stream from the provider.
+            if (request.method === 'HEAD') {
+                const probe = await fetchUpstream(upstreamUrl, 'bytes=0-0')
+                const totalSize = probe.headers.get('content-range')?.split('/')[1]
+                    || probe.headers.get('content-length')
+                    || undefined
+                probe.body?.destroy?.()
+                response.writeHead(200, dlnaHeaders({
+                    'Content-Type': getMimeForUrl(upstreamUrl, probe.headers.get('content-type')),
+                    'Content-Length': totalSize,
+                    'Accept-Ranges': 'bytes'
+                }))
+                response.end()
                 return
             }
 
@@ -195,21 +230,19 @@ async function ensureProxyServer(): Promise<number> {
                 const deviceHost = requestUrl.searchParams.get('deviceHost') || request.headers.host?.split(':')[0] || ''
                 const playlist = await upstreamResponse.text()
                 const rewritten = rewritePlaylist(playlist, upstreamUrl, deviceHost)
-                response.writeHead(200, {
-                    'Content-Type': 'application/vnd.apple.mpegurl',
-                    'Access-Control-Allow-Origin': '*'
-                })
+                response.writeHead(200, dlnaHeaders({
+                    'Content-Type': 'application/vnd.apple.mpegurl'
+                }))
                 response.end(rewritten)
                 return
             }
 
-            response.writeHead(upstreamResponse.status, {
+            response.writeHead(upstreamResponse.status, dlnaHeaders({
                 'Content-Type': getMimeForUrl(upstreamUrl, contentType),
                 'Content-Length': upstreamResponse.headers.get('content-length') || undefined,
                 'Content-Range': upstreamResponse.headers.get('content-range') || undefined,
-                'Accept-Ranges': upstreamResponse.headers.get('accept-ranges') || 'bytes',
-                'Access-Control-Allow-Origin': '*'
-            })
+                'Accept-Ranges': upstreamResponse.headers.get('accept-ranges') || 'bytes'
+            }))
             if (upstreamResponse.body) {
                 // If the upstream stream dies mid-transfer the headers are already
                 // sent — just tear the socket down instead of writeHead-ing again.
@@ -747,19 +780,7 @@ export function setupDLNAHandlers() {
                 ? createProxyUrl(url, device.host)
                 : url
 
-            const contentType = getMimeForUrl(url);
-
-            const options = {
-                autoplay: true,
-                contentType: contentType,
-                metadata: {
-                    title: title || 'Video',
-                    type: 'video',
-                    creator: 'NeoStream IPTV'
-                }
-            };
-
-            await new Promise((resolve, reject) => {
+            const tryLoad = (mime: string) => new Promise((resolve, reject) => {
                 const timeout = setTimeout(() => {
                     reject(new Error('Connection timeout - Check if TV is on and DLNA is enabled'));
                 }, 10000);
@@ -769,17 +790,43 @@ export function setupDLNAHandlers() {
                     reject(err);
                 });
 
-                client.load(castUrl, options, (err) => {
+                client.load(castUrl, {
+                    autoplay: true,
+                    contentType: mime,
+                    // Without explicit DLNA.ORG_* features in protocolInfo many
+                    // renderers (Samsung/LG) reject SetAVTransportURI with 704.
+                    dlnaFeatures: DLNA_FEATURES,
+                    metadata: {
+                        title: title || 'Video',
+                        type: 'video',
+                        creator: 'NeoStream IPTV'
+                    }
+                }, (err) => {
                     clearTimeout(timeout);
                     if (err) {
-                        console.error('[DLNA] Cast error:', err);
+                        console.error(`[DLNA] Cast error (mime=${mime}):`, err);
                         reject(err);
                     } else {
-                        console.log('[DLNA] Media loaded successfully');
+                        console.log(`[DLNA] Media loaded successfully (mime=${mime})`);
                         resolve(true);
                     }
                 });
             });
+
+            const primaryMime = getMimeForUrl(url);
+            try {
+                await tryLoad(primaryMime);
+            } catch (firstError) {
+                // Picky renderers refuse container-specific mimes (x-matroska
+                // etc.) but accept a generic video/mp4 and sniff the stream.
+                const message = getErrorMessage(firstError);
+                if (primaryMime !== 'video/mp4' && /\b704\b|restrict|format/i.test(message)) {
+                    console.warn(`[DLNA] ${primaryMime} refused (${message}); retrying as video/mp4`);
+                    await tryLoad('video/mp4');
+                } else {
+                    throw firstError;
+                }
+            }
 
             return { success: true };
         } catch (error: unknown) {
