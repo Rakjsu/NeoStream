@@ -1,5 +1,8 @@
 // TMDB API Service
-const TMDB_API_KEY = '9d8ec8b10e9b4acd85853c44b29bd83a';
+// Key comes from .env (VITE_TMDB_API_KEY). The fallback keeps builds working
+// without a .env, but rotate the dashboard key if it ever leaks — in a
+// distributed Electron app any bundled key is extractable regardless.
+const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY || '9d8ec8b10e9b4acd85853c44b29bd83a';
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
 
