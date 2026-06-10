@@ -42,19 +42,9 @@ interface NativeSsdpResponse {
     address: string
 }
 
-interface MediaRendererClientInstance {
-    on(event: 'error', callback: (error: Error) => void): void
-    load(url: string, options: unknown, callback: (error?: Error | null) => void): void
-    callAction(service: string, action: string, params: Record<string, unknown>, callback: (error?: Error | null, result?: unknown) => void): void
-    stop(callback: (error?: Error | null) => void): void
-}
-
-type MediaRendererClientConstructor = new (location: string) => MediaRendererClientInstance;
-
 const getErrorMessage = (error: unknown): string =>
     error instanceof Error ? error.message : String(error);
 
-let MediaRendererClient: MediaRendererClientConstructor | null = null;
 const discoveredDevices: Map<string, DlnaDevice> = new Map();
 let manualDevices: DlnaDevice[] = [];
 let isDiscovering = false;
@@ -170,13 +160,115 @@ async function fetchUpstream(url: string, range?: string) {
 // when the server doesn't answer like a DLNA media server.
 const DLNA_FEATURES = 'DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000'
 
-function dlnaHeaders(extra: Record<string, string | undefined>): Record<string, string | undefined> {
-    return {
+const AVTRANSPORT_SERVICE = 'urn:schemas-upnp-org:service:AVTransport:1'
+
+function escapeXml(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;')
+}
+
+// location (device description URL) -> resolved AVTransport control URL
+const controlUrlCache: Map<string, string> = new Map()
+
+async function getAvTransportControlUrl(location: string): Promise<string> {
+    const cached = controlUrlCache.get(location)
+    if (cached) return cached
+
+    const fetch = (await import('node-fetch')).default
+    const response = await fetch(location, { headers: { 'User-Agent': 'NeoStream IPTV DLNA/1.0' } })
+    if (!response.ok) {
+        throw new Error(`Device description unavailable (HTTP ${response.status})`)
+    }
+    const xml = await response.text()
+
+    // Find the <service> block for AVTransport and its <controlURL>.
+    const serviceBlock = xml.split(/<service>/i)
+        .find((block) => block.includes(AVTRANSPORT_SERVICE))
+    const controlPath = serviceBlock ? getXmlTagValue(serviceBlock, 'controlURL') : undefined
+    if (!controlPath) {
+        throw new Error('Device does not expose an AVTransport control URL')
+    }
+
+    const controlUrl = new URL(controlPath, location).toString()
+    controlUrlCache.set(location, controlUrl)
+    return controlUrl
+}
+
+// Raw SOAP caller for AVTransport actions.
+//
+// We intentionally do NOT use upnp-mediarenderer-client / upnp-device-client:
+// 1. load() calls ConnectionManager#PrepareForConnection first, which Samsung
+//    TVs advertise but refuse with UPnP 704 "Local restrictions", killing the
+//    cast before SetAVTransportURI even runs.
+// 2. upnp-device-client sets Content-Length to xml.length (UTF-16 code
+//    units, not bytes), so any multibyte title — e.g. CJK series names —
+//    truncates the SOAP body and the TV answers 402 "Invalid Args".
+function sendAvTransportAction(
+    controlUrl: string,
+    action: string,
+    paramsXml: string,
+    timeoutMs = 10000
+): Promise<string> {
+    const envelope = `<?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:${action} xmlns:u="${AVTRANSPORT_SERVICE}">${paramsXml}</u:${action}></s:Body></s:Envelope>`
+    const body = Buffer.from(envelope, 'utf8')
+    const parsed = new URL(controlUrl)
+
+    return new Promise((resolve, reject) => {
+        const request = http.request({
+            hostname: parsed.hostname,
+            port: parsed.port || 80,
+            path: parsed.pathname + parsed.search,
+            method: 'POST',
+            timeout: timeoutMs,
+            headers: {
+                'Content-Type': 'text/xml; charset="utf-8"',
+                'SOAPAction': `"${AVTRANSPORT_SERVICE}#${action}"`,
+                'Content-Length': body.length,
+                'User-Agent': 'NeoStream IPTV DLNA/1.0',
+                'Connection': 'close'
+            }
+        }, (response) => {
+            const chunks: Buffer[] = []
+            response.on('data', (chunk) => chunks.push(chunk))
+            response.on('end', () => {
+                const text = Buffer.concat(chunks).toString('utf8')
+                const errorCode = getXmlTagValue(text, 'errorCode')
+                const errorDescription = getXmlTagValue(text, 'errorDescription')
+                if (errorCode) {
+                    reject(new Error(`${errorDescription || 'UPnP error'} (${errorCode})`))
+                } else if (response.statusCode && response.statusCode >= 400) {
+                    reject(new Error(`HTTP ${response.statusCode} from device for ${action}`))
+                } else {
+                    resolve(text)
+                }
+            })
+        })
+
+        request.on('error', reject)
+        request.on('timeout', () => {
+            request.destroy()
+            reject(new Error('Connection timeout - Check if TV is on and DLNA is enabled'))
+        })
+        request.end(body)
+    })
+}
+
+function dlnaHeaders(extra: Record<string, string | undefined>): Record<string, string> {
+    const headers: Record<string, string> = {
         'transferMode.dlna.org': 'Streaming',
         'contentFeatures.dlna.org': DLNA_FEATURES,
-        'Access-Control-Allow-Origin': '*',
-        ...extra
+        'Access-Control-Allow-Origin': '*'
     }
+    // Drop undefined values — writeHead throws on them (live TS streams have
+    // no Content-Length, for example).
+    for (const [key, value] of Object.entries(extra)) {
+        if (value !== undefined) headers[key] = value
+    }
+    return headers
 }
 
 async function ensureProxyServer(): Promise<number> {
@@ -276,14 +368,6 @@ async function ensureProxyServer(): Promise<number> {
     }
 
     throw new Error('Failed to start DLNA media proxy')
-}
-
-// Initialize dependencies
-try {
-    MediaRendererClient = require('upnp-mediarenderer-client') as MediaRendererClientConstructor;
-    log.info('[DLNA] upnp-mediarenderer-client loaded successfully');
-} catch (error) {
-    log.error('[DLNA] Failed to load upnp-mediarenderer-client:', error);
 }
 
 // Load saved devices from disk
@@ -748,10 +832,6 @@ export function setupDLNAHandlers() {
         try {
             log.info('[DLNA] Cast requested:', { deviceId, title });
 
-            if (!MediaRendererClient) {
-                throw new Error('DLNA client not available');
-            }
-
             // Find device (from manual or discovered)
             let device = manualDevices.find(d => d.id === deviceId);
             if (!device) {
@@ -765,7 +845,17 @@ export function setupDLNAHandlers() {
             const location = device.location || `http://${device.host}:${device.port || 9197}/dmr`;
             log.info('[DLNA] Connecting to:', location);
 
-            const client = new MediaRendererClient(location);
+            const controlUrl = await getAvTransportControlUrl(location);
+
+            // Samsung's DLNA player does not decode HLS playlists ("file not
+            // supported" on the TV OSD). Xtream panels expose the same live
+            // channel as a continuous MPEG-TS stream at the .ts variant of the
+            // URL, which DLNA renderers play fine — prefer it for casting.
+            let streamUrl = url;
+            if (/\/live\//i.test(url) && /\.m3u8(\?|$)/i.test(url)) {
+                streamUrl = url.replace(/\.m3u8(\?|$)/i, '.ts$1');
+                log.info(`[DLNA] Live HLS detected; casting MPEG-TS variant instead: ${streamUrl}`);
+            }
 
             // Always route remote streams through the local proxy. IPTV
             // providers often reject the TV's direct request (single-connection
@@ -773,50 +863,41 @@ export function setupDLNAHandlers() {
             // reports UPnP 704 ("format not supported" / "local restrictions").
             // Through the proxy the TV fetches from this machine, which talks
             // to the provider with the app's HTTPS agent and headers.
-            const isRemoteHttp = /^https?:\/\//i.test(url)
+            const isRemoteHttp = /^https?:\/\//i.test(streamUrl)
             if (isRemoteHttp) {
                 await ensureProxyServer()
             }
             const castUrl = isRemoteHttp
-                ? createProxyUrl(url, device.host)
-                : url
+                ? createProxyUrl(streamUrl, device.host)
+                : streamUrl
 
-            const escapeXml = (value: string) => value
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&apos;');
-
-            const callAvTransport = (action: string, params: Record<string, unknown>) =>
-                new Promise((resolve, reject) => {
-                    const timeout = setTimeout(() => {
-                        reject(new Error('Connection timeout - Check if TV is on and DLNA is enabled'));
-                    }, 10000);
-                    client.callAction('AVTransport', action, params, (err, result) => {
-                        clearTimeout(timeout);
-                        if (err) reject(err);
-                        else resolve(result);
-                    });
-                });
-
-            // Deliberately NOT using client.load(): it first calls
-            // ConnectionManager#PrepareForConnection, which Samsung TVs
-            // advertise but refuse with UPnP 704 "Local restrictions",
-            // killing the cast before SetAVTransportURI even runs.
-            // Calling AVTransport directly on InstanceID 0 works
-            // (verified by hand against a TU7000 that returned 704 via load()).
             const tryLoad = async (mime: string) => {
                 const protocolInfo = `http-get:*:${mime}:${DLNA_FEATURES}`;
                 const didl = `<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:sec="http://www.sec.co.kr/"><item id="0" parentID="-1" restricted="false"><upnp:class>object.item.videoItem.movie</upnp:class><dc:title>${escapeXml(title || 'Video')}</dc:title><res protocolInfo="${protocolInfo}">${escapeXml(castUrl)}</res></item></DIDL-Lite>`;
 
+                log.info(`[DLNA] tryLoad mime=${mime} castUrl=${castUrl} title=${JSON.stringify(title)}`);
+
                 try {
-                    await callAvTransport('SetAVTransportURI', {
-                        InstanceID: 0,
-                        CurrentURI: castUrl,
-                        CurrentURIMetaData: didl
-                    });
-                    await callAvTransport('Play', { InstanceID: 0, Speed: '1' });
+                    await sendAvTransportAction(controlUrl, 'SetAVTransportURI',
+                        `<InstanceID>0</InstanceID><CurrentURI>${escapeXml(castUrl)}</CurrentURI><CurrentURIMetaData>${escapeXml(didl)}</CurrentURIMetaData>`);
+                    try {
+                        await sendAvTransportAction(controlUrl, 'Play',
+                            '<InstanceID>0</InstanceID><Speed>1</Speed>');
+                    } catch (playError) {
+                        // Samsung renderers auto-play on SetAVTransportURI; an
+                        // explicit Play that lands while TRANSITIONING returns
+                        // 701 "Transition not available" even though playback
+                        // is starting. Check the real transport state before
+                        // declaring failure.
+                        if (!/\b701\b/.test(getErrorMessage(playError))) throw playError;
+                        log.warn('[DLNA] Play returned 701; checking transport state...');
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        const info = await sendAvTransportAction(controlUrl, 'GetTransportInfo',
+                            '<InstanceID>0</InstanceID>');
+                        const state = getXmlTagValue(info, 'CurrentTransportState') || '';
+                        log.info(`[DLNA] Transport state after 701: ${state}`);
+                        if (!/PLAYING|TRANSITIONING/i.test(state)) throw playError;
+                    }
                     log.info(`[DLNA] Media loaded successfully (mime=${mime})`);
                 } catch (err) {
                     log.error(`[DLNA] Cast error (mime=${mime}):`, err);
@@ -824,7 +905,7 @@ export function setupDLNAHandlers() {
                 }
             };
 
-            const primaryMime = getMimeForUrl(url);
+            const primaryMime = getMimeForUrl(streamUrl);
             try {
                 await tryLoad(primaryMime);
             } catch (firstError) {
@@ -870,17 +951,8 @@ export function setupDLNAHandlers() {
             }
 
             const location = device.location || `http://${device.host}:${device.port || 9197}/dmr`;
-            const client = new MediaRendererClient(location);
-
-            await new Promise((resolve, reject) => {
-                client.stop((err) => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        resolve(true);
-                    }
-                });
-            });
+            const controlUrl = await getAvTransportControlUrl(location);
+            await sendAvTransportAction(controlUrl, 'Stop', '<InstanceID>0</InstanceID>');
 
             return { success: true };
         } catch (error: unknown) {
