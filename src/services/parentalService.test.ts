@@ -8,7 +8,8 @@ beforeEach(() => {
     sessionStorage.clear()
     parentalService.setConfig({
         enabled: false,
-        pin: null,
+        pinHash: null,
+        pinSalt: null,
         maxRating: '18',
         blockAdultCategories: true,
         filterByTMDB: true,
@@ -17,16 +18,33 @@ beforeEach(() => {
 })
 
 describe('parentalService PIN', () => {
-    it('starts without a PIN', () => {
+    it('starts without a PIN', async () => {
         expect(parentalService.hasPin()).toBe(false)
-        expect(parentalService.verifyPin('0000')).toBe(false)
+        expect(await parentalService.verifyPin('0000')).toBe(false)
     })
 
-    it('stores and verifies a PIN', () => {
-        parentalService.setPin('1234')
+    it('stores and verifies a PIN as salted hash (never plaintext)', async () => {
+        await parentalService.setPin('1234')
         expect(parentalService.hasPin()).toBe(true)
-        expect(parentalService.verifyPin('1234')).toBe(true)
-        expect(parentalService.verifyPin('9999')).toBe(false)
+        expect(await parentalService.verifyPin('1234')).toBe(true)
+        expect(await parentalService.verifyPin('9999')).toBe(false)
+
+        const stored = JSON.parse(localStorage.getItem('parentalConfig') || '{}')
+        expect(stored.pin).toBeUndefined()
+        expect(stored.pinHash).toMatch(/^[0-9a-f]{64}$/)
+        expect(stored.pinSalt).toMatch(/^[0-9a-f]{32}$/)
+        expect(JSON.stringify(stored)).not.toContain('1234')
+    })
+
+    it('uses a fresh salt on each setPin', async () => {
+        await parentalService.setPin('1234')
+        const first = parentalService.getConfig()
+        await parentalService.setPin('1234')
+        const second = parentalService.getConfig()
+        expect(first.pinSalt).not.toBe(second.pinSalt)
+        expect(first.pinHash).not.toBe(second.pinHash)
+        // Same PIN still verifies after re-set
+        expect(await parentalService.verifyPin('1234')).toBe(true)
     })
 
     it('session unlock toggles', () => {

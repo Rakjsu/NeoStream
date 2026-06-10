@@ -5,7 +5,10 @@
 
 export interface ParentalConfig {
     enabled: boolean;
-    pin: string | null;
+    /** @deprecated legacy plaintext PIN — migrated to pinHash/pinSalt on load */
+    pin?: string | null;
+    pinHash: string | null;
+    pinSalt: string | null;
     maxRating: 'L' | '10' | '12' | '14' | '16' | '18';
     blockAdultCategories: boolean;
     filterByTMDB: boolean;
@@ -13,7 +16,8 @@ export interface ParentalConfig {
 
 const DEFAULT_CONFIG: ParentalConfig = {
     enabled: false,
-    pin: null,
+    pinHash: null,
+    pinSalt: null,
     maxRating: '18',
     blockAdultCategories: true,
     filterByTMDB: true
@@ -21,6 +25,18 @@ const DEFAULT_CONFIG: ParentalConfig = {
 
 const STORAGE_KEY = 'parentalConfig';
 const UNLOCK_KEY = 'parentalUnlocked';
+
+function randomSaltHex(): string {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function hashPin(pin: string, saltHex: string): Promise<string> {
+    const data = new TextEncoder().encode(`${saltHex}:${pin}`);
+    const digest = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+}
 
 class ParentalService {
     private config: ParentalConfig = DEFAULT_CONFIG;
@@ -37,6 +53,14 @@ class ParentalService {
             }
         } catch (error) {
             console.error('Error loading parental config:', error);
+        }
+        // Migrate legacy plaintext PIN to hashed storage.
+        const legacyPin = this.config.pin;
+        if (legacyPin) {
+            delete this.config.pin;
+            // Fire-and-forget: by the time the user opens parental settings
+            // the migration has completed.
+            void this.setPin(legacyPin);
         }
     }
 
@@ -57,18 +81,21 @@ class ParentalService {
         this.saveConfig();
     }
 
-    // PIN Management
-    setPin(newPin: string): void {
-        this.config.pin = newPin;
+    // PIN Management — PIN is stored as SHA-256(salt:pin), never plaintext.
+    async setPin(newPin: string): Promise<void> {
+        const salt = randomSaltHex();
+        this.config.pinSalt = salt;
+        this.config.pinHash = await hashPin(newPin, salt);
         this.saveConfig();
     }
 
-    verifyPin(inputPin: string): boolean {
-        return this.config.pin === inputPin;
+    async verifyPin(inputPin: string): Promise<boolean> {
+        if (!this.config.pinHash || !this.config.pinSalt) return false;
+        return (await hashPin(inputPin, this.config.pinSalt)) === this.config.pinHash;
     }
 
     hasPin(): boolean {
-        return this.config.pin !== null && this.config.pin !== '';
+        return Boolean(this.config.pinHash);
     }
 
     // Session unlock (temporary, clears on page reload)

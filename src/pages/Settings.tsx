@@ -212,7 +212,7 @@ export function Settings() {
         setTimeout(() => setSaveAnimation(null), 1500);
     };
 
-    const handlePinSubmit = () => {
+    const handlePinSubmit = async () => {
         const pin = pinInput.join('');
 
         if (pin.length !== 4) {
@@ -222,7 +222,7 @@ export function Settings() {
 
         // Verification mode - check if PIN is correct to disable parental control
         if (pinMode === 'verify') {
-            if (parentalService.verifyPin(pin)) {
+            if (await parentalService.verifyPin(pin)) {
                 // PIN is correct - disable parental control
                 setParentalConfig(prev => ({ ...prev, enabled: false }));
                 parentalService.setConfig({ enabled: false });
@@ -253,7 +253,7 @@ export function Settings() {
                 return;
             }
             // Save PIN
-            parentalService.setPin(pin);
+            await parentalService.setPin(pin);
             setParentalConfig(parentalService.getConfig());
             setShowPinModal(false);
             resetPinModal();
