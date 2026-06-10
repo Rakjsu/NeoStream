@@ -37,11 +37,6 @@ interface SsdpHeaders {
     location?: string
 }
 
-interface SsdpPeer {
-    on(event: 'found', callback: (headers: SsdpHeaders, address: string) => void): void
-    search(target: string): void
-}
-
 interface NativeSsdpResponse {
     headers: SsdpHeaders
     address: string
@@ -50,6 +45,7 @@ interface NativeSsdpResponse {
 interface MediaRendererClientInstance {
     on(event: 'error', callback: (error: Error) => void): void
     load(url: string, options: unknown, callback: (error?: Error | null) => void): void
+    callAction(service: string, action: string, params: Record<string, unknown>, callback: (error?: Error | null, result?: unknown) => void): void
     stop(callback: (error?: Error | null) => void): void
 }
 
@@ -59,11 +55,9 @@ const getErrorMessage = (error: unknown): string =>
     error instanceof Error ? error.message : String(error);
 
 let MediaRendererClient: MediaRendererClientConstructor | null = null;
-let ssdp: SsdpPeer | null = null;
 const discoveredDevices: Map<string, DlnaDevice> = new Map();
 let manualDevices: DlnaDevice[] = [];
 let isDiscovering = false;
-let ssdpListenerRegistered = false;
 let proxyServer: http.Server | null = null;
 let proxyPort: number | null = null;
 // token -> upstream URL, with creation time so stale entries can be pruned.
@@ -292,14 +286,6 @@ try {
     log.error('[DLNA] Failed to load upnp-mediarenderer-client:', error);
 }
 
-try {
-    const SSDP = require('peer-ssdp').Peer as new () => SsdpPeer;
-    ssdp = new SSDP();
-    log.info('[DLNA] SSDP peer loaded successfully');
-} catch (error) {
-    log.error('[DLNA] Failed to load SSDP:', error);
-}
-
 // Load saved devices from disk
 function loadSavedDevices(): void {
     try {
@@ -405,24 +391,37 @@ function createSearchMessage(target: string): string {
     ].join('\r\n')
 }
 
+function localIPv4Addresses(): string[] {
+    return Object.values(os.networkInterfaces())
+        .flat()
+        .filter((address): address is os.NetworkInterfaceInfo =>
+            Boolean(address) && address.family === 'IPv4' && !address.internal
+        )
+        .map((address) => address.address)
+}
+
 async function nativeSsdpSearch(targets: string[], timeoutMs = 5000): Promise<NativeSsdpResponse[]> {
     return new Promise((resolve) => {
-        const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true })
         const responses = new Map<string, NativeSsdpResponse>()
+        const sockets: dgram.Socket[] = []
+        const timers: NodeJS.Timeout[] = []
         let settled = false
 
         const finish = () => {
             if (settled) return
             settled = true
-            try {
-                socket.close()
-            } catch {
-                // Socket may already be closed.
+            timers.forEach(clearTimeout)
+            for (const socket of sockets) {
+                try {
+                    socket.close()
+                } catch {
+                    // Socket may already be closed.
+                }
             }
             resolve(Array.from(responses.values()))
         }
 
-        socket.on('message', (buffer, remote) => {
+        const onMessage = (buffer: Buffer, remote: dgram.RemoteInfo) => {
             const headers = parseSsdpMessage(buffer.toString('utf8'))
             if (!looksLikeMediaRenderer(headers)) return
 
@@ -433,27 +432,48 @@ async function nativeSsdpSearch(targets: string[], timeoutMs = 5000): Promise<Na
                 headers,
                 address: remote.address
             })
-        })
+        }
 
-        socket.on('error', (error) => {
-            log.warn('[DLNA] Native SSDP error:', getErrorMessage(error))
-            finish()
-        })
+        // One socket per local IPv4 interface: on multi-homed machines
+        // (VPN/virtual adapters) a single 0.0.0.0 socket multicasts out the
+        // default-route interface, which is often not the LAN where the TV is.
+        const localAddresses = localIPv4Addresses()
+        const bindAddresses = localAddresses.length > 0 ? localAddresses : ['0.0.0.0']
 
-        socket.bind(0, '0.0.0.0', () => {
-            try {
-                socket.setBroadcast(true)
-                socket.setMulticastTTL(4)
-            } catch {
-                // Some network adapters do not allow multicast options.
-            }
+        for (const localAddress of bindAddresses) {
+            const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true })
+            sockets.push(socket)
 
-            for (const target of targets) {
-                const message = Buffer.from(createSearchMessage(target))
-                socket.send(message, 0, message.length, 1900, '239.255.255.250')
-                socket.send(message, 0, message.length, 1900, '255.255.255.255')
-            }
-        })
+            socket.on('message', onMessage)
+            socket.on('error', (error) => {
+                log.warn(`[DLNA] Native SSDP error on ${localAddress}:`, getErrorMessage(error))
+            })
+
+            socket.bind(0, localAddress, () => {
+                try {
+                    socket.setBroadcast(true)
+                    socket.setMulticastTTL(4)
+                    if (localAddress !== '0.0.0.0') socket.setMulticastInterface(localAddress)
+                } catch {
+                    // Some network adapters do not allow multicast options.
+                }
+
+                // SSDP is lossy UDP — devices routinely miss a single M-SEARCH.
+                // Re-send each target a few times across the search window.
+                const sendAll = () => {
+                    if (settled) return
+                    for (const target of targets) {
+                        const message = Buffer.from(createSearchMessage(target))
+                        socket.send(message, 0, message.length, 1900, '239.255.255.250')
+                        socket.send(message, 0, message.length, 1900, '255.255.255.255')
+                    }
+                }
+
+                sendAll()
+                timers.push(setTimeout(sendAll, 700))
+                timers.push(setTimeout(sendAll, 1800))
+            })
+        }
 
         setTimeout(finish, timeoutMs)
     })
@@ -585,66 +605,46 @@ async function resolveManualLocation(ip: string, port?: number): Promise<{ locat
     }
 }
 
-// Discover DLNA devices using SSDP
+// Discover DLNA devices via native SSDP M-SEARCH (dgram).
+// peer-ssdp was removed: it exports createPeer(), not Peer, so the previous
+// `new SSDP()` threw on load and a guard then skipped discovery entirely —
+// the search button returned an empty list instantly.
 async function discoverDevices(): Promise<DlnaDevice[]> {
-    return new Promise((resolve) => {
-        if (!ssdp || isDiscovering) {
-            resolve(Array.from(discoveredDevices.values()));
-            return;
-        }
+    if (isDiscovering) {
+        return Array.from(discoveredDevices.values());
+    }
 
-        isDiscovering = true;
-        discoveredDevices.clear();
+    isDiscovering = true;
+    discoveredDevices.clear();
 
-        try {
-            const searchTargets = [
-                'urn:schemas-upnp-org:device:MediaRenderer:1',
-                'urn:schemas-upnp-org:service:AVTransport:1',
-                'urn:schemas-upnp-org:service:RenderingControl:1',
-                'ssdp:all'
-            ]
+    try {
+        const searchTargets = [
+            'urn:schemas-upnp-org:device:MediaRenderer:1',
+            'urn:schemas-upnp-org:service:AVTransport:1',
+            'urn:schemas-upnp-org:service:RenderingControl:1',
+            'ssdp:all'
+        ]
 
-            if (!ssdpListenerRegistered) {
-                ssdp.on('found', (headers, address) => {
-                    if (!looksLikeMediaRenderer(headers)) return
+        const responses = await nativeSsdpSearch(searchTargets)
+        responses.forEach(({ headers, address }) => {
+            if (!looksLikeMediaRenderer(headers)) return
+            const device = createDiscoveredDevice(headers, address)
+            upsertDiscoveredDevice(device)
+            log.info('[DLNA] SSDP found device:', device.name, 'at', device.host)
+        })
 
-                    const server = getHeader(headers, 'SERVER')
-                    const device = createDiscoveredDevice(headers, address)
+        await Promise.all(Array.from(discoveredDevices.values()).map((device) =>
+            enrichDeviceFromDescription(device).then(upsertDiscoveredDevice)
+        ))
 
-                    upsertDiscoveredDevice(device)
-                    void enrichDeviceFromDescription(device, server).then(upsertDiscoveredDevice)
-                    log.info('[DLNA] Found device:', device.name, 'at', device.host);
-                });
-                ssdpListenerRegistered = true
-            }
-
-            searchTargets.forEach((target) => ssdp?.search(target));
-
-            void nativeSsdpSearch(searchTargets).then((responses) => {
-                responses.forEach(({ headers, address }) => {
-                    const server = getHeader(headers, 'SERVER')
-                    const device = createDiscoveredDevice(headers, address)
-                    upsertDiscoveredDevice(device)
-                    void enrichDeviceFromDescription(device, server).then(upsertDiscoveredDevice)
-                    log.info('[DLNA] Native SSDP found device:', device.name, 'at', device.host)
-                })
-            })
-
-            // Stop discovery after 5 seconds
-            setTimeout(async () => {
-                await Promise.all(Array.from(discoveredDevices.values()).map((device) =>
-                    enrichDeviceFromDescription(device).then(upsertDiscoveredDevice)
-                ))
-                isDiscovering = false;
-                log.info('[DLNA] Discovery complete. Found', discoveredDevices.size, 'devices');
-                resolve(Array.from(discoveredDevices.values()));
-            }, 7000);
-        } catch (error) {
-            log.error('[DLNA] Discovery error:', error);
-            isDiscovering = false;
-            resolve([]);
-        }
-    });
+        log.info('[DLNA] Discovery complete. Found', discoveredDevices.size, 'devices');
+        return Array.from(discoveredDevices.values());
+    } catch (error) {
+        log.error('[DLNA] Discovery error:', error);
+        return [];
+    } finally {
+        isDiscovering = false;
+    }
 }
 
 export function setupDLNAHandlers() {
@@ -781,38 +781,48 @@ export function setupDLNAHandlers() {
                 ? createProxyUrl(url, device.host)
                 : url
 
-            const tryLoad = (mime: string) => new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    reject(new Error('Connection timeout - Check if TV is on and DLNA is enabled'));
-                }, 10000);
+            const escapeXml = (value: string) => value
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
 
-                client.on('error', (err) => {
-                    clearTimeout(timeout);
-                    reject(err);
+            const callAvTransport = (action: string, params: Record<string, unknown>) =>
+                new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => {
+                        reject(new Error('Connection timeout - Check if TV is on and DLNA is enabled'));
+                    }, 10000);
+                    client.callAction('AVTransport', action, params, (err, result) => {
+                        clearTimeout(timeout);
+                        if (err) reject(err);
+                        else resolve(result);
+                    });
                 });
 
-                client.load(castUrl, {
-                    autoplay: true,
-                    contentType: mime,
-                    // Without explicit DLNA.ORG_* features in protocolInfo many
-                    // renderers (Samsung/LG) reject SetAVTransportURI with 704.
-                    dlnaFeatures: DLNA_FEATURES,
-                    metadata: {
-                        title: title || 'Video',
-                        type: 'video',
-                        creator: 'NeoStream IPTV'
-                    }
-                }, (err) => {
-                    clearTimeout(timeout);
-                    if (err) {
-                        log.error(`[DLNA] Cast error (mime=${mime}):`, err);
-                        reject(err);
-                    } else {
-                        log.info(`[DLNA] Media loaded successfully (mime=${mime})`);
-                        resolve(true);
-                    }
-                });
-            });
+            // Deliberately NOT using client.load(): it first calls
+            // ConnectionManager#PrepareForConnection, which Samsung TVs
+            // advertise but refuse with UPnP 704 "Local restrictions",
+            // killing the cast before SetAVTransportURI even runs.
+            // Calling AVTransport directly on InstanceID 0 works
+            // (verified by hand against a TU7000 that returned 704 via load()).
+            const tryLoad = async (mime: string) => {
+                const protocolInfo = `http-get:*:${mime}:${DLNA_FEATURES}`;
+                const didl = `<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:sec="http://www.sec.co.kr/"><item id="0" parentID="-1" restricted="false"><upnp:class>object.item.videoItem.movie</upnp:class><dc:title>${escapeXml(title || 'Video')}</dc:title><res protocolInfo="${protocolInfo}">${escapeXml(castUrl)}</res></item></DIDL-Lite>`;
+
+                try {
+                    await callAvTransport('SetAVTransportURI', {
+                        InstanceID: 0,
+                        CurrentURI: castUrl,
+                        CurrentURIMetaData: didl
+                    });
+                    await callAvTransport('Play', { InstanceID: 0, Speed: '1' });
+                    log.info(`[DLNA] Media loaded successfully (mime=${mime})`);
+                } catch (err) {
+                    log.error(`[DLNA] Cast error (mime=${mime}):`, err);
+                    throw err;
+                }
+            };
 
             const primaryMime = getMimeForUrl(url);
             try {
