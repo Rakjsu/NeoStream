@@ -6,8 +6,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
-    // Only pick up tests under src/; ignore electron/ and build artifacts.
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // src/ tests + pure electron modules (no 'electron' import allowed there).
+    include: ['src/**/*.{test,spec}.{ts,tsx}', 'electron/**/*.{test,spec}.ts'],
     exclude: ['node_modules', 'dist', 'dist-electron', 'release'],
     // electron is a runtime, not something we want to import in unit tests
     // (any module that imports 'electron' should be unit-tested via mocks).

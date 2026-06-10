@@ -3,12 +3,35 @@
 
 import { ipcMain } from 'electron';
 import { createRequire } from 'module';
+import { spawn, type ChildProcess } from 'child_process';
 import dgram from 'dgram';
 import http from 'http';
 import os from 'os';
 import { randomUUID } from 'crypto';
 import { getProviderHttpsAgent } from './certificatePolicy';
 import log from './logger';
+import {
+    DLNA_FEATURES,
+    AVTRANSPORT_SERVICE,
+    RENDERING_CONTROL_SERVICE,
+    type SsdpHeaders,
+    escapeXml,
+    getXmlTagValue,
+    getHeader,
+    parseSsdpMessage,
+    looksLikeMediaRenderer,
+    createSearchMessage,
+    getMimeForUrl,
+    needsRemux,
+    toCastableLiveUrl,
+    buildDidl,
+    buildSoapEnvelope,
+    parseUpnpFault,
+    parseUpnpTime,
+    formatUpnpTime,
+    vttToSrt,
+    rewritePlaylistUris,
+} from './dlnaProtocol';
 
 const require = createRequire(import.meta.url);
 
@@ -26,21 +49,20 @@ interface DlnaDevice {
     source?: string
 }
 
-interface SsdpHeaders {
-    ST?: string
-    USN?: string
-    SERVER?: string
-    LOCATION?: string
-    st?: string
-    usn?: string
-    server?: string
-    location?: string
-}
-
 interface NativeSsdpResponse {
     headers: SsdpHeaders
     address: string
 }
+
+// Active cast session — set on successful dlna:cast, cleared on stop/new cast.
+interface CastSession {
+    deviceId: string
+    location: string
+    avTransportUrl: string
+    renderingControlUrl: string | null
+    title: string
+}
+let castSession: CastSession | null = null;
 
 const getErrorMessage = (error: unknown): string =>
     error instanceof Error ? error.message : String(error);
@@ -56,6 +78,23 @@ let proxyPort: number | null = null;
 const proxyUrls: Map<string, { url: string; createdAt: number }> = new Map();
 const PROXY_URL_TTL_MS = 60 * 60 * 1000; // 1 hour
 const PROXY_URL_MAX_ENTRIES = 5000;
+
+// token -> SRT subtitle content served at /dlna-sub/<token>.srt
+const proxySubtitles: Map<string, { srt: string; createdAt: number }> = new Map();
+// token -> upstream URL remuxed by ffmpeg at /dlna-transcode/<token>
+const transcodeUrls: Map<string, { url: string; createdAt: number }> = new Map();
+const activeTranscodes: Set<ChildProcess> = new Set();
+
+function resolveFfmpegPath(): string | null {
+    try {
+        const ffmpegPath = require('ffmpeg-static') as string | null;
+        if (!ffmpegPath) return null;
+        // Inside a packaged app the binary lives in app.asar.unpacked.
+        return ffmpegPath.replace('app.asar', 'app.asar.unpacked');
+    } catch {
+        return null;
+    }
+}
 
 function pruneProxyUrls(): void {
     const now = Date.now()
@@ -97,27 +136,6 @@ function getLocalAddressForDevice(deviceHost: string): string {
     return candidates[0]?.address || '127.0.0.1'
 }
 
-function getMimeForUrl(url: string, fallback?: string | null): string {
-    const cleanUrl = url.split('?')[0].toLowerCase()
-    if (cleanUrl.endsWith('.m3u8')) return 'application/vnd.apple.mpegurl'
-    if (cleanUrl.endsWith('.ts')) return 'video/MP2T'
-    if (cleanUrl.endsWith('.mp4')) return 'video/mp4'
-    if (cleanUrl.endsWith('.mkv')) return 'video/x-matroska'
-    if (cleanUrl.endsWith('.avi')) return 'video/x-msvideo'
-    if (cleanUrl.endsWith('.m4s')) return 'video/iso.segment'
-    if (cleanUrl.endsWith('.aac')) return 'audio/aac'
-    if (cleanUrl.endsWith('.vtt')) return 'text/vtt'
-    return fallback || 'video/mp4'
-}
-
-function toAbsoluteUrl(uri: string, baseUrl: string): string {
-    try {
-        return new URL(uri, baseUrl).toString()
-    } catch {
-        return uri
-    }
-}
-
 function createProxyUrl(upstreamUrl: string, deviceHost: string): string {
     const token = randomUUID()
     pruneProxyUrls()
@@ -126,19 +144,7 @@ function createProxyUrl(upstreamUrl: string, deviceHost: string): string {
 }
 
 function rewritePlaylist(playlist: string, baseUrl: string, deviceHost: string): string {
-    return playlist.split(/\r?\n/).map((line) => {
-        const trimmed = line.trim()
-        if (!trimmed) return line
-
-        if (trimmed.startsWith('#')) {
-            return line.replace(/URI="([^"]+)"/g, (_match, uri: string) => {
-                const absoluteUrl = toAbsoluteUrl(uri, baseUrl)
-                return `URI="${createProxyUrl(absoluteUrl, deviceHost)}"`
-            })
-        }
-
-        return createProxyUrl(toAbsoluteUrl(trimmed, baseUrl), deviceHost)
-    }).join('\n')
+    return rewritePlaylistUris(playlist, baseUrl, (absoluteUrl) => createProxyUrl(absoluteUrl, deviceHost))
 }
 
 async function fetchUpstream(url: string, range?: string) {
@@ -153,29 +159,12 @@ async function fetchUpstream(url: string, range?: string) {
     })
 }
 
-// DLNA "features" advertised both in the AVTransport protocolInfo and in the
-// HTTP responses. OP=01 (range seek), CI=0 (no conversion), FLAGS bits for
-// streaming-mode + background transfer. Samsung/LG renderers probe for these
-// (HEAD or GET with getcontentFeatures.dlna.org: 1) and refuse with UPnP 704
-// when the server doesn't answer like a DLNA media server.
-const DLNA_FEATURES = 'DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000'
-
-const AVTRANSPORT_SERVICE = 'urn:schemas-upnp-org:service:AVTransport:1'
-
-function escapeXml(value: string): string {
-    return value
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;')
-}
-
-// location (device description URL) -> resolved AVTransport control URL
+// location|serviceType -> resolved control URL
 const controlUrlCache: Map<string, string> = new Map()
 
-async function getAvTransportControlUrl(location: string): Promise<string> {
-    const cached = controlUrlCache.get(location)
+async function getServiceControlUrl(location: string, serviceType: string): Promise<string> {
+    const cacheKey = `${location}|${serviceType}`
+    const cached = controlUrlCache.get(cacheKey)
     if (cached) return cached
 
     const fetch = (await import('node-fetch')).default
@@ -185,20 +174,19 @@ async function getAvTransportControlUrl(location: string): Promise<string> {
     }
     const xml = await response.text()
 
-    // Find the <service> block for AVTransport and its <controlURL>.
     const serviceBlock = xml.split(/<service>/i)
-        .find((block) => block.includes(AVTRANSPORT_SERVICE))
+        .find((block) => block.includes(serviceType))
     const controlPath = serviceBlock ? getXmlTagValue(serviceBlock, 'controlURL') : undefined
     if (!controlPath) {
-        throw new Error('Device does not expose an AVTransport control URL')
+        throw new Error(`Device does not expose a control URL for ${serviceType}`)
     }
 
     const controlUrl = new URL(controlPath, location).toString()
-    controlUrlCache.set(location, controlUrl)
+    controlUrlCache.set(cacheKey, controlUrl)
     return controlUrl
 }
 
-// Raw SOAP caller for AVTransport actions.
+// Raw SOAP caller for UPnP service actions.
 //
 // We intentionally do NOT use upnp-mediarenderer-client / upnp-device-client:
 // 1. load() calls ConnectionManager#PrepareForConnection first, which Samsung
@@ -207,14 +195,14 @@ async function getAvTransportControlUrl(location: string): Promise<string> {
 // 2. upnp-device-client sets Content-Length to xml.length (UTF-16 code
 //    units, not bytes), so any multibyte title — e.g. CJK series names —
 //    truncates the SOAP body and the TV answers 402 "Invalid Args".
-function sendAvTransportAction(
+function sendUpnpAction(
     controlUrl: string,
+    serviceType: string,
     action: string,
     paramsXml: string,
     timeoutMs = 10000
 ): Promise<string> {
-    const envelope = `<?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:${action} xmlns:u="${AVTRANSPORT_SERVICE}">${paramsXml}</u:${action}></s:Body></s:Envelope>`
-    const body = Buffer.from(envelope, 'utf8')
+    const body = Buffer.from(buildSoapEnvelope(serviceType, action, paramsXml), 'utf8')
     const parsed = new URL(controlUrl)
 
     return new Promise((resolve, reject) => {
@@ -226,7 +214,7 @@ function sendAvTransportAction(
             timeout: timeoutMs,
             headers: {
                 'Content-Type': 'text/xml; charset="utf-8"',
-                'SOAPAction': `"${AVTRANSPORT_SERVICE}#${action}"`,
+                'SOAPAction': `"${serviceType}#${action}"`,
                 'Content-Length': body.length,
                 'User-Agent': 'NeoStream IPTV DLNA/1.0',
                 'Connection': 'close'
@@ -236,10 +224,9 @@ function sendAvTransportAction(
             response.on('data', (chunk) => chunks.push(chunk))
             response.on('end', () => {
                 const text = Buffer.concat(chunks).toString('utf8')
-                const errorCode = getXmlTagValue(text, 'errorCode')
-                const errorDescription = getXmlTagValue(text, 'errorDescription')
-                if (errorCode) {
-                    reject(new Error(`${errorDescription || 'UPnP error'} (${errorCode})`))
+                const fault = parseUpnpFault(text)
+                if (fault) {
+                    reject(new Error(`${fault.description} (${fault.code})`))
                 } else if (response.statusCode && response.statusCode >= 400) {
                     reject(new Error(`HTTP ${response.statusCode} from device for ${action}`))
                 } else {
@@ -256,6 +243,9 @@ function sendAvTransportAction(
         request.end(body)
     })
 }
+
+const sendAvTransportAction = (controlUrl: string, action: string, paramsXml: string, timeoutMs = 10000) =>
+    sendUpnpAction(controlUrl, AVTRANSPORT_SERVICE, action, paramsXml, timeoutMs)
 
 function dlnaHeaders(extra: Record<string, string | undefined>): Record<string, string> {
     const headers: Record<string, string> = {
@@ -277,6 +267,76 @@ async function ensureProxyServer(): Promise<number> {
     proxyServer = http.createServer(async (request, response) => {
         try {
             const requestUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
+
+            // Subtitle route: serve stored SRT content.
+            if (requestUrl.pathname.startsWith('/dlna-sub/')) {
+                const subToken = requestUrl.pathname.replace('/dlna-sub/', '').replace(/\.srt$/i, '')
+                const subtitle = proxySubtitles.get(subToken)
+                log.info(`[DLNA] Proxy ${request.method} subtitle token=${subToken.slice(0, 8)}… known=${Boolean(subtitle)}`)
+                if (!subtitle) {
+                    response.writeHead(404)
+                    response.end('Not found')
+                    return
+                }
+                const srtBuffer = Buffer.from(subtitle.srt, 'utf8')
+                response.writeHead(200, dlnaHeaders({
+                    'Content-Type': 'text/srt;charset=utf-8',
+                    'Content-Length': String(srtBuffer.length)
+                }))
+                response.end(request.method === 'HEAD' ? undefined : srtBuffer)
+                return
+            }
+
+            // Transcode route: remux upstream to MPEG-TS via ffmpeg.
+            if (requestUrl.pathname.startsWith('/dlna-transcode/')) {
+                const tToken = requestUrl.pathname.replace('/dlna-transcode/', '')
+                const entry = transcodeUrls.get(tToken)
+                log.info(`[DLNA] Proxy ${request.method} transcode token=${tToken.slice(0, 8)}… known=${Boolean(entry)}`)
+                if (!entry) {
+                    response.writeHead(404)
+                    response.end('Not found')
+                    return
+                }
+                response.writeHead(200, dlnaHeaders({ 'Content-Type': 'video/MP2T' }))
+                if (request.method === 'HEAD') {
+                    response.end()
+                    return
+                }
+
+                const ffmpegPath = resolveFfmpegPath()
+                if (!ffmpegPath) {
+                    response.destroy()
+                    return
+                }
+                // Remux only (-c copy): container conversion without re-encoding,
+                // cheap enough for any machine. The TV gets a TS stream it can
+                // play regardless of the source container (MKV/AVI).
+                const ffmpeg = spawn(ffmpegPath, [
+                    '-hide_banner', '-loglevel', 'error',
+                    '-user_agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    '-i', entry.url,
+                    '-c', 'copy',
+                    '-f', 'mpegts',
+                    'pipe:1'
+                ], { stdio: ['ignore', 'pipe', 'pipe'] })
+                activeTranscodes.add(ffmpeg)
+
+                ffmpeg.stdout.pipe(response)
+                ffmpeg.stderr.on('data', (chunk: Buffer) => {
+                    log.warn('[DLNA] ffmpeg:', chunk.toString().trim())
+                })
+                const cleanup = () => {
+                    activeTranscodes.delete(ffmpeg)
+                    try { ffmpeg.kill('SIGKILL') } catch { /* already dead */ }
+                }
+                response.on('close', cleanup)
+                ffmpeg.on('exit', () => {
+                    activeTranscodes.delete(ffmpeg)
+                    response.end()
+                })
+                return
+            }
+
             const token = requestUrl.pathname.replace('/dlna-proxy/', '')
             const upstreamUrl = proxyUrls.get(token)?.url
             log.info(`[DLNA] Proxy ${request.method} token=${token.slice(0, 8)}… range=${request.headers.range || '-'} known=${Boolean(upstreamUrl)}`)
@@ -403,11 +463,6 @@ function saveDevices(): void {
     }
 }
 
-function getHeader(headers: SsdpHeaders, key: 'ST' | 'USN' | 'SERVER' | 'LOCATION'): string | undefined {
-    const lowerKey = key.toLowerCase() as keyof SsdpHeaders
-    return headers[key] || headers[lowerKey]
-}
-
 function normalizeHost(host: string): string {
     return host.replace(/^\[|\]$/g, '').toLowerCase()
 }
@@ -435,44 +490,6 @@ function getPortFromLocation(location?: string): number | undefined {
     } catch {
         return undefined
     }
-}
-
-function getXmlTagValue(xml: string, tag: string): string | undefined {
-    const match = xml.match(new RegExp(`<${tag}[^>]*>([^<]+)</${tag}>`, 'i'))
-    return match?.[1]?.trim()
-}
-
-function looksLikeMediaRenderer(headers: SsdpHeaders): boolean {
-    const target = `${getHeader(headers, 'ST') || ''} ${getHeader(headers, 'USN') || ''}`.toLowerCase()
-    return target.includes('mediarenderer') || target.includes('avtransport') || target.includes('renderingcontrol')
-}
-
-function parseSsdpMessage(message: string): SsdpHeaders {
-    return message.split(/\r?\n/).reduce<SsdpHeaders>((headers, line) => {
-        const separatorIndex = line.indexOf(':')
-        if (separatorIndex <= 0) return headers
-
-        const key = line.slice(0, separatorIndex).trim().toUpperCase()
-        const value = line.slice(separatorIndex + 1).trim()
-
-        if (key === 'ST' || key === 'USN' || key === 'SERVER' || key === 'LOCATION') {
-            headers[key] = value
-        }
-
-        return headers
-    }, {})
-}
-
-function createSearchMessage(target: string): string {
-    return [
-        'M-SEARCH * HTTP/1.1',
-        'HOST: 239.255.255.250:1900',
-        'MAN: "ssdp:discover"',
-        'MX: 3',
-        `ST: ${target}`,
-        '',
-        ''
-    ].join('\r\n')
 }
 
 function localIPv4Addresses(): string[] {
@@ -828,9 +845,9 @@ export function setupDLNAHandlers() {
     });
 
     // Cast media to DLNA device
-    ipcMain.handle('dlna:cast', async (_, { deviceId, url, title }) => {
+    ipcMain.handle('dlna:cast', async (_, { deviceId, url, title, subtitleVtt }) => {
         try {
-            log.info('[DLNA] Cast requested:', { deviceId, title });
+            log.info('[DLNA] Cast requested:', { deviceId, title, hasSubtitle: Boolean(subtitleVtt) });
 
             // Find device (from manual or discovered)
             let device = manualDevices.find(d => d.id === deviceId);
@@ -845,15 +862,15 @@ export function setupDLNAHandlers() {
             const location = device.location || `http://${device.host}:${device.port || 9197}/dmr`;
             log.info('[DLNA] Connecting to:', location);
 
-            const controlUrl = await getAvTransportControlUrl(location);
+            const avTransportUrl = await getServiceControlUrl(location, AVTRANSPORT_SERVICE);
+            const renderingControlUrl = await getServiceControlUrl(location, RENDERING_CONTROL_SERVICE)
+                .catch(() => null);
 
             // Samsung's DLNA player does not decode HLS playlists ("file not
-            // supported" on the TV OSD). Xtream panels expose the same live
-            // channel as a continuous MPEG-TS stream at the .ts variant of the
-            // URL, which DLNA renderers play fine — prefer it for casting.
-            let streamUrl = url;
-            if (/\/live\//i.test(url) && /\.m3u8(\?|$)/i.test(url)) {
-                streamUrl = url.replace(/\.m3u8(\?|$)/i, '.ts$1');
+            // supported" on the TV OSD); Xtream live channels are cast as
+            // their continuous MPEG-TS variant instead.
+            const streamUrl = toCastableLiveUrl(url);
+            if (streamUrl !== url) {
                 log.info(`[DLNA] Live HLS detected; casting MPEG-TS variant instead: ${streamUrl}`);
             }
 
@@ -861,27 +878,45 @@ export function setupDLNAHandlers() {
             // providers often reject the TV's direct request (single-connection
             // limits, User-Agent checks, self-signed HTTPS) and the TV then
             // reports UPnP 704 ("format not supported" / "local restrictions").
-            // Through the proxy the TV fetches from this machine, which talks
-            // to the provider with the app's HTTPS agent and headers.
+            // MKV/AVI containers additionally go through an ffmpeg remux to
+            // MPEG-TS, which renderers play regardless of source container.
             const isRemoteHttp = /^https?:\/\//i.test(streamUrl)
             if (isRemoteHttp) {
                 await ensureProxyServer()
             }
-            const castUrl = isRemoteHttp
-                ? createProxyUrl(streamUrl, device.host)
-                : streamUrl
+
+            const useTranscode = isRemoteHttp && needsRemux(streamUrl) && resolveFfmpegPath() !== null;
+            let castUrl = streamUrl;
+            let effectiveMime = getMimeForUrl(streamUrl);
+            if (useTranscode) {
+                const tToken = randomUUID();
+                transcodeUrls.set(tToken, { url: streamUrl, createdAt: Date.now() });
+                castUrl = `http://${getLocalAddressForDevice(device.host)}:${proxyPort}/dlna-transcode/${tToken}`;
+                effectiveMime = 'video/MP2T';
+                log.info(`[DLNA] ${streamUrl.split('?')[0].slice(-12)} container needs remux; casting via ffmpeg MPEG-TS`);
+            } else if (isRemoteHttp) {
+                castUrl = createProxyUrl(streamUrl, device.host);
+            }
+
+            // Subtitle: store SRT (converted from the renderer's VTT) and
+            // reference it in the DIDL via Samsung's sec:CaptionInfoEx.
+            let subtitleUrl: string | undefined;
+            if (typeof subtitleVtt === 'string' && subtitleVtt.trim() && isRemoteHttp) {
+                const subToken = randomUUID();
+                proxySubtitles.set(subToken, { srt: vttToSrt(subtitleVtt), createdAt: Date.now() });
+                subtitleUrl = `http://${getLocalAddressForDevice(device.host)}:${proxyPort}/dlna-sub/${subToken}.srt`;
+                log.info('[DLNA] Subtitle attached to cast');
+            }
 
             const tryLoad = async (mime: string) => {
-                const protocolInfo = `http-get:*:${mime}:${DLNA_FEATURES}`;
-                const didl = `<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:sec="http://www.sec.co.kr/"><item id="0" parentID="-1" restricted="false"><upnp:class>object.item.videoItem.movie</upnp:class><dc:title>${escapeXml(title || 'Video')}</dc:title><res protocolInfo="${protocolInfo}">${escapeXml(castUrl)}</res></item></DIDL-Lite>`;
-
+                const didl = buildDidl({ title: title || 'Video', mediaUrl: castUrl, mime, subtitleUrl });
                 log.info(`[DLNA] tryLoad mime=${mime} castUrl=${castUrl} title=${JSON.stringify(title)}`);
 
                 try {
-                    await sendAvTransportAction(controlUrl, 'SetAVTransportURI',
+                    await sendAvTransportAction(avTransportUrl, 'SetAVTransportURI',
                         `<InstanceID>0</InstanceID><CurrentURI>${escapeXml(castUrl)}</CurrentURI><CurrentURIMetaData>${escapeXml(didl)}</CurrentURIMetaData>`);
                     try {
-                        await sendAvTransportAction(controlUrl, 'Play',
+                        await sendAvTransportAction(avTransportUrl, 'Play',
                             '<InstanceID>0</InstanceID><Speed>1</Speed>');
                     } catch (playError) {
                         // Samsung renderers auto-play on SetAVTransportURI; an
@@ -892,7 +927,7 @@ export function setupDLNAHandlers() {
                         if (!/\b701\b/.test(getErrorMessage(playError))) throw playError;
                         log.warn('[DLNA] Play returned 701; checking transport state...');
                         await new Promise(resolve => setTimeout(resolve, 1500));
-                        const info = await sendAvTransportAction(controlUrl, 'GetTransportInfo',
+                        const info = await sendAvTransportAction(avTransportUrl, 'GetTransportInfo',
                             '<InstanceID>0</InstanceID>');
                         const state = getXmlTagValue(info, 'CurrentTransportState') || '';
                         log.info(`[DLNA] Transport state after 701: ${state}`);
@@ -905,20 +940,27 @@ export function setupDLNAHandlers() {
                 }
             };
 
-            const primaryMime = getMimeForUrl(streamUrl);
             try {
-                await tryLoad(primaryMime);
+                await tryLoad(effectiveMime);
             } catch (firstError) {
                 // Picky renderers refuse container-specific mimes (x-matroska
                 // etc.) but accept a generic video/mp4 and sniff the stream.
                 const message = getErrorMessage(firstError);
-                if (primaryMime !== 'video/mp4' && /\b704\b|restrict|format/i.test(message)) {
-                    log.warn(`[DLNA] ${primaryMime} refused (${message}); retrying as video/mp4`);
+                if (effectiveMime !== 'video/mp4' && /\b704\b|restrict|format/i.test(message)) {
+                    log.warn(`[DLNA] ${effectiveMime} refused (${message}); retrying as video/mp4`);
                     await tryLoad('video/mp4');
                 } else {
                     throw firstError;
                 }
             }
+
+            castSession = {
+                deviceId,
+                location,
+                avTransportUrl,
+                renderingControlUrl,
+                title: title || 'Video'
+            };
 
             return { success: true };
         } catch (error: unknown) {
@@ -951,8 +993,14 @@ export function setupDLNAHandlers() {
             }
 
             const location = device.location || `http://${device.host}:${device.port || 9197}/dmr`;
-            const controlUrl = await getAvTransportControlUrl(location);
+            const controlUrl = await getServiceControlUrl(location, AVTRANSPORT_SERVICE);
             await sendAvTransportAction(controlUrl, 'Stop', '<InstanceID>0</InstanceID>');
+
+            castSession = null;
+            for (const ffmpeg of activeTranscodes) {
+                try { ffmpeg.kill('SIGKILL') } catch { /* already dead */ }
+            }
+            activeTranscodes.clear();
 
             return { success: true };
         } catch (error: unknown) {
@@ -961,6 +1009,92 @@ export function setupDLNAHandlers() {
                 success: false,
                 error: getErrorMessage(error)
             };
+        }
+    });
+
+    // ===== Cast remote-control: pause / resume / seek / volume / status =====
+
+    const requireSession = (): CastSession => {
+        if (!castSession) throw new Error('No active cast session');
+        return castSession;
+    };
+
+    ipcMain.handle('dlna:pause', async () => {
+        try {
+            const session = requireSession();
+            await sendAvTransportAction(session.avTransportUrl, 'Pause', '<InstanceID>0</InstanceID>');
+            return { success: true };
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) };
+        }
+    });
+
+    ipcMain.handle('dlna:resume', async () => {
+        try {
+            const session = requireSession();
+            await sendAvTransportAction(session.avTransportUrl, 'Play', '<InstanceID>0</InstanceID><Speed>1</Speed>');
+            return { success: true };
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) };
+        }
+    });
+
+    ipcMain.handle('dlna:seek', async (_, { seconds }) => {
+        try {
+            const session = requireSession();
+            const target = formatUpnpTime(Number(seconds) || 0);
+            await sendAvTransportAction(session.avTransportUrl, 'Seek',
+                `<InstanceID>0</InstanceID><Unit>REL_TIME</Unit><Target>${target}</Target>`);
+            return { success: true };
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) };
+        }
+    });
+
+    ipcMain.handle('dlna:set-volume', async (_, { volume }) => {
+        try {
+            const session = requireSession();
+            if (!session.renderingControlUrl) throw new Error('Device does not expose RenderingControl');
+            const level = Math.max(0, Math.min(100, Math.round(Number(volume) || 0)));
+            await sendUpnpAction(session.renderingControlUrl, RENDERING_CONTROL_SERVICE, 'SetVolume',
+                `<InstanceID>0</InstanceID><Channel>Master</Channel><DesiredVolume>${level}</DesiredVolume>`);
+            return { success: true };
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) };
+        }
+    });
+
+    ipcMain.handle('dlna:get-status', async () => {
+        try {
+            const session = requireSession();
+            const [transportInfo, positionInfo] = await Promise.all([
+                sendAvTransportAction(session.avTransportUrl, 'GetTransportInfo', '<InstanceID>0</InstanceID>', 5000),
+                sendAvTransportAction(session.avTransportUrl, 'GetPositionInfo', '<InstanceID>0</InstanceID>', 5000)
+            ]);
+
+            let volume: number | null = null;
+            if (session.renderingControlUrl) {
+                try {
+                    const volumeInfo = await sendUpnpAction(session.renderingControlUrl, RENDERING_CONTROL_SERVICE,
+                        'GetVolume', '<InstanceID>0</InstanceID><Channel>Master</Channel>', 5000);
+                    const parsed = Number(getXmlTagValue(volumeInfo, 'CurrentVolume'));
+                    volume = Number.isFinite(parsed) ? parsed : null;
+                } catch {
+                    // Volume is best-effort; some renderers refuse GetVolume.
+                }
+            }
+
+            return {
+                success: true,
+                deviceId: session.deviceId,
+                title: session.title,
+                state: getXmlTagValue(transportInfo, 'CurrentTransportState') || 'UNKNOWN',
+                position: parseUpnpTime(getXmlTagValue(positionInfo, 'RelTime')),
+                duration: parseUpnpTime(getXmlTagValue(positionInfo, 'TrackDuration')),
+                volume
+            };
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) };
         }
     });
 
