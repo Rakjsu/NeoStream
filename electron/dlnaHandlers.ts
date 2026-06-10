@@ -8,6 +8,7 @@ import http from 'http';
 import os from 'os';
 import { randomUUID } from 'crypto';
 import { getProviderHttpsAgent } from './certificatePolicy';
+import log from './logger';
 
 const require = createRequire(import.meta.url);
 
@@ -36,33 +37,17 @@ interface SsdpHeaders {
     location?: string
 }
 
-interface SsdpPeer {
-    on(event: 'found', callback: (headers: SsdpHeaders, address: string) => void): void
-    search(target: string): void
-}
-
 interface NativeSsdpResponse {
     headers: SsdpHeaders
     address: string
 }
 
-interface MediaRendererClientInstance {
-    on(event: 'error', callback: (error: Error) => void): void
-    load(url: string, options: unknown, callback: (error?: Error | null) => void): void
-    stop(callback: (error?: Error | null) => void): void
-}
-
-type MediaRendererClientConstructor = new (location: string) => MediaRendererClientInstance;
-
 const getErrorMessage = (error: unknown): string =>
     error instanceof Error ? error.message : String(error);
 
-let MediaRendererClient: MediaRendererClientConstructor | null = null;
-let ssdp: SsdpPeer | null = null;
 const discoveredDevices: Map<string, DlnaDevice> = new Map();
 let manualDevices: DlnaDevice[] = [];
 let isDiscovering = false;
-let ssdpListenerRegistered = false;
 let proxyServer: http.Server | null = null;
 let proxyPort: number | null = null;
 // token -> upstream URL, with creation time so stale entries can be pruned.
@@ -175,13 +160,115 @@ async function fetchUpstream(url: string, range?: string) {
 // when the server doesn't answer like a DLNA media server.
 const DLNA_FEATURES = 'DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000'
 
-function dlnaHeaders(extra: Record<string, string | undefined>): Record<string, string | undefined> {
-    return {
+const AVTRANSPORT_SERVICE = 'urn:schemas-upnp-org:service:AVTransport:1'
+
+function escapeXml(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;')
+}
+
+// location (device description URL) -> resolved AVTransport control URL
+const controlUrlCache: Map<string, string> = new Map()
+
+async function getAvTransportControlUrl(location: string): Promise<string> {
+    const cached = controlUrlCache.get(location)
+    if (cached) return cached
+
+    const fetch = (await import('node-fetch')).default
+    const response = await fetch(location, { headers: { 'User-Agent': 'NeoStream IPTV DLNA/1.0' } })
+    if (!response.ok) {
+        throw new Error(`Device description unavailable (HTTP ${response.status})`)
+    }
+    const xml = await response.text()
+
+    // Find the <service> block for AVTransport and its <controlURL>.
+    const serviceBlock = xml.split(/<service>/i)
+        .find((block) => block.includes(AVTRANSPORT_SERVICE))
+    const controlPath = serviceBlock ? getXmlTagValue(serviceBlock, 'controlURL') : undefined
+    if (!controlPath) {
+        throw new Error('Device does not expose an AVTransport control URL')
+    }
+
+    const controlUrl = new URL(controlPath, location).toString()
+    controlUrlCache.set(location, controlUrl)
+    return controlUrl
+}
+
+// Raw SOAP caller for AVTransport actions.
+//
+// We intentionally do NOT use upnp-mediarenderer-client / upnp-device-client:
+// 1. load() calls ConnectionManager#PrepareForConnection first, which Samsung
+//    TVs advertise but refuse with UPnP 704 "Local restrictions", killing the
+//    cast before SetAVTransportURI even runs.
+// 2. upnp-device-client sets Content-Length to xml.length (UTF-16 code
+//    units, not bytes), so any multibyte title — e.g. CJK series names —
+//    truncates the SOAP body and the TV answers 402 "Invalid Args".
+function sendAvTransportAction(
+    controlUrl: string,
+    action: string,
+    paramsXml: string,
+    timeoutMs = 10000
+): Promise<string> {
+    const envelope = `<?xml version="1.0" encoding="utf-8"?><s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"><s:Body><u:${action} xmlns:u="${AVTRANSPORT_SERVICE}">${paramsXml}</u:${action}></s:Body></s:Envelope>`
+    const body = Buffer.from(envelope, 'utf8')
+    const parsed = new URL(controlUrl)
+
+    return new Promise((resolve, reject) => {
+        const request = http.request({
+            hostname: parsed.hostname,
+            port: parsed.port || 80,
+            path: parsed.pathname + parsed.search,
+            method: 'POST',
+            timeout: timeoutMs,
+            headers: {
+                'Content-Type': 'text/xml; charset="utf-8"',
+                'SOAPAction': `"${AVTRANSPORT_SERVICE}#${action}"`,
+                'Content-Length': body.length,
+                'User-Agent': 'NeoStream IPTV DLNA/1.0',
+                'Connection': 'close'
+            }
+        }, (response) => {
+            const chunks: Buffer[] = []
+            response.on('data', (chunk) => chunks.push(chunk))
+            response.on('end', () => {
+                const text = Buffer.concat(chunks).toString('utf8')
+                const errorCode = getXmlTagValue(text, 'errorCode')
+                const errorDescription = getXmlTagValue(text, 'errorDescription')
+                if (errorCode) {
+                    reject(new Error(`${errorDescription || 'UPnP error'} (${errorCode})`))
+                } else if (response.statusCode && response.statusCode >= 400) {
+                    reject(new Error(`HTTP ${response.statusCode} from device for ${action}`))
+                } else {
+                    resolve(text)
+                }
+            })
+        })
+
+        request.on('error', reject)
+        request.on('timeout', () => {
+            request.destroy()
+            reject(new Error('Connection timeout - Check if TV is on and DLNA is enabled'))
+        })
+        request.end(body)
+    })
+}
+
+function dlnaHeaders(extra: Record<string, string | undefined>): Record<string, string> {
+    const headers: Record<string, string> = {
         'transferMode.dlna.org': 'Streaming',
         'contentFeatures.dlna.org': DLNA_FEATURES,
-        'Access-Control-Allow-Origin': '*',
-        ...extra
+        'Access-Control-Allow-Origin': '*'
     }
+    // Drop undefined values — writeHead throws on them (live TS streams have
+    // no Content-Length, for example).
+    for (const [key, value] of Object.entries(extra)) {
+        if (value !== undefined) headers[key] = value
+    }
+    return headers
 }
 
 async function ensureProxyServer(): Promise<number> {
@@ -192,7 +279,7 @@ async function ensureProxyServer(): Promise<number> {
             const requestUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
             const token = requestUrl.pathname.replace('/dlna-proxy/', '')
             const upstreamUrl = proxyUrls.get(token)?.url
-            console.log(`[DLNA] Proxy ${request.method} token=${token.slice(0, 8)}… range=${request.headers.range || '-'} known=${Boolean(upstreamUrl)}`)
+            log.info(`[DLNA] Proxy ${request.method} token=${token.slice(0, 8)}… range=${request.headers.range || '-'} known=${Boolean(upstreamUrl)}`)
 
             if (!upstreamUrl) {
                 response.writeHead(404)
@@ -247,7 +334,7 @@ async function ensureProxyServer(): Promise<number> {
                 // If the upstream stream dies mid-transfer the headers are already
                 // sent — just tear the socket down instead of writeHead-ing again.
                 upstreamResponse.body.on('error', (error: Error) => {
-                    console.warn('[DLNA] Proxy upstream stream error:', error.message)
+                    log.warn('[DLNA] Proxy upstream stream error:', error.message)
                     response.destroy()
                 })
                 response.on('close', () => {
@@ -276,27 +363,11 @@ async function ensureProxyServer(): Promise<number> {
     const address = proxyServer.address()
     if (typeof address === 'object' && address?.port) {
         proxyPort = address.port
-        console.log('[DLNA] Local media proxy started on port', proxyPort)
+        log.info('[DLNA] Local media proxy started on port', proxyPort)
         return proxyPort
     }
 
     throw new Error('Failed to start DLNA media proxy')
-}
-
-// Initialize dependencies
-try {
-    MediaRendererClient = require('upnp-mediarenderer-client') as MediaRendererClientConstructor;
-    console.log('[DLNA] upnp-mediarenderer-client loaded successfully');
-} catch (error) {
-    console.error('[DLNA] Failed to load upnp-mediarenderer-client:', error);
-}
-
-try {
-    const SSDP = require('peer-ssdp').Peer as new () => SsdpPeer;
-    ssdp = new SSDP();
-    console.log('[DLNA] SSDP peer loaded successfully');
-} catch (error) {
-    console.error('[DLNA] Failed to load SSDP:', error);
 }
 
 // Load saved devices from disk
@@ -310,10 +381,10 @@ function loadSavedDevices(): void {
         if (fs.existsSync(savePath)) {
             const data = fs.readFileSync(savePath, 'utf8');
             manualDevices = JSON.parse(data);
-            console.log('[DLNA] Loaded', manualDevices.length, 'saved devices');
+            log.info('[DLNA] Loaded', manualDevices.length, 'saved devices');
         }
     } catch (error) {
-        console.error('[DLNA] Error loading saved devices:', error);
+        log.error('[DLNA] Error loading saved devices:', error);
     }
 }
 
@@ -326,9 +397,9 @@ function saveDevices(): void {
         const savePath = path.join(app.getPath('userData'), 'dlna-devices.json');
 
         fs.writeFileSync(savePath, JSON.stringify(manualDevices, null, 2));
-        console.log('[DLNA] Saved', manualDevices.length, 'devices');
+        log.info('[DLNA] Saved', manualDevices.length, 'devices');
     } catch (error) {
-        console.error('[DLNA] Error saving devices:', error);
+        log.error('[DLNA] Error saving devices:', error);
     }
 }
 
@@ -404,24 +475,37 @@ function createSearchMessage(target: string): string {
     ].join('\r\n')
 }
 
+function localIPv4Addresses(): string[] {
+    return Object.values(os.networkInterfaces())
+        .flat()
+        .filter((address): address is os.NetworkInterfaceInfo =>
+            Boolean(address) && address.family === 'IPv4' && !address.internal
+        )
+        .map((address) => address.address)
+}
+
 async function nativeSsdpSearch(targets: string[], timeoutMs = 5000): Promise<NativeSsdpResponse[]> {
     return new Promise((resolve) => {
-        const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true })
         const responses = new Map<string, NativeSsdpResponse>()
+        const sockets: dgram.Socket[] = []
+        const timers: NodeJS.Timeout[] = []
         let settled = false
 
         const finish = () => {
             if (settled) return
             settled = true
-            try {
-                socket.close()
-            } catch {
-                // Socket may already be closed.
+            timers.forEach(clearTimeout)
+            for (const socket of sockets) {
+                try {
+                    socket.close()
+                } catch {
+                    // Socket may already be closed.
+                }
             }
             resolve(Array.from(responses.values()))
         }
 
-        socket.on('message', (buffer, remote) => {
+        const onMessage = (buffer: Buffer, remote: dgram.RemoteInfo) => {
             const headers = parseSsdpMessage(buffer.toString('utf8'))
             if (!looksLikeMediaRenderer(headers)) return
 
@@ -432,27 +516,48 @@ async function nativeSsdpSearch(targets: string[], timeoutMs = 5000): Promise<Na
                 headers,
                 address: remote.address
             })
-        })
+        }
 
-        socket.on('error', (error) => {
-            console.warn('[DLNA] Native SSDP error:', getErrorMessage(error))
-            finish()
-        })
+        // One socket per local IPv4 interface: on multi-homed machines
+        // (VPN/virtual adapters) a single 0.0.0.0 socket multicasts out the
+        // default-route interface, which is often not the LAN where the TV is.
+        const localAddresses = localIPv4Addresses()
+        const bindAddresses = localAddresses.length > 0 ? localAddresses : ['0.0.0.0']
 
-        socket.bind(0, '0.0.0.0', () => {
-            try {
-                socket.setBroadcast(true)
-                socket.setMulticastTTL(4)
-            } catch {
-                // Some network adapters do not allow multicast options.
-            }
+        for (const localAddress of bindAddresses) {
+            const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true })
+            sockets.push(socket)
 
-            for (const target of targets) {
-                const message = Buffer.from(createSearchMessage(target))
-                socket.send(message, 0, message.length, 1900, '239.255.255.250')
-                socket.send(message, 0, message.length, 1900, '255.255.255.255')
-            }
-        })
+            socket.on('message', onMessage)
+            socket.on('error', (error) => {
+                log.warn(`[DLNA] Native SSDP error on ${localAddress}:`, getErrorMessage(error))
+            })
+
+            socket.bind(0, localAddress, () => {
+                try {
+                    socket.setBroadcast(true)
+                    socket.setMulticastTTL(4)
+                    if (localAddress !== '0.0.0.0') socket.setMulticastInterface(localAddress)
+                } catch {
+                    // Some network adapters do not allow multicast options.
+                }
+
+                // SSDP is lossy UDP — devices routinely miss a single M-SEARCH.
+                // Re-send each target a few times across the search window.
+                const sendAll = () => {
+                    if (settled) return
+                    for (const target of targets) {
+                        const message = Buffer.from(createSearchMessage(target))
+                        socket.send(message, 0, message.length, 1900, '239.255.255.250')
+                        socket.send(message, 0, message.length, 1900, '255.255.255.255')
+                    }
+                }
+
+                sendAll()
+                timers.push(setTimeout(sendAll, 700))
+                timers.push(setTimeout(sendAll, 1800))
+            })
+        }
 
         setTimeout(finish, timeoutMs)
     })
@@ -584,66 +689,46 @@ async function resolveManualLocation(ip: string, port?: number): Promise<{ locat
     }
 }
 
-// Discover DLNA devices using SSDP
+// Discover DLNA devices via native SSDP M-SEARCH (dgram).
+// peer-ssdp was removed: it exports createPeer(), not Peer, so the previous
+// `new SSDP()` threw on load and a guard then skipped discovery entirely —
+// the search button returned an empty list instantly.
 async function discoverDevices(): Promise<DlnaDevice[]> {
-    return new Promise((resolve) => {
-        if (!ssdp || isDiscovering) {
-            resolve(Array.from(discoveredDevices.values()));
-            return;
-        }
+    if (isDiscovering) {
+        return Array.from(discoveredDevices.values());
+    }
 
-        isDiscovering = true;
-        discoveredDevices.clear();
+    isDiscovering = true;
+    discoveredDevices.clear();
 
-        try {
-            const searchTargets = [
-                'urn:schemas-upnp-org:device:MediaRenderer:1',
-                'urn:schemas-upnp-org:service:AVTransport:1',
-                'urn:schemas-upnp-org:service:RenderingControl:1',
-                'ssdp:all'
-            ]
+    try {
+        const searchTargets = [
+            'urn:schemas-upnp-org:device:MediaRenderer:1',
+            'urn:schemas-upnp-org:service:AVTransport:1',
+            'urn:schemas-upnp-org:service:RenderingControl:1',
+            'ssdp:all'
+        ]
 
-            if (!ssdpListenerRegistered) {
-                ssdp.on('found', (headers, address) => {
-                    if (!looksLikeMediaRenderer(headers)) return
+        const responses = await nativeSsdpSearch(searchTargets)
+        responses.forEach(({ headers, address }) => {
+            if (!looksLikeMediaRenderer(headers)) return
+            const device = createDiscoveredDevice(headers, address)
+            upsertDiscoveredDevice(device)
+            log.info('[DLNA] SSDP found device:', device.name, 'at', device.host)
+        })
 
-                    const server = getHeader(headers, 'SERVER')
-                    const device = createDiscoveredDevice(headers, address)
+        await Promise.all(Array.from(discoveredDevices.values()).map((device) =>
+            enrichDeviceFromDescription(device).then(upsertDiscoveredDevice)
+        ))
 
-                    upsertDiscoveredDevice(device)
-                    void enrichDeviceFromDescription(device, server).then(upsertDiscoveredDevice)
-                    console.log('[DLNA] Found device:', device.name, 'at', device.host);
-                });
-                ssdpListenerRegistered = true
-            }
-
-            searchTargets.forEach((target) => ssdp?.search(target));
-
-            void nativeSsdpSearch(searchTargets).then((responses) => {
-                responses.forEach(({ headers, address }) => {
-                    const server = getHeader(headers, 'SERVER')
-                    const device = createDiscoveredDevice(headers, address)
-                    upsertDiscoveredDevice(device)
-                    void enrichDeviceFromDescription(device, server).then(upsertDiscoveredDevice)
-                    console.log('[DLNA] Native SSDP found device:', device.name, 'at', device.host)
-                })
-            })
-
-            // Stop discovery after 5 seconds
-            setTimeout(async () => {
-                await Promise.all(Array.from(discoveredDevices.values()).map((device) =>
-                    enrichDeviceFromDescription(device).then(upsertDiscoveredDevice)
-                ))
-                isDiscovering = false;
-                console.log('[DLNA] Discovery complete. Found', discoveredDevices.size, 'devices');
-                resolve(Array.from(discoveredDevices.values()));
-            }, 7000);
-        } catch (error) {
-            console.error('[DLNA] Discovery error:', error);
-            isDiscovering = false;
-            resolve([]);
-        }
-    });
+        log.info('[DLNA] Discovery complete. Found', discoveredDevices.size, 'devices');
+        return Array.from(discoveredDevices.values());
+    } catch (error) {
+        log.error('[DLNA] Discovery error:', error);
+        return [];
+    } finally {
+        isDiscovering = false;
+    }
 }
 
 export function setupDLNAHandlers() {
@@ -653,7 +738,7 @@ export function setupDLNAHandlers() {
     // Discover devices
     ipcMain.handle('dlna:discover', async () => {
         try {
-            console.log('[DLNA] Starting device discovery...');
+            log.info('[DLNA] Starting device discovery...');
             const discovered = await discoverDevices();
 
             // Combine discovered and manual devices
@@ -667,7 +752,7 @@ export function setupDLNAHandlers() {
                 devices: allDevices
             };
         } catch (error: unknown) {
-            console.error('[DLNA] Discover error:', error);
+            log.error('[DLNA] Discover error:', error);
             return {
                 success: false,
                 error: getErrorMessage(error),
@@ -692,7 +777,7 @@ export function setupDLNAHandlers() {
     // Add manual device
     ipcMain.handle('dlna:add-device', async (_, { name, ip, port }) => {
         try {
-            console.log('[DLNA] Adding manual device:', { name, ip, port });
+            log.info('[DLNA] Adding manual device:', { name, ip, port });
             const resolved = await resolveManualLocation(ip, port)
 
             const device = {
@@ -723,7 +808,7 @@ export function setupDLNAHandlers() {
                 }
             };
         } catch (error: unknown) {
-            console.error('[DLNA] Add device error:', error);
+            log.error('[DLNA] Add device error:', error);
             return {
                 success: false,
                 error: getErrorMessage(error)
@@ -745,11 +830,7 @@ export function setupDLNAHandlers() {
     // Cast media to DLNA device
     ipcMain.handle('dlna:cast', async (_, { deviceId, url, title }) => {
         try {
-            console.log('[DLNA] Cast requested:', { deviceId, title });
-
-            if (!MediaRendererClient) {
-                throw new Error('DLNA client not available');
-            }
+            log.info('[DLNA] Cast requested:', { deviceId, title });
 
             // Find device (from manual or discovered)
             let device = manualDevices.find(d => d.id === deviceId);
@@ -762,9 +843,19 @@ export function setupDLNAHandlers() {
             }
 
             const location = device.location || `http://${device.host}:${device.port || 9197}/dmr`;
-            console.log('[DLNA] Connecting to:', location);
+            log.info('[DLNA] Connecting to:', location);
 
-            const client = new MediaRendererClient(location);
+            const controlUrl = await getAvTransportControlUrl(location);
+
+            // Samsung's DLNA player does not decode HLS playlists ("file not
+            // supported" on the TV OSD). Xtream panels expose the same live
+            // channel as a continuous MPEG-TS stream at the .ts variant of the
+            // URL, which DLNA renderers play fine — prefer it for casting.
+            let streamUrl = url;
+            if (/\/live\//i.test(url) && /\.m3u8(\?|$)/i.test(url)) {
+                streamUrl = url.replace(/\.m3u8(\?|$)/i, '.ts$1');
+                log.info(`[DLNA] Live HLS detected; casting MPEG-TS variant instead: ${streamUrl}`);
+            }
 
             // Always route remote streams through the local proxy. IPTV
             // providers often reject the TV's direct request (single-connection
@@ -772,48 +863,49 @@ export function setupDLNAHandlers() {
             // reports UPnP 704 ("format not supported" / "local restrictions").
             // Through the proxy the TV fetches from this machine, which talks
             // to the provider with the app's HTTPS agent and headers.
-            const isRemoteHttp = /^https?:\/\//i.test(url)
+            const isRemoteHttp = /^https?:\/\//i.test(streamUrl)
             if (isRemoteHttp) {
                 await ensureProxyServer()
             }
             const castUrl = isRemoteHttp
-                ? createProxyUrl(url, device.host)
-                : url
+                ? createProxyUrl(streamUrl, device.host)
+                : streamUrl
 
-            const tryLoad = (mime: string) => new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    reject(new Error('Connection timeout - Check if TV is on and DLNA is enabled'));
-                }, 10000);
+            const tryLoad = async (mime: string) => {
+                const protocolInfo = `http-get:*:${mime}:${DLNA_FEATURES}`;
+                const didl = `<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/" xmlns:sec="http://www.sec.co.kr/"><item id="0" parentID="-1" restricted="false"><upnp:class>object.item.videoItem.movie</upnp:class><dc:title>${escapeXml(title || 'Video')}</dc:title><res protocolInfo="${protocolInfo}">${escapeXml(castUrl)}</res></item></DIDL-Lite>`;
 
-                client.on('error', (err) => {
-                    clearTimeout(timeout);
-                    reject(err);
-                });
+                log.info(`[DLNA] tryLoad mime=${mime} castUrl=${castUrl} title=${JSON.stringify(title)}`);
 
-                client.load(castUrl, {
-                    autoplay: true,
-                    contentType: mime,
-                    // Without explicit DLNA.ORG_* features in protocolInfo many
-                    // renderers (Samsung/LG) reject SetAVTransportURI with 704.
-                    dlnaFeatures: DLNA_FEATURES,
-                    metadata: {
-                        title: title || 'Video',
-                        type: 'video',
-                        creator: 'NeoStream IPTV'
+                try {
+                    await sendAvTransportAction(controlUrl, 'SetAVTransportURI',
+                        `<InstanceID>0</InstanceID><CurrentURI>${escapeXml(castUrl)}</CurrentURI><CurrentURIMetaData>${escapeXml(didl)}</CurrentURIMetaData>`);
+                    try {
+                        await sendAvTransportAction(controlUrl, 'Play',
+                            '<InstanceID>0</InstanceID><Speed>1</Speed>');
+                    } catch (playError) {
+                        // Samsung renderers auto-play on SetAVTransportURI; an
+                        // explicit Play that lands while TRANSITIONING returns
+                        // 701 "Transition not available" even though playback
+                        // is starting. Check the real transport state before
+                        // declaring failure.
+                        if (!/\b701\b/.test(getErrorMessage(playError))) throw playError;
+                        log.warn('[DLNA] Play returned 701; checking transport state...');
+                        await new Promise(resolve => setTimeout(resolve, 1500));
+                        const info = await sendAvTransportAction(controlUrl, 'GetTransportInfo',
+                            '<InstanceID>0</InstanceID>');
+                        const state = getXmlTagValue(info, 'CurrentTransportState') || '';
+                        log.info(`[DLNA] Transport state after 701: ${state}`);
+                        if (!/PLAYING|TRANSITIONING/i.test(state)) throw playError;
                     }
-                }, (err) => {
-                    clearTimeout(timeout);
-                    if (err) {
-                        console.error(`[DLNA] Cast error (mime=${mime}):`, err);
-                        reject(err);
-                    } else {
-                        console.log(`[DLNA] Media loaded successfully (mime=${mime})`);
-                        resolve(true);
-                    }
-                });
-            });
+                    log.info(`[DLNA] Media loaded successfully (mime=${mime})`);
+                } catch (err) {
+                    log.error(`[DLNA] Cast error (mime=${mime}):`, err);
+                    throw err;
+                }
+            };
 
-            const primaryMime = getMimeForUrl(url);
+            const primaryMime = getMimeForUrl(streamUrl);
             try {
                 await tryLoad(primaryMime);
             } catch (firstError) {
@@ -821,7 +913,7 @@ export function setupDLNAHandlers() {
                 // etc.) but accept a generic video/mp4 and sniff the stream.
                 const message = getErrorMessage(firstError);
                 if (primaryMime !== 'video/mp4' && /\b704\b|restrict|format/i.test(message)) {
-                    console.warn(`[DLNA] ${primaryMime} refused (${message}); retrying as video/mp4`);
+                    log.warn(`[DLNA] ${primaryMime} refused (${message}); retrying as video/mp4`);
                     await tryLoad('video/mp4');
                 } else {
                     throw firstError;
@@ -830,7 +922,7 @@ export function setupDLNAHandlers() {
 
             return { success: true };
         } catch (error: unknown) {
-            console.error('[DLNA] Cast error:', error);
+            log.error('[DLNA] Cast error:', error);
             const message = getErrorMessage(error);
             let friendly = message;
             if (/\b704\b|restrict|format not supported|not implemented/i.test(message)) {
@@ -847,7 +939,7 @@ export function setupDLNAHandlers() {
     // Stop casting
     ipcMain.handle('dlna:stop', async (_, { deviceId }) => {
         try {
-            console.log('[DLNA] Stop requested:', deviceId);
+            log.info('[DLNA] Stop requested:', deviceId);
 
             let device = manualDevices.find(d => d.id === deviceId);
             if (!device) {
@@ -859,21 +951,12 @@ export function setupDLNAHandlers() {
             }
 
             const location = device.location || `http://${device.host}:${device.port || 9197}/dmr`;
-            const client = new MediaRendererClient(location);
-
-            await new Promise((resolve, reject) => {
-                client.stop((err) => {
-                    if (err) {
-                        reject(err);
-                    } else {
-                        resolve(true);
-                    }
-                });
-            });
+            const controlUrl = await getAvTransportControlUrl(location);
+            await sendAvTransportAction(controlUrl, 'Stop', '<InstanceID>0</InstanceID>');
 
             return { success: true };
         } catch (error: unknown) {
-            console.error('[DLNA] Stop error:', error);
+            log.error('[DLNA] Stop error:', error);
             return {
                 success: false,
                 error: getErrorMessage(error)
@@ -881,5 +964,5 @@ export function setupDLNAHandlers() {
         }
     });
 
-    console.log('[DLNA] IPC Handlers initialized with auto-discovery');
+    log.info('[DLNA] IPC Handlers initialized with auto-discovery');
 }
