@@ -8,6 +8,7 @@ import http from 'http';
 import os from 'os';
 import { randomUUID } from 'crypto';
 import { getProviderHttpsAgent } from './certificatePolicy';
+import log from './logger';
 
 const require = createRequire(import.meta.url);
 
@@ -192,7 +193,7 @@ async function ensureProxyServer(): Promise<number> {
             const requestUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
             const token = requestUrl.pathname.replace('/dlna-proxy/', '')
             const upstreamUrl = proxyUrls.get(token)?.url
-            console.log(`[DLNA] Proxy ${request.method} token=${token.slice(0, 8)}… range=${request.headers.range || '-'} known=${Boolean(upstreamUrl)}`)
+            log.info(`[DLNA] Proxy ${request.method} token=${token.slice(0, 8)}… range=${request.headers.range || '-'} known=${Boolean(upstreamUrl)}`)
 
             if (!upstreamUrl) {
                 response.writeHead(404)
@@ -247,7 +248,7 @@ async function ensureProxyServer(): Promise<number> {
                 // If the upstream stream dies mid-transfer the headers are already
                 // sent — just tear the socket down instead of writeHead-ing again.
                 upstreamResponse.body.on('error', (error: Error) => {
-                    console.warn('[DLNA] Proxy upstream stream error:', error.message)
+                    log.warn('[DLNA] Proxy upstream stream error:', error.message)
                     response.destroy()
                 })
                 response.on('close', () => {
@@ -276,7 +277,7 @@ async function ensureProxyServer(): Promise<number> {
     const address = proxyServer.address()
     if (typeof address === 'object' && address?.port) {
         proxyPort = address.port
-        console.log('[DLNA] Local media proxy started on port', proxyPort)
+        log.info('[DLNA] Local media proxy started on port', proxyPort)
         return proxyPort
     }
 
@@ -286,17 +287,17 @@ async function ensureProxyServer(): Promise<number> {
 // Initialize dependencies
 try {
     MediaRendererClient = require('upnp-mediarenderer-client') as MediaRendererClientConstructor;
-    console.log('[DLNA] upnp-mediarenderer-client loaded successfully');
+    log.info('[DLNA] upnp-mediarenderer-client loaded successfully');
 } catch (error) {
-    console.error('[DLNA] Failed to load upnp-mediarenderer-client:', error);
+    log.error('[DLNA] Failed to load upnp-mediarenderer-client:', error);
 }
 
 try {
     const SSDP = require('peer-ssdp').Peer as new () => SsdpPeer;
     ssdp = new SSDP();
-    console.log('[DLNA] SSDP peer loaded successfully');
+    log.info('[DLNA] SSDP peer loaded successfully');
 } catch (error) {
-    console.error('[DLNA] Failed to load SSDP:', error);
+    log.error('[DLNA] Failed to load SSDP:', error);
 }
 
 // Load saved devices from disk
@@ -310,10 +311,10 @@ function loadSavedDevices(): void {
         if (fs.existsSync(savePath)) {
             const data = fs.readFileSync(savePath, 'utf8');
             manualDevices = JSON.parse(data);
-            console.log('[DLNA] Loaded', manualDevices.length, 'saved devices');
+            log.info('[DLNA] Loaded', manualDevices.length, 'saved devices');
         }
     } catch (error) {
-        console.error('[DLNA] Error loading saved devices:', error);
+        log.error('[DLNA] Error loading saved devices:', error);
     }
 }
 
@@ -326,9 +327,9 @@ function saveDevices(): void {
         const savePath = path.join(app.getPath('userData'), 'dlna-devices.json');
 
         fs.writeFileSync(savePath, JSON.stringify(manualDevices, null, 2));
-        console.log('[DLNA] Saved', manualDevices.length, 'devices');
+        log.info('[DLNA] Saved', manualDevices.length, 'devices');
     } catch (error) {
-        console.error('[DLNA] Error saving devices:', error);
+        log.error('[DLNA] Error saving devices:', error);
     }
 }
 
@@ -435,7 +436,7 @@ async function nativeSsdpSearch(targets: string[], timeoutMs = 5000): Promise<Na
         })
 
         socket.on('error', (error) => {
-            console.warn('[DLNA] Native SSDP error:', getErrorMessage(error))
+            log.warn('[DLNA] Native SSDP error:', getErrorMessage(error))
             finish()
         })
 
@@ -612,7 +613,7 @@ async function discoverDevices(): Promise<DlnaDevice[]> {
 
                     upsertDiscoveredDevice(device)
                     void enrichDeviceFromDescription(device, server).then(upsertDiscoveredDevice)
-                    console.log('[DLNA] Found device:', device.name, 'at', device.host);
+                    log.info('[DLNA] Found device:', device.name, 'at', device.host);
                 });
                 ssdpListenerRegistered = true
             }
@@ -625,7 +626,7 @@ async function discoverDevices(): Promise<DlnaDevice[]> {
                     const device = createDiscoveredDevice(headers, address)
                     upsertDiscoveredDevice(device)
                     void enrichDeviceFromDescription(device, server).then(upsertDiscoveredDevice)
-                    console.log('[DLNA] Native SSDP found device:', device.name, 'at', device.host)
+                    log.info('[DLNA] Native SSDP found device:', device.name, 'at', device.host)
                 })
             })
 
@@ -635,11 +636,11 @@ async function discoverDevices(): Promise<DlnaDevice[]> {
                     enrichDeviceFromDescription(device).then(upsertDiscoveredDevice)
                 ))
                 isDiscovering = false;
-                console.log('[DLNA] Discovery complete. Found', discoveredDevices.size, 'devices');
+                log.info('[DLNA] Discovery complete. Found', discoveredDevices.size, 'devices');
                 resolve(Array.from(discoveredDevices.values()));
             }, 7000);
         } catch (error) {
-            console.error('[DLNA] Discovery error:', error);
+            log.error('[DLNA] Discovery error:', error);
             isDiscovering = false;
             resolve([]);
         }
@@ -653,7 +654,7 @@ export function setupDLNAHandlers() {
     // Discover devices
     ipcMain.handle('dlna:discover', async () => {
         try {
-            console.log('[DLNA] Starting device discovery...');
+            log.info('[DLNA] Starting device discovery...');
             const discovered = await discoverDevices();
 
             // Combine discovered and manual devices
@@ -667,7 +668,7 @@ export function setupDLNAHandlers() {
                 devices: allDevices
             };
         } catch (error: unknown) {
-            console.error('[DLNA] Discover error:', error);
+            log.error('[DLNA] Discover error:', error);
             return {
                 success: false,
                 error: getErrorMessage(error),
@@ -692,7 +693,7 @@ export function setupDLNAHandlers() {
     // Add manual device
     ipcMain.handle('dlna:add-device', async (_, { name, ip, port }) => {
         try {
-            console.log('[DLNA] Adding manual device:', { name, ip, port });
+            log.info('[DLNA] Adding manual device:', { name, ip, port });
             const resolved = await resolveManualLocation(ip, port)
 
             const device = {
@@ -723,7 +724,7 @@ export function setupDLNAHandlers() {
                 }
             };
         } catch (error: unknown) {
-            console.error('[DLNA] Add device error:', error);
+            log.error('[DLNA] Add device error:', error);
             return {
                 success: false,
                 error: getErrorMessage(error)
@@ -745,7 +746,7 @@ export function setupDLNAHandlers() {
     // Cast media to DLNA device
     ipcMain.handle('dlna:cast', async (_, { deviceId, url, title }) => {
         try {
-            console.log('[DLNA] Cast requested:', { deviceId, title });
+            log.info('[DLNA] Cast requested:', { deviceId, title });
 
             if (!MediaRendererClient) {
                 throw new Error('DLNA client not available');
@@ -762,7 +763,7 @@ export function setupDLNAHandlers() {
             }
 
             const location = device.location || `http://${device.host}:${device.port || 9197}/dmr`;
-            console.log('[DLNA] Connecting to:', location);
+            log.info('[DLNA] Connecting to:', location);
 
             const client = new MediaRendererClient(location);
 
@@ -804,10 +805,10 @@ export function setupDLNAHandlers() {
                 }, (err) => {
                     clearTimeout(timeout);
                     if (err) {
-                        console.error(`[DLNA] Cast error (mime=${mime}):`, err);
+                        log.error(`[DLNA] Cast error (mime=${mime}):`, err);
                         reject(err);
                     } else {
-                        console.log(`[DLNA] Media loaded successfully (mime=${mime})`);
+                        log.info(`[DLNA] Media loaded successfully (mime=${mime})`);
                         resolve(true);
                     }
                 });
@@ -821,7 +822,7 @@ export function setupDLNAHandlers() {
                 // etc.) but accept a generic video/mp4 and sniff the stream.
                 const message = getErrorMessage(firstError);
                 if (primaryMime !== 'video/mp4' && /\b704\b|restrict|format/i.test(message)) {
-                    console.warn(`[DLNA] ${primaryMime} refused (${message}); retrying as video/mp4`);
+                    log.warn(`[DLNA] ${primaryMime} refused (${message}); retrying as video/mp4`);
                     await tryLoad('video/mp4');
                 } else {
                     throw firstError;
@@ -830,7 +831,7 @@ export function setupDLNAHandlers() {
 
             return { success: true };
         } catch (error: unknown) {
-            console.error('[DLNA] Cast error:', error);
+            log.error('[DLNA] Cast error:', error);
             const message = getErrorMessage(error);
             let friendly = message;
             if (/\b704\b|restrict|format not supported|not implemented/i.test(message)) {
@@ -847,7 +848,7 @@ export function setupDLNAHandlers() {
     // Stop casting
     ipcMain.handle('dlna:stop', async (_, { deviceId }) => {
         try {
-            console.log('[DLNA] Stop requested:', deviceId);
+            log.info('[DLNA] Stop requested:', deviceId);
 
             let device = manualDevices.find(d => d.id === deviceId);
             if (!device) {
@@ -873,7 +874,7 @@ export function setupDLNAHandlers() {
 
             return { success: true };
         } catch (error: unknown) {
-            console.error('[DLNA] Stop error:', error);
+            log.error('[DLNA] Stop error:', error);
             return {
                 success: false,
                 error: getErrorMessage(error)
@@ -881,5 +882,5 @@ export function setupDLNAHandlers() {
         }
     });
 
-    console.log('[DLNA] IPC Handlers initialized with auto-discovery');
+    log.info('[DLNA] IPC Handlers initialized with auto-discovery');
 }
