@@ -417,9 +417,21 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         };
     }, [subtitleUrl]);
 
-    // Keyboard shortcuts
-    const handleKeyDown = useCallback((e: KeyboardEvent) => {
-        if (e.target instanceof HTMLInputElement) return;
+    // Keyboard shortcuts — the latest handler lives in a ref so a single
+    // stable document listener is attached for the whole player lifetime.
+    const handleKeyDownRef = useRef<(e: KeyboardEvent) => void>(() => { });
+    handleKeyDownRef.current = (e: KeyboardEvent) => {
+        // Ignore keystrokes aimed at form fields or editable content
+        const target = e.target as HTMLElement | null;
+        if (target && (
+            target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.tagName === 'SELECT' ||
+            target.isContentEditable
+        )) return;
+
+        // Ignore while the cast device selector modal is open
+        if (showDeviceSelector) return;
 
         switch (e.key.toLowerCase()) {
             case ' ':
@@ -455,6 +467,13 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     document.exitFullscreen();
                 }
                 break;
+            case 'c':
+                // The CC button runs an async fetch flow; the shortcut only
+                // toggles visibility when a subtitle is already loaded.
+                if (vttContent) {
+                    setSubtitlesEnabled(prev => !prev);
+                }
+                break;
             case 'escape':
                 if (document.fullscreenElement) {
                     document.exitFullscreen();
@@ -463,12 +482,13 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                 }
                 break;
         }
-    }, [controls, state.currentTime, state.duration, state.volume, onClose]);
+    };
 
     useEffect(() => {
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [handleKeyDown]);
+        const listener = (e: KeyboardEvent) => handleKeyDownRef.current(e);
+        document.addEventListener('keydown', listener);
+        return () => document.removeEventListener('keydown', listener);
+    }, []);
 
     // Progress bar hover preview
     const handleProgressHover = (e: React.MouseEvent<HTMLDivElement>) => {

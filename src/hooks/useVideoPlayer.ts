@@ -181,47 +181,9 @@ export function useVideoPlayer() {
         };
     }, [state.volume]);
 
-    // Keyboard Shortcuts
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (!videoRef.current) return;
-
-            switch (e.key) {
-                case ' ':
-                case 'k':
-                    e.preventDefault();
-                    togglePlay();
-                    break;
-                case 'f':
-                    e.preventDefault();
-                    toggleFullscreen();
-                    break;
-                case 'm':
-                    e.preventDefault();
-                    toggleMute();
-                    break;
-                case 'ArrowLeft':
-                    e.preventDefault();
-                    seek(Math.max(0, state.currentTime - 5));
-                    break;
-                case 'ArrowRight':
-                    e.preventDefault();
-                    seek(Math.min(state.duration, state.currentTime + 5));
-                    break;
-                case 'ArrowUp':
-                    e.preventDefault();
-                    setVolume(state.volume + 0.05);
-                    break;
-                case 'ArrowDown':
-                    e.preventDefault();
-                    setVolume(state.volume - 0.05);
-                    break;
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [state.currentTime, state.duration, state.volume, togglePlay, toggleFullscreen, toggleMute, seek, setVolume]);
+    // Keyboard shortcuts are intentionally NOT registered here: each consumer
+    // (VideoPlayer, PipWindow) owns a single document-level listener so the
+    // same key never fires two competing handlers.
 
     return {
         videoRef,
