@@ -21,6 +21,7 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.14.2",
     "@vidstack/react": "^1.12.13",
     "axios": "^1.13.2",
     "bonjour-service": "^1.4.0",

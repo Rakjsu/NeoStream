@@ -6,7 +6,7 @@ import { useLanguage } from '../services/languageService';
 export interface CastDevice {
     id: string;
     name: string;
-    type: 'chromecast' | 'dlna' | 'airplay';
+    type: 'dlna' | 'airplay';
     available: boolean;
     source?: 'discovered' | 'manual';
     isSamsung?: boolean;
@@ -20,9 +20,6 @@ interface CastDeviceSelectorProps {
     subtitleVtt?: string | null;
     onClose: () => void;
     onDeviceSelected: (device: CastDevice) => void;
-    chromecastAvailable: boolean;
-    chromecastCasting: boolean;
-    onChromecastCast: () => void;
 }
 
 export function CastDeviceSelector({
@@ -30,10 +27,7 @@ export function CastDeviceSelector({
     videoTitle,
     subtitleVtt,
     onClose,
-    onDeviceSelected,
-    chromecastAvailable,
-    chromecastCasting,
-    onChromecastCast
+    onDeviceSelected
 }: CastDeviceSelectorProps) {
     const dlna = useDLNA(videoUrl, videoTitle, subtitleVtt);
     const airplay = useAirPlay(videoUrl, videoTitle);
@@ -77,17 +71,6 @@ export function CastDeviceSelector({
     const allDevices = useMemo(() => {
         const devices: CastDevice[] = [];
 
-        if (chromecastAvailable) {
-            devices.push({
-                id: 'chromecast-default',
-                name: chromecastCasting ? 'Chromecast (' + t('cast', 'connected') + ')' : 'Chromecast',
-                type: 'chromecast',
-                available: true,
-                source: 'discovered',
-                cast: onChromecastCast
-            });
-        }
-
         dlnaDevices.forEach(device => {
             devices.push({
                 id: device.id,
@@ -112,7 +95,7 @@ export function CastDeviceSelector({
         });
 
         return devices;
-    }, [airplayDevices, castToAirPlayDevice, chromecastAvailable, chromecastCasting, dlnaDevices, handleCast, onChromecastCast, t]);
+    }, [airplayDevices, castToAirPlayDevice, dlnaDevices, handleCast]);
 
     const handleAddDevice = async () => {
         if (!deviceIP) {
@@ -138,14 +121,12 @@ export function CastDeviceSelector({
     };
 
     const getDeviceIcon = (type: string, source?: string) => {
-        if (type === 'chromecast') return '📡';
         if (type === 'airplay') return '🍎';
         return source === 'discovered' ? '📺' : '🖥️';
     };
 
     const getDeviceTypeName = (type: string) => {
         switch (type) {
-            case 'chromecast': return 'Google Cast';
             case 'airplay': return 'Apple AirPlay';
             default: return 'DLNA/UPnP';
         }
@@ -187,11 +168,11 @@ export function CastDeviceSelector({
                                 <span>{isDiscovering ? t('cast', 'searching') : t('cast', 'searchNetwork')}</span>
                             </button>
 
-                            {/* Error */}
-                            {castError && (
+                            {/* Error (cast attempt or device discovery) */}
+                            {(castError || (!isDiscovering && dlnaError)) && (
                                 <div className="cast-error">
                                     <span>⚠️</span>
-                                    <span>{castError}</span>
+                                    <span>{castError || dlnaError}</span>
                                 </div>
                             )}
 

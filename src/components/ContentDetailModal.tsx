@@ -68,6 +68,8 @@ export function ContentDetailModal({
     const [selectedSeason, setSelectedSeason] = useState(1);
     const [selectedEpisode, setSelectedEpisode] = useState(1);
     const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState(false);
+    const [retryNonce, setRetryNonce] = useState(0);
     const [, setRefresh] = useState(0); // Force re-render for button states
     const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'completed'>('idle');
     const [downloadProgress, setDownloadProgress] = useState(0);
@@ -81,7 +83,10 @@ export function ContentDetailModal({
     useEffect(() => {
         if (!isOpen || contentType !== 'series') return;
 
-        queueMicrotask(() => setLoading(true));
+        queueMicrotask(() => {
+            setLoading(true);
+            setLoadError(false);
+        });
         window.ipcRenderer.invoke('auth:get-credentials').then(result => {
             if (result.success) {
                 const { url, username, password } = result.credentials;
@@ -139,11 +144,15 @@ export function ContentDetailModal({
                     })
                     .catch(() => {
                         setSeriesInfo(null);
+                        setLoadError(true);
                         setLoading(false);
                     });
+            } else {
+                setLoadError(true);
+                setLoading(false);
             }
         });
-    }, [isOpen, contentId, contentType]);
+    }, [isOpen, contentId, contentType, retryNonce]);
 
     // Fetch TMDB data for extra info
     useEffect(() => {
@@ -647,6 +656,35 @@ export function ContentDetailModal({
                             color: 'rgba(255, 255, 255, 0.5)'
                         }}>
                             Carregando episódios...
+                        </div>
+                    )}
+
+                    {/* Series info failed to load — show retry instead of a blank area */}
+                    {contentType === 'series' && !loading && loadError && (
+                        <div style={{
+                            padding: 20,
+                            textAlign: 'center',
+                            color: 'rgba(255, 255, 255, 0.7)',
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            borderRadius: 12,
+                            marginBottom: 16
+                        }}>
+                            <p style={{ marginBottom: 12 }}>⚠️ Não foi possível carregar os episódios. Verifique sua conexão.</p>
+                            <button
+                                onClick={() => setRetryNonce(n => n + 1)}
+                                style={{
+                                    padding: '8px 20px',
+                                    borderRadius: 8,
+                                    border: '1px solid rgba(139, 92, 246, 0.6)',
+                                    background: 'rgba(139, 92, 246, 0.25)',
+                                    color: 'white',
+                                    cursor: 'pointer',
+                                    fontWeight: 600
+                                }}
+                            >
+                                Tentar novamente
+                            </button>
                         </div>
                     )}
 

@@ -1,5 +1,6 @@
-import { memo, useState, useCallback } from 'react';
+import { memo } from 'react';
 import { Play } from 'lucide-react';
+import { LazyImage } from './LazyImage';
 import './HoverPreviewCard.css';
 
 interface HoverPreviewCardProps {
@@ -26,12 +27,6 @@ function HoverPreviewCardComponent({
     onMoreInfo,
     children
 }: HoverPreviewCardProps) {
-    const [imageError, setImageError] = useState(false);
-
-    const handleImageError = useCallback(() => {
-        setImageError(true);
-    }, []);
-
     return (
         <div
             className="hover-preview-card"
@@ -39,18 +34,15 @@ function HoverPreviewCardComponent({
         >
             {/* Poster */}
             <div className="preview-poster" style={{ position: 'relative' }}>
-                {!imageError ? (
-                    <img
-                        src={cover}
-                        alt={title}
-                        loading="lazy"
-                        onError={handleImageError}
-                    />
-                ) : (
-                    <div className="poster-fallback-placeholder">
-                        <span>🎬</span>
-                    </div>
-                )}
+                <LazyImage
+                    src={cover}
+                    alt={title}
+                    fallback={(
+                        <div className="poster-fallback-placeholder">
+                            <span>🎬</span>
+                        </div>
+                    )}
+                />
 
                 {/* Overlay with play button */}
                 <div className="card-overlay">

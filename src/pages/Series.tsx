@@ -14,6 +14,8 @@ import { searchSeriesByName as searchSeries, isKidsFriendly } from '../services/
 import { parentalService } from '../services/parentalService';
 import { HoverPreviewCard } from '../components/HoverPreviewCard';
 import { closeAllPreviews } from '../components/hoverPreviewActions';
+import { VirtualGrid } from '../components/VirtualGrid';
+import { useGridColumns } from '../components/useGridColumns';
 import { useLanguage } from '../services/languageService';
 
 interface Series {
@@ -51,8 +53,11 @@ interface SeriesInfo {
     episodes?: Record<string, SeriesEpisode[]>;
 }
 
+// Mirrors the .series-grid CSS rule
 const CARD_MIN_WIDTH = 180;
 const CARD_GAP = 24;
+const GRID_HORIZONTAL_PADDING = 40; // scroll container padding-right (8) + grid padding (16 + 16)
+const ESTIMATED_ROW_HEIGHT = 340; // ~2:3 poster at min width + card info
 const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'er\u00f3tico'];
 
 export function Series() {
@@ -71,10 +76,8 @@ export function Series() {
     const [seriesInfo, setSeriesInfo] = useState<SeriesInfo | null>(null);
     const [tmdbEpisodeCache, setTmdbEpisodeCache] = useState<Map<string, string>>(new Map());
     const [, setRefresh] = useState(0);
-    const [visibleCount, setVisibleCount] = useState(0);
-    const [itemsPerPage, setItemsPerPage] = useState(36);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const gridRef = useRef<HTMLDivElement>(null);
+    const columns = useGridColumns(scrollContainerRef, CARD_MIN_WIDTH, CARD_GAP, GRID_HORIZONTAL_PADDING);
     const seasonTabsRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartX, setDragStartX] = useState(0);
@@ -122,36 +125,6 @@ export function Series() {
         window.addEventListener('miniPlayerExpand', handleMiniPlayerExpand as EventListener);
         return () => window.removeEventListener('miniPlayerExpand', handleMiniPlayerExpand as EventListener);
     }, [series]);
-
-    // Dynamic grid calculation based on window dimensions
-    useEffect(() => {
-        const calculateGrid = () => {
-            // Use window dimensions directly - more reliable
-            const availableWidth = window.innerWidth - 100; // sidebar + padding
-            const availableHeight = window.innerHeight - 200; // header + details panel buffer
-
-            const cols = Math.max(2, Math.floor(availableWidth / (CARD_MIN_WIDTH + CARD_GAP)));
-            const rows = Math.max(3, Math.ceil(availableHeight / 320) + 3); // card height ~280px + gap
-
-            const items = cols * rows;
-
-            setItemsPerPage(items);
-            setVisibleCount(items);
-        };
-
-        // Initial calculation
-        calculateGrid();
-
-        // Recalculate after layout is ready
-        setTimeout(calculateGrid, 200);
-
-        // Listen to window resize
-        window.addEventListener('resize', calculateGrid);
-
-        return () => {
-            window.removeEventListener('resize', calculateGrid);
-        };
-    }, []);
 
     useEffect(() => { fetchSeries(); }, []);
 
@@ -262,27 +235,13 @@ export function Series() {
         return matchesSearch && matchesCategory;
     });
 
-    // Lazy loading scroll handler
-    useEffect(() => {
-        const container = scrollContainerRef.current;
-        if (!container) return;
-
-        const handleScroll = () => {
-            const { scrollTop, scrollHeight, clientHeight } = container;
-            if (scrollTop + clientHeight >= scrollHeight * 0.85 && visibleCount < filteredSeries.length) {
-                setVisibleCount(prev => Math.min(prev + itemsPerPage, filteredSeries.length));
-            }
-        };
-
-        container.addEventListener('scroll', handleScroll);
-        return () => container.removeEventListener('scroll', handleScroll);
-    }, [filteredSeries.length, visibleCount, itemsPerPage]);
-
     // Reset on filter change
     useEffect(() => {
-        setVisibleCount(itemsPerPage);
+        if (scrollContainerRef.current) {
+            scrollContainerRef.current.scrollTop = 0;
+        }
         setSelectedSeries(null);
-    }, [searchQuery, selectedCategory, itemsPerPage]);
+    }, [searchQuery, selectedCategory]);
 
     const fixImageUrl = (url: string): string => url && url.startsWith('http') ? url : `https://${url}`;
 
@@ -876,8 +835,14 @@ export function Series() {
                                 <p>Tente buscar por outro termo</p>
                             </div>
                         ) : (
-                            <div ref={gridRef} className="series-grid">
-                                {filteredSeries.slice(0, visibleCount).map((s, index) => {
+                            <div style={{ padding: '16px', paddingBottom: '32px' }}>
+                                <VirtualGrid
+                                    scrollRef={scrollContainerRef}
+                                    items={filteredSeries}
+                                    columns={columns}
+                                    estimateRowHeight={ESTIMATED_ROW_HEIGHT}
+                                    gap={CARD_GAP}
+                                    renderItem={(s) => {
                                     const isSaved = watchLaterService.has(String(s.series_id), 'series');
                                     const isFavorite = favoritesService.has(String(s.series_id), 'series');
                                     const hasProgress = watchProgressService.getSeriesProgress(String(s.series_id), s.name);
@@ -890,7 +855,6 @@ export function Series() {
                                         <div
                                             key={s.series_id}
                                             className={checkingItem === s.name ? 'checking' : ''}
-                                            style={{ animationDelay: `${(index % itemsPerPage) * 0.03}s` }}
                                         >
                                             <HoverPreviewCard
                                                 type="series"
@@ -973,7 +937,8 @@ export function Series() {
                                             </HoverPreviewCard>
                                         </div>
                                     );
-                                })}
+                                    }}
+                                />
                             </div>
                         )}
                     </div>
