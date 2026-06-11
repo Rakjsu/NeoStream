@@ -14,8 +14,6 @@ import { searchMovieByName as searchMovie, isKidsFriendly } from '../services/tm
 import { parentalService } from '../services/parentalService';
 import { HoverPreviewCard } from '../components/HoverPreviewCard';
 import { closeAllPreviews } from '../components/hoverPreviewActions';
-import { VirtualGrid } from '../components/VirtualGrid';
-import { useGridColumns } from '../components/useGridColumns';
 import { useLanguage } from '../services/languageService';
 
 interface VODStream {
@@ -44,11 +42,9 @@ interface VODStream {
     offlineUrl?: string;
 }
 
-// Dynamic card sizing based on container (mirrors the .movies-grid CSS rule)
+// Dynamic card sizing based on container
 const CARD_MIN_WIDTH = 180;
 const CARD_GAP = 24;
-const GRID_HORIZONTAL_PADDING = 40; // scroll container padding-right (8) + grid padding (16 + 16)
-const ESTIMATED_ROW_HEIGHT = 340; // ~2:3 poster at min width + card info
 const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'er\u00f3tico'];
 
 export function VOD() {
@@ -62,8 +58,10 @@ export function VOD() {
     const [playingMovie, setPlayingMovie] = useState<VODStream | null>(null);
     const [pipResumeTime, setPipResumeTime] = useState<number | null>(null);
     const [, setRefresh] = useState(0);
+    const [visibleCount, setVisibleCount] = useState(0);
+    const [itemsPerPage, setItemsPerPage] = useState(36);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const columns = useGridColumns(scrollContainerRef, CARD_MIN_WIDTH, CARD_GAP, GRID_HORIZONTAL_PADDING);
+    const gridRef = useRef<HTMLDivElement>(null);
     const [hiddenMovies, setHiddenMovies] = useState<Set<string>>(new Set());
     const [blockedCategoryIds, setBlockedCategoryIds] = useState<Set<string>>(new Set());
     const [checkingItem, setCheckingItem] = useState<string | null>(null);
@@ -94,6 +92,36 @@ export function VOD() {
         window.addEventListener('miniPlayerExpand', handleMiniPlayerExpand as EventListener);
         return () => window.removeEventListener('miniPlayerExpand', handleMiniPlayerExpand as EventListener);
     }, [streams]);
+
+    // Dynamic grid calculation based on window dimensions
+    useEffect(() => {
+        const calculateGrid = () => {
+            // Use window dimensions directly - more reliable
+            const availableWidth = window.innerWidth - 100; // sidebar + padding
+            const availableHeight = window.innerHeight - 200; // header + details panel buffer
+
+            const cols = Math.max(2, Math.floor(availableWidth / (CARD_MIN_WIDTH + CARD_GAP)));
+            const rows = Math.max(3, Math.ceil(availableHeight / 320) + 3); // card height ~280px + gap
+
+            const items = cols * rows;
+
+            setItemsPerPage(items);
+            setVisibleCount(items);
+        };
+
+        // Initial calculation
+        calculateGrid();
+
+        // Recalculate after layout is ready
+        setTimeout(calculateGrid, 200);
+
+        // Listen to window resize
+        window.addEventListener('resize', calculateGrid);
+
+        return () => {
+            window.removeEventListener('resize', calculateGrid);
+        };
+    }, []);
 
     const fetchStreams = useCallback(async () => {
         setLoading(true);
@@ -203,13 +231,27 @@ export function VOD() {
         return matchesSearch && matchesCategory;
     });
 
+    // Lazy loading scroll handler
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        const handleScroll = () => {
+            const { scrollTop, scrollHeight, clientHeight } = container;
+            if (scrollTop + clientHeight >= scrollHeight * 0.85 && visibleCount < filteredStreams.length) {
+                setVisibleCount(prev => Math.min(prev + itemsPerPage, filteredStreams.length));
+            }
+        };
+
+        container.addEventListener('scroll', handleScroll);
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, [filteredStreams.length, visibleCount, itemsPerPage]);
+
     // Reset on filter change
     useEffect(() => {
-        if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTop = 0;
-        }
+        setVisibleCount(itemsPerPage);
         setSelectedMovie(null);
-    }, [searchQuery, selectedCategory]);
+    }, [searchQuery, selectedCategory, itemsPerPage]);
 
     // Fetch TMDB data
     useEffect(() => {
@@ -498,14 +540,8 @@ export function VOD() {
                                 <p>Tente buscar por outro termo</p>
                             </div>
                         ) : (
-                            <div style={{ padding: '16px', paddingBottom: '32px' }}>
-                                <VirtualGrid
-                                    scrollRef={scrollContainerRef}
-                                    items={filteredStreams}
-                                    columns={columns}
-                                    estimateRowHeight={ESTIMATED_ROW_HEIGHT}
-                                    gap={CARD_GAP}
-                                    renderItem={(stream) => {
+                            <div ref={gridRef} className="movies-grid">
+                                {filteredStreams.slice(0, visibleCount).map((stream, index) => {
                                     const progress = getProgress(stream.stream_id);
                                     const movieProgress = getMovieProgress(stream.stream_id);
                                     const isSaved = watchLaterService.has(String(stream.stream_id), 'movie');
@@ -518,6 +554,7 @@ export function VOD() {
                                         <div
                                             key={stream.stream_id}
                                             className={checkingItem === stream.name ? 'checking' : ''}
+                                            style={{ animationDelay: `${(index % itemsPerPage) * 0.03}s` }}
                                         >
                                             <HoverPreviewCard
                                                 type="movie"
@@ -615,8 +652,7 @@ export function VOD() {
                                             </HoverPreviewCard>
                                         </div>
                                     );
-                                    }}
-                                />
+                                })}
                             </div>
                         )}
                     </div>

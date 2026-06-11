@@ -3,8 +3,6 @@ import { CategoryMenu } from '../components/CategoryMenu';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { LazyImage } from '../components/LazyImage';
-import { VirtualGrid } from '../components/VirtualGrid';
-import { useGridColumns } from '../components/useGridColumns';
 import { epgService } from '../services/epgService';
 import { profileService } from '../services/profileService';
 import { parentalService } from '../services/parentalService';
@@ -64,11 +62,10 @@ interface HlsWindow extends Window {
     Hls?: HlsConstructor;
 }
 
-// Channel card dimensions (mirror the .channels-grid CSS rule)
-const CARD_MIN_WIDTH = 240; // min-width of grid column
+// Channel card approximate dimensions
+const CARD_WIDTH = 200; // min-width of grid column
+const CARD_HEIGHT = 80; // approximate card height with gap
 const GRID_GAP = 16; // gap between cards
-const GRID_HORIZONTAL_PADDING = 76; // container padding-left (60) + padding-right (8) + grid padding-right (8)
-const ESTIMATED_ROW_HEIGHT = 82; // 56px logo + 12px vertical padding x2 + border
 const KIDS_ALLOWED_PATTERNS = ['infantil', 'infantis', 'kids', 'criança', '24 horas infantis'];
 const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'erotic', 'erótico'];
 
@@ -85,14 +82,47 @@ export function LiveTV() {
     const [, setEpgData] = useState<EPGProgram[]>([]);
     const [currentProgram, setCurrentProgram] = useState<EPGProgram | null>(null);
     const [upcomingPrograms, setUpcomingPrograms] = useState<EPGProgram[]>([]);
+    const [visibleCount, setVisibleCount] = useState(0);
+    const [itemsPerPage, setItemsPerPage] = useState(48); // Default fallback
     const [progressTick, setProgressTick] = useState(0);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
-    const columns = useGridColumns(scrollContainerRef, CARD_MIN_WIDTH, GRID_GAP, GRID_HORIZONTAL_PADDING);
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const [allowedCategoryIds, setAllowedCategoryIds] = useState<Set<string>>(new Set());
     const [blockedCategoryIds, setBlockedCategoryIds] = useState<Set<string>>(new Set());
     const [pipResumeTime, setPipResumeTime] = useState<number | null>(null);
     const { t } = useLanguage();
+
+    // Calculate items per page based on window dimensions
+    useEffect(() => {
+        const calculateItemsPerPage = () => {
+            // Use window dimensions directly - more reliable
+            const availableWidth = window.innerWidth - 100; // sidebar + padding
+            const availableHeight = window.innerHeight - 150; // header + padding
+
+            // Calculate how many columns fit
+            const columns = Math.max(1, Math.floor(availableWidth / (CARD_WIDTH + GRID_GAP)));
+            // Calculate how many rows fit + buffer for scroll
+            const rows = Math.max(3, Math.ceil(availableHeight / (CARD_HEIGHT + GRID_GAP)) + 3);
+
+            const calculatedItems = columns * rows;
+
+            setItemsPerPage(calculatedItems);
+            setVisibleCount(calculatedItems);
+        };
+
+        // Initial calculation
+        calculateItemsPerPage();
+
+        // Recalculate after layout is ready
+        setTimeout(calculateItemsPerPage, 200);
+
+        // Listen to window resize
+        window.addEventListener('resize', calculateItemsPerPage);
+
+        return () => {
+            window.removeEventListener('resize', calculateItemsPerPage);
+        };
+    }, []);
 
     // Listen for mini player expand event to reopen full player
     useEffect(() => {
@@ -242,13 +272,24 @@ export function LiveTV() {
         return matchesSearch && matchesCategory;
     });
 
-    // Reset scroll position when search or category changes
-    useEffect(() => {
-        if (scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTop = 0;
+    // Scroll handler for lazy loading
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const container = e.currentTarget;
+        const { scrollTop, scrollHeight, clientHeight } = container;
+        const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
+
+        // Load more when 80% scrolled
+        if (scrollPercentage >= 0.8 && visibleCount < filteredStreams.length) {
+            const newCount = Math.min(visibleCount + itemsPerPage, filteredStreams.length);
+            setVisibleCount(newCount);
         }
+    };
+
+    // Reset visible count when search or category changes
+    useEffect(() => {
+        setVisibleCount(itemsPerPage);
         setSelectedChannel(null);
-    }, [searchQuery, selectedCategory]);
+    }, [searchQuery, selectedCategory, itemsPerPage]);
 
     // Find quality variants for a channel (e.g., Globo SP matches Globo [4K])
     const getChannelQualityVariants = (channel: LiveStream) => {
@@ -733,7 +774,7 @@ export function LiveTV() {
                 type="live"
                 isKidsProfile={isKidsProfile}
             />
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflowY: 'auto', paddingTop: '40px' }}>
+            <div ref={scrollContainerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflowY: 'auto', paddingTop: '40px' }}>
                 {selectedChannel && (
                     <div style={{
                         padding: '24px 20px 24px 60px',
@@ -1087,7 +1128,7 @@ export function LiveTV() {
                     </div>
                 )}
 
-                <div ref={scrollContainerRef} className="livetv-scroll-container p-8" style={{ paddingLeft: '60px', position: 'relative', zIndex: 1, height: 'calc(100vh - 120px)', overflowY: 'auto', paddingRight: '8px', scrollbarWidth: 'thin', scrollbarColor: 'rgba(168, 85, 247, 0.4) transparent' }}>
+                <div ref={scrollContainerRef} onScroll={handleScroll} className="livetv-scroll-container p-8" style={{ paddingLeft: '60px', position: 'relative', zIndex: 1, height: 'calc(100vh - 120px)', overflowY: 'auto', paddingRight: '8px', scrollbarWidth: 'thin', scrollbarColor: 'rgba(168, 85, 247, 0.4) transparent' }}>
                     <style>{`
                         .channel-card {
                             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1143,14 +1184,8 @@ export function LiveTV() {
                             <p style={{ fontSize: '14px', color: 'rgba(107, 114, 128, 1)', marginTop: '8px' }}>Tente buscar por outro termo</p>
                         </div>
                     ) : (
-                        <div style={{ paddingRight: '8px' }}>
-                            <VirtualGrid
-                                scrollRef={scrollContainerRef}
-                                items={filteredStreams}
-                                columns={columns}
-                                estimateRowHeight={ESTIMATED_ROW_HEIGHT}
-                                gap={GRID_GAP}
-                                renderItem={(stream) => (
+                        <div className="channels-grid" style={{ animation: 'fadeInScale 0.5s ease-out' }}>
+                            {filteredStreams.slice(0, visibleCount).map((stream) => (
                                 <div
                                     key={stream.stream_id}
                                     onClick={() => setSelectedChannel(stream)}
@@ -1238,8 +1273,7 @@ export function LiveTV() {
                                         }} />
                                     )}
                                 </div>
-                                )}
-                            />
+                            ))}
                         </div>
                     )}
                 </div>
