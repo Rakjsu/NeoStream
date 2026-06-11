@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { type TMDBSeriesDetails, fetchEpisodeDetails, getBackdropUrl, searchSeriesByName } from '../services/tmdb';
+import { getBackdropUrl } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
 import { favoritesService } from '../services/favoritesService';
 import { watchProgressService } from '../services/watchProgressService';
@@ -9,9 +9,9 @@ import { CategoryMenu } from '../components/CategoryMenu';
 import { ResumeModal } from '../components/ResumeModal';
 import { ContentDetailModal } from '../components/ContentDetailModal';
 import { profileService } from '../services/profileService';
-import { indexedDBCache } from '../services/indexedDBCache';
-import { searchSeriesByName as searchSeries, isKidsFriendly } from '../services/tmdb';
-import { parentalService } from '../services/parentalService';
+import { SeriesDetailPanel, type SeriesEpisode, type SeriesInfo } from '../components/SeriesDetailPanel';
+import { useSeriesMetadata } from '../hooks/useSeriesMetadata';
+import { useContentFiltering } from '../hooks/useContentFiltering';
 import { HoverPreviewCard } from '../components/HoverPreviewCard';
 import { closeAllPreviews } from '../components/hoverPreviewActions';
 import { VirtualGrid } from '../components/VirtualGrid';
@@ -39,26 +39,11 @@ interface Series {
     tmdb_id: string;
 }
 
-interface SeriesEpisode {
-    id: number | string;
-    episode_num: number | string;
-    title?: string;
-    info?: {
-        duration?: string;
-    };
-    container_extension?: string;
-}
-
-interface SeriesInfo {
-    episodes?: Record<string, SeriesEpisode[]>;
-}
-
 // Mirrors the .series-grid CSS rule
 const CARD_MIN_WIDTH = 180;
 const CARD_GAP = 24;
 const GRID_HORIZONTAL_PADDING = 40; // scroll container padding-right (8) + grid padding (16 + 16)
 const ESTIMATED_ROW_HEIGHT = 340; // ~2:3 poster at min width + card info
-const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'er\u00f3tico'];
 
 export function Series() {
     const [series, setSeries] = useState<Series[]>([]);
@@ -67,21 +52,14 @@ export function Series() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [selectedSeries, setSelectedSeries] = useState<Series | null>(null);
-    const [tmdbData, setTmdbData] = useState<TMDBSeriesDetails | null>(null);
-    const [loadingTmdb, setLoadingTmdb] = useState(false);
     const [playingSeries, setPlayingSeries] = useState<Series | null>(null);
     const [pipResumeTime, setPipResumeTime] = useState<number | null>(null);
     const [selectedSeason, setSelectedSeason] = useState<number>(1);
     const [selectedEpisode, setSelectedEpisode] = useState<number>(1);
     const [seriesInfo, setSeriesInfo] = useState<SeriesInfo | null>(null);
-    const [tmdbEpisodeCache, setTmdbEpisodeCache] = useState<Map<string, string>>(new Map());
     const [, setRefresh] = useState(0);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const columns = useGridColumns(scrollContainerRef, CARD_MIN_WIDTH, CARD_GAP, GRID_HORIZONTAL_PADDING);
-    const seasonTabsRef = useRef<HTMLDivElement>(null);
-    const [isDragging, setIsDragging] = useState(false);
-    const [dragStartX, setDragStartX] = useState(0);
-    const [scrollStartX, setScrollStartX] = useState(0);
 
     // Resume modal state
     const [showResumeModal, setShowResumeModal] = useState(false);
@@ -92,13 +70,26 @@ export function Series() {
 
     // Clear history confirmation
     const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false);
-    const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
-    const [blockedCategoryIds, setBlockedCategoryIds] = useState<Set<string>>(new Set());
-    const [checkingItem, setCheckingItem] = useState<string | null>(null);
-    const [blockMessage, setBlockMessage] = useState<string | null>(null);
-    const [cachedRatings, setCachedRatings] = useState<Map<string, string | null>>(new Map());
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const { t } = useLanguage();
+
+    // TMDB metadata + episode title resolution for the selected series
+    const { tmdbData, loadingTmdb, getEpisodeTitle } = useSeriesMetadata(selectedSeries, selectedSeason);
+
+    // Kids profile + Parental Control filtering and click-gating
+    const {
+        checkingItem,
+        blockMessage,
+        isItemVisible,
+        handleItemClick: handleSeriesClick
+    } = useContentFiltering<Series>({
+        contentType: 'series',
+        isKidsProfile,
+        items: series,
+        getItemName: (s) => s.name,
+        getItemCategoryIds: (s) => Array.isArray(s.category_id) ? s.category_id : [s.category_id],
+        onAllowed: setSelectedSeries
+    });
 
     // Close any open previews when this page mounts
     useEffect(() => {
@@ -145,80 +136,12 @@ export function Series() {
         }
     };
 
-    // Load hidden items from IndexedDB on mount (for Kids profile)
-    useEffect(() => {
-        if (!isKidsProfile) return;
-
-        const loadHiddenItems = async () => {
-            const hidden = await indexedDBCache.getHiddenItems('series');
-            setHiddenSeries(new Set(hidden));
-        };
-        loadHiddenItems();
-    }, [isKidsProfile]);
-
-    // Load cached ratings for parental control filtering
-    useEffect(() => {
-        const loadCachedRatings = async () => {
-            const ratings = await indexedDBCache.getAllCachedSeries();
-            setCachedRatings(ratings);
-        };
-        loadCachedRatings();
-    }, [series]);
-
-    // Fetch blocked category IDs for Kids profile OR Parental Control
-    useEffect(() => {
-        const fetchBlockedCategories = async () => {
-            try {
-                const result = await window.ipcRenderer.invoke('categories:get-series');
-                if (result.success) {
-                    const parentalConfig = parentalService.getConfig();
-                    const shouldBlockCategories = isKidsProfile || (parentalConfig.enabled && parentalConfig.blockAdultCategories && !parentalService.isSessionUnlocked());
-
-                    if (shouldBlockCategories) {
-                        const blockedIds = new Set<string>();
-                        (result.data || []).forEach((cat: { category_id: string; category_name: string }) => {
-                            const lowerName = cat.category_name.toLowerCase();
-                            if (BLOCKED_CATEGORY_PATTERNS.some(p => lowerName.includes(p))) {
-                                blockedIds.add(cat.category_id);
-                            }
-                        });
-                        setBlockedCategoryIds(blockedIds);
-                    } else {
-                        setBlockedCategoryIds(new Set());
-                    }
-                }
-            } catch (err) {
-                console.error('Failed to fetch categories for filter:', err);
-            }
-        };
-        fetchBlockedCategories();
-    }, [isKidsProfile]);
-
     const filteredSeries = series.filter(s => {
         const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
-        const normalizedName = s.name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
 
-        // Parental Control filtering (applies to all profiles)
-        const seriesCategories = Array.isArray(s.category_id) ? s.category_id : [s.category_id];
-        if (seriesCategories.some(catId => blockedCategoryIds.has(catId))) {
+        // Kids profile + Parental Control filtering
+        if (!isItemVisible(s)) {
             return false;
-        }
-
-        // Parental Control: Filter by cached rating
-        const parentalConfig = parentalService.getConfig();
-        if (parentalConfig.enabled && !parentalService.isSessionUnlocked()) {
-            const cachedRating = cachedRatings.get(normalizedName);
-            if (cachedRating && parentalService.isContentBlocked(cachedRating)) {
-                return false;
-            }
-        }
-
-        // Kids profile filtering (additional checks)
-        if (isKidsProfile) {
-            // Block items that have been marked as hidden
-            if (hiddenSeries.has(normalizedName)) {
-                return false;
-            }
         }
 
         if (selectedCategory === 'CONTINUE_WATCHING') {
@@ -245,27 +168,6 @@ export function Series() {
 
     const fixImageUrl = (url: string): string => url && url.startsWith('http') ? url : `https://${url}`;
 
-    const extractYearFromName = (name: string): string => {
-        const match = name.match(/\((\d{4})\)/);
-        return match ? match[1] : '';
-    };
-
-    // Fetch TMDB data
-    useEffect(() => {
-        if (!selectedSeries) {
-            setTmdbData(null);
-            return;
-        }
-
-        const year = extractYearFromName(selectedSeries.name);
-        setLoadingTmdb(true);
-        setTmdbData(null);
-
-        searchSeriesByName(selectedSeries.name, year)
-            .then(data => { setTmdbData(data); setLoadingTmdb(false); })
-            .catch(() => setLoadingTmdb(false));
-    }, [selectedSeries]);
-
     const handlePlaySeries = (seriesItem: Series) => {
         // Check for existing progress
         const progress = watchProgressService.getEpisodeProgress(
@@ -285,51 +187,6 @@ export function Series() {
             // No progress or completed, play directly
             setPlayingSeries(seriesItem);
         }
-    };
-
-    // Episode title handling
-    const isValidEpisodeTitle = (cleanTitle: string): boolean => {
-        const genericPatterns = [
-            /^s\d+\s*e\d+$/i,
-            /^episode\s*\d+$/i,
-            /^ep\s*\d+$/i,
-            /^\d+$/,
-            /^temporada\s*\d+\s*episodio\s*\d+$/i
-        ];
-        return !genericPatterns.some(pattern => pattern.test(cleanTitle));
-    };
-
-    const getEpisodeTitle = (fullTitle: string, episodeNum: number, season: number = selectedSeason): string => {
-        const cleanTitle = fullTitle
-            .replace(/^(.*?)[\s\-–—]*S\d+[\s\-:.]*E\d+[\s\-:.–—]*/i, '')
-            .replace(/\s*(?:\[|\()?S\d+[\s.-]*E\d+(?:\]|\))?\s*/gi, '')
-            .replace(/\s*-\s*Temporada\s*\d+\s*Epis[oó]dio\s*\d+\s*/gi, '')
-            .replace(/\s*Temp\s*\d+\s*Ep\s*\d+\s*/gi, '')
-            .trim();
-
-        if (cleanTitle && isValidEpisodeTitle(cleanTitle)) {
-            return `Episódio ${episodeNum} - ${cleanTitle}`;
-        }
-
-        // Check cache for TMDB title
-        const cacheKey = `${selectedSeries?.tmdb_id || selectedSeries?.series_id}-${season}-${episodeNum}`;
-        const cachedTitle = tmdbEpisodeCache.get(cacheKey);
-        if (cachedTitle) {
-            return `Episódio ${episodeNum} - ${cachedTitle}`;
-        }
-
-        // Fetch from TMDB if we have tmdb_id
-        if (selectedSeries?.tmdb_id && tmdbData) {
-            fetchEpisodeDetails(selectedSeries.tmdb_id, season, episodeNum)
-                .then(epDetails => {
-                    if (epDetails?.name) {
-                        setTmdbEpisodeCache(prev => new Map(prev).set(cacheKey, epDetails.name));
-                    }
-                })
-                .catch(() => { });
-        }
-
-        return `Episódio ${episodeNum}`;
     };
 
     const buildSeriesStreamUrl = async (seriesItem: Series): Promise<string> => {
@@ -379,104 +236,6 @@ export function Series() {
             setSeriesInfo(null);
         }
     }, [selectedSeries]);
-
-    // Handle series card click - check Kids filter and Parental Control, always cache for future use
-    const handleSeriesClick = async (s: Series) => {
-        const normalizedName = s.name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
-
-        // Check if already hidden for Kids profile
-        if (isKidsProfile && hiddenSeries.has(normalizedName)) {
-            return;
-        }
-
-        // Get parental control config
-        const parentalConfig = parentalService.getConfig();
-        const isParentalActive = parentalConfig.enabled && !parentalService.isSessionUnlocked();
-
-        // If no restrictions, just open and cache in background
-        if (!isKidsProfile && !isParentalActive) {
-            setSelectedSeries(s);
-
-            // Background caching for cross-profile benefit
-            (async () => {
-                const cached = await indexedDBCache.getCachedSeries(s.name);
-                if (!cached) {
-                    const yearMatch = s.name.match(/\((\d{4})\)/);
-                    const year = yearMatch ? yearMatch[1] : undefined;
-                    const tmdbResult = await searchSeries(s.name, year);
-                    if (tmdbResult) {
-                        await indexedDBCache.setCacheSeries(
-                            s.name,
-                            tmdbResult.certification || null,
-                            tmdbResult.genres?.map(g => g.name) || []
-                        );
-                        // If not kids-friendly, hide it for future Kids sessions
-                        if (!isKidsFriendly(tmdbResult.certification)) {
-                            await indexedDBCache.hideItem('series', s.name);
-                        }
-                    }
-                }
-            })();
-            return;
-        }
-
-        // Need to check rating - show loading
-        setCheckingItem(s.name);
-
-        try {
-            const cached = await indexedDBCache.getCachedSeries(s.name);
-            let certification: string | null = null;
-
-            if (cached) {
-                certification = cached.certification;
-            } else {
-                const yearMatch = s.name.match(/\((\d{4})\)/);
-                const year = yearMatch ? yearMatch[1] : undefined;
-                const tmdbResult = await searchSeries(s.name, year);
-
-                if (tmdbResult) {
-                    certification = tmdbResult.certification || null;
-                    await indexedDBCache.setCacheSeries(
-                        s.name,
-                        certification,
-                        tmdbResult.genres?.map(g => g.name) || []
-                    );
-                    // Update local cache for immediate filtering
-                    setCachedRatings(prev => new Map(prev).set(normalizedName, certification));
-                }
-            }
-
-            // Check Kids profile restriction
-            if (isKidsProfile) {
-                if (isKidsFriendly(certification)) {
-                    setSelectedSeries(s);
-                } else {
-                    setBlockMessage(`"${s.name}" não está disponível para este perfil`);
-                    await indexedDBCache.hideItem('series', s.name);
-                    setHiddenSeries(prev => new Set(prev).add(normalizedName));
-                    setTimeout(() => setBlockMessage(null), 3000);
-                }
-                return;
-            }
-
-            // Check Parental Control restriction
-            if (isParentalActive && certification) {
-                if (parentalService.isContentBlocked(certification)) {
-                    setBlockMessage(`"${s.name}" está bloqueado pelo controle parental (${certification})`);
-                    setTimeout(() => setBlockMessage(null), 3000);
-                    return;
-                }
-            }
-
-            // Allow access
-            setSelectedSeries(s);
-        } catch (error) {
-            console.error('Error checking series rating:', error);
-            setSelectedSeries(s);
-        } finally {
-            setCheckingItem(null);
-        }
-    };
 
     // Loading State
     if (loading) return (
@@ -585,242 +344,24 @@ export function Series() {
                 <div className="series-content">
                     {/* Series Details Panel */}
                     {selectedSeries && (
-                        <div className="series-details-panel" style={{ display: 'none' }}>
-                            <div className="details-content">
-                                {/* Meta Info */}
-                                <div className="meta-badges">
-                                    {loadingTmdb ? (
-                                        <span className="badge shimmer">Carregando...</span>
-                                    ) : (
-                                        <>
-                                            {tmdbData?.first_air_date && (
-                                                <span className="badge date-badge">
-                                                    📅 {new Date(tmdbData.first_air_date).getFullYear()}
-                                                </span>
-                                            )}
-                                            {tmdbData?.vote_average ? (
-                                                <span className="badge rating-badge">
-                                                    ⭐ {tmdbData.vote_average.toFixed(1)}
-                                                </span>
-                                            ) : null}
-                                            {seriesInfo?.episodes && (
-                                                <span className="badge seasons-badge">
-                                                    📺 {Object.keys(seriesInfo.episodes).length} Temporadas
-                                                </span>
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-
-                                {/* Title */}
-                                <h1 className="series-title">{selectedSeries.name}</h1>
-
-                                {/* Genres */}
-                                {loadingTmdb ? (
-                                    <p className="loading-text">Carregando gêneros...</p>
-                                ) : tmdbData?.genres && tmdbData.genres.length > 0 ? (
-                                    <div className="genre-tags">
-                                        {tmdbData.genres.slice(0, 4).map(genre => (
-                                            <span key={genre.id} className="genre-tag">{genre.name}</span>
-                                        ))}
-                                    </div>
-                                ) : null}
-
-                                {/* Overview */}
-                                {loadingTmdb ? (
-                                    <p className="loading-text">Carregando sinopse...</p>
-                                ) : tmdbData?.overview ? (
-                                    <p className="series-overview">{tmdbData.overview}</p>
-                                ) : null}
-
-                                {/* Season Tabs Carousel */}
-                                <div className="season-carousel-wrapper">
-                                    <button
-                                        className="season-nav-btn season-nav-left"
-                                        onClick={() => {
-                                            if (seasonTabsRef.current) {
-                                                seasonTabsRef.current.scrollBy({ left: -200, behavior: 'smooth' });
-                                            }
-                                        }}
-                                    >
-                                        ‹
-                                    </button>
-                                    <div
-                                        className={`season-tabs-container ${isDragging ? 'dragging' : ''}`}
-                                        ref={seasonTabsRef}
-                                        onMouseDown={(e) => {
-                                            setIsDragging(true);
-                                            setDragStartX(e.pageX);
-                                            setScrollStartX(seasonTabsRef.current?.scrollLeft || 0);
-                                        }}
-                                        onMouseMove={(e) => {
-                                            if (!isDragging) return;
-                                            e.preventDefault();
-                                            const delta = e.pageX - dragStartX;
-                                            if (seasonTabsRef.current) {
-                                                seasonTabsRef.current.scrollLeft = scrollStartX - delta;
-                                            }
-                                        }}
-                                        onMouseUp={() => setIsDragging(false)}
-                                        onMouseLeave={() => setIsDragging(false)}
-                                    >
-                                        <div className="season-tabs">
-                                            {seriesInfo?.episodes ? Object.keys(seriesInfo.episodes).sort((a, b) => Number(a) - Number(b)).map((season: string, index: number) => (
-                                                <button
-                                                    key={season}
-                                                    className={`season-tab ${selectedSeason === Number(season) ? 'active' : ''}`}
-                                                    onClick={() => {
-                                                        if (!isDragging) {
-                                                            setSelectedSeason(Number(season));
-                                                            setSelectedEpisode(1);
-                                                        }
-                                                    }}
-                                                    style={{ animationDelay: `${index * 0.05}s` }}
-                                                >
-                                                    <span className="season-tab-number">T{season}</span>
-                                                    <span className="season-tab-label">Temporada {season}</span>
-                                                </button>
-                                            )) : (
-                                                <button className="season-tab active">
-                                                    <span className="season-tab-number">T1</span>
-                                                    <span className="season-tab-label">Temporada 1</span>
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <button
-                                        className="season-nav-btn season-nav-right"
-                                        onClick={() => {
-                                            if (seasonTabsRef.current) {
-                                                seasonTabsRef.current.scrollBy({ left: 200, behavior: 'smooth' });
-                                            }
-                                        }}
-                                    >
-                                        ›
-                                    </button>
-                                </div>
-
-                                {/* Episode List */}
-                                <div className="episode-list-container">
-                                    <div className="episode-list">
-                                        {seriesInfo?.episodes?.[selectedSeason] ? seriesInfo.episodes[selectedSeason].map((episode: SeriesEpisode, index: number) => {
-                                            const episodeNum = Number(episode.episode_num);
-                                            const progress = watchProgressService.getEpisodeProgress(String(selectedSeries.series_id), selectedSeason, episodeNum);
-                                            const isSelected = selectedEpisode === episodeNum;
-                                            const isWatched = progress?.completed;
-                                            const progressPercent = progress ? Math.round((progress.currentTime / progress.duration) * 100) : 0;
-
-                                            return (
-                                                <div
-                                                    key={episode.id}
-                                                    className={`episode-card ${isSelected ? 'selected' : ''} ${isWatched ? 'watched' : ''}`}
-                                                    onClick={() => setSelectedEpisode(episodeNum)}
-                                                    style={{ animationDelay: `${index * 0.03}s` }}
-                                                >
-                                                    <div className="episode-number-badge">
-                                                        {isWatched ? '✓' : episodeNum}
-                                                    </div>
-                                                    <div className="episode-info">
-                                                        <div className="episode-title-row">
-                                                            <span className="episode-title">{getEpisodeTitle(episode.title || '', episodeNum)}</span>
-                                                        </div>
-                                                        {episode.info?.duration && (
-                                                            <span className="episode-duration">{episode.info.duration}</span>
-                                                        )}
-                                                        {progressPercent > 0 && progressPercent < 95 && (
-                                                            <div className="episode-progress-bar">
-                                                                <div className="episode-progress-fill" style={{ width: `${progressPercent}%` }} />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    {isSelected && (
-                                                        <div className="episode-play-indicator">▶</div>
-                                                    )}
-                                                </div>
-                                            );
-                                        }) : (
-                                            <div className="episode-card selected">
-                                                <div className="episode-number-badge">1</div>
-                                                <div className="episode-info">
-                                                    <span className="episode-title">Episódio 1</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="action-buttons">
-                                    <button
-                                        className="btn btn-primary"
-                                        onClick={() => handlePlaySeries(selectedSeries)}
-                                    >
-                                        <span className="btn-icon">▶</span>
-                                        <span>Assistir</span>
-                                    </button>
-
-                                    <button
-                                        className={`btn btn-secondary ${watchLaterService.has(String(selectedSeries.series_id), 'series') ? 'saved' : ''}`}
-                                        onClick={() => {
-                                            if (watchLaterService.has(String(selectedSeries.series_id), 'series')) {
-                                                watchLaterService.remove(String(selectedSeries.series_id), 'series');
-                                            } else {
-                                                watchLaterService.add({
-                                                    id: String(selectedSeries.series_id),
-                                                    type: 'series',
-                                                    name: selectedSeries.name,
-                                                    cover: selectedSeries.cover || selectedSeries.stream_icon
-                                                });
-                                            }
-                                            setRefresh(r => r + 1);
-                                        }}
-                                    >
-                                        <span className="btn-icon">
-                                            {watchLaterService.has(String(selectedSeries.series_id), 'series') ? '✓' : '+'}
-                                        </span>
-                                        <span>{watchLaterService.has(String(selectedSeries.series_id), 'series') ? 'Salvo' : 'Minha Lista'}</span>
-                                    </button>
-
-                                    <button
-                                        className={`btn btn-favorite ${favoritesService.has(String(selectedSeries.series_id), 'series') ? 'favorited' : ''}`}
-                                        onClick={() => {
-                                            favoritesService.toggle({
-                                                id: String(selectedSeries.series_id),
-                                                type: 'series',
-                                                title: selectedSeries.name,
-                                                poster: selectedSeries.cover || selectedSeries.stream_icon,
-                                                rating: tmdbData?.vote_average?.toFixed(1),
-                                                year: tmdbData?.first_air_date ? new Date(tmdbData.first_air_date).getFullYear().toString() : undefined,
-                                                seriesId: selectedSeries.series_id
-                                            });
-                                            setRefresh(r => r + 1);
-                                        }}
-                                        title={favoritesService.has(String(selectedSeries.series_id), 'series') ? 'Remover dos Favoritos' : 'Adicionar aos Favoritos'}
-                                    >
-                                        <span className="btn-icon">
-                                            {favoritesService.has(String(selectedSeries.series_id), 'series') ? '❤️' : '🤍'}
-                                        </span>
-                                    </button>
-
-                                    {watchProgressService.getSeriesProgress(String(selectedSeries.series_id), selectedSeries.name) && (
-                                        <button
-                                            className="btn btn-danger"
-                                            onClick={() => setShowClearHistoryConfirm(true)}
-                                        >
-                                            <span className="btn-icon">🗑️</span>
-                                            <span>Limpar Histórico</span>
-                                        </button>
-                                    )}
-
-                                    <button
-                                        className="btn btn-close"
-                                        onClick={() => setSelectedSeries(null)}
-                                    >
-                                        ✕
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
+                        <SeriesDetailPanel
+                            series={selectedSeries}
+                            tmdbData={tmdbData}
+                            loadingTmdb={loadingTmdb}
+                            seriesInfo={seriesInfo}
+                            selectedSeason={selectedSeason}
+                            selectedEpisode={selectedEpisode}
+                            getEpisodeTitle={getEpisodeTitle}
+                            onSelectSeason={(season) => {
+                                setSelectedSeason(season);
+                                setSelectedEpisode(1);
+                            }}
+                            onSelectEpisode={setSelectedEpisode}
+                            onPlay={() => handlePlaySeries(selectedSeries)}
+                            onClearHistory={() => setShowClearHistoryConfirm(true)}
+                            onClose={() => setSelectedSeries(null)}
+                            onRefresh={() => setRefresh(r => r + 1)}
+                        />
                     )}
 
                     {/* Series Grid */}
