@@ -44,6 +44,11 @@ function App() {
     // Force refresh content by clearing cache timestamp
     localStorage.removeItem('contentLastFetch');
 
+    // Best-effort sweep of expired certification cache (30-day TTL).
+    void import('./services/indexedDBCache').then(({ indexedDBCache }) =>
+      indexedDBCache.cleanupExpired()
+    );
+
     // Initialize profile service (migrate old data if needed)
     profileService.initialize();
 
