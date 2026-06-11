@@ -3,6 +3,7 @@ import { CategoryMenu } from '../components/CategoryMenu';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { LazyImage } from '../components/LazyImage';
+import { useWindowedGrid } from '../hooks/useWindowedGrid';
 import { epgService } from '../services/epgService';
 import { profileService } from '../services/profileService';
 import { parentalService } from '../services/parentalService';
@@ -86,6 +87,7 @@ export function LiveTV() {
     const [itemsPerPage, setItemsPerPage] = useState(48); // Default fallback
     const [progressTick, setProgressTick] = useState(0);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const gridRef = useRef<HTMLDivElement>(null);
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const [allowedCategoryIds, setAllowedCategoryIds] = useState<Set<string>>(new Set());
     const [blockedCategoryIds, setBlockedCategoryIds] = useState<Set<string>>(new Set());
@@ -272,23 +274,20 @@ export function LiveTV() {
         return matchesSearch && matchesCategory;
     });
 
-    // Scroll handler for lazy loading
-    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-        const container = e.currentTarget;
-        const { scrollTop, scrollHeight, clientHeight } = container;
-        const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
-
-        // Load more when 80% scrolled
-        if (scrollPercentage >= 0.8 && visibleCount < filteredStreams.length) {
-            const newCount = Math.min(visibleCount + itemsPerPage, filteredStreams.length);
-            setVisibleCount(newCount);
-        }
-    };
+    // Windowed rendering (same mechanism as VOD/Series).
+    const gridWindow = useWindowedGrid({
+        scrollRef: scrollContainerRef,
+        gridRef,
+        itemCount: filteredStreams.length
+    });
+    const windowStart = gridWindow.ready ? gridWindow.start : 0;
+    const windowEnd = gridWindow.ready ? gridWindow.end : Math.min(visibleCount, filteredStreams.length);
 
     // Reset visible count when search or category changes
     useEffect(() => {
         setVisibleCount(itemsPerPage);
         setSelectedChannel(null);
+        if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
     }, [searchQuery, selectedCategory, itemsPerPage]);
 
     // Find quality variants for a channel (e.g., Globo SP matches Globo [4K])
@@ -1128,7 +1127,7 @@ export function LiveTV() {
                     </div>
                 )}
 
-                <div ref={scrollContainerRef} onScroll={handleScroll} className="livetv-scroll-container p-8" style={{ paddingLeft: '60px', position: 'relative', zIndex: 1, height: 'calc(100vh - 120px)', overflowY: 'auto', paddingRight: '8px', scrollbarWidth: 'thin', scrollbarColor: 'rgba(168, 85, 247, 0.4) transparent' }}>
+                <div ref={scrollContainerRef} className="livetv-scroll-container p-8" style={{ paddingLeft: '60px', position: 'relative', zIndex: 1, height: 'calc(100vh - 120px)', overflowY: 'auto', paddingRight: '8px', scrollbarWidth: 'thin', scrollbarColor: 'rgba(168, 85, 247, 0.4) transparent' }}>
                     <style>{`
                         .channel-card {
                             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1184,8 +1183,11 @@ export function LiveTV() {
                             <p style={{ fontSize: '14px', color: 'rgba(107, 114, 128, 1)', marginTop: '8px' }}>Tente buscar por outro termo</p>
                         </div>
                     ) : (
-                        <div className="channels-grid" style={{ animation: 'fadeInScale 0.5s ease-out' }}>
-                            {filteredStreams.slice(0, visibleCount).map((stream) => (
+                        <div ref={gridRef} className="channels-grid" style={{ animation: 'fadeInScale 0.5s ease-out' }}>
+                            {gridWindow.topSpacer > 0 && (
+                                <div data-spacer="true" style={{ gridColumn: '1 / -1', height: gridWindow.topSpacer }} />
+                            )}
+                            {filteredStreams.slice(windowStart, windowEnd).map((stream) => (
                                 <div
                                     key={stream.stream_id}
                                     onClick={() => setSelectedChannel(stream)}
@@ -1274,6 +1276,9 @@ export function LiveTV() {
                                     )}
                                 </div>
                             ))}
+                            {gridWindow.bottomSpacer > 0 && (
+                                <div data-spacer="true" style={{ gridColumn: '1 / -1', height: gridWindow.bottomSpacer }} />
+                            )}
                         </div>
                     )}
                 </div>
