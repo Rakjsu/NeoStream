@@ -14,6 +14,7 @@
     "myList": "My List",
     "favorites": "Favorites",
     "downloads": "Downloads",
+    "history": "History",
     "settings": "Settings",
     "switchProfile": "Switch Profile",
     "manageProfiles": "Manage Profiles",
@@ -469,6 +470,7 @@
     "goodAfternoon": "Good afternoon",
     "goodEvening": "Good evening",
     "continueWatching": "Continue Watching",
+    "nextEpisodes": "Next Episodes",
     "recommendations": "Recommended For You",
     "recentSeries": "Recent Series",
     "recentMovies": "Recent Movies",
@@ -570,5 +572,19 @@
     "exploreSeries": "Explore Series",
     "availableOffline": "is available offline!",
     "failedTo": "Failed to download"
+  },
+  "history": {
+    "title": "History",
+    "item": "watched item",
+    "items": "watched items",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "movie": "Movie",
+    "serie": "Series",
+    "watched": "watched",
+    "emptyTitle": "No history yet",
+    "emptyText": "Movies and episodes you watch will appear here",
+    "exploreMovies": "Explore Movies",
+    "exploreSeries": "Explore Series"
   }
 }

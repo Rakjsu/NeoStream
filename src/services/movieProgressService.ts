@@ -1,6 +1,6 @@
 import { profileService } from './profileService';
 
-interface MovieProgress {
+export interface MovieProgress {
     movieId: string;
     movieName: string;
     profileId: string;
@@ -103,6 +103,14 @@ class MovieProgressService {
                     (p.progress >= 95 || p.completed)
             )
             .map((p) => p.movieId);
+    }
+
+    // Read-only watch history for the active profile (every movie with progress)
+    getHistory(): MovieProgress[] {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return [];
+
+        return this.getProgress().filter((p) => p.profileId === activeProfile.id);
     }
 
     // Clear movie progress
