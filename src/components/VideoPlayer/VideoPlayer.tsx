@@ -2,7 +2,6 @@ import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Pause, Volume2, Volume1, Volume, VolumeX, Maximize, Minimize, Settings, Cast, Captions, PictureInPicture2 } from 'lucide-react';
 import { useVideoPlayer } from '../../hooks/useVideoPlayer';
 import { useHls } from '../../hooks/useHls';
-import { useChromecast } from '../../hooks/useChromecast';
 import { CastDeviceSelector } from '../CastDeviceSelector';
 import { CastControls } from '../CastControls';
 import { formatTime, percentage } from '../../utils/videoHelpers';
@@ -110,8 +109,6 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
 
     useHls({ src, videoRef, onStreamError: handleStreamError });
 
-    // Chromecast integration
-    const chromecast = useChromecast(src, title || 'Video');
 
     const [showControls, setShowControls] = useState(true);
     const [seeking, setSeeking] = useState(false);
@@ -1209,7 +1206,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             onClick={() => setShowDeviceSelector(true)}
                             title="Cast to Device"
                             style={{
-                                color: chromecast.isCasting ? '#2563eb' : 'white',
+                                color: castingDevice ? '#2563eb' : 'white',
                                 opacity: 1
                             }}
                         >
@@ -1243,12 +1240,6 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                                 // Pause local playback — the TV took over.
                                 if (state.playing) controls.togglePlay();
                             }
-                        }}
-                        chromecastAvailable={chromecast.isAvailable}
-                        chromecastCasting={chromecast.isCasting}
-                        onChromecastCast={() => {
-                            chromecast.setCurrentTime(state.currentTime);
-                            chromecast.startCasting();
                         }}
                     />
                 )
