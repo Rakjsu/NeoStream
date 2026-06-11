@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { debounce } from '../utils/debounce';
 
 interface AnimatedSearchBarProps {
     value: string;
@@ -6,10 +7,23 @@ interface AnimatedSearchBarProps {
     placeholder?: string;
 }
 
+const SEARCH_DEBOUNCE_MS = 300;
+
 export function AnimatedSearchBar({ value, onChange, placeholder = "Buscar..." }: AnimatedSearchBarProps) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
+    // The input shows keystrokes immediately; the (expensive) parent filter
+    // only runs after the user pauses typing.
+    const [draft, setDraft] = useState(value);
     const inputRef = useRef<HTMLInputElement>(null);
+
+    const debouncedOnChange = useMemo(() => debounce(onChange, SEARCH_DEBOUNCE_MS), [onChange]);
+    useEffect(() => () => debouncedOnChange.cancel(), [debouncedOnChange]);
+
+    // Keep the draft in sync when the parent clears/sets the value externally.
+    useEffect(() => {
+        setDraft(value);
+    }, [value]);
 
     useEffect(() => {
         if (isExpanded && inputRef.current) {
@@ -17,10 +31,17 @@ export function AnimatedSearchBar({ value, onChange, placeholder = "Buscar..." }
         }
     }, [isExpanded]);
 
+    const handleInput = (next: string) => {
+        setDraft(next);
+        debouncedOnChange(next);
+    };
+
     const handleToggle = () => {
-        if (isExpanded && value === '') {
+        if (isExpanded && draft === '') {
             setIsExpanded(false);
-        } else if (isExpanded && value !== '') {
+        } else if (isExpanded && draft !== '') {
+            debouncedOnChange.cancel();
+            setDraft('');
             onChange('');
         } else {
             setIsExpanded(true);
@@ -29,7 +50,7 @@ export function AnimatedSearchBar({ value, onChange, placeholder = "Buscar..." }
 
     const handleBlur = () => {
         setIsFocused(false);
-        if (value === '') {
+        if (draft === '') {
             setTimeout(() => setIsExpanded(false), 200);
         }
     };
@@ -212,8 +233,8 @@ export function AnimatedSearchBar({ value, onChange, placeholder = "Buscar..." }
                     <input
                         ref={inputRef}
                         type="text"
-                        value={value}
-                        onChange={(e) => onChange(e.target.value)}
+                        value={draft}
+                        onChange={(e) => handleInput(e.target.value)}
                         onFocus={() => setIsFocused(true)}
                         onBlur={handleBlur}
                         placeholder={placeholder}
@@ -235,7 +256,7 @@ export function AnimatedSearchBar({ value, onChange, placeholder = "Buscar..." }
                         marginLeft: isExpanded ? '-52px' : '0'
                     }}
                 >
-                    {isExpanded && value ? (
+                    {isExpanded && draft ? (
                         <svg
                             className="search-btn-icon clear-icon"
                             width="22"
