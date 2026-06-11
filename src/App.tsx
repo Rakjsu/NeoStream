@@ -19,6 +19,7 @@ const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.S
 const WatchLater = lazy(() => import('./pages/WatchLater').then(m => ({ default: m.WatchLater })));
 const Favorites = lazy(() => import('./pages/Favorites').then(m => ({ default: m.Favorites })));
 const Downloads = lazy(() => import('./pages/Downloads').then(m => ({ default: m.Downloads })));
+const History = lazy(() => import('./pages/History').then(m => ({ default: m.History })));
 const PipWindow = lazy(() => import('./pages/PipWindow').then(m => ({ default: m.PipWindow })));
 
 function PageLoader() {
@@ -115,6 +116,7 @@ function App() {
               <Route path="watch-later" element={<WatchLater />} />
               <Route path="favorites" element={<Favorites />} />
               <Route path="downloads" element={<Downloads />} />
+              <Route path="history" element={<History />} />
               <Route path="settings" element={<Settings />} />
             </Route>
             <Route

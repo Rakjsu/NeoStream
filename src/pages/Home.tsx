@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { watchProgressService, type SeriesProgress } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
 import { ContentDetailModal } from '../components/ContentDetailModal';
+import { NextEpisodes } from '../components/NextEpisodes';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { ResumeModal } from '../components/ResumeModal';
 import { profileService } from '../services/profileService';
@@ -1427,6 +1428,9 @@ export function Home() {
                     showProgress={true}
                     sectionIndex={0}
                 />
+
+                {/* Next Episodes Section */}
+                <NextEpisodes allSeries={allSeries} />
 
                 {/* Recommendations Section */}
                 < ContentSection

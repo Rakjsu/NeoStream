@@ -14,6 +14,7 @@
     "myList": "Minha Lista",
     "favorites": "Favoritos",
     "downloads": "Baixados",
+    "history": "Histórico",
     "settings": "Configurações",
     "switchProfile": "Trocar Perfil",
     "manageProfiles": "Gerenciar Perfis",
@@ -469,6 +470,7 @@
     "goodAfternoon": "Boa tarde",
     "goodEvening": "Boa noite",
     "continueWatching": "Continue Assistindo",
+    "nextEpisodes": "Próximos Episódios",
     "recommendations": "Recomendados Para Você",
     "recentSeries": "Séries Recentes",
     "recentMovies": "Filmes Recentes",
@@ -570,5 +572,19 @@
     "exploreSeries": "Explorar Séries",
     "availableOffline": "está disponível offline!",
     "failedTo": "Falha ao baixar"
+  },
+  "history": {
+    "title": "Histórico",
+    "item": "item assistido",
+    "items": "itens assistidos",
+    "today": "Hoje",
+    "yesterday": "Ontem",
+    "movie": "Filme",
+    "serie": "Série",
+    "watched": "assistido",
+    "emptyTitle": "Nenhum histórico ainda",
+    "emptyText": "Os filmes e episódios que você assistir aparecerão aqui",
+    "exploreMovies": "Explorar Filmes",
+    "exploreSeries": "Explorar Séries"
   }
 }

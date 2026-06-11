@@ -1,6 +1,6 @@
 import { profileService } from './profileService';
 
-interface EpisodeProgress {
+export interface EpisodeProgress {
     seriesId: string;
     seasonNumber: number;
     episodeNumber: number;
@@ -218,6 +218,14 @@ class WatchProgressService {
         });
 
         return seriesMap;
+    }
+
+    // Read-only watch history for the active profile (every episode with progress)
+    getEpisodeHistory(): EpisodeProgress[] {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return [];
+
+        return this.getProgress().filter((p) => p.profileId === activeProfile.id);
     }
 
     // Get last watched episode for a series (for auto-selection)
