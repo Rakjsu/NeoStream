@@ -1,82 +1,59 @@
+# Multi-OS release pipeline: push a v*.*.* tag and this builds Windows
+# (NSIS + portable), Linux (AppImage + deb) and macOS (dmg + zip), then
+# attaches everything — including the latest*.yml auto-update feeds — to
+# the GitHub release for that tag. Release notes are edited afterwards.
 name: Build and Release
 
 on:
   push:
     tags:
-      - 'v*.*.*'  # Triggers on version tags like v1.0.0, v1.0.1, etc.
+      - 'v*.*.*'
+
+permissions:
+  contents: write
 
 jobs:
   release:
     runs-on: ${{ matrix.os }}
-    
+
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
-    
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
-      
+          node-version: 22
+          cache: npm
+
       - name: Install dependencies
         run: npm ci
-      
+
+      # --publish never: electron-builder only builds; the release step
+      # below uploads. (With GH_TOKEN visible, builder would double-publish.)
       - name: Build application
-        run: npm run build
+        run: npm run build -- --publish never
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Upload artifacts (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-installers
-          path: |
-            release/**/*.exe
-            release/**/*.yml
-          retention-days: 5
-      
-      - name: Upload artifacts (macOS)
-        if: matrix.os == 'macos-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-installers
-          path: |
-            release/**/*.dmg
-            release/**/*.zip
-            release/**/*.yml
-          retention-days: 5
-      
-      - name: Upload artifacts (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-installers
-          path: |
-            release/**/*.AppImage
-            release/**/*.deb
-            release/**/*.yml
-          retention-days: 5
-      
-      # Publish to GitHub Releases
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+          VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
+          # macOS: no signing identity in CI — skip signing instead of failing.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Attach artifacts to the release
+        uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/**/*.exe
-            release/**/*.dmg
-            release/**/*.zip
-            release/**/*.AppImage
-            release/**/*.deb
-            release/**/*.yml
+            release/*.exe
+            release/*.exe.blockmap
+            release/*.dmg
+            release/*.zip
+            release/*.AppImage
+            release/*.deb
+            release/latest*.yml
           draft: false
           prerelease: false
-          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
