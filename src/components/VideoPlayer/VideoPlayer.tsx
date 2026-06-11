@@ -1,17 +1,21 @@
 import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, Volume2, Volume1, Volume, VolumeX, Maximize, Minimize, Settings, Cast, Captions, PictureInPicture2 } from 'lucide-react';
+import { Play, Pause, Volume2, Volume1, Volume, VolumeX, Maximize, Minimize, Cast, Captions, PictureInPicture2 } from 'lucide-react';
 import { useVideoPlayer } from '../../hooks/useVideoPlayer';
 import { useHls } from '../../hooks/useHls';
 import { CastDeviceSelector } from '../CastDeviceSelector';
 import { CastControls } from '../CastControls';
 import { formatTime, percentage } from '../../utils/videoHelpers';
 import { usageStatsService } from '../../services/usageStatsService';
-import { autoFetchSubtitle, autoFetchForcedSubtitle, cleanupSubtitleUrl } from '../../services/subtitleService';
 import { SubtitleOverlay } from './SubtitleOverlay';
+import { useSubtitleManager } from './useSubtitleManager';
+import { useKeyboardShortcuts } from './useKeyboardShortcuts';
+import { PlayerSettingsMenu } from './PlayerSettingsMenu';
+import { ForcedSubtitlesMenu } from './ForcedSubtitlesMenu';
 import { useLanguage } from '../../services/languageService';
 import './VideoPlayer.css';
 
 import type { MovieVersion } from '../../services/movieVersionService';
+import type { SwitchableContent } from './PlayerSettingsMenu';
 
 // Live TV quality variant type (matches LiveTV.tsx structure)
 export interface QualityVariant<TChannel = unknown> {
@@ -19,10 +23,6 @@ export interface QualityVariant<TChannel = unknown> {
     quality: string;
     priority: number;
     label: string;
-}
-
-interface SwitchableContent {
-    stream_id?: string | number;
 }
 
 export interface VideoPlayerProps<TSwitchContent extends SwitchableContent = SwitchableContent> {
@@ -116,36 +116,20 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     const [showSettings, setShowSettings] = useState(false);
     const [showDeviceSelector, setShowDeviceSelector] = useState(false);
     const [castingDevice, setCastingDevice] = useState<{ id: string; name: string } | null>(null);
-    const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     const [hoverPosition, setHoverPosition] = useState(0);
-    const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
-    const [subtitleLoading, setSubtitleLoading] = useState(false);
-    const [subtitleLanguage, setSubtitleLanguage] = useState<string | null>(null);
-    const [vttContent, setVttContent] = useState<string | null>(null);
-    const [subtitleWarning, setSubtitleWarning] = useState<string | null>(null);
-    const [isForcedSubtitle, setIsForcedSubtitle] = useState(false); // Track if current subtitle is Forced type
-    const [showSettingsMenu, setShowSettingsMenu] = useState(false); // Gear menu visibility
-    // Initialize session toggle from global config (enabled = setting is ON)
-    const [forcedEnabledForSession, setForcedEnabledForSession] = useState(() => {
-        try {
-            // Read active profile ID from neostream_profiles (correct key)
-            const profilesData = localStorage.getItem('neostream_profiles');
-            let profileId: string | null = null;
-            if (profilesData) {
-                const parsed = JSON.parse(profilesData);
-                profileId = parsed.activeProfileId || null;
-            }
-            const configKey = profileId ? `playbackConfig_${profileId}` : 'playbackConfig';
-            const saved = localStorage.getItem(configKey);
-            if (saved) {
-                const config = JSON.parse(saved);
-                const result = config.forcedSubtitlesEnabled !== false;
-                return result;
-            }
-        } catch (e) { console.error('Error reading forced config:', e); }
-        return true; // default enabled
-    });
+    const {
+        subtitlesEnabled,
+        setSubtitlesEnabled,
+        subtitleLoading,
+        subtitleLanguage,
+        vttContent,
+        subtitleWarning,
+        isForcedSubtitle,
+        forcedEnabledForSession,
+        handleSubtitleToggle,
+        handleForcedSessionToggle
+    } = useSubtitleManager({ title, tmdbId, imdbId, seasonNumber, episodeNumber, videoRef });
     const containerRef = useRef<HTMLDivElement>(null);
     const progressRef = useRef<HTMLDivElement>(null);
 
@@ -207,57 +191,6 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
             }
         };
     }, [resetHideControlsTimer, state.fullscreen]);
-
-    // Auto-load Forced subtitles when content starts (movies and series)
-    useEffect(() => {
-        // Skip if no title
-        if (!title) return;
-
-        // Check if title contains [L] - already subtitled, skip Forced
-        if (title.includes('[L]')) {
-            return;
-        }
-
-        const loadForcedSubtitles = async () => {
-            try {
-                // Check if Forced subtitles are disabled for this session
-                if (!forcedEnabledForSession) {
-                    return;
-                }
-
-                // Check if Forced subtitles are enabled in settings
-                const { playbackService } = await import('../../services/playbackService');
-                playbackService.reloadConfig();
-                const config = playbackService.getConfig();
-
-                if (!config.forcedSubtitlesEnabled) {
-                    return;
-                }
-
-                const result = await autoFetchForcedSubtitle({
-                    title,
-                    tmdbId,
-                    imdbId,
-                    season: seasonNumber,
-                    episode: episodeNumber
-                });
-
-                if (result) {
-                    setSubtitleUrl(result.url);
-                    setSubtitleLanguage(result.language);
-                    setVttContent(result.vttContent);
-                    setSubtitlesEnabled(true);
-                    setIsForcedSubtitle(true);
-                }
-            } catch (error) {
-                console.error('Error auto-loading forced subtitles:', error);
-            }
-        };
-
-        // Small delay to let video player initialize
-        const timer = setTimeout(loadForcedSubtitles, 1000);
-        return () => clearTimeout(timer);
-    }, [title, tmdbId, imdbId, seasonNumber, episodeNumber, forcedEnabledForSession]);
 
     // Handle auto-play (respects the shouldAutoPlayNextEpisode setting)
     useEffect(() => {
@@ -408,87 +341,18 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
 
     // Note: SubtitleOverlay component handles its own timeupdate/seeked events
 
-    // Cleanup subtitle blob URL on unmount
-    useEffect(() => {
-        return () => {
-            if (subtitleUrl) {
-                cleanupSubtitleUrl(subtitleUrl);
-            }
-        };
-    }, [subtitleUrl]);
-
-    // Keyboard shortcuts — the latest handler lives in a ref so a single
-    // stable document listener is attached for the whole player lifetime.
-    const handleKeyDownRef = useRef<(e: KeyboardEvent) => void>(() => { });
-    handleKeyDownRef.current = (e: KeyboardEvent) => {
-        // Ignore keystrokes aimed at form fields or editable content
-        const target = e.target as HTMLElement | null;
-        if (target && (
-            target.tagName === 'INPUT' ||
-            target.tagName === 'TEXTAREA' ||
-            target.tagName === 'SELECT' ||
-            target.isContentEditable
-        )) return;
-
-        // Ignore while the cast device selector modal is open
-        if (showDeviceSelector) return;
-
-        switch (e.key.toLowerCase()) {
-            case ' ':
-            case 'k':
-                e.preventDefault();
-                controls.togglePlay();
-                break;
-            case 'arrowleft':
-                e.preventDefault();
-                controls.seek(Math.max(0, state.currentTime - 10));
-                break;
-            case 'arrowright':
-                e.preventDefault();
-                controls.seek(Math.min(state.duration, state.currentTime + 10));
-                break;
-            case 'arrowup':
-                e.preventDefault();
-                controls.setVolume(Math.min(1, state.volume + 0.1));
-                break;
-            case 'arrowdown':
-                e.preventDefault();
-                controls.setVolume(Math.max(0, state.volume - 0.1));
-                break;
-            case 'm':
-                e.preventDefault();
-                controls.toggleMute();
-                break;
-            case 'f':
-                e.preventDefault();
-                if (!document.fullscreenElement) {
-                    containerRef.current?.requestFullscreen();
-                } else {
-                    document.exitFullscreen();
-                }
-                break;
-            case 'c':
-                // The CC button runs an async fetch flow; the shortcut only
-                // toggles visibility when a subtitle is already loaded.
-                if (vttContent) {
-                    setSubtitlesEnabled(prev => !prev);
-                }
-                break;
-            case 'escape':
-                if (document.fullscreenElement) {
-                    document.exitFullscreen();
-                } else if (onClose) {
-                    onClose();
-                }
-                break;
-        }
-    };
-
-    useEffect(() => {
-        const listener = (e: KeyboardEvent) => handleKeyDownRef.current(e);
-        document.addEventListener('keydown', listener);
-        return () => document.removeEventListener('keydown', listener);
-    }, []);
+    // Keyboard shortcuts (Space/K/arrows/M/F/C/Escape) — single stable document listener.
+    useKeyboardShortcuts({
+        showDeviceSelector,
+        controls,
+        currentTime: state.currentTime,
+        duration: state.duration,
+        volume: state.volume,
+        containerRef,
+        vttContent,
+        setSubtitlesEnabled,
+        onClose
+    });
 
     // Progress bar hover preview
     const handleProgressHover = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -523,8 +387,6 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         controls.setVolume(parseFloat(e.target.value));
     };
-
-    const playbackRates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
 
     const currentTimePercent = percentage(state.currentTime, state.duration);
     const bufferedPercent = percentage(state.buffered, state.duration);
@@ -781,135 +643,18 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     </div>
 
                     <div className="controls-right">
-                        {/* Settings/Quality button - show for movies/series OR for live TV with quality variants */}
-                        {(contentType !== 'live' || (movieVersions && movieVersions.length > 1)) && (
-                            <div className="settings-menu-container">
-                                <button
-                                    className="control-btn settings-btn"
-                                    onClick={() => setShowSettings(!showSettings)}
-                                    style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '4px' }}
-                                >
-                                    <Settings size="1em" />
-                                    {/* Quality Badge - show current quality when movie versions available */}
-                                    {movieVersions && movieVersions.length > 0 && (() => {
-                                        const currentVersion = movieVersions.find(v => v.movie.stream_id === currentMovieId);
-                                        if (currentVersion) {
-                                            // For live TV, just show the quality label directly
-                                            if (contentType === 'live') {
-                                                return (
-                                                    <span style={{
-                                                        fontSize: '10px',
-                                                        fontWeight: 700,
-                                                        padding: '2px 6px',
-                                                        borderRadius: '4px',
-                                                        background: currentVersion.label === '4K' || currentVersion.label === 'UHD'
-                                                            ? 'linear-gradient(135deg, #f59e0b, #d97706)'
-                                                            : currentVersion.label === 'FHD' || currentVersion.label === 'H.265'
-                                                                ? 'linear-gradient(135deg, #10b981, #059669)'
-                                                                : currentVersion.label === 'SD'
-                                                                    ? 'linear-gradient(135deg, #6b7280, #4b5563)'
-                                                                    : 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
-                                                        color: 'white',
-                                                        textTransform: 'uppercase',
-                                                        letterSpacing: '0.5px',
-                                                        boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
-                                                    }}>
-                                                        {currentVersion.label}
-                                                    </span>
-                                                );
-                                            }
-                                            // For movies/series
-                                            const qualityText = currentVersion.quality === '4k' ? '4K' : '1080p';
-                                            const audioText = currentVersion.audio === 'subtitled' ? 'LEG' : 'DUB';
-                                            return (
-                                                <span style={{
-                                                    fontSize: '9px',
-                                                    fontWeight: 700,
-                                                    padding: '2px 5px',
-                                                    borderRadius: '4px',
-                                                    background: currentVersion.quality === '4k'
-                                                        ? 'linear-gradient(135deg, #f59e0b, #d97706)'
-                                                        : 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
-                                                    color: 'white',
-                                                    textTransform: 'uppercase',
-                                                    letterSpacing: '0.5px',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: '3px',
-                                                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
-                                                }}>
-                                                    {qualityText}
-                                                    <span style={{ opacity: 0.7, fontSize: '7px' }}>•</span>
-                                                    <span style={{ fontSize: '7px', opacity: 0.9 }}>{audioText}</span>
-                                                </span>
-                                            );
-                                        }
-                                        return null;
-                                    })()}
-                                </button>
-
-                                {showSettings && (
-                                    <div className="settings-menu">
-                                        {/* Movie Version Switcher / Live TV Quality Switcher */}
-                                        {movieVersions && movieVersions.length > 1 && onSwitchVersion ? (
-                                            <div className="settings-section">
-                                                <span className="settings-label">
-                                                    {contentType === 'live' ? t('player', 'quality') : t('player', 'version')}
-                                                </span>
-                                                <div className="settings-options">
-                                                    {movieVersions.map(version => {
-                                                        const isActive = version.movie.stream_id === currentMovieId;
-                                                        // Get icon based on quality
-                                                        const getQualityIcon = (label: string) => {
-                                                            const l = label.toLowerCase();
-                                                            if (l.includes('4k') || l.includes('uhd')) return '🔵';
-                                                            if (l.includes('fhd') || l.includes('h.265') || l.includes('1080')) return '🟢';
-                                                            if (l.includes('hd') || l.includes('720')) return '🟡';
-                                                            return '⚪'; // SD or unknown
-                                                        };
-                                                        return (
-                                                            <button
-                                                                key={version.movie.stream_id}
-                                                                className={`settings-option ${isActive ? 'active' : ''}`}
-                                                                onClick={() => {
-                                                                    if (!isActive) {
-                                                                        onSwitchVersion(version.movie, state.currentTime);
-                                                                    }
-                                                                    setShowSettings(false);
-                                                                }}
-                                                                style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
-                                                            >
-                                                                <span style={{ fontSize: '10px' }}>{getQualityIcon(version.label)}</span>
-                                                                {version.label}
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            /* Playback Speed - show for series or single-version movies */
-                                            <div className="settings-section">
-                                                <span className="settings-label">{t('player', 'speed')}</span>
-                                                <div className="settings-options">
-                                                    {playbackRates.map(rate => (
-                                                        <button
-                                                            key={rate}
-                                                            className={`settings-option ${state.playbackRate === rate ? 'active' : ''}`}
-                                                            onClick={() => {
-                                                                controls.setPlaybackRate(rate);
-                                                                setShowSettings(false);
-                                                            }}
-                                                        >
-                                                            {rate}x
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                        {/* Settings/Quality gear menu (movie versions / live quality / speed) */}
+                        <PlayerSettingsMenu
+                            contentType={contentType}
+                            movieVersions={movieVersions}
+                            currentMovieId={currentMovieId}
+                            onSwitchVersion={onSwitchVersion}
+                            currentTime={state.currentTime}
+                            playbackRate={state.playbackRate}
+                            onSetPlaybackRate={controls.setPlaybackRate}
+                            showSettings={showSettings}
+                            setShowSettings={setShowSettings}
+                        />
 
                         {/* Episode Navigation - Only show for series */}
                         {(onNextEpisode || onPreviousEpisode) && (
@@ -935,106 +680,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                         {!isSubtitled && contentType !== 'live' && (
                             <button
                                 className="control-btn"
-                                onClick={async () => {
-                                    // If currently showing Forced subtitles, switch to full subtitles
-                                    if (subtitlesEnabled && isForcedSubtitle) {
-                                        // Cleanup Forced subtitle
-                                        if (subtitleUrl) {
-                                            cleanupSubtitleUrl(subtitleUrl);
-                                        }
-                                        setSubtitleLoading(true);
-                                        setIsForcedSubtitle(false);
-
-                                        try {
-                                            const result = await autoFetchSubtitle({
-                                                title: title || '',
-                                                tmdbId,
-                                                imdbId,
-                                                season: seasonNumber,
-                                                episode: episodeNumber
-                                            });
-                                            if (result) {
-                                                setSubtitleUrl(result.url);
-                                                setSubtitleLanguage(result.language);
-                                                setVttContent(result.vttContent);
-                                                if (result.warning) {
-                                                    setSubtitleWarning(result.warning);
-                                                    setTimeout(() => setSubtitleWarning(null), 5000);
-                                                }
-                                            } else {
-                                                setSubtitleWarning(t('player', 'noFullSubtitlesFound'));
-                                                setTimeout(() => setSubtitleWarning(null), 4000);
-                                            }
-                                        } catch (error) {
-                                            console.error('Error fetching full subtitles:', error);
-                                        } finally {
-                                            setSubtitleLoading(false);
-                                        }
-                                        return;
-                                    }
-
-                                    if (subtitlesEnabled) {
-                                        // Disable subtitles and cleanup
-                                        setSubtitlesEnabled(false);
-                                        setIsForcedSubtitle(false);
-
-                                        // Cleanup subtitle blob URL from memory
-                                        if (subtitleUrl) {
-                                            cleanupSubtitleUrl(subtitleUrl);
-                                            setSubtitleUrl(null);
-                                            setSubtitleLanguage(null);
-                                            setVttContent(null);
-                                        }
-
-                                        const video = videoRef.current;
-                                        if (video && video.textTracks.length > 0) {
-                                            for (let i = 0; i < video.textTracks.length; i++) {
-                                                video.textTracks[i].mode = 'hidden';
-                                            }
-                                        }
-                                    } else {
-                                        // Enable subtitles - fetch if not already loaded
-                                        if (!subtitleUrl && title) {
-                                            setSubtitleLoading(true);
-                                            try {
-                                                const result = await autoFetchSubtitle({
-                                                    title,
-                                                    tmdbId,
-                                                    imdbId,
-                                                    season: seasonNumber,
-                                                    episode: episodeNumber
-                                                });
-                                                if (result) {
-                                                    setSubtitleUrl(result.url);
-                                                    setSubtitleLanguage(result.language);
-                                                    setVttContent(result.vttContent);
-                                                    setSubtitlesEnabled(true);
-                                                    // Show warning if using fallback language
-                                                    if (result.warning) {
-                                                        setSubtitleWarning(result.warning);
-                                                        // Clear warning after 5 seconds
-                                                        setTimeout(() => setSubtitleWarning(null), 5000);
-                                                    }
-                                                } else {
-                                                    setSubtitleWarning(t('player', 'noSubtitlesFound'));
-                                                    setTimeout(() => setSubtitleWarning(null), 4000);
-                                                }
-                                            } catch (error) {
-                                                console.error('Error fetching subtitles:', error);
-                                            } finally {
-                                                setSubtitleLoading(false);
-                                            }
-                                        } else {
-                                            setSubtitlesEnabled(true);
-                                            const video = videoRef.current;
-                                            if (video && video.textTracks.length > 0) {
-                                                for (let i = 0; i < video.textTracks.length; i++) {
-                                                    video.textTracks[i].mode = 'showing';
-                                                }
-                                            }
-                                        }
-                                    }
-                                }}
+                                onClick={handleSubtitleToggle}
                                 title={subtitleLoading ? t('player', 'fetchingSubtitles') : (subtitlesEnabled ? `${t('player', 'disableSubtitles')} (${subtitleLanguage || 'PT'})` : t('player', 'enableSubtitles'))}
                                 style={{
                                     color: subtitlesEnabled && !isForcedSubtitle ? '#10b981' : (subtitleLoading ? '#f59e0b' : 'white'),
@@ -1052,134 +698,10 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
 
                         {/* Forced Subtitles Button - Only show for non-[L] content and not live */}
                         {title && !title.includes('[L]') && contentType !== 'live' && (
-                            <div style={{ position: 'relative' }}>
-                                <button
-                                    className="control-btn"
-                                    onClick={() => setShowSettingsMenu(!showSettingsMenu)}
-                                    title={t('player', 'forcedSubtitles')}
-                                    style={{ color: showSettingsMenu ? '#a855f7' : (!forcedEnabledForSession ? 'rgba(255,255,255,0.4)' : 'white') }}
-                                >
-                                    <span style={{ fontSize: 14, fontWeight: 600 }}>F</span>
-                                </button>
-
-                                {/* Settings Dropdown Menu */}
-                                {showSettingsMenu && (
-                                    <div
-                                        style={{
-                                            position: 'absolute',
-                                            bottom: '100%',
-                                            right: 0,
-                                            marginBottom: 8,
-                                            background: 'rgba(0, 0, 0, 0.95)',
-                                            borderRadius: 12,
-                                            padding: '12px 0',
-                                            minWidth: 220,
-                                            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-                                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                                            zIndex: 100
-                                        }}
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <div style={{ padding: '0 16px 8px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', marginBottom: 8 }}>
-                                            <span style={{ fontSize: 12, fontWeight: 600, color: 'rgba(255, 255, 255, 0.5)', textTransform: 'uppercase' }}>
-                                                {t('player', 'currentSession')}
-                                            </span>
-                                        </div>
-
-                                        {/* Forced Subtitles Toggle */}
-                                        <div
-                                            style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                padding: '10px 16px',
-                                                cursor: 'pointer',
-                                                transition: 'background 0.2s'
-                                            }}
-                                            onClick={async () => {
-                                                const newValue = !forcedEnabledForSession;
-                                                setForcedEnabledForSession(newValue);
-
-                                                if (!newValue && isForcedSubtitle) {
-                                                    // Disabling: remove current forced subtitle
-                                                    setSubtitlesEnabled(false);
-                                                    setIsForcedSubtitle(false);
-                                                    if (subtitleUrl) {
-                                                        cleanupSubtitleUrl(subtitleUrl);
-                                                        setSubtitleUrl(null);
-                                                        setVttContent(null);
-                                                    }
-                                                } else if (newValue && !subtitlesEnabled) {
-                                                    // Enabling: load forced subtitles now
-                                                    try {
-                                                        const { autoFetchForcedSubtitle } = await import('../../services/subtitleService');
-                                                        const result = await autoFetchForcedSubtitle({
-                                                            title: title || '',
-                                                            tmdbId,
-                                                            imdbId,
-                                                            season: seasonNumber,
-                                                            episode: episodeNumber
-                                                        });
-                                                        if (result && result.warning) {
-                                                            // Show warning toast for rejected special editions
-                                                            setSubtitleWarning(result.warning);
-                                                            setTimeout(() => setSubtitleWarning(null), 4000);
-                                                        } else if (result && result.vttContent) {
-                                                            const blob = new Blob([result.vttContent], { type: 'text/vtt' });
-                                                            const blobUrl = URL.createObjectURL(blob);
-                                                            setSubtitleUrl(blobUrl);
-                                                            setVttContent(result.vttContent);
-                                                            setSubtitlesEnabled(true);
-                                                            setIsForcedSubtitle(true);
-                                                        } else {
-                                                            setSubtitleWarning(t('player', 'noForcedSubtitlesFound'));
-                                                            setTimeout(() => setSubtitleWarning(null), 4000);
-                                                        }
-                                                    } catch (e) {
-                                                        console.error('Failed to load forced subtitles:', e);
-                                                        setSubtitleWarning(t('player', 'errorLoadingSubtitles'));
-                                                        setTimeout(() => setSubtitleWarning(null), 4000);
-                                                    }
-                                                }
-                                            }}
-                                            onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)')}
-                                            onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                                        >
-                                            <div>
-                                                <div style={{ fontSize: 14, color: 'white', fontWeight: 500 }}>
-                                                    Legendas Forçadas
-                                                </div>
-                                                <div style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.5)', marginTop: 2 }}>
-                                                    Placas e diálogos estrangeiros
-                                                </div>
-                                            </div>
-                                            <div
-                                                style={{
-                                                    width: 36,
-                                                    height: 20,
-                                                    borderRadius: 10,
-                                                    background: forcedEnabledForSession ? 'linear-gradient(135deg, #a855f7, #ec4899)' : 'rgba(255, 255, 255, 0.2)',
-                                                    position: 'relative',
-                                                    transition: 'background 0.3s'
-                                                }}
-                                            >
-                                                <div
-                                                    style={{
-                                                        width: 16,
-                                                        height: 16,
-                                                        borderRadius: '50%',
-                                                        background: 'white',
-                                                        position: 'absolute',
-                                                        top: 2,
-                                                        left: forcedEnabledForSession ? 18 : 2,
-                                                        transition: 'left 0.3s'
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                            <ForcedSubtitlesMenu
+                                forcedEnabledForSession={forcedEnabledForSession}
+                                onToggleForcedSession={handleForcedSessionToggle}
+                            />
                         )}
 
                         {/* Picture-in-Picture */}
