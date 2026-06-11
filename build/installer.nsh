@@ -7,10 +7,21 @@
 ; NOTE: MUI_ICON, MUI_UNICON are managed by electron-builder
 
 ; ═══════════════════════════════════════════════════════════════════════
-; BRANDING TEXT
+; APP THEME — dark background + light text on every MUI page
+; Palette: #0f0f1a (bg) / #c4b5fd (light purple) / #ffffff (text)
 ; ═══════════════════════════════════════════════════════════════════════
 
-BrandingText "NeoStream IPTV v3.9.0"
+!define MUI_BGCOLOR "0F0F1A"
+!define MUI_TEXTCOLOR "FFFFFF"
+
+; Install-progress page: light-purple log text on the app's dark bg
+!define MUI_INSTFILESPAGE_COLORS "C4B5FD 0F0F1A"
+
+; ═══════════════════════════════════════════════════════════════════════
+; BRANDING TEXT (VERSION macro is provided by electron-builder)
+; ═══════════════════════════════════════════════════════════════════════
+
+BrandingText "NeoStream IPTV v${VERSION}"
 
 ; ═══════════════════════════════════════════════════════════════════════
 ; WELCOME PAGE CUSTOMIZATION
