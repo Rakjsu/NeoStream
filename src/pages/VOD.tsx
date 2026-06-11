@@ -8,10 +8,8 @@ import { CategoryMenu } from '../components/CategoryMenu';
 import { movieProgressService } from '../services/movieProgressService';
 import { ContentDetailModal } from '../components/ContentDetailModal';
 import { profileService } from '../services/profileService';
-import { indexedDBCache } from '../services/indexedDBCache';
 import { downloadService } from '../services/downloadService';
-import { searchMovieByName as searchMovie, isKidsFriendly } from '../services/tmdb';
-import { parentalService } from '../services/parentalService';
+import { useContentFiltering } from '../hooks/useContentFiltering';
 import { HoverPreviewCard } from '../components/HoverPreviewCard';
 import { closeAllPreviews } from '../components/hoverPreviewActions';
 import { useLanguage } from '../services/languageService';
@@ -45,7 +43,6 @@ interface VODStream {
 // Dynamic card sizing based on container
 const CARD_MIN_WIDTH = 180;
 const CARD_GAP = 24;
-const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'er\u00f3tico'];
 
 export function VOD() {
     const [streams, setStreams] = useState<VODStream[]>([]);
@@ -62,13 +59,24 @@ export function VOD() {
     const [itemsPerPage, setItemsPerPage] = useState(36);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const gridRef = useRef<HTMLDivElement>(null);
-    const [hiddenMovies, setHiddenMovies] = useState<Set<string>>(new Set());
-    const [blockedCategoryIds, setBlockedCategoryIds] = useState<Set<string>>(new Set());
-    const [checkingItem, setCheckingItem] = useState<string | null>(null);
-    const [blockMessage, setBlockMessage] = useState<string | null>(null);
-    const [cachedRatings, setCachedRatings] = useState<Map<string, string | null>>(new Map());
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const { t } = useLanguage();
+
+    // Kids profile + Parental Control filtering and click-gating
+    // (same generic hook Series.tsx uses)
+    const {
+        checkingItem,
+        blockMessage,
+        isItemVisible,
+        handleItemClick: handleMovieClick
+    } = useContentFiltering<VODStream>({
+        contentType: 'movie',
+        isKidsProfile,
+        items: streams,
+        getItemName: (movie) => movie.name,
+        getItemCategoryIds: (movie) => [movie.category_id],
+        onAllowed: setSelectedMovie
+    });
 
     // Close any open previews when this page mounts
     useEffect(() => {
@@ -140,81 +148,16 @@ export function VOD() {
         }
     }, []);
 
-    const fetchCategories = useCallback(async () => {
-        try {
-            const result = await window.ipcRenderer.invoke('categories:get-vod');
-            if (result.success) {
-                // Extract blocked category IDs for Kids profile OR Parental Control
-                const parentalConfig = parentalService.getConfig();
-                const shouldBlockCategories = isKidsProfile || (parentalConfig.enabled && parentalConfig.blockAdultCategories && !parentalService.isSessionUnlocked());
-
-                if (shouldBlockCategories) {
-                    const blockedIds = new Set<string>();
-                    (result.data || []).forEach((cat: { category_id: string; category_name: string }) => {
-                        const lowerName = cat.category_name.toLowerCase();
-                        if (BLOCKED_CATEGORY_PATTERNS.some(p => lowerName.includes(p))) {
-                            blockedIds.add(cat.category_id);
-                        }
-                    });
-                    setBlockedCategoryIds(blockedIds);
-                } else {
-                    setBlockedCategoryIds(new Set());
-                }
-            }
-        } catch (err) {
-            console.error('Failed to load categories:', err);
-        }
-    }, [isKidsProfile]);
-
     useEffect(() => {
         fetchStreams();
-        fetchCategories();
-    }, [fetchCategories, fetchStreams]);
-
-    // Load hidden items from IndexedDB on mount (for Kids profile)
-    useEffect(() => {
-        if (!isKidsProfile) return;
-
-        const loadHiddenItems = async () => {
-            const hidden = await indexedDBCache.getHiddenItems('movie');
-            setHiddenMovies(new Set(hidden));
-        };
-        loadHiddenItems();
-    }, [isKidsProfile]);
-
-    // Load cached ratings for parental control filtering
-    useEffect(() => {
-        const loadCachedRatings = async () => {
-            const ratings = await indexedDBCache.getAllCachedMovies();
-            setCachedRatings(ratings);
-        };
-        loadCachedRatings();
-    }, [streams]);
+    }, [fetchStreams]);
 
     const filteredStreams = streams.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
-        const normalizedName = stream.name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
 
-        // Parental Control filtering (applies to all profiles)
-        if (blockedCategoryIds.has(stream.category_id)) {
+        // Kids profile + Parental Control gating (categories, cached ratings, hidden items)
+        if (!isItemVisible(stream)) {
             return false;
-        }
-
-        // Parental Control: Filter by cached rating
-        const parentalConfig = parentalService.getConfig();
-        if (parentalConfig.enabled && !parentalService.isSessionUnlocked()) {
-            const cachedRating = cachedRatings.get(normalizedName);
-            if (cachedRating && parentalService.isContentBlocked(cachedRating)) {
-                return false;
-            }
-        }
-
-        // Kids profile filtering (additional checks)
-        if (isKidsProfile) {
-            // Block items that have been marked as hidden
-            if (hiddenMovies.has(normalizedName)) {
-                return false;
-            }
         }
 
         if (selectedCategory === 'CONTINUE_WATCHING') {
@@ -324,103 +267,8 @@ export function VOD() {
         return `${hours}h ${mins}min restantes`;
     };
 
-    // Handle movie card click - check Kids filter and Parental Control, always cache for future use
-    const handleMovieClick = async (movie: VODStream) => {
-        const normalizedName = movie.name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
-
-        // Check if already hidden for Kids profile
-        if (isKidsProfile && hiddenMovies.has(normalizedName)) {
-            return;
-        }
-
-        // Get parental control config
-        const parentalConfig = parentalService.getConfig();
-        const isParentalActive = parentalConfig.enabled && !parentalService.isSessionUnlocked();
-
-        // If no restrictions, just open and cache in background
-        if (!isKidsProfile && !isParentalActive) {
-            setSelectedMovie(movie);
-
-            // Background caching for cross-profile benefit
-            (async () => {
-                const cached = await indexedDBCache.getCachedMovie(movie.name);
-                if (!cached) {
-                    const yearMatch = movie.name.match(/\((\d{4})\)/);
-                    const year = yearMatch ? yearMatch[1] : undefined;
-                    const tmdbResult = await searchMovie(movie.name, year);
-                    if (tmdbResult) {
-                        await indexedDBCache.setCacheMovie(
-                            movie.name,
-                            tmdbResult.certification || null,
-                            tmdbResult.genres?.map(g => g.name) || []
-                        );
-                        // If not kids-friendly, hide it for future Kids sessions
-                        if (!isKidsFriendly(tmdbResult.certification)) {
-                            await indexedDBCache.hideItem('movie', movie.name);
-                        }
-                    }
-                }
-            })();
-            return;
-        }
-
-        // Need to check rating - show loading
-        setCheckingItem(movie.name);
-
-        try {
-            const cached = await indexedDBCache.getCachedMovie(movie.name);
-            let certification: string | null = null;
-
-            if (cached) {
-                certification = cached.certification;
-            } else {
-                const yearMatch = movie.name.match(/\((\d{4})\)/);
-                const year = yearMatch ? yearMatch[1] : undefined;
-                const tmdbResult = await searchMovie(movie.name, year);
-
-                if (tmdbResult) {
-                    certification = tmdbResult.certification || null;
-                    await indexedDBCache.setCacheMovie(
-                        movie.name,
-                        certification,
-                        tmdbResult.genres?.map(g => g.name) || []
-                    );
-                    // Update local cache for immediate filtering
-                    setCachedRatings(prev => new Map(prev).set(normalizedName, certification));
-                }
-            }
-
-            // Check Kids profile restriction
-            if (isKidsProfile) {
-                if (isKidsFriendly(certification)) {
-                    setSelectedMovie(movie);
-                } else {
-                    setBlockMessage(`"${movie.name}" não está disponível para este perfil`);
-                    await indexedDBCache.hideItem('movie', movie.name);
-                    setHiddenMovies(prev => new Set(prev).add(normalizedName));
-                    setTimeout(() => setBlockMessage(null), 3000);
-                }
-                return;
-            }
-
-            // Check Parental Control restriction
-            if (isParentalActive && certification) {
-                if (parentalService.isContentBlocked(certification)) {
-                    setBlockMessage(`"${movie.name}" está bloqueado pelo controle parental (${certification})`);
-                    setTimeout(() => setBlockMessage(null), 3000);
-                    return;
-                }
-            }
-
-            // Allow access
-            setSelectedMovie(movie);
-        } catch (error) {
-            console.error('Error checking movie rating:', error);
-            setSelectedMovie(movie);
-        } finally {
-            setCheckingItem(null);
-        }
-    };
+    // Movie card click gating (Kids/Parental) is handleMovieClick from
+    // useContentFiltering above — identical flow to the one Series.tsx uses.
 
 
     // Loading State
