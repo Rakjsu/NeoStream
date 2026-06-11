@@ -275,6 +275,32 @@ export function PipWindow() {
         }
     }, [videoRef]);
 
+    // Keyboard shortcuts: Space toggles play, M toggles mute
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement | null;
+            if (target && (
+                target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.tagName === 'SELECT' ||
+                target.isContentEditable
+            )) return;
+
+            switch (e.key.toLowerCase()) {
+                case ' ':
+                    e.preventDefault();
+                    handleTogglePlay();
+                    break;
+                case 'm':
+                    handleToggleMute();
+                    break;
+            }
+        };
+
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [handleTogglePlay, handleToggleMute]);
+
     // Send state updates to main window
     useEffect(() => {
         const video = videoRef.current;

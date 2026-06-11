@@ -7,6 +7,7 @@ import { NetworkSection } from './settings/NetworkSection';
 import { EpgSection, type EpgResultsFilter, type EpgCountryFilter } from './settings/EpgSection';
 import { StatsSection } from './settings/StatsSection';
 import { ParentalSection } from './settings/ParentalSection';
+import { BackupSection } from './settings/BackupSection';
 import { AboutSection } from './settings/AboutSection';
 
 
@@ -37,6 +38,7 @@ export function Settings() {
         { id: 'epg', icon: '📡', label: 'EPG', color: '#06b6d4' },
         { id: 'stats', icon: '📊', label: t('nav', 'stats'), color: '#8b5cf6' },
         { id: 'parental', icon: '👨‍👩‍👧', label: t('nav', 'parental'), color: '#ef4444' },
+        { id: 'backup', icon: '💾', label: t('nav', 'backup'), color: '#64748b' },
         { id: 'about', icon: 'ℹ️', label: t('nav', 'about'), color: '#f59e0b' }
     ];
 
@@ -106,6 +108,9 @@ export function Settings() {
 
                         {/* Parental Control Section */}
                         {activeSection === 'parental' && <ParentalSection />}
+
+                        {/* Backup Section */}
+                        {activeSection === 'backup' && <BackupSection />}
 
                         {/* About Section */}
                         {activeSection === 'about' && <AboutSection />}
