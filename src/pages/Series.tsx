@@ -12,6 +12,7 @@ import { profileService } from '../services/profileService';
 import { SeriesDetailPanel, type SeriesEpisode, type SeriesInfo } from '../components/SeriesDetailPanel';
 import { useSeriesMetadata } from '../hooks/useSeriesMetadata';
 import { useContentFiltering } from '../hooks/useContentFiltering';
+import { useWindowedGrid } from '../hooks/useWindowedGrid';
 import { HoverPreviewCard } from '../components/HoverPreviewCard';
 import { closeAllPreviews } from '../components/hoverPreviewActions';
 import { useLanguage } from '../services/languageService';
@@ -185,26 +186,21 @@ export function Series() {
         return matchesSearch && matchesCategory;
     });
 
-    // Lazy loading scroll handler
-    useEffect(() => {
-        const container = scrollContainerRef.current;
-        if (!container) return;
-
-        const handleScroll = () => {
-            const { scrollTop, scrollHeight, clientHeight } = container;
-            if (scrollTop + clientHeight >= scrollHeight * 0.85 && visibleCount < filteredSeries.length) {
-                setVisibleCount(prev => Math.min(prev + itemsPerPage, filteredSeries.length));
-            }
-        };
-
-        container.addEventListener('scroll', handleScroll);
-        return () => container.removeEventListener('scroll', handleScroll);
-    }, [filteredSeries.length, visibleCount, itemsPerPage]);
+    // Windowed rendering (same mechanism as VOD): spacer rows keep the
+    // scrollbar honest while only ~3 screens of cards stay mounted.
+    const gridWindow = useWindowedGrid({
+        scrollRef: scrollContainerRef,
+        gridRef,
+        itemCount: filteredSeries.length
+    });
+    const windowStart = gridWindow.ready ? gridWindow.start : 0;
+    const windowEnd = gridWindow.ready ? gridWindow.end : Math.min(visibleCount, filteredSeries.length);
 
     // Reset on filter change
     useEffect(() => {
         setVisibleCount(itemsPerPage);
         setSelectedSeries(null);
+        if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
     }, [searchQuery, selectedCategory, itemsPerPage]);
 
     const fixImageUrl = (url: string): string => url && url.startsWith('http') ? url : `https://${url}`;
@@ -418,7 +414,10 @@ export function Series() {
                             </div>
                         ) : (
                             <div ref={gridRef} className="series-grid">
-                                {filteredSeries.slice(0, visibleCount).map((s, index) => {
+                                {gridWindow.topSpacer > 0 && (
+                                    <div data-spacer="true" style={{ gridColumn: '1 / -1', height: gridWindow.topSpacer }} />
+                                )}
+                                {filteredSeries.slice(windowStart, windowEnd).map((s, index) => {
                                     const isSaved = watchLaterService.has(String(s.series_id), 'series');
                                     const isFavorite = favoritesService.has(String(s.series_id), 'series');
                                     const hasProgress = watchProgressService.getSeriesProgress(String(s.series_id), s.name);
@@ -431,7 +430,7 @@ export function Series() {
                                         <div
                                             key={s.series_id}
                                             className={checkingItem === s.name ? 'checking' : ''}
-                                            style={{ animationDelay: `${(index % itemsPerPage) * 0.03}s` }}
+                                            style={{ animationDelay: gridWindow.ready ? '0s' : `${(index % itemsPerPage) * 0.03}s` }}
                                         >
                                             <HoverPreviewCard
                                                 type="series"
@@ -515,6 +514,9 @@ export function Series() {
                                         </div>
                                     );
                                 })}
+                                {gridWindow.bottomSpacer > 0 && (
+                                    <div data-spacer="true" style={{ gridColumn: '1 / -1', height: gridWindow.bottomSpacer }} />
+                                )}
                             </div>
                         )}
                     </div>

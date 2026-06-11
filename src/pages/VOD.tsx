@@ -10,6 +10,7 @@ import { ContentDetailModal } from '../components/ContentDetailModal';
 import { profileService } from '../services/profileService';
 import { downloadService } from '../services/downloadService';
 import { useContentFiltering } from '../hooks/useContentFiltering';
+import { useWindowedGrid } from '../hooks/useWindowedGrid';
 import { HoverPreviewCard } from '../components/HoverPreviewCard';
 import { closeAllPreviews } from '../components/hoverPreviewActions';
 import { useLanguage } from '../services/languageService';
@@ -174,26 +175,23 @@ export function VOD() {
         return matchesSearch && matchesCategory;
     });
 
-    // Lazy loading scroll handler
-    useEffect(() => {
-        const container = scrollContainerRef.current;
-        if (!container) return;
-
-        const handleScroll = () => {
-            const { scrollTop, scrollHeight, clientHeight } = container;
-            if (scrollTop + clientHeight >= scrollHeight * 0.85 && visibleCount < filteredStreams.length) {
-                setVisibleCount(prev => Math.min(prev + itemsPerPage, filteredStreams.length));
-            }
-        };
-
-        container.addEventListener('scroll', handleScroll);
-        return () => container.removeEventListener('scroll', handleScroll);
-    }, [filteredStreams.length, visibleCount, itemsPerPage]);
+    // Windowed rendering: only ~3 screens of cards stay mounted while the
+    // scrollbar reflects the full list (spacer rows keep the geometry).
+    // Until geometry is measured, the plain first-page slice renders.
+    const gridWindow = useWindowedGrid({
+        scrollRef: scrollContainerRef,
+        gridRef,
+        itemCount: filteredStreams.length
+    });
+    const windowStart = gridWindow.ready ? gridWindow.start : 0;
+    const windowEnd = gridWindow.ready ? gridWindow.end : Math.min(visibleCount, filteredStreams.length);
 
     // Reset on filter change
     useEffect(() => {
         setVisibleCount(itemsPerPage);
         setSelectedMovie(null);
+        // Back to the top so the window recomputes from row 0.
+        if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
     }, [searchQuery, selectedCategory, itemsPerPage]);
 
     // Fetch TMDB data
@@ -389,7 +387,10 @@ export function VOD() {
                             </div>
                         ) : (
                             <div ref={gridRef} className="movies-grid">
-                                {filteredStreams.slice(0, visibleCount).map((stream, index) => {
+                                {gridWindow.topSpacer > 0 && (
+                                    <div data-spacer="true" style={{ gridColumn: '1 / -1', height: gridWindow.topSpacer }} />
+                                )}
+                                {filteredStreams.slice(windowStart, windowEnd).map((stream, index) => {
                                     const progress = getProgress(stream.stream_id);
                                     const movieProgress = getMovieProgress(stream.stream_id);
                                     const isSaved = watchLaterService.has(String(stream.stream_id), 'movie');
@@ -402,7 +403,7 @@ export function VOD() {
                                         <div
                                             key={stream.stream_id}
                                             className={checkingItem === stream.name ? 'checking' : ''}
-                                            style={{ animationDelay: `${(index % itemsPerPage) * 0.03}s` }}
+                                            style={{ animationDelay: gridWindow.ready ? '0s' : `${(index % itemsPerPage) * 0.03}s` }}
                                         >
                                             <HoverPreviewCard
                                                 type="movie"
@@ -501,6 +502,9 @@ export function VOD() {
                                         </div>
                                     );
                                 })}
+                                {gridWindow.bottomSpacer > 0 && (
+                                    <div data-spacer="true" style={{ gridColumn: '1 / -1', height: gridWindow.bottomSpacer }} />
+                                )}
                             </div>
                         )}
                     </div>
