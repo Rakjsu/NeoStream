@@ -15,11 +15,20 @@ interface CastControlsProps {
 }
 
 const POLL_INTERVAL_MS = 2000;
+// After seek/play/pause the TV repositions and may report STOPPED or refuse
+// status calls for several seconds — suppress session-ended detection during
+// this window so the remote doesn't vanish mid-seek.
+const COMMAND_GRACE_MS = 12000;
+const STOPPED_POLLS_TO_END = 4;
+const FAILED_POLLS_TO_END = 6;
 
 export function CastControls({ deviceId, deviceName, onSessionEnded }: CastControlsProps) {
     const [status, setStatus] = useState<CastStatus | null>(null);
     const [pendingVolume, setPendingVolume] = useState<number | null>(null);
     const stoppedPolls = useRef(0);
+    const failedPolls = useRef(0);
+    // 0 = "treat mount time as the first command" — set on mount effect below.
+    const lastCommandAt = useRef(0);
     const endedRef = useRef(false);
 
     const endSession = useCallback(() => {
@@ -28,18 +37,36 @@ export function CastControls({ deviceId, deviceName, onSessionEnded }: CastContr
         onSessionEnded();
     }, [onSessionEnded]);
 
+    const markCommand = () => {
+        lastCommandAt.current = Date.now();
+        stoppedPolls.current = 0;
+        failedPolls.current = 0;
+    };
+
     useEffect(() => {
         let cancelled = false;
+        // Grace window also covers the cast start (TV still buffering).
+        if (lastCommandAt.current === 0) lastCommandAt.current = Date.now();
 
         const poll = async () => {
+            const inGrace = Date.now() - lastCommandAt.current < COMMAND_GRACE_MS;
             try {
                 const result = await castControls.getStatus();
                 if (cancelled) return;
                 if (!result.success) {
-                    // Session gone in the main process (stop, error, app logic).
-                    endSession();
+                    // Session explicitly cleared in the main process — end now.
+                    if (/no active cast session/i.test(result.error || '')) {
+                        endSession();
+                        return;
+                    }
+                    // Transient SOAP failure (TV busy seeking/buffering):
+                    // tolerate several in a row before giving up.
+                    if (!inGrace && ++failedPolls.current >= FAILED_POLLS_TO_END) {
+                        endSession();
+                    }
                     return;
                 }
+                failedPolls.current = 0;
                 setStatus({
                     state: result.state || 'UNKNOWN',
                     position: result.position || 0,
@@ -49,11 +76,14 @@ export function CastControls({ deviceId, deviceName, onSessionEnded }: CastContr
                     deviceId: result.deviceId || deviceId,
                 });
 
-                // TV reports STOPPED/NO_MEDIA for a few consecutive polls →
+                // TV reports STOPPED/NO_MEDIA for several consecutive polls →
                 // the user stopped it on the TV side or playback finished.
+                // Ignored during the post-command grace window (seek causes a
+                // transient STOPPED while the TV repositions the stream).
                 if (/STOPPED|NO_MEDIA/i.test(result.state || '')) {
-                    stoppedPolls.current += 1;
-                    if (stoppedPolls.current >= 3) endSession();
+                    if (!inGrace && ++stoppedPolls.current >= STOPPED_POLLS_TO_END) {
+                        endSession();
+                    }
                 } else {
                     stoppedPolls.current = 0;
                 }
@@ -77,12 +107,14 @@ export function CastControls({ deviceId, deviceName, onSessionEnded }: CastContr
     const volume = pendingVolume ?? status?.volume ?? null;
 
     const handleTogglePlay = async () => {
+        markCommand();
         if (isPlaying) await castControls.pause();
         else await castControls.resume();
     };
 
     const handleSeek = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const seconds = Number(event.target.value);
+        markCommand();
         setStatus(prev => prev ? { ...prev, position: seconds } : prev);
         await castControls.seek(seconds);
     };
