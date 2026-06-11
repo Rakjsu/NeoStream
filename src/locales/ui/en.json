@@ -1,6 +1,7 @@
 {
   "nav": {
     "updates": "Updates",
+    "backup": "Backup",
     "playback": "Playback",
     "epg": "EPG",
     "stats": "Statistics",
@@ -112,7 +113,11 @@
     "enterPinToDelete": "Enter PIN to delete",
     "actionCannotBeUndone": "This action cannot be undone.",
     "pinActive": "PIN Active",
-    "currentPinIncorrect": "Current PIN is incorrect"
+    "currentPinIncorrect": "Current PIN is incorrect",
+    "confirmDeleteTitle": "Delete profile?",
+    "confirmDeleteMessage": "This action cannot be undone. This profile's watch progress and favorites will be lost.",
+    "confirmDeleteConfirm": "Delete profile",
+    "confirmDeleteCancel": "Cancel"
   },
   "cast": {
     "title": "Cast to TV",
@@ -269,6 +274,26 @@
     "autoPlayNextDesc": "Automatically play the next episode",
     "clickThrough": "Click-Through Mode (PiP)",
     "clickThroughDesc": "Allows mouse to pass through PiP without interacting (F9 to toggle)"
+  },
+  "backup": {
+    "title": "Backup & Restore",
+    "description": "Export or restore your profiles, progress and preferences",
+    "exportTitle": "Export backup",
+    "exportDesc": "Saves profiles, favorites, watch progress, statistics and settings to a JSON file",
+    "exportButton": "Export Backup",
+    "exported": "✓ Backup saved",
+    "exportError": "Error exporting the backup",
+    "importTitle": "Import backup",
+    "importDesc": "Restores data from a backup file created by NeoStream",
+    "importButton": "Import Backup",
+    "importError": "Error importing the backup",
+    "invalidFile": "Invalid or incompatible backup file",
+    "confirmImportTitle": "Restore backup?",
+    "confirmImportMessage": "Current data (profiles, favorites, progress and settings) will be overwritten by the backup data. This action cannot be undone.",
+    "confirmImportConfirm": "Restore",
+    "confirmImportCancel": "Cancel",
+    "importSuccess": "Backup restored successfully! Restart the app to apply all changes.",
+    "credentialsNote": "IPTV provider credentials are NOT included in the backup."
   },
   "epg": {
     "title": "Program Guide (EPG)",

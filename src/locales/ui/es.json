@@ -1,6 +1,7 @@
 {
   "nav": {
     "updates": "Actualizaciones",
+    "backup": "Copia de seguridad",
     "playback": "Reproducción",
     "epg": "EPG",
     "stats": "Estadísticas",
@@ -112,7 +113,11 @@
     "enterPinToDelete": "Ingresa el PIN para eliminar",
     "actionCannotBeUndone": "Esta acción no se puede deshacer.",
     "pinActive": "PIN Activo",
-    "currentPinIncorrect": "El PIN actual es incorrecto"
+    "currentPinIncorrect": "El PIN actual es incorrecto",
+    "confirmDeleteTitle": "¿Eliminar perfil?",
+    "confirmDeleteMessage": "Esta acción no se puede deshacer. El progreso de visualización y los favoritos de este perfil se perderán.",
+    "confirmDeleteConfirm": "Eliminar perfil",
+    "confirmDeleteCancel": "Cancelar"
   },
   "cast": {
     "title": "Transmitir a TV",
@@ -269,6 +274,26 @@
     "autoPlayNextDesc": "Reproducir automáticamente el siguiente episodio",
     "clickThrough": "Modo Click-Through (PiP)",
     "clickThroughDesc": "Permite que el mouse pase por el PiP sin interactuar (F9 para alternar)"
+  },
+  "backup": {
+    "title": "Copia de Seguridad y Restauración",
+    "description": "Exporta o restaura tus perfiles, progreso y preferencias",
+    "exportTitle": "Exportar copia de seguridad",
+    "exportDesc": "Guarda perfiles, favoritos, progreso de visualización, estadísticas y configuración en un archivo JSON",
+    "exportButton": "Exportar Copia",
+    "exported": "✓ Copia guardada",
+    "exportError": "Error al exportar la copia de seguridad",
+    "importTitle": "Importar copia de seguridad",
+    "importDesc": "Restaura los datos de un archivo de copia creado por NeoStream",
+    "importButton": "Importar Copia",
+    "importError": "Error al importar la copia de seguridad",
+    "invalidFile": "Archivo de copia de seguridad inválido o incompatible",
+    "confirmImportTitle": "¿Restaurar copia de seguridad?",
+    "confirmImportMessage": "Los datos actuales (perfiles, favoritos, progreso y configuración) serán sobrescritos por los datos de la copia. Esta acción no se puede deshacer.",
+    "confirmImportConfirm": "Restaurar",
+    "confirmImportCancel": "Cancelar",
+    "importSuccess": "¡Copia restaurada con éxito! Reinicia la aplicación para aplicar todos los cambios.",
+    "credentialsNote": "Las credenciales del proveedor IPTV NO se incluyen en la copia de seguridad."
   },
   "epg": {
     "title": "Guía de Programación (EPG)",

@@ -1,6 +1,7 @@
 {
   "nav": {
     "updates": "Atualizações",
+    "backup": "Backup",
     "playback": "Reprodução",
     "epg": "EPG",
     "stats": "Estatísticas",
@@ -112,7 +113,11 @@
     "enterPinToDelete": "Digite o PIN para deletar",
     "actionCannotBeUndone": "Esta ação não pode ser desfeita.",
     "pinActive": "PIN Ativo",
-    "currentPinIncorrect": "PIN atual incorreto"
+    "currentPinIncorrect": "PIN atual incorreto",
+    "confirmDeleteTitle": "Excluir perfil?",
+    "confirmDeleteMessage": "Esta ação não pode ser desfeita. O progresso de exibição e os favoritos deste perfil serão perdidos.",
+    "confirmDeleteConfirm": "Excluir perfil",
+    "confirmDeleteCancel": "Cancelar"
   },
   "cast": {
     "title": "Transmitir para TV",
@@ -210,6 +215,26 @@
     "lastCheck": "Última verificação",
     "checkNow": "Verificar Atualizações Agora",
     "checking": "Verificando..."
+  },
+  "backup": {
+    "title": "Backup e Restauração",
+    "description": "Exporte ou restaure seus perfis, progresso e preferências",
+    "exportTitle": "Exportar backup",
+    "exportDesc": "Salva perfis, favoritos, progresso de exibição, estatísticas e configurações em um arquivo JSON",
+    "exportButton": "Exportar Backup",
+    "exported": "✓ Backup salvo",
+    "exportError": "Erro ao exportar o backup",
+    "importTitle": "Importar backup",
+    "importDesc": "Restaura os dados de um arquivo de backup criado pelo NeoStream",
+    "importButton": "Importar Backup",
+    "importError": "Erro ao importar o backup",
+    "invalidFile": "Arquivo de backup inválido ou incompatível",
+    "confirmImportTitle": "Restaurar backup?",
+    "confirmImportMessage": "Os dados atuais (perfis, favoritos, progresso e configurações) serão sobrescritos pelos dados do backup. Esta ação não pode ser desfeita.",
+    "confirmImportConfirm": "Restaurar",
+    "confirmImportCancel": "Cancelar",
+    "importSuccess": "Backup restaurado com sucesso! Reinicie o aplicativo para aplicar todas as alterações.",
+    "credentialsNote": "As credenciais do provedor IPTV não são incluídas no backup."
   },
   "epg": {
     "title": "Guia de Programação (EPG)",

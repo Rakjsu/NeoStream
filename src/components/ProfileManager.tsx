@@ -398,22 +398,22 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                     <div className="pm-modal pm-modal-delete" onClick={(e) => e.stopPropagation()}>
                         <div className="pm-modal-header">
                             <span className="pm-modal-icon danger">🗑️</span>
-                            <h2>{t('profile', 'deleteProfile')}?</h2>
+                            <h2>{t('profile', 'confirmDeleteTitle')}</h2>
                         </div>
 
                         <p className="pm-delete-msg">
-                            {t('profile', 'confirmDelete').replace('este perfil', '')} <strong>{deleteConfirm.name}</strong>?
+                            <strong>{deleteConfirm.name}</strong>
                             <br />
-                            <span className="pm-delete-warning">{t('profile', 'actionCannotBeUndone')}</span>
+                            <span className="pm-delete-warning">{t('profile', 'confirmDeleteMessage')}</span>
                         </p>
 
                         <div className="pm-modal-buttons">
                             <button className="pm-btn pm-btn-cancel" onClick={() => setDeleteConfirm(null)}>
-                                {t('profile', 'cancel')}
+                                {t('profile', 'confirmDeleteCancel')}
                             </button>
                             <button className="pm-btn pm-btn-danger" onClick={confirmDelete}>
                                 <Trash2 size={18} />
-                                {t('profile', 'deleteProfile')}
+                                {t('profile', 'confirmDeleteConfirm')}
                             </button>
                         </div>
                     </div>
