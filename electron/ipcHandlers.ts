@@ -21,6 +21,15 @@ const OPEN_SUBTITLES_PASSWORD = process.env.OPEN_SUBTITLES_PASSWORD
 export function setupIpcHandlers() {
     ipcMain.handle('ping', () => 'pong')
 
+    // Renderer errors land in main.log so packaged-app bug reports include
+    // the UI side, not just the main process.
+    ipcMain.on('log:renderer', (_event, payload: { level?: string; message?: string; stack?: string }) => {
+        const message = `[Renderer] ${String(payload?.message ?? 'unknown error').slice(0, 2000)}`
+        const stack = payload?.stack ? `\n${String(payload.stack).slice(0, 4000)}` : ''
+        if (payload?.level === 'warn') log.warn(message + stack)
+        else log.error(message + stack)
+    })
+
     // Window controls for custom title bar
     ipcMain.handle('window:minimize', () => {
         const win = BrowserWindow.getFocusedWindow()

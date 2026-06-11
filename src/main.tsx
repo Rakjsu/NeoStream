@@ -2,6 +2,33 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
+// Forward uncaught renderer errors to the main process so they land in
+// main.log — packaged-app bug reports were blind to the UI side.
+// Throttled so an error loop can't flood the log file.
+const REPORT_LIMIT = 20
+let reportedErrors = 0
+
+function reportRendererError(message: string, stack?: string, level: 'error' | 'warn' = 'error') {
+  if (reportedErrors >= REPORT_LIMIT) return
+  reportedErrors += 1
+  try {
+    window.ipcRenderer?.send('log:renderer', { level, message, stack })
+  } catch {
+    // Preload bridge unavailable (e.g. tests) — nothing to do.
+  }
+}
+
+window.addEventListener('error', (event) => {
+  reportRendererError(event.message, event.error?.stack)
+})
+
+window.addEventListener('unhandledrejection', (event) => {
+  const reason = event.reason
+  const message = reason instanceof Error ? reason.message : String(reason)
+  const stack = reason instanceof Error ? reason.stack : undefined
+  reportRendererError(`Unhandled rejection: ${message}`, stack)
+})
+
 // Note: StrictMode was removed because it causes video player issues
 // (double mounting causes video to reinitialize and seek operations to fail)
 createRoot(document.getElementById('root')!).render(
