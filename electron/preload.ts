@@ -11,6 +11,8 @@ const invokeChannels = new Set([
     'auth:get-credentials',
     'auth:login',
     'auth:logout',
+    'backup:load-file',
+    'backup:save-file',
     'categories:get-live',
     'categories:get-series',
     'categories:get-vod',

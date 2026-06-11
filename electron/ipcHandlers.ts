@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, screen } from 'electron'
+import { ipcMain, BrowserWindow, dialog, screen } from 'electron'
 import { XtreamClient } from './xtreamClient'
 import store from './store'
 import { getCertificateSettings, getProviderHttpsAgent, registerApprovedProviderUrl, setAllowInvalidProviderCertificates } from './certificatePolicy'
@@ -550,6 +550,53 @@ export function setupIpcHandlers() {
             }
         } catch (error: unknown) {
             log.error('[OpenSubtitles] Error:', getErrorMessage(error))
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
+    // Save a user-data backup JSON to a file chosen by the user
+    ipcMain.handle('backup:save-file', async (_, { json }: { json: string }) => {
+        try {
+            const date = new Date().toISOString().slice(0, 10)
+            const result = await dialog.showSaveDialog({
+                title: 'Save backup',
+                defaultPath: `neostream-backup-${date}.json`,
+                filters: [{ name: 'JSON', extensions: ['json'] }]
+            })
+
+            if (result.canceled || !result.filePath) {
+                return { success: false, canceled: true }
+            }
+
+            const fs = await import('fs/promises')
+            await fs.writeFile(result.filePath, json, 'utf-8')
+            log.info('[Backup] Saved to', result.filePath)
+            return { success: true, path: result.filePath }
+        } catch (error: unknown) {
+            log.error('[Backup] Save error:', getErrorMessage(error))
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
+    // Load a user-data backup JSON from a file chosen by the user
+    ipcMain.handle('backup:load-file', async () => {
+        try {
+            const result = await dialog.showOpenDialog({
+                title: 'Open backup',
+                filters: [{ name: 'JSON', extensions: ['json'] }],
+                properties: ['openFile']
+            })
+
+            if (result.canceled || result.filePaths.length === 0) {
+                return { success: false, canceled: true }
+            }
+
+            const fs = await import('fs/promises')
+            const json = await fs.readFile(result.filePaths[0], 'utf-8')
+            log.info('[Backup] Loaded from', result.filePaths[0])
+            return { success: true, json }
+        } catch (error: unknown) {
+            log.error('[Backup] Load error:', getErrorMessage(error))
             return { success: false, error: getErrorMessage(error) }
         }
     })
