@@ -20,7 +20,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:build": "vite build && playwright test"
   },
   "dependencies": {
     "@vidstack/react": "^1.12.13",
@@ -47,6 +49,7 @@
   "devDependencies": {
     "@electron/packager": "^19.0.1",
     "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4.1.17",
     "@testing-library/jest-dom": "^6.9.1",
     "@types/node": "^24.10.1",
