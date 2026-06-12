@@ -23,7 +23,7 @@ import {
 } from './providerEpgProtocol'
 import type { ProviderEpgProgram } from './providerEpgProtocol'
 
-const XMLTV_CACHE_KEY = 'provider-xmltv'
+const XMLTV_CACHE_KEY_PREFIX = 'provider-xmltv'
 const XMLTV_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const SIMPLE_TABLE_TTL_MS = 60 * 60 * 1000
 const FETCH_HEADERS = {
@@ -71,11 +71,18 @@ export function resetProviderEpgState() {
 async function fetchXmltvWithCache(url: string): Promise<string | null> {
     const fs = await import('fs/promises')
     const path = await import('path')
+    const crypto = await import('crypto')
     const { app } = await import('electron')
 
+    // Per-provider cache key (multi-playlist): hashing the full xmltv URL
+    // (host + credentials) keeps each provider's EPG file separate, so
+    // switching playlists never serves another provider's cached guide.
+    const urlHash = crypto.createHash('sha1').update(url).digest('hex').slice(0, 12)
+    const cacheKey = `${XMLTV_CACHE_KEY_PREFIX}-${urlHash}`
+
     const cacheDir = path.join(app.getPath('userData'), 'epg_cache')
-    const cacheFile = path.join(cacheDir, `${XMLTV_CACHE_KEY}.xml`)
-    const metaFile = path.join(cacheDir, `${XMLTV_CACHE_KEY}.meta.json`)
+    const cacheFile = path.join(cacheDir, `${cacheKey}.xml`)
+    const metaFile = path.join(cacheDir, `${cacheKey}.meta.json`)
     await fs.mkdir(cacheDir, { recursive: true })
 
     // Within TTL → reuse the cached file, never re-download.

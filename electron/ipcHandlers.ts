@@ -3,6 +3,16 @@ import { XtreamClient } from './xtreamClient'
 import store from './store'
 import { getCertificateSettings, getProviderHttpsAgent, registerApprovedProviderUrl, setAllowInvalidProviderCertificates } from './certificatePolicy'
 import { resetProviderEpgState, setupProviderEpgHandlers } from './providerEpg'
+import {
+    activatePlaylist,
+    deactivatePlaylists,
+    findPlaylist,
+    listPublicPlaylists,
+    migratePlaylistsOnStartup,
+    removePlaylist,
+    renameStoredPlaylist,
+    saveAndActivatePlaylist,
+} from './playlistManager'
 
 import log from './logger'
 // Store for window state (for custom maximize)
@@ -20,6 +30,9 @@ const OPEN_SUBTITLES_USERNAME = process.env.OPEN_SUBTITLES_USERNAME
 const OPEN_SUBTITLES_PASSWORD = process.env.OPEN_SUBTITLES_PASSWORD
 
 export function setupIpcHandlers() {
+    // Legacy single `auth` entry → multi-playlist model (one-time, idempotent).
+    migratePlaylistsOnStartup()
+
     ipcMain.handle('ping', () => 'pong')
 
     // Renderer errors land in main.log so packaged-app bug reports include
@@ -73,21 +86,103 @@ export function setupIpcHandlers() {
         return savedWindowBounds !== null
     })
 
-    ipcMain.handle('auth:login', async (_, { url, username, password }) => {
+    ipcMain.handle('auth:login', async (_, { url, username, password, name }) => {
         try {
             const client = new XtreamClient(url, username, password)
             const data = await client.authenticate()
 
-            // Save to store
-            store.set('auth', { url, username, password, userInfo: data.user_info })
+            // Single write path: saves into the playlists model and mirrors
+            // the active playlist into the legacy `auth` entry.
+            const entry = saveAndActivatePlaylist({
+                name: typeof name === 'string' ? name : undefined,
+                url,
+                username,
+                password,
+                userInfo: data.user_info
+            })
 
             // New provider may have a different (or no) EPG — re-probe lazily.
             resetProviderEpgState()
 
-            return { success: true, data }
+            return { success: true, data, playlistId: entry.id }
         } catch (error: unknown) {
             return { success: false, error: getErrorMessage(error) }
         }
+    })
+
+    // ---- Multi-playlist management -------------------------------------
+
+    ipcMain.handle('playlists:list', () => {
+        return { success: true, playlists: listPublicPlaylists() }
+    })
+
+    ipcMain.handle('playlists:add', async (_, { name, url, username, password }) => {
+        try {
+            // Same validation as auth:login (player_api authenticate).
+            const client = new XtreamClient(url, username, password)
+            const data = await client.authenticate()
+
+            const entry = saveAndActivatePlaylist({
+                name: typeof name === 'string' ? name : undefined,
+                url,
+                username,
+                password,
+                userInfo: data.user_info
+            })
+            resetProviderEpgState()
+
+            return { success: true, playlistId: entry.id, userInfo: data.user_info }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
+    ipcMain.handle('playlists:switch', async (_, { id }) => {
+        try {
+            const target = findPlaylist(String(id))
+            if (!target) {
+                return { success: false, error: 'Playlist not found' }
+            }
+
+            // Revalidate before switching — a dead provider should not take
+            // down the current session.
+            const client = new XtreamClient(target.url, target.username, target.password)
+            const data = await client.authenticate()
+
+            activatePlaylist(target.id, data.user_info)
+            // Per-provider main-process state: EPG indexes/caches.
+            resetProviderEpgState()
+
+            return { success: true, userInfo: data.user_info }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
+    ipcMain.handle('playlists:remove', (_, { id }) => {
+        try {
+            const outcome = removePlaylist(String(id))
+            if (!outcome.removed) {
+                return { success: false, error: 'Playlist not found' }
+            }
+            if (outcome.activeChanged) {
+                resetProviderEpgState()
+            }
+            return {
+                success: true,
+                loggedOut: outcome.loggedOut,
+                newActiveId: outcome.newActive?.id ?? null
+            }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
+    ipcMain.handle('playlists:rename', (_, { id, name }) => {
+        const renamed = renameStoredPlaylist(String(id), String(name ?? ''))
+        return renamed
+            ? { success: true }
+            : { success: false, error: 'Playlist not found or invalid name' }
     })
 
     ipcMain.handle('auth:check', () => {
@@ -107,7 +202,8 @@ export function setupIpcHandlers() {
     })
 
     ipcMain.handle('auth:logout', () => {
-        store.set('auth', {})
+        // Clears the active playlist + auth mirror; saved playlists are kept.
+        deactivatePlaylists()
         resetProviderEpgState()
         return { success: true }
     })
