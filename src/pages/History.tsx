@@ -349,7 +349,7 @@ const historyStyles = `
     font-weight: 800;
     color: white;
     letter-spacing: -0.02em;
-    background: linear-gradient(135deg, #fff 0%, #c4b5fd 100%);
+    background: linear-gradient(135deg, #fff 0%, var(--ns-accent-light) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -373,7 +373,7 @@ const historyStyles = `
 .history-day-label {
     font-size: 18px;
     font-weight: 700;
-    color: #c4b5fd;
+    color: var(--ns-accent-light);
     margin: 0 0 14px 0;
     text-transform: capitalize;
 }

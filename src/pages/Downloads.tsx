@@ -439,13 +439,13 @@ export function Downloads() {
                         width: '90%',
                         maxWidth: 800,
                         maxHeight: '85vh',
-                        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                        background: 'linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-tint) 100%)',
                         borderRadius: 20,
                         overflow: 'hidden',
                         display: 'flex',
                         zIndex: 1001,
                         boxShadow: '0 25px 80px rgba(0, 0, 0, 0.6)',
-                        border: '1px solid rgba(168, 85, 247, 0.3)'
+                        border: '1px solid rgba(var(--ns-accent-rgb), 0.3)'
                     }}>
                         {/* Poster */}
                         <div style={{ width: 260, minWidth: 260, position: 'relative' }}>
@@ -474,7 +474,7 @@ export function Downloads() {
                             <h2 style={{ color: 'white', fontSize: 24, marginBottom: 8 }}>{seriesModal.series.seriesName}</h2>
 
                             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                                {seriesModal.series.year && <span style={{ background: 'rgba(168,85,247,0.3)', padding: '4px 10px', borderRadius: 6, color: '#c4b5fd', fontSize: 12 }}>{seriesModal.series.year}</span>}
+                                {seriesModal.series.year && <span style={{ background: 'rgba(var(--ns-accent-rgb),0.3)', padding: '4px 10px', borderRadius: 6, color: 'var(--ns-accent-light)', fontSize: 12 }}>{seriesModal.series.year}</span>}
                                 {seriesModal.series.rating && <span style={{ background: 'rgba(251,191,36,0.3)', padding: '4px 10px', borderRadius: 6, color: '#fcd34d', fontSize: 12 }}>⭐ {seriesModal.series.rating}</span>}
                                 <span style={{ background: 'rgba(16,185,129,0.3)', padding: '4px 10px', borderRadius: 6, color: '#6ee7b7', fontSize: 12 }}>{seriesModal.series.seasons.length} {seriesModal.series.seasons.length > 1 ? t('downloads', 'seasons') : t('downloads', 'season')}</span>
                                 <span style={{ background: 'rgba(59,130,246,0.3)', padding: '4px 10px', borderRadius: 6, color: '#93c5fd', fontSize: 12 }}>📥 {t('downloads', 'offline')}</span>
@@ -562,9 +562,9 @@ export function Downloads() {
                                                     borderRadius: 10,
                                                     cursor: 'pointer',
                                                     background: isSelected
-                                                        ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.15))'
+                                                        ? 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.15))'
                                                         : 'transparent',
-                                                    border: isSelected ? '1px solid rgba(168, 85, 247, 0.4)' : '1px solid transparent',
+                                                    border: isSelected ? '1px solid rgba(var(--ns-accent-rgb), 0.4)' : '1px solid transparent',
                                                     opacity: isCompleted ? 1 : 0.7,
                                                     transition: 'all 0.2s'
                                                 }}
@@ -734,7 +734,7 @@ export function Downloads() {
                         width: '90%',
                         maxWidth: 700,
                         maxHeight: '85vh',
-                        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                        background: 'linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-tint) 100%)',
                         borderRadius: 20,
                         overflow: 'hidden',
                         display: 'flex',
@@ -769,7 +769,7 @@ export function Downloads() {
                             <h2 style={{ color: 'white', fontSize: 24, marginBottom: 8 }}>{movieModal.movie.name}</h2>
 
                             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                                {movieModal.movie.year && <span style={{ background: 'rgba(168,85,247,0.3)', padding: '4px 10px', borderRadius: 6, color: '#c4b5fd', fontSize: 12 }}>{movieModal.movie.year}</span>}
+                                {movieModal.movie.year && <span style={{ background: 'rgba(var(--ns-accent-rgb),0.3)', padding: '4px 10px', borderRadius: 6, color: 'var(--ns-accent-light)', fontSize: 12 }}>{movieModal.movie.year}</span>}
                                 {movieModal.movie.rating && <span style={{ background: 'rgba(251,191,36,0.3)', padding: '4px 10px', borderRadius: 6, color: '#fcd34d', fontSize: 12 }}>⭐ {movieModal.movie.rating}</span>}
                                 <span style={{
                                     background: movieModal.movie.status === 'completed' ? 'rgba(16,185,129,0.3)' : 'rgba(245,158,11,0.3)',
@@ -884,7 +884,7 @@ const downloadsStyles = `
     min-height: 100vh;
     padding: 32px;
     overflow-x: hidden;
-    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+    background: linear-gradient(135deg, var(--ns-bg-deep) 0%, var(--ns-bg-panel) 50%, var(--ns-bg-tint) 100%);
 }
 
 .downloads-backdrop {
@@ -892,7 +892,7 @@ const downloadsStyles = `
     inset: 0;
     background: 
         radial-gradient(ellipse at 30% 30%, rgba(6, 182, 212, 0.1) 0%, transparent 50%),
-        radial-gradient(ellipse at 70% 70%, rgba(168, 85, 247, 0.08) 0%, transparent 50%);
+        radial-gradient(ellipse at 70% 70%, rgba(var(--ns-accent-rgb), 0.08) 0%, transparent 50%);
     pointer-events: none;
     z-index: 0;
 }
@@ -1192,7 +1192,7 @@ const downloadsStyles = `
     position: relative;
     aspect-ratio: 2 / 3;
     overflow: hidden;
-    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
+    background: linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-deep) 100%);
 }
 
 .card-poster img {
@@ -1436,7 +1436,7 @@ const downloadsStyles = `
     transform: translate(-50%, -50%);
     width: 90%;
     max-width: 420px;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    background: linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-tint) 100%);
     border: 1px solid rgba(239, 68, 68, 0.3);
     border-radius: 20px;
     padding: 32px;

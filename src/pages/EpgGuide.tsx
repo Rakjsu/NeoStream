@@ -12,9 +12,15 @@ import {
     nowOffsetPx,
     isAiringNow,
     formatGuideTime,
+    shiftWindow,
+    clampWindow,
+    searchPrograms,
+    HALF_HOUR_MS,
     PX_PER_HALF_HOUR,
-    WINDOW_HALF_HOURS
+    WINDOW_HALF_HOURS,
+    WINDOW_SHIFT_MS
 } from '../utils/epgGuide';
+import type { ProgramSearchResult } from '../utils/epgGuide';
 
 interface LiveStream {
     num: number;
@@ -119,9 +125,15 @@ export function EpgGuide() {
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const { t } = useLanguage();
 
-    // Fixed window for the page's lifetime; the "now" line moves within it.
-    const guideWindow = useMemo(() => getGuideWindow(), []);
+    // Pageable window (◀/▶ shift it by 2h; "Hoje/Agora" resets to default).
+    const [guideWindow, setGuideWindow] = useState(() => getGuideWindow());
     const ticks = useMemo(() => buildTimeTicks(guideWindow), [guideWindow]);
+
+    // Program search over the already-loaded EPG data
+    const [searchQuery, setSearchQuery] = useState('');
+    const [pendingScrollChannel, setPendingScrollChannel] = useState<string | null>(null);
+    const [highlightedChannel, setHighlightedChannel] = useState<string | null>(null);
+    const rowRefs = useRef(new Map<string, HTMLDivElement>());
 
     // "Now" line updates every minute
     useEffect(() => {
@@ -230,6 +242,58 @@ export function EpgGuide() {
         }
     }, [categoryStreams.length]);
 
+    // Time paging: shift the visible window in 2h steps, clamped to the data range
+    const pageWindow = useCallback((direction: 1 | -1) => {
+        setGuideWindow(w => shiftWindow(w, direction * WINDOW_SHIFT_MS));
+    }, []);
+    const resetWindow = useCallback(() => {
+        setGuideWindow(getGuideWindow());
+    }, []);
+
+    // Search over everything already fetched (module cache + this page's state)
+    const searchResults = useMemo<ProgramSearchResult[]>(() => {
+        if (!searchQuery.trim()) return [];
+        const merged = new Map<string, EPGProgram[]>(epgCache);
+        for (const [name, programs] of Object.entries(epgByChannel)) {
+            if (programs) merged.set(name, programs);
+        }
+        return searchPrograms(merged, searchQuery);
+    }, [searchQuery, epgByChannel]);
+
+    const goToSearchResult = useCallback((result: ProgramSearchResult) => {
+        setSearchQuery('');
+        const channel = streams.find(s => s.name === result.channelKey);
+        if (!channel) return;
+        // Page the window so the program's start is visible
+        setGuideWindow(w => {
+            if (result.startMs >= w.start && result.startMs < w.end) return w;
+            const span = w.end - w.start;
+            const start = Math.floor(result.startMs / HALF_HOUR_MS) * HALF_HOUR_MS - HALF_HOUR_MS;
+            return clampWindow({ start, end: start + span });
+        });
+        // Switch category if needed; the effect below scrolls once the row exists
+        if (channel.category_id !== selectedCategory) setSelectedCategory(channel.category_id);
+        setPendingScrollChannel(channel.name);
+    }, [streams, selectedCategory]);
+
+    // Scroll to (and briefly highlight) the searched channel's row once rendered
+    useEffect(() => {
+        if (!pendingScrollChannel) return;
+        const index = categoryStreams.findIndex(s => s.name === pendingScrollChannel);
+        if (index === -1) return;
+        if (index >= visibleRows) {
+            setVisibleRows(index + 1);
+            return;
+        }
+        const row = rowRefs.current.get(pendingScrollChannel);
+        if (!row) return;
+        row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        setHighlightedChannel(pendingScrollChannel);
+        setPendingScrollChannel(null);
+        const timer = setTimeout(() => setHighlightedChannel(null), 2200);
+        return () => clearTimeout(timer);
+    }, [pendingScrollChannel, categoryStreams, visibleRows]);
+
     const buildLiveStreamUrl = async (channel: LiveStream): Promise<string> => {
         const result = await window.ipcRenderer.invoke('auth:get-credentials');
         if (result.success) {
@@ -284,6 +348,13 @@ export function EpgGuide() {
                 }
                 .guide-program:hover { filter: brightness(1.25); }
                 .guide-channel-cell:hover { background: rgba(var(--ns-accent-rgb), 0.12) !important; }
+                .guide-pager-btn:hover { background: rgba(var(--ns-accent-rgb), 0.25) !important; }
+                .guide-search-result:hover { background: rgba(var(--ns-accent-rgb), 0.18) !important; }
+                .guide-row-highlight { animation: guideRowFlash 2.2s ease; }
+                @keyframes guideRowFlash {
+                    0%, 55% { background: rgba(var(--ns-accent-rgb), 0.22); }
+                    100% { background: transparent; }
+                }
             `}</style>
 
             {/* Header: title + category selector */}
@@ -294,7 +365,7 @@ export function EpgGuide() {
             }}>
                 <h1 style={{
                     fontSize: '24px', fontWeight: 800, margin: 0,
-                    background: 'linear-gradient(135deg, #ffffff 0%, #c4b5fd 100%)',
+                    background: 'linear-gradient(135deg, #ffffff 0%, var(--ns-accent-light) 100%)',
                     WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'
                 }}>
                     {t('guide', 'title')}
@@ -322,6 +393,102 @@ export function EpgGuide() {
                         </option>
                     ))}
                 </select>
+
+                {/* Time paging: ◀ Hoje/Agora ▶ */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <button
+                        className="guide-pager-btn"
+                        onClick={() => pageWindow(-1)}
+                        aria-label={t('guide', 'earlier')}
+                        title={t('guide', 'earlier')}
+                        style={pagerButtonStyle}
+                    >
+                        ◀
+                    </button>
+                    <button
+                        className="guide-pager-btn"
+                        onClick={resetWindow}
+                        title={t('guide', 'today')}
+                        style={{ ...pagerButtonStyle, width: 'auto', padding: '0 12px', fontSize: '12px', fontWeight: 600 }}
+                    >
+                        {t('guide', 'today')}
+                    </button>
+                    <button
+                        className="guide-pager-btn"
+                        onClick={() => pageWindow(1)}
+                        aria-label={t('guide', 'later')}
+                        title={t('guide', 'later')}
+                        style={pagerButtonStyle}
+                    >
+                        ▶
+                    </button>
+                </div>
+
+                {/* Program search across the loaded EPG data */}
+                <div style={{ position: 'relative', flex: '0 1 300px', minWidth: '210px' }}>
+                    <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder={t('guide', 'searchPlaceholder')}
+                        aria-label={t('guide', 'searchPlaceholder')}
+                        style={{
+                            width: '100%',
+                            boxSizing: 'border-box',
+                            background: 'rgba(31, 41, 55, 0.9)',
+                            color: 'white',
+                            border: '1px solid rgba(var(--ns-accent-rgb), 0.4)',
+                            borderRadius: '10px',
+                            padding: '8px 14px',
+                            fontSize: '13px',
+                            outline: 'none'
+                        }}
+                    />
+                    {searchQuery.trim() !== '' && (
+                        <div
+                            className="guide-scroll"
+                            style={{
+                                position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
+                                zIndex: 60, maxHeight: '320px', overflowY: 'auto',
+                                background: 'var(--ns-bg-panel)',
+                                border: '1px solid rgba(var(--ns-accent-rgb), 0.35)',
+                                borderRadius: '10px',
+                                boxShadow: '0 12px 32px rgba(0, 0, 0, 0.5)'
+                            }}
+                        >
+                            {searchResults.length === 0 ? (
+                                <div style={{ padding: '12px 14px', fontSize: '12px', fontStyle: 'italic', color: 'rgba(148, 163, 184, 0.9)' }}>
+                                    {t('guide', 'searchNoResults')}
+                                </div>
+                            ) : (
+                                searchResults.map(result => (
+                                    <button
+                                        key={result.channelKey + result.start + result.title}
+                                        className="guide-search-result"
+                                        onClick={() => goToSearchResult(result)}
+                                        style={{
+                                            display: 'block', width: '100%', textAlign: 'left',
+                                            background: 'transparent', border: 'none', cursor: 'pointer',
+                                            padding: '8px 14px',
+                                            borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+                                        }}
+                                    >
+                                        <div style={{
+                                            fontSize: '13px', fontWeight: 600, color: 'rgba(229, 231, 235, 1)',
+                                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                                        }}>
+                                            {result.title}
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: 'var(--ns-accent-light)' }}>
+                                            {result.channelKey} · {formatGuideDayTime(result.startMs)}
+                                        </div>
+                                    </button>
+                                ))
+                            )}
+                        </div>
+                    )}
+                </div>
+
                 <span style={{ fontSize: '13px', color: 'rgba(148, 163, 184, 0.9)' }}>
                     {categoryStreams.length} {t('guide', 'channels')}
                 </span>
@@ -362,7 +529,7 @@ export function EpgGuide() {
                                 background: 'linear-gradient(180deg, var(--ns-bg-panel) 0%, var(--ns-bg-deep) 100%)',
                                 borderRight: '1px solid rgba(255, 255, 255, 0.08)',
                                 fontSize: '11px', fontWeight: 700, letterSpacing: '1px',
-                                textTransform: 'uppercase', color: 'rgba(196, 181, 253, 0.9)'
+                                textTransform: 'uppercase', color: 'var(--ns-accent-light)'
                             }}>
                                 {t('guide', 'channelsHeader')}
                             </div>
@@ -403,10 +570,18 @@ export function EpgGuide() {
                             {renderedStreams.map(channel => {
                                 const programs = epgByChannel[channel.name];
                                 return (
-                                    <div key={channel.stream_id} style={{
-                                        display: 'flex', height: ROW_HEIGHT,
-                                        borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
-                                    }}>
+                                    <div
+                                        key={channel.stream_id}
+                                        className={highlightedChannel === channel.name ? 'guide-row-highlight' : undefined}
+                                        ref={el => {
+                                            if (el) rowRefs.current.set(channel.name, el);
+                                            else rowRefs.current.delete(channel.name);
+                                        }}
+                                        style={{
+                                            display: 'flex', height: ROW_HEIGHT,
+                                            borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
+                                        }}
+                                    >
                                         {/* Sticky channel cell */}
                                         <div
                                             className="guide-channel-cell"
@@ -536,6 +711,15 @@ export function EpgGuide() {
     );
 }
 
+/** "HH:MM" plus "dd/MM" when the timestamp falls on another day. */
+function formatGuideDayTime(ms: number): string {
+    const time = formatGuideTime(ms);
+    const date = new Date(ms);
+    const today = new Date();
+    if (date.toDateString() === today.toDateString()) return time;
+    return `${date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} ${time}`;
+}
+
 function ChannelLetterFallback({ name }: { name: string }) {
     // Skip country/quality prefixes when picking the letter (e.g. "BR: Globo" → G)
     const cleaned = name.replace(/^[a-z]{2,3}\s*[:|]\s*/i, '').trim();
@@ -565,6 +749,21 @@ const backdropStyle: React.CSSProperties = {
     inset: 0,
     background: 'linear-gradient(135deg, var(--ns-bg-deep) 0%, var(--ns-bg-panel) 50%, var(--ns-bg-tint) 100%)',
     zIndex: 0
+};
+
+const pagerButtonStyle: React.CSSProperties = {
+    width: '34px',
+    height: '34px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'rgba(var(--ns-accent-rgb), 0.12)',
+    color: 'var(--ns-accent-light)',
+    border: '1px solid rgba(var(--ns-accent-rgb), 0.4)',
+    borderRadius: '10px',
+    fontSize: '11px',
+    cursor: 'pointer',
+    transition: 'background 0.2s ease'
 };
 
 const rowPlaceholderStyle: React.CSSProperties = {

@@ -117,7 +117,7 @@ export function PlaylistsSection() {
         <div className="section-card">
             <style>{playlistsStyles}</style>
             <div className="section-header">
-                <div className="section-icon" style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf6)' }}>📺</div>
+                <div className="section-icon" style={{ background: 'linear-gradient(135deg, var(--ns-accent-dark), var(--ns-accent))' }}>📺</div>
                 <div>
                     <h2>{t('playlists', 'title')}</h2>
                     <p>{t('playlists', 'description')}</p>
@@ -280,7 +280,7 @@ const playlistsStyles = `
 
 .playlists-badge {
     padding: 2px 8px;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    background: linear-gradient(135deg, var(--ns-accent-dark), var(--ns-accent));
     border-radius: 8px;
     font-size: 11px;
     font-weight: 600;
@@ -321,7 +321,7 @@ const playlistsStyles = `
 }
 
 .playlists-btn-primary {
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    background: linear-gradient(135deg, var(--ns-accent-dark), var(--ns-accent));
     border-color: transparent;
     color: #fff;
 }

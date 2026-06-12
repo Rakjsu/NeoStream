@@ -28,7 +28,7 @@ export function StatsSection() {
     return (
         <div className="section-card">
             <div className="section-header">
-                <div className="section-icon" style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}>📊</div>
+                <div className="section-icon" style={{ background: 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-dark))' }}>📊</div>
                 <div>
                     <h2>{t('stats', 'title')}</h2>
                     <p>{t('stats', 'description')}</p>
@@ -45,16 +45,16 @@ export function StatsSection() {
                 }}>
                     {/* Total Watch Time */}
                     <div style={{
-                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(124, 58, 237, 0.1))',
+                        background: 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-rgb), 0.1))',
                         borderRadius: '16px',
                         padding: '24px',
-                        border: '1px solid rgba(139, 92, 246, 0.3)'
+                        border: '1px solid rgba(var(--ns-accent-rgb), 0.3)'
                     }}>
                         <div style={{ fontSize: '32px', marginBottom: '8px' }}>⏱️</div>
                         <div style={{
                             fontSize: '28px',
                             fontWeight: 700,
-                            color: '#a78bfa',
+                            color: 'var(--ns-accent-light)',
                             marginBottom: '4px'
                         }}>
                             {formatWatchTime(usageStats?.totalWatchTimeThisMonth || 0)}
@@ -142,8 +142,8 @@ export function StatsSection() {
                                         style={{
                                             height: `${height}px`,
                                             background: isToday
-                                                ? 'linear-gradient(180deg, #8b5cf6, #6d28d9)'
-                                                : 'linear-gradient(180deg, rgba(139, 92, 246, 0.5), rgba(139, 92, 246, 0.2))',
+                                                ? 'linear-gradient(180deg, var(--ns-accent), var(--ns-accent-dark))'
+                                                : 'linear-gradient(180deg, rgba(var(--ns-accent-rgb), 0.5), rgba(var(--ns-accent-rgb), 0.2))',
                                             borderRadius: '4px',
                                             margin: '0 auto',
                                             width: '100%',
@@ -153,7 +153,7 @@ export function StatsSection() {
                                         title={`${formatWatchTime(day.totalSeconds)}`}
                                     />
                                     <div style={{
-                                        color: isToday ? '#a78bfa' : 'rgba(255,255,255,0.4)',
+                                        color: isToday ? 'var(--ns-accent-light)' : 'rgba(255,255,255,0.4)',
                                         fontSize: '11px',
                                         marginTop: '6px',
                                         fontWeight: isToday ? 600 : 400

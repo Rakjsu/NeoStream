@@ -145,7 +145,7 @@ export function EpgSection({
                     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
                 }
                 .epg-progress-bar {
-                    background: linear-gradient(90deg, #06b6d4, #8b5cf6, #06b6d4);
+                    background: linear-gradient(90deg, #06b6d4, var(--ns-accent), #06b6d4);
                     background-size: 200% 100%;
                     animation: epgProgressShine 2s linear infinite;
                 }
@@ -199,13 +199,13 @@ export function EpgSection({
                         {/* Featured Total Card */}
                         <div className="setting-item epg-grid-item" style={{
                             padding: '20px',
-                            background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.15))',
-                            border: '1px solid rgba(168, 85, 247, 0.4)',
+                            background: 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.15))',
+                            border: '1px solid rgba(var(--ns-accent-rgb), 0.4)',
                             marginBottom: '12px',
                             justifyContent: 'center'
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
-                                <div style={{ fontSize: '42px', fontWeight: 800, color: '#a855f7' }}>
+                                <div style={{ fontSize: '42px', fontWeight: 800, color: 'var(--ns-accent)' }}>
                                     {playlistChannelCounts.total}
                                 </div>
                                 <div style={{ textAlign: 'left' }}>
@@ -250,7 +250,7 @@ export function EpgSection({
                 {/* Progress when testing */}
                 {testingEpg && (
                     <div className="setting-item" style={{
-                        background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(139, 92, 246, 0.1))',
+                        background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.15), rgba(var(--ns-accent-rgb), 0.1))',
                         border: '1px solid rgba(6, 182, 212, 0.3)'
                     }}>
                         <div style={{ flex: 1 }}>
@@ -306,7 +306,7 @@ export function EpgSection({
                         {epgTestResults.lastScannedIndex && epgTestResults.lastScannedIndex < (epgTestResults.summary?.total || 0) && (
                             <button className="check-btn" onClick={() => handleEpgTest('continue')} style={{
                                 flex: 1,
-                                background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)'
+                                background: 'linear-gradient(135deg, var(--ns-accent) 0%, var(--ns-accent-dark) 100%)'
                             }}>
                                 <span>▶️</span>
                                 <span>{t('epg', 'continueFrom')} ({epgTestResults.lastScannedIndex}/{epgTestResults.summary?.total})</span>
@@ -585,7 +585,7 @@ export function EpgSection({
                                                 <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>
                                                     <span style={{ color: '#06b6d4' }}>{item.source}</span>
                                                     <span style={{ margin: '0 6px' }}>•</span>
-                                                    <code style={{ color: '#a78bfa', background: 'rgba(167, 139, 250, 0.1)', padding: '2px 5px', borderRadius: '3px', fontSize: '10px' }}>{item.epgId}</code>
+                                                    <code style={{ color: 'var(--ns-accent-light)', background: 'rgba(var(--ns-accent-rgb), 0.1)', padding: '2px 5px', borderRadius: '3px', fontSize: '10px' }}>{item.epgId}</code>
                                                 </div>
                                             </div>
                                         ))}

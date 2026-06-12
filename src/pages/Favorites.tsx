@@ -400,7 +400,7 @@ const favoritesStyles = `
 .favorites-backdrop {
     position: fixed;
     inset: 0;
-    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+    background: linear-gradient(135deg, var(--ns-bg-deep) 0%, var(--ns-bg-panel) 50%, var(--ns-bg-tint) 100%);
     z-index: 0;
 }
 

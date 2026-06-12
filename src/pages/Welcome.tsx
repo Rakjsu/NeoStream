@@ -167,7 +167,7 @@ const welcomeStyles = `
 .welcome-orb-2 {
     width: 400px;
     height: 400px;
-    background: radial-gradient(circle, #a855f7 0%, transparent 70%);
+    background: radial-gradient(circle, var(--ns-accent) 0%, transparent 70%);
     bottom: -100px;
     right: -100px;
     animation-delay: -7s;
@@ -220,7 +220,7 @@ const welcomeStyles = `
 .welcome-logo-bg {
     width: 100px;
     height: 100px;
-    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    background: linear-gradient(135deg, var(--ns-accent-dark) 0%, var(--ns-accent) 100%);
     border-radius: 28px;
     display: flex;
     align-items: center;
@@ -257,10 +257,10 @@ const welcomeStyles = `
     gap: 6px;
     margin-top: 12px;
     padding: 6px 14px;
-    background: rgba(168, 85, 247, 0.15);
-    border: 1px solid rgba(168, 85, 247, 0.3);
+    background: rgba(var(--ns-accent-rgb), 0.15);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.3);
     border-radius: 20px;
-    color: #c4b5fd;
+    color: var(--ns-accent-light);
     font-size: 12px;
     font-weight: 600;
     letter-spacing: 0.1em;
@@ -304,7 +304,7 @@ const welcomeStyles = `
 }
 
 .welcome-card-primary {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, var(--ns-accent-dark) 0%, var(--ns-accent) 100%);
     box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
 }
 
@@ -393,7 +393,7 @@ const welcomeStyles = `
     left: 0;
     width: 340px;
     height: 100vh;
-    background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+    background: linear-gradient(180deg, var(--ns-bg-panel) 0%, var(--ns-bg-tint) 100%);
     border-right: 1px solid rgba(255,255,255,0.1);
     z-index: 101;
     transform: translateX(-100%);
