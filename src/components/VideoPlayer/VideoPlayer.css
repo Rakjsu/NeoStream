@@ -91,7 +91,7 @@
 }
 
 .spinner-ring:nth-child(1) {
-    border-top-color: #a855f7;
+    border-top-color: var(--ns-accent);
     animation: spinRing 1.2s linear infinite;
 }
 
@@ -100,7 +100,7 @@
     height: 70%;
     top: 15%;
     left: 15%;
-    border-right-color: #ec4899;
+    border-right-color: var(--ns-accent-grad-to);
     animation: spinRing 1s linear infinite reverse;
 }
 
@@ -109,7 +109,7 @@
     height: 40%;
     top: 30%;
     left: 30%;
-    border-bottom-color: #6366f1;
+    border-bottom-color: var(--ns-accent-dark);
     animation: spinRing 0.8s linear infinite;
 }
 
@@ -155,7 +155,7 @@
 .central-play-icon {
     width: 100px;
     height: 100px;
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.9), rgba(236, 72, 153, 0.9));
+    background: linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.9), rgba(var(--ns-accent-grad-to-rgb), 0.9));
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -163,25 +163,25 @@
     font-size: 40px;
     color: white;
     padding-left: 8px;
-    box-shadow: 0 8px 40px rgba(168, 85, 247, 0.5);
+    box-shadow: 0 8px 40px rgba(var(--ns-accent-rgb), 0.5);
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
     animation: centralPlayPulse 2s ease-in-out infinite;
 }
 
 .central-play-icon:hover {
     transform: scale(1.15);
-    box-shadow: 0 12px 50px rgba(168, 85, 247, 0.7);
+    box-shadow: 0 12px 50px rgba(var(--ns-accent-rgb), 0.7);
 }
 
 @keyframes centralPlayPulse {
 
     0%,
     100% {
-        box-shadow: 0 8px 40px rgba(168, 85, 247, 0.5);
+        box-shadow: 0 8px 40px rgba(var(--ns-accent-rgb), 0.5);
     }
 
     50% {
-        box-shadow: 0 8px 60px rgba(168, 85, 247, 0.8), 0 0 100px rgba(236, 72, 153, 0.3);
+        box-shadow: 0 8px 60px rgba(var(--ns-accent-rgb), 0.8), 0 0 100px rgba(var(--ns-accent-grad-to-rgb), 0.3);
     }
 }
 
@@ -308,7 +308,7 @@
     top: 0;
     left: 0;
     height: 100%;
-    background: linear-gradient(90deg, #a855f7, #ec4899);
+    background: linear-gradient(90deg, var(--ns-accent), var(--ns-accent-grad-to));
     border-radius: 3px;
     transition: width 0.1s ease;
 }
@@ -470,7 +470,7 @@
 }
 
 .settings-option.active {
-    background: linear-gradient(135deg, #a855f7, #ec4899);
+    background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to));
 }
 
 /* Fullscreen styles */

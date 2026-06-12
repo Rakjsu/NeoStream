@@ -119,8 +119,8 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                     <svg width="60" height="60" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                         <defs>
                             <linearGradient id="profileLogoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stopColor="#a855f7" />
-                                <stop offset="100%" stopColor="#ec4899" />
+                                <stop offset="0%" style={{ stopColor: 'var(--ns-accent)' }} />
+                                <stop offset="100%" style={{ stopColor: 'var(--ns-accent-grad-to)' }} />
                             </linearGradient>
                         </defs>
                         <path d="M 10,10 L 10,90 L 90,50 Z" fill="none" stroke="url(#profileLogoGrad)" strokeWidth="6" strokeLinejoin="round" />
@@ -372,7 +372,7 @@ const profileSelectorStyles = `
     padding: 40px;
     position: relative;
     overflow: hidden;
-    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+    background: linear-gradient(135deg, var(--ns-bg-deep) 0%, var(--ns-bg-panel) 50%, var(--ns-bg-tint) 100%);
 }
 
 /* Animated Background */
@@ -394,7 +394,7 @@ const profileSelectorStyles = `
 .orb-1 {
     width: 400px;
     height: 400px;
-    background: radial-gradient(circle, #a855f7 0%, transparent 70%);
+    background: radial-gradient(circle, var(--ns-accent) 0%, transparent 70%);
     top: -100px;
     left: -100px;
     animation-delay: 0s;
@@ -403,7 +403,7 @@ const profileSelectorStyles = `
 .orb-2 {
     width: 350px;
     height: 350px;
-    background: radial-gradient(circle, #ec4899 0%, transparent 70%);
+    background: radial-gradient(circle, var(--ns-accent-grad-to) 0%, transparent 70%);
     bottom: -50px;
     right: -50px;
     animation-delay: -5s;
@@ -567,29 +567,29 @@ const profileSelectorStyles = `
     width: 150px;
     height: 150px;
     border-radius: 16px;
-    border: 3px dashed rgba(168, 85, 247, 0.4);
+    border: 3px dashed rgba(var(--ns-accent-rgb), 0.4);
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(168, 85, 247, 0.05);
+    background: rgba(var(--ns-accent-rgb), 0.05);
     transition: all 0.3s ease;
 }
 
 .add-profile-card:hover .add-icon-container {
-    border-color: rgba(168, 85, 247, 0.7);
-    background: rgba(168, 85, 247, 0.1);
+    border-color: rgba(var(--ns-accent-rgb), 0.7);
+    background: rgba(var(--ns-accent-rgb), 0.1);
     border-style: solid;
 }
 
 .add-icon {
     font-size: 60px;
-    color: rgba(168, 85, 247, 0.5);
+    color: rgba(var(--ns-accent-rgb), 0.5);
     font-weight: 300;
     transition: all 0.3s ease;
 }
 
 .add-profile-card:hover .add-icon {
-    color: #a855f7;
+    color: var(--ns-accent);
     transform: rotate(90deg) scale(1.1);
 }
 
@@ -597,7 +597,7 @@ const profileSelectorStyles = `
     position: absolute;
     inset: -10px;
     border-radius: 20px;
-    background: radial-gradient(circle, rgba(168, 85, 247, 0.2) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(var(--ns-accent-rgb), 0.2) 0%, transparent 70%);
     opacity: 0;
     transition: opacity 0.3s ease;
 }
@@ -641,7 +641,7 @@ const profileSelectorStyles = `
 
 .manage-btn:hover {
     background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(168, 85, 247, 0.5);
+    border-color: rgba(var(--ns-accent-rgb), 0.5);
     color: white;
     transform: translateY(-2px);
 }
@@ -665,7 +665,7 @@ const profileSelectorStyles = `
     padding: 40px;
     max-width: 420px;
     width: 90%;
-    border: 1px solid rgba(168, 85, 247, 0.2);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.2);
     box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
     animation: modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -711,7 +711,7 @@ const profileSelectorStyles = `
 }
 
 .pin-modal-header strong {
-    color: #c4b5fd;
+    color: var(--ns-accent-light);
 }
 
 /* PIN Input */
@@ -738,8 +738,8 @@ const profileSelectorStyles = `
 }
 
 .pin-digit.filled {
-    border-color: #a855f7;
-    background: rgba(168, 85, 247, 0.1);
+    border-color: var(--ns-accent);
+    background: rgba(var(--ns-accent-rgb), 0.1);
     animation: digitFill 0.2s ease;
 }
 
@@ -818,15 +818,15 @@ const profileSelectorStyles = `
 }
 
 .btn-submit {
-    background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+    background: linear-gradient(135deg, var(--ns-accent) 0%, var(--ns-accent-grad-to) 100%);
     border: none;
     color: white;
-    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.3);
+    box-shadow: 0 8px 24px rgba(var(--ns-accent-rgb), 0.3);
 }
 
 .btn-submit:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 12px 32px rgba(168, 85, 247, 0.4);
+    box-shadow: 0 12px 32px rgba(var(--ns-accent-rgb), 0.4);
 }
 
 .btn-submit:disabled {
@@ -866,7 +866,7 @@ const profileSelectorStyles = `
     position: absolute;
     top: 8px;
     left: 8px;
-    background: rgba(168, 85, 247, 0.9);
+    background: rgba(var(--ns-accent-rgb), 0.9);
     border-radius: 50%;
     width: 32px;
     height: 32px;
@@ -951,8 +951,8 @@ const profileSelectorStyles = `
 }
 
 .edit-profile-input:focus {
-    border-color: #a855f7;
-    background: rgba(168, 85, 247, 0.1);
+    border-color: var(--ns-accent);
+    background: rgba(var(--ns-accent-rgb), 0.1);
 }
 
 .avatar-selector {
@@ -976,13 +976,13 @@ const profileSelectorStyles = `
 }
 
 .avatar-option:hover {
-    border-color: rgba(168, 85, 247, 0.5);
-    background: rgba(168, 85, 247, 0.1);
+    border-color: rgba(var(--ns-accent-rgb), 0.5);
+    background: rgba(var(--ns-accent-rgb), 0.1);
     transform: scale(1.1);
 }
 
 .avatar-option.selected {
-    border-color: #a855f7;
-    background: rgba(168, 85, 247, 0.2);
+    border-color: var(--ns-accent);
+    background: rgba(var(--ns-accent-rgb), 0.2);
 }
 `;

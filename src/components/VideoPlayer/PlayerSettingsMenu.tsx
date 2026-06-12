@@ -66,7 +66,7 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
                                             ? 'linear-gradient(135deg, #10b981, #059669)'
                                             : currentVersion.label === 'SD'
                                                 ? 'linear-gradient(135deg, #6b7280, #4b5563)'
-                                                : 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                                                : 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-dark))',
                                     color: 'white',
                                     textTransform: 'uppercase',
                                     letterSpacing: '0.5px',
@@ -87,7 +87,7 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
                                 borderRadius: '4px',
                                 background: currentVersion.quality === '4k'
                                     ? 'linear-gradient(135deg, #f59e0b, #d97706)'
-                                    : 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                                    : 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-dark))',
                                 color: 'white',
                                 textTransform: 'uppercase',
                                 letterSpacing: '0.5px',

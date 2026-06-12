@@ -452,7 +452,7 @@ const castStyles = `
     justify-content: center;
     gap: 10px;
     padding: 14px 20px;
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(147, 51, 234, 0.2));
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(var(--ns-accent-rgb), 0.2));
     border: 1px solid rgba(59, 130, 246, 0.3);
     border-radius: 12px;
     color: white;

@@ -76,8 +76,8 @@ export function CustomTitleBar() {
                     <svg className="title-bar-svg" width="22" height="22" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                         <defs>
                             <linearGradient id="titleBarGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stopColor="#a855f7" />
-                                <stop offset="100%" stopColor="#ec4899" />
+                                <stop offset="0%" style={{ stopColor: 'var(--ns-accent)' }} />
+                                <stop offset="100%" style={{ stopColor: 'var(--ns-accent-grad-to)' }} />
                             </linearGradient>
                         </defs>
                         <path d="M 10,10 L 10,90 L 90,50 Z" fill="none" stroke="url(#titleBarGradient)" strokeWidth="6" strokeLinejoin="round" />

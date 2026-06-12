@@ -500,7 +500,7 @@ export function Series() {
                                                         position: 'absolute',
                                                         top: 10,
                                                         left: 10,
-                                                        background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+                                                        background: 'linear-gradient(135deg, var(--ns-accent) 0%, var(--ns-accent-grad-to) 100%)',
                                                         borderRadius: 8,
                                                         padding: '4px 8px',
                                                         fontSize: 14,
@@ -520,7 +520,7 @@ export function Series() {
                                                         padding: '5px 8px',
                                                         fontSize: 11,
                                                         fontWeight: 600,
-                                                        color: '#c4b5fd',
+                                                        color: 'var(--ns-accent-light)',
                                                         textAlign: 'center',
                                                         zIndex: 5
                                                     }}>
@@ -693,7 +693,7 @@ const seriesStyles = `
     position: relative;
     height: 100vh;
     overflow: hidden;
-    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+    background: linear-gradient(135deg, var(--ns-bg-deep) 0%, var(--ns-bg-panel) 50%, var(--ns-bg-tint) 100%);
 }
 
 /* Dynamic Backdrop */
@@ -727,7 +727,7 @@ const seriesStyles = `
     background: linear-gradient(135deg, rgba(15, 15, 26, 0.9) 0%, rgba(26, 26, 46, 0.85) 100%);
     backdrop-filter: blur(24px);
     border-radius: 24px;
-    border: 1px solid rgba(168, 85, 247, 0.2);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.2);
     padding: 32px;
     animation: slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 
@@ -767,7 +767,7 @@ const seriesStyles = `
 }
 
 .badge.shimmer {
-    background: linear-gradient(90deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.2), rgba(168, 85, 247, 0.2));
+    background: linear-gradient(90deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.2), rgba(var(--ns-accent-rgb), 0.2));
     background-size: 200% 100%;
     animation: shimmerBadge 1.5s ease infinite;
     color: rgba(255, 255, 255, 0.6);
@@ -779,9 +779,9 @@ const seriesStyles = `
 }
 
 .date-badge {
-    background: rgba(168, 85, 247, 0.2);
-    color: #c4b5fd;
-    border: 1px solid rgba(168, 85, 247, 0.3);
+    background: rgba(var(--ns-accent-rgb), 0.2);
+    color: var(--ns-accent-light);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.3);
 }
 
 .rating-badge {
@@ -854,8 +854,8 @@ const seriesStyles = `
 }
 
 .genre-tag:hover {
-    background: rgba(168, 85, 247, 0.2);
-    border-color: rgba(168, 85, 247, 0.4);
+    background: rgba(var(--ns-accent-rgb), 0.2);
+    border-color: rgba(var(--ns-accent-rgb), 0.4);
 }
 
 /* Overview */
@@ -904,8 +904,8 @@ const seriesStyles = `
 }
 
 .season-nav-btn:hover {
-    background: rgba(168, 85, 247, 0.3);
-    border-color: rgba(168, 85, 247, 0.5);
+    background: rgba(var(--ns-accent-rgb), 0.3);
+    border-color: rgba(var(--ns-accent-rgb), 0.5);
     opacity: 1;
     transform: scale(1.1);
 }
@@ -969,16 +969,16 @@ const seriesStyles = `
 }
 
 .season-tab:hover {
-    background: rgba(168, 85, 247, 0.15);
-    border-color: rgba(168, 85, 247, 0.4);
+    background: rgba(var(--ns-accent-rgb), 0.15);
+    border-color: rgba(var(--ns-accent-rgb), 0.4);
     color: white;
 }
 
 .season-tab.active {
-    background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+    background: linear-gradient(135deg, var(--ns-accent) 0%, var(--ns-accent-grad-to) 100%);
     border-color: transparent;
     color: white;
-    box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+    box-shadow: 0 4px 15px rgba(var(--ns-accent-rgb), 0.4);
 }
 
 .season-tab-number {
@@ -998,7 +998,7 @@ const seriesStyles = `
     background: rgba(0, 0, 0, 0.2);
     padding: 8px;
     scrollbar-width: thin;
-    scrollbar-color: rgba(168, 85, 247, 0.4) transparent;
+    scrollbar-color: rgba(var(--ns-accent-rgb), 0.4) transparent;
 }
 
 .episode-list-container::-webkit-scrollbar {
@@ -1010,7 +1010,7 @@ const seriesStyles = `
 }
 
 .episode-list-container::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #a855f7, #ec4899);
+    background: linear-gradient(180deg, var(--ns-accent), var(--ns-accent-grad-to));
     border-radius: 3px;
 }
 
@@ -1045,15 +1045,15 @@ const seriesStyles = `
 }
 
 .episode-card:hover {
-    background: rgba(168, 85, 247, 0.1);
-    border-color: rgba(168, 85, 247, 0.3);
+    background: rgba(var(--ns-accent-rgb), 0.1);
+    border-color: rgba(var(--ns-accent-rgb), 0.3);
     transform: translateX(4px);
 }
 
 .episode-card.selected {
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(236, 72, 153, 0.15) 100%);
-    border-color: rgba(168, 85, 247, 0.5);
-    box-shadow: 0 4px 20px rgba(168, 85, 247, 0.2);
+    background: linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2) 0%, rgba(var(--ns-accent-grad-to-rgb), 0.15) 100%);
+    border-color: rgba(var(--ns-accent-rgb), 0.5);
+    box-shadow: 0 4px 20px rgba(var(--ns-accent-rgb), 0.2);
 }
 
 .episode-card.watched {
@@ -1070,7 +1070,7 @@ const seriesStyles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(168, 85, 247, 0.3);
+    background: rgba(var(--ns-accent-rgb), 0.3);
     border-radius: 10px;
     font-size: 14px;
     font-weight: 700;
@@ -1116,7 +1116,7 @@ const seriesStyles = `
 
 .episode-progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #a855f7, #ec4899);
+    background: linear-gradient(90deg, var(--ns-accent), var(--ns-accent-grad-to));
     border-radius: 3px;
     transition: width 0.3s ease;
 }
@@ -1127,7 +1127,7 @@ const seriesStyles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #a855f7, #ec4899);
+    background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to));
     border-radius: 50%;
     font-size: 12px;
     color: white;
@@ -1155,7 +1155,7 @@ const seriesStyles = `
     font-size: 15px;
     font-weight: 600;
     border-radius: 12px;
-    border: 2px solid rgba(168, 85, 247, 0.4);
+    border: 2px solid rgba(var(--ns-accent-rgb), 0.4);
     cursor: pointer;
     outline: none;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -1164,13 +1164,13 @@ const seriesStyles = `
 }
 
 .episode-select:hover {
-    border-color: rgba(168, 85, 247, 0.7);
+    border-color: rgba(var(--ns-accent-rgb), 0.7);
     background: rgba(40, 40, 60, 0.9);
 }
 
 .episode-select:focus {
-    border-color: #a855f7;
-    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2);
+    border-color: var(--ns-accent);
+    box-shadow: 0 0 0 3px rgba(var(--ns-accent-rgb), 0.2);
 }
 
 .episode-dropdown {
@@ -1204,14 +1204,14 @@ const seriesStyles = `
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+    background: linear-gradient(135deg, var(--ns-accent) 0%, var(--ns-accent-grad-to) 100%);
     color: white;
-    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.4);
+    box-shadow: 0 8px 24px rgba(var(--ns-accent-rgb), 0.4);
 }
 
 .btn-primary:hover {
     transform: translateY(-3px) scale(1.02);
-    box-shadow: 0 12px 32px rgba(168, 85, 247, 0.5);
+    box-shadow: 0 12px 32px rgba(var(--ns-accent-rgb), 0.5);
 }
 
 .btn-primary:active {
@@ -1305,7 +1305,7 @@ const seriesStyles = `
     overflow-x: hidden;
     padding-right: 8px;
     scrollbar-width: thin;
-    scrollbar-color: rgba(168, 85, 247, 0.4) transparent;
+    scrollbar-color: rgba(var(--ns-accent-rgb), 0.4) transparent;
 }
 
 .series-scroll-container::-webkit-scrollbar {
@@ -1317,7 +1317,7 @@ const seriesStyles = `
 }
 
 .series-scroll-container::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #a855f7, #ec4899);
+    background: linear-gradient(180deg, var(--ns-accent), var(--ns-accent-grad-to));
     border-radius: 3px;
 }
 
@@ -1369,14 +1369,14 @@ const seriesStyles = `
 
 .series-card:hover {
     transform: translateY(-8px) scale(1.03);
-    border-color: rgba(168, 85, 247, 0.4);
+    border-color: rgba(var(--ns-accent-rgb), 0.4);
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4),
-                0 0 40px rgba(168, 85, 247, 0.15);
+                0 0 40px rgba(var(--ns-accent-rgb), 0.15);
 }
 
 .series-card.selected {
-    border-color: #a855f7;
-    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.3),
+    border-color: var(--ns-accent);
+    box-shadow: 0 0 0 3px rgba(var(--ns-accent-rgb), 0.3),
                 0 20px 40px rgba(0, 0, 0, 0.4);
 }
 
@@ -1385,7 +1385,7 @@ const seriesStyles = `
     position: relative;
     aspect-ratio: 2 / 3;
     overflow: hidden;
-    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
+    background: linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-deep) 100%);
 }
 
 .card-poster img {
@@ -1405,7 +1405,7 @@ const seriesStyles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #1e1e3f 0%, #0f0f1a 100%);
+    background: linear-gradient(135deg, #1e1e3f 0%, var(--ns-bg-deep) 100%);
     font-size: 48px;
 }
 
@@ -1433,7 +1433,7 @@ const seriesStyles = `
 .play-icon {
     width: 60px;
     height: 60px;
-    background: rgba(168, 85, 247, 0.9);
+    background: rgba(var(--ns-accent-rgb), 0.9);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -1442,7 +1442,7 @@ const seriesStyles = `
     color: white;
     transform: scale(0);
     transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.5);
+    box-shadow: 0 8px 24px rgba(var(--ns-accent-rgb), 0.5);
 }
 
 .series-card:hover .play-icon {
@@ -1473,7 +1473,7 @@ const seriesStyles = `
     left: 10px;
     width: 32px;
     height: 32px;
-    background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+    background: linear-gradient(135deg, var(--ns-accent) 0%, var(--ns-accent-grad-to) 100%);
     border-radius: 8px;
     display: flex;
     align-items: center;
@@ -1481,7 +1481,7 @@ const seriesStyles = `
     font-size: 18px;
     color: white;
     font-weight: bold;
-    box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+    box-shadow: 0 4px 12px rgba(var(--ns-accent-rgb), 0.4);
 }
 
 /* Episode Badge */
@@ -1522,7 +1522,7 @@ const seriesStyles = `
 }
 
 .series-card:hover .card-title {
-    color: #c4b5fd;
+    color: var(--ns-accent-light);
 }
 
 /* Empty State */
@@ -1574,13 +1574,13 @@ const seriesStyles = `
 
 .skeleton-poster {
     aspect-ratio: 2 / 3;
-    background: linear-gradient(135deg, #2a2a4a 0%, #1a1a2e 100%);
+    background: linear-gradient(135deg, #2a2a4a 0%, var(--ns-bg-panel) 100%);
     border-radius: 16px 16px 0 0;
 }
 
 .skeleton-title {
     height: 50px;
-    background: linear-gradient(135deg, #1a1a2e 0%, #2a2a4a 100%);
+    background: linear-gradient(135deg, var(--ns-bg-panel) 0%, #2a2a4a 100%);
     border-radius: 0 0 16px 16px;
 }
 

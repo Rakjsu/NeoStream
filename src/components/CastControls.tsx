@@ -144,13 +144,13 @@ export function CastControls({ deviceId, deviceName, onSessionEnded }: CastContr
             padding: '10px 16px',
             borderRadius: 14,
             background: 'rgba(15, 15, 35, 0.95)',
-            border: '1px solid rgba(139, 92, 246, 0.5)',
+            border: '1px solid rgba(var(--ns-accent-rgb), 0.5)',
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
             color: 'white',
             minWidth: 420,
             maxWidth: '90vw'
         }}>
-            <Tv size={18} color="#8b5cf6" style={{ flexShrink: 0 }} />
+            <Tv size={18} color="var(--ns-accent)" style={{ flexShrink: 0 }} />
             <div style={{ minWidth: 0, flexShrink: 1 }}>
                 <div style={{
                     fontSize: 12,
@@ -169,7 +169,7 @@ export function CastControls({ deviceId, deviceName, onSessionEnded }: CastContr
                 onClick={handleTogglePlay}
                 title={isPlaying ? 'Pausar' : 'Reproduzir'}
                 style={{
-                    background: 'rgba(139, 92, 246, 0.8)',
+                    background: 'rgba(var(--ns-accent-rgb), 0.8)',
                     border: 'none',
                     borderRadius: 8,
                     padding: 8,
@@ -192,7 +192,7 @@ export function CastControls({ deviceId, deviceName, onSessionEnded }: CastContr
                         max={Math.max(1, Math.floor(duration))}
                         value={Math.floor(position)}
                         onChange={handleSeek}
-                        style={{ flex: 1, height: 4, cursor: 'pointer', accentColor: '#8b5cf6' }}
+                        style={{ flex: 1, height: 4, cursor: 'pointer', accentColor: 'var(--ns-accent)' }}
                     />
                     <span style={{ fontSize: 10, color: '#9ca3af', flexShrink: 0 }}>{formatTime(duration)}</span>
                 </div>
@@ -211,7 +211,7 @@ export function CastControls({ deviceId, deviceName, onSessionEnded }: CastContr
                         max={100}
                         value={volume}
                         onChange={handleVolume}
-                        style={{ width: 64, height: 4, cursor: 'pointer', accentColor: '#8b5cf6' }}
+                        style={{ width: 64, height: 4, cursor: 'pointer', accentColor: 'var(--ns-accent)' }}
                     />
                 </div>
             )}
