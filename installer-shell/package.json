@@ -1,0 +1,9 @@
+{
+  "name": "neostream-installer-shell",
+  "productName": "NeoStream IPTV Installer",
+  "private": true,
+  "version": "3.12.0",
+  "description": "Instalador personalizado do NeoStream IPTV",
+  "author": "Rakjsu",
+  "main": "main.cjs"
+}

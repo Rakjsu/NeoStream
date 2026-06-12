@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:;" />
+    <title>Instalação do NeoStream IPTV</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <!-- ─── Custom title bar (same language as the app's CustomTitleBar) ─── -->
+    <header class="title-bar">
+        <div class="title-bar-drag">
+            <div class="title-bar-logo">
+                <svg width="20" height="20" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="tbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#a855f7" />
+                            <stop offset="100%" stop-color="#ec4899" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M 10,10 L 10,90 L 90,50 Z" fill="none" stroke="url(#tbGrad)" stroke-width="6" stroke-linejoin="round" />
+                    <rect class="tb-bar tb-bar-1" x="35" y="35" width="6" height="30" fill="url(#tbGrad)" rx="3" />
+                    <rect class="tb-bar tb-bar-2" x="45" y="25" width="6" height="50" fill="url(#tbGrad)" rx="3" />
+                    <rect class="tb-bar tb-bar-3" x="55" y="40" width="6" height="20" fill="url(#tbGrad)" rx="3" />
+                </svg>
+                <span class="title-bar-text">Instalação do NeoStream IPTV</span>
+            </div>
+        </div>
+        <div class="window-controls">
+            <button id="btn-minimize" class="window-control-btn minimize" title="Minimizar">
+                <svg width="12" height="12" viewBox="0 0 12 12">
+                    <rect width="10" height="1" x="1" y="6" fill="currentColor" />
+                </svg>
+            </button>
+            <button id="btn-close" class="window-control-btn close" title="Fechar">
+                <svg width="12" height="12" viewBox="0 0 12 12">
+                    <path d="M1,1 L11,11 M11,1 L1,11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="content">
+        <div class="bg-glow bg-glow-1"></div>
+        <div class="bg-glow bg-glow-2"></div>
+
+        <!-- ─── Step 1: Bem-vindo ─── -->
+        <section id="step-welcome" class="step active">
+            <div class="logo-wrap">
+                <svg width="96" height="96" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#a855f7" />
+                            <stop offset="100%" stop-color="#ec4899" />
+                        </linearGradient>
+                    </defs>
+                    <rect x="2" y="2" width="96" height="96" rx="22" fill="#1a1a2e" stroke="url(#logoGrad)" stroke-width="2" />
+                    <path d="M 28,28 L 28,72 L 74,50 Z" fill="none" stroke="url(#logoGrad)" stroke-width="5" stroke-linejoin="round" />
+                    <rect class="tb-bar tb-bar-1" x="40" y="42" width="4.5" height="16" fill="url(#logoGrad)" rx="2.25" />
+                    <rect class="tb-bar tb-bar-2" x="47.5" y="36" width="4.5" height="28" fill="url(#logoGrad)" rx="2.25" />
+                    <rect class="tb-bar tb-bar-3" x="55" y="44" width="4.5" height="12" fill="url(#logoGrad)" rx="2.25" />
+                </svg>
+            </div>
+            <h1 class="app-name">NeoStream IPTV</h1>
+            <p id="app-version" class="app-version">Versão</p>
+            <p class="tagline">Seu streaming, do seu jeito.</p>
+
+            <button id="btn-install" class="btn-primary">Instalar</button>
+            <button id="btn-toggle-dir" class="link-btn">Escolher pasta</button>
+
+            <div id="dir-row" class="dir-row hidden">
+                <span class="dir-label">Instalar em</span>
+                <span id="dir-path" class="dir-path" title=""></span>
+                <button id="btn-browse" class="btn-secondary">Procurar…</button>
+            </div>
+        </section>
+
+        <!-- ─── Step 2: Instalando ─── -->
+        <section id="step-installing" class="step">
+            <div class="installing-icon">
+                <svg width="64" height="64" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="instGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#a855f7" />
+                            <stop offset="100%" stop-color="#ec4899" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M 10,10 L 10,90 L 90,50 Z" fill="none" stroke="url(#instGrad)" stroke-width="6" stroke-linejoin="round" />
+                    <rect class="tb-bar tb-bar-1" x="35" y="35" width="6" height="30" fill="url(#instGrad)" rx="3" />
+                    <rect class="tb-bar tb-bar-2" x="45" y="25" width="6" height="50" fill="url(#instGrad)" rx="3" />
+                    <rect class="tb-bar tb-bar-3" x="55" y="40" width="6" height="20" fill="url(#instGrad)" rx="3" />
+                </svg>
+            </div>
+            <h2 class="step-title">Instalando o NeoStream IPTV</h2>
+            <p id="install-status" class="install-status">Preparando instalação…</p>
+            <div class="progress-track">
+                <div class="progress-shimmer"></div>
+            </div>
+            <p class="install-hint">Isso pode levar alguns instantes. Não feche esta janela.</p>
+        </section>
+
+        <!-- ─── Step 3: Concluído ─── -->
+        <section id="step-done" class="step">
+            <div class="done-icon">
+                <svg width="84" height="84" viewBox="0 0 84 84" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="doneGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#a855f7" />
+                            <stop offset="100%" stop-color="#ec4899" />
+                        </linearGradient>
+                    </defs>
+                    <circle cx="42" cy="42" r="39" fill="none" stroke="url(#doneGrad)" stroke-width="3" />
+                    <path class="check-path" d="M 26,43 L 38,55 L 60,31" fill="none" stroke="url(#doneGrad)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </div>
+            <h2 class="step-title">Instalação concluída!</h2>
+            <p class="done-subtitle">O NeoStream IPTV foi instalado com sucesso no seu computador.</p>
+            <label class="launch-row">
+                <input type="checkbox" id="chk-launch" checked />
+                <span class="checkmark"></span>
+                Iniciar NeoStream IPTV
+            </label>
+            <button id="btn-finish" class="btn-primary">Concluir</button>
+        </section>
+
+        <!-- ─── Error state ─── -->
+        <section id="step-error" class="step">
+            <div class="error-icon">
+                <svg width="84" height="84" viewBox="0 0 84 84" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="42" cy="42" r="39" fill="none" stroke="#f87171" stroke-width="3" />
+                    <path d="M 30,30 L 54,54 M 54,30 L 30,54" fill="none" stroke="#f87171" stroke-width="6" stroke-linecap="round" />
+                </svg>
+            </div>
+            <h2 class="step-title">Algo deu errado</h2>
+            <p id="error-detail" class="done-subtitle">A instalação não foi concluída.</p>
+            <button id="btn-retry" class="btn-primary">Tentar novamente</button>
+            <button id="btn-error-close" class="link-btn">Fechar</button>
+        </section>
+
+        <footer class="branding">© Rakjsu — NeoStream IPTV</footer>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>

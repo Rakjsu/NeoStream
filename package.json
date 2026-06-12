@@ -14,6 +14,8 @@
     "build:mac": "node build/generate-installer-images.js && tsc -b && vite build && electron-builder --mac",
     "build:linux": "node build/generate-installer-images.js && tsc -b && vite build && electron-builder --linux",
     "build:installer-images": "node build/generate-installer-images.js",
+    "build:custom-installer": "node build/build-custom-installer.cjs",
+    "dev:installer-shell": "electron installer-shell --preview",
     "package:win": "vite build && npx @electron/packager . \"NeoStream IPTV\" --platform=win32 --arch=x64 --out=release --overwrite --asar --executable-name=\"NeoStream IPTV\" --icon=public/app-icon.png",
     "lint": "eslint .",
     "preview": "vite preview",
@@ -125,7 +127,6 @@
       "installerHeader": "build/installer-header.bmp",
       "installerSidebar": "build/installer-sidebar.bmp",
       "uninstallerSidebar": "build/uninstaller-sidebar.bmp",
-      "license": "build/license_pt.txt",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
     }

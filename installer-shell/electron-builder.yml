@@ -1,0 +1,40 @@
+# NeoStream IPTV — custom installer shell (portable exe)
+# Built FROM THE REPO ROOT (two-package.json structure: dev deps live in the
+# root node_modules, app code lives in installer-shell/):
+#   node build/build-custom-installer.cjs
+# The build script overrides directories.output to a temp dir outside Music
+# (EPERM quirk: WMPNetworkSvc locks fresh dirs under C:\Users\...\Music).
+appId: com.rakjsu.neostream.installer
+productName: NeoStream IPTV Installer
+
+directories:
+  app: installer-shell
+  buildResources: build
+
+files:
+  - main.cjs
+  - preload.cjs
+  - renderer/**
+
+# The standard electron-builder NSIS setup, run silently by the shell.
+# Staged by build/build-custom-installer.cjs (gitignored).
+extraResources:
+  - from: installer-shell/payload.exe
+    to: payload.exe
+
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+  icon: build/icons/icon.ico
+  signAndEditExecutable: false
+  verifyUpdateCodeSignature: false
+
+portable:
+  artifactName: NeoStream-IPTV-Installer-${version}.${ext}
+  # The embedded NSIS setup is perMachine — the shell itself elevates so the
+  # spawned silent setup inherits admin.
+  requestExecutionLevel: admin
+
+publish: null
