@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark, Home, Users, Heart, Check, Download, History } from 'lucide-react';
+import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark, Home, Users, Heart, Check, Download, History, Search } from 'lucide-react';
+import { GLOBAL_SEARCH_OPEN_EVENT } from './GlobalSearch';
 import { profileService } from '../services/profileService';
 import { useState, useEffect } from 'react';
 import { UpdateNotificationBadge } from './UpdateNotificationBadge';
@@ -155,6 +156,35 @@ export function Sidebar() {
 
                 {/* Navigation */}
                 <nav className="nav-container">
+                    {/* Global Search (Ctrl+K) */}
+                    <button
+                        onClick={() => window.dispatchEvent(new Event(GLOBAL_SEARCH_OPEN_EVENT))}
+                        onMouseEnter={() => setHoveredItem('search')}
+                        onMouseLeave={() => setHoveredItem(null)}
+                        className="nav-item"
+                        title={`${t('search', 'openSearch')} (Ctrl+K)`}
+                    >
+                        <div
+                            className="item-glow"
+                            style={{
+                                background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                                opacity: hoveredItem === 'search' ? 0.15 : 0
+                            }}
+                        />
+                        <div className="item-icon-wrapper">
+                            <Search
+                                className="item-icon"
+                                style={{
+                                    stroke: hoveredItem === 'search' ? '#c4b5fd' : 'rgba(255,255,255,0.7)'
+                                }}
+                            />
+                        </div>
+                        <div className={`tooltip ${hoveredItem === 'search' ? 'visible' : ''}`}>
+                            <span className="tooltip-emoji">🔍</span>
+                            <span className="tooltip-label">{t('search', 'openSearch')} · Ctrl+K</span>
+                        </div>
+                    </button>
+
                     {menuItems.map((item, index) => {
                         const isActive = location.pathname.startsWith(item.path);
                         const isHovered = hoveredItem === item.path;

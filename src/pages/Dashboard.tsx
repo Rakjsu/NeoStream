@@ -1,5 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
+import { GlobalSearch } from '../components/GlobalSearch';
 
 export function Dashboard() {
     return (
@@ -8,6 +9,8 @@ export function Dashboard() {
             <main className="flex-1 overflow-hidden relative">
                 <Outlet />
             </main>
+            {/* Ctrl+K / Cmd+K global search overlay — available on all dashboard pages */}
+            <GlobalSearch />
         </div>
     );
 }

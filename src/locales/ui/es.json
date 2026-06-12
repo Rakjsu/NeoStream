@@ -586,5 +586,13 @@
     "emptyText": "Las películas y episodios que veas aparecerán aquí",
     "exploreMovies": "Explorar Películas",
     "exploreSeries": "Explorar Series"
+  },
+  "search": {
+    "placeholder": "Buscar canales, películas y series...",
+    "noResults": "No se encontraron resultados",
+    "loading": "Cargando catálogo...",
+    "loadError": "Error al cargar el catálogo",
+    "hint": "↑↓ navegar · Enter abrir · Esc cerrar",
+    "openSearch": "Buscar"
   }
 }
