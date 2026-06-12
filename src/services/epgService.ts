@@ -81,7 +81,18 @@ const openEpgBrazilMappings: Record<string, string> = openEpgBrazilMappingsJson;
 export const epgService = {
 
     // Main function to fetch EPG for a channel
-    async fetchChannelEPG(_epgChannelId: string, channelName?: string): Promise<EPGProgram[]> {
+    async fetchChannelEPG(epgChannelId: string, channelName?: string, streamId?: number): Promise<EPGProgram[]> {
+        // PRIMARY: the Xtream provider's own EPG (xmltv.php parsed once in the
+        // main process; get_simple_data_table as secondary). Falls back to the
+        // existing chain when the provider has nothing for this channel.
+        // Providers sometimes ship stale dumps (e.g. ending hours ago), so the
+        // provider only wins when it has at least one current/future program.
+        const providerPrograms = await this.fetchFromProvider(epgChannelId, streamId);
+        const now = Date.now();
+        if (providerPrograms.some(p => new Date(p.end).getTime() > now)) {
+            return providerPrograms;
+        }
+
         if (!channelName) return [];
 
         // Check if this is a Portuguese channel (has mapping in Open-EPG Portugal)
@@ -124,6 +135,29 @@ export const epgService = {
         }
 
         return [];
+    },
+
+    // Fetch from the Xtream provider's own EPG via the main process
+    // ('epg:provider-channel' answers from an in-memory index, so this is
+    // effectively instant when the provider has an EPG)
+    async fetchFromProvider(epgChannelId: string, streamId?: number): Promise<EPGProgram[]> {
+        try {
+            if (!epgChannelId && streamId === undefined) return [];
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ipcRenderer = (window as any).ipcRenderer;
+            if (!ipcRenderer?.invoke) return [];
+
+            const result = await ipcRenderer.invoke('epg:provider-channel', {
+                channelId: epgChannelId || '',
+                streamId
+            });
+            if (!result?.success || !Array.isArray(result.programs)) return [];
+
+            return result.programs as EPGProgram[];
+        } catch (error) {
+            console.error('[EPG] Provider EPG error:', error);
+            return [];
+        }
     },
 
     // Get Open-EPG Portugal ID from channel name

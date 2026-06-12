@@ -2,6 +2,7 @@ import { ipcMain, BrowserWindow, dialog, screen } from 'electron'
 import { XtreamClient } from './xtreamClient'
 import store from './store'
 import { getCertificateSettings, getProviderHttpsAgent, registerApprovedProviderUrl, setAllowInvalidProviderCertificates } from './certificatePolicy'
+import { resetProviderEpgState, setupProviderEpgHandlers } from './providerEpg'
 
 import log from './logger'
 // Store for window state (for custom maximize)
@@ -80,6 +81,9 @@ export function setupIpcHandlers() {
             // Save to store
             store.set('auth', { url, username, password, userInfo: data.user_info })
 
+            // New provider may have a different (or no) EPG — re-probe lazily.
+            resetProviderEpgState()
+
             return { success: true, data }
         } catch (error: unknown) {
             return { success: false, error: getErrorMessage(error) }
@@ -104,6 +108,7 @@ export function setupIpcHandlers() {
 
     ipcMain.handle('auth:logout', () => {
         store.set('auth', {})
+        resetProviderEpgState()
         return { success: true }
     })
 
@@ -600,6 +605,9 @@ export function setupIpcHandlers() {
             return { success: false, error: getErrorMessage(error) }
         }
     })
+
+    // Provider EPG (xmltv.php / get_simple_data_table) handlers
+    setupProviderEpgHandlers()
 
     log.info('IPC Handlers initialized')
 }

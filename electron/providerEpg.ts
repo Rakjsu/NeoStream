@@ -1,0 +1,265 @@
+/**
+ * Xtream provider EPG — main process side.
+ *
+ * Downloads {server}/xmltv.php once per session (24h file cache, same
+ * mechanism/dir as 'epg:get-cached'), parses it ONCE into an in-memory
+ * Map<epg_channel_id, programs> and answers per-channel lookups instantly
+ * over IPC. When the provider has no xmltv.php (404/HTML/empty), it is
+ * marked unavailable for the session — no retry storms — and per-channel
+ * get_simple_data_table is tried as the secondary provider source.
+ *
+ * Pure parsing helpers live in providerEpgProtocol.ts (unit-tested).
+ */
+import { ipcMain } from 'electron'
+import store from './store'
+import log from './logger'
+import { getProviderHttpsAgent, registerApprovedProviderUrl } from './certificatePolicy'
+import {
+    buildSimpleDataTableUrl,
+    buildXmltvUrl,
+    looksLikeXmltv,
+    parseSimpleDataTable,
+    parseXmltvIndex,
+} from './providerEpgProtocol'
+import type { ProviderEpgProgram } from './providerEpgProtocol'
+
+const XMLTV_CACHE_KEY = 'provider-xmltv'
+const XMLTV_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+const SIMPLE_TABLE_TTL_MS = 60 * 60 * 1000
+const FETCH_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'Accept': 'application/xml, text/xml, application/json, */*'
+}
+
+type Availability = 'unknown' | 'ready' | 'unavailable'
+
+interface Credentials {
+    url: string
+    username: string
+    password: string
+}
+
+let xmltvAvailability: Availability = 'unknown'
+let xmltvIndex: Map<string, ProviderEpgProgram[]> | null = null
+let xmltvLoading: Promise<void> | null = null
+
+// get_simple_data_table fallback — disabled for the session on first hard failure.
+let simpleTableAvailable = true
+const simpleTableCache = new Map<number, { at: number; programs: ProviderEpgProgram[] }>()
+
+function getCredentials(): Credentials | null {
+    const auth = store.get('auth')
+    if (auth.url && auth.username && auth.password) {
+        return { url: auth.url, username: auth.username, password: auth.password }
+    }
+    return null
+}
+
+/** Reset all session state (e.g. after switching providers). Exported for tests/future use. */
+export function resetProviderEpgState() {
+    xmltvAvailability = 'unknown'
+    xmltvIndex = null
+    xmltvLoading = null
+    simpleTableAvailable = true
+    simpleTableCache.clear()
+}
+
+/**
+ * Download xmltv.php through the same 24h file cache used by 'epg:get-cached'
+ * (userData/epg_cache, cacheKey 'provider-xmltv'). Returns null on failure.
+ */
+async function fetchXmltvWithCache(url: string): Promise<string | null> {
+    const fs = await import('fs/promises')
+    const path = await import('path')
+    const { app } = await import('electron')
+
+    const cacheDir = path.join(app.getPath('userData'), 'epg_cache')
+    const cacheFile = path.join(cacheDir, `${XMLTV_CACHE_KEY}.xml`)
+    const metaFile = path.join(cacheDir, `${XMLTV_CACHE_KEY}.meta.json`)
+    await fs.mkdir(cacheDir, { recursive: true })
+
+    // Within TTL → reuse the cached file, never re-download.
+    try {
+        const meta = JSON.parse(await fs.readFile(metaFile, 'utf-8'))
+        if (Date.now() - meta.timestamp < XMLTV_CACHE_TTL_MS) {
+            const cached = await fs.readFile(cacheFile, 'utf-8')
+            log.info('[Provider EPG] Using cached xmltv, age:',
+                Math.round((Date.now() - meta.timestamp) / 3600000), 'h, length:', cached.length)
+            return cached
+        }
+        log.info('[Provider EPG] Cache expired, downloading fresh xmltv')
+    } catch {
+        log.info('[Provider EPG] No xmltv cache, downloading fresh')
+    }
+
+    try {
+        const fetch = (await import('node-fetch')).default
+        const response = await fetch(url, {
+            agent: getProviderHttpsAgent(url),
+            headers: FETCH_HEADERS
+        })
+
+        if (!response.ok) {
+            log.warn('[Provider EPG] xmltv download failed: HTTP', response.status)
+            return await readStaleCache(fs, cacheFile)
+        }
+
+        const data = await response.text()
+        registerApprovedProviderUrl(response.url || url)
+        log.info('[Provider EPG] Downloaded xmltv, length:', data.length)
+
+        // Only cache plausible XMLTV — caching an HTML error page for 24h
+        // would mask the provider coming back.
+        if (looksLikeXmltv(data)) {
+            await fs.writeFile(cacheFile, data, 'utf-8')
+            await fs.writeFile(metaFile, JSON.stringify({ timestamp: Date.now(), size: data.length }), 'utf-8')
+        }
+        return data
+    } catch (error) {
+        log.warn('[Provider EPG] xmltv download error:', error instanceof Error ? error.message : String(error))
+        return await readStaleCache(fs, cacheFile)
+    }
+}
+
+async function readStaleCache(fs: typeof import('fs/promises'), cacheFile: string): Promise<string | null> {
+    try {
+        const data = await fs.readFile(cacheFile, 'utf-8')
+        log.info('[Provider EPG] Using stale xmltv cache after download failure')
+        return data
+    } catch {
+        return null
+    }
+}
+
+/**
+ * Availability probe + index build. Runs the download/parse at most once per
+ * session (single in-flight promise); a definitive failure marks the source
+ * unavailable for the rest of the session.
+ */
+function ensureXmltvIndex(): Promise<void> {
+    if (xmltvAvailability !== 'unknown') return Promise.resolve()
+    if (xmltvLoading) return xmltvLoading
+
+    xmltvLoading = (async () => {
+        const credentials = getCredentials()
+        if (!credentials) {
+            // Not logged in yet — stay 'unknown' so the next call (post-login) retries.
+            log.info('[Provider EPG] No credentials, skipping xmltv probe')
+            return
+        }
+
+        try {
+            const url = buildXmltvUrl(credentials.url, credentials.username, credentials.password)
+            const xml = await fetchXmltvWithCache(url)
+
+            if (!xml || !looksLikeXmltv(xml)) {
+                xmltvAvailability = 'unavailable'
+                log.info('[Provider EPG] Provider xmltv unavailable (empty/404/HTML), disabled for this session')
+                return
+            }
+
+            const parseStart = Date.now()
+            xmltvIndex = parseXmltvIndex(xml)
+            xmltvAvailability = 'ready'
+
+            let programCount = 0
+            for (const programs of xmltvIndex.values()) programCount += programs.length
+            log.info('[Provider EPG] Indexed', xmltvIndex.size, 'channels /', programCount,
+                'programs in', Date.now() - parseStart, 'ms')
+        } catch (error) {
+            xmltvAvailability = 'unavailable'
+            log.error('[Provider EPG] xmltv probe error:', error instanceof Error ? error.message : String(error))
+        }
+    })().finally(() => {
+        xmltvLoading = null
+    })
+
+    return xmltvLoading
+}
+
+/** Per-channel JSON EPG (secondary source when xmltv.php is unavailable). */
+async function fetchSimpleDataTable(streamId: number, channelId: string): Promise<ProviderEpgProgram[]> {
+    const cached = simpleTableCache.get(streamId)
+    if (cached && Date.now() - cached.at < SIMPLE_TABLE_TTL_MS) {
+        return cached.programs
+    }
+
+    const credentials = getCredentials()
+    if (!credentials) return []
+
+    try {
+        const url = buildSimpleDataTableUrl(credentials.url, credentials.username, credentials.password, streamId)
+        const fetch = (await import('node-fetch')).default
+        const response = await fetch(url, {
+            agent: getProviderHttpsAgent(url),
+            headers: FETCH_HEADERS
+        })
+
+        if (!response.ok) {
+            log.warn('[Provider EPG] get_simple_data_table failed: HTTP', response.status, '— disabled for this session')
+            simpleTableAvailable = false
+            return []
+        }
+
+        const text = await response.text()
+        let payload: unknown
+        try {
+            payload = JSON.parse(text)
+        } catch {
+            log.warn('[Provider EPG] get_simple_data_table returned non-JSON — disabled for this session')
+            simpleTableAvailable = false
+            return []
+        }
+
+        registerApprovedProviderUrl(response.url || url)
+        const programs = parseSimpleDataTable(payload, channelId || String(streamId))
+        simpleTableCache.set(streamId, { at: Date.now(), programs })
+        return programs
+    } catch (error) {
+        log.warn('[Provider EPG] get_simple_data_table error:', error instanceof Error ? error.message : String(error))
+        simpleTableAvailable = false
+        return []
+    }
+}
+
+export function setupProviderEpgHandlers() {
+    // Is the provider's own EPG usable this session? (Triggers the probe.)
+    ipcMain.handle('epg:provider-available', async () => {
+        try {
+            await ensureXmltvIndex()
+            return { success: true, available: xmltvAvailability === 'ready' }
+        } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : String(error) }
+        }
+    })
+
+    // Programs for one channel, straight from the in-memory index.
+    ipcMain.handle('epg:provider-channel', async (_, args: { channelId?: string; streamId?: number }) => {
+        try {
+            const channelId = typeof args?.channelId === 'string' ? args.channelId : ''
+            const streamId = typeof args?.streamId === 'number' && Number.isFinite(args.streamId)
+                ? args.streamId
+                : null
+
+            if (channelId) {
+                await ensureXmltvIndex()
+                if (xmltvAvailability === 'ready' && xmltvIndex) {
+                    // xmltv is THE provider EPG when present: a channel missing
+                    // from it means the provider has no EPG for it — let the
+                    // renderer fall back to its existing chain.
+                    return { success: true, programs: xmltvIndex.get(channelId) ?? [], source: 'xmltv' }
+                }
+            }
+
+            // xmltv unavailable (or channel has no epg id): try the per-channel endpoint.
+            if (streamId !== null && simpleTableAvailable) {
+                const programs = await fetchSimpleDataTable(streamId, channelId)
+                return { success: true, programs, source: 'simple-data-table' }
+            }
+
+            return { success: true, programs: [], source: 'none' }
+        } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : String(error) }
+        }
+    })
+}

@@ -185,7 +185,7 @@ export function LiveTV() {
             try {
                 console.log('[EPG] Fetching EPG for channel:', selectedChannel.name, 'EPG ID:', selectedChannel.epg_channel_id);
                 // Pass both EPG ID and channel name (for Open-EPG Portugal and meuguia.tv fallback)
-                const programs = await epgService.fetchChannelEPG(selectedChannel.epg_channel_id || '', selectedChannel.name);
+                const programs = await epgService.fetchChannelEPG(selectedChannel.epg_channel_id || '', selectedChannel.name, selectedChannel.stream_id);
                 console.log('[EPG] Got programs:', programs.length);
                 setEpgData(programs);
 
