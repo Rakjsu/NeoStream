@@ -125,7 +125,6 @@
       "installerHeader": "build/installer-header.bmp",
       "installerSidebar": "build/installer-sidebar.bmp",
       "uninstallerSidebar": "build/uninstaller-sidebar.bmp",
-      "license": "build/license_pt.txt",
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
     }
