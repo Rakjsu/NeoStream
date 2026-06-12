@@ -3,6 +3,7 @@
     "updates": "Atualizações",
     "backup": "Backup",
     "playback": "Reprodução",
+    "appearance": "Aparência",
     "epg": "EPG",
     "stats": "Estatísticas",
     "parental": "Controle Parental",
@@ -375,6 +376,23 @@
     "autoPlayNextDesc": "Reproduzir automaticamente o próximo episódio",
     "clickThrough": "Modo Click-Through (PiP)",
     "clickThroughDesc": "Permite que o mouse passe pelo PiP sem interagir (F9 para alternar)"
+  },
+  "appearance": {
+    "title": "Aparência",
+    "description": "Personalize as cores do aplicativo",
+    "background": "Fundo",
+    "backgroundDesc": "Escolha o estilo de fundo do aplicativo",
+    "backgroundDefault": "Padrão",
+    "backgroundAmoled": "AMOLED (preto puro)",
+    "accent": "Cor de destaque",
+    "accentDesc": "Cor usada em botões, realces e gradientes",
+    "colorPurple": "Roxo",
+    "colorBlue": "Azul",
+    "colorGreen": "Verde",
+    "colorRed": "Vermelho",
+    "colorOrange": "Laranja",
+    "colorPink": "Rosa",
+    "note": "Algumas telas ainda mantêm a paleta clássica por enquanto."
   },
   "dashboard": {
     "live": "TV Ao Vivo",

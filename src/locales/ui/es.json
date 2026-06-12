@@ -3,6 +3,7 @@
     "updates": "Actualizaciones",
     "backup": "Copia de seguridad",
     "playback": "Reproducción",
+    "appearance": "Apariencia",
     "epg": "EPG",
     "stats": "Estadísticas",
     "parental": "Control Parental",
@@ -276,6 +277,23 @@
     "autoPlayNextDesc": "Reproducir automáticamente el siguiente episodio",
     "clickThrough": "Modo Click-Through (PiP)",
     "clickThroughDesc": "Permite que el mouse pase por el PiP sin interactuar (F9 para alternar)"
+  },
+  "appearance": {
+    "title": "Apariencia",
+    "description": "Personaliza los colores de la aplicación",
+    "background": "Fondo",
+    "backgroundDesc": "Elige el estilo de fondo de la aplicación",
+    "backgroundDefault": "Predeterminado",
+    "backgroundAmoled": "AMOLED (negro puro)",
+    "accent": "Color de acento",
+    "accentDesc": "Color usado en botones, resaltados y degradados",
+    "colorPurple": "Morado",
+    "colorBlue": "Azul",
+    "colorGreen": "Verde",
+    "colorRed": "Rojo",
+    "colorOrange": "Naranja",
+    "colorPink": "Rosa",
+    "note": "Algunas pantallas aún mantienen la paleta clásica por ahora."
   },
   "backup": {
     "title": "Copia de Seguridad y Restauración",

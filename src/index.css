@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme variables (NeoStream appearance system).
+   Defaults mirror the classic palette exactly — themeService overrides them
+   at startup from localStorage ('neostream_theme'). */
+:root {
+    --ns-accent: #a855f7;
+    --ns-accent-dark: #7c3aed;
+    --ns-accent-light: #c4b5fd;
+    --ns-accent-grad-to: #ec4899;
+    --ns-accent-rgb: 168, 85, 247;
+    --ns-accent-grad-to-rgb: 236, 72, 153;
+    --ns-accent-soft: rgba(168, 85, 247, 0.15);
+    --ns-accent-glow: rgba(168, 85, 247, 0.4);
+    --ns-bg-deep: #0f0f1a;
+    --ns-bg-panel: #1a1a2e;
+    --ns-bg-tint: #16213e;
+}
+
 /* Basic debugging styles */
 * {
     margin: 0;
@@ -16,7 +33,7 @@ body {
 }
 
 body {
-    background: #0f0f23;
+    background: var(--ns-bg-deep);
     color: white;
     font-family: system-ui, -apple-system, sans-serif;
     padding-top: 36px;
@@ -38,17 +55,17 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(59, 130, 246, 0.5);
+    background: rgba(var(--ns-accent-rgb), 0.5);
     border-radius: 6px;
     border: 2px solid rgba(0, 0, 0, 0.2);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(59, 130, 246, 0.7);
+    background: rgba(var(--ns-accent-rgb), 0.7);
 }
 
 /* Para Firefox */
 * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(59, 130, 246, 0.5) rgba(0, 0, 0, 0.2);
+    scrollbar-color: rgba(var(--ns-accent-rgb), 0.5) rgba(0, 0, 0, 0.2);
 }

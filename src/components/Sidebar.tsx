@@ -142,8 +142,8 @@ export function Sidebar() {
                         <svg className="logo-svg" width="44" height="44" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                             <defs>
                                 <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                    <stop offset="0%" stopColor="#a855f7" />
-                                    <stop offset="100%" stopColor="#ec4899" />
+                                    <stop offset="0%" style={{ stopColor: 'var(--ns-accent)' }} />
+                                    <stop offset="100%" style={{ stopColor: 'var(--ns-accent-grad-to)' }} />
                                 </linearGradient>
                             </defs>
                             <path d="M 10,10 L 10,90 L 90,50 Z" fill="none" stroke="url(#logoGradient)" strokeWidth="6" strokeLinejoin="round" />
@@ -168,7 +168,7 @@ export function Sidebar() {
                         <div
                             className="item-glow"
                             style={{
-                                background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                                background: 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to))',
                                 opacity: hoveredItem === 'search' ? 0.15 : 0
                             }}
                         />
@@ -176,7 +176,7 @@ export function Sidebar() {
                             <Search
                                 className="item-icon"
                                 style={{
-                                    stroke: hoveredItem === 'search' ? '#c4b5fd' : 'rgba(255,255,255,0.7)'
+                                    stroke: hoveredItem === 'search' ? 'var(--ns-accent-light)' : 'rgba(255,255,255,0.7)'
                                 }}
                             />
                         </div>
@@ -214,7 +214,7 @@ export function Sidebar() {
                                     <item.icon
                                         className="item-icon"
                                         style={{
-                                            stroke: isActive ? '#fff' : isHovered ? '#c4b5fd' : 'rgba(255,255,255,0.7)'
+                                            stroke: isActive ? '#fff' : isHovered ? 'var(--ns-accent-light)' : 'rgba(255,255,255,0.7)'
                                         }}
                                     />
                                 </div>
@@ -265,8 +265,8 @@ export function Sidebar() {
                                 <svg width="26" height="26" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
                                     <defs>
                                         <linearGradient id="profileGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                            <stop offset="0%" stopColor="#a855f7" />
-                                            <stop offset="100%" stopColor="#ec4899" />
+                                            <stop offset="0%" style={{ stopColor: 'var(--ns-accent)' }} />
+                                            <stop offset="100%" style={{ stopColor: 'var(--ns-accent-grad-to)' }} />
                                         </linearGradient>
                                     </defs>
                                     <circle cx="50" cy="35" r="14" fill="none" stroke="url(#profileGrad)" strokeWidth="6" />
@@ -453,7 +453,7 @@ const sidebarStyles = `
     overflow-x: hidden;
     overflow-y: auto;
     scrollbar-width: thin;
-    scrollbar-color: rgba(168, 85, 247, 0.4) transparent;
+    scrollbar-color: rgba(var(--ns-accent-rgb), 0.4) transparent;
 }
 
 .sidebar::-webkit-scrollbar {
@@ -465,7 +465,7 @@ const sidebarStyles = `
 }
 
 .sidebar::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #a855f7, #ec4899);
+    background: linear-gradient(180deg, var(--ns-accent), var(--ns-accent-grad-to));
     border-radius: 2px;
 }
 
@@ -479,7 +479,7 @@ const sidebarStyles = `
 .bg-gradient {
     position: absolute;
     inset: 0;
-    background: linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 50%, #0f0f1a 100%);
+    background: linear-gradient(180deg, var(--ns-bg-deep) 0%, var(--ns-bg-panel) 50%, var(--ns-bg-deep) 100%);
 }
 
 .bg-glow {
@@ -488,7 +488,7 @@ const sidebarStyles = `
     left: 0;
     right: 0;
     height: 200px;
-    background: radial-gradient(ellipse at center top, rgba(168, 85, 247, 0.15) 0%, transparent 70%);
+    background: radial-gradient(ellipse at center top, rgba(var(--ns-accent-rgb), 0.15) 0%, transparent 70%);
     pointer-events: none;
 }
 
@@ -515,24 +515,24 @@ const sidebarStyles = `
 .logo-svg {
     position: relative;
     z-index: 2;
-    filter: drop-shadow(0 0 8px rgba(168, 85, 247, 0.5));
+    filter: drop-shadow(0 0 8px rgba(var(--ns-accent-rgb), 0.5));
     transition: filter 0.3s ease;
 }
 
 .logo-wrapper:hover .logo-svg {
-    filter: drop-shadow(0 0 15px rgba(168, 85, 247, 0.8))
-            drop-shadow(0 0 30px rgba(168, 85, 247, 0.5));
+    filter: drop-shadow(0 0 15px rgba(var(--ns-accent-rgb), 0.8))
+            drop-shadow(0 0 30px rgba(var(--ns-accent-rgb), 0.5));
     animation: logoGlow 2s ease-in-out infinite;
 }
 
 @keyframes logoGlow {
     0%, 100% { 
-        filter: drop-shadow(0 0 15px rgba(168, 85, 247, 0.8))
-                drop-shadow(0 0 30px rgba(168, 85, 247, 0.5));
+        filter: drop-shadow(0 0 15px rgba(var(--ns-accent-rgb), 0.8))
+                drop-shadow(0 0 30px rgba(var(--ns-accent-rgb), 0.5));
     }
     50% { 
-        filter: drop-shadow(0 0 25px rgba(168, 85, 247, 1))
-                drop-shadow(0 0 50px rgba(168, 85, 247, 0.7));
+        filter: drop-shadow(0 0 25px rgba(var(--ns-accent-rgb), 1))
+                drop-shadow(0 0 50px rgba(var(--ns-accent-rgb), 0.7));
     }
 }
 
@@ -540,7 +540,7 @@ const sidebarStyles = `
     position: absolute;
     inset: -8px;
     border-radius: 50%;
-    border: 2px solid rgba(168, 85, 247, 0.3);
+    border: 2px solid rgba(var(--ns-accent-rgb), 0.3);
     opacity: 0;
     transition: all 0.3s ease;
 }
@@ -682,8 +682,8 @@ const sidebarStyles = `
     align-items: center;
     gap: 10px;
     padding: 10px 16px;
-    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
-    border: 1px solid rgba(168, 85, 247, 0.3);
+    background: linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-deep) 100%);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.3);
     border-radius: 12px;
     white-space: nowrap;
     opacity: 0;
@@ -748,7 +748,7 @@ const sidebarStyles = `
     position: absolute;
     inset: -3px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #a855f7, #ec4899);
+    background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to));
     opacity: 0.8;
     transition: all 0.3s ease;
 }
@@ -768,7 +768,7 @@ const sidebarStyles = `
     width: 42px;
     height: 42px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #1a1a2e, #0f0f1a);
+    background: linear-gradient(135deg, var(--ns-bg-panel), var(--ns-bg-deep));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -823,8 +823,8 @@ const sidebarStyles = `
     left: 92px;
     bottom: 80px;
     width: 220px;
-    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
-    border: 1px solid rgba(168, 85, 247, 0.3);
+    background: linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-deep) 100%);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.3);
     border-radius: 16px;
     padding: 12px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
@@ -880,14 +880,14 @@ const sidebarStyles = `
 }
 
 .profile-popup-item.active {
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.15));
+    background: linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.15));
 }
 
 .profile-popup-avatar {
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(236, 72, 153, 0.3));
+    background: linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.3), rgba(var(--ns-accent-grad-to-rgb), 0.3));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -954,7 +954,7 @@ const sidebarStyles = `
     padding: 32px;
     max-width: 480px;
     width: 95%;
-    border: 1px solid rgba(168, 85, 247, 0.3);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.3);
     box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
     animation: sidebarPinModalSlide 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -995,7 +995,7 @@ const sidebarStyles = `
 }
 
 .sidebar-pin-header strong {
-    color: #c4b5fd;
+    color: var(--ns-accent-light);
 }
 
 .sidebar-pin-container {
@@ -1022,8 +1022,8 @@ const sidebarStyles = `
 }
 
 .sidebar-pin-digit.filled {
-    border-color: rgba(168, 85, 247, 0.7);
-    background: rgba(168, 85, 247, 0.15);
+    border-color: rgba(var(--ns-accent-rgb), 0.7);
+    background: rgba(var(--ns-accent-rgb), 0.15);
     animation: sidebarPinPop 0.2s ease;
 }
 
@@ -1103,13 +1103,13 @@ const sidebarStyles = `
 }
 
 .sidebar-pin-btn.submit {
-    background: linear-gradient(135deg, #a855f7, #7c3aed);
+    background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-dark));
     color: white;
 }
 
 .sidebar-pin-btn.submit:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.4);
+    box-shadow: 0 8px 24px rgba(var(--ns-accent-rgb), 0.4);
 }
 
 .sidebar-pin-btn.submit:disabled {
@@ -1151,8 +1151,8 @@ const sidebarStyles = `
 .profile-transition-spinner {
     width: 48px;
     height: 48px;
-    border: 3px solid rgba(168, 85, 247, 0.2);
-    border-top-color: #a855f7;
+    border: 3px solid rgba(var(--ns-accent-rgb), 0.2);
+    border-top-color: var(--ns-accent);
     border-radius: 50%;
     animation: transitionSpin 0.8s linear infinite;
 }

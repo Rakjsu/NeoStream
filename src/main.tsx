@@ -1,6 +1,11 @@
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { themeService } from './services/themeService'
+
+// Apply the persisted theme (CSS custom properties on <html>) before the
+// first render so themed surfaces never flash the default palette.
+themeService.apply()
 
 // Forward uncaught renderer errors to the main process so they land in
 // main.log — packaged-app bug reports were blind to the UI side.

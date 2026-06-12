@@ -3,6 +3,7 @@ import { useLanguage } from '../services/languageService';
 import epgTestService from '../services/epgTestService';
 import { UpdatesSection } from './settings/UpdatesSection';
 import { PlaybackSection } from './settings/PlaybackSection';
+import { AppearanceSection } from './settings/AppearanceSection';
 import { NetworkSection } from './settings/NetworkSection';
 import { EpgSection, type EpgResultsFilter, type EpgCountryFilter } from './settings/EpgSection';
 import { StatsSection } from './settings/StatsSection';
@@ -34,6 +35,7 @@ export function Settings() {
     const sections = [
         { id: 'updates', icon: '🔄', label: t('nav', 'updates'), color: '#10b981' },
         { id: 'playback', icon: '⏯️', label: t('nav', 'playback') || 'Reprodução', color: '#3b82f6' },
+        { id: 'appearance', icon: '🎨', label: t('nav', 'appearance') || 'Aparência', color: 'var(--ns-accent)' },
         { id: 'network', icon: '🔐', label: 'Rede', color: '#14b8a6' },
         { id: 'epg', icon: '📡', label: 'EPG', color: '#06b6d4' },
         { id: 'stats', icon: '📊', label: t('nav', 'stats'), color: '#8b5cf6' },
@@ -86,6 +88,9 @@ export function Settings() {
                         {/* Playback Section */}
                         {activeSection === 'playback' && <PlaybackSection />}
 
+                        {/* Appearance Section */}
+                        {activeSection === 'appearance' && <AppearanceSection />}
+
                         {/* Network Section */}
                         {activeSection === 'network' && <NetworkSection />}
 
@@ -129,7 +134,7 @@ const settingsStyles = `
     min-height: 100vh;
     padding: 32px;
     overflow-x: hidden;
-    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+    background: linear-gradient(135deg, var(--ns-bg-deep) 0%, var(--ns-bg-panel) 50%, var(--ns-bg-tint) 100%);
 }
 
 /* Animated Backdrop */
@@ -137,7 +142,7 @@ const settingsStyles = `
     position: fixed;
     inset: 0;
     background:
-        radial-gradient(ellipse at 30% 30%, rgba(168, 85, 247, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 30% 30%, rgba(var(--ns-accent-rgb), 0.1) 0%, transparent 50%),
         radial-gradient(ellipse at 70% 70%, rgba(59, 130, 246, 0.1) 0%, transparent 50%);
     pointer-events: none;
     z-index: 0;
@@ -180,7 +185,7 @@ const settingsStyles = `
     font-weight: 800;
     color: white;
     letter-spacing: -0.02em;
-    background: linear-gradient(135deg, #fff 0%, #c4b5fd 100%);
+    background: linear-gradient(135deg, #fff 0%, var(--ns-accent-light) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -265,9 +270,9 @@ const settingsStyles = `
 }
 
 .nav-item.active {
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.25), rgba(236, 72, 153, 0.2));
+    background: linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.25), rgba(var(--ns-accent-grad-to-rgb), 0.2));
     color: white;
-    box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.4);
+    box-shadow: inset 0 0 0 1px rgba(var(--ns-accent-rgb), 0.4);
 }
 
 .nav-icon {
@@ -380,7 +385,7 @@ const settingsStyles = `
     font-size: 14px;
     font-weight: 600;
     border-radius: 12px;
-    border: 2px solid rgba(168, 85, 247, 0.3);
+    border: 2px solid rgba(var(--ns-accent-rgb), 0.3);
     cursor: pointer;
     outline: none;
     min-width: 180px;
@@ -388,12 +393,12 @@ const settingsStyles = `
 }
 
 .setting-select:hover {
-    border-color: rgba(168, 85, 247, 0.5);
+    border-color: rgba(var(--ns-accent-rgb), 0.5);
 }
 
 .setting-select:focus {
-    border-color: #a855f7;
-    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.2);
+    border-color: var(--ns-accent);
+    box-shadow: 0 0 0 3px rgba(var(--ns-accent-rgb), 0.2);
 }
 
 /* Toggle Switch */
@@ -432,7 +437,7 @@ const settingsStyles = `
 }
 
 .toggle-switch input:checked + .toggle-slider {
-    background: linear-gradient(135deg, #a855f7, #ec4899);
+    background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to));
 }
 
 .toggle-switch input:checked + .toggle-slider:before {
@@ -462,7 +467,7 @@ const settingsStyles = `
     align-items: center;
     gap: 10px;
     padding: 16px 20px;
-    background: rgba(168, 85, 247, 0.1);
+    background: rgba(var(--ns-accent-rgb), 0.1);
     border-radius: 12px;
     color: rgba(255, 255, 255, 0.7);
     font-size: 14px;
@@ -498,7 +503,7 @@ const settingsStyles = `
     gap: 12px;
     width: 100%;
     padding: 18px 32px;
-    background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+    background: linear-gradient(135deg, var(--ns-accent) 0%, var(--ns-accent-grad-to) 100%);
     border: none;
     border-radius: 14px;
     color: white;
@@ -506,12 +511,12 @@ const settingsStyles = `
     font-weight: 700;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.3);
+    box-shadow: 0 8px 24px rgba(var(--ns-accent-rgb), 0.3);
 }
 
 .check-btn:hover:not(:disabled) {
     transform: translateY(-3px);
-    box-shadow: 0 12px 32px rgba(168, 85, 247, 0.4);
+    box-shadow: 0 12px 32px rgba(var(--ns-accent-rgb), 0.4);
 }
 
 .check-btn:disabled {
@@ -520,7 +525,7 @@ const settingsStyles = `
 }
 
 .check-btn.checking {
-    background: rgba(168, 85, 247, 0.3);
+    background: rgba(var(--ns-accent-rgb), 0.3);
 }
 
 .spinner {
@@ -560,7 +565,7 @@ const settingsStyles = `
     font-weight: 800;
     color: white;
     margin: 0 0 8px 0;
-    background: linear-gradient(135deg, #a855f7, #ec4899);
+    background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -569,9 +574,9 @@ const settingsStyles = `
 .app-version {
     display: inline-block;
     padding: 6px 16px;
-    background: rgba(168, 85, 247, 0.2);
+    background: rgba(var(--ns-accent-rgb), 0.2);
     border-radius: 20px;
-    color: #c4b5fd;
+    color: var(--ns-accent-light);
     font-size: 14px;
     font-weight: 600;
     margin-bottom: 20px;
@@ -594,24 +599,24 @@ const settingsStyles = `
 
 .about-link {
     padding: 14px 24px;
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.15) 0%, rgba(236, 72, 153, 0.15) 100%);
-    border: 1px solid rgba(168, 85, 247, 0.3);
+    background: linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.15) 0%, rgba(var(--ns-accent-grad-to-rgb), 0.15) 100%);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.3);
     border-radius: 14px;
-    color: #c4b5fd;
+    color: var(--ns-accent-light);
     text-decoration: none;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    box-shadow: 0 4px 15px rgba(168, 85, 247, 0.15);
+    box-shadow: 0 4px 15px rgba(var(--ns-accent-rgb), 0.15);
 }
 
 .about-link:hover {
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.25) 0%, rgba(236, 72, 153, 0.25) 100%);
+    background: linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.25) 0%, rgba(var(--ns-accent-grad-to-rgb), 0.25) 100%);
     color: white;
     transform: translateY(-4px) scale(1.02);
-    box-shadow: 0 8px 25px rgba(168, 85, 247, 0.3);
-    border-color: rgba(168, 85, 247, 0.5);
+    box-shadow: 0 8px 25px rgba(var(--ns-accent-rgb), 0.3);
+    border-color: rgba(var(--ns-accent-rgb), 0.5);
 }
 
 .about-link:active {
