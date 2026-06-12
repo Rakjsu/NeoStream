@@ -89,7 +89,7 @@ function loadChannelEpg(channel: LiveStream): Promise<EPGProgram[]> {
         pending = (async () => {
             await acquireEpgSlot();
             try {
-                const programs = await epgService.fetchChannelEPG(channel.epg_channel_id || '', channel.name);
+                const programs = await epgService.fetchChannelEPG(channel.epg_channel_id || '', channel.name, channel.stream_id);
                 epgCache.set(key, programs);
                 return programs;
             } catch {
