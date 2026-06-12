@@ -375,7 +375,16 @@
     "autoPlayNext": "Reproduzir próximo episódio",
     "autoPlayNextDesc": "Reproduzir automaticamente o próximo episódio",
     "clickThrough": "Modo Click-Through (PiP)",
-    "clickThroughDesc": "Permite que o mouse passe pelo PiP sem interagir (F9 para alternar)"
+    "clickThroughDesc": "Permite que o mouse passe pelo PiP sem interagir (F9 para alternar)",
+    "mpvEnabled": "Player MPV (experimental)",
+    "mpvEnabledDesc": "Reproduz canais ao vivo e filmes em uma janela MPV externa — toca formatos que o player interno não suporta (HEVC/MKV). Séries continuam no player interno.",
+    "mpvPath": "Caminho do MPV",
+    "mpvPathDesc": "Caminho do mpv.exe (deixe vazio para detectar automaticamente)",
+    "mpvDetect": "Detectar",
+    "mpvDetecting": "Detectando...",
+    "mpvFoundAt": "MPV encontrado em",
+    "mpvNotFound": "mpv não encontrado",
+    "mpvInstallHint": "Instale com scoop install mpv, choco install mpv ou baixe em mpv.io"
   },
   "appearance": {
     "title": "Aparência",

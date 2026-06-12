@@ -276,7 +276,16 @@
     "autoPlayNext": "Auto-play next episode",
     "autoPlayNextDesc": "Automatically play the next episode",
     "clickThrough": "Click-Through Mode (PiP)",
-    "clickThroughDesc": "Allows mouse to pass through PiP without interacting (F9 to toggle)"
+    "clickThroughDesc": "Allows mouse to pass through PiP without interacting (F9 to toggle)",
+    "mpvEnabled": "MPV Player (experimental)",
+    "mpvEnabledDesc": "Plays live channels and movies in an external MPV window — handles formats the internal player can't (HEVC/MKV). Series stay on the internal player.",
+    "mpvPath": "MPV path",
+    "mpvPathDesc": "Path to mpv.exe (leave empty to auto-detect)",
+    "mpvDetect": "Detect",
+    "mpvDetecting": "Detecting...",
+    "mpvFoundAt": "MPV found at",
+    "mpvNotFound": "mpv not found",
+    "mpvInstallHint": "Install with scoop install mpv, choco install mpv or download from mpv.io"
   },
   "appearance": {
     "title": "Appearance",

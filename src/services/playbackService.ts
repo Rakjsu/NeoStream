@@ -17,6 +17,7 @@ export interface PlaybackConfig {
     subtitleLanguageUserSet?: boolean; // True if user manually changed subtitle language
     forcedSubtitlesEnabled: boolean; // Auto-load forced subtitles (signs/foreign dialogue)
     clickThroughEnabled: boolean; // PiP click-through mode (mouse passes through)
+    mpvEnabled: boolean; // EXPERIMENTAL — play live/movies in an external MPV window (PoC)
 }
 
 const STORAGE_KEY_PREFIX = 'playbackConfig';
@@ -42,7 +43,8 @@ function getDefaultConfig(): PlaybackConfig {
         subtitleLanguage: getDefaultSubtitleLanguage(),
         subtitleLanguageUserSet: false,
         forcedSubtitlesEnabled: true, // Enabled by default
-        clickThroughEnabled: false // Disabled by default
+        clickThroughEnabled: false, // Disabled by default
+        mpvEnabled: false // EXPERIMENTAL — disabled by default
     };
 }
 

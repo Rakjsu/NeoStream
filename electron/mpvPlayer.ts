@@ -1,0 +1,338 @@
+/**
+ * EXPERIMENTAL — MPV playback engine PoC.
+ *
+ * Spawns mpv.exe as its own window and controls it via mpv's JSON IPC over
+ * a Windows named pipe (--input-ipc-server). No libmpv embedding — that is
+ * a possible hardening phase later (--wid). The pure/testable parts live in
+ * mpvProtocol.ts; this module owns the process, the pipe and the ipcMain
+ * surface exposed to the renderer.
+ *
+ * Channels:
+ *   mpv:available  -> { path: string | null, configuredPath: string | null }
+ *   mpv:play       -> { success, reason? }   ({ url, title?, start? })
+ *   mpv:pause / mpv:resume / mpv:stop -> { success }
+ *   mpv:seek       -> { success }            ({ seconds })
+ *   mpv:status     -> MpvStatus snapshot (polled by the renderer)
+ *   mpv:set-path   -> { path: string | null } (persists to electron-store)
+ */
+
+import { app, ipcMain } from 'electron'
+import { spawn, type ChildProcess } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import net from 'node:net'
+import store from './store'
+import log from './logger'
+import {
+    applyIpcMessage,
+    buildMpvArgs,
+    buildObserveCommandLines,
+    buildPathCandidates,
+    buildPipeName,
+    createInitialStatus,
+    extractIpcLines,
+    parseIpcLine,
+    serializeIpcCommand,
+    type MpvStatus,
+} from './mpvProtocol'
+
+const PIPE_CONNECT_RETRY_MS = 300
+const PIPE_CONNECT_MAX_ATTEMPTS = 30 // ~9s — mpv creates the pipe early in startup
+const PATH_PROBE_TIMEOUT_MS = 3000
+
+interface MpvSession {
+    child: ChildProcess
+    socket: net.Socket | null
+    status: MpvStatus
+    pipeName: string
+    readBuffer: string
+    stopRequested: boolean
+}
+
+let session: MpvSession | null = null
+let instanceCounter = 0
+let resolvedPathCache: string | null | undefined // undefined = not probed yet
+
+const getConfiguredPath = (): string | null => {
+    const value = store.get('settings')?.mpvPath
+    return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+/** Probe `mpv` on PATH by spawning `mpv --version`. */
+function probeMpvOnPath(): Promise<boolean> {
+    return new Promise((resolve) => {
+        let settled = false
+        const done = (found: boolean) => {
+            if (!settled) {
+                settled = true
+                resolve(found)
+            }
+        }
+        try {
+            const child = spawn('mpv', ['--version'], { windowsHide: true, stdio: 'ignore' })
+            const timer = setTimeout(() => {
+                try { child.kill() } catch { /* already gone */ }
+                done(false)
+            }, PATH_PROBE_TIMEOUT_MS)
+            child.on('error', () => {
+                clearTimeout(timer)
+                done(false)
+            })
+            child.on('exit', (code) => {
+                clearTimeout(timer)
+                done(code === 0)
+            })
+        } catch {
+            done(false)
+        }
+    })
+}
+
+/**
+ * Resolve the mpv executable: configured path > PATH > well-known dirs.
+ * Result is cached for the session; mpv:set-path invalidates it.
+ */
+export async function resolveMpvPath(forceRefresh = false): Promise<string | null> {
+    if (!forceRefresh && resolvedPathCache !== undefined) {
+        return resolvedPathCache
+    }
+
+    const configured = getConfiguredPath()
+    if (configured && existsSync(configured)) {
+        resolvedPathCache = configured
+        return configured
+    }
+
+    if (await probeMpvOnPath()) {
+        resolvedPathCache = 'mpv'
+        return 'mpv'
+    }
+
+    for (const candidate of buildPathCandidates(process.env)) {
+        if (existsSync(candidate)) {
+            resolvedPathCache = candidate
+            return candidate
+        }
+    }
+
+    resolvedPathCache = null
+    return null
+}
+
+function sendIpcLine(line: string): boolean {
+    if (!session?.socket || session.socket.destroyed) return false
+    try {
+        session.socket.write(line)
+        return true
+    } catch (error) {
+        log.warn(`[MPV] pipe write failed: ${error instanceof Error ? error.message : String(error)}`)
+        return false
+    }
+}
+
+function sendCommand(command: ReadonlyArray<string | number | boolean>): boolean {
+    return sendIpcLine(serializeIpcCommand(command))
+}
+
+function connectPipe(current: MpvSession) {
+    let attempts = 0
+
+    const tryConnect = () => {
+        if (session !== current || current.stopRequested) return
+        attempts += 1
+
+        const socket = net.connect(current.pipeName)
+
+        socket.on('connect', () => {
+            if (session !== current) {
+                socket.destroy()
+                return
+            }
+            current.socket = socket
+            log.info('[MPV] IPC pipe connected')
+            for (const line of buildObserveCommandLines()) {
+                sendIpcLine(line)
+            }
+        })
+
+        socket.on('data', (data) => {
+            if (session !== current) return
+            const { lines, rest } = extractIpcLines(current.readBuffer, data.toString('utf8'))
+            current.readBuffer = rest
+            for (const line of lines) {
+                const message = parseIpcLine(line)
+                if (message) {
+                    current.status = applyIpcMessage(current.status, message)
+                }
+            }
+        })
+
+        socket.on('error', () => {
+            socket.destroy()
+            if (session !== current || current.stopRequested) return
+            if (current.socket === socket) {
+                // Established connection dropped — mark not running.
+                current.socket = null
+                current.status = { ...current.status, running: false }
+                return
+            }
+            if (attempts < PIPE_CONNECT_MAX_ATTEMPTS) {
+                setTimeout(tryConnect, PIPE_CONNECT_RETRY_MS)
+            } else {
+                log.warn('[MPV] could not connect IPC pipe — playback continues without status/control')
+            }
+        })
+
+        socket.on('close', () => {
+            if (session === current && current.socket === socket) {
+                current.socket = null
+            }
+        })
+    }
+
+    tryConnect()
+}
+
+function teardownSession(killProcess: boolean) {
+    const current = session
+    if (!current) return
+    session = null
+
+    current.stopRequested = true
+    if (current.socket) {
+        try { current.socket.destroy() } catch { /* noop */ }
+        current.socket = null
+    }
+    if (killProcess && current.child.exitCode === null && !current.child.killed) {
+        try { current.child.kill() } catch { /* noop */ }
+    }
+}
+
+export async function launchMpv(options: { url: string; title?: string; start?: number }): Promise<{ success: boolean; reason?: string }> {
+    const mpvPath = await resolveMpvPath()
+    if (!mpvPath) {
+        return { success: false, reason: 'not-found' }
+    }
+
+    // One mpv at a time: politely quit any previous instance.
+    stopMpv()
+
+    instanceCounter += 1
+    const pipeName = buildPipeName(process.pid, instanceCounter)
+    const args = buildMpvArgs(pipeName, {
+        url: options.url,
+        title: options.title,
+        startSeconds: options.start,
+    })
+
+    try {
+        const child = spawn(mpvPath, args, { windowsHide: false, stdio: 'ignore' })
+
+        const current: MpvSession = {
+            child,
+            socket: null,
+            status: createInitialStatus(true),
+            pipeName,
+            readBuffer: '',
+            stopRequested: false,
+        }
+        session = current
+
+        child.on('error', (error) => {
+            log.error(`[MPV] spawn error: ${error.message}`)
+            if (session === current) {
+                current.status = { ...current.status, running: false }
+                teardownSession(false)
+            }
+        })
+
+        child.on('exit', (code) => {
+            log.info(`[MPV] process exited (code ${code})`)
+            if (session === current) {
+                current.status = { ...current.status, running: false }
+                teardownSession(false)
+            }
+        })
+
+        connectPipe(current)
+        log.info(`[MPV] launched ${mpvPath} (pipe ${pipeName})`)
+        return { success: true }
+    } catch (error) {
+        log.error(`[MPV] launch failed: ${error instanceof Error ? error.message : String(error)}`)
+        session = null
+        return { success: false, reason: 'spawn-failed' }
+    }
+}
+
+export function stopMpv(): void {
+    const current = session
+    if (!current) return
+    // Ask mpv to quit cleanly first; fall back to kill shortly after.
+    const quitSent = sendCommand(['quit'])
+    const child = current.child
+    teardownSession(!quitSent)
+    if (quitSent) {
+        setTimeout(() => {
+            if (child.exitCode === null && !child.killed) {
+                try { child.kill() } catch { /* noop */ }
+            }
+        }, 1500)
+    }
+}
+
+function getStatusSnapshot(): MpvStatus {
+    if (!session) return createInitialStatus(false)
+    const exited = session.child.exitCode !== null || session.child.killed
+    return { ...session.status, running: session.status.running && !exited }
+}
+
+export function setupMpvHandlers() {
+    ipcMain.handle('mpv:available', async () => {
+        const path = await resolveMpvPath(true)
+        return { path, configuredPath: getConfiguredPath() }
+    })
+
+    ipcMain.handle('mpv:play', async (_event, payload: { url?: string; title?: string; start?: number }) => {
+        const url = typeof payload?.url === 'string' ? payload.url : ''
+        if (!/^https?:\/\//i.test(url)) {
+            return { success: false, reason: 'invalid-url' }
+        }
+        return launchMpv({
+            url,
+            title: typeof payload?.title === 'string' ? payload.title : undefined,
+            start: typeof payload?.start === 'number' ? payload.start : undefined,
+        })
+    })
+
+    ipcMain.handle('mpv:pause', () => ({ success: sendCommand(['set_property', 'pause', true]) }))
+    ipcMain.handle('mpv:resume', () => ({ success: sendCommand(['set_property', 'pause', false]) }))
+
+    ipcMain.handle('mpv:seek', (_event, payload: { seconds?: number }) => {
+        const seconds = typeof payload?.seconds === 'number' ? payload.seconds : null
+        if (seconds === null) return { success: false }
+        return { success: sendCommand(['seek', seconds, 'absolute']) }
+    })
+
+    ipcMain.handle('mpv:stop', () => {
+        stopMpv()
+        return { success: true }
+    })
+
+    ipcMain.handle('mpv:status', () => getStatusSnapshot())
+
+    ipcMain.handle('mpv:set-path', async (_event, payload: { path?: string }) => {
+        const path = typeof payload?.path === 'string' ? payload.path.trim() : ''
+        const settings = { ...store.get('settings') }
+        if (path) {
+            settings.mpvPath = path
+        } else {
+            delete settings.mpvPath
+        }
+        store.set('settings', settings)
+        const resolved = await resolveMpvPath(true)
+        return { path: resolved }
+    })
+
+    app.on('will-quit', () => {
+        stopMpv()
+    })
+}

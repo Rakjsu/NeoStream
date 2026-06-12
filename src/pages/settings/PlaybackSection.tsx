@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { playbackService } from '../../services/playbackService';
 import type { PlaybackConfig } from '../../services/playbackService';
+import { mpvService } from '../../services/mpvService';
 import { useLanguage } from '../../services/languageService';
 import { useSaveAnimation } from './useSaveAnimation';
 
@@ -9,6 +10,11 @@ export function PlaybackSection() {
     const { t } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
 
+    // EXPERIMENTAL — MPV PoC state
+    const [mpvPathInput, setMpvPathInput] = useState('');
+    const [mpvDetecting, setMpvDetecting] = useState(false);
+    const [mpvResolvedPath, setMpvResolvedPath] = useState<string | null | undefined>(undefined);
+
     const handlePlaybackConfigChange = <K extends keyof PlaybackConfig>(key: K, value: PlaybackConfig[K]) => {
         const newConfig = { ...playbackConfig, [key]: value };
         setPlaybackConfig(newConfig);
@@ -16,6 +22,30 @@ export function PlaybackSection() {
 
         // Show save animation
         triggerSaveAnimation(key);
+    };
+
+    // EXPERIMENTAL — show the current configured/resolved mpv path on mount
+    useEffect(() => {
+        let cancelled = false;
+        mpvService.getAvailability().then(({ path, configuredPath }) => {
+            if (cancelled) return;
+            setMpvResolvedPath(path);
+            if (configuredPath) setMpvPathInput(configuredPath);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    // EXPERIMENTAL — persist the path (empty = auto-detect) and re-resolve
+    const handleMpvDetect = async () => {
+        setMpvDetecting(true);
+        try {
+            const resolved = await mpvService.setPath(mpvPathInput.trim());
+            setMpvResolvedPath(resolved);
+        } finally {
+            setMpvDetecting(false);
+        }
     };
 
     return (
@@ -147,6 +177,66 @@ export function PlaybackSection() {
                     </label>
                     {saveAnimation === 'clickThroughEnabled' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                 </div>
+
+                {/* EXPERIMENTAL — MPV PoC: external MPV player toggle */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>🧪 {t('playback', 'mpvEnabled') || 'Player MPV (experimental)'}</label>
+                        <p>{t('playback', 'mpvEnabledDesc') || 'Reproduz canais ao vivo e filmes em uma janela MPV externa.'}</p>
+                    </div>
+                    <label className="toggle-switch">
+                        <input
+                            type="checkbox"
+                            checked={playbackConfig.mpvEnabled}
+                            onChange={(e) => handlePlaybackConfigChange('mpvEnabled', e.target.checked)}
+                        />
+                        <span className="toggle-slider"></span>
+                    </label>
+                    {saveAnimation === 'mpvEnabled' && <span className="save-indicator">{t('settings', 'saved')}</span>}
+                </div>
+
+                {/* EXPERIMENTAL — MPV path + detection */}
+                {playbackConfig.mpvEnabled && (
+                    <div className="setting-item" style={{ flexWrap: 'wrap', gap: '12px' }}>
+                        <div className="setting-info">
+                            <label>{t('playback', 'mpvPath') || 'Caminho do MPV'}</label>
+                            <p>{t('playback', 'mpvPathDesc') || 'Caminho do mpv.exe (deixe vazio para detectar automaticamente)'}</p>
+                            <p style={{ marginTop: '6px', fontSize: '12px' }}>
+                                {mpvResolvedPath === undefined ? (
+                                    <span style={{ opacity: 0.6 }}>...</span>
+                                ) : mpvResolvedPath ? (
+                                    <span style={{ color: '#10b981' }}>
+                                        ✓ {t('playback', 'mpvFoundAt') || 'MPV encontrado em'}: {mpvResolvedPath}
+                                    </span>
+                                ) : (
+                                    <span style={{ color: '#ef4444' }}>
+                                        ✕ {t('playback', 'mpvNotFound') || 'mpv não encontrado'} — {t('playback', 'mpvInstallHint') || 'Instale com scoop install mpv, choco install mpv ou baixe em mpv.io'}
+                                    </span>
+                                )}
+                            </p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <input
+                                type="text"
+                                className="setting-select"
+                                style={{ minWidth: '260px' }}
+                                placeholder="C:\\Program Files\\mpv\\mpv.exe"
+                                value={mpvPathInput}
+                                onChange={(e) => setMpvPathInput(e.target.value)}
+                            />
+                            <button
+                                className="setting-select"
+                                style={{ cursor: 'pointer' }}
+                                disabled={mpvDetecting}
+                                onClick={handleMpvDetect}
+                            >
+                                {mpvDetecting
+                                    ? (t('playback', 'mpvDetecting') || 'Detectando...')
+                                    : (t('playback', 'mpvDetect') || 'Detectar')}
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

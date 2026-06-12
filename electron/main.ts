@@ -11,6 +11,7 @@ import { setupDownloadHandlers } from './downloadHandlers'
 import { initializeAutoUpdater } from './autoUpdater'
 import { setupPipHandlers } from './pipHandlers'
 import { setupCertificateErrorHandler } from './certificatePolicy'
+import { setupMpvHandlers } from './mpvPlayer'
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url)
@@ -28,6 +29,7 @@ setupDLNAHandlers()
 setupAirPlayHandlers()
 setupDownloadHandlers()
 setupCertificateErrorHandler()
+setupMpvHandlers() // EXPERIMENTAL — MPV PoC
 
 process.env.DIST = path.join(__dirname, '../dist')
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public')

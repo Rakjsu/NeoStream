@@ -3,6 +3,8 @@ import { VideoPlayer } from './VideoPlayer/VideoPlayer';
 import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
 import { findMovieVersions } from '../services/movieVersionService';
+import { playbackService } from '../services/playbackService';
+import MpvPlaybackOverlay from './MpvPlaybackOverlay';
 
 interface MediaItem {
     id?: number | string;
@@ -87,6 +89,17 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
     const urlLoadedRef = useRef(false);
     const lastMovieIdRef = useRef<string | number | null>(null);
     const lastEpisodeRef = useRef<string | null>(null);
+
+    // EXPERIMENTAL — MPV PoC. When the toggle is on, live channels and movies
+    // are handed to an external MPV window instead of the internal player.
+    // Series/episodes stay on the internal player (out of PoC scope).
+    // Read once on mount so the choice is stable for this playback session.
+    const [mpvRequested] = useState<boolean>(() =>
+        playbackService.getConfig().mpvEnabled && !seriesId && contentType !== 'series'
+    );
+    // Set when mpv turns out to be missing/broken — falls back to the internal player.
+    const [mpvFailed, setMpvFailed] = useState(false);
+    const useMpv = mpvRequested && !mpvFailed;
 
     // Effect 1: Load stream URL (only triggers on movie/episode changes, NOT resumeTime)
     useEffect(() => {
@@ -371,6 +384,24 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
                     </div>
                 </div>
             </>
+        );
+    }
+
+    // EXPERIMENTAL — MPV PoC: hand the stream to an external MPV window and
+    // show a compact in-app overlay instead of mounting the internal player.
+    if (useMpv) {
+        const mpvMovieId = movie.stream_id || movie.id || movie.series_id;
+        return (
+            <MpvPlaybackOverlay
+                streamUrl={streamUrl}
+                title={customTitle || movie.name || movie.title || 'NeoStream'}
+                startSeconds={resumeTime}
+                movieId={contentType !== 'live' && mpvMovieId ? String(mpvMovieId) : undefined}
+                movieName={movie.name || movie.title}
+                isLive={contentType === 'live'}
+                onClose={onClose}
+                onFallback={() => setMpvFailed(true)}
+            />
         );
     }
 

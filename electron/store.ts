@@ -15,6 +15,8 @@ interface StoreSchema {
         player?: unknown
         allowInvalidProviderCertificates?: boolean
         approvedProviderHosts?: string[]
+        // EXPERIMENTAL — user-configured mpv.exe path for the MPV PoC (mpvPlayer.ts)
+        mpvPath?: string
     }
 }
 
