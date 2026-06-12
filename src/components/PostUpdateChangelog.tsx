@@ -134,7 +134,7 @@ const changelogStyles = `
     max-width: 480px;
     max-height: 80vh;
     overflow-y: auto;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    background: linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-tint) 100%);
     border: 1px solid rgba(16, 185, 129, 0.3);
     border-radius: 24px;
     padding: 24px;

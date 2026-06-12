@@ -650,7 +650,12 @@
     "loadingEpg": "Loading...",
     "noEpg": "No program data",
     "noChannels": "No channels in this category",
-    "now": "Now"
+    "now": "Now",
+    "searchPlaceholder": "Search loaded programming...",
+    "searchNoResults": "Nothing found in loaded programming",
+    "today": "Today / Now",
+    "earlier": "Earlier",
+    "later": "Later"
   },
   "search": {
     "placeholder": "Search channels, movies and series...",

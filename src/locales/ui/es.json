@@ -650,7 +650,12 @@
     "loadingEpg": "Cargando...",
     "noEpg": "Sin programación",
     "noChannels": "No hay canales en esta categoría",
-    "now": "Ahora"
+    "now": "Ahora",
+    "searchPlaceholder": "Buscar en la programación cargada...",
+    "searchNoResults": "Nada encontrado en la programación cargada",
+    "today": "Hoy / Ahora",
+    "earlier": "Más temprano",
+    "later": "Más tarde"
   },
   "search": {
     "placeholder": "Buscar canales, películas y series...",

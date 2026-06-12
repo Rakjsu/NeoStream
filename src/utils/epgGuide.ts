@@ -35,6 +35,73 @@ export function getGuideWindow(now: number = Date.now()): GuideWindow {
     return { start, end: start + WINDOW_HALF_HOURS * HALF_HOUR_MS };
 }
 
+/** Paging step for the ◀/▶ guide buttons. */
+export const WINDOW_SHIFT_MS = 2 * 60 * 60 * 1000;
+/** Earliest reachable point relative to "now" (provider EPG holds ~now-24h). */
+export const WINDOW_MIN_OFFSET_MS = -12 * 60 * 60 * 1000;
+/** Latest reachable point relative to "now" (provider EPG holds ~now+48h). */
+export const WINDOW_MAX_OFFSET_MS = 36 * 60 * 60 * 1000;
+
+/**
+ * Clamps a window into [now-12h, now+36h], preserving its span and keeping
+ * the start on the absolute 30-min lattice (bounds are rounded inward).
+ */
+export function clampWindow(window: GuideWindow, now: number = Date.now()): GuideWindow {
+    const span = window.end - window.start;
+    const minStart = Math.ceil((now + WINDOW_MIN_OFFSET_MS) / HALF_HOUR_MS) * HALF_HOUR_MS;
+    const maxEnd = Math.floor((now + WINDOW_MAX_OFFSET_MS) / HALF_HOUR_MS) * HALF_HOUR_MS;
+    let start = window.start;
+    if (start + span > maxEnd) start = maxEnd - span;
+    if (start < minStart) start = minStart;
+    return { start, end: start + span };
+}
+
+/** Shifts the window by deltaMs (e.g. ±WINDOW_SHIFT_MS), clamped to the data range. */
+export function shiftWindow(window: GuideWindow, deltaMs: number, now: number = Date.now()): GuideWindow {
+    return clampWindow({ start: window.start + deltaMs, end: window.end + deltaMs }, now);
+}
+
+/** Minimal program shape the search helper needs. */
+export interface GuideProgramLike {
+    title: string;
+    start: string;
+    end: string;
+}
+
+export interface ProgramSearchResult {
+    /** Channel key (the EPG cache key, i.e. the channel name) */
+    channelKey: string;
+    title: string;
+    /** ISO start (used to page the window to the program) */
+    start: string;
+    /** Parsed start in ms (for sorting/labels) */
+    startMs: number;
+}
+
+/**
+ * Case-insensitive title search across already-loaded EPG data.
+ * Results are sorted by start time and capped at `limit`.
+ */
+export function searchPrograms(
+    entries: Iterable<[string, GuideProgramLike[]]>,
+    query: string,
+    limit: number = 12
+): ProgramSearchResult[] {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    const results: ProgramSearchResult[] = [];
+    for (const [channelKey, programs] of entries) {
+        for (const program of programs) {
+            if (!program.title || !program.title.toLowerCase().includes(q)) continue;
+            const startMs = Date.parse(program.start);
+            if (Number.isNaN(startMs)) continue;
+            results.push({ channelKey, title: program.title, start: program.start, startMs });
+        }
+    }
+    results.sort((a, b) => a.startMs - b.startMs);
+    return results.slice(0, limit);
+}
+
 /** Timestamps (ms) for every 30-min tick in the window, including the start. */
 export function buildTimeTicks(window: GuideWindow): number[] {
     const ticks: number[] = [];

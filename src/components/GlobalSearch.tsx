@@ -608,7 +608,7 @@ const globalSearchStyles = `
     align-items: center;
     gap: 8px;
     padding: 10px 12px 6px;
-    color: rgba(196, 181, 253, 0.8);
+    color: var(--ns-accent-light);
     font-size: 12px;
     font-weight: 700;
     text-transform: uppercase;

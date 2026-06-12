@@ -356,7 +356,7 @@ const loginStyles = `
 .login-orb-2 {
     width: 400px;
     height: 400px;
-    background: radial-gradient(circle, #a855f7 0%, transparent 70%);
+    background: radial-gradient(circle, var(--ns-accent) 0%, transparent 70%);
     bottom: -100px;
     left: -100px;
     animation-delay: -7s;
@@ -410,7 +410,7 @@ const loginStyles = `
 .login-logo-bg {
     width: 80px;
     height: 80px;
-    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    background: linear-gradient(135deg, var(--ns-accent-dark) 0%, var(--ns-accent) 100%);
     border-radius: 24px;
     display: flex;
     align-items: center;
@@ -439,10 +439,10 @@ const loginStyles = `
     gap: 6px;
     margin-top: 10px;
     padding: 5px 12px;
-    background: rgba(168, 85, 247, 0.15);
-    border: 1px solid rgba(168, 85, 247, 0.3);
+    background: rgba(var(--ns-accent-rgb), 0.15);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.3);
     border-radius: 16px;
-    color: #c4b5fd;
+    color: var(--ns-accent-light);
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.1em;
@@ -546,7 +546,7 @@ const loginStyles = `
 }
 
 .login-checkbox input:checked + .login-checkbox-mark {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, var(--ns-accent-dark) 0%, var(--ns-accent) 100%);
     border-color: transparent;
 }
 
@@ -579,7 +579,7 @@ const loginStyles = `
 }
 
 .login-btn-primary {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, var(--ns-accent-dark) 0%, var(--ns-accent) 100%);
     color: white;
     box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
 }
@@ -677,7 +677,7 @@ const loginStyles = `
 }
 
 .login-stat-blue { background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); }
-.login-stat-purple { background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.2); }
+.login-stat-purple { background: rgba(var(--ns-accent-rgb), 0.1); border: 1px solid rgba(var(--ns-accent-rgb), 0.2); }
 .login-stat-green { background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); }
 
 .login-stat-icon {
@@ -691,7 +691,7 @@ const loginStyles = `
 }
 
 .login-stat-blue .login-stat-icon { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
-.login-stat-purple .login-stat-icon { background: linear-gradient(135deg, #a855f7 0%, #9333ea 100%); }
+.login-stat-purple .login-stat-icon { background: linear-gradient(135deg, var(--ns-accent) 0%, var(--ns-accent-dark) 100%); }
 .login-stat-green .login-stat-icon { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); }
 
 .login-stat-value {
