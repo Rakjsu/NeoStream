@@ -167,7 +167,7 @@ export function BackupSection() {
                             padding: 32,
                             maxWidth: 480,
                             width: '90%',
-                            border: '1px solid rgba(168, 85, 247, 0.2)',
+                            border: '1px solid rgba(var(--ns-accent-rgb), 0.2)',
                             boxShadow: '0 25px 80px rgba(0, 0, 0, 0.5)'
                         }}
                         onClick={(e) => e.stopPropagation()}
