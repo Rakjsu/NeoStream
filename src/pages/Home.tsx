@@ -754,13 +754,13 @@ export function Home() {
                                 width: 48,
                                 height: 48,
                                 borderRadius: '50%',
-                                background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                                background: 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to))',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 fontSize: 18,
                                 color: 'white',
-                                boxShadow: '0 4px 20px rgba(168, 85, 247, 0.5)',
+                                boxShadow: '0 4px 20px rgba(var(--ns-accent-rgb), 0.5)',
                                 cursor: 'pointer'
                             }}>▶</div>
 
@@ -787,7 +787,7 @@ export function Home() {
                                     display: 'inline-flex',
                                     padding: '3px 8px',
                                     background: type === 'series' || (isContinue && continueItem.type === 'series')
-                                        ? 'rgba(139, 92, 246, 0.8)'
+                                        ? 'rgba(var(--ns-accent-rgb), 0.8)'
                                         : 'rgba(59, 130, 246, 0.8)',
                                     borderRadius: 4,
                                     fontSize: 10,
@@ -825,7 +825,7 @@ export function Home() {
                                 <div style={{
                                     height: '100%',
                                     width: `${progress}%`,
-                                    background: 'linear-gradient(90deg, #a855f7, #ec4899)',
+                                    background: 'linear-gradient(90deg, var(--ns-accent), var(--ns-accent-grad-to))',
                                     borderRadius: 2
                                 }} />
                             </div>
@@ -979,7 +979,7 @@ export function Home() {
                                 fontSize: 16,
                                 transition: 'all 0.2s'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(168, 85, 247, 0.4)'}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(var(--ns-accent-rgb), 0.4)'}
                             onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
                         >
                             <span className="arrow-icon">←</span>
@@ -1001,7 +1001,7 @@ export function Home() {
                                 fontSize: 16,
                                 transition: 'all 0.2s'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(168, 85, 247, 0.4)'}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(var(--ns-accent-rgb), 0.4)'}
                             onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
                         >
                             <span className="arrow-icon">→</span>
@@ -1116,7 +1116,7 @@ export function Home() {
                     left: 50%;
                     width: 0;
                     height: 0;
-                    background: radial-gradient(circle, rgba(168, 85, 247, 0.6) 0%, transparent 70%);
+                    background: radial-gradient(circle, rgba(var(--ns-accent-rgb), 0.6) 0%, transparent 70%);
                     border-radius: 50%;
                     transform: translate(-50%, -50%);
                     transition: width 0.3s, height 0.3s;
@@ -1127,8 +1127,8 @@ export function Home() {
                 }
                 .nav-arrow:hover {
                     transform: scale(1.1);
-                    border-color: rgba(168, 85, 247, 0.5) !important;
-                    box-shadow: 0 0 15px rgba(168, 85, 247, 0.3);
+                    border-color: rgba(var(--ns-accent-rgb), 0.5) !important;
+                    box-shadow: 0 0 15px rgba(var(--ns-accent-rgb), 0.3);
                 }
                 .nav-arrow:active {
                     transform: scale(0.9);
@@ -1193,7 +1193,7 @@ export function Home() {
                 }
                 .content-card .play-btn:hover {
                     transform: translate(-50%, -50%) scale(1.15) !important;
-                    box-shadow: 0 8px 30px rgba(168, 85, 247, 0.7) !important;
+                    box-shadow: 0 8px 30px rgba(var(--ns-accent-rgb), 0.7) !important;
                 }
                 @keyframes bounceIn {
                     0% { transform: scale(0) rotate(-90deg); }
@@ -1241,7 +1241,7 @@ export function Home() {
                     background: transparent;
                 }
                 .home-scroll-container::-webkit-scrollbar-thumb {
-                    background: linear-gradient(180deg, #a855f7, #ec4899);
+                    background: linear-gradient(180deg, var(--ns-accent), var(--ns-accent-grad-to));
                     border-radius: 3px;
                 }
             `}</style>
@@ -1255,14 +1255,14 @@ export function Home() {
             )}
             <div className="home-scroll-container" style={{
                 height: '100%',
-                background: 'linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%)',
+                background: 'linear-gradient(135deg, var(--ns-bg-deep) 0%, var(--ns-bg-panel) 50%, var(--ns-bg-tint) 100%)',
                 padding: '40px 40px 40px 40px',
                 position: 'relative',
                 overflowY: 'auto',
                 overflowX: 'hidden',
                 paddingRight: '8px',
                 scrollbarWidth: 'thin',
-                scrollbarColor: 'rgba(168, 85, 247, 0.4) transparent'
+                scrollbarColor: 'rgba(var(--ns-accent-rgb), 0.4) transparent'
             }}>
                 {/* Background decorations */}
                 <div style={{
@@ -1281,7 +1281,7 @@ export function Home() {
                     left: '-150px',
                     width: '400px',
                     height: '400px',
-                    background: 'radial-gradient(circle, rgba(139, 92, 246, 0.08) 0%, transparent 70%)',
+                    background: 'radial-gradient(circle, rgba(var(--ns-accent-rgb), 0.08) 0%, transparent 70%)',
                     borderRadius: '50%',
                     pointerEvents: 'none'
                 }} />
@@ -1394,17 +1394,17 @@ export function Home() {
 
                     {/* Series Card */}
                     < a href="#/dashboard/series" style={{
-                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%)',
+                        background: 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.15) 0%, rgba(var(--ns-accent-rgb), 0.05) 100%)',
                         borderRadius: '16px',
                         padding: '20px',
-                        border: '1px solid rgba(139, 92, 246, 0.2)',
+                        border: '1px solid rgba(var(--ns-accent-rgb), 0.2)',
                         textDecoration: 'none',
                         transition: 'all 0.3s ease',
                         cursor: 'pointer'
                     }}
                         onMouseEnter={(e) => {
                             e.currentTarget.style.transform = 'translateY(-4px)';
-                            e.currentTarget.style.boxShadow = '0 20px 40px rgba(139, 92, 246, 0.2)';
+                            e.currentTarget.style.boxShadow = '0 20px 40px rgba(var(--ns-accent-rgb), 0.2)';
                         }}
                         onMouseLeave={(e) => {
                             e.currentTarget.style.transform = 'translateY(0)';
@@ -1414,7 +1414,7 @@ export function Home() {
                         <div style={{ fontSize: '24px', fontWeight: '700', color: 'white', marginBottom: '2px' }}>
                             {loading ? '...' : filteredCounts.series.toLocaleString()}
                         </div>
-                        <div style={{ fontSize: '12px', color: 'rgba(139, 92, 246, 0.9)', fontWeight: '600' }}>
+                        <div style={{ fontSize: '12px', color: 'rgba(var(--ns-accent-rgb), 0.9)', fontWeight: '600' }}>
                             {t('home', 'seriesCount')}
                         </div>
                     </a >

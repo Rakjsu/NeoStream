@@ -248,7 +248,7 @@ export function EpgGuide() {
                 <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '16px' }}>
                     <div style={{
                         width: '48px', height: '48px', borderRadius: '50%',
-                        border: '3px solid rgba(168, 85, 247, 0.2)', borderTopColor: '#a855f7',
+                        border: '3px solid rgba(var(--ns-accent-rgb), 0.2)', borderTopColor: 'var(--ns-accent)',
                         animation: 'guideSpin 0.8s linear infinite'
                     }} />
                     <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '15px', fontWeight: 500 }}>
@@ -279,11 +279,11 @@ export function EpgGuide() {
                 .guide-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
                 .guide-scroll::-webkit-scrollbar-track { background: transparent; }
                 .guide-scroll::-webkit-scrollbar-thumb {
-                    background: linear-gradient(180deg, #a855f7, #ec4899);
+                    background: linear-gradient(180deg, var(--ns-accent), var(--ns-accent-grad-to));
                     border-radius: 3px;
                 }
                 .guide-program:hover { filter: brightness(1.25); }
-                .guide-channel-cell:hover { background: rgba(168, 85, 247, 0.12) !important; }
+                .guide-channel-cell:hover { background: rgba(var(--ns-accent-rgb), 0.12) !important; }
             `}</style>
 
             {/* Header: title + category selector */}
@@ -306,7 +306,7 @@ export function EpgGuide() {
                     style={{
                         background: 'rgba(31, 41, 55, 0.9)',
                         color: 'white',
-                        border: '1px solid rgba(168, 85, 247, 0.4)',
+                        border: '1px solid rgba(var(--ns-accent-rgb), 0.4)',
                         borderRadius: '10px',
                         padding: '8px 14px',
                         fontSize: '14px',
@@ -352,14 +352,14 @@ export function EpgGuide() {
                         <div style={{
                             position: 'sticky', top: 0, zIndex: 30,
                             display: 'flex', height: HEADER_HEIGHT,
-                            background: 'linear-gradient(180deg, #1a1a2e 0%, #16162a 100%)',
-                            borderBottom: '1px solid rgba(168, 85, 247, 0.25)'
+                            background: 'linear-gradient(180deg, var(--ns-bg-panel) 0%, var(--ns-bg-deep) 100%)',
+                            borderBottom: '1px solid rgba(var(--ns-accent-rgb), 0.25)'
                         }}>
                             <div style={{
                                 position: 'sticky', left: 0, zIndex: 31,
                                 width: CHANNEL_COL_WIDTH, minWidth: CHANNEL_COL_WIDTH,
                                 display: 'flex', alignItems: 'center', paddingLeft: '14px',
-                                background: 'linear-gradient(180deg, #1a1a2e 0%, #16162a 100%)',
+                                background: 'linear-gradient(180deg, var(--ns-bg-panel) 0%, var(--ns-bg-deep) 100%)',
                                 borderRight: '1px solid rgba(255, 255, 255, 0.08)',
                                 fontSize: '11px', fontWeight: 700, letterSpacing: '1px',
                                 textTransform: 'uppercase', color: 'rgba(196, 181, 253, 0.9)'
@@ -386,14 +386,14 @@ export function EpgGuide() {
                                     position: 'absolute',
                                     left: CHANNEL_COL_WIDTH + nowLineLeft,
                                     top: 0, bottom: 0, width: '2px',
-                                    background: 'linear-gradient(180deg, #a855f7, #ec4899)',
-                                    boxShadow: '0 0 8px rgba(168, 85, 247, 0.7)',
+                                    background: 'linear-gradient(180deg, var(--ns-accent), var(--ns-accent-grad-to))',
+                                    boxShadow: '0 0 8px rgba(var(--ns-accent-rgb), 0.7)',
                                     zIndex: 20, pointerEvents: 'none'
                                 }}>
                                     <span style={{
                                         position: 'absolute', top: '2px', left: '4px',
                                         fontSize: '9px', fontWeight: 700, letterSpacing: '0.5px',
-                                        textTransform: 'uppercase', color: '#c4b5fd', whiteSpace: 'nowrap'
+                                        textTransform: 'uppercase', color: 'var(--ns-accent-light)', whiteSpace: 'nowrap'
                                     }}>
                                         {t('guide', 'now')}
                                     </span>
@@ -417,7 +417,7 @@ export function EpgGuide() {
                                                 width: CHANNEL_COL_WIDTH, minWidth: CHANNEL_COL_WIDTH,
                                                 display: 'flex', alignItems: 'center', gap: '10px',
                                                 padding: '0 12px',
-                                                background: 'linear-gradient(90deg, #14142299 0%, #14142299 100%), #0f0f1a',
+                                                background: 'linear-gradient(90deg, #14142299 0%, #14142299 100%), var(--ns-bg-deep)',
                                                 borderRight: '1px solid rgba(255, 255, 255, 0.08)',
                                                 cursor: 'pointer',
                                                 transition: 'background 0.2s ease'
@@ -485,10 +485,10 @@ export function EpgGuide() {
                                                                 overflow: 'hidden',
                                                                 cursor: airing ? 'pointer' : 'default',
                                                                 background: airing
-                                                                    ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.35) 0%, rgba(236, 72, 153, 0.25) 100%)'
+                                                                    ? 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.35) 0%, rgba(var(--ns-accent-grad-to-rgb), 0.25) 100%)'
                                                                     : 'rgba(255, 255, 255, 0.05)',
                                                                 border: airing
-                                                                    ? '1px solid rgba(168, 85, 247, 0.6)'
+                                                                    ? '1px solid rgba(var(--ns-accent-rgb), 0.6)'
                                                                     : '1px solid rgba(255, 255, 255, 0.08)',
                                                                 transition: 'filter 0.2s ease'
                                                             }}
@@ -543,7 +543,7 @@ function ChannelLetterFallback({ name }: { name: string }) {
     return (
         <div style={{
             width: '100%', height: '100%',
-            background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+            background: 'linear-gradient(135deg, var(--ns-accent) 0%, var(--ns-accent-grad-to) 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '16px', fontWeight: 700, color: 'white'
         }}>
@@ -563,7 +563,7 @@ const pageWrapperStyle: React.CSSProperties = {
 const backdropStyle: React.CSSProperties = {
     position: 'fixed',
     inset: 0,
-    background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)',
+    background: 'linear-gradient(135deg, var(--ns-bg-deep) 0%, var(--ns-bg-panel) 50%, var(--ns-bg-tint) 100%)',
     zIndex: 0
 };
 

@@ -3,6 +3,7 @@
     "updates": "Updates",
     "backup": "Backup",
     "playback": "Playback",
+    "appearance": "Appearance",
     "epg": "EPG",
     "stats": "Statistics",
     "parental": "Parental Control",
@@ -276,6 +277,23 @@
     "autoPlayNextDesc": "Automatically play the next episode",
     "clickThrough": "Click-Through Mode (PiP)",
     "clickThroughDesc": "Allows mouse to pass through PiP without interacting (F9 to toggle)"
+  },
+  "appearance": {
+    "title": "Appearance",
+    "description": "Customize the app colors",
+    "background": "Background",
+    "backgroundDesc": "Choose the app background style",
+    "backgroundDefault": "Default",
+    "backgroundAmoled": "AMOLED (pure black)",
+    "accent": "Accent color",
+    "accentDesc": "Color used on buttons, highlights and gradients",
+    "colorPurple": "Purple",
+    "colorBlue": "Blue",
+    "colorGreen": "Green",
+    "colorRed": "Red",
+    "colorOrange": "Orange",
+    "colorPink": "Pink",
+    "note": "Some screens still keep the classic palette for now."
   },
   "backup": {
     "title": "Backup & Restore",

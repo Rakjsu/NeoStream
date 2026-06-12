@@ -511,11 +511,11 @@ const globalSearchStyles = `
     max-height: 70vh;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
-    border: 1px solid rgba(168, 85, 247, 0.3);
+    background: linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-deep) 100%);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.3);
     border-radius: 20px;
     overflow: hidden;
-    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6), 0 0 40px rgba(168, 85, 247, 0.1);
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.6), 0 0 40px rgba(var(--ns-accent-rgb), 0.1);
     animation: gsearchSlide 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -567,7 +567,7 @@ const globalSearchStyles = `
     overflow-y: auto;
     padding: 8px;
     scrollbar-width: thin;
-    scrollbar-color: rgba(168, 85, 247, 0.4) transparent;
+    scrollbar-color: rgba(var(--ns-accent-rgb), 0.4) transparent;
 }
 
 .gsearch-results::-webkit-scrollbar {
@@ -575,7 +575,7 @@ const globalSearchStyles = `
 }
 
 .gsearch-results::-webkit-scrollbar-thumb {
-    background: rgba(168, 85, 247, 0.4);
+    background: rgba(var(--ns-accent-rgb), 0.4);
     border-radius: 3px;
 }
 
@@ -592,8 +592,8 @@ const globalSearchStyles = `
 .gsearch-spinner {
     width: 18px;
     height: 18px;
-    border: 2px solid rgba(168, 85, 247, 0.2);
-    border-top-color: #a855f7;
+    border: 2px solid rgba(var(--ns-accent-rgb), 0.2);
+    border-top-color: var(--ns-accent);
     border-radius: 50%;
     animation: gsearchSpin 0.8s linear infinite;
 }
@@ -631,7 +631,7 @@ const globalSearchStyles = `
 }
 
 .gsearch-item.selected {
-    background: rgba(168, 85, 247, 0.18);
+    background: rgba(var(--ns-accent-rgb), 0.18);
 }
 
 .gsearch-thumb {
@@ -649,7 +649,7 @@ const globalSearchStyles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.35), rgba(236, 72, 153, 0.35));
+    background: linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.35), rgba(var(--ns-accent-grad-to-rgb), 0.35));
     color: white;
     font-size: 18px;
     font-weight: 700;
@@ -674,9 +674,9 @@ const globalSearchStyles = `
 }
 
 .badge-live {
-    background: rgba(168, 85, 247, 0.15);
-    color: #c4b5fd;
-    border: 1px solid rgba(168, 85, 247, 0.3);
+    background: rgba(var(--ns-accent-rgb), 0.15);
+    color: var(--ns-accent-light);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.3);
 }
 
 .badge-vod {
