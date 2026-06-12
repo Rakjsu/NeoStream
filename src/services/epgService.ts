@@ -560,38 +560,38 @@ export const epgService = {
             .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code)));
     },
 
-    // Fetch from mi.tv
+    // Fetch from mi.tv via the main-process proxy (direct fetch is CORS-blocked
+    // in the renderer — webSecurity is on)
     async fetchFromMiTV(channelName: string): Promise<EPGProgram[]> {
         try {
             const slug = this.getMiTVSlug(channelName);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ipcRenderer = (window as any).ipcRenderer;
+            if (!ipcRenderer?.invoke) return [];
 
-            // Use -300 timezone offset for Brazil (UTC-3 = -180 minutes, but site uses -300)
-            const url = `https://mi.tv/br/async/channel/${slug}/-300`;
-            const response = await fetch(url);
+            const result = await ipcRenderer.invoke('epg:fetch-mitv', slug);
+            if (!result?.success || !result.html) return [];
 
-            if (!response.ok) return [];
-
-            const html = await response.text();
-            return this.parseHTML(html, channelName);
+            return this.parseHTML(result.html, channelName);
         } catch (error) {
             console.error('[EPG] mi.tv error:', error);
             return [];
         }
     },
 
-    // Fetch from meuguia.tv
+    // Fetch from meuguia.tv via the main-process proxy (same CORS situation)
     async fetchFromMeuGuia(channelName: string): Promise<EPGProgram[]> {
         try {
             const slug = this.getMeuGuiaSlug(channelName);
             if (!slug) return [];
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ipcRenderer = (window as any).ipcRenderer;
+            if (!ipcRenderer?.invoke) return [];
 
-            const url = `https://meuguia.tv/programacao/canal/${slug}`;
-            const response = await fetch(url);
+            const result = await ipcRenderer.invoke('epg:fetch-meuguia', slug);
+            if (!result?.success || !result.html) return [];
 
-            if (!response.ok) return [];
-
-            const html = await response.text();
-            return this.parseMeuGuiaHTML(html, channelName);
+            return this.parseMeuGuiaHTML(result.html, channelName);
         } catch (error) {
             console.error('[EPG] meuguia.tv error:', error);
             return [];

@@ -9,6 +9,7 @@
     "about": "Sobre",
     "home": "Início",
     "liveTV": "TV ao Vivo",
+    "guide": "Guia de TV",
     "movies": "Filmes",
     "series": "Séries",
     "myList": "Minha Lista",
@@ -586,6 +587,17 @@
     "emptyText": "Os filmes e episódios que você assistir aparecerão aqui",
     "exploreMovies": "Explorar Filmes",
     "exploreSeries": "Explorar Séries"
+  },
+  "guide": {
+    "title": "Guia de TV",
+    "category": "Categoria",
+    "channels": "canais",
+    "channelsHeader": "Canais",
+    "loading": "Carregando guia...",
+    "loadingEpg": "Carregando...",
+    "noEpg": "Sem programação",
+    "noChannels": "Nenhum canal nesta categoria",
+    "now": "Agora"
   },
   "search": {
     "placeholder": "Buscar canais, filmes e séries...",

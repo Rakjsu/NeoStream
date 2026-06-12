@@ -13,6 +13,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 
 const Home = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })));
 const LiveTV = lazy(() => import('./pages/LiveTV').then(m => ({ default: m.LiveTV })));
+const EpgGuide = lazy(() => import('./pages/EpgGuide').then(m => ({ default: m.EpgGuide })));
 const VOD = lazy(() => import('./pages/VOD').then(m => ({ default: m.VOD })));
 const Series = lazy(() => import('./pages/Series').then(m => ({ default: m.Series })));
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
@@ -111,6 +112,7 @@ function App() {
               <Route index element={<Navigate to="home" replace />} />
               <Route path="home" element={<Home />} />
               <Route path="live" element={<LiveTV />} />
+              <Route path="guide" element={<EpgGuide />} />
               <Route path="vod" element={<VOD />} />
               <Route path="series" element={<Series />} />
               <Route path="watch-later" element={<WatchLater />} />
