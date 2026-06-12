@@ -106,7 +106,9 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
             // Give user 5 seconds before auto-installing
             setTimeout(() => {
                 log.info('Auto-installing update...');
-                autoUpdater.quitAndInstall(false, true);
+                // isSilent=true: never show the NSIS wizard — the in-app
+                // update UI is the only thing the user sees.
+                autoUpdater.quitAndInstall(true, true);
             }, 5000);
         }
     });
@@ -160,8 +162,8 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
 
     ipcMain.handle('update:install', () => {
         try {
-            // Quit and install immediately
-            autoUpdater.quitAndInstall(false, true);
+            // Quit and install immediately, silently (no NSIS wizard)
+            autoUpdater.quitAndInstall(true, true);
             return { success: true };
         } catch (error: unknown) {
             log.error('Error installing update:', error);
