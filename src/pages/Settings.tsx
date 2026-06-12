@@ -10,6 +10,7 @@ import { StatsSection } from './settings/StatsSection';
 import { ParentalSection } from './settings/ParentalSection';
 import { BackupSection } from './settings/BackupSection';
 import { AboutSection } from './settings/AboutSection';
+import { PlaylistsSection } from './settings/PlaylistsSection';
 
 
 export function Settings() {
@@ -34,6 +35,7 @@ export function Settings() {
 
     const sections = [
         { id: 'updates', icon: '🔄', label: t('nav', 'updates'), color: '#10b981' },
+        { id: 'playlists', icon: '📺', label: t('playlists', 'title'), color: '#6366f1' },
         { id: 'playback', icon: '⏯️', label: t('nav', 'playback') || 'Reprodução', color: '#3b82f6' },
         { id: 'appearance', icon: '🎨', label: t('nav', 'appearance') || 'Aparência', color: 'var(--ns-accent)' },
         { id: 'network', icon: '🔐', label: 'Rede', color: '#14b8a6' },
@@ -84,6 +86,9 @@ export function Settings() {
                         {activeSection === 'updates' && (
                             <UpdatesSection checking={updateChecking} setChecking={setUpdateChecking} />
                         )}
+
+                        {/* Playlists Section */}
+                        {activeSection === 'playlists' && <PlaylistsSection />}
 
                         {/* Playback Section */}
                         {activeSection === 'playback' && <PlaybackSection />}

@@ -13,6 +13,7 @@ export function Login() {
     const [loadingCounts, setLoadingCounts] = useState(false);
     const [error, setError] = useState('');
     const [playlistName, setPlaylistName] = useState('');
+    const [playlistId, setPlaylistId] = useState<string | null>(null);
     const [counts, setCounts] = useState({ live: 0, vod: 0, series: 0 });
 
     const [formData, setFormData] = useState({
@@ -56,6 +57,7 @@ export function Login() {
             if (result.success) {
                 localStorage.setItem('includeTV', includeTV.toString());
                 localStorage.setItem('includeVOD', includeVOD.toString());
+                setPlaylistId(typeof result.playlistId === 'string' ? result.playlistId : null);
                 setStep('playlist-name');
             } else {
                 const errorMessage = result.error || t('login', 'unexpectedError');
@@ -91,9 +93,18 @@ export function Login() {
         }
     };
 
-    const handlePlaylistNameSubmit = (e: React.FormEvent) => {
+    const handlePlaylistNameSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        localStorage.setItem('playlistName', playlistName || 'Minha Playlist');
+        const name = playlistName || 'Minha Playlist';
+        localStorage.setItem('playlistName', name);
+        // Persist the display name on the playlist saved by auth:login
+        if (playlistId) {
+            try {
+                await window.ipcRenderer.invoke('playlists:rename', { id: playlistId, name });
+            } catch (err) {
+                console.error('Failed to rename playlist:', err);
+            }
+        }
         window.location.reload();
     };
 

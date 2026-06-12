@@ -241,6 +241,24 @@
     "subtitle": "Personaliza tu experiencia",
     "saved": "✓ Guardado"
   },
+  "playlists": {
+    "title": "Playlists",
+    "description": "Administra tus playlists Xtream guardadas y cambia entre proveedores",
+    "activeBadge": "Activa",
+    "empty": "No hay playlists guardadas",
+    "add": "Agregar playlist",
+    "addTitle": "Nueva playlist",
+    "namePlaceholder": "Nombre de la playlist (opcional)",
+    "addConfirm": "Agregar",
+    "adding": "Validando...",
+    "addError": "No se pudo agregar la playlist. Verifica los datos.",
+    "switch": "Cambiar",
+    "switching": "Cambiando...",
+    "switchError": "No se pudo conectar a esta playlist.",
+    "remove": "Eliminar",
+    "confirmRemove": "¿Confirmar?",
+    "removeError": "No se pudo eliminar la playlist."
+  },
   "updates": {
     "title": "Actualizaciones Automáticas",
     "description": "Mantén tu aplicación siempre actualizada",

@@ -202,6 +202,24 @@
     "subtitle": "Customize your experience",
     "saved": "✓ Saved"
   },
+  "playlists": {
+    "title": "Playlists",
+    "description": "Manage your saved Xtream playlists and switch between providers",
+    "activeBadge": "Active",
+    "empty": "No saved playlists",
+    "add": "Add playlist",
+    "addTitle": "New playlist",
+    "namePlaceholder": "Playlist name (optional)",
+    "addConfirm": "Add",
+    "adding": "Validating...",
+    "addError": "Could not add the playlist. Check the credentials.",
+    "switch": "Switch",
+    "switching": "Switching...",
+    "switchError": "Could not connect to this playlist.",
+    "remove": "Remove",
+    "confirmRemove": "Confirm?",
+    "removeError": "Could not remove the playlist."
+  },
   "notifications": {
     "title": "Notifications",
     "tooltip": "Notifications",
