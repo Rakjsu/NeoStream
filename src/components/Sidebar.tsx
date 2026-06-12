@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark, Home, Users, Heart, Check, Download, History, Search } from 'lucide-react';
+import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark, Home, Users, Heart, Check, Download, History, Search, CalendarRange } from 'lucide-react';
 import { GLOBAL_SEARCH_OPEN_EVENT } from './GlobalSearch';
 import { profileService } from '../services/profileService';
 import { useState, useEffect } from 'react';
@@ -90,6 +90,7 @@ export function Sidebar() {
     const menuItems = [
         { icon: Home, label: t('nav', 'home'), path: '/dashboard/home', emoji: '🏠', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)' },
         { icon: Tv, label: t('nav', 'liveTV'), path: '/dashboard/live', emoji: '📺', gradient: 'linear-gradient(135deg, #a855f7, #7c3aed)' },
+        { icon: CalendarRange, label: t('nav', 'guide'), path: '/dashboard/guide', emoji: '🗓️', gradient: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' },
         { icon: Film, label: t('nav', 'movies'), path: '/dashboard/vod', emoji: '🎬', gradient: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' },
         { icon: PlaySquare, label: t('nav', 'series'), path: '/dashboard/series', emoji: '📺', gradient: 'linear-gradient(135deg, #ec4899, #db2777)' },
         { icon: Bookmark, label: t('nav', 'myList'), path: '/dashboard/watch-later', emoji: '🔖', gradient: 'linear-gradient(135deg, #10b981, #059669)' },

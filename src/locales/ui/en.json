@@ -9,6 +9,7 @@
     "about": "About",
     "home": "Home",
     "liveTV": "Live TV",
+    "guide": "TV Guide",
     "movies": "Movies",
     "series": "Series",
     "myList": "My List",
@@ -586,6 +587,17 @@
     "emptyText": "Movies and episodes you watch will appear here",
     "exploreMovies": "Explore Movies",
     "exploreSeries": "Explore Series"
+  },
+  "guide": {
+    "title": "TV Guide",
+    "category": "Category",
+    "channels": "channels",
+    "channelsHeader": "Channels",
+    "loading": "Loading guide...",
+    "loadingEpg": "Loading...",
+    "noEpg": "No program data",
+    "noChannels": "No channels in this category",
+    "now": "Now"
   },
   "search": {
     "placeholder": "Search channels, movies and series...",
