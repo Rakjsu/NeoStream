@@ -8,6 +8,7 @@ import { epgService } from '../services/epgService';
 import { profileService } from '../services/profileService';
 import { parentalService } from '../services/parentalService';
 import { useLanguage } from '../services/languageService';
+import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
 
 interface LiveStream {
     num: number;
@@ -124,6 +125,22 @@ export function LiveTV() {
         return () => {
             window.removeEventListener('resize', calculateItemsPerPage);
         };
+    }, []);
+
+    // Global search term-bridge: consume (read + remove) the term stored by
+    // the Ctrl+K overlay, both on mount (cross-page navigation) and on the
+    // event (already on this page).
+    useEffect(() => {
+        const consumeGlobalSearchTerm = () => {
+            const term = sessionStorage.getItem(GLOBAL_SEARCH_TERM_KEY);
+            if (term !== null) {
+                sessionStorage.removeItem(GLOBAL_SEARCH_TERM_KEY);
+                setSearchQuery(term);
+            }
+        };
+        consumeGlobalSearchTerm();
+        window.addEventListener(GLOBAL_SEARCH_EVENT, consumeGlobalSearchTerm);
+        return () => window.removeEventListener(GLOBAL_SEARCH_EVENT, consumeGlobalSearchTerm);
     }, []);
 
     // Listen for mini player expand event to reopen full player
