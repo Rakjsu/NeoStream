@@ -247,15 +247,15 @@ const notificationStyles = `
     transform: translate(-50%, -50%);
     width: 90%;
     max-width: 420px;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    border: 1px solid rgba(168, 85, 247, 0.3);
+    background: linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-tint) 100%);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.3);
     border-radius: 24px;
     padding: 24px;
     z-index: 9999;
     box-shadow: 
         0 25px 50px -12px rgba(0, 0, 0, 0.5),
         0 0 0 1px rgba(255, 255, 255, 0.05),
-        0 0 60px rgba(168, 85, 247, 0.2);
+        0 0 60px rgba(var(--ns-accent-rgb), 0.2);
     animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
@@ -285,13 +285,13 @@ const notificationStyles = `
 .update-icon {
     width: 56px;
     height: 56px;
-    background: linear-gradient(135deg, #a855f7, #ec4899);
+    background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to));
     border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 28px;
-    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.4);
+    box-shadow: 0 8px 24px rgba(var(--ns-accent-rgb), 0.4);
 }
 
 .update-header h3 {
@@ -304,7 +304,7 @@ const notificationStyles = `
 .version-info {
     margin: 4px 0 0 0;
     font-size: 14px;
-    color: #a855f7;
+    color: var(--ns-accent);
     font-weight: 600;
 }
 
@@ -339,7 +339,7 @@ const notificationStyles = `
 
 .download-progress {
     padding: 16px;
-    background: rgba(168, 85, 247, 0.1);
+    background: rgba(var(--ns-accent-rgb), 0.1);
     border-radius: 12px;
 }
 
@@ -361,7 +361,7 @@ const notificationStyles = `
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #a855f7, #ec4899);
+    background: linear-gradient(90deg, var(--ns-accent), var(--ns-accent-grad-to));
     border-radius: 4px;
     transition: width 0.3s ease;
 }
@@ -421,7 +421,7 @@ const notificationStyles = `
     gap: 10px;
     width: 100%;
     padding: 14px 24px;
-    background: linear-gradient(135deg, #a855f7, #ec4899);
+    background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to));
     border: none;
     border-radius: 12px;
     color: white;
@@ -429,12 +429,12 @@ const notificationStyles = `
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s;
-    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.3);
+    box-shadow: 0 8px 24px rgba(var(--ns-accent-rgb), 0.3);
 }
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 32px rgba(168, 85, 247, 0.4);
+    box-shadow: 0 12px 32px rgba(var(--ns-accent-rgb), 0.4);
 }
 
 .btn-secondary {

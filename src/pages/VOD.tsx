@@ -495,7 +495,7 @@ export function VOD() {
                                                         <div style={{
                                                             width: `${progress}%`,
                                                             height: '100%',
-                                                            background: 'linear-gradient(90deg, #6366f1, #a855f7)'
+                                                            background: 'linear-gradient(90deg, var(--ns-accent-dark), var(--ns-accent))'
                                                         }} />
                                                     </div>
                                                 )}
@@ -601,7 +601,7 @@ const vodStyles = `
     position: relative;
     height: 100vh;
     overflow: hidden;
-    background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+    background: linear-gradient(135deg, var(--ns-bg-deep) 0%, var(--ns-bg-panel) 50%, var(--ns-bg-tint) 100%);
 }
 
 /* Dynamic Backdrop */
@@ -635,7 +635,7 @@ const vodStyles = `
     background: linear-gradient(135deg, rgba(15, 15, 26, 0.9) 0%, rgba(26, 26, 46, 0.85) 100%);
     backdrop-filter: blur(24px);
     border-radius: 24px;
-    border: 1px solid rgba(99, 102, 241, 0.2);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.2);
     padding: 32px;
     animation: slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4), 
@@ -675,7 +675,7 @@ const vodStyles = `
 }
 
 .badge.shimmer {
-    background: linear-gradient(90deg, rgba(99, 102, 241, 0.2), rgba(168, 85, 247, 0.2), rgba(99, 102, 241, 0.2));
+    background: linear-gradient(90deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.2), rgba(var(--ns-accent-rgb), 0.2));
     background-size: 200% 100%;
     animation: shimmerBadge 1.5s ease infinite;
     color: rgba(255, 255, 255, 0.6);
@@ -762,8 +762,8 @@ const vodStyles = `
 }
 
 .genre-tag:hover {
-    background: rgba(99, 102, 241, 0.2);
-    border-color: rgba(99, 102, 241, 0.4);
+    background: rgba(var(--ns-accent-rgb), 0.2);
+    border-color: rgba(var(--ns-accent-rgb), 0.4);
 }
 
 /* Overview */
@@ -805,14 +805,14 @@ const vodStyles = `
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    background: linear-gradient(135deg, var(--ns-accent-dark) 0%, var(--ns-accent) 100%);
     color: white;
-    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+    box-shadow: 0 8px 24px rgba(var(--ns-accent-rgb), 0.4);
 }
 
 .btn-primary:hover {
     transform: translateY(-3px) scale(1.02);
-    box-shadow: 0 12px 32px rgba(99, 102, 241, 0.5);
+    box-shadow: 0 12px 32px rgba(var(--ns-accent-rgb), 0.5);
 }
 
 .btn-primary:active {
@@ -895,7 +895,7 @@ const vodStyles = `
     overflow-x: hidden;
     padding-right: 8px;
     scrollbar-width: thin;
-    scrollbar-color: rgba(99, 102, 241, 0.4) transparent;
+    scrollbar-color: rgba(var(--ns-accent-rgb), 0.4) transparent;
 }
 
 .movies-scroll-container::-webkit-scrollbar {
@@ -907,7 +907,7 @@ const vodStyles = `
 }
 
 .movies-scroll-container::-webkit-scrollbar-thumb {
-    background: linear-gradient(180deg, #6366f1, #a855f7);
+    background: linear-gradient(180deg, var(--ns-accent-dark), var(--ns-accent));
     border-radius: 3px;
 }
 
@@ -959,14 +959,14 @@ const vodStyles = `
 
 .movie-card:hover {
     transform: translateY(-8px) scale(1.03);
-    border-color: rgba(99, 102, 241, 0.4);
+    border-color: rgba(var(--ns-accent-rgb), 0.4);
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4),
-                0 0 40px rgba(99, 102, 241, 0.15);
+                0 0 40px rgba(var(--ns-accent-rgb), 0.15);
 }
 
 .movie-card.selected {
-    border-color: #6366f1;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3),
+    border-color: var(--ns-accent);
+    box-shadow: 0 0 0 3px rgba(var(--ns-accent-rgb), 0.3),
                 0 20px 40px rgba(0, 0, 0, 0.4);
 }
 
@@ -975,7 +975,7 @@ const vodStyles = `
     position: relative;
     aspect-ratio: 2 / 3;
     overflow: hidden;
-    background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%);
+    background: linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-deep) 100%);
 }
 
 .card-poster img {
@@ -995,7 +995,7 @@ const vodStyles = `
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #1e1e3f 0%, #0f0f1a 100%);
+    background: linear-gradient(135deg, #1e1e3f 0%, var(--ns-bg-deep) 100%);
     font-size: 48px;
 }
 
@@ -1023,7 +1023,7 @@ const vodStyles = `
 .play-icon {
     width: 60px;
     height: 60px;
-    background: rgba(99, 102, 241, 0.9);
+    background: rgba(var(--ns-accent-rgb), 0.9);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -1032,7 +1032,7 @@ const vodStyles = `
     color: white;
     transform: scale(0);
     transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.5);
+    box-shadow: 0 8px 24px rgba(var(--ns-accent-rgb), 0.5);
 }
 
 .movie-card:hover .play-icon {
@@ -1090,7 +1090,7 @@ const vodStyles = `
 
 .card-progress-bar {
     height: 100%;
-    background: linear-gradient(90deg, #6366f1, #a855f7);
+    background: linear-gradient(90deg, var(--ns-accent-dark), var(--ns-accent));
     transition: width 0.3s ease;
 }
 
@@ -1189,13 +1189,13 @@ const vodStyles = `
 
 .skeleton-poster {
     aspect-ratio: 2 / 3;
-    background: linear-gradient(135deg, #2a2a4a 0%, #1a1a2e 100%);
+    background: linear-gradient(135deg, #2a2a4a 0%, var(--ns-bg-panel) 100%);
     border-radius: 16px 16px 0 0;
 }
 
 .skeleton-title {
     height: 50px;
-    background: linear-gradient(135deg, #1a1a2e 0%, #2a2a4a 100%);
+    background: linear-gradient(135deg, var(--ns-bg-panel) 0%, #2a2a4a 100%);
     border-radius: 0 0 16px 16px;
 }
 

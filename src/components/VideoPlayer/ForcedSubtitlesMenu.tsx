@@ -20,7 +20,7 @@ export function ForcedSubtitlesMenu({
                 className="control-btn"
                 onClick={() => setShowSettingsMenu(!showSettingsMenu)}
                 title={t('player', 'forcedSubtitles')}
-                style={{ color: showSettingsMenu ? '#a855f7' : (!forcedEnabledForSession ? 'rgba(255,255,255,0.4)' : 'white') }}
+                style={{ color: showSettingsMenu ? 'var(--ns-accent)' : (!forcedEnabledForSession ? 'rgba(255,255,255,0.4)' : 'white') }}
             >
                 <span style={{ fontSize: 14, fontWeight: 600 }}>F</span>
             </button>
@@ -76,7 +76,7 @@ export function ForcedSubtitlesMenu({
                                 width: 36,
                                 height: 20,
                                 borderRadius: 10,
-                                background: forcedEnabledForSession ? 'linear-gradient(135deg, #a855f7, #ec4899)' : 'rgba(255, 255, 255, 0.2)',
+                                background: forcedEnabledForSession ? 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to))' : 'rgba(255, 255, 255, 0.2)',
                                 position: 'relative',
                                 transition: 'background 0.3s'
                             }}

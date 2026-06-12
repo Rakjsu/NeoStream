@@ -79,7 +79,7 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
         switch (type) {
             case 'new_season':
             case 'new_episodes':
-                return <Tv size={16} color="#a855f7" />;
+                return <Tv size={16} color="var(--ns-accent)" />;
             case 'download_complete':
                 return <Download size={16} color="#10b981" />;
             case 'download_failed':
@@ -104,7 +104,7 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
             case 'download_started':
                 return { bg: 'rgba(59, 130, 246, 0.3)', text: '#93c5fd' };
             default:
-                return { bg: 'rgba(168, 85, 247, 0.3)', text: '#c4b5fd' };
+                return { bg: 'rgba(var(--ns-accent-rgb), 0.3)', text: 'var(--ns-accent-light)' };
         }
     };
 
@@ -210,10 +210,10 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
                             minWidth: 380,
                             minHeight: 200,
                             maxHeight: 520,
-                            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                            background: 'linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-tint) 100%)',
                             borderRadius: 16,
                             boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
-                            border: '1px solid rgba(168, 85, 247, 0.3)',
+                            border: '1px solid rgba(var(--ns-accent-rgb), 0.3)',
                             overflow: 'hidden',
                             zIndex: 999,
                             animation: 'slideIn 0.2s ease'
@@ -240,7 +240,7 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
                                 transition: all 0.2s ease;
                             }
                             .notif-action-btn:hover {
-                                background: rgba(168, 85, 247, 0.3);
+                                background: rgba(var(--ns-accent-rgb), 0.3);
                                 transform: scale(1.1);
                             }
                             .notif-action-btn:active {
@@ -257,7 +257,7 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
                                 transition: all 0.2s ease;
                             }
                             .notif-header-btn:hover {
-                                background: rgba(168, 85, 247, 0.3);
+                                background: rgba(var(--ns-accent-rgb), 0.3);
                                 transform: scale(1.1);
                             }
                             .notif-header-btn:active {
@@ -274,14 +274,14 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
                             justifyContent: 'space-between'
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <Bell size={18} color="#a855f7" />
+                                <Bell size={18} color="var(--ns-accent)" />
                                 <span style={{ color: 'white', fontWeight: 600, fontSize: 15 }}>
                                     {t('notifications', 'title')}
                                 </span>
                                 {unreadCount > 0 && (
                                     <span style={{
-                                        background: 'rgba(168, 85, 247, 0.3)',
-                                        color: '#c4b5fd',
+                                        background: 'rgba(var(--ns-accent-rgb), 0.3)',
+                                        color: 'var(--ns-accent-light)',
                                         fontSize: 11,
                                         fontWeight: 600,
                                         padding: '2px 8px',
@@ -345,13 +345,13 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
                                                 gap: 12,
                                                 padding: '12px 16px',
                                                 borderBottom: '1px solid rgba(255,255,255,0.05)',
-                                                background: notification.read ? 'transparent' : 'rgba(168, 85, 247, 0.08)',
+                                                background: notification.read ? 'transparent' : 'rgba(var(--ns-accent-rgb), 0.08)',
                                                 cursor: 'pointer',
                                                 transition: 'background 0.2s'
                                             }}
                                             onClick={() => handleNotificationClick(notification)}
                                             onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
-                                            onMouseLeave={e => e.currentTarget.style.background = notification.read ? 'transparent' : 'rgba(168, 85, 247, 0.08)'}
+                                            onMouseLeave={e => e.currentTarget.style.background = notification.read ? 'transparent' : 'rgba(var(--ns-accent-rgb), 0.08)'}
                                         >
                                             {/* Icon or Poster */}
                                             <div style={{

@@ -102,8 +102,8 @@ export function AboutSection() {
                         width: '100%',
                         maxHeight: '80vh',
                         overflow: 'auto',
-                        border: '1px solid rgba(168, 85, 247, 0.3)',
-                        boxShadow: '0 25px 80px rgba(0, 0, 0, 0.5), 0 0 40px rgba(168, 85, 247, 0.1)',
+                        border: '1px solid rgba(var(--ns-accent-rgb), 0.3)',
+                        boxShadow: '0 25px 80px rgba(0, 0, 0, 0.5), 0 0 40px rgba(var(--ns-accent-rgb), 0.1)',
                         animation: 'modalSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -118,7 +118,7 @@ export function AboutSection() {
                             }}>
                                 <span style={{ fontSize: '32px', animation: 'iconPulse 2s ease infinite' }}>📄</span>
                                 <span style={{
-                                    background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)',
+                                    background: 'linear-gradient(135deg, var(--ns-accent) 0%, var(--ns-accent-grad-to) 100%)',
                                     WebkitBackgroundClip: 'text',
                                     WebkitTextFillColor: 'transparent',
                                     backgroundClip: 'text'
@@ -127,22 +127,22 @@ export function AboutSection() {
                             <button
                                 onClick={() => setShowTermsModal(false)}
                                 style={{
-                                    background: 'rgba(168, 85, 247, 0.15)',
-                                    border: '1px solid rgba(168, 85, 247, 0.3)',
+                                    background: 'rgba(var(--ns-accent-rgb), 0.15)',
+                                    border: '1px solid rgba(var(--ns-accent-rgb), 0.3)',
                                     borderRadius: '12px',
                                     padding: '10px 16px',
-                                    color: '#a855f7',
+                                    color: 'var(--ns-accent)',
                                     cursor: 'pointer',
                                     fontSize: '14px',
                                     fontWeight: 600,
                                     transition: 'all 0.2s ease'
                                 }}
                                 onMouseEnter={(e) => {
-                                    e.currentTarget.style.background = 'rgba(168, 85, 247, 0.25)';
+                                    e.currentTarget.style.background = 'rgba(var(--ns-accent-rgb), 0.25)';
                                     e.currentTarget.style.transform = 'scale(1.05)';
                                 }}
                                 onMouseLeave={(e) => {
-                                    e.currentTarget.style.background = 'rgba(168, 85, 247, 0.15)';
+                                    e.currentTarget.style.background = 'rgba(var(--ns-accent-rgb), 0.15)';
                                     e.currentTarget.style.transform = 'scale(1)';
                                 }}
                             >
@@ -150,17 +150,17 @@ export function AboutSection() {
                             </button>
                         </div>
                         <div style={{ color: '#9ca3af', fontSize: '14px', lineHeight: 1.8, animation: 'fadeInUp 0.5s ease 0.2s both' }}>
-                            <p style={{ marginBottom: '16px', padding: '12px 16px', background: 'rgba(168, 85, 247, 0.1)', borderRadius: '12px', border: '1px solid rgba(168, 85, 247, 0.2)' }}>
-                                <strong style={{ color: '#a855f7' }}>📅 Última atualização:</strong> <span style={{ color: 'white' }}>09 de Dezembro de 2025</span>
+                            <p style={{ marginBottom: '16px', padding: '12px 16px', background: 'rgba(var(--ns-accent-rgb), 0.1)', borderRadius: '12px', border: '1px solid rgba(var(--ns-accent-rgb), 0.2)' }}>
+                                <strong style={{ color: 'var(--ns-accent)' }}>📅 Última atualização:</strong> <span style={{ color: 'white' }}>09 de Dezembro de 2025</span>
                             </p>
 
-                            <h3 style={{ color: '#a855f7', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>1. Aceitação dos Termos</h3>
+                            <h3 style={{ color: 'var(--ns-accent)', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>1. Aceitação dos Termos</h3>
                             <p>Ao utilizar o NeoStream, você concorda com estes Termos de Uso. O aplicativo é destinado exclusivamente para uso pessoal e não comercial.</p>
 
-                            <h3 style={{ color: '#a855f7', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>2. Descrição do Serviço</h3>
+                            <h3 style={{ color: 'var(--ns-accent)', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>2. Descrição do Serviço</h3>
                             <p>O NeoStream é um player de mídia que permite visualizar conteúdo IPTV através de listas M3U fornecidas pelo usuário. Não fornecemos, hospedamos ou distribuímos qualquer conteúdo de mídia.</p>
 
-                            <h3 style={{ color: '#a855f7', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>3. Responsabilidade do Usuário</h3>
+                            <h3 style={{ color: 'var(--ns-accent)', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>3. Responsabilidade do Usuário</h3>
                             <p>Você é responsável por:</p>
                             <ul style={{ marginLeft: '20px', marginTop: '8px' }}>
                                 <li>Garantir que possui direitos legais sobre o conteúdo acessado</li>
@@ -169,10 +169,10 @@ export function AboutSection() {
                                 <li>Usar o aplicativo de forma ética e responsável</li>
                             </ul>
 
-                            <h3 style={{ color: '#a855f7', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>4. Uso do Controle Parental</h3>
+                            <h3 style={{ color: 'var(--ns-accent)', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>4. Uso do Controle Parental</h3>
                             <p>O recurso de controle parental é fornecido como ferramenta auxiliar. Os pais/responsáveis devem supervisionar o uso do aplicativo por menores.</p>
 
-                            <h3 style={{ color: '#a855f7', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>5. Limitação de Responsabilidade</h3>
+                            <h3 style={{ color: 'var(--ns-accent)', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>5. Limitação de Responsabilidade</h3>
                             <p>O NeoStream é fornecido "como está", sem garantias. Não nos responsabilizamos por:</p>
                             <ul style={{ marginLeft: '20px', marginTop: '8px' }}>
                                 <li>Conteúdo de terceiros acessado através do aplicativo</li>
@@ -180,7 +180,7 @@ export function AboutSection() {
                                 <li>Perdas de dados ou problemas técnicos</li>
                             </ul>
 
-                            <h3 style={{ color: '#a855f7', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>6. Modificações</h3>
+                            <h3 style={{ color: 'var(--ns-accent)', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>6. Modificações</h3>
                             <p>Reservamo-nos o direito de modificar estes termos a qualquer momento. Alterações significativas serão comunicadas através do aplicativo.</p>
                         </div>
                     </div>

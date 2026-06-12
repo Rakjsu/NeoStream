@@ -430,7 +430,7 @@ export function PipWindow() {
                 overflow: 'hidden',
                 position: 'relative',
                 boxShadow: '0 10px 40px rgba(0, 0, 0, 0.6)',
-                border: '1px solid rgba(139, 92, 246, 0.4)',
+                border: '1px solid rgba(var(--ns-accent-rgb), 0.4)',
             }}
             onMouseMove={resetHideTimeout}
             onMouseEnter={() => setShowControls(true)}
@@ -532,7 +532,7 @@ export function PipWindow() {
                     onClick={handleTogglePlay}
                     className="pip-btn pip-btn-play"
                     style={{
-                        background: 'rgba(139, 92, 246, 0.8)',
+                        background: 'rgba(var(--ns-accent-rgb), 0.8)',
                         border: 'none',
                         borderRadius: 6,
                         padding: 8,
@@ -563,7 +563,7 @@ export function PipWindow() {
                     <div style={{
                         width: `${(currentTime / duration) * 100 || 0}%`,
                         height: '100%',
-                        background: 'linear-gradient(90deg, #8b5cf6, #a855f7)',
+                        background: 'linear-gradient(90deg, var(--ns-accent), var(--ns-accent))',
                         borderRadius: 2
                     }} />
                 </div>
@@ -622,7 +622,7 @@ export function PipWindow() {
                                 width: 55,
                                 height: 4,
                                 cursor: 'pointer',
-                                accentColor: '#8b5cf6'
+                                accentColor: 'var(--ns-accent)'
                             }}
                         />
                     </div>
@@ -634,8 +634,8 @@ export function PipWindow() {
                     className="pip-btn"
                     title={clickThrough ? 'Click-Through: ON (F9)' : 'Click-Through: OFF (F9)'}
                     style={{
-                        background: clickThrough ? 'rgba(139, 92, 246, 0.8)' : 'transparent',
-                        border: clickThrough ? '1px solid #8b5cf6' : '1px solid rgba(255,255,255,0.3)',
+                        background: clickThrough ? 'rgba(var(--ns-accent-rgb), 0.8)' : 'transparent',
+                        border: clickThrough ? '1px solid var(--ns-accent)' : '1px solid rgba(255,255,255,0.3)',
                         padding: '2px 6px',
                         cursor: 'pointer',
                         borderRadius: 4,
@@ -663,7 +663,7 @@ export function PipWindow() {
                         width: 24,
                         height: 24,
                         border: '2px solid rgba(255,255,255,0.3)',
-                        borderTopColor: '#8b5cf6',
+                        borderTopColor: 'var(--ns-accent)',
                         borderRadius: '50%',
                         animation: 'spin 1s linear infinite'
                     }} />
@@ -691,7 +691,7 @@ export function PipWindow() {
                     background: rgba(255,255,255,0.35) !important;
                 }
                 .pip-btn-play:hover {
-                    background: rgba(139, 92, 246, 1) !important;
+                    background: rgba(var(--ns-accent-rgb), 1) !important;
                 }
                 .pip-title-bar {
                     -webkit-app-region: drag;

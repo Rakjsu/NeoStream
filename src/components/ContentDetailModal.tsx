@@ -365,13 +365,13 @@ export function ContentDetailModal({
                     width: '90%',
                     maxWidth: 900,
                     maxHeight: '90vh',
-                    background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                    background: 'linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-tint) 100%)',
                     borderRadius: 20,
                     overflow: 'hidden',
                     display: 'flex',
                     flexDirection: 'row',
                     boxShadow: '0 25px 80px rgba(0, 0, 0, 0.6)',
-                    border: '1px solid rgba(168, 85, 247, 0.3)',
+                    border: '1px solid rgba(var(--ns-accent-rgb), 0.3)',
                     animation: 'slideUp 0.3s ease'
                 }}
             >
@@ -421,7 +421,7 @@ export function ContentDetailModal({
                     <div style={{
                         position: 'absolute',
                         inset: 0,
-                        background: 'linear-gradient(90deg, transparent 60%, rgba(26, 26, 46, 1) 100%)'
+                        background: 'linear-gradient(90deg, transparent 60%, var(--ns-bg-panel) 100%)'
                     }} />
                 </div>
 
@@ -550,10 +550,10 @@ export function ContentDetailModal({
                                             padding: '8px 16px',
                                             borderRadius: 20,
                                             border: selectedSeason === Number(season)
-                                                ? '2px solid #a855f7'
+                                                ? '2px solid var(--ns-accent)'
                                                 : '2px solid rgba(255, 255, 255, 0.1)',
                                             background: selectedSeason === Number(season)
-                                                ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(236, 72, 153, 0.2))'
+                                                ? 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.3), rgba(var(--ns-accent-grad-to-rgb), 0.2))'
                                                 : 'rgba(255, 255, 255, 0.05)',
                                             color: 'white',
                                             fontSize: 13,
@@ -593,9 +593,9 @@ export function ContentDetailModal({
                                                 borderRadius: 10,
                                                 cursor: 'pointer',
                                                 background: isSelected
-                                                    ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.15))'
+                                                    ? 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.15))'
                                                     : 'transparent',
-                                                border: isSelected ? '1px solid rgba(168, 85, 247, 0.4)' : '1px solid transparent',
+                                                border: isSelected ? '1px solid rgba(var(--ns-accent-rgb), 0.4)' : '1px solid transparent',
                                                 opacity: isWatched ? 0.6 : 1,
                                                 transition: 'all 0.2s'
                                             }}
@@ -606,7 +606,7 @@ export function ContentDetailModal({
                                                 borderRadius: 8,
                                                 background: isWatched
                                                     ? 'linear-gradient(135deg, #10b981, #059669)'
-                                                    : 'rgba(168, 85, 247, 0.3)',
+                                                    : 'rgba(var(--ns-accent-rgb), 0.3)',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
@@ -631,7 +631,7 @@ export function ContentDetailModal({
                                                     width: 24,
                                                     height: 24,
                                                     borderRadius: '50%',
-                                                    background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                                                    background: 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to))',
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
@@ -676,8 +676,8 @@ export function ContentDetailModal({
                                 style={{
                                     padding: '8px 20px',
                                     borderRadius: 8,
-                                    border: '1px solid rgba(139, 92, 246, 0.6)',
-                                    background: 'rgba(139, 92, 246, 0.25)',
+                                    border: '1px solid rgba(var(--ns-accent-rgb), 0.6)',
+                                    background: 'rgba(var(--ns-accent-rgb), 0.25)',
                                     color: 'white',
                                     cursor: 'pointer',
                                     fontWeight: 600
@@ -718,7 +718,7 @@ export function ContentDetailModal({
                                 background: (contentType === 'movie' && downloadService.isDownloaded(contentData.name, 'movie')) ||
                                     (contentType === 'series' && downloadService.getOfflineEpisodePath(contentData.name, selectedSeason, selectedEpisode))
                                     ? 'linear-gradient(135deg, #06b6d4, #0891b2)'
-                                    : 'linear-gradient(135deg, #a855f7, #ec4899)',
+                                    : 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to))',
                                 color: 'white',
                                 fontSize: 15,
                                 fontWeight: 600,
@@ -730,7 +730,7 @@ export function ContentDetailModal({
                                 boxShadow: (contentType === 'movie' && downloadService.isDownloaded(contentData.name, 'movie')) ||
                                     (contentType === 'series' && downloadService.getOfflineEpisodePath(contentData.name, selectedSeason, selectedEpisode))
                                     ? '0 8px 24px rgba(6, 182, 212, 0.4)'
-                                    : '0 8px 24px rgba(168, 85, 247, 0.4)',
+                                    : '0 8px 24px rgba(var(--ns-accent-rgb), 0.4)',
                                 transition: 'all 0.3s'
                             }}
                             onMouseEnter={e => {
@@ -996,12 +996,12 @@ export function ContentDetailModal({
                 >
                     <div
                         style={{
-                            background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                            background: 'linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-tint) 100%)',
                             borderRadius: 20,
                             padding: 32,
                             maxWidth: 400,
                             textAlign: 'center',
-                            border: '1px solid rgba(168, 85, 247, 0.3)'
+                            border: '1px solid rgba(var(--ns-accent-rgb), 0.3)'
                         }}
                         onClick={e => e.stopPropagation()}
                     >
@@ -1069,9 +1069,9 @@ export function ContentDetailModal({
                                 <div style={{
                                     padding: '14px 24px',
                                     borderRadius: 12,
-                                    background: 'rgba(168, 85, 247, 0.2)',
-                                    border: '2px solid rgba(168, 85, 247, 0.4)',
-                                    color: '#c4b5fd',
+                                    background: 'rgba(var(--ns-accent-rgb), 0.2)',
+                                    border: '2px solid rgba(var(--ns-accent-rgb), 0.4)',
+                                    color: 'var(--ns-accent-light)',
                                     fontSize: 14,
                                     fontWeight: 600,
                                     textAlign: 'center'
@@ -1085,7 +1085,7 @@ export function ContentDetailModal({
                                         padding: '14px 24px',
                                         borderRadius: 12,
                                         border: 'none',
-                                        background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                                        background: 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to))',
                                         color: 'white',
                                         fontSize: 14,
                                         fontWeight: 600,

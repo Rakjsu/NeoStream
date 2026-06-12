@@ -295,11 +295,11 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                 @keyframes borderGlow {
                     0%, 100% { 
                         background-position: 0% 50%;
-                        box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+                        box-shadow: 0 0 20px rgba(var(--ns-accent-rgb), 0.3);
                     }
                     50% { 
                         background-position: 100% 50%;
-                        box-shadow: 0 0 30px rgba(168, 85, 247, 0.4);
+                        box-shadow: 0 0 30px rgba(var(--ns-accent-rgb), 0.4);
                     }
                 }
                 
@@ -355,7 +355,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                     inset: 0;
                     border-radius: 14px;
                     padding: 2px;
-                    background: linear-gradient(135deg, #6366f1, #a855f7, #ec4899, #6366f1);
+                    background: linear-gradient(135deg, var(--ns-accent-dark), var(--ns-accent), var(--ns-accent-grad-to), var(--ns-accent-dark));
                     background-size: 300% 300%;
                     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
                     mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -372,7 +372,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                 
                 .category-item:hover {
                     transform: translateX(8px) scale(1.02);
-                    background: rgba(99, 102, 241, 0.1) !important;
+                    background: rgba(var(--ns-accent-rgb), 0.1) !important;
                 }
                 
                 .category-item.selected {
@@ -390,7 +390,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                 }
                 
                 .category-scroll::-webkit-scrollbar-thumb {
-                    background: linear-gradient(180deg, #6366f1, #a855f7);
+                    background: linear-gradient(180deg, var(--ns-accent-dark), var(--ns-accent));
                     border-radius: 4px;
                     border: 2px solid transparent;
                     background-clip: content-box;
@@ -408,7 +408,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                 
                 .toggle-btn:hover {
                     transform: scale(1.15);
-                    filter: drop-shadow(0 0 12px rgba(99, 102, 241, 0.6));
+                    filter: drop-shadow(0 0 12px rgba(var(--ns-accent-rgb), 0.6));
                 }
                 
                 .toggle-btn:active {
@@ -428,7 +428,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                     width: '48px',
                     height: '48px',
                     background: isOpen
-                        ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(168, 85, 247, 0.3) 100%)'
+                        ? 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.3) 0%, rgba(var(--ns-accent-grad-to-rgb), 0.3) 100%)'
                         : 'transparent',
                     border: 'none',
                     borderRadius: '12px',
@@ -446,7 +446,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                     style={{
                         width: '22px',
                         height: '2.5px',
-                        background: 'linear-gradient(90deg, #6366f1, #a855f7)',
+                        background: 'linear-gradient(90deg, var(--ns-accent-dark), var(--ns-accent))',
                         borderRadius: '2px',
                         display: 'block'
                     }}
@@ -456,7 +456,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                     style={{
                         width: '22px',
                         height: '2.5px',
-                        background: 'linear-gradient(90deg, #a855f7, #ec4899)',
+                        background: 'linear-gradient(90deg, var(--ns-accent), var(--ns-accent-grad-to))',
                         borderRadius: '2px',
                         display: 'block'
                     }}
@@ -466,7 +466,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                     style={{
                         width: '22px',
                         height: '2.5px',
-                        background: 'linear-gradient(90deg, #ec4899, #6366f1)',
+                        background: 'linear-gradient(90deg, var(--ns-accent-grad-to), var(--ns-accent-dark))',
                         borderRadius: '2px',
                         display: 'block'
                     }}
@@ -503,14 +503,14 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                     flexDirection: 'column',
                     backdropFilter: 'blur(24px)',
                     borderRight: '2px solid',
-                    borderImage: 'linear-gradient(180deg, rgba(99, 102, 241, 0.5), rgba(168, 85, 247, 0.5), rgba(236, 72, 153, 0.3)) 1',
-                    boxShadow: '8px 0 40px rgba(0, 0, 0, 0.5), 0 0 100px rgba(99, 102, 241, 0.15)'
+                    borderImage: 'linear-gradient(180deg, rgba(var(--ns-accent-rgb), 0.5), rgba(var(--ns-accent-rgb), 0.5), rgba(var(--ns-accent-grad-to-rgb), 0.3)) 1',
+                    boxShadow: '8px 0 40px rgba(0, 0, 0, 0.5), 0 0 100px rgba(var(--ns-accent-rgb), 0.15)'
                 }}
             >
                 {/* Header with gradient */}
                 <div style={{
                     padding: '32px 24px',
-                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 100%)',
+                    background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(var(--ns-accent-rgb), 0.15) 100%)',
                     borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
                     position: 'relative',
                     overflow: 'hidden'
@@ -567,7 +567,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                     <div style={{ position: 'relative', zIndex: 1 }}>
                         <h2 style={{
                             margin: 0,
-                            background: 'linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%)',
+                            background: 'linear-gradient(135deg, #60a5fa 0%, var(--ns-accent-light) 100%)',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
                             fontSize: '28px',
@@ -596,7 +596,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                         overflowY: 'auto',
                         padding: '16px',
                         scrollbarWidth: 'thin',
-                        scrollbarColor: 'rgba(99, 102, 241, 0.5) transparent'
+                        scrollbarColor: 'rgba(var(--ns-accent-rgb), 0.5) transparent'
                     }}
                 >
                     {loading && (

@@ -60,14 +60,14 @@ export function AnimatedSearchBar({ value, onChange, placeholder = "Buscar..." }
             <style>{`
                 @keyframes pulseGlow {
                     0%, 100% { 
-                        box-shadow: 0 0 20px rgba(99, 102, 241, 0.4), 
-                                    0 0 40px rgba(99, 102, 241, 0.2),
-                                    inset 0 0 20px rgba(99, 102, 241, 0.1);
+                        box-shadow: 0 0 20px rgba(var(--ns-accent-rgb), 0.4), 
+                                    0 0 40px rgba(var(--ns-accent-rgb), 0.2),
+                                    inset 0 0 20px rgba(var(--ns-accent-rgb), 0.1);
                     }
                     50% { 
-                        box-shadow: 0 0 30px rgba(99, 102, 241, 0.6), 
-                                    0 0 60px rgba(99, 102, 241, 0.3),
-                                    inset 0 0 30px rgba(99, 102, 241, 0.15);
+                        box-shadow: 0 0 30px rgba(var(--ns-accent-rgb), 0.6), 
+                                    0 0 60px rgba(var(--ns-accent-rgb), 0.3),
+                                    inset 0 0 30px rgba(var(--ns-accent-rgb), 0.15);
                     }
                 }
                 
@@ -116,7 +116,7 @@ export function AnimatedSearchBar({ value, onChange, placeholder = "Buscar..." }
                     inset: 0;
                     border-radius: 50px;
                     padding: 2px;
-                    background: linear-gradient(135deg, #6366f1, #8b5cf6, #a855f7, #6366f1);
+                    background: linear-gradient(135deg, var(--ns-accent-dark), var(--ns-accent), var(--ns-accent-grad-to), var(--ns-accent-dark));
                     background-size: 300% 300%;
                     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
                     mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -136,7 +136,7 @@ export function AnimatedSearchBar({ value, onChange, placeholder = "Buscar..." }
                     color: white;
                     font-size: 15px;
                     font-weight: 500;
-                    border: 1px solid rgba(99, 102, 241, 0.3);
+                    border: 1px solid rgba(var(--ns-accent-rgb), 0.3);
                     border-radius: 50px;
                     outline: none;
                     backdrop-filter: blur(20px);
@@ -150,21 +150,21 @@ export function AnimatedSearchBar({ value, onChange, placeholder = "Buscar..." }
                 }
                 
                 .search-input:focus {
-                    border-color: rgba(99, 102, 241, 0.6);
+                    border-color: rgba(var(--ns-accent-rgb), 0.6);
                 }
                 
                 .search-btn {
                     width: 52px;
                     height: 52px;
-                    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+                    background: linear-gradient(135deg, var(--ns-accent-dark) 0%, var(--ns-accent) 50%, var(--ns-accent-grad-to) 100%);
                     border: none;
                     border-radius: 50%;
                     cursor: pointer;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4),
-                                0 0 40px rgba(99, 102, 241, 0.2);
+                    box-shadow: 0 4px 20px rgba(var(--ns-accent-rgb), 0.4),
+                                0 0 40px rgba(var(--ns-accent-rgb), 0.2);
                     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
                     position: relative;
                     z-index: 10;
@@ -173,8 +173,8 @@ export function AnimatedSearchBar({ value, onChange, placeholder = "Buscar..." }
                 
                 .search-btn:hover {
                     transform: scale(1.1);
-                    box-shadow: 0 6px 30px rgba(99, 102, 241, 0.5),
-                                0 0 60px rgba(99, 102, 241, 0.3);
+                    box-shadow: 0 6px 30px rgba(var(--ns-accent-rgb), 0.5),
+                                0 0 60px rgba(var(--ns-accent-rgb), 0.3);
                 }
                 
                 .search-btn:active {

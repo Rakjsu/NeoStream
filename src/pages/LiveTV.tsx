@@ -475,7 +475,7 @@ export function LiveTV() {
                 <div style={{
                     position: 'fixed',
                     inset: 0,
-                    background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)',
+                    background: 'linear-gradient(135deg, var(--ns-bg-deep) 0%, var(--ns-bg-panel) 50%, var(--ns-bg-tint) 100%)',
                     zIndex: 0
                 }} />
                 <div style={{
@@ -483,7 +483,7 @@ export function LiveTV() {
                     inset: 0,
                     background: `
                         radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
-                        radial-gradient(ellipse at 80% 80%, rgba(147, 51, 234, 0.1) 0%, transparent 50%)
+                        radial-gradient(ellipse at 80% 80%, rgba(var(--ns-accent-rgb), 0.1) 0%, transparent 50%)
                     `,
                     pointerEvents: 'none',
                     zIndex: 0
@@ -539,7 +539,7 @@ export function LiveTV() {
                         width: '100px',
                         height: '100px',
                         borderRadius: '24px',
-                        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                        background: 'linear-gradient(135deg, #3b82f6 0%, var(--ns-accent) 100%)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -758,7 +758,7 @@ export function LiveTV() {
             <div style={{
                 position: 'fixed',
                 inset: 0,
-                background: 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)',
+                background: 'linear-gradient(135deg, var(--ns-bg-deep) 0%, var(--ns-bg-panel) 50%, var(--ns-bg-tint) 100%)',
                 zIndex: 0
             }} />
             <div style={{
@@ -766,7 +766,7 @@ export function LiveTV() {
                 inset: 0,
                 background: `
                     radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
-                    radial-gradient(ellipse at 80% 80%, rgba(147, 51, 234, 0.1) 0%, transparent 50%),
+                    radial-gradient(ellipse at 80% 80%, rgba(var(--ns-accent-rgb), 0.1) 0%, transparent 50%),
                     radial-gradient(ellipse at 50% 50%, rgba(59, 130, 246, 0.05) 0%, transparent 70%)
                 `,
                 pointerEvents: 'none',
@@ -1035,7 +1035,7 @@ export function LiveTV() {
                                     gap: '10px'
                                 }}>
                                     <span style={{
-                                        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                                        background: 'linear-gradient(135deg, #3b82f6 0%, var(--ns-accent) 100%)',
                                         padding: '8px',
                                         borderRadius: '10px',
                                         display: 'flex',
@@ -1050,7 +1050,7 @@ export function LiveTV() {
                                         <div style={{
                                             marginBottom: '20px',
                                             padding: 'clamp(14px, 2vw, 20px)',
-                                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.1) 100%)',
+                                            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(var(--ns-accent-rgb), 0.1) 100%)',
                                             borderRadius: '14px',
                                             border: '1px solid rgba(59, 130, 246, 0.25)',
                                             position: 'relative',
@@ -1093,7 +1093,7 @@ export function LiveTV() {
                                                 <div style={{
                                                     width: `${epgService.getProgramProgress(currentProgram)}%`,
                                                     height: '100%',
-                                                    background: 'linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%)',
+                                                    background: 'linear-gradient(90deg, #3b82f6 0%, var(--ns-accent) 100%)',
                                                     borderRadius: '3px',
                                                     transition: 'width 1s ease',
                                                     animation: 'progressGlow 2s ease-in-out infinite'
@@ -1144,7 +1144,7 @@ export function LiveTV() {
                     </div>
                 )}
 
-                <div ref={scrollContainerRef} className="livetv-scroll-container p-8" style={{ paddingLeft: '60px', position: 'relative', zIndex: 1, height: 'calc(100vh - 120px)', overflowY: 'auto', paddingRight: '8px', scrollbarWidth: 'thin', scrollbarColor: 'rgba(168, 85, 247, 0.4) transparent' }}>
+                <div ref={scrollContainerRef} className="livetv-scroll-container p-8" style={{ paddingLeft: '60px', position: 'relative', zIndex: 1, height: 'calc(100vh - 120px)', overflowY: 'auto', paddingRight: '8px', scrollbarWidth: 'thin', scrollbarColor: 'rgba(var(--ns-accent-rgb), 0.4) transparent' }}>
                     <style>{`
                         .channel-card {
                             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1188,7 +1188,7 @@ export function LiveTV() {
                             background: transparent;
                         }
                         .livetv-scroll-container::-webkit-scrollbar-thumb {
-                            background: linear-gradient(180deg, #a855f7, #ec4899);
+                            background: linear-gradient(180deg, var(--ns-accent), var(--ns-accent-grad-to));
                             border-radius: 3px;
                         }
                     `}</style>
@@ -1248,7 +1248,7 @@ export function LiveTV() {
                                                     <div style={{
                                                         width: '100%',
                                                         height: '100%',
-                                                        background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                                                        background: 'linear-gradient(135deg, #3b82f6 0%, var(--ns-accent) 100%)',
                                                         display: 'flex',
                                                         alignItems: 'center',
                                                         justifyContent: 'center',
@@ -1260,7 +1260,7 @@ export function LiveTV() {
                                             <div style={{
                                                 width: '100%',
                                                 height: '100%',
-                                                background: 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)',
+                                                background: 'linear-gradient(135deg, #3b82f6 0%, var(--ns-accent) 100%)',
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',

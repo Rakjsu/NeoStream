@@ -86,10 +86,10 @@ export function EpisodeToast({ onNavigateToSeries }: EpisodeToastProps) {
                         display: 'flex',
                         gap: 12,
                         padding: 16,
-                        background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)',
+                        background: 'linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-tint) 100%)',
                         borderRadius: 16,
-                        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(168, 85, 247, 0.2)',
-                        border: '1px solid rgba(168, 85, 247, 0.4)',
+                        boxShadow: '0 10px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(var(--ns-accent-rgb), 0.2)',
+                        border: '1px solid rgba(var(--ns-accent-rgb), 0.4)',
                         maxWidth: 380,
                         animation: 'slideInRight 0.3s ease',
                         pointerEvents: 'auto',
@@ -170,7 +170,7 @@ export function EpisodeToast({ onNavigateToSeries }: EpisodeToastProps) {
                             {toast.message}
                         </div>
                         <div style={{
-                            color: '#a855f7',
+                            color: 'var(--ns-accent)',
                             fontSize: 11,
                             marginTop: 6,
                             fontWeight: 500

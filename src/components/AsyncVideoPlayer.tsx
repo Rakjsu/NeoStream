@@ -217,8 +217,8 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
         }
 
         @keyframes loadingGlow {
-            0%, 100% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.3); }
-            50% { box-shadow: 0 0 40px rgba(168, 85, 247, 0.6), 0 0 60px rgba(236, 72, 153, 0.3); }
+            0%, 100% { box-shadow: 0 0 20px rgba(var(--ns-accent-rgb), 0.3); }
+            50% { box-shadow: 0 0 40px rgba(var(--ns-accent-rgb), 0.6), 0 0 60px rgba(var(--ns-accent-grad-to-rgb), 0.3); }
         }
 
         .player-backdrop {
@@ -255,7 +255,7 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
             width: 80px;
             height: 80px;
             border-radius: 50%;
-            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.2));
+            background: linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.2));
             display: flex;
             align-items: center;
             justify-content: center;
@@ -275,7 +275,7 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
             width: 10px;
             height: 10px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #a855f7, #ec4899);
+            background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to));
             animation: loadingDots 1.4s ease-in-out infinite;
         }
 
@@ -334,7 +334,7 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
 
         .error-btn {
             padding: 12px 24px;
-            background: linear-gradient(135deg, #a855f7, #ec4899);
+            background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to));
             border: none;
             border-radius: 8px;
             color: white;
