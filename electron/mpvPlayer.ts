@@ -8,15 +8,24 @@
  * surface exposed to the renderer.
  *
  * Channels:
- *   mpv:available  -> { path: string | null, configuredPath: string | null }
- *   mpv:play       -> { success, reason? }   ({ url, title?, start? })
+ *   mpv:available      -> { path: string | null, configuredPath: string | null }
+ *   mpv:play           -> { success, reason? }   ({ url, title?, start? })
  *   mpv:pause / mpv:resume / mpv:stop -> { success }
- *   mpv:seek       -> { success }            ({ seconds })
- *   mpv:status     -> MpvStatus snapshot (polled by the renderer)
- *   mpv:set-path   -> { path: string | null } (persists to electron-store)
+ *   mpv:seek           -> { success }            ({ seconds })
+ *   mpv:set-volume     -> { success }            ({ volume: 0..100 })
+ *   mpv:set-fullscreen -> { success }            ({ fullscreen: boolean })
+ *   mpv:status         -> MpvStatus snapshot (polled by the renderer)
+ *   mpv:set-path       -> { path: string | null } (persists to electron-store)
+ *
+ * Phase 2 pseudo-embedding: mpv is spawned borderless/ontop with --geometry
+ * matching the caller window's client area minus the bottom controls strip
+ * (see buildMpvArgs in mpvProtocol.ts for the design discussion). While a
+ * session is active the main process listens to the app window's
+ * move/resize/minimize/restore/show/hide events and mirrors them onto mpv
+ * via the `geometry` and `window-minimized` properties.
  */
 
-import { app, ipcMain } from 'electron'
+import { app, ipcMain, BrowserWindow } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import net from 'node:net'
@@ -28,8 +37,10 @@ import {
     buildObserveCommandLines,
     buildPathCandidates,
     buildPipeName,
+    computeMpvGeometry,
     createInitialStatus,
     extractIpcLines,
+    formatMpvGeometry,
     parseIpcLine,
     serializeIpcCommand,
     type MpvStatus,
@@ -46,6 +57,10 @@ interface MpvSession {
     pipeName: string
     readBuffer: string
     stopRequested: boolean
+    /** App window the mpv window follows (pseudo-embedding) — null when standalone. */
+    followWindow: BrowserWindow | null
+    /** Removes the move/resize/minimize/... listeners from followWindow. */
+    detachFollow: (() => void) | null
 }
 
 let session: MpvSession | null = null
@@ -133,6 +148,64 @@ function sendCommand(command: ReadonlyArray<string | number | boolean>): boolean
     return sendIpcLine(serializeIpcCommand(command))
 }
 
+/**
+ * Re-position the mpv window over the app window's client area (minus the
+ * controls strip). No-op while minimized (geometry would be stale) or while
+ * mpv is fullscreen (mpv owns the whole screen; geometry is re-applied when
+ * fullscreen is left / the window is restored).
+ */
+function applyGeometryFromWindow(current: MpvSession) {
+    const win = current.followWindow
+    if (!win || win.isDestroyed() || win.isMinimized()) return
+    if (current.status.fullscreen) return
+    const geometry = computeMpvGeometry(win.getContentBounds())
+    sendCommand(['set_property', 'geometry', formatMpvGeometry(geometry)])
+}
+
+/**
+ * Glue the mpv window to the app window for the lifetime of the session:
+ * move/resize follow, minimize/hide mirror (window-minimized), close stops
+ * playback. Listener removal happens in teardownSession via detachFollow.
+ */
+function attachWindowFollow(current: MpvSession, win: BrowserWindow) {
+    const onMoveResize = () => {
+        if (session === current) applyGeometryFromWindow(current)
+    }
+    const onMinimizeOrHide = () => {
+        if (session === current) sendCommand(['set_property', 'window-minimized', true])
+    }
+    const onRestoreOrShow = () => {
+        if (session !== current) return
+        sendCommand(['set_property', 'window-minimized', false])
+        applyGeometryFromWindow(current)
+    }
+    const onClosed = () => {
+        if (session === current) stopMpv()
+    }
+
+    win.on('move', onMoveResize)
+    win.on('resize', onMoveResize)
+    win.on('minimize', onMinimizeOrHide)
+    win.on('hide', onMinimizeOrHide)
+    win.on('restore', onRestoreOrShow)
+    win.on('show', onRestoreOrShow)
+    win.on('closed', onClosed)
+
+    current.followWindow = win
+    current.detachFollow = () => {
+        current.followWindow = null
+        current.detachFollow = null
+        if (win.isDestroyed()) return
+        win.off('move', onMoveResize)
+        win.off('resize', onMoveResize)
+        win.off('minimize', onMinimizeOrHide)
+        win.off('hide', onMinimizeOrHide)
+        win.off('restore', onRestoreOrShow)
+        win.off('show', onRestoreOrShow)
+        win.off('closed', onClosed)
+    }
+}
+
 function connectPipe(current: MpvSession) {
     let attempts = 0
 
@@ -152,6 +225,8 @@ function connectPipe(current: MpvSession) {
             for (const line of buildObserveCommandLines()) {
                 sendIpcLine(line)
             }
+            // The app window may have moved/resized while mpv was starting.
+            applyGeometryFromWindow(current)
         })
 
         socket.on('data', (data) => {
@@ -198,6 +273,7 @@ function teardownSession(killProcess: boolean) {
     session = null
 
     current.stopRequested = true
+    current.detachFollow?.()
     if (current.socket) {
         try { current.socket.destroy() } catch { /* noop */ }
         current.socket = null
@@ -207,7 +283,10 @@ function teardownSession(killProcess: boolean) {
     }
 }
 
-export async function launchMpv(options: { url: string; title?: string; start?: number }): Promise<{ success: boolean; reason?: string }> {
+export async function launchMpv(
+    options: { url: string; title?: string; start?: number },
+    followWindow?: BrowserWindow | null,
+): Promise<{ success: boolean; reason?: string }> {
     const mpvPath = await resolveMpvPath()
     if (!mpvPath) {
         return { success: false, reason: 'not-found' }
@@ -218,10 +297,12 @@ export async function launchMpv(options: { url: string; title?: string; start?: 
 
     instanceCounter += 1
     const pipeName = buildPipeName(process.pid, instanceCounter)
+    const embedTarget = followWindow && !followWindow.isDestroyed() ? followWindow : null
     const args = buildMpvArgs(pipeName, {
         url: options.url,
         title: options.title,
         startSeconds: options.start,
+        geometry: embedTarget ? computeMpvGeometry(embedTarget.getContentBounds()) : undefined,
     })
 
     try {
@@ -234,8 +315,13 @@ export async function launchMpv(options: { url: string; title?: string; start?: 
             pipeName,
             readBuffer: '',
             stopRequested: false,
+            followWindow: null,
+            detachFollow: null,
         }
         session = current
+        if (embedTarget) {
+            attachWindowFollow(current, embedTarget)
+        }
 
         child.on('error', (error) => {
             log.error(`[MPV] spawn error: ${error.message}`)
@@ -291,7 +377,7 @@ export function setupMpvHandlers() {
         return { path, configuredPath: getConfiguredPath() }
     })
 
-    ipcMain.handle('mpv:play', async (_event, payload: { url?: string; title?: string; start?: number }) => {
+    ipcMain.handle('mpv:play', async (event, payload: { url?: string; title?: string; start?: number }) => {
         const url = typeof payload?.url === 'string' ? payload.url : ''
         if (!/^https?:\/\//i.test(url)) {
             return { success: false, reason: 'invalid-url' }
@@ -300,11 +386,31 @@ export function setupMpvHandlers() {
             url,
             title: typeof payload?.title === 'string' ? payload.title : undefined,
             start: typeof payload?.start === 'number' ? payload.start : undefined,
-        })
+        }, BrowserWindow.fromWebContents(event.sender))
     })
 
     ipcMain.handle('mpv:pause', () => ({ success: sendCommand(['set_property', 'pause', true]) }))
     ipcMain.handle('mpv:resume', () => ({ success: sendCommand(['set_property', 'pause', false]) }))
+
+    ipcMain.handle('mpv:set-volume', (_event, payload: { volume?: number }) => {
+        const volume = typeof payload?.volume === 'number' && isFinite(payload.volume) ? payload.volume : null
+        if (volume === null) return { success: false }
+        const clamped = Math.round(Math.min(100, Math.max(0, volume)))
+        return { success: sendCommand(['set_property', 'volume', clamped]) }
+    })
+
+    ipcMain.handle('mpv:set-fullscreen', (_event, payload: { fullscreen?: boolean }) => {
+        const fullscreen = payload?.fullscreen === true
+        const success = sendCommand(['set_property', 'fullscreen', fullscreen])
+        if (success && !fullscreen && session) {
+            // Leaving fullscreen: glue the window back over the app right away
+            // (the observed `fullscreen` property may lag one poll behind).
+            const current = session
+            current.status = { ...current.status, fullscreen: false }
+            applyGeometryFromWindow(current)
+        }
+        return { success }
+    })
 
     ipcMain.handle('mpv:seek', (_event, payload: { seconds?: number }) => {
         const seconds = typeof payload?.seconds === 'number' ? payload.seconds : null

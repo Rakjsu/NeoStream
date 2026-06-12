@@ -12,6 +12,8 @@ export interface MpvStatus {
     duration: number | null;
     paused: boolean;
     eofReached: boolean;
+    volume: number | null;
+    fullscreen: boolean;
 }
 
 export interface MpvAvailability {
@@ -39,7 +41,10 @@ class MpvService {
         }
     }
 
-    /** Launch mpv in its own window. Never throws — inspect `success`/`reason`. */
+    /**
+     * Launch mpv glued over the app window (pseudo-embedded, main-side
+     * geometry follow). Never throws — inspect `success`/`reason`.
+     */
     async play(url: string, title?: string, startSeconds?: number): Promise<MpvPlayResult> {
         try {
             const result = await window.ipcRenderer.invoke('mpv:play', { url, title, start: startSeconds });
@@ -60,6 +65,16 @@ class MpvService {
 
     async seek(seconds: number): Promise<void> {
         await window.ipcRenderer.invoke('mpv:seek', { seconds }).catch(() => undefined);
+    }
+
+    /** Set the player volume (0..100). */
+    async setVolume(volume: number): Promise<void> {
+        await window.ipcRenderer.invoke('mpv:set-volume', { volume }).catch(() => undefined);
+    }
+
+    /** Toggle the mpv window in/out of fullscreen. */
+    async setFullscreen(fullscreen: boolean): Promise<void> {
+        await window.ipcRenderer.invoke('mpv:set-fullscreen', { fullscreen }).catch(() => undefined);
     }
 
     async stop(): Promise<void> {
