@@ -652,7 +652,7 @@ const profileManagerStyles = `
             .profile-manager-overlay {
                 position: fixed;
             inset: 0;
-            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            background: linear-gradient(135deg, var(--ns-bg-deep) 0%, var(--ns-bg-panel) 50%, var(--ns-bg-tint) 100%);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -687,7 +687,7 @@ const profileManagerStyles = `
             .pm-orb-1 {
                 width: 400px;
             height: 400px;
-            background: radial-gradient(circle, #a855f7 0%, transparent 70%);
+            background: radial-gradient(circle, var(--ns-accent) 0%, transparent 70%);
             top: -100px;
             left: -100px;
 }
@@ -695,7 +695,7 @@ const profileManagerStyles = `
             .pm-orb-2 {
                 width: 350px;
             height: 350px;
-            background: radial-gradient(circle, #ec4899 0%, transparent 70%);
+            background: radial-gradient(circle, var(--ns-accent-grad-to) 0%, transparent 70%);
             bottom: -50px;
             right: -50px;
             animation-delay: -5s;
@@ -814,7 +814,7 @@ const profileManagerStyles = `
             .pm-profile-card:hover {
                 transform: translateY(-8px);
             background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(168, 85, 247, 0.4);
+            border-color: rgba(var(--ns-accent-rgb), 0.4);
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
@@ -851,7 +851,7 @@ const profileManagerStyles = `
             height: 100px;
             border-radius: 50%;
             overflow: hidden;
-            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.2));
+            background: linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.2));
             border: 3px solid rgba(255, 255, 255, 0.2);
             display: flex;
             align-items: center;
@@ -860,7 +860,7 @@ const profileManagerStyles = `
 }
 
             .pm-profile-card:hover .pm-avatar {
-                border - color: rgba(168, 85, 247, 0.6);
+                border - color: rgba(var(--ns-accent-rgb), 0.6);
             transform: scale(1.05);
 }
 
@@ -980,15 +980,15 @@ const profileManagerStyles = `
             min-height: 280px;
             border-radius: 16px;
             background: rgba(255, 255, 255, 0.03);
-            border: 3px dashed rgba(168, 85, 247, 0.3);
+            border: 3px dashed rgba(var(--ns-accent-rgb), 0.3);
             cursor: pointer;
             transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
             animation: pmCardSlideUp 0.6s ease backwards;
 }
 
             .pm-add-card:hover {
-                background: rgba(168, 85, 247, 0.1);
-            border-color: #a855f7;
+                background: rgba(var(--ns-accent-rgb), 0.1);
+            border-color: var(--ns-accent);
             transform: translateY(-8px) scale(1.02);
 }
 
@@ -996,16 +996,16 @@ const profileManagerStyles = `
                 width: 80px;
             height: 80px;
             border-radius: 50%;
-            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.2));
+            background: linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.2));
             display: flex;
             align-items: center;
             justify-content: center;
-            color: rgba(168, 85, 247, 0.8);
+            color: rgba(var(--ns-accent-rgb), 0.8);
             transition: all 0.3s ease;
 }
 
             .pm-add-card:hover .pm-add-icon {
-                background: linear-gradient(135deg, #a855f7, #ec4899);
+                background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to));
             color: white;
             transform: rotate(90deg) scale(1.1);
 }
@@ -1030,10 +1030,10 @@ const profileManagerStyles = `
     width: 100%;
     padding: 12px 16px;
     margin-top: 16px;
-    background: rgba(168, 85, 247, 0.15);
-    border: 1px solid rgba(168, 85, 247, 0.3);
+    background: rgba(var(--ns-accent-rgb), 0.15);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.3);
     border-radius: 12px;
-    color: #c4b5fd;
+    color: var(--ns-accent-light);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
@@ -1041,8 +1041,8 @@ const profileManagerStyles = `
 }
 
 .pm-edit-pin-btn:hover {
-    background: rgba(168, 85, 247, 0.3);
-    border-color: rgba(168, 85, 247, 0.5);
+    background: rgba(var(--ns-accent-rgb), 0.3);
+    border-color: rgba(var(--ns-accent-rgb), 0.5);
     color: white;
     transform: translateY(-2px);
 }
@@ -1067,7 +1067,7 @@ const profileManagerStyles = `
             padding: 32px;
             max-width: 480px;
             width: 90%;
-            border: 1px solid rgba(168, 85, 247, 0.2);
+            border: 1px solid rgba(var(--ns-accent-rgb), 0.2);
             box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
             animation: pmModalSlide 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -1133,8 +1133,8 @@ const profileManagerStyles = `
 }
 
             .pm-input:focus {
-                border - color: #a855f7;
-            background: rgba(168, 85, 247, 0.1);
+                border - color: var(--ns-accent);
+            background: rgba(var(--ns-accent-rgb), 0.1);
 }
 
             .pm-avatar-grid {
@@ -1158,14 +1158,14 @@ const profileManagerStyles = `
 }
 
             .pm-avatar-option:hover {
-                border - color: rgba(168, 85, 247, 0.5);
-            background: rgba(168, 85, 247, 0.1);
+                border - color: rgba(var(--ns-accent-rgb), 0.5);
+            background: rgba(var(--ns-accent-rgb), 0.1);
             transform: scale(1.1);
 }
 
             .pm-avatar-option.selected {
-                border - color: #a855f7;
-            background: rgba(168, 85, 247, 0.3);
+                border - color: var(--ns-accent);
+            background: rgba(var(--ns-accent-rgb), 0.3);
             transform: scale(1.1);
 }
 
@@ -1209,14 +1209,14 @@ const profileManagerStyles = `
 
             .pm-btn-save {
                 flex: 1;
-            background: linear-gradient(135deg, #a855f7, #ec4899);
+            background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to));
             color: white;
-            box-shadow: 0 8px 24px rgba(168, 85, 247, 0.3);
+            box-shadow: 0 8px 24px rgba(var(--ns-accent-rgb), 0.3);
 }
 
             .pm-btn-save:hover:not(:disabled) {
                 transform: translateY(-2px);
-            box-shadow: 0 12px 32px rgba(168, 85, 247, 0.4);
+            box-shadow: 0 12px 32px rgba(var(--ns-accent-rgb), 0.4);
 }
 
             .pm-btn-save:disabled {
@@ -1260,7 +1260,7 @@ const profileManagerStyles = `
     padding: 32px;
     max-width: 480px;
     width: 95%;
-    border: 1px solid rgba(168, 85, 247, 0.3);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.3);
     box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
     animation: pmPinModalSlide 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -1301,7 +1301,7 @@ const profileManagerStyles = `
 }
 
 .pm-pin-header strong {
-    color: #c4b5fd;
+    color: var(--ns-accent-light);
 }
 
 .pm-pin-input-container {
@@ -1328,8 +1328,8 @@ const profileManagerStyles = `
 }
 
 .pm-pin-digit.filled {
-    border-color: rgba(168, 85, 247, 0.7);
-    background: rgba(168, 85, 247, 0.15);
+    border-color: rgba(var(--ns-accent-rgb), 0.7);
+    background: rgba(var(--ns-accent-rgb), 0.15);
     animation: pmPinPop 0.2s ease;
 }
 
@@ -1409,13 +1409,13 @@ const profileManagerStyles = `
 }
 
 .pm-pin-btn.submit {
-    background: linear-gradient(135deg, #a855f7, #7c3aed);
+    background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-dark));
     color: white;
 }
 
 .pm-pin-btn.submit:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(168, 85, 247, 0.4);
+    box-shadow: 0 8px 24px rgba(var(--ns-accent-rgb), 0.4);
 }
 
 .pm-pin-btn.submit:disabled {

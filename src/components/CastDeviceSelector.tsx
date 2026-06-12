@@ -320,8 +320,8 @@ const castStyles = `
     width: 90%;
     max-width: 480px;
     max-height: 85vh;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-    border: 1px solid rgba(168, 85, 247, 0.2);
+    background: linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-tint) 100%);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.2);
     border-radius: 24px;
     overflow: hidden;
     animation: modalSlide 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -350,7 +350,7 @@ const castStyles = `
 .orb-1 {
     width: 200px;
     height: 200px;
-    background: linear-gradient(135deg, #a855f7, #ec4899);
+    background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to));
     top: -50px;
     right: -50px;
     animation: orbFloat 8s ease-in-out infinite;
@@ -402,7 +402,7 @@ const castStyles = `
     font-weight: 700;
     color: white;
     margin: 0;
-    background: linear-gradient(135deg, #fff 0%, #c4b5fd 100%);
+    background: linear-gradient(135deg, #fff 0%, var(--ns-accent-light) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -559,8 +559,8 @@ const castStyles = `
 }
 
 .device-item:hover:not(.disabled) {
-    background: rgba(168, 85, 247, 0.1);
-    border-color: rgba(168, 85, 247, 0.3);
+    background: rgba(var(--ns-accent-rgb), 0.1);
+    border-color: rgba(var(--ns-accent-rgb), 0.3);
     transform: translateX(4px);
 }
 
@@ -573,7 +573,7 @@ const castStyles = `
     width: 48px;
     height: 48px;
     border-radius: 12px;
-    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.2));
+    background: linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.2));
     display: flex;
     align-items: center;
     justify-content: center;
@@ -644,9 +644,9 @@ const castStyles = `
 }
 
 .add-device-btn:hover {
-    border-color: rgba(168, 85, 247, 0.5);
+    border-color: rgba(var(--ns-accent-rgb), 0.5);
     color: white;
-    background: rgba(168, 85, 247, 0.1);
+    background: rgba(var(--ns-accent-rgb), 0.1);
 }
 
 /* Help */
@@ -719,8 +719,8 @@ const castStyles = `
 
 .form-input:focus {
     outline: none;
-    border-color: rgba(168, 85, 247, 0.5);
-    box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.1);
+    border-color: rgba(var(--ns-accent-rgb), 0.5);
+    box-shadow: 0 0 0 3px rgba(var(--ns-accent-rgb), 0.1);
 }
 
 .form-input::placeholder {
@@ -731,7 +731,7 @@ const castStyles = `
 .submit-btn {
     width: 100%;
     padding: 14px 24px;
-    background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+    background: linear-gradient(135deg, var(--ns-accent) 0%, var(--ns-accent-grad-to) 100%);
     border: none;
     border-radius: 12px;
     color: white;
@@ -744,7 +744,7 @@ const castStyles = `
 
 .submit-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 30px rgba(168, 85, 247, 0.3);
+    box-shadow: 0 10px 30px rgba(var(--ns-accent-rgb), 0.3);
 }
 
 .submit-btn:active {

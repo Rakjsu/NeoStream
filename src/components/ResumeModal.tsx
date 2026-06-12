@@ -79,8 +79,8 @@ export function ResumeModal({
                     50% { transform: scale(1.1); }
                 }
                 @keyframes progressGlow {
-                    0%, 100% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.4); }
-                    50% { box-shadow: 0 0 40px rgba(168, 85, 247, 0.8); }
+                    0%, 100% { box-shadow: 0 0 20px rgba(var(--ns-accent-rgb), 0.4); }
+                    50% { box-shadow: 0 0 40px rgba(var(--ns-accent-rgb), 0.8); }
                 }
                 @keyframes shimmer {
                     0% { background-position: -200% 0; }
@@ -105,8 +105,8 @@ export function ResumeModal({
                     padding: 0,
                     maxWidth: 420,
                     width: '92%',
-                    boxShadow: '0 40px 100px -20px rgba(0, 0, 0, 0.8), 0 0 80px rgba(168, 85, 247, 0.15)',
-                    border: '1px solid rgba(168, 85, 247, 0.25)',
+                    boxShadow: '0 40px 100px -20px rgba(0, 0, 0, 0.8), 0 0 80px rgba(var(--ns-accent-rgb), 0.15)',
+                    border: '1px solid rgba(var(--ns-accent-rgb), 0.25)',
                     overflow: 'hidden',
                     animation: isVisible ? 'modalSlideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards' : 'none'
                 }}
@@ -114,7 +114,7 @@ export function ResumeModal({
                 {/* Decorative gradient header */}
                 <div style={{
                     height: 6,
-                    background: 'linear-gradient(90deg, #a855f7, #ec4899, #f97316, #a855f7)',
+                    background: 'linear-gradient(90deg, var(--ns-accent), var(--ns-accent-grad-to), var(--ns-accent-light), var(--ns-accent))',
                     backgroundSize: '200% 100%',
                     animation: 'shimmer 3s linear infinite'
                 }} />
@@ -134,7 +134,7 @@ export function ResumeModal({
                             width: 100,
                             height: 100,
                             borderRadius: '50%',
-                            border: '2px solid rgba(168, 85, 247, 0.3)',
+                            border: '2px solid rgba(var(--ns-accent-rgb), 0.3)',
                             animation: 'ringPulse 2s ease-out infinite'
                         }} />
                         <div style={{
@@ -142,7 +142,7 @@ export function ResumeModal({
                             width: 100,
                             height: 100,
                             borderRadius: '50%',
-                            border: '2px solid rgba(236, 72, 153, 0.3)',
+                            border: '2px solid rgba(var(--ns-accent-grad-to-rgb), 0.3)',
                             animation: 'ringPulse 2s ease-out 0.5s infinite'
                         }} />
 
@@ -151,12 +151,12 @@ export function ResumeModal({
                             width: 80,
                             height: 80,
                             borderRadius: '50%',
-                            background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.2))',
+                            background: 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.2))',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             animation: 'iconPulse 2s ease-in-out infinite',
-                            border: '2px solid rgba(168, 85, 247, 0.4)'
+                            border: '2px solid rgba(var(--ns-accent-rgb), 0.4)'
                         }}>
                             <span style={{ fontSize: 36 }}>⏯️</span>
                         </div>
@@ -190,7 +190,7 @@ export function ResumeModal({
                             {seriesName}
                         </p>
                         <p style={{
-                            color: 'rgba(168, 85, 247, 0.9)',
+                            color: 'rgba(var(--ns-accent-rgb), 0.9)',
                             fontSize: 13,
                             fontWeight: 500
                         }}>
@@ -218,7 +218,7 @@ export function ResumeModal({
                                 <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
                                     Parou em
                                 </div>
-                                <div style={{ color: '#a855f7', fontSize: 18, fontWeight: 700 }}>
+                                <div style={{ color: 'var(--ns-accent)', fontSize: 18, fontWeight: 700 }}>
                                     {formatTime(currentTime)}
                                 </div>
                             </div>
@@ -226,13 +226,13 @@ export function ResumeModal({
                                 width: 40,
                                 height: 40,
                                 borderRadius: '50%',
-                                background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.2))',
+                                background: 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.2))',
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                                 fontSize: 14,
                                 fontWeight: 700,
-                                color: '#a855f7'
+                                color: 'var(--ns-accent)'
                             }}>
                                 {progress}%
                             </div>
@@ -261,10 +261,10 @@ export function ResumeModal({
                                 left: 0,
                                 width: `${progressAnimated}%`,
                                 height: '100%',
-                                background: 'linear-gradient(90deg, #a855f7, #ec4899)',
+                                background: 'linear-gradient(90deg, var(--ns-accent), var(--ns-accent-grad-to))',
                                 borderRadius: 5,
                                 transition: 'width 1s cubic-bezier(0.16, 1, 0.3, 1)',
-                                boxShadow: '0 0 20px rgba(168, 85, 247, 0.5)'
+                                boxShadow: '0 0 20px rgba(var(--ns-accent-rgb), 0.5)'
                             }}>
                                 {/* Shimmer effect */}
                                 <div style={{
@@ -288,7 +288,7 @@ export function ResumeModal({
                                 borderRadius: '50%',
                                 background: 'white',
                                 boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
-                                border: '3px solid #a855f7',
+                                border: '3px solid var(--ns-accent)',
                                 transition: 'left 1s cubic-bezier(0.16, 1, 0.3, 1)',
                                 animation: 'progressGlow 2s ease-in-out infinite'
                             }} />
@@ -307,14 +307,14 @@ export function ResumeModal({
                             onClick={onResume}
                             style={{
                                 padding: '16px 24px',
-                                background: 'linear-gradient(135deg, #a855f7, #ec4899)',
+                                background: 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to))',
                                 color: 'white',
                                 fontSize: 16,
                                 fontWeight: 700,
                                 borderRadius: 14,
                                 border: 'none',
                                 cursor: 'pointer',
-                                boxShadow: '0 8px 32px rgba(168, 85, 247, 0.4)',
+                                boxShadow: '0 8px 32px rgba(var(--ns-accent-rgb), 0.4)',
                                 transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
                                 display: 'flex',
                                 alignItems: 'center',
@@ -325,11 +325,11 @@ export function ResumeModal({
                             }}
                             onMouseEnter={(e) => {
                                 e.currentTarget.style.transform = 'translateY(-2px) scale(1.02)';
-                                e.currentTarget.style.boxShadow = '0 12px 40px rgba(168, 85, 247, 0.6)';
+                                e.currentTarget.style.boxShadow = '0 12px 40px rgba(var(--ns-accent-rgb), 0.6)';
                             }}
                             onMouseLeave={(e) => {
                                 e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                                e.currentTarget.style.boxShadow = '0 8px 32px rgba(168, 85, 247, 0.4)';
+                                e.currentTarget.style.boxShadow = '0 8px 32px rgba(var(--ns-accent-rgb), 0.4)';
                             }}
                         >
                             <span style={{ fontSize: 20 }}>▶️</span>
