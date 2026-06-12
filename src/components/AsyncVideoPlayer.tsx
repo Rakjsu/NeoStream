@@ -4,7 +4,7 @@ import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
 import { findMovieVersions } from '../services/movieVersionService';
 import { playbackService } from '../services/playbackService';
-import MpvPlaybackOverlay from './MpvPlaybackOverlay';
+import MpvPlayerView from './MpvPlayerView';
 
 interface MediaItem {
     id?: number | string;
@@ -90,13 +90,11 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
     const lastMovieIdRef = useRef<string | number | null>(null);
     const lastEpisodeRef = useRef<string | null>(null);
 
-    // EXPERIMENTAL — MPV PoC. When the toggle is on, live channels and movies
-    // are handed to an external MPV window instead of the internal player.
-    // Series/episodes stay on the internal player (out of PoC scope).
+    // EXPERIMENTAL — MPV phase 2. When the toggle is on, live channels, movies
+    // AND series episodes are handed to a pseudo-embedded MPV window with
+    // in-app controls (MpvPlayerView) instead of the internal player.
     // Read once on mount so the choice is stable for this playback session.
-    const [mpvRequested] = useState<boolean>(() =>
-        playbackService.getConfig().mpvEnabled && !seriesId && contentType !== 'series'
-    );
+    const [mpvRequested] = useState<boolean>(() => playbackService.getConfig().mpvEnabled);
     // Set when mpv turns out to be missing/broken — falls back to the internal player.
     const [mpvFailed, setMpvFailed] = useState(false);
     const useMpv = mpvRequested && !mpvFailed;
@@ -387,17 +385,21 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
         );
     }
 
-    // EXPERIMENTAL — MPV PoC: hand the stream to an external MPV window and
-    // show a compact in-app overlay instead of mounting the internal player.
+    // EXPERIMENTAL — MPV phase 2: hand the stream to the pseudo-embedded MPV
+    // window and render the in-app controls bar instead of the internal player.
     if (useMpv) {
+        const mpvIsSeries = Boolean(seriesId) && seasonNumber !== undefined && episodeNumber !== undefined;
         const mpvMovieId = movie.stream_id || movie.id || movie.series_id;
         return (
-            <MpvPlaybackOverlay
+            <MpvPlayerView
                 streamUrl={streamUrl}
                 title={customTitle || movie.name || movie.title || 'NeoStream'}
                 startSeconds={resumeTime}
-                movieId={contentType !== 'live' && mpvMovieId ? String(mpvMovieId) : undefined}
+                movieId={contentType !== 'live' && !mpvIsSeries && mpvMovieId ? String(mpvMovieId) : undefined}
                 movieName={movie.name || movie.title}
+                seriesId={mpvIsSeries ? seriesId : undefined}
+                seasonNumber={mpvIsSeries ? seasonNumber : undefined}
+                episodeNumber={mpvIsSeries ? episodeNumber : undefined}
                 isLive={contentType === 'live'}
                 onClose={onClose}
                 onFallback={() => setMpvFailed(true)}

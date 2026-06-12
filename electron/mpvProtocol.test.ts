@@ -8,8 +8,11 @@ import {
     buildObserveCommandLines,
     buildPathCandidates,
     buildPipeName,
+    computeMpvGeometry,
     createInitialStatus,
     extractIpcLines,
+    formatMpvGeometry,
+    MPV_CONTROLS_HEIGHT,
     MPV_USER_AGENT,
     MPV_WINDOW_TITLE,
     OBSERVED_PROPERTIES,
@@ -50,6 +53,65 @@ describe('buildMpvArgs', () => {
     it('omits --start when startSeconds is missing or zero', () => {
         const noStart = buildMpvArgs('\\\\.\\pipe\\t', { url: 'http://x/y', startSeconds: 0 })
         expect(noStart.some((a) => a.startsWith('--start='))).toBe(false)
+    })
+
+    it('uses borderless/ontop pseudo-embedded options when geometry is given', () => {
+        const args = buildMpvArgs('\\\\.\\pipe\\t', {
+            url: 'http://x/y',
+            geometry: { x: 100, y: 50, width: 1280, height: 624 },
+        })
+
+        expect(args).toContain('--no-border')
+        expect(args).toContain('--ontop')
+        expect(args).toContain('--no-osc')
+        expect(args).toContain('--geometry=1280x624+100+50')
+        expect(args.some((a) => a.startsWith('--autofit'))).toBe(false)
+    })
+
+    it('keeps the standalone window options when geometry is omitted', () => {
+        const args = buildMpvArgs('\\\\.\\pipe\\t', { url: 'http://x/y' })
+
+        expect(args).toContain('--autofit=70%')
+        expect(args).not.toContain('--no-border')
+        expect(args).not.toContain('--ontop')
+        expect(args.some((a) => a.startsWith('--geometry='))).toBe(false)
+    })
+})
+
+describe('computeMpvGeometry', () => {
+    it('reserves the controls strip at the bottom of the content bounds', () => {
+        const geometry = computeMpvGeometry({ x: 200, y: 120, width: 1280, height: 720 })
+
+        expect(geometry).toEqual({
+            x: 200,
+            y: 120,
+            width: 1280,
+            height: 720 - MPV_CONTROLS_HEIGHT,
+        })
+    })
+
+    it('accepts a custom controls height and never collapses below 1px', () => {
+        expect(computeMpvGeometry({ x: 0, y: 0, width: 800, height: 600 }, 100).height).toBe(500)
+        expect(computeMpvGeometry({ x: 0, y: 0, width: 800, height: 50 }, 100).height).toBe(1)
+        expect(computeMpvGeometry({ x: 0, y: 0, width: 0, height: 200 }).width).toBe(1)
+    })
+
+    it('rounds fractional bounds (scaled displays)', () => {
+        const geometry = computeMpvGeometry({ x: 10.4, y: 20.6, width: 1000.5, height: 500.2 })
+        expect(geometry.x).toBe(10)
+        expect(geometry.y).toBe(21)
+        expect(geometry.width).toBe(1001)
+        expect(geometry.height).toBe(500 - MPV_CONTROLS_HEIGHT)
+    })
+})
+
+describe('formatMpvGeometry', () => {
+    it('serializes WxH+X+Y', () => {
+        expect(formatMpvGeometry({ x: 100, y: 50, width: 1280, height: 624 })).toBe('1280x624+100+50')
+    })
+
+    it('keeps negative offsets parseable (monitors left of/above primary)', () => {
+        expect(formatMpvGeometry({ x: -1920, y: -10, width: 800, height: 600 })).toBe('800x600+-1920+-10')
     })
 })
 
@@ -99,10 +161,34 @@ describe('applyIpcMessage', () => {
         status = applyIpcMessage(status, { event: 'property-change', name: 'duration', data: 3600 })
         status = applyIpcMessage(status, { event: 'property-change', name: 'pause', data: true })
 
-        expect(status).toEqual({ running: true, timePos: 42.5, duration: 3600, paused: true, eofReached: false })
+        expect(status).toEqual({
+            running: true,
+            timePos: 42.5,
+            duration: 3600,
+            paused: true,
+            eofReached: false,
+            volume: null,
+            fullscreen: false,
+        })
 
         status = applyIpcMessage(status, { event: 'property-change', name: 'eof-reached', data: true })
         expect(status.eofReached).toBe(true)
+    })
+
+    it('tracks volume and fullscreen property changes', () => {
+        let status = createInitialStatus(true)
+
+        status = applyIpcMessage(status, { event: 'property-change', name: 'volume', data: 65 })
+        expect(status.volume).toBe(65)
+
+        status = applyIpcMessage(status, { event: 'property-change', name: 'fullscreen', data: true })
+        expect(status.fullscreen).toBe(true)
+
+        status = applyIpcMessage(status, { event: 'property-change', name: 'volume', data: 'loud' })
+        expect(status.volume).toBeNull()
+
+        status = applyIpcMessage(status, { event: 'property-change', name: 'fullscreen', data: false })
+        expect(status.fullscreen).toBe(false)
     })
 
     it('nullifies numeric properties when mpv sends non-numbers', () => {

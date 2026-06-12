@@ -19,7 +19,7 @@ export const MPV_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWe
  * Properties we observe over the IPC pipe. The observe id is the array
  * index + 1 (mpv requires a non-zero id per observer).
  */
-export const OBSERVED_PROPERTIES = ['time-pos', 'duration', 'pause', 'eof-reached'] as const
+export const OBSERVED_PROPERTIES = ['time-pos', 'duration', 'pause', 'eof-reached', 'volume', 'fullscreen'] as const
 
 export interface MpvStatus {
     running: boolean
@@ -27,10 +27,54 @@ export interface MpvStatus {
     duration: number | null
     paused: boolean
     eofReached: boolean
+    /** 0..100 (mpv allows >100 but we never set it above 100). */
+    volume: number | null
+    fullscreen: boolean
 }
 
 export function createInitialStatus(running = false): MpvStatus {
-    return { running, timePos: null, duration: null, paused: false, eofReached: false }
+    return { running, timePos: null, duration: null, paused: false, eofReached: false, volume: null, fullscreen: false }
+}
+
+/**
+ * Height (px) of the in-app controls strip reserved at the bottom of the
+ * window's client area. The mpv window covers everything above it, so the
+ * React controls bar must use the same constant (MpvPlayerView.tsx).
+ */
+export const MPV_CONTROLS_HEIGHT = 96
+
+export interface MpvGeometry {
+    x: number
+    y: number
+    width: number
+    height: number
+}
+
+/**
+ * Where the mpv window should sit, given the app window's content bounds
+ * (screen coordinates of the client area): the full client area minus the
+ * bottom strip reserved for the in-app controls bar.
+ */
+export function computeMpvGeometry(
+    contentBounds: { x: number; y: number; width: number; height: number },
+    controlsHeight: number = MPV_CONTROLS_HEIGHT,
+): MpvGeometry {
+    return {
+        x: Math.round(contentBounds.x),
+        y: Math.round(contentBounds.y),
+        width: Math.max(1, Math.round(contentBounds.width)),
+        height: Math.max(1, Math.round(contentBounds.height - controlsHeight)),
+    }
+}
+
+/**
+ * Serialize geometry for mpv's --geometry option / `geometry` property
+ * (X11 geometry spec: WxH+X+Y). Negative offsets serialize as `+-N`,
+ * which the spec defines as a negative absolute position — needed for
+ * monitors left of / above the primary display.
+ */
+export function formatMpvGeometry(geometry: MpvGeometry): string {
+    return `${geometry.width}x${geometry.height}+${geometry.x}+${geometry.y}`
 }
 
 /**
@@ -45,18 +89,43 @@ export interface MpvLaunchOptions {
     url: string
     title?: string
     startSeconds?: number
+    /**
+     * Pseudo-embedded mode: open mpv as a borderless always-on-top window at
+     * exactly this screen geometry (the app window's client area minus the
+     * controls strip). When omitted, mpv opens as a normal standalone window.
+     */
+    geometry?: MpvGeometry
 }
 
 /**
  * Command-line arguments for the spawned mpv.exe.
- * PoC embedding: mpv opens as its own bordered window (no --wid embedding yet).
+ *
+ * Embedding approach (phase 2) — evaluated options:
+ *   (a) --wid=<app HWND>: mpv becomes a child of the whole Electron window and
+ *       paints over ALL the React UI; repositioning the child would need a
+ *       native module (SetWindowPos) which we don't ship. Rejected.
+ *   (c) --wid + transparent child BrowserWindow just for the controls:
+ *       two windows to keep in sync plus --wid quirks. Rejected as too complex.
+ *   (d) CHOSEN: mpv stays its own top-level window but borderless + ontop,
+ *       positioned exactly over the app's client area minus a bottom controls
+ *       strip (--geometry). The main process re-applies the `geometry`
+ *       property whenever the app window moves/resizes, and mirrors
+ *       minimize/hide via the `window-minimized` property — so it looks and
+ *       behaves embedded without native code.
  */
 export function buildMpvArgs(pipeName: string, options: MpvLaunchOptions): string[] {
     const args = [
         `--input-ipc-server=${pipeName}`,
         '--force-window=immediate',
         `--title=${MPV_WINDOW_TITLE}`,
-        '--autofit=70%',
+        ...(options.geometry
+            ? [
+                '--no-border', // borderless: blends with the app window underneath
+                '--ontop', // keep the video above the app even when our controls are clicked
+                '--no-osc', // controls live in the React UI, not mpv's on-screen controller
+                `--geometry=${formatMpvGeometry(options.geometry)}`,
+            ]
+            : ['--autofit=70%']),
         '--no-terminal',
         `--user-agent=${MPV_USER_AGENT}`,
     ]
@@ -133,6 +202,10 @@ export function applyIpcMessage(status: MpvStatus, message: MpvIpcMessage): MpvS
                 return { ...status, paused: message.data === true }
             case 'eof-reached':
                 return { ...status, eofReached: message.data === true }
+            case 'volume':
+                return { ...status, volume: typeof message.data === 'number' ? message.data : null }
+            case 'fullscreen':
+                return { ...status, fullscreen: message.data === true }
             default:
                 return status
         }
