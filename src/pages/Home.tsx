@@ -8,6 +8,7 @@ import { ResumeModal } from '../components/ResumeModal';
 import { profileService } from '../services/profileService';
 import { indexedDBCache } from '../services/indexedDBCache';
 import { searchMovieByName, searchSeriesByName, isKidsFriendly } from '../services/tmdb';
+import { getHomeRecommendations, type RecommendationGroup } from '../services/recommendationService';
 import { useLanguage } from '../services/languageService';
 
 interface ContentCounts {
@@ -73,7 +74,7 @@ export function Home() {
     const [recentMovies, setRecentMovies] = useState<MovieData[]>([]);
     const [allSeries, setAllSeries] = useState<SeriesData[]>([]);
     const [allMovies, setAllMovies] = useState<MovieData[]>([]);
-    const [recommendations, setRecommendations] = useState<(SeriesData | MovieData)[]>([]);
+    const [recommendationGroups, setRecommendationGroups] = useState<RecommendationGroup[]>([]);
     const [isVisible, setIsVisible] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -324,66 +325,26 @@ export function Home() {
         setContinueWatching(items.slice(0, 30));
     }, [allSeries, allMovies, refreshTrigger]);
 
-    // Build recommendations based on watched categories (only once when data is ready)
+    // Build personalized recommendations ("Porque você assistiu X") from local
+    // watch history + genre/category/franchise scoring (recommendationService).
     useEffect(() => {
-        if (continueWatching.length === 0 || (allSeries.length === 0 && allMovies.length === 0)) return;
+        if (allSeries.length === 0 && allMovies.length === 0) return;
 
         // Only run once when we have data
-        if (recommendations.length > 0) return;
+        if (recommendationGroups.length > 0) return;
 
-        // Get categories from what user is watching
-        const watchedCategoryIds = new Set<string>();
-        const watchedIds = new Set<string>();
+        let cancelled = false;
+        getHomeRecommendations(allMovies, allSeries)
+            .then(groups => {
+                if (!cancelled && groups.length > 0) setRecommendationGroups(groups);
+            })
+            .catch(error => console.error('Failed to build recommendations:', error));
 
-        continueWatching.forEach(item => {
-            watchedIds.add(item.id);
-            if (item.type === 'series') {
-                const series = allSeries.find(s => s.series_id.toString() === item.id);
-                if (series?.category_id) watchedCategoryIds.add(series.category_id);
-            } else {
-                const movie = allMovies.find(m => m.stream_id.toString() === item.id);
-                if (movie?.category_id) watchedCategoryIds.add(movie.category_id);
-            }
-        });
-
-        // Find recommendations from same categories (not already watched/in progress)
-        const recs: (SeriesData | MovieData)[] = [];
-
-        // Add series from watched categories
-        allSeries.forEach(series => {
-            if (series.category_id &&
-                watchedCategoryIds.has(series.category_id) &&
-                !watchedIds.has(series.series_id.toString())) {
-                recs.push(series);
-            }
-        });
-
-        // Add movies from watched categories
-        allMovies.forEach(movie => {
-            if (movie.category_id &&
-                watchedCategoryIds.has(movie.category_id) &&
-                !watchedIds.has(movie.stream_id.toString())) {
-                recs.push(movie);
-            }
-        });
-
-        // Stable shuffle using Fisher-Yates with seed
-        const seed = continueWatching.length + allSeries.length;
-        let currentIndex = recs.length;
-        let randomIndex;
-        const seededRandom = (max: number) => Math.floor((seed * 9301 + 49297) % 233280 / 233280 * max);
-
-        while (currentIndex > 0) {
-            randomIndex = seededRandom(currentIndex);
-            currentIndex--;
-            [recs[currentIndex], recs[randomIndex]] = [recs[randomIndex], recs[currentIndex]];
-        }
-
-        setRecommendations(recs.slice(0, 30));
+        return () => { cancelled = true; };
     // This intentionally depends on list sizes only to avoid rebuilding recommendations
     // every time array identities change during the Home page refresh cycle.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [continueWatching.length, allSeries.length, allMovies.length]);
+    }, [allSeries.length, allMovies.length]);
 
     const formatTime = (date: Date) => {
         return date.toLocaleTimeString(t('home', 'locale'), { hour: '2-digit', minute: '2-digit' });
@@ -402,6 +363,12 @@ export function Home() {
         if (hour < 12) return t('home', 'goodMorning');
         if (hour < 18) return t('home', 'goodAfternoon');
         return t('home', 'goodEvening');
+    };
+
+    // Row title: "Porque você assistiu {seed}" (seed truncated to keep rows tidy)
+    const becauseYouWatchedTitle = (seedName: string) => {
+        const truncated = seedName.length > 28 ? `${seedName.slice(0, 27).trimEnd()}…` : seedName;
+        return t('home', 'becauseYouWatched').replace('{name}', truncated);
     };
 
     const formatProgress = (currentTime: number, duration: number) => {
@@ -1432,13 +1399,16 @@ export function Home() {
                 {/* Next Episodes Section */}
                 <NextEpisodes allSeries={allSeries} />
 
-                {/* Recommendations Section */}
-                < ContentSection
-                    title={`💡 ${t('home', 'recommendations')}`}
-                    items={recommendations}
-                    type="recommendations"
-                    sectionIndex={1}
-                />
+                {/* Personalized Recommendations ("Porque você assistiu X") */}
+                {recommendationGroups.map((group, index) => (
+                    <ContentSection
+                        key={`rec-${group.seedName}`}
+                        title={`💡 ${becauseYouWatchedTitle(group.seedName)}`}
+                        items={group.items.map(rec => rec.item)}
+                        type="recommendations"
+                        sectionIndex={1 + index}
+                    />
+                ))}
 
                 {/* Recently Added Series */}
                 < ContentSection

@@ -524,6 +524,7 @@
     "goodEvening": "Good evening",
     "continueWatching": "Continue Watching",
     "nextEpisodes": "Next Episodes",
+    "becauseYouWatched": "Because you watched {name}",
     "recommendations": "Recommended For You",
     "recentSeries": "Recent Series",
     "recentMovies": "Recent Movies",
