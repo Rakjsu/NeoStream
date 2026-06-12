@@ -1,0 +1,5 @@
+[
+    { "category_id": "1", "category_name": "CANAIS | ABERTOS", "parent_id": 0 },
+    { "category_id": "2", "category_name": "CANAIS | INFANTIS", "parent_id": 0 },
+    { "category_id": "3", "category_name": "CANAIS | ADULTOS", "parent_id": 0 }
+]

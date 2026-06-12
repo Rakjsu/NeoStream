@@ -1,3 +1,6 @@
+// Keep this first: redirects userData when the Playwright E2E suite is
+// driving the app (no-op otherwise). See electron/e2eUserData.ts.
+import './e2eUserData'
 import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
