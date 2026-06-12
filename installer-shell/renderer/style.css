@@ -1,0 +1,472 @@
+/* NeoStream IPTV — Installer Shell
+   Visual language copied from the app: #0f0f1a bg, #a855f7→#ec4899 accent,
+   title bar gradient #1a1a2e→#0f0f23, Segoe UI. */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg: #0f0f1a;
+    --bg-alt: #0f0f23;
+    --surface: #1a1a2e;
+    --accent: #a855f7;
+    --accent-2: #ec4899;
+    --text: #ffffff;
+    --text-dim: #c4b5fd;
+    --text-muted: #6b6b8a;
+    --grad: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+}
+
+html,
+body {
+    height: 100%;
+    overflow: hidden;
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    user-select: none;
+    cursor: default;
+}
+
+/* ─── Title bar ─────────────────────────────────────────────── */
+
+.title-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 36px;
+    background: linear-gradient(180deg, #1a1a2e 0%, #0f0f23 100%);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 100;
+    border-bottom: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+.title-bar-drag {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    padding-left: 12px;
+    -webkit-app-region: drag;
+}
+
+.title-bar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.title-bar-logo svg {
+    filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.4));
+}
+
+.title-bar-text {
+    font-size: 13px;
+    font-weight: 600;
+    background: linear-gradient(90deg, #a855f7, #ec4899, #a855f7);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: titleShimmer 3s ease infinite;
+}
+
+@keyframes titleShimmer {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Animated equalizer bars (same as the app title bar) */
+.tb-bar {
+    animation: tbBounce 1.2s ease-in-out infinite;
+    transform-origin: center bottom;
+    transform-box: fill-box;
+}
+
+.tb-bar-1 { animation-delay: 0s; }
+.tb-bar-2 { animation-delay: 0.2s; }
+.tb-bar-3 { animation-delay: 0.4s; }
+
+@keyframes tbBounce {
+    0%, 100% { transform: scaleY(1); }
+    50% { transform: scaleY(0.6); }
+}
+
+/* Window controls — hover styles copied from the app */
+.window-controls {
+    display: flex;
+    height: 100%;
+    -webkit-app-region: no-drag;
+}
+
+.window-control-btn {
+    width: 46px;
+    height: 100%;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.window-control-btn.minimize:hover {
+    background: rgba(168, 85, 247, 0.3);
+    color: #fff;
+}
+
+.window-control-btn.close:hover {
+    background: #e81123;
+    color: #fff;
+}
+
+.window-control-btn:active {
+    transform: scale(0.95);
+}
+
+/* ─── Layout ────────────────────────────────────────────────── */
+
+.content {
+    position: fixed;
+    top: 36px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+    background: radial-gradient(circle at 20% 0%, #16162a 0%, var(--bg) 55%);
+}
+
+.bg-glow {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(90px);
+    pointer-events: none;
+}
+
+.bg-glow-1 {
+    width: 320px;
+    height: 320px;
+    top: -120px;
+    left: -100px;
+    background: rgba(168, 85, 247, 0.16);
+}
+
+.bg-glow-2 {
+    width: 300px;
+    height: 300px;
+    bottom: -140px;
+    right: -90px;
+    background: rgba(236, 72, 153, 0.10);
+}
+
+.step {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 64px 48px;
+    text-align: center;
+    animation: stepIn 0.35s ease;
+}
+
+.step.active {
+    display: flex;
+}
+
+@keyframes stepIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.branding {
+    position: absolute;
+    bottom: 12px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+/* ─── Welcome ───────────────────────────────────────────────── */
+
+.logo-wrap {
+    margin-bottom: 18px;
+    filter: drop-shadow(0 8px 28px rgba(168, 85, 247, 0.35));
+}
+
+.app-name {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    background: linear-gradient(90deg, #ffffff 0%, #c4b5fd 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.app-version {
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+}
+
+.tagline {
+    margin-top: 6px;
+    font-size: 14px;
+    font-style: italic;
+    color: var(--text-dim);
+}
+
+.btn-primary {
+    margin-top: 26px;
+    min-width: 220px;
+    padding: 13px 42px;
+    border: none;
+    border-radius: 12px;
+    background: var(--grad);
+    color: #fff;
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 6px 24px rgba(168, 85, 247, 0.35);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+    box-shadow: 0 8px 30px rgba(168, 85, 247, 0.5);
+}
+
+.btn-primary:active {
+    transform: translateY(0) scale(0.98);
+}
+
+.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: default;
+    transform: none;
+    filter: none;
+}
+
+.link-btn {
+    margin-top: 14px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    transition: color 0.15s ease;
+}
+
+.link-btn:hover {
+    color: var(--accent);
+}
+
+.dir-row {
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 560px;
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid rgba(168, 85, 247, 0.25);
+    border-radius: 10px;
+    background: rgba(26, 26, 46, 0.7);
+    animation: stepIn 0.25s ease;
+}
+
+.dir-row.hidden {
+    display: none;
+}
+
+.dir-label {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.dir-path {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    direction: rtl; /* keep the tail (app folder) visible when truncated */
+    font-size: 12.5px;
+    color: var(--text);
+}
+
+.btn-secondary {
+    flex-shrink: 0;
+    padding: 7px 16px;
+    border: 1px solid rgba(168, 85, 247, 0.45);
+    border-radius: 8px;
+    background: rgba(168, 85, 247, 0.12);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-secondary:hover {
+    background: rgba(168, 85, 247, 0.28);
+    border-color: var(--accent);
+}
+
+/* ─── Installing ────────────────────────────────────────────── */
+
+.installing-icon {
+    margin-bottom: 20px;
+    filter: drop-shadow(0 0 18px rgba(168, 85, 247, 0.45));
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+}
+
+.step-title {
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.install-status {
+    margin-top: 10px;
+    min-height: 20px;
+    font-size: 14px;
+    color: var(--text-dim);
+    transition: opacity 0.3s ease;
+}
+
+.progress-track {
+    margin-top: 22px;
+    width: 420px;
+    max-width: 80%;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(168, 85, 247, 0.15);
+    overflow: hidden;
+    position: relative;
+}
+
+.progress-shimmer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 40%;
+    border-radius: 999px;
+    background: var(--grad);
+    box-shadow: 0 0 14px rgba(168, 85, 247, 0.6);
+    animation: shimmerSlide 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmerSlide {
+    0% { left: -40%; }
+    100% { left: 100%; }
+}
+
+.install-hint {
+    margin-top: 18px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* ─── Done / Error ──────────────────────────────────────────── */
+
+.done-icon,
+.error-icon {
+    margin-bottom: 18px;
+}
+
+.done-icon {
+    filter: drop-shadow(0 0 22px rgba(168, 85, 247, 0.45));
+}
+
+.error-icon {
+    filter: drop-shadow(0 0 22px rgba(248, 113, 113, 0.35));
+}
+
+.check-path {
+    stroke-dasharray: 60;
+    stroke-dashoffset: 60;
+    animation: drawCheck 0.6s ease 0.2s forwards;
+}
+
+@keyframes drawCheck {
+    to { stroke-dashoffset: 0; }
+}
+
+.done-subtitle {
+    margin-top: 10px;
+    font-size: 14px;
+    color: var(--text-dim);
+    max-width: 460px;
+}
+
+.launch-row {
+    margin-top: 22px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.launch-row input {
+    display: none;
+}
+
+.launch-row .checkmark {
+    width: 19px;
+    height: 19px;
+    border-radius: 6px;
+    border: 1.5px solid rgba(168, 85, 247, 0.6);
+    background: rgba(26, 26, 46, 0.8);
+    position: relative;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.launch-row input:checked + .checkmark {
+    background: var(--grad);
+    border-color: transparent;
+}
+
+.launch-row input:checked + .checkmark::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    top: 2.5px;
+    width: 4px;
+    height: 9px;
+    border: solid #fff;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+#step-done .btn-primary,
+#step-error .btn-primary {
+    margin-top: 24px;
+}

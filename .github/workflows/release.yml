@@ -42,6 +42,13 @@ jobs:
           # macOS: no signing identity in CI — skip signing instead of failing.
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
+      # Custom installer (Windows only): Electron shell with the app's look
+      # that runs the standard NSIS Setup silently. The Setup exe + latest.yml
+      # stay attached — auto-update depends on them.
+      - name: Build custom installer
+        if: runner.os == 'Windows'
+        run: node build/build-custom-installer.cjs
+
       - name: Attach artifacts to the release
         uses: softprops/action-gh-release@v2
         with:
