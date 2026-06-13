@@ -661,7 +661,12 @@
     "searchNoResults": "Nada encontrado en la programación cargada",
     "today": "Hoy / Ahora",
     "earlier": "Más temprano",
-    "later": "Más tarde"
+    "later": "Más tarde",
+    "replay": "Replay",
+    "replayBadge": "Replay disponible ({days} días)",
+    "replayOf": "Ver replay de {title}",
+    "watchLive": "Ver en vivo",
+    "watchFromStart": "Ver desde el inicio"
   },
   "search": {
     "placeholder": "Buscar canales, películas y series...",

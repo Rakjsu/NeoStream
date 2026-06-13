@@ -78,6 +78,7 @@ const invokeChannels = new Set([
     'streams:get-live-url',
     'streams:get-series',
     'streams:get-series-url',
+    'streams:get-timeshift-url',
     'streams:get-vod',
     'streams:get-vod-url',
     'update:check-now',

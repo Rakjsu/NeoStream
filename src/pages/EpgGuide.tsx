@@ -15,12 +15,15 @@ import {
     shiftWindow,
     clampWindow,
     searchPrograms,
+    isReplayable,
+    replayDurationMinutes,
     HALF_HOUR_MS,
     PX_PER_HALF_HOUR,
     WINDOW_HALF_HOURS,
     WINDOW_SHIFT_MS
 } from '../utils/epgGuide';
 import type { ProgramSearchResult } from '../utils/epgGuide';
+import { getTimeshiftUrl } from '../services/timeshiftService';
 
 interface LiveStream {
     num: number;
@@ -121,6 +124,15 @@ export function EpgGuide() {
     const [epgByChannel, setEpgByChannel] = useState<Record<string, EPGProgram[] | undefined>>({});
     const [now, setNow] = useState(() => Date.now());
     const [playingChannel, setPlayingChannel] = useState<LiveStream | null>(null);
+    // Catch-up/replay playback (timeshift) of an already-aired program
+    const [timeshiftPlayback, setTimeshiftPlayback] = useState<{ channel: LiveStream; program: EPGProgram } | null>(null);
+    // Small action popover for the CURRENT program on archive channels
+    // ("watch live" / "watch from start")
+    const [programPopover, setProgramPopover] = useState<{
+        channel: LiveStream;
+        program: EPGProgram;
+        anchor: { x: number; y: number };
+    } | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const { t } = useLanguage();
@@ -303,6 +315,24 @@ export function EpgGuide() {
         throw new Error('Credenciais não encontradas');
     };
 
+    const startReplay = useCallback((channel: LiveStream, program: EPGProgram) => {
+        setProgramPopover(null);
+        setTimeshiftPlayback({ channel, program });
+    }, []);
+
+    // Timeshift URL builder for the AsyncVideoPlayer — the main process picks
+    // the URL form (probe) and converts the start to provider-local time.
+    const buildTimeshiftStreamUrl = useCallback(async (channel: LiveStream): Promise<string> => {
+        const program = timeshiftPlayback?.program;
+        if (!program) throw new Error('Programa de replay não selecionado');
+        const result = await getTimeshiftUrl({
+            streamId: channel.stream_id,
+            startIso: program.start,
+            durationMin: replayDurationMinutes(program.start, program.end)
+        });
+        return result.url;
+    }, [timeshiftPlayback]);
+
     const nowLineLeft = nowOffsetPx(now, guideWindow);
 
     if (loading) {
@@ -350,6 +380,9 @@ export function EpgGuide() {
                 .guide-channel-cell:hover { background: rgba(var(--ns-accent-rgb), 0.12) !important; }
                 .guide-pager-btn:hover { background: rgba(var(--ns-accent-rgb), 0.25) !important; }
                 .guide-search-result:hover { background: rgba(var(--ns-accent-rgb), 0.18) !important; }
+                .guide-popover-action:hover { background: rgba(var(--ns-accent-rgb), 0.18) !important; }
+                .guide-replay-hint { opacity: 0; transition: opacity 0.15s ease; }
+                .guide-program-replay:hover .guide-replay-hint { opacity: 1; }
                 .guide-row-highlight { animation: guideRowFlash 2.2s ease; }
                 @keyframes guideRowFlash {
                     0%, 55% { background: rgba(var(--ns-accent-rgb), 0.22); }
@@ -621,6 +654,21 @@ export function EpgGuide() {
                                             }}>
                                                 {channel.name}
                                             </span>
+                                            {channel.tv_archive === 1 && (
+                                                <span
+                                                    title={t('guide', 'replayBadge').replace('{days}', String(channel.tv_archive_duration || 1))}
+                                                    style={{
+                                                        marginLeft: 'auto', flexShrink: 0,
+                                                        fontSize: '10px', lineHeight: 1,
+                                                        padding: '3px 5px', borderRadius: '6px',
+                                                        background: 'rgba(var(--ns-accent-rgb), 0.18)',
+                                                        border: '1px solid rgba(var(--ns-accent-rgb), 0.35)',
+                                                        color: 'var(--ns-accent-light)'
+                                                    }}
+                                                >
+                                                    ⏪
+                                                </span>
+                                            )}
                                         </div>
 
                                         {/* Timeline cell */}
@@ -644,12 +692,27 @@ export function EpgGuide() {
                                                 }
                                                 return blocks.map(({ program, block }) => {
                                                     const airing = isAiringNow(program.start, program.end, now);
+                                                    const replayable = !airing && isReplayable(program, channel, now);
+                                                    const baseTitle = program.description ? `${program.title}\n${program.description}` : program.title;
+                                                    const handleClick = airing
+                                                        ? (channel.tv_archive === 1
+                                                            ? (e: React.MouseEvent<HTMLDivElement>) => {
+                                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                                setProgramPopover({
+                                                                    channel, program,
+                                                                    anchor: { x: Math.max(rect.left, e.clientX - 110), y: rect.bottom }
+                                                                });
+                                                            }
+                                                            : () => setPlayingChannel(channel))
+                                                        : (replayable ? () => startReplay(channel, program) : undefined);
                                                     return (
                                                         <div
                                                             key={program.id + program.start}
-                                                            className="guide-program"
-                                                            onClick={airing ? () => setPlayingChannel(channel) : undefined}
-                                                            title={program.description ? `${program.title}\n${program.description}` : program.title}
+                                                            className={replayable ? 'guide-program guide-program-replay' : 'guide-program'}
+                                                            onClick={handleClick}
+                                                            title={replayable
+                                                                ? `${t('guide', 'replayOf').replace('{title}', program.title)}\n${baseTitle}`
+                                                                : baseTitle}
                                                             style={{
                                                                 position: 'absolute',
                                                                 left: block.left + 2,
@@ -658,16 +721,29 @@ export function EpgGuide() {
                                                                 borderRadius: '8px',
                                                                 padding: '6px 8px',
                                                                 overflow: 'hidden',
-                                                                cursor: airing ? 'pointer' : 'default',
+                                                                cursor: handleClick ? 'pointer' : 'default',
                                                                 background: airing
                                                                     ? 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.35) 0%, rgba(var(--ns-accent-grad-to-rgb), 0.25) 100%)'
-                                                                    : 'rgba(255, 255, 255, 0.05)',
+                                                                    : (replayable ? 'rgba(var(--ns-accent-rgb), 0.08)' : 'rgba(255, 255, 255, 0.05)'),
                                                                 border: airing
                                                                     ? '1px solid rgba(var(--ns-accent-rgb), 0.6)'
                                                                     : '1px solid rgba(255, 255, 255, 0.08)',
+                                                                borderLeft: airing
+                                                                    ? '1px solid rgba(var(--ns-accent-rgb), 0.6)'
+                                                                    : (replayable
+                                                                        ? '3px solid rgba(var(--ns-accent-rgb), 0.55)'
+                                                                        : '1px solid rgba(255, 255, 255, 0.08)'),
                                                                 transition: 'filter 0.2s ease'
                                                             }}
                                                         >
+                                                            {replayable && (
+                                                                <span className="guide-replay-hint" aria-hidden style={{
+                                                                    position: 'absolute', top: '4px', right: '6px',
+                                                                    fontSize: '11px', color: 'var(--ns-accent-light)'
+                                                                }}>
+                                                                    ⏪
+                                                                </span>
+                                                            )}
                                                             <div style={{
                                                                 fontSize: '12px', fontWeight: 600, lineHeight: '16px',
                                                                 color: airing ? '#e9d5ff' : 'rgba(226, 232, 240, 0.9)',
@@ -697,6 +773,33 @@ export function EpgGuide() {
                 )}
             </div>
 
+            {/* Current-program actions on archive channels (live / from start) */}
+            {programPopover && (
+                <ProgramActionsPopover
+                    title={programPopover.program.title}
+                    anchor={programPopover.anchor}
+                    onClose={() => setProgramPopover(null)}
+                    actions={[
+                        {
+                            key: 'watch-live',
+                            icon: '📡',
+                            label: t('guide', 'watchLive'),
+                            onClick: () => {
+                                const { channel } = programPopover;
+                                setProgramPopover(null);
+                                setPlayingChannel(channel);
+                            }
+                        },
+                        {
+                            key: 'watch-from-start',
+                            icon: '▶',
+                            label: t('guide', 'watchFromStart'),
+                            onClick: () => startReplay(programPopover.channel, programPopover.program)
+                        }
+                    ]}
+                />
+            )}
+
             {playingChannel && (
                 <AsyncVideoPlayer
                     movie={playingChannel}
@@ -707,7 +810,91 @@ export function EpgGuide() {
                     contentType="live"
                 />
             )}
+
+            {timeshiftPlayback && (
+                <AsyncVideoPlayer
+                    movie={timeshiftPlayback.channel}
+                    buildStreamUrl={buildTimeshiftStreamUrl}
+                    onClose={() => setTimeshiftPlayback(null)}
+                    customTitle={`${timeshiftPlayback.program.title} — ${timeshiftPlayback.channel.name}`}
+                    contentId={`${timeshiftPlayback.channel.stream_id}-ts-${timeshiftPlayback.program.start}`}
+                    contentType="live"
+                />
+            )}
         </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Small anchored action popover for a program block. Action list is
+// slot-friendly: future features (e.g. reminders) just append entries.
+// ---------------------------------------------------------------------------
+interface ProgramPopoverAction {
+    key: string;
+    icon?: string;
+    label: string;
+    onClick: () => void;
+}
+
+function ProgramActionsPopover({ title, anchor, actions, onClose }: {
+    title: string;
+    anchor: { x: number; y: number };
+    actions: ProgramPopoverAction[];
+    onClose: () => void;
+}) {
+    const POPOVER_WIDTH = 232;
+    const estimatedHeight = 40 + actions.length * 42;
+    const left = Math.max(8, Math.min(anchor.x, window.innerWidth - POPOVER_WIDTH - 8));
+    const top = Math.max(8, Math.min(anchor.y + 6, window.innerHeight - estimatedHeight - 8));
+    return (
+        <>
+            {/* Click-away backdrop */}
+            <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80 }} />
+            <div
+                role="menu"
+                style={{
+                    position: 'fixed', left, top, zIndex: 81,
+                    width: POPOVER_WIDTH, boxSizing: 'border-box',
+                    background: 'var(--ns-bg-panel)',
+                    border: '1px solid rgba(var(--ns-accent-rgb), 0.35)',
+                    borderRadius: '12px',
+                    boxShadow: '0 16px 40px rgba(0, 0, 0, 0.55)',
+                    padding: '6px'
+                }}
+            >
+                <div style={{
+                    padding: '8px 10px 6px',
+                    fontSize: '11px', fontWeight: 700,
+                    textTransform: 'uppercase', letterSpacing: '0.5px',
+                    color: 'var(--ns-accent-light)',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                }}>
+                    {title}
+                </div>
+                {actions.map(action => (
+                    <button
+                        key={action.key}
+                        className="guide-popover-action"
+                        role="menuitem"
+                        onClick={action.onClick}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: '10px',
+                            width: '100%', textAlign: 'left',
+                            background: 'transparent', border: 'none', cursor: 'pointer',
+                            borderRadius: '8px', padding: '10px 10px',
+                            fontSize: '13px', fontWeight: 500,
+                            color: 'rgba(229, 231, 235, 1)',
+                            transition: 'background 0.15s ease'
+                        }}
+                    >
+                        {action.icon && <span aria-hidden style={{ fontSize: '13px' }}>{action.icon}</span>}
+                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {action.label}
+                        </span>
+                    </button>
+                ))}
+            </div>
+        </>
     );
 }
 

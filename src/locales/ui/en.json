@@ -661,7 +661,12 @@
     "searchNoResults": "Nothing found in loaded programming",
     "today": "Today / Now",
     "earlier": "Earlier",
-    "later": "Later"
+    "later": "Later",
+    "replay": "Replay",
+    "replayBadge": "Replay available ({days} days)",
+    "replayOf": "Watch replay of {title}",
+    "watchLive": "Watch live",
+    "watchFromStart": "Watch from start"
   },
   "search": {
     "placeholder": "Search channels, movies and series...",

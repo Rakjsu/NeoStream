@@ -1,8 +1,10 @@
 import { ipcMain, BrowserWindow, dialog, screen } from 'electron'
+import axios from 'axios'
 import { XtreamClient } from './xtreamClient'
 import store from './store'
 import { getCertificateSettings, getProviderHttpsAgent, registerApprovedProviderUrl, setAllowInvalidProviderCertificates } from './certificatePolicy'
-import { resetProviderEpgState, setupProviderEpgHandlers } from './providerEpg'
+import { ensureProviderEpgLoaded, getProviderUtcOffsetMinutes, resetProviderEpgState, setupProviderEpgHandlers } from './providerEpg'
+import { formatTimeshiftStart } from './timeshiftProtocol'
 import {
     activatePlaylist,
     deactivatePlaylists,
@@ -23,6 +25,32 @@ const getErrorMessage = (error: unknown): string =>
 
 type OpenSubtitlesBody = Record<string, unknown> & {
     authToken?: string
+}
+
+// Which timeshift URL form the provider accepted this session ('m3u8' = path
+// form, 'php' = streaming/timeshift.php). Keyed by base URL so a playlist
+// switch re-probes the new provider.
+let timeshiftProbeResult: { base: string; form: 'm3u8' | 'php' } | null = null
+
+/**
+ * Quick probe of the path-form timeshift URL: GET with a 2s timeout, body
+ * discarded. 2xx/3xx means the provider speaks form (a); 4xx/timeout/network
+ * error means the caller should use the timeshift.php form instead.
+ */
+async function probeTimeshiftM3u8(url: string, baseUrl: string): Promise<boolean> {
+    try {
+        const response = await axios.get(url, {
+            timeout: 2000,
+            validateStatus: () => true,
+            responseType: 'stream',
+            httpsAgent: getProviderHttpsAgent(url, baseUrl)
+        })
+        const body = response.data as { destroy?: () => void } | undefined
+        body?.destroy?.()
+        return response.status >= 200 && response.status < 400
+    } catch {
+        return false
+    }
 }
 
 const OPEN_SUBTITLES_API_KEY = process.env.OPEN_SUBTITLES_API_KEY
@@ -592,6 +620,52 @@ export function setupIpcHandlers() {
             registerApprovedProviderUrl(url, auth.url)
 
             return { success: true, url }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
+    // Get catch-up/timeshift (replay) stream URL for an archived program.
+    // startIso is the program start in ISO-8601 (UTC); the provider expects
+    // its OWN local time, so the start is converted using the UTC offset
+    // learned from the provider xmltv (fallback: this machine's offset).
+    ipcMain.handle('streams:get-timeshift-url', async (_, { streamId, startIso, durationMin }) => {
+        try {
+            const auth = store.get('auth')
+            if (!auth.url || !auth.username || !auth.password) {
+                return { success: false, error: 'Not authenticated' }
+            }
+
+            const startMs = Date.parse(String(startIso))
+            if (Number.isNaN(startMs)) {
+                return { success: false, error: 'Invalid start time' }
+            }
+            const duration = Math.max(1, Math.round(Number(durationMin) || 0))
+
+            // Make sure the xmltv probe ran so the provider offset is known.
+            await ensureProviderEpgLoaded()
+            const offsetMinutes = getProviderUtcOffsetMinutes() ?? -new Date().getTimezoneOffset()
+            const start = formatTimeshiftStart(startMs, offsetMinutes)
+
+            const client = new XtreamClient(auth.url, auth.username, auth.password)
+            const m3u8Url = client.getTimeshiftM3u8Url(Number(streamId), start, duration)
+            const phpUrl = client.getTimeshiftPhpUrl(Number(streamId), start, duration)
+
+            // Session-cached probe: try the path form once; on 4xx/timeout
+            // fall back to streaming/timeshift.php for the rest of the session.
+            let form = timeshiftProbeResult?.base === auth.url ? timeshiftProbeResult.form : null
+            if (!form) {
+                form = (await probeTimeshiftM3u8(m3u8Url, auth.url)) ? 'm3u8' : 'php'
+                timeshiftProbeResult = { base: auth.url, form }
+                log.info('[Timeshift] Probe selected form:', form)
+            }
+
+            const url = form === 'm3u8' ? m3u8Url : phpUrl
+            const fallbackUrl = form === 'm3u8' ? phpUrl : m3u8Url
+            registerApprovedProviderUrl(url, auth.url)
+            registerApprovedProviderUrl(fallbackUrl, auth.url)
+
+            return { success: true, url, fallbackUrl, form, offsetMinutes }
         } catch (error: unknown) {
             return { success: false, error: getErrorMessage(error) }
         }

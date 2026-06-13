@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { getInvalidCertificateGuidance, getProviderHttpsAgent, isTlsCertificateError } from './certificatePolicy'
+import { buildTimeshiftM3u8Url, buildTimeshiftPhpUrl } from './timeshiftProtocol'
 
 import log from './logger'
 export interface XtreamAccount {
@@ -166,5 +167,18 @@ export class XtreamClient {
     // Build series episode URL
     getSeriesStreamUrl(streamId: number, container: string = 'mp4'): string {
         return `${this.baseUrl}/series/${this.username}/${this.password}/${streamId}.${container}`
+    }
+
+    // Build catch-up/timeshift URL, path form (a):
+    // {base}/timeshift/{user}/{pass}/{durationMin}/{start}/{id}.m3u8
+    // `start` is "YYYY-MM-DD:HH-MM" in the provider's local time.
+    getTimeshiftM3u8Url(streamId: number, start: string, durationMin: number): string {
+        return buildTimeshiftM3u8Url(this.baseUrl, this.username, this.password, streamId, start, durationMin)
+    }
+
+    // Build catch-up/timeshift URL, query form (b):
+    // {base}/streaming/timeshift.php?username=..&password=..&stream={id}&start={start}&duration={durationMin}
+    getTimeshiftPhpUrl(streamId: number, start: string, durationMin: number): string {
+        return buildTimeshiftPhpUrl(this.baseUrl, this.username, this.password, streamId, start, durationMin)
     }
 }
