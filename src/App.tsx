@@ -9,6 +9,7 @@ import { EpisodeToast } from './components/EpisodeToast';
 import { MiniPlayerProvider } from './components/MiniPlayer';
 import { CustomTitleBar } from './components/CustomTitleBar';
 import { profileService } from './services/profileService';
+import { reminderService } from './services/reminderService';
 import { useState, useEffect, lazy, Suspense } from 'react';
 
 const Home = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })));
@@ -29,6 +30,25 @@ function PageLoader() {
       <div className="text-white text-xl">Carregando...</div>
     </div>
   );
+}
+
+// Schedules program-reminder timers on boot and navigates when the user
+// clicks a fired native notification (main process sends 'notify:clicked').
+function ProgramReminderBridge() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    reminderService.scheduleAll();
+
+    const handleNotifyClicked = (_event: unknown, payload: unknown) => {
+      const route = (payload as { route?: string } | undefined)?.route;
+      if (route) navigate(route);
+    };
+    window.ipcRenderer.on('notify:clicked', handleNotifyClicked);
+    return () => window.ipcRenderer.off('notify:clicked', handleNotifyClicked);
+  }, [navigate]);
+
+  return null;
 }
 
 // Wrapper component to use navigate hook inside App
@@ -99,6 +119,7 @@ function App() {
       <UpdateNotification />
       <PostUpdateChangelog />
       <HashRouter>
+        <ProgramReminderBridge />
         <EpisodeToastWithNavigation />
         <Suspense fallback={<PageLoader />}>
           <Routes>
