@@ -288,9 +288,28 @@ const settingsStyles = `
     white-space: nowrap;
 }
 
-/* Content Area */
+/* Content Area — independently scrollable so tall sections (EPG results,
+   Reprodução with the MPV block) aren't cut off in the 800px window */
 .settings-content {
     flex: 1;
+    max-height: calc(100vh - 180px);
+    overflow-y: auto;
+    padding-right: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--ns-accent-rgb), 0.4) transparent;
+}
+
+.settings-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.settings-content::-webkit-scrollbar-thumb {
+    background: rgba(var(--ns-accent-rgb), 0.4);
+    border-radius: 3px;
+}
+
+.settings-content::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 /* Section Card */

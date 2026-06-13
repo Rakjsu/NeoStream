@@ -28,7 +28,9 @@ win:
       arch:
         - x64
   icon: build/icons/icon.ico
-  signAndEditExecutable: false
+  # signExecutable (not signAndEditExecutable): keep icon/metadata embedding
+  # via rcedit, skip only code signing
+  signExecutable: false
   verifyUpdateCodeSignature: false
 
 portable:
