@@ -310,7 +310,13 @@
     "mpvDetecting": "Detecting...",
     "mpvFoundAt": "MPV found at",
     "mpvNotFound": "mpv not found",
-    "mpvInstallHint": "Install with scoop install mpv, choco install mpv or download from mpv.io"
+    "mpvInstallHint": "Install with scoop install mpv, choco install mpv or download from mpv.io",
+    "mpvDownloadButton": "Download MPV automatically (~30MB)",
+    "mpvDownloading": "Downloading MPV...",
+    "mpvDownloadCancel": "Cancel",
+    "mpvDownloadSuccess": "MPV installed",
+    "mpvDownloadError": "MPV download failed. Check your connection.",
+    "mpvDownloadRetry": "Try again"
   },
   "appearance": {
     "title": "Appearance",
