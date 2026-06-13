@@ -9,6 +9,8 @@ import { profileService } from '../services/profileService';
 import { parentalService } from '../services/parentalService';
 import { useLanguage } from '../services/languageService';
 import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
+import { isReplayable, replayDurationMinutes } from '../utils/epgGuide';
+import { getTimeshiftUrl } from '../services/timeshiftService';
 
 interface LiveStream {
     num: number;
@@ -81,7 +83,7 @@ export function LiveTV() {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedChannel, setSelectedChannel] = useState<LiveStream | null>(null);
     const [playingChannel, setPlayingChannel] = useState<LiveStream | null>(null);
-    const [, setEpgData] = useState<EPGProgram[]>([]);
+    const [epgData, setEpgData] = useState<EPGProgram[]>([]);
     const [currentProgram, setCurrentProgram] = useState<EPGProgram | null>(null);
     const [upcomingPrograms, setUpcomingPrograms] = useState<EPGProgram[]>([]);
     const [visibleCount, setVisibleCount] = useState(0);
@@ -93,6 +95,8 @@ export function LiveTV() {
     const [allowedCategoryIds, setAllowedCategoryIds] = useState<Set<string>>(new Set());
     const [blockedCategoryIds, setBlockedCategoryIds] = useState<Set<string>>(new Set());
     const [pipResumeTime, setPipResumeTime] = useState<number | null>(null);
+    // Catch-up/replay playback (timeshift) of an already-aired program
+    const [replayPlayback, setReplayPlayback] = useState<{ channel: LiveStream; program: EPGProgram } | null>(null);
     const { t } = useLanguage();
 
     // Calculate items per page based on window dimensions
@@ -459,6 +463,25 @@ export function LiveTV() {
             throw error;
         }
     };
+
+    // Timeshift URL builder for the replay player — same shared service the
+    // EPG guide uses (main process probes the URL form + provider timezone).
+    const buildReplayStreamUrl = useCallback(async (channel: LiveStream): Promise<string> => {
+        const program = replayPlayback?.program;
+        if (!program) throw new Error('Programa de replay não selecionado');
+        const result = await getTimeshiftUrl({
+            streamId: channel.stream_id,
+            startIso: program.start,
+            durationMin: replayDurationMinutes(program.start, program.end)
+        });
+        return result.url;
+    }, [replayPlayback]);
+
+    // Recent already-aired programs of the selected archive channel
+    // (newest first, capped at 4) — each gets a ▶ Replay button.
+    const replayablePrograms = selectedChannel && selectedChannel.tv_archive === 1
+        ? epgData.filter(p => isReplayable(p, selectedChannel)).slice(-4).reverse()
+        : [];
 
     if (loading) {
         return (
@@ -1139,6 +1162,63 @@ export function LiveTV() {
                                         <div style={{ fontWeight: '500' }}>{t('liveTV', 'noScheduleInfo')}</div>
                                     </div>
                                 )}
+
+                                {/* Replay (catch-up): recent past programs on archive channels */}
+                                {replayablePrograms.length > 0 && (
+                                    <div style={{ marginTop: '20px' }}>
+                                        <div style={{ fontSize: '13px', color: 'rgba(148, 163, 184, 1)', marginBottom: '14px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                            ⏪ {t('guide', 'replay')}
+                                        </div>
+                                        {replayablePrograms.map((program, index) => (
+                                            <div
+                                                key={program.id || `${program.start}-${index}`}
+                                                className="epg-item epg-program-item"
+                                                style={{
+                                                    marginBottom: '10px',
+                                                    padding: 'clamp(10px, 1.5vw, 14px) clamp(12px, 1.5vw, 16px)',
+                                                    background: 'rgba(var(--ns-accent-rgb), 0.05)',
+                                                    borderRadius: '10px',
+                                                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                                                    borderLeft: '3px solid rgba(var(--ns-accent-rgb), 0.5)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '12px',
+                                                    animationDelay: `${index * 0.1}s`
+                                                }}
+                                            >
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{ fontSize: 'clamp(12px, 1.2vw, 14px)', color: 'white', fontWeight: '500', marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                        {program.title}
+                                                    </div>
+                                                    <div style={{ fontSize: '12px', color: 'rgba(148, 163, 184, 0.8)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                        <span style={{ opacity: 0.7 }}>🕐</span>
+                                                        {epgService.formatTime(program.start)} - {epgService.formatTime(program.end)}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    title={t('guide', 'replayOf').replace('{title}', program.title)}
+                                                    onClick={() => setReplayPlayback({ channel: selectedChannel!, program })}
+                                                    style={{
+                                                        flexShrink: 0,
+                                                        padding: '8px 14px',
+                                                        background: 'rgba(var(--ns-accent-rgb), 0.18)',
+                                                        color: 'var(--ns-accent-light)',
+                                                        border: '1px solid rgba(var(--ns-accent-rgb), 0.4)',
+                                                        borderRadius: '8px',
+                                                        fontSize: '12px',
+                                                        fontWeight: 600,
+                                                        cursor: 'pointer',
+                                                        transition: 'background 0.2s ease'
+                                                    }}
+                                                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(var(--ns-accent-rgb), 0.32)'; }}
+                                                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(var(--ns-accent-rgb), 0.18)'; }}
+                                                >
+                                                    ▶ {t('guide', 'replay')}
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -1336,6 +1416,17 @@ export function LiveTV() {
                     />
                 )
             }
+
+            {replayPlayback && (
+                <AsyncVideoPlayer
+                    movie={replayPlayback.channel}
+                    buildStreamUrl={buildReplayStreamUrl}
+                    onClose={() => setReplayPlayback(null)}
+                    customTitle={`${replayPlayback.program.title} — ${replayPlayback.channel.name}`}
+                    contentId={`${replayPlayback.channel.stream_id}-ts-${replayPlayback.program.start}`}
+                    contentType="live"
+                />
+            )}
         </div >
     );
 }

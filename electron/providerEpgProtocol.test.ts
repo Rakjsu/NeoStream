@@ -12,6 +12,8 @@ import {
     normalizeServerUrl,
     parseSimpleDataTable,
     parseXmltvIndex,
+    parseXmltvIndexWithMeta,
+    parseXmltvOffsetMinutes,
     parseXmltvTime,
     PROVIDER_EPG_FUTURE_WINDOW_MS,
     PROVIDER_EPG_PAST_WINDOW_MS,
@@ -158,6 +160,48 @@ describe('parseXmltvIndex', () => {
 
     it('returns an empty index for non-XMLTV input', () => {
         expect(parseXmltvIndex('<html>404</html>', NOW).size).toBe(0)
+    })
+})
+
+describe('parseXmltvOffsetMinutes', () => {
+    it('extracts positive and negative offsets in minutes', () => {
+        expect(parseXmltvOffsetMinutes('20260612153000 -0300')).toBe(-180)
+        expect(parseXmltvOffsetMinutes('20260612153000 +0200')).toBe(120)
+        expect(parseXmltvOffsetMinutes('20260612153000 +0530')).toBe(330)
+        expect(parseXmltvOffsetMinutes('20260612153000 +0000')).toBe(0)
+    })
+
+    it('returns null when the offset is absent or malformed', () => {
+        expect(parseXmltvOffsetMinutes('20260612153000')).toBeNull()
+        expect(parseXmltvOffsetMinutes('bogus')).toBeNull()
+        expect(parseXmltvOffsetMinutes('')).toBeNull()
+    })
+})
+
+describe('parseXmltvIndexWithMeta', () => {
+    it('reports the dominant UTC offset across programmes', () => {
+        // Fixture (in-window only): 2 programmes with +0000, 1 with -0300 → +0000 wins.
+        const { index, utcOffsetMinutes } = parseXmltvIndexWithMeta(XMLTV_FIXTURE, NOW)
+        expect(index.size).toBe(2)
+        expect(utcOffsetMinutes).toBe(0)
+    })
+
+    it('picks the most common offset when providers mix timezones', () => {
+        const xml = `<tv>
+            <programme start="20260612100000 -0300" stop="20260612110000 -0300" channel="a"><title>1</title></programme>
+            <programme start="20260612110000 -0300" stop="20260612120000 -0300" channel="a"><title>2</title></programme>
+            <programme start="20260612100000 +0000" stop="20260612110000 +0000" channel="b"><title>3</title></programme>
+        </tv>`
+        expect(parseXmltvIndexWithMeta(xml, NOW).utcOffsetMinutes).toBe(-180)
+    })
+
+    it('returns null when no programme carries an offset', () => {
+        const xml = `<tv>
+            <programme start="20260612100000" stop="20260612110000" channel="a"><title>1</title></programme>
+        </tv>`
+        const result = parseXmltvIndexWithMeta(xml, NOW)
+        expect(result.index.get('a')).toHaveLength(1)
+        expect(result.utcOffsetMinutes).toBeNull()
     })
 })
 

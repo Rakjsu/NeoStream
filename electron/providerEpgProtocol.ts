@@ -80,6 +80,18 @@ export function parseXmltvTime(value: string): number | null {
     return Date.UTC(year, month, day, hour, minute, second) - offsetMs
 }
 
+/**
+ * Extract the UTC offset (in minutes) from an XMLTV time value, e.g.
+ * "20260612153000 -0300" → -180. Returns null when the offset is absent.
+ * Used to learn the provider's local timezone for timeshift start strings.
+ */
+export function parseXmltvOffsetMinutes(value: string): number | null {
+    const match = /^\d{12,14}\s*([+-])(\d{2})(\d{2})$/.exec(value.trim())
+    if (!match) return null
+    const sign = match[1] === '-' ? -1 : 1
+    return sign * (parseInt(match[2], 10) * 60 + parseInt(match[3], 10))
+}
+
 /** Strip a CDATA wrapper (if any) and decode the common XML entities. */
 export function decodeXmlText(text: string): string {
     let value = text.trim()
@@ -120,14 +132,29 @@ const ATTR_RE: Record<string, RegExp> = {
 const TITLE_RE = /<title[^>]*>([\s\S]*?)<\/title>/i
 const DESC_RE = /<desc[^>]*>([\s\S]*?)<\/desc>/i
 
+export interface XmltvIndexResult {
+    index: Map<string, ProviderEpgProgram[]>
+    /**
+     * Most common UTC offset (minutes) seen on programme start attributes —
+     * i.e. the provider's local timezone — or null when none carried one.
+     */
+    utcOffsetMinutes: number | null
+}
+
 /**
  * Single-pass scan of an XMLTV document into a per-channel program index.
  * Regex/string scanning on purpose (same approach as the renderer's Open-EPG
  * parser) — a DOM parse of a multi-megabyte dump would be far more expensive.
  */
 export function parseXmltvIndex(xml: string, nowMs: number = Date.now()): Map<string, ProviderEpgProgram[]> {
+    return parseXmltvIndexWithMeta(xml, nowMs).index
+}
+
+/** Same scan as parseXmltvIndex, additionally tallying the dominant UTC offset. */
+export function parseXmltvIndexWithMeta(xml: string, nowMs: number = Date.now()): XmltvIndexResult {
     const index = new Map<string, ProviderEpgProgram[]>()
     const window = buildDefaultWindow(nowMs)
+    const offsetCounts = new Map<number, number>()
 
     PROGRAMME_RE.lastIndex = 0
     let match: RegExpExecArray | null
@@ -140,10 +167,16 @@ export function parseXmltvIndex(xml: string, nowMs: number = Date.now()): Map<st
         const stopMatch = ATTR_RE.stop.exec(attrs)
         if (!channelMatch || !startMatch || !stopMatch) continue
 
-        const startMs = parseXmltvTime(decodeXmlText(startMatch[1]))
+        const startRaw = decodeXmlText(startMatch[1])
+        const startMs = parseXmltvTime(startRaw)
         const endMs = parseXmltvTime(decodeXmlText(stopMatch[1]))
         if (startMs === null || endMs === null) continue
         if (endMs < window.minEndMs || startMs > window.maxStartMs) continue
+
+        const offset = parseXmltvOffsetMinutes(startRaw)
+        if (offset !== null) {
+            offsetCounts.set(offset, (offsetCounts.get(offset) ?? 0) + 1)
+        }
 
         const channelId = decodeXmlText(channelMatch[1])
         if (!channelId) continue
@@ -170,7 +203,16 @@ export function parseXmltvIndex(xml: string, nowMs: number = Date.now()): Map<st
         programs.sort((a, b) => a.start.localeCompare(b.start))
     }
 
-    return index
+    let utcOffsetMinutes: number | null = null
+    let bestCount = 0
+    for (const [offset, count] of offsetCounts) {
+        if (count > bestCount) {
+            utcOffsetMinutes = offset
+            bestCount = count
+        }
+    }
+
+    return { index, utcOffsetMinutes }
 }
 
 /** Decode a base64 string as UTF-8 text (Xtream get_simple_data_table fields). */

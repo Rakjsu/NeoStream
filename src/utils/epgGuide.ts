@@ -156,6 +156,47 @@ export function isAiringNow(startIso: string, endIso: string, now: number = Date
     return now >= start && now < end;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Minimal channel shape for replay checks (Xtream live stream fields). */
+export interface ReplayChannelLike {
+    /** 1 when the provider archives this channel (catch-up available). */
+    tv_archive: number;
+    /** Retention in days (0/undefined → assume 1 day). */
+    tv_archive_duration: number;
+}
+
+/**
+ * True when an already-finished program can be replayed via timeshift:
+ * the channel has the archive flag, the program has ended, and its start
+ * still falls inside the provider's retention window.
+ */
+export function isReplayable(
+    program: { start: string; end: string },
+    channel: ReplayChannelLike,
+    nowMs: number = Date.now()
+): boolean {
+    if (channel.tv_archive !== 1) return false;
+    const start = Date.parse(program.start);
+    const end = Date.parse(program.end);
+    if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return false;
+    if (end >= nowMs) return false;
+    const retentionDays = channel.tv_archive_duration > 0 ? channel.tv_archive_duration : 1;
+    return start >= nowMs - retentionDays * DAY_MS;
+}
+
+/**
+ * Timeshift duration in whole minutes for a program: its real duration plus
+ * a small slack so the tail isn't cut off. Falls back to the slack alone on
+ * malformed timestamps.
+ */
+export function replayDurationMinutes(startIso: string, endIso: string, slackMin: number = 2): number {
+    const start = Date.parse(startIso);
+    const end = Date.parse(endIso);
+    if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return Math.max(1, slackMin);
+    return Math.ceil((end - start) / 60000) + slackMin;
+}
+
 /** HH:MM label for a tick / program time (local time, 24h). */
 export function formatGuideTime(ms: number): string {
     return new Date(ms).toLocaleTimeString('pt-BR', {

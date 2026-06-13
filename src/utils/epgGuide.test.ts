@@ -13,7 +13,9 @@ import {
     isAiringNow,
     clampWindow,
     shiftWindow,
-    searchPrograms
+    searchPrograms,
+    isReplayable,
+    replayDurationMinutes
 } from './epgGuide';
 
 // Fixed reference: 2026-06-11T15:47:00Z
@@ -181,5 +183,67 @@ describe('searchPrograms', () => {
             ['X', [{ title: 'Foo', start: 'not-a-date', end: iso(30) }]]
         ];
         expect(searchPrograms(bad, 'foo')).toEqual([]);
+    });
+});
+
+describe('isReplayable', () => {
+    const HOUR = 60 * 60 * 1000;
+    const DAY = 24 * HOUR;
+    const isoAt = (ms: number) => new Date(ms).toISOString();
+    const archive = { tv_archive: 1, tv_archive_duration: 3 };
+    const noArchive = { tv_archive: 0, tv_archive_duration: 0 };
+    const pastProgram = { start: isoAt(NOW - 3 * HOUR), end: isoAt(NOW - 2 * HOUR) };
+
+    it('accepts a finished program on an archive channel within retention', () => {
+        expect(isReplayable(pastProgram, archive, NOW)).toBe(true);
+    });
+
+    it('rejects channels without the archive flag', () => {
+        expect(isReplayable(pastProgram, noArchive, NOW)).toBe(false);
+    });
+
+    it('rejects programs still airing or in the future', () => {
+        const airing = { start: isoAt(NOW - HOUR), end: isoAt(NOW + HOUR) };
+        const future = { start: isoAt(NOW + HOUR), end: isoAt(NOW + 2 * HOUR) };
+        expect(isReplayable(airing, archive, NOW)).toBe(false);
+        expect(isReplayable(future, archive, NOW)).toBe(false);
+    });
+
+    it('rejects programs older than the retention window', () => {
+        const old = { start: isoAt(NOW - 4 * DAY), end: isoAt(NOW - 4 * DAY + HOUR) };
+        expect(isReplayable(old, archive, NOW)).toBe(false);
+        // ...but the same program passes with a longer retention
+        expect(isReplayable(old, { tv_archive: 1, tv_archive_duration: 7 }, NOW)).toBe(true);
+    });
+
+    it('assumes 1-day retention when tv_archive_duration is 0/missing', () => {
+        const yesterday = { start: isoAt(NOW - 20 * HOUR), end: isoAt(NOW - 19 * HOUR) };
+        const older = { start: isoAt(NOW - 30 * HOUR), end: isoAt(NOW - 29 * HOUR) };
+        const zeroRetention = { tv_archive: 1, tv_archive_duration: 0 };
+        expect(isReplayable(yesterday, zeroRetention, NOW)).toBe(true);
+        expect(isReplayable(older, zeroRetention, NOW)).toBe(false);
+    });
+
+    it('rejects malformed or inverted timestamps', () => {
+        expect(isReplayable({ start: 'bogus', end: isoAt(NOW - HOUR) }, archive, NOW)).toBe(false);
+        expect(isReplayable({ start: isoAt(NOW - HOUR), end: isoAt(NOW - 2 * HOUR) }, archive, NOW)).toBe(false);
+    });
+});
+
+describe('replayDurationMinutes', () => {
+    const isoAt = (ms: number) => new Date(ms).toISOString();
+
+    it('returns the program duration plus the default 2-minute slack', () => {
+        expect(replayDurationMinutes(isoAt(NOW), isoAt(NOW + 60 * 60 * 1000))).toBe(62);
+    });
+
+    it('rounds partial minutes up and honors a custom slack', () => {
+        expect(replayDurationMinutes(isoAt(NOW), isoAt(NOW + 90 * 1000), 0)).toBe(2);
+        expect(replayDurationMinutes(isoAt(NOW), isoAt(NOW + 30 * 60 * 1000), 5)).toBe(35);
+    });
+
+    it('falls back to the slack on malformed timestamps', () => {
+        expect(replayDurationMinutes('bogus', isoAt(NOW))).toBe(2);
+        expect(replayDurationMinutes(isoAt(NOW), isoAt(NOW))).toBe(2);
     });
 });

@@ -19,7 +19,7 @@ import {
     buildXmltvUrl,
     looksLikeXmltv,
     parseSimpleDataTable,
-    parseXmltvIndex,
+    parseXmltvIndexWithMeta,
 } from './providerEpgProtocol'
 import type { ProviderEpgProgram } from './providerEpgProtocol'
 
@@ -42,6 +42,9 @@ interface Credentials {
 let xmltvAvailability: Availability = 'unknown'
 let xmltvIndex: Map<string, ProviderEpgProgram[]> | null = null
 let xmltvLoading: Promise<void> | null = null
+// Provider's local UTC offset (minutes) learned from the xmltv timestamps —
+// used to format timeshift (catch-up) start strings in provider-local time.
+let providerUtcOffsetMinutes: number | null = null
 
 // get_simple_data_table fallback — disabled for the session on first hard failure.
 let simpleTableAvailable = true
@@ -60,8 +63,26 @@ export function resetProviderEpgState() {
     xmltvAvailability = 'unknown'
     xmltvIndex = null
     xmltvLoading = null
+    providerUtcOffsetMinutes = null
     simpleTableAvailable = true
     simpleTableCache.clear()
+}
+
+/**
+ * The provider's local UTC offset (minutes) as seen in its xmltv timestamps,
+ * or null when unknown (no xmltv / no offsets). Callers should fall back to
+ * the local machine offset.
+ */
+export function getProviderUtcOffsetMinutes(): number | null {
+    return providerUtcOffsetMinutes
+}
+
+/**
+ * Triggers the xmltv probe (no-op if already done) so the offset above gets
+ * populated before building a timeshift start string.
+ */
+export function ensureProviderEpgLoaded(): Promise<void> {
+    return ensureXmltvIndex()
 }
 
 /**
@@ -166,8 +187,13 @@ function ensureXmltvIndex(): Promise<void> {
             }
 
             const parseStart = Date.now()
-            xmltvIndex = parseXmltvIndex(xml)
+            const parsed = parseXmltvIndexWithMeta(xml)
+            xmltvIndex = parsed.index
+            providerUtcOffsetMinutes = parsed.utcOffsetMinutes
             xmltvAvailability = 'ready'
+            if (parsed.utcOffsetMinutes !== null) {
+                log.info('[Provider EPG] Provider UTC offset (min):', parsed.utcOffsetMinutes)
+            }
 
             let programCount = 0
             for (const programs of xmltvIndex.values()) programCount += programs.length

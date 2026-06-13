@@ -158,6 +158,12 @@ test('guia de TV: seletor de categoria e linhas de canais', async () => {
     // Channel rows from the mock render (EPG itself may be "Sem programação")
     await expect(page.getByText('Globo São Paulo HD').first()).toBeVisible();
     await expect(page.getByText('SBT HD').first()).toBeVisible();
+
+    // Replay (catch-up) badge: only on the archive-enabled mock channel
+    const globoRow = page.locator('div', { hasText: 'Globo São Paulo HD' }).locator('span', { hasText: '⏪' });
+    await expect(globoRow.first()).toBeVisible();
+    const sbtCell = page.getByText('SBT HD').first().locator('..');
+    await expect(sbtCell.locator('span', { hasText: '⏪' })).toHaveCount(0);
 });
 
 test('configurações: página renderiza título e seções', async () => {
