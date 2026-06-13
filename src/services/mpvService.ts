@@ -26,6 +26,19 @@ export interface MpvPlayResult {
     reason?: string;
 }
 
+export interface MpvDownloadProgress {
+    percent: number;
+    transferredMB: number;
+    totalMB: number;
+}
+
+export interface MpvDownloadResult {
+    success: boolean;
+    path?: string;
+    version?: string;
+    reason?: string;
+}
+
 class MpvService {
     /** Resolved mpv path (configured > PATH > common install dirs) or null. */
     async getAvailability(): Promise<MpvAvailability> {
@@ -89,6 +102,35 @@ class MpvService {
         } catch {
             return null;
         }
+    }
+
+    /**
+     * One-click MPV install: download the latest Windows build and persist
+     * its path. Resolves with the final result (progress arrives via
+     * onDownloadProgress). Never throws — inspect `success`/`reason`.
+     */
+    async startDownload(): Promise<MpvDownloadResult> {
+        try {
+            const result = await window.ipcRenderer.invoke('mpv:download-start');
+            return result ?? { success: false, reason: 'no-response' };
+        } catch (error) {
+            console.warn('[MPV] download failed:', error);
+            return { success: false, reason: 'ipc-error' };
+        }
+    }
+
+    /** Abort an in-flight download (startDownload resolves with reason 'cancelled'). */
+    async cancelDownload(): Promise<void> {
+        await window.ipcRenderer.invoke('mpv:download-cancel').catch(() => undefined);
+    }
+
+    /** Subscribe to download progress events. Returns the unsubscribe function. */
+    onDownloadProgress(listener: (progress: MpvDownloadProgress) => void): () => void {
+        const wrapped = (_event: unknown, progress: unknown) => {
+            listener(progress as MpvDownloadProgress);
+        };
+        window.ipcRenderer.on('mpv:download-progress', wrapped);
+        return () => window.ipcRenderer.off('mpv:download-progress', wrapped);
     }
 
     /** Persist a user-chosen mpv.exe path (empty clears it). Returns the re-resolved path. */

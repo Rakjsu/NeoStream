@@ -46,6 +46,8 @@ const invokeChannels = new Set([
     'epg:provider-channel',
     'fetch-url',
     'mpv:available',
+    'mpv:download-cancel',
+    'mpv:download-start',
     'mpv:pause',
     'mpv:play',
     'mpv:resume',
@@ -99,6 +101,7 @@ const sendChannels = new Set([
 const receiveChannels = new Set([
     'download:progress',
     'main-process-message',
+    'mpv:download-progress',
     'pip:clickThroughChanged',
     'pip:closed',
     'pip:control',

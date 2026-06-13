@@ -2,8 +2,16 @@ import { useEffect, useState } from 'react';
 import { playbackService } from '../../services/playbackService';
 import type { PlaybackConfig } from '../../services/playbackService';
 import { mpvService } from '../../services/mpvService';
+import type { MpvDownloadProgress } from '../../services/mpvService';
 import { useLanguage } from '../../services/languageService';
 import { useSaveAnimation } from './useSaveAnimation';
+
+// EXPERIMENTAL — one-click MPV download state machine
+type MpvDownloadState =
+    | { phase: 'idle' }
+    | { phase: 'downloading'; progress: MpvDownloadProgress | null }
+    | { phase: 'success'; path: string }
+    | { phase: 'error' };
 
 export function PlaybackSection() {
     const [playbackConfig, setPlaybackConfig] = useState<PlaybackConfig>(playbackService.getConfig());
@@ -14,6 +22,7 @@ export function PlaybackSection() {
     const [mpvPathInput, setMpvPathInput] = useState('');
     const [mpvDetecting, setMpvDetecting] = useState(false);
     const [mpvResolvedPath, setMpvResolvedPath] = useState<string | null | undefined>(undefined);
+    const [mpvDownload, setMpvDownload] = useState<MpvDownloadState>({ phase: 'idle' });
 
     const handlePlaybackConfigChange = <K extends keyof PlaybackConfig>(key: K, value: PlaybackConfig[K]) => {
         const newConfig = { ...playbackConfig, [key]: value };
@@ -45,6 +54,28 @@ export function PlaybackSection() {
             setMpvResolvedPath(resolved);
         } finally {
             setMpvDetecting(false);
+        }
+    };
+
+    // EXPERIMENTAL — one-click MPV download (progress streams via mpv:download-progress)
+    const handleMpvDownload = async () => {
+        setMpvDownload({ phase: 'downloading', progress: null });
+        const unsubscribe = mpvService.onDownloadProgress((progress) => {
+            setMpvDownload((prev) => (prev.phase === 'downloading' ? { phase: 'downloading', progress } : prev));
+        });
+        try {
+            const result = await mpvService.startDownload();
+            if (result.success && result.path) {
+                setMpvResolvedPath(result.path);
+                setMpvPathInput(result.path);
+                setMpvDownload({ phase: 'success', path: result.path });
+            } else if (result.reason === 'cancelled') {
+                setMpvDownload({ phase: 'idle' });
+            } else {
+                setMpvDownload({ phase: 'error' });
+            }
+        } finally {
+            unsubscribe();
         }
     };
 
@@ -235,6 +266,82 @@ export function PlaybackSection() {
                                     : (t('playback', 'mpvDetect') || 'Detectar')}
                             </button>
                         </div>
+
+                        {/* EXPERIMENTAL — one-click MPV download (mpv not found, or download in progress) */}
+                        {(mpvResolvedPath === null || mpvDownload.phase !== 'idle') && (
+                            <div style={{ width: '100%' }}>
+                                {(mpvDownload.phase === 'idle' || mpvDownload.phase === 'error') && (
+                                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                        <button
+                                            onClick={handleMpvDownload}
+                                            style={{
+                                                cursor: 'pointer',
+                                                border: 'none',
+                                                borderRadius: '8px',
+                                                padding: '10px 18px',
+                                                fontWeight: 600,
+                                                color: '#fff',
+                                                background: 'linear-gradient(135deg, var(--ns-accent) 0%, var(--ns-accent-dark) 100%)',
+                                            }}
+                                        >
+                                            {mpvDownload.phase === 'error'
+                                                ? (t('playback', 'mpvDownloadRetry') || 'Tentar novamente')
+                                                : (t('playback', 'mpvDownloadButton') || 'Baixar MPV automaticamente (~30MB)')}
+                                        </button>
+                                        {mpvDownload.phase === 'error' && (
+                                            <span style={{ color: '#ef4444', fontSize: '13px' }}>
+                                                ✕ {t('playback', 'mpvDownloadError') || 'Falha ao baixar o MPV. Verifique sua conexão.'}
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+
+                                {mpvDownload.phase === 'downloading' && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                                            <span>{t('playback', 'mpvDownloading') || 'Baixando MPV...'}</span>
+                                            <span style={{ opacity: 0.8 }}>
+                                                {mpvDownload.progress
+                                                    ? `${mpvDownload.progress.percent}% — ${mpvDownload.progress.transferredMB} / ${mpvDownload.progress.totalMB} MB`
+                                                    : '...'}
+                                            </span>
+                                        </div>
+                                        <div
+                                            style={{
+                                                height: '8px',
+                                                borderRadius: '4px',
+                                                overflow: 'hidden',
+                                                background: 'rgba(var(--ns-accent-rgb), 0.15)',
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    height: '100%',
+                                                    width: `${mpvDownload.progress?.percent ?? 0}%`,
+                                                    transition: 'width 0.3s ease',
+                                                    background: 'linear-gradient(90deg, var(--ns-accent) 0%, var(--ns-accent-dark) 100%)',
+                                                }}
+                                            />
+                                        </div>
+                                        <div>
+                                            <button
+                                                className="setting-select"
+                                                style={{ cursor: 'pointer' }}
+                                                onClick={() => mpvService.cancelDownload()}
+                                            >
+                                                {t('playback', 'mpvDownloadCancel') || 'Cancelar'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {mpvDownload.phase === 'success' && (
+                                    <span style={{ color: '#10b981', fontSize: '13px' }}>
+                                        ✓ {t('playback', 'mpvDownloadSuccess') || 'MPV instalado'}: {mpvDownload.path}
+                                    </span>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

@@ -16,6 +16,9 @@
  *   mpv:set-fullscreen -> { success }            ({ fullscreen: boolean })
  *   mpv:status         -> MpvStatus snapshot (polled by the renderer)
  *   mpv:set-path       -> { path: string | null } (persists to electron-store)
+ *   mpv:download-start -> MpvInstallResult (one-click install, see mpvDownloader.ts)
+ *   mpv:download-cancel-> { success: boolean }
+ *   mpv:download-progress (main -> renderer) { percent, transferredMB, totalMB }
  *
  * Phase 2 pseudo-embedding: mpv is spawned borderless/ontop with --geometry
  * matching the caller window's client area minus the bottom controls strip
@@ -29,8 +32,10 @@ import { app, ipcMain, BrowserWindow } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import net from 'node:net'
+import path from 'node:path'
 import store from './store'
 import log from './logger'
+import { installMpv } from './mpvDownloader'
 import {
     applyIpcMessage,
     buildMpvArgs,
@@ -424,6 +429,49 @@ export function setupMpvHandlers() {
     })
 
     ipcMain.handle('mpv:status', () => getStatusSnapshot())
+
+    // EXPERIMENTAL — one-click MPV install. Single in-flight download; the
+    // controller doubles as the guard (null = idle).
+    let downloadController: AbortController | null = null
+
+    ipcMain.handle('mpv:download-start', async (event) => {
+        if (downloadController) {
+            return { success: false, reason: 'in-progress' }
+        }
+        const controller = new AbortController()
+        downloadController = controller
+        const sender = event.sender
+        try {
+            const result = await installMpv({
+                installDir: path.join(app.getPath('userData'), 'mpv'),
+                signal: controller.signal,
+                onProgress: (progress) => {
+                    if (!sender.isDestroyed()) {
+                        sender.send('mpv:download-progress', progress)
+                    }
+                },
+            })
+            if (result.success && result.path) {
+                // Same flow as mpv:set-path: persist + invalidate the resolver cache.
+                store.set('settings', { ...store.get('settings'), mpvPath: result.path })
+                await resolveMpvPath(true)
+                log.info(`[MPV] auto-download installed ${result.path} (${result.version ?? 'unknown version'})`)
+            } else if (!result.success) {
+                log.warn(`[MPV] auto-download failed: ${result.reason}`)
+            }
+            return result
+        } finally {
+            if (downloadController === controller) {
+                downloadController = null
+            }
+        }
+    })
+
+    ipcMain.handle('mpv:download-cancel', () => {
+        if (!downloadController) return { success: false }
+        downloadController.abort()
+        return { success: true }
+    })
 
     ipcMain.handle('mpv:set-path', async (_event, payload: { path?: string }) => {
         const path = typeof payload?.path === 'string' ? payload.path.trim() : ''
