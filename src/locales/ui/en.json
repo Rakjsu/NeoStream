@@ -237,7 +237,9 @@
     "noNotifications": "No notifications",
     "newNotifications": "New updates will appear here",
     "ago": "ago",
-    "now": "now"
+    "now": "now",
+    "programReminder": "Program Reminder",
+    "programReminderStarting": "{title} is starting on {channel}"
   },
   "changelog": {
     "updateInstalled": "Update Installed!",
@@ -666,7 +668,9 @@
     "replayBadge": "Replay available ({days} days)",
     "replayOf": "Watch replay of {title}",
     "watchLive": "Watch live",
-    "watchFromStart": "Watch from start"
+    "watchFromStart": "Watch from start",
+    "remind": "Remind me about this program",
+    "removeReminder": "Remove reminder"
   },
   "search": {
     "placeholder": "Search channels, movies and series...",

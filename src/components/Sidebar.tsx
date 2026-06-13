@@ -249,6 +249,9 @@ export function Sidebar() {
                         onNavigateToDownloads={() => {
                             navigate('/dashboard/downloads');
                         }}
+                        onNavigateToGuide={() => {
+                            navigate('/dashboard/guide');
+                        }}
                     />
 
                     {/* Profile */}
