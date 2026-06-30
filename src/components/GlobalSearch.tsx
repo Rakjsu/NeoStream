@@ -6,6 +6,12 @@ import { useLanguage } from '../services/languageService';
 import { profileService } from '../services/profileService';
 import { parentalService } from '../services/parentalService';
 import { isCategoryNameBlocked } from '../hooks/useContentFiltering';
+import {
+    rankItems,
+    getRecentSearches,
+    addRecentSearch,
+    clearRecentSearches
+} from '../utils/searchRank';
 
 /**
  * sessionStorage bridge: the section pages (LiveTV/VOD/Series) don't support
@@ -181,25 +187,12 @@ function isItemAllowed(item: SearchItem, gate: GateConfig): boolean {
 }
 
 /**
- * Case-insensitive substring match, ranked startsWith > includes,
- * capped at MAX_PER_CATEGORY results.
+ * Diacritics- and case-insensitive scored match (exact > prefix >
+ * word-boundary > substring > subsequence/fuzzy), capped at
+ * MAX_PER_CATEGORY after scoring. See src/utils/searchRank.ts.
  */
 function matchItems(items: SearchItem[], query: string): SearchItem[] {
-    const q = query.toLowerCase();
-    const startsWith: SearchItem[] = [];
-    const includes: SearchItem[] = [];
-    for (const item of items) {
-        const name = item.name.toLowerCase();
-        const index = name.indexOf(q);
-        if (index === -1) continue;
-        if (index === 0) {
-            startsWith.push(item);
-            if (startsWith.length >= MAX_PER_CATEGORY) break;
-        } else if (includes.length < MAX_PER_CATEGORY) {
-            includes.push(item);
-        }
-    }
-    return startsWith.concat(includes).slice(0, MAX_PER_CATEGORY);
+    return rankItems(items, query, item => item.name, MAX_PER_CATEGORY);
 }
 
 interface ResultGroup {
@@ -230,6 +223,7 @@ export function GlobalSearch() {
     const [loading, setLoading] = useState(false);
     const [loadError, setLoadError] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(0);
+    const [recent, setRecent] = useState<string[]>([]);
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
     const openRef = useRef(open);
@@ -295,9 +289,11 @@ export function GlobalSearch() {
         };
     }, [ensureDataLoaded]);
 
-    // Autofocus on open
+    // Autofocus on open; also refresh the recent-searches list so it reflects
+    // anything added since the last open.
     useEffect(() => {
         if (open) {
+            setRecent(getRecentSearches());
             // After the overlay paints
             requestAnimationFrame(() => inputRef.current?.focus());
         }
@@ -350,6 +346,9 @@ export function GlobalSearch() {
         } catch {
             // sessionStorage unavailable: navigation still works, just unfiltered
         }
+        // Record the typed query (not the item name) as a recent search.
+        const typed = query.trim();
+        if (typed) addRecentSearch(typed);
         navigate(SECTION_ROUTES[item.kind]);
         // Covers the "already on that page" case (no remount on same-route navigate)
         window.dispatchEvent(new Event(GLOBAL_SEARCH_EVENT));
@@ -357,6 +356,20 @@ export function GlobalSearch() {
         setInputValue('');
         setQuery('');
     }, [navigate, query]);
+
+    // Click a recent-search chip: fill the input and run the search immediately.
+    const runRecent = useCallback((term: string) => {
+        setQueryDebounced.cancel();
+        setInputValue(term);
+        setQuery(term);
+        setSelectedIndex(0);
+        requestAnimationFrame(() => inputRef.current?.focus());
+    }, [setQueryDebounced]);
+
+    const clearRecent = useCallback(() => {
+        clearRecentSearches();
+        setRecent([]);
+    }, []);
 
     const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'ArrowDown') {
@@ -372,7 +385,17 @@ export function GlobalSearch() {
         } else if (e.key === 'Enter') {
             e.preventDefault();
             const item = flatResults[selectedIndex];
-            if (item) activate(item);
+            if (item) {
+                activate(item);
+            } else {
+                // Enter with a non-empty query but no results: still record it
+                // as a recent search so it can be re-run later.
+                const typed = query.trim();
+                if (typed) {
+                    addRecentSearch(typed);
+                    setRecent(getRecentSearches());
+                }
+            }
         }
     };
 
@@ -380,6 +403,9 @@ export function GlobalSearch() {
 
     const trimmedQuery = query.trim();
     const showNoResults = !!data && !!trimmedQuery && flatResults.length === 0;
+    // Recents show only when the input is empty (keyed off the live value so it
+    // hides the instant the user types) and we're not loading/erroring.
+    const showRecents = !loading && !loadError && inputValue.trim() === '' && recent.length > 0;
 
     return (
         <>
@@ -427,6 +453,33 @@ export function GlobalSearch() {
                         {showNoResults && !loading && (
                             <div className="gsearch-status">
                                 <span>{t('search', 'noResults')}</span>
+                            </div>
+                        )}
+
+                        {showRecents && (
+                            <div className="gsearch-recent">
+                                <div className="gsearch-recent-header">
+                                    <span>{t('search', 'recent')}</span>
+                                    <button
+                                        type="button"
+                                        className="gsearch-recent-clear"
+                                        onClick={clearRecent}
+                                    >
+                                        {t('search', 'clearRecent')}
+                                    </button>
+                                </div>
+                                <div className="gsearch-recent-chips">
+                                    {recent.map(term => (
+                                        <button
+                                            key={term}
+                                            type="button"
+                                            className="gsearch-recent-chip"
+                                            onClick={() => runRecent(term)}
+                                        >
+                                            🕘 {term}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         )}
 
@@ -689,6 +742,72 @@ const globalSearchStyles = `
     background: rgba(236, 72, 153, 0.15);
     color: #f9a8d4;
     border: 1px solid rgba(236, 72, 153, 0.3);
+}
+
+/* Recent searches */
+.gsearch-recent {
+    padding: 6px 4px 10px;
+}
+
+.gsearch-recent-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px 8px;
+    color: var(--ns-accent-light);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.gsearch-recent-clear {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.gsearch-recent-clear:hover {
+    color: white;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.gsearch-recent-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0 12px;
+}
+
+.gsearch-recent-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    padding: 7px 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.gsearch-recent-chip:hover {
+    background: rgba(var(--ns-accent-rgb), 0.18);
+    border-color: rgba(var(--ns-accent-rgb), 0.4);
 }
 
 /* Footer */
