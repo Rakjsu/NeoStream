@@ -1,4 +1,5 @@
-import { HashRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Welcome } from './pages/Welcome';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
@@ -57,6 +58,14 @@ function ProgramReminderBridge() {
 function EpisodeToastWithNavigation() {
   const navigate = useNavigate();
   return <EpisodeToast onNavigateToSeries={(seriesId) => navigate(`/dashboard/series?id=${seriesId}`)} />;
+}
+
+// Wraps a route element in an error boundary that auto-resets on navigation
+// (keyed by pathname), so a render crash in one page shows a fallback without
+// taking down the shell.
+function RouteBoundary({ name, children }: { name: string; children: React.ReactNode }) {
+  const location = useLocation();
+  return <ErrorBoundary name={name} resetKey={location.pathname}>{children}</ErrorBoundary>;
 }
 
 function App() {
@@ -145,24 +154,24 @@ function App() {
         <EpisodeToastWithNavigation />
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            <Route path="/welcome" element={<Welcome />} />
-            <Route path="/pip" element={<PipWindow />} />
-            <Route path="/login" element={<Login />} />
+            <Route path="/welcome" element={<RouteBoundary name="Welcome"><Welcome /></RouteBoundary>} />
+            <Route path="/pip" element={<RouteBoundary name="PiP"><PipWindow /></RouteBoundary>} />
+            <Route path="/login" element={<RouteBoundary name="Login"><Login /></RouteBoundary>} />
             <Route
               path="/dashboard"
               element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" replace />}
             >
               <Route index element={<Navigate to="home" replace />} />
-              <Route path="home" element={<Home />} />
-              <Route path="live" element={<LiveTV />} />
-              <Route path="guide" element={<EpgGuide />} />
-              <Route path="vod" element={<VOD />} />
-              <Route path="series" element={<Series />} />
-              <Route path="watch-later" element={<WatchLater />} />
-              <Route path="favorites" element={<Favorites />} />
-              <Route path="downloads" element={<Downloads />} />
-              <Route path="history" element={<History />} />
-              <Route path="settings" element={<Settings />} />
+              <Route path="home" element={<RouteBoundary name="Home"><Home /></RouteBoundary>} />
+              <Route path="live" element={<RouteBoundary name="LiveTV"><LiveTV /></RouteBoundary>} />
+              <Route path="guide" element={<RouteBoundary name="EpgGuide"><EpgGuide /></RouteBoundary>} />
+              <Route path="vod" element={<RouteBoundary name="VOD"><VOD /></RouteBoundary>} />
+              <Route path="series" element={<RouteBoundary name="Series"><Series /></RouteBoundary>} />
+              <Route path="watch-later" element={<RouteBoundary name="WatchLater"><WatchLater /></RouteBoundary>} />
+              <Route path="favorites" element={<RouteBoundary name="Favorites"><Favorites /></RouteBoundary>} />
+              <Route path="downloads" element={<RouteBoundary name="Downloads"><Downloads /></RouteBoundary>} />
+              <Route path="history" element={<RouteBoundary name="History"><History /></RouteBoundary>} />
+              <Route path="settings" element={<RouteBoundary name="Settings"><Settings /></RouteBoundary>} />
             </Route>
             <Route
               path="/"
