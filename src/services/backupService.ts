@@ -33,6 +33,7 @@ const EXACT_KEYS = [
 // Keys included when they start with one of these prefixes
 const PREFIX_KEYS = [
     'neostream_profile_',     // per-profile favorites, incl. _<profileId>__pl_<playlistId>
+    'neostream_watchlater_',  // per-(profile,playlist) watch-later, _<profileId>__pl_<playlistId>
     'playbackConfig',         // playbackConfig and playbackConfig_<profileId>
     'movie_watch_progress',   // movie resume positions, incl. per-(profile,playlist)
     'series_watch_progress',  // series progress, incl. per-(profile,playlist)
