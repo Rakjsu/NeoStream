@@ -13,9 +13,13 @@
  *   GET /player_api.php?...&action=get_vod_streams
  *   GET /player_api.php?...&action=get_series_categories
  *   GET /player_api.php?...&action=get_series
+ *   GET /xmltv.php?username=..&password=..                    -> tiny XMLTV EPG
  *
- * Anything else (xmltv.php, stream URLs, EPG) answers 404 — the app
- * tolerates that (pages render "Sem programação" / fallbacks).
+ * The xmltv.php endpoint serves a small, "now"-relative guide for a few of
+ * the seeded channels (globo-sp / sbt / record) so the EpgGuide search and
+ * time-paging E2E flows have deterministic program data. Anything else
+ * (stream URLs, per-channel EPG) answers 404 — the app tolerates that
+ * (pages render "Sem programação" / fallbacks).
  */
 
 const http = require('node:http');
@@ -68,6 +72,61 @@ function authResponse(port) {
     };
 }
 
+/** Format a Date as XMLTV time "YYYYMMDDHHMMSS +0000" (UTC). */
+function xmltvTime(date) {
+    const p = (n, w = 2) => String(n).padStart(w, '0');
+    return (
+        `${p(date.getUTCFullYear(), 4)}${p(date.getUTCMonth() + 1)}${p(date.getUTCDate())}` +
+        `${p(date.getUTCHours())}${p(date.getUTCMinutes())}${p(date.getUTCSeconds())} +0000`
+    );
+}
+
+/**
+ * Build a tiny XMLTV document anchored on "now" so the programs always land
+ * inside both the provider retention window (now-24h..now+48h) and the guide's
+ * visible window (now-30min..now+4h). Each channel gets a handful of 1h
+ * programmes with distinctive titles for the search test.
+ *
+ * The grid for globo-sp spans now-1h .. now+3h, so:
+ *  - "Jornal da Globo" (now-1h..now): already aired (replay material),
+ *  - "Jornal Nacional" (now..now+1h): airing now (searchable),
+ *  - "Novela das Nove" / "Programa Especial": future blocks (paging material).
+ */
+function buildXmltv() {
+    const HOUR = 60 * 60 * 1000;
+    const now = Date.now();
+    // Floor to the hour so block boundaries line up cleanly with 30-min ticks.
+    const base = Math.floor(now / HOUR) * HOUR;
+
+    const grids = {
+        'globo-sp': ['Jornal da Globo', 'Jornal Nacional', 'Novela das Nove', 'Programa Especial'],
+        sbt: ['SBT Notícias', 'Programa Silvio Santos', 'Cinema em Casa'],
+        record: ['Fala Brasil', 'Cidade Alerta', 'Record Esporte']
+    };
+
+    let channelsXml = '';
+    let programmesXml = '';
+
+    for (const [channelId, titles] of Object.entries(grids)) {
+        channelsXml += `  <channel id="${channelId}"><display-name>${channelId}</display-name></channel>\n`;
+        titles.forEach((title, i) => {
+            // Start the first block 1h before "now" so the second one is airing.
+            const start = new Date(base + (i - 1) * HOUR);
+            const stop = new Date(base + i * HOUR);
+            programmesXml +=
+                `  <programme start="${xmltvTime(start)}" stop="${xmltvTime(stop)}" channel="${channelId}">` +
+                `<title lang="pt">${title}</title>` +
+                `<desc lang="pt">${title} — descrição</desc>` +
+                `</programme>\n`;
+        });
+    }
+
+    return (
+        `<?xml version="1.0" encoding="UTF-8"?>\n` +
+        `<tv generator-info-name="e2e-mock">\n${channelsXml}${programmesXml}</tv>\n`
+    );
+}
+
 /**
  * Starts the mock server on an ephemeral port.
  * @returns {Promise<{ url: string, port: number, close: () => Promise<void> }>}
@@ -75,6 +134,20 @@ function authResponse(port) {
 function startMockServer() {
     const server = http.createServer((req, res) => {
         const url = new URL(req.url, 'http://127.0.0.1');
+
+        // Provider XMLTV EPG (main process: electron/providerEpg.ts).
+        if (url.pathname === '/xmltv.php') {
+            const user = url.searchParams.get('username');
+            const pass = url.searchParams.get('password');
+            if (user !== USERNAME || pass !== PASSWORD) {
+                res.writeHead(401, { 'Content-Type': 'text/plain' });
+                res.end('unauthorized');
+                return;
+            }
+            res.writeHead(200, { 'Content-Type': 'application/xml' });
+            res.end(buildXmltv());
+            return;
+        }
 
         if (url.pathname !== '/player_api.php') {
             res.writeHead(404, { 'Content-Type': 'application/json' });
