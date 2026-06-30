@@ -233,5 +233,49 @@ export const tmdbCacheService = {
     clearCache(): void {
         localStorage.removeItem(MOVIE_CACHE_KEY);
         localStorage.removeItem(SERIES_CACHE_KEY);
+    },
+
+    /**
+     * Drop expired entries from the movie/series name caches.
+     *
+     * Both caches grow one entry per VOD title seen (including "not found"
+     * misses) and are never compacted — reads honour the 30-day TTL but stale
+     * entries linger in localStorage forever. This sweeps each cache:
+     *   - entries past CACHE_EXPIRY_DAYS are deleted;
+     *   - legacy entries without a `cachedAt` are kept once but stamped with
+     *     `now`, so they become eligible for expiry on a later sweep (matches
+     *     the indexedDBCache "treat-once-then-stamp" convention).
+     *
+     * Pure-ish and idempotent: a second call right after the first removes
+     * nothing new. Returns how many entries were removed across both caches.
+     */
+    pruneExpired(now: number = Date.now()): number {
+        let removed = 0;
+
+        const sweep = (
+            cache: TMDBCache,
+            save: (c: TMDBCache) => void
+        ): void => {
+            let changed = false;
+            for (const key of Object.keys(cache)) {
+                const item = cache[key];
+                if (typeof item?.cachedAt !== 'number') {
+                    // Legacy / unstamped: keep once, stamp so it can expire later.
+                    cache[key] = { ...item, cachedAt: now };
+                    changed = true;
+                    continue;
+                }
+                if (now - item.cachedAt > CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000) {
+                    delete cache[key];
+                    removed += 1;
+                    changed = true;
+                }
+            }
+            if (changed) save(cache);
+        };
+
+        sweep(getMovieCache(), saveMovieCache);
+        sweep(getSeriesCache(), saveSeriesCache);
+        return removed;
     }
 };

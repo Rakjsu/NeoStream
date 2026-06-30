@@ -406,6 +406,39 @@ class AppNotificationService {
         seriesData.delete(seriesId);
         this.saveSeriesData(seriesData);
     }
+
+    /**
+     * Drop tracked-series entries that are no longer monitored.
+     *
+     * `series_episode_data_<profile>` accumulates one entry per series we ever
+     * checked for new episodes and is never pruned automatically
+     * (removeSeriesFromTracking is only called by hand). The monitored set is
+     * "favorites + series with watch progress" (see getSeriesToMonitor): once a
+     * series leaves both, its entry is dead weight. This removes exactly those
+     * stale entries and is a no-op when nothing is stale.
+     *
+     * Returns the number of entries removed (handy for tests/telemetry).
+     */
+    async pruneStaleSeriesData(): Promise<number> {
+        const seriesData = this.getSeriesData();
+        if (seriesData.size === 0) return 0;
+
+        const monitored = await this.getSeriesToMonitor();
+        const monitoredIds = new Set(monitored.map(s => s.id));
+
+        let removed = 0;
+        for (const seriesId of Array.from(seriesData.keys())) {
+            if (!monitoredIds.has(seriesId)) {
+                seriesData.delete(seriesId);
+                removed += 1;
+            }
+        }
+
+        if (removed > 0) {
+            this.saveSeriesData(seriesData);
+        }
+        return removed;
+    }
 }
 
 export const appNotificationService = new AppNotificationService();

@@ -182,3 +182,77 @@ describe('background episode check — concurrency guard', () => {
         svc.getSeriesToMonitor = original;
     });
 });
+
+describe('pruneStaleSeriesData — drop un-monitored series entries', () => {
+    // No active profile in test → storage key suffix is `_default`.
+    const KEY = 'series_episode_data_default';
+
+    const entry = (id: string) => ({
+        seriesId: id,
+        seriesName: `Series ${id}`,
+        poster: '',
+        lastKnownSeasons: 1,
+        lastKnownEpisodes: 10,
+        lastChecked: '2026-01-01T00:00:00.000Z'
+    });
+
+    beforeEach(() => {
+        localStorage.clear();
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+        localStorage.clear();
+    });
+
+    const mockMonitored = (ids: string[]) => {
+        const svc = appNotificationService as unknown as {
+            getSeriesToMonitor: () => Promise<Array<{ id: string; name: string; poster: string }>>;
+        };
+        vi.spyOn(svc, 'getSeriesToMonitor').mockResolvedValue(
+            ids.map(id => ({ id, name: `Series ${id}`, poster: '' }))
+        );
+    };
+
+    it('removes only the entries no longer in the monitored set', async () => {
+        localStorage.setItem(
+            KEY,
+            JSON.stringify({ tracked: entry('tracked'), untracked: entry('untracked') })
+        );
+        // Only "tracked" is still a favorite / has progress.
+        mockMonitored(['tracked']);
+
+        const removed = await appNotificationService.pruneStaleSeriesData();
+
+        expect(removed).toBe(1);
+        const after = JSON.parse(localStorage.getItem(KEY)!);
+        expect(Object.keys(after)).toEqual(['tracked']);
+        expect(after.untracked).toBeUndefined();
+    });
+
+    it('keeps everything when all entries are still monitored', async () => {
+        localStorage.setItem(
+            KEY,
+            JSON.stringify({ a: entry('a'), b: entry('b') })
+        );
+        mockMonitored(['a', 'b']);
+
+        const removed = await appNotificationService.pruneStaleSeriesData();
+
+        expect(removed).toBe(0);
+        const after = JSON.parse(localStorage.getItem(KEY)!);
+        expect(Object.keys(after).sort()).toEqual(['a', 'b']);
+    });
+
+    it('is a no-op (and does not query the monitor set) when storage is empty', async () => {
+        const svc = appNotificationService as unknown as {
+            getSeriesToMonitor: () => Promise<unknown[]>;
+        };
+        const spy = vi.spyOn(svc, 'getSeriesToMonitor').mockResolvedValue([]);
+
+        const removed = await appNotificationService.pruneStaleSeriesData();
+
+        expect(removed).toBe(0);
+        expect(spy).not.toHaveBeenCalled();
+    });
+});

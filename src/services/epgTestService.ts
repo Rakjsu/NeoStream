@@ -28,6 +28,9 @@ type StateListener = () => void;
 class EpgTestService {
     private static instance: EpgTestService;
 
+    /** A cached test result older than this is considered stale and dropped. */
+    private static readonly MAX_RESULT_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
     // State
     private _status: TestStatus = 'idle';
     private _progress: EpgTestProgress = { current: 0, total: 0, currentChannel: '' };
@@ -109,6 +112,46 @@ class EpgTestService {
         this._lastTestDate = null;
         this._status = 'idle';
         this.notifyListeners();
+    }
+
+    /**
+     * Drop the cached EPG test result once it goes stale (>7 days old).
+     *
+     * `epg_test_results` is a single snapshot — one object holding the
+     * working/notWorking arrays of the most recent run — not an accumulating
+     * log, so it is naturally bounded by the channel count and overwritten each
+     * run. The only unbounded-in-time concern is a result that lingers forever
+     * after the user stops running tests; channels listed there can also go
+     * stale. We treat a result older than MAX_RESULT_AGE_MS as expired and
+     * clear it (same effect as clearCache), leaving fresh results untouched.
+     *
+     * A running/paused test is never pruned. Results without a timestamp
+     * (legacy) are left alone. Returns true if a stale result was removed.
+     */
+    pruneOldResults(now: number = Date.now()): boolean {
+        // Don't disturb an in-flight or resumable run.
+        if (this._status === 'running' || this._status === 'paused') return false;
+
+        let cached: EpgTestResult | null = this._results;
+        if (!cached) {
+            try {
+                const raw = localStorage.getItem('epg_test_results');
+                cached = raw ? (JSON.parse(raw) as EpgTestResult) : null;
+            } catch {
+                cached = null;
+            }
+        }
+        if (!cached || typeof cached.timestamp !== 'number') return false;
+
+        if (now - cached.timestamp > EpgTestService.MAX_RESULT_AGE_MS) {
+            localStorage.removeItem('epg_test_results');
+            this._results = null;
+            this._lastTestDate = null;
+            this._status = 'idle';
+            this.notifyListeners();
+            return true;
+        }
+        return false;
     }
 
     // Pause the test
