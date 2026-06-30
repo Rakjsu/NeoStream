@@ -19,9 +19,9 @@ export function EpisodeToast({ onNavigateToSeries }: EpisodeToastProps) {
         if (hasCheckedRef.current) return;
         hasCheckedRef.current = true;
 
-        // Delay check to allow app to fully load
+        // Delay the first check to allow app to fully load (run once on start).
         const checkTimeout = setTimeout(async () => {
-                        const newNotifications = await episodeNotificationService.checkForNewEpisodes();
+            const newNotifications = await episodeNotificationService.checkForNewEpisodes();
 
             if (newNotifications.length > 0) {
                 // Show toasts for new notifications (max 3)
@@ -29,7 +29,18 @@ export function EpisodeToast({ onNavigateToSeries }: EpisodeToastProps) {
             }
         }, 3000); // Wait 3 seconds after app starts
 
-        return () => clearTimeout(checkTimeout);
+        // Keep checking in the background every 6h while the app runs. The
+        // one-shot above covers "run once on start"; this only adds the
+        // recurring cadence (runImmediately:false), guarded against overlap.
+        const stopPeriodic = episodeNotificationService.startPeriodicCheck(
+            undefined,
+            { runImmediately: false }
+        );
+
+        return () => {
+            clearTimeout(checkTimeout);
+            stopPeriodic();
+        };
     }, []);
 
     // Auto-dismiss toasts after 8 seconds

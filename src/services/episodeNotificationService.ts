@@ -46,11 +46,16 @@ export interface SeriesEpisodeData {
 
 type NotificationCallback = (notifications: AppNotification[]) => void;
 
+/** How often the background new-episode check runs while the app is open. */
+export const EPISODE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h
+
 class AppNotificationService {
     private readonly STORAGE_KEY_PREFIX = 'app_notifications';
     private readonly SERIES_DATA_KEY_PREFIX = 'series_episode_data';
     private listeners: NotificationCallback[] = [];
     private isCheckingEpisodes = false;
+    // Background periodic check bookkeeping (single shared timer).
+    private periodicTimer: ReturnType<typeof setInterval> | null = null;
 
     // Get storage key for current profile
     private getStorageKey(suffix: string): string {
@@ -342,6 +347,56 @@ class AppNotificationService {
         }
 
         return newNotifications;
+    }
+
+    // ========== Background periodic check ==========
+
+    /** True while the background interval is running. */
+    isPeriodicCheckRunning(): boolean {
+        return this.periodicTimer !== null;
+    }
+
+    /**
+     * Start (idempotent) the background new-episode check: runs once now, then
+     * every `intervalMs` (default 6h). Overlap is prevented by the existing
+     * `isCheckingEpisodes` guard inside checkForNewEpisodes (a tick that fires
+     * while a prior run is still in flight is a no-op), and the per-series API
+     * throttle is honoured because the same method is reused.
+     *
+     * Returns a teardown function that clears the interval. Calling start again
+     * while already running is a no-op (the same single timer is kept), so
+     * multiple mounts/unmounts can't spawn parallel intervals.
+     */
+    startPeriodicCheck(
+        intervalMs: number = EPISODE_CHECK_INTERVAL_MS,
+        options: { runImmediately?: boolean } = {}
+    ): () => void {
+        if (this.periodicTimer !== null) {
+            // Already running — share the existing timer.
+            return () => this.stopPeriodicCheck();
+        }
+
+        // Optionally run once on start. The caller (EpisodeToast) already does a
+        // delayed one-shot to surface toasts, so it passes runImmediately:false
+        // and relies on this only for the recurring cadence. The guard inside
+        // checkForNewEpisodes swallows any overlap either way.
+        if (options.runImmediately) {
+            void this.checkForNewEpisodes();
+        }
+
+        this.periodicTimer = setInterval(() => {
+            void this.checkForNewEpisodes();
+        }, intervalMs);
+
+        return () => this.stopPeriodicCheck();
+    }
+
+    /** Clear the background interval (no-op if not running). */
+    stopPeriodicCheck(): void {
+        if (this.periodicTimer !== null) {
+            clearInterval(this.periodicTimer);
+            this.periodicTimer = null;
+        }
     }
 
     // Remove series from tracking

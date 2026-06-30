@@ -549,7 +549,7 @@ export function EpgGuide() {
                 ) : (
                     <div style={{ position: 'relative', width: CHANNEL_COL_WIDTH + TIMELINE_WIDTH, minWidth: '100%' }}>
                         {/* Sticky time header */}
-                        <div style={{
+                        <div data-testid="guide-timeline-header" style={{
                             position: 'sticky', top: 0, zIndex: 30,
                             display: 'flex', height: HEADER_HEIGHT,
                             background: 'linear-gradient(180deg, var(--ns-bg-panel) 0%, var(--ns-bg-deep) 100%)',
@@ -566,13 +566,15 @@ export function EpgGuide() {
                             }}>
                                 {t('guide', 'channelsHeader')}
                             </div>
-                            {ticks.map(tick => (
-                                <div key={tick} style={{
-                                    width: PX_PER_HALF_HOUR, minWidth: PX_PER_HALF_HOUR,
-                                    display: 'flex', alignItems: 'center', paddingLeft: '8px',
-                                    borderLeft: '1px solid rgba(255, 255, 255, 0.06)',
-                                    fontSize: '12px', fontWeight: 600, color: 'rgba(203, 213, 225, 0.9)'
-                                }}>
+                            {ticks.map((tick, i) => (
+                                <div key={tick}
+                                    data-testid={i === 0 ? 'guide-tick-first' : undefined}
+                                    style={{
+                                        width: PX_PER_HALF_HOUR, minWidth: PX_PER_HALF_HOUR,
+                                        display: 'flex', alignItems: 'center', paddingLeft: '8px',
+                                        borderLeft: '1px solid rgba(255, 255, 255, 0.06)',
+                                        fontSize: '12px', fontWeight: 600, color: 'rgba(203, 213, 225, 0.9)'
+                                    }}>
                                     {formatGuideTime(tick)}
                                 </div>
                             ))}
