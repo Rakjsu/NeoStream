@@ -78,6 +78,12 @@ function App() {
       runStorageCleanup()
     );
 
+    // Weekly background refresh of the EPG fallback mappings from the repo
+    // (applies on the next boot; static maps are the fallback if it fails).
+    void import('./services/epgMappingsService').then(({ refreshFromRemote }) =>
+      refreshFromRemote()
+    );
+
     const boot = async () => {
       // Resolve the active playlist id FIRST so per-(profile,playlist) scoping
       // and the per-profile→per-playlist migrations below run with a known id

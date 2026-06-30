@@ -4,6 +4,7 @@ import openEpgPortugalMappingsJson from '../data/epg-mappings/openepg-pt.json';
 import openEpgArgentinaMappingsJson from '../data/epg-mappings/openepg-ar.json';
 import openEpgUSAMappingsJson from '../data/epg-mappings/openepg-usa.json';
 import openEpgBrazilMappingsJson from '../data/epg-mappings/openepg-br.json';
+import { getMergedMappings } from './epgMappingsService';
 // EPG Service - Simple and Clean
 // Uses times from mi.tv/meuguia.tv exactly as displayed (no timezone conversion)
 
@@ -16,11 +17,12 @@ interface EPGProgram {
     channel_id: string;
 }
 
-// Manual channel mappings for mi.tv
-const mitvMappings: Record<string, string> = mitvMappingsJson;
+// Mappings = bundled static JSON merged with any weekly-refreshed remote cache
+// (epgMappingsService). Read once at module load; the background refresh applies
+// on the next boot.
+const mitvMappings: Record<string, string> = getMergedMappings('mitv', mitvMappingsJson);
 
-// Manual channel mappings for meuguia.tv (fallback)
-const meuguiaMappings: Record<string, string> = meuguiaMappingsJson;
+const meuguiaMappings: Record<string, string> = getMergedMappings('meuguia', meuguiaMappingsJson);
 
 // Open-EPG Portugal sources (both files contain different channels)
 const OPEN_EPG_PORTUGAL_URLS = [
@@ -50,11 +52,11 @@ const OPEN_EPG_BRAZIL_URLS = [
 
 // Open-EPG Portugal channel mappings (channel name -> Open-EPG ID)
 // IDs use format: "Channel Name.pt" or "Channel Name HD.pt"
-const openEpgPortugalMappings: Record<string, string> = openEpgPortugalMappingsJson;
+const openEpgPortugalMappings: Record<string, string> = getMergedMappings('openepg-pt', openEpgPortugalMappingsJson);
 
 // Open-EPG Argentina channel mappings (channel name -> Open-EPG ID)
 // IDs use format: "Channel Name.ar"
-const openEpgArgentinaMappings: Record<string, string> = openEpgArgentinaMappingsJson;
+const openEpgArgentinaMappings: Record<string, string> = getMergedMappings('openepg-ar', openEpgArgentinaMappingsJson);
 
 // Open-EPG USA sources (10 files)
 const OPEN_EPG_USA_URLS = [
@@ -71,12 +73,12 @@ const OPEN_EPG_USA_URLS = [
 ];
 
 // Open-EPG USA channel mappings (channel name -> Open-EPG ID)
-const openEpgUSAMappings: Record<string, string> = openEpgUSAMappingsJson;
+const openEpgUSAMappings: Record<string, string> = getMergedMappings('openepg-usa', openEpgUSAMappingsJson);
 
 // Open-EPG Brazil channel mappings (channel name -> Open-EPG ID)
 // Used as fallback for Brazilian channels not in mi.tv or meuguia.tv
 // IDs use format: "Channel Name.br"
-const openEpgBrazilMappings: Record<string, string> = openEpgBrazilMappingsJson;
+const openEpgBrazilMappings: Record<string, string> = getMergedMappings('openepg-br', openEpgBrazilMappingsJson);
 
 export const epgService = {
 
