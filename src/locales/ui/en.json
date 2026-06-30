@@ -7,6 +7,7 @@
     "epg": "EPG",
     "stats": "Statistics",
     "parental": "Parental Control",
+    "diagnostics": "Diagnostics",
     "about": "About",
     "home": "Home",
     "liveTV": "Live TV",
@@ -356,6 +357,21 @@
     "confirmImportCancel": "Cancel",
     "importSuccess": "Backup restored successfully! Restart the app to apply all changes.",
     "credentialsNote": "IPTV provider credentials are NOT included in the backup."
+  },
+  "diagnostics": {
+    "title": "Diagnostics",
+    "description": "Generate an error report you can share to help troubleshoot issues",
+    "enableDetailed": "Enable detailed diagnostics",
+    "enableDetailedDesc": "Keeps a small history of recent UI errors in memory. It stays on your device and is only included when you export a report.",
+    "note": "Nothing is sent automatically. Diagnostics stay local and only leave the app when you manually export and share the report.",
+    "exportReport": "Export error report",
+    "exportReportDesc": "Creates a .txt file with the app version, system info and the tail of the log (main.log)",
+    "exported": "✓ Report saved to:",
+    "exportCanceled": "Export canceled",
+    "exportError": "Error exporting the report",
+    "openLogs": "Open logs folder",
+    "openLogsDesc": "Opens the folder where main.log is written",
+    "openLogsError": "Could not open the logs folder"
   },
   "epg": {
     "title": "Program Guide (EPG)",

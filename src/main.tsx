@@ -2,6 +2,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { themeService } from './services/themeService'
+import { diagnosticsService } from './services/diagnosticsService'
 
 // Apply the persisted theme (CSS custom properties on <html>) before the
 // first render so themed surfaces never flash the default palette.
@@ -14,6 +15,14 @@ const REPORT_LIMIT = 20
 let reportedErrors = 0
 
 function reportRendererError(message: string, stack?: string, level: 'error' | 'warn' = 'error') {
+  // Always record into the in-memory diagnostics ring buffer (cheap, never
+  // persisted; only included in an export when the opt-in is enabled).
+  try {
+    diagnosticsService.record({ time: new Date().toISOString(), level, message })
+  } catch {
+    // Buffer unavailable — ignore.
+  }
+
   if (reportedErrors >= REPORT_LIMIT) return
   reportedErrors += 1
   try {

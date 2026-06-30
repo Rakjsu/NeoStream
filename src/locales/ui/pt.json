@@ -7,6 +7,7 @@
     "epg": "EPG",
     "stats": "Estatísticas",
     "parental": "Controle Parental",
+    "diagnostics": "Diagnóstico",
     "about": "Sobre",
     "home": "Início",
     "liveTV": "TV ao Vivo",
@@ -256,6 +257,21 @@
     "confirmImportCancel": "Cancelar",
     "importSuccess": "Backup restaurado com sucesso! Reinicie o aplicativo para aplicar todas as alterações.",
     "credentialsNote": "As credenciais do provedor IPTV não são incluídas no backup."
+  },
+  "diagnostics": {
+    "title": "Diagnóstico",
+    "description": "Gere um relatório de erro que você pode compartilhar para ajudar a resolver problemas",
+    "enableDetailed": "Ativar diagnóstico detalhado",
+    "enableDetailedDesc": "Mantém um pequeno histórico de erros recentes da interface em memória. Fica apenas no seu dispositivo e só é incluído quando você exporta um relatório.",
+    "note": "Nada é enviado automaticamente. O diagnóstico permanece local e só sai do app quando você exporta e compartilha o relatório manualmente.",
+    "exportReport": "Exportar relatório de erro",
+    "exportReportDesc": "Cria um arquivo .txt com a versão do app, informações do sistema e o final do log (main.log)",
+    "exported": "✓ Relatório salvo em:",
+    "exportCanceled": "Exportação cancelada",
+    "exportError": "Erro ao exportar o relatório",
+    "openLogs": "Abrir pasta de logs",
+    "openLogsDesc": "Abre a pasta onde o main.log é gravado",
+    "openLogsError": "Não foi possível abrir a pasta de logs"
   },
   "epg": {
     "title": "Guia de Programação (EPG)",
