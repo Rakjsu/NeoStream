@@ -26,16 +26,16 @@ const EXACT_KEYS = [
     'neostream_profiles',     // profiles + active profile + watch-later lists
     'neostream_language',     // UI language
     'parentalConfig',         // parental control config (PIN hash included)
-    'movie_watch_progress',   // movie resume positions
     'playerVolume',           // last player volume
     'watchLater',             // legacy pre-profile watch-later list
 ];
 
 // Keys included when they start with one of these prefixes
 const PREFIX_KEYS = [
-    'neostream_profile_',     // per-profile data (favorites)
+    'neostream_profile_',     // per-profile favorites, incl. _<profileId>__pl_<playlistId>
     'playbackConfig',         // playbackConfig and playbackConfig_<profileId>
-    'series_watch_progress',  // series_watch_progress and _<profileId>
+    'movie_watch_progress',   // movie resume positions, incl. per-(profile,playlist)
+    'series_watch_progress',  // series progress, incl. per-(profile,playlist)
     'usage_stats',            // usage_stats_<profileId> / usage_stats_default
 ];
 

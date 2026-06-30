@@ -25,6 +25,11 @@ function getActivePlaylistId(): string | undefined {
     return store.get('activePlaylistId')
 }
 
+/** Public read of the active playlist id (renderer scopes per-playlist user-state by it). */
+export function getActivePlaylistIdPublic(): string | null {
+    return getActivePlaylistId() ?? null
+}
+
 /** Point the legacy `auth` mirror at one playlist (or clear it). */
 function mirrorAuth(entry: PlaylistEntry | null) {
     if (entry) {

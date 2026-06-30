@@ -9,6 +9,7 @@ import {
     activatePlaylist,
     deactivatePlaylists,
     findPlaylist,
+    getActivePlaylistIdPublic,
     listPublicPlaylists,
     migratePlaylistsOnStartup,
     removePlaylist,
@@ -142,6 +143,13 @@ export function setupIpcHandlers() {
 
     ipcMain.handle('playlists:list', () => {
         return { success: true, playlists: listPublicPlaylists() }
+    })
+
+    // Synchronous-ish read of the active playlist id. The renderer namespaces
+    // per-profile user-state (favorites / watch progress) by it so stream ids
+    // from different providers don't bleed across playlists.
+    ipcMain.handle('playlists:get-active-id', () => {
+        return { id: getActivePlaylistIdPublic() }
     })
 
     ipcMain.handle('playlists:add', async (_, { name, url, username, password }) => {

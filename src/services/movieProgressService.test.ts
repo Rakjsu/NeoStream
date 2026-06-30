@@ -8,6 +8,18 @@ vi.mock('./profileService', () => ({
     }
 }));
 
+// Mock the active playlist so keys are scoped to a known playlist id. Defaults
+// to 'plA'; tests flip it to assert per-playlist isolation. With a known id,
+// the per-profile→per-playlist migration runs and storage keys become
+// `movie_watch_progress_${profileId}__pl_${playlistId}`.
+let playlistId = 'plA';
+vi.mock('./activePlaylistService', () => ({
+    getActivePlaylistId: () => playlistId,
+    hasKnownPlaylistId: () => playlistId !== 'default',
+    playlistScopedKey: (base: string, profileId: string) =>
+        `${base}_${profileId}__pl_${playlistId}`
+}));
+
 import { movieProgressService, type MovieProgress } from './movieProgressService';
 
 const entry = (over: Partial<MovieProgress> & { movieId: string; profileId: string }): MovieProgress => ({
@@ -24,6 +36,7 @@ describe('movieProgressService — per-profile', () => {
     beforeEach(() => {
         localStorage.clear();
         activeId = 'p1';
+        playlistId = 'plA';
     });
 
     it('keys progress per profile (no leak across profiles)', () => {
@@ -35,8 +48,8 @@ describe('movieProgressService — per-profile', () => {
 
         activeId = 'p1';
         expect(movieProgressService.getMoviePositionById('m1')?.movieId).toBe('m1');
-        expect(localStorage.getItem('movie_watch_progress_p1')).toBeTruthy();
-        expect(localStorage.getItem('movie_watch_progress_p2')).toBeNull();
+        expect(localStorage.getItem('movie_watch_progress_p1__pl_plA')).toBeTruthy();
+        expect(localStorage.getItem('movie_watch_progress_p2__pl_plA')).toBeNull();
     });
 
     it('classifies in-progress vs watched by percentage', () => {
@@ -61,10 +74,77 @@ describe('movieProgressService — per-profile', () => {
     });
 });
 
+describe('movieProgressService — per-playlist isolation', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        activeId = 'p1';
+        playlistId = 'plA';
+    });
+
+    it('progress saved under playlist A is not visible under playlist B', () => {
+        playlistId = 'plA';
+        movieProgressService.saveMovieTime('m1', 'Filme 1', 50, 100);
+        expect(movieProgressService.getMoviePositionById('m1')?.movieId).toBe('m1');
+
+        playlistId = 'plB';
+        expect(movieProgressService.getMoviePositionById('m1')).toBeNull();
+        expect(movieProgressService.getMoviesInProgress()).toEqual([]);
+
+        playlistId = 'plA';
+        expect(movieProgressService.getMoviePositionById('m1')?.movieId).toBe('m1');
+        expect(localStorage.getItem('movie_watch_progress_p1__pl_plA')).toBeTruthy();
+        expect(localStorage.getItem('movie_watch_progress_p1__pl_plB')).toBeNull();
+    });
+});
+
+describe('movieProgressService — per-profile → per-playlist migration', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        activeId = 'p1';
+        playlistId = 'plA';
+    });
+
+    it('copies the per-profile key into the active playlist scope, then removes it', () => {
+        localStorage.setItem('movie_watch_progress_p1', JSON.stringify([entry({ movieId: 'm1', profileId: 'p1' })]));
+
+        // Any read triggers getStorageKey() → migration.
+        expect(movieProgressService.getMoviePositionById('m1')?.movieId).toBe('m1');
+
+        expect(localStorage.getItem('movie_watch_progress_p1')).toBeNull();
+        const scoped = JSON.parse(localStorage.getItem('movie_watch_progress_p1__pl_plA')!);
+        expect(scoped.map((e: MovieProgress) => e.movieId)).toEqual(['m1']);
+    });
+
+    it('is idempotent and does not clobber existing scoped data', () => {
+        localStorage.setItem('movie_watch_progress_p1__pl_plA', JSON.stringify([entry({ movieId: 'keep', profileId: 'p1' })]));
+        localStorage.setItem('movie_watch_progress_p1', JSON.stringify([entry({ movieId: 'old', profileId: 'p1' })]));
+
+        movieProgressService.getMoviesInProgress(); // triggers migration
+        movieProgressService.getMoviesInProgress(); // again — no-op
+
+        expect(localStorage.getItem('movie_watch_progress_p1')).toBeNull();
+        const scoped = JSON.parse(localStorage.getItem('movie_watch_progress_p1__pl_plA')!);
+        // Existing scoped data preserved (old per-profile key NOT copied over it).
+        expect(scoped.map((e: MovieProgress) => e.movieId)).toEqual(['keep']);
+    });
+
+    it('is skipped while the active playlist id is unknown (default fallback)', () => {
+        playlistId = 'default';
+        localStorage.setItem('movie_watch_progress_p1', JSON.stringify([entry({ movieId: 'm1', profileId: 'p1' })]));
+
+        movieProgressService.getMoviesInProgress();
+
+        // Old per-profile key untouched; nothing migrated to a scoped key.
+        expect(localStorage.getItem('movie_watch_progress_p1')).toBeTruthy();
+        expect(localStorage.getItem('movie_watch_progress_p1__pl_default')).toBeNull();
+    });
+});
+
 describe('movieProgressService — legacy migration', () => {
     beforeEach(() => {
         localStorage.clear();
         activeId = 'p1';
+        playlistId = 'plA';
     });
 
     it('splits the global key into per-profile keys, newest wins, and removes the legacy key', () => {

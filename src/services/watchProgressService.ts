@@ -1,4 +1,5 @@
 import { profileService } from './profileService';
+import { playlistScopedKey, hasKnownPlaylistId } from './activePlaylistService';
 
 export interface EpisodeProgress {
     seriesId: string;
@@ -23,13 +24,32 @@ export interface SeriesProgress {
 class WatchProgressService {
     private STORAGE_KEY_PREFIX = 'series_watch_progress';
 
-    // Get storage key for current profile
+    // Get storage key for current profile (per-profile per-playlist)
     private getStorageKey(): string {
         const activeProfile = profileService.getActiveProfile();
-        if (activeProfile) {
-            return `${this.STORAGE_KEY_PREFIX}_${activeProfile.id}`;
+        if (!activeProfile) return this.STORAGE_KEY_PREFIX; // Fallback for no profile
+        this.migratePerProfileToPlaylist(activeProfile.id);
+        return playlistScopedKey(this.STORAGE_KEY_PREFIX, activeProfile.id);
+    }
+
+    /**
+     * One-time, idempotent migration: copy the per-profile-only key
+     * `series_watch_progress_${profileId}` into the per-(profile,playlist) key
+     * for the CURRENT active playlist, then remove the old key. Skipped while
+     * the active playlist id is unknown ('default' race) — re-runs next access.
+     */
+    private migratePerProfileToPlaylist(profileId: string): void {
+        if (!hasKnownPlaylistId()) return;
+
+        const oldKey = `${this.STORAGE_KEY_PREFIX}_${profileId}`;
+        const old = localStorage.getItem(oldKey);
+        if (old === null) return;
+
+        const newKey = playlistScopedKey(this.STORAGE_KEY_PREFIX, profileId);
+        if (localStorage.getItem(newKey) === null) {
+            localStorage.setItem(newKey, old);
         }
-        return this.STORAGE_KEY_PREFIX; // Fallback for no profile
+        localStorage.removeItem(oldKey);
     }
 
     // Get all watch progress for current profile

@@ -11,6 +11,7 @@ import { CustomTitleBar } from './components/CustomTitleBar';
 import { profileService } from './services/profileService';
 import { reminderService } from './services/reminderService';
 import { movieProgressService } from './services/movieProgressService';
+import { activePlaylistService } from './services/activePlaylistService';
 import { useState, useEffect, lazy, Suspense } from 'react';
 
 const Home = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })));
@@ -77,32 +78,37 @@ function App() {
       runStorageCleanup()
     );
 
-    // Initialize profile service (migrate old data if needed)
-    profileService.initialize();
+    const boot = async () => {
+      // Resolve the active playlist id FIRST so per-(profile,playlist) scoping
+      // and the per-profile→per-playlist migrations below run with a known id
+      // (a playlist switch reloads the app, so this re-runs each boot).
+      await activePlaylistService.init();
 
-    // One-time: split the legacy global movie-progress key into per-profile
-    // keys (no-op once migrated). Runs after profiles exist.
-    movieProgressService.migrateLegacyGlobalProgress();
+      // Initialize profile service (migrate old data if needed)
+      profileService.initialize();
 
-    // Check if there's an active profile
-    const activeProfile = profileService.getActiveProfile();
-    setProfileSelected(!!activeProfile);
+      // One-time: split the legacy global movie-progress key into per-profile
+      // keys (no-op once migrated). Runs after profiles exist.
+      movieProgressService.migrateLegacyGlobalProgress();
 
-    // Then check auth
-    checkAuth();
+      // Check if there's an active profile
+      const activeProfile = profileService.getActiveProfile();
+      setProfileSelected(!!activeProfile);
+
+      // Then check auth
+      try {
+        const result = await window.ipcRenderer.invoke('auth:check');
+        setIsAuthenticated(result.authenticated);
+      } catch (error) {
+        console.error('Failed to check auth:', error);
+        setIsAuthenticated(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void boot();
   }, []);
-
-  const checkAuth = async () => {
-    try {
-      const result = await window.ipcRenderer.invoke('auth:check');
-      setIsAuthenticated(result.authenticated);
-    } catch (error) {
-      console.error('Failed to check auth:', error);
-      setIsAuthenticated(false);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleProfileSelected = () => {
     setProfileSelected(true);
