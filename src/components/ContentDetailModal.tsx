@@ -6,6 +6,7 @@ import { watchLaterService } from '../services/watchLater';
 import { favoritesService } from '../services/favoritesService';
 import { downloadService } from '../services/downloadService';
 import { useLanguage } from '../services/languageService';
+import { extractYouTubeId } from '../utils/youtube';
 
 interface ContentDetailModalProps {
     isOpen: boolean;
@@ -1179,18 +1180,10 @@ export function ContentDetailModal({
                         {/* YouTube Embed */}
                         <iframe
                             src={(() => {
-                                // Extract video ID from URL
-                                const patterns = [
-                                    /(?:youtube.com\/watch\?v=|youtu.be\/|youtube.com\/embed\/)([^&\n?#]+)/,
-                                    /^([a-zA-Z0-9_-]{11})$/
-                                ];
-                                for (const pattern of patterns) {
-                                    const match = trailerUrl.match(pattern);
-                                    if (match && match[1]) {
-                                        return `https://www.youtube.com/embed/${match[1]}?autoplay=1&rel=0&modestbranding=1`;
-                                    }
-                                }
-                                return '';
+                                const id = extractYouTubeId(trailerUrl);
+                                return id
+                                    ? `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`
+                                    : '';
                             })()}
                             style={{
                                 width: '100%',

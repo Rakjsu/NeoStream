@@ -48,6 +48,52 @@
     transform: scale(1.08);
 }
 
+/* Muted trailer preview that fades in over the poster */
+.preview-trailer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    overflow: hidden;
+    background: #000;
+    animation: trailerFadeIn 0.6s ease forwards;
+}
+
+@keyframes trailerFadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.preview-trailer iframe {
+    /* Fill the 2:3 poster area with a 16:9 video, cropping the sides. */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 178%;
+    /* 16/9 of the height */
+    height: 100%;
+    min-width: 100%;
+    transform: translate(-50%, -50%) scale(1.01);
+    border: none;
+    pointer-events: none;
+}
+
+.preview-trailer-muted {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 2;
+    font-size: 14px;
+    line-height: 1;
+    padding: 4px 6px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.55);
+}
+
 /* Card info (below poster) */
 .card-info {
     padding: 14px;
