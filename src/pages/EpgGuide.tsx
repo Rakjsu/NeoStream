@@ -24,6 +24,7 @@ import {
 } from '../utils/epgGuide';
 import type { ProgramSearchResult } from '../utils/epgGuide';
 import { getTimeshiftUrl } from '../services/timeshiftService';
+import { reminderService, reminderId } from '../services/reminderService';
 
 interface LiveStream {
     num: number;
@@ -126,8 +127,9 @@ export function EpgGuide() {
     const [playingChannel, setPlayingChannel] = useState<LiveStream | null>(null);
     // Catch-up/replay playback (timeshift) of an already-aired program
     const [timeshiftPlayback, setTimeshiftPlayback] = useState<{ channel: LiveStream; program: EPGProgram } | null>(null);
-    // Small action popover for the CURRENT program on archive channels
-    // ("watch live" / "watch from start")
+    // Small action popover for program blocks: CURRENT program on archive
+    // channels ("watch live" / "watch from start") and FUTURE programs
+    // ("remind me" / "remove reminder").
     const [programPopover, setProgramPopover] = useState<{
         channel: LiveStream;
         program: EPGProgram;
@@ -152,6 +154,14 @@ export function EpgGuide() {
         const id = setInterval(() => setNow(Date.now()), 60000);
         return () => clearInterval(id);
     }, []);
+
+    // Program reminders: re-render on changes (🔔 indicators + popover label)
+    const [reminderVersion, setReminderVersion] = useState(0);
+    useEffect(() => reminderService.subscribe(() => setReminderVersion(v => v + 1)), []);
+    const reminderIds = useMemo(() => {
+        void reminderVersion; // dependency: re-read the list on every change
+        return new Set(reminderService.list().map(r => r.id));
+    }, [reminderVersion]);
 
     // Load channels + categories, applying the same gating as LiveTV
     useEffect(() => {
@@ -695,18 +705,23 @@ export function EpgGuide() {
                                                 return blocks.map(({ program, block }) => {
                                                     const airing = isAiringNow(program.start, program.end, now);
                                                     const replayable = !airing && isReplayable(program, channel, now);
+                                                    const future = !airing && Date.parse(program.start) > now;
+                                                    const hasReminder = future && reminderIds.has(reminderId(channel.name, program.start));
                                                     const baseTitle = program.description ? `${program.title}\n${program.description}` : program.title;
+                                                    const openPopover = (e: React.MouseEvent<HTMLDivElement>) => {
+                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                        setProgramPopover({
+                                                            channel, program,
+                                                            anchor: { x: Math.max(rect.left, e.clientX - 110), y: rect.bottom }
+                                                        });
+                                                    };
                                                     const handleClick = airing
                                                         ? (channel.tv_archive === 1
-                                                            ? (e: React.MouseEvent<HTMLDivElement>) => {
-                                                                const rect = e.currentTarget.getBoundingClientRect();
-                                                                setProgramPopover({
-                                                                    channel, program,
-                                                                    anchor: { x: Math.max(rect.left, e.clientX - 110), y: rect.bottom }
-                                                                });
-                                                            }
+                                                            ? openPopover
                                                             : () => setPlayingChannel(channel))
-                                                        : (replayable ? () => startReplay(channel, program) : undefined);
+                                                        : future
+                                                            ? openPopover
+                                                            : (replayable ? () => startReplay(channel, program) : undefined);
                                                     return (
                                                         <div
                                                             key={program.id + program.start}
@@ -746,6 +761,18 @@ export function EpgGuide() {
                                                                     ⏪
                                                                 </span>
                                                             )}
+                                                            {hasReminder && (
+                                                                <span
+                                                                    aria-hidden
+                                                                    title={t('guide', 'removeReminder')}
+                                                                    style={{
+                                                                        position: 'absolute', top: '4px', right: '6px',
+                                                                        fontSize: '10px', lineHeight: 1
+                                                                    }}
+                                                                >
+                                                                    🔔
+                                                                </span>
+                                                            )}
                                                             <div style={{
                                                                 fontSize: '12px', fontWeight: 600, lineHeight: '16px',
                                                                 color: airing ? '#e9d5ff' : 'rgba(226, 232, 240, 0.9)',
@@ -775,19 +802,46 @@ export function EpgGuide() {
                 )}
             </div>
 
-            {/* Current-program actions on archive channels (live / from start) */}
-            {programPopover && (
-                <ProgramActionsPopover
-                    title={programPopover.program.title}
-                    anchor={programPopover.anchor}
-                    onClose={() => setProgramPopover(null)}
-                    actions={[
+            {/* Program actions: current program on archive channels (live /
+                from start) or future program (set/remove reminder) */}
+            {programPopover && (() => {
+                const { channel, program } = programPopover;
+                const isFutureProgram = Date.parse(program.start) > now;
+                const popoverReminderId = reminderId(channel.name, program.start);
+                const actions: ProgramPopoverAction[] = isFutureProgram
+                    ? [
+                        reminderIds.has(popoverReminderId)
+                            ? {
+                                key: 'remove-reminder',
+                                icon: '🔕',
+                                label: t('guide', 'removeReminder'),
+                                onClick: () => {
+                                    reminderService.removeReminder(popoverReminderId);
+                                    setProgramPopover(null);
+                                }
+                            }
+                            : {
+                                key: 'add-reminder',
+                                icon: '🔔',
+                                label: t('guide', 'remind'),
+                                onClick: () => {
+                                    reminderService.addReminder({
+                                        channelName: channel.name,
+                                        streamId: channel.stream_id,
+                                        categoryId: channel.category_id,
+                                        title: program.title,
+                                        startIso: program.start
+                                    });
+                                    setProgramPopover(null);
+                                }
+                            }
+                    ]
+                    : [
                         {
                             key: 'watch-live',
                             icon: '📡',
                             label: t('guide', 'watchLive'),
                             onClick: () => {
-                                const { channel } = programPopover;
                                 setProgramPopover(null);
                                 setPlayingChannel(channel);
                             }
@@ -796,11 +850,18 @@ export function EpgGuide() {
                             key: 'watch-from-start',
                             icon: '▶',
                             label: t('guide', 'watchFromStart'),
-                            onClick: () => startReplay(programPopover.channel, programPopover.program)
+                            onClick: () => startReplay(channel, program)
                         }
-                    ]}
-                />
-            )}
+                    ];
+                return (
+                    <ProgramActionsPopover
+                        title={program.title}
+                        anchor={programPopover.anchor}
+                        onClose={() => setProgramPopover(null)}
+                        actions={actions}
+                    />
+                );
+            })()}
 
             {playingChannel && (
                 <AsyncVideoPlayer

@@ -12,7 +12,8 @@ export type NotificationType =
     | 'new_episodes'
     | 'download_complete'
     | 'download_failed'
-    | 'download_started';
+    | 'download_started'
+    | 'program_reminder';
 
 export interface AppNotification {
     id: string;

@@ -6,9 +6,10 @@ import { useLanguage } from '../services/languageService';
 interface NotificationsPanelProps {
     onNavigateToSeries?: (seriesId: string) => void;
     onNavigateToDownloads?: () => void;
+    onNavigateToGuide?: () => void;
 }
 
-export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }: NotificationsPanelProps) {
+export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads, onNavigateToGuide }: NotificationsPanelProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [notifications, setNotifications] = useState<AppNotification[]>(() => appNotificationService.getNotifications());
     const [unreadCount, setUnreadCount] = useState(() => appNotificationService.getUnreadCount());
@@ -57,6 +58,11 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
                 onNavigateToDownloads();
                 setIsOpen(false);
             }
+        } else if (notification.type === 'program_reminder') {
+            if (onNavigateToGuide) {
+                onNavigateToGuide();
+                setIsOpen(false);
+            }
         }
     };
 
@@ -86,6 +92,8 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
                 return <AlertCircle size={16} color="#ef4444" />;
             case 'download_started':
                 return <Download size={16} color="#3b82f6" />;
+            case 'program_reminder':
+                return <Bell size={16} color="#fbbf24" />;
             default:
                 return <Bell size={16} />;
         }
@@ -103,6 +111,8 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
                 return { bg: 'rgba(239, 68, 68, 0.3)', text: '#fca5a5' };
             case 'download_started':
                 return { bg: 'rgba(59, 130, 246, 0.3)', text: '#93c5fd' };
+            case 'program_reminder':
+                return { bg: 'rgba(251, 191, 36, 0.3)', text: '#fcd34d' };
             default:
                 return { bg: 'rgba(var(--ns-accent-rgb), 0.3)', text: 'var(--ns-accent-light)' };
         }
@@ -115,6 +125,7 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads }
             case 'download_complete': return t('notifications', 'downloadComplete');
             case 'download_failed': return t('notifications', 'downloadFailed');
             case 'download_started': return t('notifications', 'downloadStarted');
+            case 'program_reminder': return t('notifications', 'programReminder');
             default: return t('notifications', 'notification');
         }
     };

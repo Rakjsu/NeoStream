@@ -502,7 +502,9 @@
     "noNotifications": "Nenhuma notificação",
     "newNotifications": "Novidades aparecerão aqui",
     "ago": "atrás",
-    "now": "agora"
+    "now": "agora",
+    "programReminder": "Lembrete de Programa",
+    "programReminderStarting": "{title} está começando em {channel}"
   },
   "changelog": {
     "updateInstalled": "Atualização Instalada!",
@@ -666,7 +668,9 @@
     "replayBadge": "Replay disponível ({days} dias)",
     "replayOf": "Assistir replay de {title}",
     "watchLive": "Assistir ao vivo",
-    "watchFromStart": "Assistir do início"
+    "watchFromStart": "Assistir do início",
+    "remind": "Lembrar deste programa",
+    "removeReminder": "Remover lembrete"
   },
   "search": {
     "placeholder": "Buscar canais, filmes e séries...",
