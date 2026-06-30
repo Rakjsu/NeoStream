@@ -694,6 +694,8 @@
     "loading": "Loading catalog...",
     "loadError": "Failed to load catalog",
     "hint": "↑↓ navigate · Enter open · Esc close",
-    "openSearch": "Search"
+    "openSearch": "Search",
+    "recent": "Recent searches",
+    "clearRecent": "clear"
   }
 }

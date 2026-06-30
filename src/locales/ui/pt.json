@@ -694,6 +694,8 @@
     "loading": "Carregando catálogo...",
     "loadError": "Falha ao carregar o catálogo",
     "hint": "↑↓ navegar · Enter abrir · Esc fechar",
-    "openSearch": "Buscar"
+    "openSearch": "Buscar",
+    "recent": "Buscas recentes",
+    "clearRecent": "limpar"
   }
 }
