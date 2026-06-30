@@ -1,5 +1,11 @@
 // Favorites localStorage utility (adapted for profiles)
 import { profileService } from './profileService';
+import { playlistScopedKey, hasKnownPlaylistId } from './activePlaylistService';
+
+// localStorage key base. Per-profile per-playlist key is
+// `neostream_profile_${profileId}__pl_${activePlaylistId}`; the legacy
+// per-profile-only key `neostream_profile_${profileId}` is the migration source.
+const KEY_BASE = 'neostream_profile';
 
 export interface FavoriteItem {
     id: string;
@@ -101,13 +107,14 @@ export const favoritesService = {
         this.saveProfileData({ ...profileData, favorites: [] });
     },
 
-    // Get profile data from localStorage
+    // Get profile data from localStorage (per-profile per-playlist key)
     getProfileData(): FavoriteProfileData {
         const activeProfile = profileService.getActiveProfile();
         if (!activeProfile) return {};
 
+        this.migrate();
         try {
-            const key = `neostream_profile_${activeProfile.id}`;
+            const key = playlistScopedKey(KEY_BASE, activeProfile.id);
             const data = localStorage.getItem(key);
             return data ? JSON.parse(data) as FavoriteProfileData : {};
         } catch {
@@ -115,12 +122,35 @@ export const favoritesService = {
         }
     },
 
-    // Save profile data to localStorage
+    // Save profile data to localStorage (per-profile per-playlist key)
     saveProfileData(data: FavoriteProfileData): void {
         const activeProfile = profileService.getActiveProfile();
         if (!activeProfile) return;
 
-        const key = `neostream_profile_${activeProfile.id}`;
+        const key = playlistScopedKey(KEY_BASE, activeProfile.id);
         localStorage.setItem(key, JSON.stringify(data));
+    },
+
+    /**
+     * One-time, idempotent migration: copy the legacy per-profile-only key
+     * `neostream_profile_${profileId}` into the per-(profile,playlist) key for
+     * the CURRENT active playlist (the only playlist data existed under until
+     * now), then remove the old key. Skipped while the active playlist id is
+     * unknown ('default' race) — it re-runs next access once known.
+     */
+    migrate(): void {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return;
+        if (!hasKnownPlaylistId()) return;
+
+        const oldKey = `${KEY_BASE}_${activeProfile.id}`;
+        const old = localStorage.getItem(oldKey);
+        if (old === null) return;
+
+        const newKey = playlistScopedKey(KEY_BASE, activeProfile.id);
+        if (localStorage.getItem(newKey) === null) {
+            localStorage.setItem(newKey, old);
+        }
+        localStorage.removeItem(oldKey);
     }
 };
