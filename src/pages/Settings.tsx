@@ -11,6 +11,7 @@ import { ParentalSection } from './settings/ParentalSection';
 import { BackupSection } from './settings/BackupSection';
 import { AboutSection } from './settings/AboutSection';
 import { PlaylistsSection } from './settings/PlaylistsSection';
+import { DiagnosticsSection } from './settings/DiagnosticsSection';
 
 
 export function Settings() {
@@ -43,6 +44,7 @@ export function Settings() {
         { id: 'stats', icon: '📊', label: t('nav', 'stats'), color: '#8b5cf6' },
         { id: 'parental', icon: '👨‍👩‍👧', label: t('nav', 'parental'), color: '#ef4444' },
         { id: 'backup', icon: '💾', label: t('nav', 'backup'), color: '#64748b' },
+        { id: 'diagnostics', icon: '🩺', label: t('nav', 'diagnostics'), color: '#ec4899' },
         { id: 'about', icon: 'ℹ️', label: t('nav', 'about'), color: '#f59e0b' }
     ];
 
@@ -121,6 +123,9 @@ export function Settings() {
 
                         {/* Backup Section */}
                         {activeSection === 'backup' && <BackupSection />}
+
+                        {/* Diagnostics Section */}
+                        {activeSection === 'diagnostics' && <DiagnosticsSection />}
 
                         {/* About Section */}
                         {activeSection === 'about' && <AboutSection />}
