@@ -10,6 +10,7 @@ import { MiniPlayerProvider } from './components/MiniPlayer';
 import { CustomTitleBar } from './components/CustomTitleBar';
 import { profileService } from './services/profileService';
 import { reminderService } from './services/reminderService';
+import { movieProgressService } from './services/movieProgressService';
 import { useState, useEffect, lazy, Suspense } from 'react';
 
 const Home = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })));
@@ -73,6 +74,10 @@ function App() {
 
     // Initialize profile service (migrate old data if needed)
     profileService.initialize();
+
+    // One-time: split the legacy global movie-progress key into per-profile
+    // keys (no-op once migrated). Runs after profiles exist.
+    movieProgressService.migrateLegacyGlobalProgress();
 
     // Check if there's an active profile
     const activeProfile = profileService.getActiveProfile();
