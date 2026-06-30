@@ -72,6 +72,11 @@ function App() {
       indexedDBCache.cleanupExpired()
     );
 
+    // Best-effort sweep of unbounded localStorage keys (self-throttled to 24h).
+    void import('./services/storageCleanup').then(({ runStorageCleanup }) =>
+      runStorageCleanup()
+    );
+
     // Initialize profile service (migrate old data if needed)
     profileService.initialize();
 
