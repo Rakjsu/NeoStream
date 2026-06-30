@@ -117,8 +117,11 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
         }
         lastEpisodeRef.current = currentEpisodeKey;
 
-        // Skip if already loaded for same content
-        if (urlLoadedRef.current && streamUrl) {
+        // Skip if already loaded for this content. Uses the ref only (not the
+        // streamUrl closure) so a re-run can never re-enter the load path once
+        // the URL is in — re-entering would setLoading(true) and, under the
+        // experimental MPV path, unmount MpvPlayerView right after it launched.
+        if (urlLoadedRef.current) {
             return;
         }
 
@@ -152,7 +155,12 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
         return () => {
             cancelled = true;
         };
-    }, [movie, buildStreamUrl, currentEpisode, seriesId, seasonNumber, episodeNumber, streamUrl]);
+        // Re-run only when the CONTENT changes (movie/episode), not when the
+        // parent re-creates buildStreamUrl or when streamUrl is set — those
+        // caused the effect to churn (cancel + restart the load) on every
+        // parent render. buildStreamUrl is intentionally omitted.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [movie, currentEpisode, seriesId, seasonNumber, episodeNumber]);
 
     const resumeTime = useMemo(() => {
         if (!streamUrl || loading) return null;

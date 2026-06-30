@@ -28,7 +28,7 @@
  * via the `geometry` and `window-minimized` properties.
  */
 
-import { app, ipcMain, BrowserWindow } from 'electron'
+import { app, ipcMain, BrowserWindow, net as electronNet } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import net from 'node:net'
@@ -387,6 +387,7 @@ export function setupMpvHandlers() {
         if (!/^https?:\/\//i.test(url)) {
             return { success: false, reason: 'invalid-url' }
         }
+        log.info(`[MPV] mpv:play requested (${payload?.title ?? 'sem título'})`)
         return launchMpv({
             url,
             title: typeof payload?.title === 'string' ? payload.title : undefined,
@@ -424,6 +425,7 @@ export function setupMpvHandlers() {
     })
 
     ipcMain.handle('mpv:stop', () => {
+        log.info('[MPV] mpv:stop requested by renderer')
         stopMpv()
         return { success: true }
     })
@@ -442,8 +444,11 @@ export function setupMpvHandlers() {
         downloadController = controller
         const sender = event.sender
         try {
-            const result = await installMpv({
+            const runInstall = () => installMpv({
                 installDir: path.join(app.getPath('userData'), 'mpv'),
+                // Chromium's network stack (system proxy/TLS) — Node's undici
+                // fetch proved flaky on multi-adapter/VPN machines.
+                fetchImpl: electronNet.fetch as typeof fetch,
                 signal: controller.signal,
                 onProgress: (progress) => {
                     if (!sender.isDestroyed()) {
@@ -451,13 +456,21 @@ export function setupMpvHandlers() {
                     }
                 },
             })
+            let result = await runInstall()
+            // One automatic retry for transient mid-stream interruptions —
+            // a 30MB GitHub asset stream occasionally drops on flaky links.
+            if (!result.success && result.reason === 'network' && !controller.signal.aborted) {
+                log.warn(`[MPV] auto-download network failure, retrying once: ${result.message ?? ''}`)
+                await new Promise(resolve => setTimeout(resolve, 1500))
+                result = await runInstall()
+            }
             if (result.success && result.path) {
                 // Same flow as mpv:set-path: persist + invalidate the resolver cache.
                 store.set('settings', { ...store.get('settings'), mpvPath: result.path })
                 await resolveMpvPath(true)
                 log.info(`[MPV] auto-download installed ${result.path} (${result.version ?? 'unknown version'})`)
             } else if (!result.success) {
-                log.warn(`[MPV] auto-download failed: ${result.reason}`)
+                log.warn(`[MPV] auto-download failed: ${result.reason} — ${result.message ?? 'no detail'}`)
             }
             return result
         } finally {

@@ -447,7 +447,11 @@ export function LiveTV() {
         return variants.length > 1 ? variants : [];
     };
 
-    const buildLiveStreamUrl = async (channel: LiveStream): Promise<string> => {
+    // Memoized so AsyncVideoPlayer's URL effect (which lists buildStreamUrl in
+    // its deps) doesn't re-run on every LiveTV render. Without this, the rapid
+    // re-runs cancel + restart the load, which under the experimental MPV path
+    // could mount→unmount MpvPlayerView (launch then immediate stop).
+    const buildLiveStreamUrl = useCallback(async (channel: LiveStream): Promise<string> => {
         try {
             const result = await window.ipcRenderer.invoke('auth:get-credentials');
 
@@ -462,7 +466,7 @@ export function LiveTV() {
             console.error('❌ Error building live stream URL:', error);
             throw error;
         }
-    };
+    }, []);
 
     // Timeshift URL builder for the replay player — same shared service the
     // EPG guide uses (main process probes the URL form + provider timezone).

@@ -49,6 +49,8 @@ export interface MpvInstallResult {
     /** Build version parsed from the asset name, e.g. "20260612-git-7d245fd100". */
     version?: string
     reason?: MpvInstallFailureReason
+    /** Diagnostic detail for the failure (logged, not shown to the user). */
+    message?: string
 }
 
 export interface MpvInstallOptions {
@@ -157,6 +159,17 @@ async function downloadToFile(
     }
 }
 
+/**
+ * Windows' bundled bsdtar, by ABSOLUTE path. Resolving plain 'tar' from PATH
+ * can pick up Git's GNU tar (MSYS), which treats "C:\..." as a remote host
+ * ("Cannot connect to C") — found the hard way when the app inherited a Git
+ * Bash PATH. System32's bsdtar handles drive letters and both zip and 7z.
+ */
+function tarExecutable(): string {
+    const systemRoot = process.env.SystemRoot || process.env.windir
+    return systemRoot ? path.join(systemRoot, 'System32', 'tar.exe') : 'tar'
+}
+
 /** Extract with Windows' bundled bsdtar (auto-detects zip and 7z). */
 function extractArchive(archivePath: string, destDir: string, signal?: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -172,7 +185,7 @@ function extractArchive(archivePath: string, destDir: string, signal?: AbortSign
 
         let child: ReturnType<typeof spawn>
         try {
-            child = spawn('tar', buildExtractArgs(archivePath, destDir), { windowsHide: true, stdio: 'ignore' })
+            child = spawn(tarExecutable(), buildExtractArgs(archivePath, destDir), { windowsHide: true, stdio: 'ignore' })
         } catch (error) {
             done(new InstallError('extract-failed', `tar spawn failed: ${error instanceof Error ? error.message : String(error)}`))
             return
@@ -287,8 +300,9 @@ export async function installMpv(options: MpvInstallOptions): Promise<MpvInstall
         }
     } catch (error) {
         const reason = error instanceof InstallError ? error.reason : 'download-failed'
+        const message = error instanceof Error ? error.message : String(error)
         await rm(tmpDir, { recursive: true, force: true }).catch(() => undefined)
-        return { success: false, reason }
+        return { success: false, reason, message }
     } finally {
         if (archivePath) {
             await rm(archivePath, { force: true }).catch(() => undefined)
