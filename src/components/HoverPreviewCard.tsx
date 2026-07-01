@@ -1,12 +1,12 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { Play } from 'lucide-react';
 import { LazyImage } from './LazyImage';
-import { extractYouTubeId } from '../utils/youtube';
-import { fetchMovieTrailer, fetchSeriesTrailer } from '../services/tmdb';
+import { hoverPreviewBus } from './hoverPreviewBus';
 import './HoverPreviewCard.css';
 
-// Delay before the trailer starts so a quick mouse pass-over never loads it.
-const TRAILER_DELAY_MS = 1200;
+// Delay before the centered preview opens, so a quick mouse pass-over never
+// triggers it.
+const OPEN_DELAY_MS = 450;
 
 const prefersReducedMotion = () =>
     typeof window !== 'undefined' &&
@@ -34,24 +34,20 @@ interface HoverPreviewCardProps {
 function HoverPreviewCardComponent({
     type,
     cover,
+    backdrop,
     title,
     year,
+    rating,
+    genres,
     youtubeTrailer,
+    isFavorite,
+    onPlay,
     onMoreInfo,
+    onToggleFavorite,
     children
 }: HoverPreviewCardProps) {
-    // The provider's youtube_trailer field is empty for most items, so fall
-    // back to TMDB (same source the detail modal uses) — fetched lazily on
-    // first hover and cached for later hovers.
-    const [fetchedTrailer, setFetchedTrailer] = useState<string | null>(null);
-    const trailerId = extractYouTubeId(youtubeTrailer || fetchedTrailer || undefined);
-
-    // Only mount the iframe once the hover delay elapses; unmount on leave.
-    const [showTrailer, setShowTrailer] = useState(false);
+    const posterRef = useRef<HTMLDivElement>(null);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const hoveringRef = useRef(false);
-    // 'idle' → not tried, 'loading' → in flight, 'done' → resolved (or no id).
-    const fetchStateRef = useRef<'idle' | 'loading' | 'done'>('idle');
 
     const clearTimer = () => {
         if (timerRef.current) {
@@ -60,42 +56,38 @@ function HoverPreviewCardComponent({
         }
     };
 
-    const maybeFetchTrailer = () => {
-        if (fetchStateRef.current !== 'idle') return;
-        if (youtubeTrailer || !title) return;
-        fetchStateRef.current = 'loading';
-        const fetcher = type === 'series' ? fetchSeriesTrailer : fetchMovieTrailer;
-        fetcher(title, year)
-            .then(url => setFetchedTrailer(url))
-            .catch(() => { /* no trailer — leave the poster as-is */ })
-            .finally(() => { fetchStateRef.current = 'done'; });
-    };
-
     const handleMouseEnter = () => {
         if (prefersReducedMotion()) return;
-        hoveringRef.current = true;
-        maybeFetchTrailer();
-        // Arm the delay timer even before the id resolves; the render is also
-        // gated on trailerId, so it appears as soon as both are ready.
         clearTimer();
         timerRef.current = setTimeout(() => {
             timerRef.current = null;
-            if (hoveringRef.current) setShowTrailer(true);
-        }, TRAILER_DELAY_MS);
+            const el = posterRef.current;
+            if (!el) return;
+            hoverPreviewBus.open({
+                anchor: el.getBoundingClientRect(),
+                type,
+                title,
+                year,
+                cover,
+                backdrop,
+                rating,
+                genres,
+                youtubeTrailer,
+                isFavorite,
+                onPlay,
+                onMoreInfo,
+                onToggleFavorite,
+            });
+        }, OPEN_DELAY_MS);
     };
 
     const handleMouseLeave = () => {
-        hoveringRef.current = false;
         clearTimer();
-        setShowTrailer(false);
+        hoverPreviewBus.scheduleClose();
     };
 
-    // Drop any pending timer / iframe on unmount.
+    // Drop any pending timer on unmount.
     useEffect(() => clearTimer, []);
-
-    const embedSrc = trailerId
-        ? `https://www.youtube-nocookie.com/embed/${trailerId}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&playsinline=1&loop=1&playlist=${trailerId}`
-        : '';
 
     return (
         <div
@@ -105,7 +97,7 @@ function HoverPreviewCardComponent({
             onMouseLeave={handleMouseLeave}
         >
             {/* Poster */}
-            <div className="preview-poster" style={{ position: 'relative' }}>
+            <div className="preview-poster" ref={posterRef} style={{ position: 'relative' }}>
                 <LazyImage
                     src={cover}
                     alt={title}
@@ -115,20 +107,6 @@ function HoverPreviewCardComponent({
                         </div>
                     )}
                 />
-
-                {/* Muted trailer preview, fades in over the poster */}
-                {showTrailer && trailerId && (
-                    <div className="preview-trailer">
-                        <iframe
-                            src={embedSrc}
-                            title={`${title} trailer`}
-                            referrerPolicy="strict-origin-when-cross-origin"
-                            allow="autoplay; encrypted-media; picture-in-picture"
-                            tabIndex={-1}
-                        />
-                        <span className="preview-trailer-muted" aria-hidden="true">🔇</span>
-                    </div>
-                )}
 
                 {/* Overlay with play button */}
                 <div className="card-overlay">

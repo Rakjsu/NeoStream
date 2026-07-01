@@ -9,6 +9,7 @@ import { PostUpdateChangelog } from './components/PostUpdateChangelog';
 import { EpisodeToast } from './components/EpisodeToast';
 import { MiniPlayerProvider } from './components/MiniPlayer';
 import { CustomTitleBar } from './components/CustomTitleBar';
+import { HoverPreviewOverlay } from './components/HoverPreviewOverlay';
 import { profileService } from './services/profileService';
 import { reminderService } from './services/reminderService';
 import { movieProgressService } from './services/movieProgressService';
@@ -147,6 +148,7 @@ function App() {
   return (
     <MiniPlayerProvider>
       <CustomTitleBar />
+      <HoverPreviewOverlay />
       <UpdateNotification />
       <PostUpdateChangelog />
       <HashRouter>
