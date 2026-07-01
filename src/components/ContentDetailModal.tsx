@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { searchSeriesByName, searchMovieByName, fetchMovieTrailer, fetchSeriesTrailer, type TMDBSeriesDetails, type TMDBMovieDetails } from '../services/tmdb';
 import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
@@ -8,6 +8,7 @@ import { favoritesService } from '../services/favoritesService';
 import { downloadService } from '../services/downloadService';
 import { useLanguage } from '../services/languageService';
 import { extractYouTubeId } from '../utils/youtube';
+import { episodeDisplayTitle, sortedSeasonKeys } from '../utils/seriesEpisodes';
 
 interface ContentDetailModalProps {
     isOpen: boolean;
@@ -85,6 +86,8 @@ export function ContentDetailModal({
     });
     // Narrow window → stack episodes below the trailer instead of beside it.
     const [narrow, setNarrow] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 900);
+    // Lightweight windowing for long episode lists (uniform-height rows).
+    const [epScroll, setEpScroll] = useState({ top: 0, height: 0 });
     const modalRef = useRef<HTMLDivElement>(null);
     const { t } = useLanguage();
 
@@ -204,35 +207,8 @@ export function ContentDetailModal({
     }, [isOpen, contentData.name, contentType]);
 
     // Helper function to get clean episode title
-    const getEpisodeTitle = (ep: SeriesEpisode): string => {
-        const epNum = Number(ep.episode_num);
-        const rawTitle = ep.title || '';
-
-        // Clean the title - remove series name, season/episode markers, etc.
-        const cleanTitle = rawTitle
-            .replace(/^(.*?)[\s\-–—]*S\d+[\s\-:.]*E\d+[\s\-:.–—]*/i, '') // Remove "SeriesName S01E01 -"
-            .replace(/\s*(?:\[|\()?S\d+[\s.-]*E\d+(?:\]|\))?\s*/gi, '') // Remove [S01E01] or (S01.E01)
-            .replace(/\s*-\s*Temporada\s*\d+\s*Epis[óo]dio\s*\d+\s*/gi, '') // Remove "Temporada X Epi..."
-            .replace(/\s*Temp\s*\d+\s*Ep\s*\d+\s*/gi, '') // Remove "Temp X Ep Y"
-            .replace(/Episode\s*\d+/gi, '') // Remove "Episode X"
-            .replace(/^\d+\.?\s*/, '') // Remove leading numbers like "1. " or "01 "
-            .trim();
-
-        // Check if remaining title is valid (not empty or generic)
-        const genericPatterns = [
-            /^ep\s*\d+$/i,
-            /^\d+$/,
-            /^temporada\s*\d+\s*episodio\s*\d+$/i,
-            /^episode$/i
-        ];
-        const isValidTitle = cleanTitle.length > 0 && !genericPatterns.some(p => p.test(cleanTitle));
-
-        if (isValidTitle) {
-            return cleanTitle;
-        }
-
-        return `Episódio ${epNum}`;
-    };
+    const getEpisodeTitle = (ep: SeriesEpisode): string =>
+        episodeDisplayTitle(ep.title, Number(ep.episode_num));
 
     // Fetch trailer from TMDB if not provided by API
     useEffect(() => {
@@ -363,14 +339,42 @@ export function ContentDetailModal({
         }
     };
 
+    // Per-episode watch state for the selected season, computed once per
+    // change instead of two service lookups per row per render.
+    const episodeProgressMap = useMemo(() => {
+        const map = new Map<number, { watched: boolean; pct: number }>();
+        if (contentType !== 'series') return map;
+        const eps = seriesInfo?.episodes?.[selectedSeason] || [];
+        for (const ep of eps) {
+            const epNum = Number(ep.episode_num);
+            const watched = watchProgressService.isEpisodeWatched(contentId, selectedSeason, epNum);
+            const prog = watched ? null : watchProgressService.getEpisodeProgress(contentId, selectedSeason, epNum);
+            const pct = (prog && prog.duration > 0) ? Math.min(100, (prog.currentTime / prog.duration) * 100) : 0;
+            map.set(epNum, { watched, pct });
+        }
+        return map;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [contentType, seriesInfo, selectedSeason, contentId, isOpen]);
+
     if (!isOpen) return null;
 
     const tmdbDetails = tmdbData as TmdbDetails | null;
     const overview = tmdbDetails?.overview || contentData.plot || t('contentModal', 'noDescription');
     const rating = contentData.rating || tmdbDetails?.vote_average?.toFixed(1);
     const genres = contentData.genre || tmdbDetails?.genres?.map((g) => g.name).join(', ');
-    const seasons = seriesInfo?.episodes ? Object.keys(seriesInfo.episodes).sort((a, b) => Number(a) - Number(b)) : [];
+    const seasons = sortedSeasonKeys(seriesInfo?.episodes);
     const episodes = seriesInfo?.episodes?.[selectedSeason] || [];
+
+    // Windowing for long seasons: uniform rows → render only the visible
+    // slice with top/bottom spacers keeping the scrollbar honest.
+    const EP_ROW_H = 52;
+    const EP_OVERSCAN = 8;
+    const windowEpisodes = episodes.length > 60;
+    const epStart = windowEpisodes ? Math.max(0, Math.floor(epScroll.top / EP_ROW_H) - EP_OVERSCAN) : 0;
+    const epEnd = windowEpisodes
+        ? Math.min(episodes.length, Math.ceil((epScroll.top + (epScroll.height || 360)) / EP_ROW_H) + EP_OVERSCAN)
+        : episodes.length;
+    const visibleEpisodes = episodes.slice(epStart, epEnd);
 
     // Check movie progress
     const movieProgress = contentType === 'movie' ? movieProgressService.getMoviePositionById(contentId) : null;
@@ -589,16 +593,25 @@ export function ContentDetailModal({
                                     ))}
                                 </div>
 
-                                {/* Episode List (fills the remaining height, scrolls) */}
-                                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'rgba(0, 0, 0, 0.2)', borderRadius: 12, padding: 8 }}>
-                                    {episodes.map((ep: SeriesEpisode, index: number) => {
+                                {/* Episode List (fills the remaining height, scrolls; windowed for long seasons) */}
+                                <div
+                                    style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'rgba(0, 0, 0, 0.2)', borderRadius: 12, padding: 8 }}
+                                    onScroll={windowEpisodes ? (e) => {
+                                        const el = e.currentTarget;
+                                        setEpScroll({ top: el.scrollTop, height: el.clientHeight });
+                                    } : undefined}
+                                >
+                                    {windowEpisodes && epStart > 0 && (
+                                        <div style={{ height: epStart * EP_ROW_H }} aria-hidden="true" />
+                                    )}
+                                    {visibleEpisodes.map((ep: SeriesEpisode, index: number) => {
                                         const epNum = Number(ep.episode_num);
                                         const isSelected = epNum === selectedEpisode;
-                                        const isWatched = watchProgressService.isEpisodeWatched(contentId, selectedSeason, epNum);
-                                        const prog = watchProgressService.getEpisodeProgress(contentId, selectedSeason, epNum);
-                                        const pct = (!isWatched && prog && prog.duration > 0) ? Math.min(100, (prog.currentTime / prog.duration) * 100) : 0;
+                                        const state = episodeProgressMap.get(epNum);
+                                        const isWatched = state?.watched ?? false;
+                                        const pct = state?.pct ?? 0;
                                         return (
-                                            <div key={ep.id || index} onClick={() => setSelectedEpisode(epNum)}
+                                            <div key={ep.id || (epStart + index)} onClick={() => setSelectedEpisode(epNum)}
                                                 style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
                                                     background: isSelected ? 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.15))' : 'transparent',
                                                     border: isSelected ? '1px solid rgba(var(--ns-accent-rgb), 0.4)' : '1px solid transparent', opacity: isWatched ? 0.6 : 1, transition: 'all 0.2s' }}>
@@ -619,6 +632,9 @@ export function ContentDetailModal({
                                             </div>
                                         );
                                     })}
+                                    {windowEpisodes && epEnd < episodes.length && (
+                                        <div style={{ height: (episodes.length - epEnd) * EP_ROW_H }} aria-hidden="true" />
+                                    )}
                                 </div>
                             </>
                         )}
