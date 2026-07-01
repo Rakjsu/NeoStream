@@ -1,17 +1,7 @@
-import { memo, useEffect, useRef } from 'react';
+import { memo } from 'react';
 import { Play } from 'lucide-react';
 import { LazyImage } from './LazyImage';
-import { hoverPreviewBus } from './hoverPreviewBus';
 import './HoverPreviewCard.css';
-
-// Delay before the centered preview opens, so a quick mouse pass-over never
-// triggers it.
-const OPEN_DELAY_MS = 450;
-
-const prefersReducedMotion = () =>
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 interface HoverPreviewCardProps {
     type: 'movie' | 'series';
@@ -31,76 +21,19 @@ interface HoverPreviewCardProps {
     children?: React.ReactNode;
 }
 
+// Grid card. Clicking opens the centered detail modal (trailer hero + info);
+// hover is purely a CSS lift — no preview overlay (that caused flicker on
+// distant items and the owner prefers click-to-open).
 function HoverPreviewCardComponent({
-    type,
     cover,
-    backdrop,
     title,
-    year,
-    rating,
-    genres,
-    youtubeTrailer,
-    isFavorite,
-    onPlay,
     onMoreInfo,
-    onToggleFavorite,
     children
 }: HoverPreviewCardProps) {
-    const posterRef = useRef<HTMLDivElement>(null);
-    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-    const clearTimer = () => {
-        if (timerRef.current) {
-            clearTimeout(timerRef.current);
-            timerRef.current = null;
-        }
-    };
-
-    const handleMouseEnter = () => {
-        if (prefersReducedMotion()) return;
-        clearTimer();
-        timerRef.current = setTimeout(() => {
-            timerRef.current = null;
-            const el = posterRef.current;
-            if (!el) return;
-            hoverPreviewBus.open({
-                anchor: el.getBoundingClientRect(),
-                type,
-                title,
-                year,
-                cover,
-                backdrop,
-                rating,
-                genres,
-                youtubeTrailer,
-                isFavorite,
-                onPlay,
-                onMoreInfo,
-                onToggleFavorite,
-            });
-        }, OPEN_DELAY_MS);
-    };
-
-    const handleMouseLeave = () => {
-        // Only cancel a not-yet-opened preview. Once open, the overlay owns
-        // closing (it tracks the pointer against the card + panel rects) — the
-        // full-screen dim would otherwise fire mouseleave here immediately and
-        // close the preview before it's even visible.
-        clearTimer();
-    };
-
-    // Drop any pending timer on unmount.
-    useEffect(() => clearTimer, []);
-
     return (
-        <div
-            className="hover-preview-card"
-            onClick={onMoreInfo}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
-        >
+        <div className="hover-preview-card" onClick={onMoreInfo}>
             {/* Poster */}
-            <div className="preview-poster" ref={posterRef} style={{ position: 'relative' }}>
+            <div className="preview-poster" style={{ position: 'relative' }}>
                 <LazyImage
                     src={cover}
                     alt={title}

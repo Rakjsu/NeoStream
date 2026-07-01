@@ -76,7 +76,7 @@ export function ContentDetailModal({
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [showDownloadModal, setShowDownloadModal] = useState(false);
     const [trailerUrl, setTrailerUrl] = useState<string | null>(null);
-    const [showTrailerModal, setShowTrailerModal] = useState(false);
+    const [trailerMuted, setTrailerMuted] = useState(true);
     const modalRef = useRef<HTMLDivElement>(null);
     const { t } = useLanguage();
 
@@ -347,7 +347,7 @@ export function ContentDetailModal({
                     to { opacity: 1; }
                 }
                 @keyframes slideUp {
-                    from { opacity: 0; transform: translateY(40px) scale(0.95); }
+                    from { opacity: 0; transform: translateY(30px) scale(0.85); }
                     to { opacity: 1; transform: translateY(0) scale(1); }
                 }
                 @keyframes ratingPulse {
@@ -363,17 +363,17 @@ export function ContentDetailModal({
             <div
                 style={{
                     position: 'relative',
-                    width: '90%',
-                    maxWidth: 900,
-                    maxHeight: '90vh',
+                    width: '68%',
+                    maxWidth: 1040,
+                    maxHeight: '92vh',
                     background: 'linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-tint) 100%)',
-                    borderRadius: 20,
+                    borderRadius: 18,
                     overflow: 'hidden',
                     display: 'flex',
-                    flexDirection: 'row',
-                    boxShadow: '0 25px 80px rgba(0, 0, 0, 0.6)',
+                    flexDirection: 'column',
+                    boxShadow: '0 30px 70px rgba(0, 0, 0, 0.6)',
                     border: '1px solid rgba(var(--ns-accent-rgb), 0.3)',
-                    animation: 'slideUp 0.3s ease'
+                    animation: 'slideUp 0.34s cubic-bezier(.32,1.28,.5,1)'
                 }}
             >
                 {/* Close Button */}
@@ -403,35 +403,90 @@ export function ContentDetailModal({
                     ✕
                 </button>
 
-                {/* Poster */}
+                {/* Hero: trailer (autoplay, muted) or poster fallback */}
                 <div style={{
-                    width: 300,
-                    minWidth: 300,
                     position: 'relative',
-                    overflow: 'hidden'
+                    width: '100%',
+                    aspectRatio: '16 / 9',
+                    background: '#000',
+                    overflow: 'hidden',
+                    flexShrink: 0
                 }}>
-                    <img
-                        src={contentData.cover}
-                        alt={contentData.name}
-                        style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: 'cover'
-                        }}
-                    />
+                    {(() => {
+                        const trailerId = extractYouTubeId(trailerUrl);
+                        if (trailerId) {
+                            return (
+                                <iframe
+                                    key={trailerMuted ? 'muted' : 'unmuted'}
+                                    src={`https://www.youtube-nocookie.com/embed/${trailerId}?autoplay=1&mute=${trailerMuted ? 1 : 0}&controls=0&modestbranding=1&rel=0&playsinline=1&loop=1&playlist=${trailerId}`}
+                                    title={`${contentData.name} trailer`}
+                                    referrerPolicy="strict-origin-when-cross-origin"
+                                    allow="autoplay; encrypted-media; picture-in-picture"
+                                    style={{
+                                        position: 'absolute',
+                                        top: '50%',
+                                        left: '50%',
+                                        width: '100%',
+                                        height: '100%',
+                                        transform: 'translate(-50%, -50%) scale(1.02)',
+                                        border: 'none',
+                                        pointerEvents: 'none'
+                                    }}
+                                />
+                            );
+                        }
+                        return (
+                            <img
+                                src={contentData.cover}
+                                alt={contentData.name}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                        );
+                    })()}
+
+                    {/* Fade into the content below */}
                     <div style={{
                         position: 'absolute',
                         inset: 0,
-                        background: 'linear-gradient(90deg, transparent 60%, var(--ns-bg-panel) 100%)'
+                        pointerEvents: 'none',
+                        background: 'linear-gradient(to bottom, transparent 55%, var(--ns-bg-panel) 100%)'
                     }} />
+
+                    {/* Mute / unmute toggle (only when a trailer is playing) */}
+                    {extractYouTubeId(trailerUrl) && (
+                        <button
+                            onClick={() => setTrailerMuted(m => !m)}
+                            title={trailerMuted ? t('contentModal', 'unmute') : t('contentModal', 'mute')}
+                            aria-label={trailerMuted ? 'Ativar som' : 'Silenciar'}
+                            style={{
+                                position: 'absolute',
+                                bottom: 14,
+                                right: 14,
+                                width: 40,
+                                height: 40,
+                                borderRadius: '50%',
+                                background: 'rgba(0, 0, 0, 0.55)',
+                                border: '1px solid rgba(255, 255, 255, 0.35)',
+                                color: 'white',
+                                fontSize: 16,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                zIndex: 5
+                            }}
+                        >
+                            {trailerMuted ? '🔇' : '🔊'}
+                        </button>
+                    )}
                 </div>
 
                 {/* Content */}
                 <div style={{
                     flex: 1,
+                    minHeight: 0,
                     padding: 32,
-                    overflowY: 'auto',
-                    maxHeight: '90vh'
+                    overflowY: 'auto'
                 }}>
                     {/* Title */}
                     <h2 style={{
@@ -911,38 +966,6 @@ export function ContentDetailModal({
                             }
                         </button>
 
-                        {/* Ver Trailer Button */}
-                        {trailerUrl && (
-                            <button
-                                onClick={() => setShowTrailerModal(true)}
-                                style={{
-                                    padding: '14px 20px',
-                                    borderRadius: 12,
-                                    border: '2px solid rgba(239, 68, 68, 0.4)',
-                                    background: 'rgba(239, 68, 68, 0.15)',
-                                    color: '#fca5a5',
-                                    fontSize: 14,
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={e => {
-                                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)';
-                                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.6)';
-                                }}
-                                onMouseLeave={e => {
-                                    e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
-                                    e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-                                }}
-                                title={t('contentModal', 'trailerTooltip')}
-                            >
-                                🎬 {t('contentModal', 'watchTrailer')}
-                            </button>
-                        )}
-
                         {/* Favorite Button */}
                         <button
                             onClick={() => {
@@ -1117,87 +1140,6 @@ export function ContentDetailModal({
                 </div>
             )}
 
-            {/* Trailer Modal */}
-            {showTrailerModal && trailerUrl && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        inset: 0,
-                        background: 'rgba(0, 0, 0, 0.95)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        zIndex: 10002,
-                        animation: 'fadeIn 0.2s ease'
-                    }}
-                    onClick={() => setShowTrailerModal(false)}
-                >
-                    <div
-                        style={{
-                            position: 'relative',
-                            width: '90%',
-                            maxWidth: 1200,
-                            aspectRatio: '16 / 9',
-                            background: '#000',
-                            borderRadius: 16,
-                            overflow: 'hidden',
-                            boxShadow: '0 25px 80px rgba(0, 0, 0, 0.8)',
-                            border: '2px solid rgba(239, 68, 68, 0.4)'
-                        }}
-                        onClick={e => e.stopPropagation()}
-                    >
-                        {/* Close Button */}
-                        <button
-                            onClick={() => setShowTrailerModal(false)}
-                            style={{
-                                position: 'absolute',
-                                top: 16,
-                                right: 16,
-                                width: 44,
-                                height: 44,
-                                borderRadius: '50%',
-                                background: 'rgba(0, 0, 0, 0.7)',
-                                border: '2px solid rgba(255, 255, 255, 0.3)',
-                                color: 'white',
-                                fontSize: 22,
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                zIndex: 10,
-                                transition: 'all 0.2s'
-                            }}
-                            onMouseEnter={e => {
-                                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.6)';
-                            }}
-                            onMouseLeave={e => {
-                                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.7)';
-                            }}
-                        >
-                            ✕
-                        </button>
-
-                        {/* YouTube Embed */}
-                        <iframe
-                            src={(() => {
-                                const id = extractYouTubeId(trailerUrl);
-                                return id
-                                    ? `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`
-                                    : '';
-                            })()}
-                            style={{
-                                width: '100%',
-                                height: '100%',
-                                border: 'none'
-                            }}
-                            referrerPolicy="strict-origin-when-cross-origin"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                            title="Trailer"
-                        />
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
