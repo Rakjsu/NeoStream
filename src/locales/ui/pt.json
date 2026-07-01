@@ -182,6 +182,8 @@
     "downloadTooltip": "Baixar para assistir offline",
     "watchTrailer": "Ver Trailer",
     "trailerTooltip": "Assistir trailer",
+    "mute": "Silenciar",
+    "unmute": "Ativar som",
     "removeFromFavorites": "Remover dos Favoritos",
     "addToFavorites": "Adicionar aos Favoritos",
     "movie": "Filme",
