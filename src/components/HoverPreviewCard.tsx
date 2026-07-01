@@ -82,8 +82,11 @@ function HoverPreviewCardComponent({
     };
 
     const handleMouseLeave = () => {
+        // Only cancel a not-yet-opened preview. Once open, the overlay owns
+        // closing (it tracks the pointer against the card + panel rects) — the
+        // full-screen dim would otherwise fire mouseleave here immediately and
+        // close the preview before it's even visible.
         clearTimer();
-        hoverPreviewBus.scheduleClose();
     };
 
     // Drop any pending timer on unmount.
