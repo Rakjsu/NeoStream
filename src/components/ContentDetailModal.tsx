@@ -1182,7 +1182,7 @@ export function ContentDetailModal({
                             src={(() => {
                                 const id = extractYouTubeId(trailerUrl);
                                 return id
-                                    ? `https://www.youtube.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`
+                                    ? `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`
                                     : '';
                             })()}
                             style={{
@@ -1190,6 +1190,7 @@ export function ContentDetailModal({
                                 height: '100%',
                                 border: 'none'
                             }}
+                            referrerPolicy="strict-origin-when-cross-origin"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowFullScreen
                             title="Trailer"
