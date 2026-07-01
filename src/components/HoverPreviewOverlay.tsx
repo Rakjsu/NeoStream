@@ -6,11 +6,9 @@ import { fetchMovieTrailer, fetchSeriesTrailer } from '../services/tmdb';
 import { hoverPreviewBus, type HoverPreviewPayload } from './hoverPreviewBus';
 import './HoverPreviewOverlay.css';
 
-// How long the card lingers (after the mouse leaves it) before the panel
-// closes — enough time to travel across the dim toward the centered panel.
-const CLOSE_FROM_CARD_MS = 380;
-// Shorter grace once the mouse is on/near the panel itself.
-const CLOSE_FROM_PANEL_MS = 160;
+// Grace period once the pointer is over neither the card nor the panel —
+// long enough to travel across the dim from the card to the centered panel.
+const CLOSE_GRACE_MS = 340;
 
 const prefersReducedMotion = () =>
     typeof window !== 'undefined' &&
@@ -66,11 +64,6 @@ export function HoverPreviewOverlay() {
         closeTimer.current = setTimeout(() => setPayload(null), 300);
     }, []);
 
-    const scheduleClose = useCallback((delay: number) => {
-        clearCloseTimer();
-        closeTimer.current = setTimeout(animateOutAndClose, delay);
-    }, [animateOutAndClose]);
-
     // Register with the bus once.
     useEffect(() => {
         const unregister = hoverPreviewBus.register({
@@ -79,14 +72,39 @@ export function HoverPreviewOverlay() {
                 setFavorite(!!next.isFavorite);
                 setPayload(next);
             },
-            scheduleClose: () => scheduleClose(CLOSE_FROM_CARD_MS),
+            scheduleClose: () => {
+                clearCloseTimer();
+                closeTimer.current = setTimeout(animateOutAndClose, CLOSE_GRACE_MS);
+            },
             cancelClose: clearCloseTimer,
         });
         return () => {
             unregister();
             clearCloseTimer();
         };
-    }, [scheduleClose]);
+    }, [animateOutAndClose]);
+
+    // Keep the preview open while the pointer is over the originating card OR
+    // the centered panel; close (after a grace) once it's over neither. This
+    // is coordinate-based on purpose: the full-screen dim covers the card, so
+    // DOM hover/mouseleave can't be trusted, and the panel sits far away at
+    // the center — the pointer has to travel across the dim to reach it.
+    useEffect(() => {
+        if (!payload) return;
+        const onMove = (e: MouseEvent) => {
+            const a = payload.anchor;
+            const inCard = e.clientX >= a.left && e.clientX <= a.right && e.clientY >= a.top && e.clientY <= a.bottom;
+            const p = panelRef.current?.getBoundingClientRect();
+            const inPanel = !!p && e.clientX >= p.left && e.clientX <= p.right && e.clientY >= p.top && e.clientY <= p.bottom;
+            if (inCard || inPanel) {
+                clearCloseTimer();
+            } else if (!closeTimer.current) {
+                closeTimer.current = setTimeout(animateOutAndClose, CLOSE_GRACE_MS);
+            }
+        };
+        window.addEventListener('mousemove', onMove);
+        return () => window.removeEventListener('mousemove', onMove);
+    }, [payload, animateOutAndClose]);
 
     // Resolve the trailer from TMDB when the provider didn't supply one (same
     // source the detail modal uses). The async callback tags its result with
@@ -145,12 +163,11 @@ export function HoverPreviewOverlay() {
 
     return createPortal(
         <div className="hp-overlay" role="dialog" aria-label={`${payload.title} — prévia`}>
-            <div className="hp-dim" onClick={animateOutAndClose} />
+            <div className="hp-dim" />
             <div
                 className="hp-panel"
                 ref={panelRef}
                 onMouseEnter={clearCloseTimer}
-                onMouseLeave={() => scheduleClose(CLOSE_FROM_PANEL_MS)}
             >
                 <div className="hp-screen" onClick={() => runAndClose(payload.onMoreInfo)}>
                     <div className="hp-still" style={{ backgroundImage: still ? `url("${still}")` : undefined }} />

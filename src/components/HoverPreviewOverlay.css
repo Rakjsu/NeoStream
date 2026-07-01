@@ -5,6 +5,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    /* Let the grid underneath stay hoverable so the pointer can move from one
+       card to another while a preview is open — only the panel itself grabs
+       the pointer (below). */
+    pointer-events: none;
 }
 
 .hp-dim {
@@ -12,6 +16,11 @@
     inset: 0;
     background: rgba(6, 6, 18, 0.62);
     animation: hpDimIn 0.3s ease forwards;
+    pointer-events: none;
+}
+
+.hp-panel {
+    pointer-events: auto;
 }
 
 @keyframes hpDimIn {
