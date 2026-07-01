@@ -2,6 +2,7 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { Play } from 'lucide-react';
 import { LazyImage } from './LazyImage';
 import { extractYouTubeId } from '../utils/youtube';
+import { fetchMovieTrailer, fetchSeriesTrailer } from '../services/tmdb';
 import './HoverPreviewCard.css';
 
 // Delay before the trailer starts so a quick mouse pass-over never loads it.
@@ -31,16 +32,26 @@ interface HoverPreviewCardProps {
 }
 
 function HoverPreviewCardComponent({
+    type,
     cover,
     title,
+    year,
     youtubeTrailer,
     onMoreInfo,
     children
 }: HoverPreviewCardProps) {
-    const trailerId = extractYouTubeId(youtubeTrailer);
+    // The provider's youtube_trailer field is empty for most items, so fall
+    // back to TMDB (same source the detail modal uses) — fetched lazily on
+    // first hover and cached for later hovers.
+    const [fetchedTrailer, setFetchedTrailer] = useState<string | null>(null);
+    const trailerId = extractYouTubeId(youtubeTrailer || fetchedTrailer || undefined);
+
     // Only mount the iframe once the hover delay elapses; unmount on leave.
     const [showTrailer, setShowTrailer] = useState(false);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hoveringRef = useRef(false);
+    // 'idle' → not tried, 'loading' → in flight, 'done' → resolved (or no id).
+    const fetchStateRef = useRef<'idle' | 'loading' | 'done'>('idle');
 
     const clearTimer = () => {
         if (timerRef.current) {
@@ -49,16 +60,32 @@ function HoverPreviewCardComponent({
         }
     };
 
+    const maybeFetchTrailer = () => {
+        if (fetchStateRef.current !== 'idle') return;
+        if (youtubeTrailer || !title) return;
+        fetchStateRef.current = 'loading';
+        const fetcher = type === 'series' ? fetchSeriesTrailer : fetchMovieTrailer;
+        fetcher(title, year)
+            .then(url => setFetchedTrailer(url))
+            .catch(() => { /* no trailer — leave the poster as-is */ })
+            .finally(() => { fetchStateRef.current = 'done'; });
+    };
+
     const handleMouseEnter = () => {
-        if (!trailerId || prefersReducedMotion()) return;
+        if (prefersReducedMotion()) return;
+        hoveringRef.current = true;
+        maybeFetchTrailer();
+        // Arm the delay timer even before the id resolves; the render is also
+        // gated on trailerId, so it appears as soon as both are ready.
         clearTimer();
         timerRef.current = setTimeout(() => {
             timerRef.current = null;
-            setShowTrailer(true);
+            if (hoveringRef.current) setShowTrailer(true);
         }, TRAILER_DELAY_MS);
     };
 
     const handleMouseLeave = () => {
+        hoveringRef.current = false;
         clearTimer();
         setShowTrailer(false);
     };
