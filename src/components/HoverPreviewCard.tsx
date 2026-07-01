@@ -95,6 +95,7 @@ function HoverPreviewCardComponent({
                         <iframe
                             src={embedSrc}
                             title={`${title} trailer`}
+                            referrerPolicy="strict-origin-when-cross-origin"
                             allow="autoplay; encrypted-media; picture-in-picture"
                             tabIndex={-1}
                         />
