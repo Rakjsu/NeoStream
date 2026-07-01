@@ -403,14 +403,20 @@ export function ContentDetailModal({
                     ✕
                 </button>
 
+                {/* Top row: trailer on the left, episodes beside it (series) */}
+                <div style={{
+                    display: 'flex',
+                    alignItems: 'stretch',
+                    flexShrink: 0
+                }}>
                 {/* Hero: trailer (autoplay, muted) or poster fallback */}
                 <div style={{
                     position: 'relative',
-                    width: '100%',
+                    flex: '1 1 0',
+                    minWidth: 0,
                     aspectRatio: '16 / 9',
                     background: '#000',
-                    overflow: 'hidden',
-                    flexShrink: 0
+                    overflow: 'hidden'
                 }}>
                     {(() => {
                         const trailerId = extractYouTubeId(trailerUrl);
@@ -480,6 +486,89 @@ export function ContentDetailModal({
                         </button>
                     )}
                 </div>
+
+                {/* Episodes beside the trailer (series only) */}
+                {contentType === 'series' && (
+                <div style={{
+                    width: 320,
+                    flexShrink: 0,
+                    position: 'relative',
+                    borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
+                    background: 'rgba(0, 0, 0, 0.25)'
+                }}>
+                    {/* Absolute inner so this column takes the trailer's height, then scrolls */}
+                    <div style={{
+                        position: 'absolute',
+                        inset: 14,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 12
+                    }}>
+                        {!loading && seasons.length > 0 && (
+                            <>
+                                {/* Season Tabs */}
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexShrink: 0 }}>
+                                    {seasons.map(season => (
+                                        <button
+                                            key={season}
+                                            onClick={() => { setSelectedSeason(Number(season)); setSelectedEpisode(1); }}
+                                            style={{
+                                                padding: '6px 14px',
+                                                borderRadius: 20,
+                                                border: selectedSeason === Number(season) ? '2px solid var(--ns-accent)' : '2px solid rgba(255, 255, 255, 0.1)',
+                                                background: selectedSeason === Number(season) ? 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.3), rgba(var(--ns-accent-grad-to-rgb), 0.2))' : 'rgba(255, 255, 255, 0.05)',
+                                                color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            T{season}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Episode List (fills the remaining height, scrolls) */}
+                                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'rgba(0, 0, 0, 0.2)', borderRadius: 12, padding: 8 }}>
+                                    {episodes.map((ep: SeriesEpisode, index: number) => {
+                                        const epNum = Number(ep.episode_num);
+                                        const isSelected = epNum === selectedEpisode;
+                                        const isWatched = watchProgressService.isEpisodeWatched(contentId, selectedSeason, epNum);
+                                        return (
+                                            <div key={ep.id || index} onClick={() => setSelectedEpisode(epNum)}
+                                                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
+                                                    background: isSelected ? 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.15))' : 'transparent',
+                                                    border: isSelected ? '1px solid rgba(var(--ns-accent-rgb), 0.4)' : '1px solid transparent', opacity: isWatched ? 0.6 : 1, transition: 'all 0.2s' }}>
+                                                <span style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, background: isWatched ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(var(--ns-accent-rgb), 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'white' }}>
+                                                    {isWatched ? '✓' : epNum}
+                                                </span>
+                                                <span style={{ fontSize: 13, color: 'white', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {getEpisodeTitle(ep)}
+                                                </span>
+                                                {isSelected && (
+                                                    <span style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'white' }}>▶</span>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        )}
+
+                        {/* Loading */}
+                        {loading && (
+                            <div style={{ margin: 'auto', textAlign: 'center', color: 'rgba(255, 255, 255, 0.5)', fontSize: 13 }}>Carregando episódios...</div>
+                        )}
+
+                        {/* Error / retry */}
+                        {!loading && loadError && (
+                            <div style={{ margin: 'auto', textAlign: 'center', color: 'rgba(255, 255, 255, 0.7)', fontSize: 13 }}>
+                                <p style={{ marginBottom: 12 }}>⚠️ Não foi possível carregar os episódios.</p>
+                                <button onClick={() => setRetryNonce(n => n + 1)} style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(var(--ns-accent-rgb), 0.6)', background: 'rgba(var(--ns-accent-rgb), 0.25)', color: 'white', cursor: 'pointer', fontWeight: 600 }}>Tentar novamente</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                )}
+                </div>
+                {/* End top row */}
 
                 {/* Content */}
                 <div style={{
@@ -584,165 +673,6 @@ export function ContentDetailModal({
                     }}>
                         {overview}
                     </p>
-
-                    {/* Series: Season & Episode Selector */}
-                    {contentType === 'series' && !loading && seasons.length > 0 && (
-                        <>
-                            {/* Season Tabs */}
-                            <div style={{
-                                display: 'flex',
-                                gap: 8,
-                                marginBottom: 12,
-                                flexWrap: 'wrap'
-                            }}>
-                                {seasons.map(season => (
-                                    <button
-                                        key={season}
-                                        onClick={() => {
-                                            setSelectedSeason(Number(season));
-                                            setSelectedEpisode(1);
-                                        }}
-                                        style={{
-                                            padding: '8px 16px',
-                                            borderRadius: 20,
-                                            border: selectedSeason === Number(season)
-                                                ? '2px solid var(--ns-accent)'
-                                                : '2px solid rgba(255, 255, 255, 0.1)',
-                                            background: selectedSeason === Number(season)
-                                                ? 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.3), rgba(var(--ns-accent-grad-to-rgb), 0.2))'
-                                                : 'rgba(255, 255, 255, 0.05)',
-                                            color: 'white',
-                                            fontSize: 13,
-                                            fontWeight: 600,
-                                            cursor: 'pointer',
-                                            transition: 'all 0.2s'
-                                        }}
-                                    >
-                                        T{season}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* Episode List */}
-                            <div style={{
-                                maxHeight: 180,
-                                overflowY: 'auto',
-                                marginBottom: 20,
-                                background: 'rgba(0, 0, 0, 0.2)',
-                                borderRadius: 12,
-                                padding: 8
-                            }}>
-                                {episodes.map((ep: SeriesEpisode, index: number) => {
-                                    const epNum = Number(ep.episode_num);
-                                    const isSelected = epNum === selectedEpisode;
-                                    const isWatched = watchProgressService.isEpisodeWatched(contentId, selectedSeason, epNum);
-
-                                    return (
-                                        <div
-                                            key={ep.id || index}
-                                            onClick={() => setSelectedEpisode(epNum)}
-                                            style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: 12,
-                                                padding: '10px 14px',
-                                                borderRadius: 10,
-                                                cursor: 'pointer',
-                                                background: isSelected
-                                                    ? 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.15))'
-                                                    : 'transparent',
-                                                border: isSelected ? '1px solid rgba(var(--ns-accent-rgb), 0.4)' : '1px solid transparent',
-                                                opacity: isWatched ? 0.6 : 1,
-                                                transition: 'all 0.2s'
-                                            }}
-                                        >
-                                            <span style={{
-                                                width: 32,
-                                                height: 32,
-                                                borderRadius: 8,
-                                                background: isWatched
-                                                    ? 'linear-gradient(135deg, #10b981, #059669)'
-                                                    : 'rgba(var(--ns-accent-rgb), 0.3)',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                fontSize: 12,
-                                                fontWeight: 700,
-                                                color: 'white'
-                                            }}>
-                                                {isWatched ? '✓' : epNum}
-                                            </span>
-                                            <span style={{
-                                                fontSize: 13,
-                                                color: 'white',
-                                                flex: 1,
-                                                overflow: 'hidden',
-                                                textOverflow: 'ellipsis',
-                                                whiteSpace: 'nowrap'
-                                            }}>
-                                                {getEpisodeTitle(ep)}
-                                            </span>
-                                            {isSelected && (
-                                                <span style={{
-                                                    width: 24,
-                                                    height: 24,
-                                                    borderRadius: '50%',
-                                                    background: 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to))',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    fontSize: 10,
-                                                    color: 'white'
-                                                }}>
-                                                    ▶
-                                                </span>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </>
-                    )}
-
-                    {/* Loading for series info */}
-                    {contentType === 'series' && loading && (
-                        <div style={{
-                            padding: 20,
-                            textAlign: 'center',
-                            color: 'rgba(255, 255, 255, 0.5)'
-                        }}>
-                            Carregando episódios...
-                        </div>
-                    )}
-
-                    {/* Series info failed to load — show retry instead of a blank area */}
-                    {contentType === 'series' && !loading && loadError && (
-                        <div style={{
-                            padding: 20,
-                            textAlign: 'center',
-                            color: 'rgba(255, 255, 255, 0.7)',
-                            background: 'rgba(239, 68, 68, 0.08)',
-                            border: '1px solid rgba(239, 68, 68, 0.3)',
-                            borderRadius: 12,
-                            marginBottom: 16
-                        }}>
-                            <p style={{ marginBottom: 12 }}>⚠️ Não foi possível carregar os episódios. Verifique sua conexão.</p>
-                            <button
-                                onClick={() => setRetryNonce(n => n + 1)}
-                                style={{
-                                    padding: '8px 20px',
-                                    borderRadius: 8,
-                                    border: '1px solid rgba(var(--ns-accent-rgb), 0.6)',
-                                    background: 'rgba(var(--ns-accent-rgb), 0.25)',
-                                    color: 'white',
-                                    cursor: 'pointer',
-                                    fontWeight: 600
-                                }}
-                            >
-                                Tentar novamente
-                            </button>
-                        </div>
-                    )}
 
                     {/* Action Buttons */}
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
