@@ -17,6 +17,7 @@ import { setupCertificateErrorHandler } from './certificatePolicy'
 import { setupMpvHandlers } from './mpvPlayer'
 import { setupNotifyHandlers } from './notifyHandlers'
 import { setupDiagnosticsHandlers } from './diagnosticsHandlers'
+import { setupYouTubeEmbedFix } from './youtubeEmbedFix'
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url)
@@ -62,6 +63,11 @@ function createWindow() {
             webSecurity: true,
         },
     })
+
+    // YouTube trailer embeds throw "Erro 153" from the packaged file:// origin
+    // because they lack a valid Referer/Origin. Inject one for YouTube hosts so
+    // both the "Ver Trailer" modal and the hover preview play inline.
+    setupYouTubeEmbedFix(win.webContents.session)
 
     // Prevent any native maximize attempts (Win+Up, etc.)
     win.on('maximize', () => {
