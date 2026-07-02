@@ -702,7 +702,9 @@
     "watchLive": "Watch live",
     "watchFromStart": "Watch from start",
     "remind": "Remind me about this program",
-    "removeReminder": "Remove reminder"
+    "removeReminder": "Remove reminder",
+    "scheduleRecording": "Record this program",
+    "cancelRecording": "Cancel recording"
   },
   "search": {
     "placeholder": "Search channels, movies and series...",

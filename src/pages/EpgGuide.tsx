@@ -25,6 +25,7 @@ import {
 import type { ProgramSearchResult } from '../utils/epgGuide';
 import { getTimeshiftUrl } from '../services/timeshiftService';
 import { reminderService, reminderId } from '../services/reminderService';
+import { scheduledRecordingService, scheduleId } from '../services/scheduledRecordingService';
 
 interface LiveStream {
     num: number;
@@ -162,6 +163,14 @@ export function EpgGuide() {
         void reminderVersion; // dependency: re-read the list on every change
         return new Set(reminderService.list().map(r => r.id));
     }, [reminderVersion]);
+
+    // Scheduled recordings: same pattern (⏺ indicator + popover label)
+    const [scheduleVersion, setScheduleVersion] = useState(0);
+    useEffect(() => scheduledRecordingService.subscribe(() => setScheduleVersion(v => v + 1)), []);
+    const scheduleIds = useMemo(() => {
+        void scheduleVersion;
+        return new Set(scheduledRecordingService.list().map(s => s.id));
+    }, [scheduleVersion]);
 
     // Load channels + categories, applying the same gating as LiveTV
     useEffect(() => {
@@ -707,6 +716,7 @@ export function EpgGuide() {
                                                     const replayable = !airing && isReplayable(program, channel, now);
                                                     const future = !airing && Date.parse(program.start) > now;
                                                     const hasReminder = future && reminderIds.has(reminderId(channel.name, program.start));
+                                                    const hasSchedule = future && scheduleIds.has(scheduleId(channel.name, program.start));
                                                     const baseTitle = program.description ? `${program.title}\n${program.description}` : program.title;
                                                     const openPopover = (e: React.MouseEvent<HTMLDivElement>) => {
                                                         const rect = e.currentTarget.getBoundingClientRect();
@@ -766,11 +776,23 @@ export function EpgGuide() {
                                                                     aria-hidden
                                                                     title={t('guide', 'removeReminder')}
                                                                     style={{
-                                                                        position: 'absolute', top: '4px', right: '6px',
+                                                                        position: 'absolute', top: '4px', right: hasSchedule ? '20px' : '6px',
                                                                         fontSize: '10px', lineHeight: 1
                                                                     }}
                                                                 >
                                                                     🔔
+                                                                </span>
+                                                            )}
+                                                            {hasSchedule && (
+                                                                <span
+                                                                    aria-hidden
+                                                                    title={t('guide', 'cancelRecording')}
+                                                                    style={{
+                                                                        position: 'absolute', top: '4px', right: '6px',
+                                                                        fontSize: '10px', lineHeight: 1, color: '#ef4444'
+                                                                    }}
+                                                                >
+                                                                    ⏺
                                                                 </span>
                                                             )}
                                                             <div style={{
@@ -808,6 +830,7 @@ export function EpgGuide() {
                 const { channel, program } = programPopover;
                 const isFutureProgram = Date.parse(program.start) > now;
                 const popoverReminderId = reminderId(channel.name, program.start);
+                const popoverScheduleId = scheduleId(channel.name, program.start);
                 const actions: ProgramPopoverAction[] = isFutureProgram
                     ? [
                         reminderIds.has(popoverReminderId)
@@ -831,6 +854,31 @@ export function EpgGuide() {
                                         categoryId: channel.category_id,
                                         title: program.title,
                                         startIso: program.start
+                                    });
+                                    setProgramPopover(null);
+                                }
+                            },
+                        scheduleIds.has(popoverScheduleId)
+                            ? {
+                                key: 'remove-recording',
+                                icon: '⏹',
+                                label: t('guide', 'cancelRecording'),
+                                onClick: () => {
+                                    scheduledRecordingService.remove(popoverScheduleId);
+                                    setProgramPopover(null);
+                                }
+                            }
+                            : {
+                                key: 'add-recording',
+                                icon: '⏺',
+                                label: t('guide', 'scheduleRecording'),
+                                onClick: () => {
+                                    scheduledRecordingService.add({
+                                        channelName: channel.name,
+                                        streamId: channel.stream_id,
+                                        title: program.title,
+                                        startIso: program.start,
+                                        endIso: program.end
                                     });
                                     setProgramPopover(null);
                                 }

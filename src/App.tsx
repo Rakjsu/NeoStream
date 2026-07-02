@@ -11,6 +11,7 @@ import { MiniPlayerProvider } from './components/MiniPlayer';
 import { CustomTitleBar } from './components/CustomTitleBar';
 import { profileService } from './services/profileService';
 import { reminderService } from './services/reminderService';
+import { scheduledRecordingService } from './services/scheduledRecordingService';
 import { movieProgressService } from './services/movieProgressService';
 import { activePlaylistService } from './services/activePlaylistService';
 import { useState, useEffect, lazy, Suspense } from 'react';
@@ -43,6 +44,7 @@ function ProgramReminderBridge() {
 
   useEffect(() => {
     reminderService.scheduleAll();
+    scheduledRecordingService.init();
 
     const handleNotifyClicked = (_event: unknown, payload: unknown) => {
       const route = (payload as { route?: string } | undefined)?.route;
