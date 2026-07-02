@@ -322,6 +322,42 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     }, [contentId, contentType, title, genre, videoRef]);
 
 
+    // Live TV recording (DVR) — ffmpeg in the main process copies the stream.
+    const [recording, setRecording] = useState<{ id: string; seconds: number } | null>(null);
+    const [recToast, setRecToast] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (contentType !== 'live') return;
+        const onProgress = (_e: unknown, data: { id: string; seconds: number }) => {
+            setRecording(prev => (prev && prev.id === data.id ? { ...prev, seconds: data.seconds } : prev));
+        };
+        const onStopped = (_e: unknown, data: { id: string; file: string; error?: string }) => {
+            setRecording(prev => (prev && prev.id === data.id ? null : prev));
+            setRecToast(data.error ? t('player', 'recordingFailed') : `${t('player', 'recordingSaved')}: ${data.file}`);
+            setTimeout(() => setRecToast(null), 6000);
+        };
+        window.ipcRenderer.on('dvr:progress', onProgress);
+        window.ipcRenderer.on('dvr:stopped', onStopped);
+        return () => {
+            window.ipcRenderer.off('dvr:progress', onProgress);
+            window.ipcRenderer.off('dvr:stopped', onStopped);
+        };
+    }, [contentType, t]);
+
+    const toggleRecording = async () => {
+        if (recording) {
+            await window.ipcRenderer.invoke('dvr:stop', { id: recording.id });
+            return;
+        }
+        const result = await window.ipcRenderer.invoke('dvr:start', { url: src, channelName: title || 'canal' });
+        if (result?.success) {
+            setRecording({ id: result.id, seconds: 0 });
+        } else {
+            setRecToast(`${t('player', 'recordingFailed')}${result?.error ? `: ${result.error}` : ''}`);
+            setTimeout(() => setRecToast(null), 5000);
+        }
+    };
+
     // Live TV zapping: channel list overlay + PageUp/PageDown channel hop.
     const [showChannelList, setShowChannelList] = useState(false);
     const zapEnabled = contentType === 'live' && !!channelList?.length && !!onSwitchChannel;
@@ -563,6 +599,34 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                         }}
                     >
                         {streamErrorToast === t('player', 'streamUnavailable') ? '⚠️' : '🔄'} {streamErrorToast}
+                    </div>
+                )}
+
+                {/* Recording saved/failed toast */}
+                {recToast && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: '130px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            padding: '12px 24px',
+                            background: recToast.startsWith(t('player', 'recordingFailed'))
+                                ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                                : 'linear-gradient(135deg, #10b981, #059669)',
+                            borderRadius: '10px',
+                            color: 'white',
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            zIndex: 1000,
+                            maxWidth: '80%',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            boxShadow: '0 4px 20px rgba(0,0,0,0.4)'
+                        }}
+                    >
+                        ⏺ {recToast}
                     </div>
                 )}
 
@@ -829,6 +893,25 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                                 style={{ fontSize: 16 }}
                             >
                                 📺
+                            </button>
+                        )}
+
+                        {/* Record toggle (live TV DVR) */}
+                        {contentType === 'live' && (
+                            <button
+                                className="control-btn"
+                                onClick={toggleRecording}
+                                title={recording ? t('player', 'stopRecording') : t('player', 'record')}
+                                style={{
+                                    fontSize: 14,
+                                    color: recording ? '#ef4444' : 'white',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6
+                                }}
+                            >
+                                <span>⏺</span>
+                                {recording && <span style={{ fontSize: 12, fontWeight: 700 }}>{formatTime(recording.seconds)}</span>}
                             </button>
                         )}
 

@@ -17,6 +17,7 @@ import { setupCertificateErrorHandler } from './certificatePolicy'
 import { setupMpvHandlers } from './mpvPlayer'
 import { setupNotifyHandlers } from './notifyHandlers'
 import { setupDiagnosticsHandlers } from './diagnosticsHandlers'
+import { setupDvrHandlers } from './dvrHandlers'
 import { setupYouTubeEmbedFix } from './youtubeEmbedFix'
 
 // ES module equivalent of __dirname
@@ -37,6 +38,7 @@ setupDownloadHandlers()
 setupCertificateErrorHandler()
 setupMpvHandlers() // EXPERIMENTAL — MPV PoC
 setupDiagnosticsHandlers()
+setupDvrHandlers()
 
 process.env.DIST = path.join(__dirname, '../dist')
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public')

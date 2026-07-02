@@ -30,6 +30,10 @@ const invokeChannels = new Set([
     'dlna:seek',
     'dlna:set-volume',
     'dlna:stop',
+    'dvr:active',
+    'dvr:open-folder',
+    'dvr:start',
+    'dvr:stop',
     'download:cache-image',
     'download:cancel',
     'download:delete-file',
@@ -105,6 +109,8 @@ const sendChannels = new Set([
 
 const receiveChannels = new Set([
     'download:progress',
+    'dvr:progress',
+    'dvr:stopped',
     'main-process-message',
     'mpv:download-progress',
     'notify:clicked',
