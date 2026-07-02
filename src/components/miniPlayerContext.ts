@@ -1,5 +1,11 @@
 import { createContext, useContext } from 'react';
 
+/** Serializable channel entry for zapping inside the PiP window (live TV). */
+export interface MiniPlayerChannel {
+    id: string | number;
+    name: string;
+}
+
 export interface MiniPlayerContent {
     src: string;
     title: string;
@@ -9,6 +15,8 @@ export interface MiniPlayerContent {
     currentTime?: number;
     seasonNumber?: number;
     episodeNumber?: number;
+    /** Live TV: channels available for prev/next zapping in the PiP window. */
+    channelList?: MiniPlayerChannel[];
     onExpand?: (currentTime: number) => void;
 }
 

@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Play, Pause, X, Maximize, Volume2, VolumeX, Volume1, Volume } from 'lucide-react';
+import { Play, Pause, X, Maximize, Volume2, VolumeX, Volume1, Volume, SkipBack, SkipForward } from 'lucide-react';
 import { useHls } from '../hooks/useHls';
 import { useVideoPlayer } from '../hooks/useVideoPlayer';
 import { useSearchParams } from 'react-router-dom';
@@ -12,6 +12,11 @@ import { movieProgressService } from '../services/movieProgressService';
 import { watchProgressService } from '../services/watchProgressService';
 import { useLanguage } from '../services/languageService';
 import { playbackService } from '../services/playbackService';
+
+interface PipChannel {
+    id: string | number;
+    name: string;
+}
 
 interface PipContent {
     src: string;
@@ -22,6 +27,7 @@ interface PipContent {
     currentTime?: number;
     seasonNumber?: number;
     episodeNumber?: number;
+    channelList?: PipChannel[];
 }
 
 interface NextEpisodeContent {
@@ -245,6 +251,42 @@ export function PipWindow() {
         };
     }, [content, videoRef]);
 
+    const isLive = content?.contentType === 'live';
+
+    // Live TV zapping inside the PiP: switch to the adjacent channel from the
+    // list snapshot, rebuilding the stream URL with the stored credentials.
+    const handleZap = useCallback(async (direction: 1 | -1) => {
+        if (!content?.channelList?.length) return;
+        const list = content.channelList;
+        const currentIndex = list.findIndex(c => String(c.id) === String(content.contentId));
+        const nextIndex = (currentIndex + direction + list.length) % list.length;
+        const target = list[nextIndex];
+        if (!target || String(target.id) === String(content.contentId)) return;
+
+        try {
+            setIsLoading(true);
+            const result = await window.ipcRenderer.invoke('auth:get-credentials') as {
+                success: boolean;
+                credentials: { url: string; username: string; password: string };
+            };
+            if (!result.success) {
+                setIsLoading(false);
+                return;
+            }
+            const { url, username, password } = result.credentials;
+            setContent({
+                ...content,
+                src: `${url}/live/${username}/${password}/${target.id}.m3u8`,
+                title: target.name,
+                contentId: String(target.id),
+                currentTime: 0
+            });
+        } catch (error) {
+            console.error('[PiP] Zap error:', error);
+            setIsLoading(false);
+        }
+    }, [content]);
+
     // Local control handlers
     const handleTogglePlay = useCallback(() => {
         if (videoRef.current) {
@@ -294,12 +336,24 @@ export function PipWindow() {
                 case 'm':
                     handleToggleMute();
                     break;
+                case 'arrowup':
+                    if (isLive) {
+                        e.preventDefault();
+                        void handleZap(1);
+                    }
+                    break;
+                case 'arrowdown':
+                    if (isLive) {
+                        e.preventDefault();
+                        void handleZap(-1);
+                    }
+                    break;
             }
         };
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [handleTogglePlay, handleToggleMute]);
+    }, [handleTogglePlay, handleToggleMute, handleZap, isLive]);
 
     // Send state updates to main window
     useEffect(() => {
@@ -544,29 +598,73 @@ export function PipWindow() {
                     {isPlaying ? <Pause size={12} color="white" /> : <Play size={12} color="white" />}
                 </button>
 
-                {/* Progress bar */}
-                <div
-                    style={{
-                        flex: 1,
-                        height: 4,
-                        background: 'rgba(255,255,255,0.3)',
-                        borderRadius: 2,
-                        cursor: 'pointer',
-                        overflow: 'hidden'
-                    }}
-                    onClick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const pos = (e.clientX - rect.left) / rect.width;
-                        handleSeek(pos * duration);
-                    }}
-                >
-                    <div style={{
-                        width: `${(currentTime / duration) * 100 || 0}%`,
-                        height: '100%',
-                        background: 'linear-gradient(90deg, var(--ns-accent), var(--ns-accent))',
-                        borderRadius: 2
-                    }} />
-                </div>
+                {isLive ? (
+                    /* Live TV: zapping buttons + LIVE badge instead of a seek bar */
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                        {!!content.channelList?.length && (
+                            <button
+                                onClick={() => void handleZap(-1)}
+                                className="pip-btn"
+                                title={t('player', 'previousChannel')}
+                                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 4, padding: 5, cursor: 'pointer', display: 'flex' }}
+                            >
+                                <SkipBack size={11} color="white" />
+                            </button>
+                        )}
+                        <span style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 5,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: 'white',
+                            letterSpacing: '0.5px'
+                        }}>
+                            <span style={{
+                                width: 7,
+                                height: 7,
+                                borderRadius: '50%',
+                                background: '#ef4444',
+                                animation: 'pipLivePulse 1.5s ease-in-out infinite'
+                            }} />
+                            {t('player', 'liveBadge')}
+                        </span>
+                        {!!content.channelList?.length && (
+                            <button
+                                onClick={() => void handleZap(1)}
+                                className="pip-btn"
+                                title={t('player', 'nextChannel')}
+                                style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 4, padding: 5, cursor: 'pointer', display: 'flex' }}
+                            >
+                                <SkipForward size={11} color="white" />
+                            </button>
+                        )}
+                    </div>
+                ) : (
+                    /* Progress bar */
+                    <div
+                        style={{
+                            flex: 1,
+                            height: 4,
+                            background: 'rgba(255,255,255,0.3)',
+                            borderRadius: 2,
+                            cursor: 'pointer',
+                            overflow: 'hidden'
+                        }}
+                        onClick={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const pos = (e.clientX - rect.left) / rect.width;
+                            handleSeek(pos * duration);
+                        }}
+                    >
+                        <div style={{
+                            width: `${(currentTime / duration) * 100 || 0}%`,
+                            height: '100%',
+                            background: 'linear-gradient(90deg, var(--ns-accent), var(--ns-accent))',
+                            borderRadius: 2
+                        }} />
+                    </div>
+                )}
 
                 {/* Volume control */}
                 <div
@@ -673,6 +771,10 @@ export function PipWindow() {
             <style>{`
                 @keyframes spin {
                     to { transform: rotate(360deg); }
+                }
+                @keyframes pipLivePulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.4; }
                 }
                 .pip-btn {
                     transition: all 0.2s ease;

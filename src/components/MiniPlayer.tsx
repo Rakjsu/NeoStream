@@ -37,6 +37,20 @@ declare global {
     }
 }
 
+const PIP_CHANNEL_WINDOW = 300;
+
+/** Slice the channel list to a window centered on the current channel. */
+function limitChannelWindow(
+    channelList: MiniPlayerContent['channelList'],
+    contentId?: string
+): MiniPlayerContent['channelList'] {
+    if (!channelList || channelList.length <= PIP_CHANNEL_WINDOW) return channelList;
+    const index = Math.max(0, channelList.findIndex(c => String(c.id) === String(contentId)));
+    const half = Math.floor(PIP_CHANNEL_WINDOW / 2);
+    const start = Math.min(Math.max(0, index - half), channelList.length - PIP_CHANNEL_WINDOW);
+    return channelList.slice(start, start + PIP_CHANNEL_WINDOW);
+}
+
 export function MiniPlayerProvider({ children }: { children: ReactNode }) {
     const [isActive, setIsActive] = useState(false);
     const [content, setContent] = useState<MiniPlayerContent | null>(null);
@@ -67,7 +81,10 @@ export function MiniPlayerProvider({ children }: { children: ReactNode }) {
                 contentType: newContent.contentType,
                 currentTime: newContent.currentTime,
                 seasonNumber: newContent.seasonNumber,
-                episodeNumber: newContent.episodeNumber
+                episodeNumber: newContent.episodeNumber,
+                // The content travels as a URL query param, so cap the zapping
+                // list to a window of channels centered on the current one.
+                channelList: limitChannelWindow(newContent.channelList, newContent.contentId)
             };
             window.ipcRenderer.invoke('pip:open', serializableContent).catch(console.error);
         }
