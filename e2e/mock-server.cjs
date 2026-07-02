@@ -13,6 +13,7 @@
  *   GET /player_api.php?...&action=get_vod_streams
  *   GET /player_api.php?...&action=get_series_categories
  *   GET /player_api.php?...&action=get_series
+ *   GET /player_api.php?...&action=get_series_info        -> episodes fixture (any id)
  *   GET /xmltv.php?username=..&password=..                    -> tiny XMLTV EPG
  *
  * The xmltv.php endpoint serves a small, "now"-relative guide for a few of
@@ -42,6 +43,7 @@ const fixtures = {
     get_vod_streams: loadFixture('vod_streams.json'),
     get_series_categories: loadFixture('series_categories.json'),
     get_series: loadFixture('series.json'),
+    get_series_info: loadFixture('series_info.json'),
 };
 
 function authResponse(port) {
