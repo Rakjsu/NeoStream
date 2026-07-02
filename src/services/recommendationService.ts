@@ -15,6 +15,8 @@ import { movieProgressService } from './movieProgressService';
 import { watchProgressService } from './watchProgressService';
 import { indexedDBCache } from './indexedDBCache';
 import { searchMovieByName, searchSeriesByName } from './tmdb';
+import { usageStatsService } from './usageStatsService';
+import { buildHabitProfile, habitBoost, hourBucketOf, type HabitProfile, type HourBucket } from './habitProfile';
 
 // ==================== Types ====================
 
@@ -216,6 +218,12 @@ export function bandedShuffle<T extends { score: number }>(items: T[], rng: () =
     return result;
 }
 
+export interface HabitContext {
+    profile: HabitProfile;
+    weekday: number;
+    hourBucket: HourBucket;
+}
+
 export interface BuildInput {
     seeds: RecSeed[];
     movies: RecMovie[];
@@ -227,6 +235,8 @@ export interface BuildInput {
     excludeSeriesIds: Set<string>;
     maxItems?: number;
     rng?: () => number;
+    /** Optional viewing-habit context: boosts genres the user favors now. */
+    habit?: HabitContext;
 }
 
 /** Score all candidates, exclude watched, return top N lightly shuffled. */
@@ -234,7 +244,7 @@ export function buildRecommendations(input: BuildInput): Recommendation[] {
     const {
         seeds, movies, series, excludeTitles,
         excludeMovieIds, excludeSeriesIds,
-        maxItems = 20, rng = Math.random
+        maxItems = 20, rng = Math.random, habit
     } = input;
 
     if (seeds.length === 0) return [];
@@ -248,7 +258,14 @@ export function buildRecommendations(input: BuildInput): Recommendation[] {
         if (normalized.length === 0 || excludeTitles.has(normalized) || seedTitles.has(normalized)) return;
         const result = scoreCandidate(item, seeds);
         if (result) {
-            scored.push({ kind, item, becauseOf: result.becauseOf, score: result.score });
+            // Gentle habit multiplier: up to +60% for genres the user actually
+            // watches on this weekday / time of day. Never demotes below base.
+            let score = result.score;
+            if (habit) {
+                const boost = habitBoost(splitGenres(item.genre), habit.profile, habit.weekday, habit.hourBucket);
+                score *= 1 + 0.6 * boost;
+            }
+            scored.push({ kind, item, becauseOf: result.becauseOf, score });
         }
     };
 
@@ -406,6 +423,11 @@ export async function getHomeRecommendations(
 
     const seeds = await resolveSeedGenres(rawSeeds);
 
+    // Habit context: what this profile actually watches on this weekday /
+    // time of day (per-profile sessions from usageStatsService).
+    const now = new Date();
+    const habitProfile = buildHabitProfile(usageStatsService.getStats().sessionsThisMonth, splitGenres);
+
     const recommendations = buildRecommendations({
         seeds,
         movies,
@@ -413,7 +435,12 @@ export async function getHomeRecommendations(
         excludeTitles: watchedTitles,
         excludeMovieIds: watchedMovieIds,
         excludeSeriesIds: watchedSeriesIds,
-        maxItems: 40 // generous pool so each group can still show up to 20
+        maxItems: 40, // generous pool so each group can still show up to 20
+        habit: {
+            profile: habitProfile,
+            weekday: now.getDay(),
+            hourBucket: hourBucketOf(now.getHours())
+        }
     });
 
     return groupBySeed(recommendations, 2, 3).map(group => ({

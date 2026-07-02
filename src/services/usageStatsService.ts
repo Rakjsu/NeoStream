@@ -4,6 +4,7 @@
  */
 
 import { profileService } from './profileService';
+import { hourBucketOf, type HourBucket } from './habitProfile';
 
 export interface WatchSession {
     contentId: string;
@@ -12,6 +13,8 @@ export interface WatchSession {
     watchedSeconds: number;
     date: string; // YYYY-MM-DD
     genre?: string;
+    /** Time of day the session started (fuels habit-aware recommendations). */
+    hourBucket?: HourBucket;
 }
 
 export interface DailyStats {
@@ -223,7 +226,8 @@ class UsageStatsService {
                     contentName,
                     watchedSeconds: seconds,
                     date: today,
-                    genre
+                    genre,
+                    hourBucket: hourBucketOf(new Date().getHours())
                 });
             }
         }
