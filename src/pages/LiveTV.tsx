@@ -1398,7 +1398,7 @@ export function LiveTV() {
                         contentId={playingChannel.stream_id.toString()}
                         contentType="live"
                         resumeTime={pipResumeTime}
-                        channelList={filteredStreams.map(s => ({ id: s.stream_id, name: s.name, logo: s.stream_icon }))}
+                        channelList={filteredStreams.map(s => ({ id: s.stream_id, name: s.name, logo: s.stream_icon, num: s.num }))}
                         onSwitchChannel={(id) => {
                             const next = filteredStreams.find(s => String(s.stream_id) === String(id));
                             if (next) {
