@@ -13,7 +13,8 @@ export type NotificationType =
     | 'download_complete'
     | 'download_failed'
     | 'download_started'
-    | 'program_reminder';
+    | 'program_reminder'
+    | 'dvr_recording';
 
 export interface AppNotification {
     id: string;
