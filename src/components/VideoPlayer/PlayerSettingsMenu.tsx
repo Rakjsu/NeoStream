@@ -1,6 +1,7 @@
 import { Settings } from 'lucide-react';
 import { useLanguage } from '../../services/languageService';
 import { SUBTITLE_LANGUAGE_OPTIONS } from '../../services/subtitleService';
+import { SLEEP_TIMER_OPTIONS } from './useSleepTimer';
 
 import type { MovieVersion } from '../../services/movieVersionService';
 
@@ -34,6 +35,9 @@ export interface PlayerSettingsMenuProps<TSwitchContent extends SwitchableConten
     /** HLS audio tracks (live streams with more than one). */
     audioTracks?: PlayerAudioTrack[];
     onSelectAudioTrack?: (id: number) => void;
+    /** Sleep timer (null = off, otherwise the armed duration in minutes). */
+    sleepTimerMinutes?: number | null;
+    onSetSleepTimer?: (minutes: number | null) => void;
 }
 
 // Gear settings menu: movie version / live quality switcher, or playback speed.
@@ -52,12 +56,15 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
     onSelectSubtitleLanguage,
     onDisableSubtitles,
     audioTracks,
-    onSelectAudioTrack
+    onSelectAudioTrack,
+    sleepTimerMinutes,
+    onSetSleepTimer
 }: PlayerSettingsMenuProps<TSwitchContent>) {
     const { t } = useLanguage();
 
-    // Settings/Quality button - show for movies/series OR for live TV with quality variants
-    if (!(contentType !== 'live' || (movieVersions && movieVersions.length > 1))) {
+    // Settings/Quality button - show for movies/series, live TV with quality
+    // variants, or whenever the sleep timer is available.
+    if (!(contentType !== 'live' || (movieVersions && movieVersions.length > 1) || onSetSleepTimer)) {
         return null;
     }
 
@@ -165,7 +172,7 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
                                 })}
                             </div>
                         </div>
-                    ) : (
+                    ) : contentType !== 'live' && (
                         /* Playback Speed - show for series or single-version movies */
                         <div className="settings-section">
                             <span className="settings-label">{t('player', 'speed')}</span>
@@ -236,6 +243,36 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
                                         }}
                                     >
                                         {track.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Sleep timer: pause playback after 30/60/90 minutes */}
+                    {onSetSleepTimer && (
+                        <div className="settings-section">
+                            <span className="settings-label">{t('player', 'sleepTimer')}</span>
+                            <div className="settings-options">
+                                <button
+                                    className={`settings-option ${sleepTimerMinutes == null ? 'active' : ''}`}
+                                    onClick={() => {
+                                        onSetSleepTimer(null);
+                                        setShowSettings(false);
+                                    }}
+                                >
+                                    {t('player', 'sleepTimerOff')}
+                                </button>
+                                {SLEEP_TIMER_OPTIONS.map(minutes => (
+                                    <button
+                                        key={minutes}
+                                        className={`settings-option ${sleepTimerMinutes === minutes ? 'active' : ''}`}
+                                        onClick={() => {
+                                            onSetSleepTimer(minutes);
+                                            setShowSettings(false);
+                                        }}
+                                    >
+                                        {minutes} min
                                     </button>
                                 ))}
                             </div>
