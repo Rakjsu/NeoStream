@@ -2,6 +2,7 @@ import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Pause, Volume2, Volume1, Volume, VolumeX, Maximize, Minimize, Cast, Captions, PictureInPicture2 } from 'lucide-react';
 import { useVideoPlayer } from '../../hooks/useVideoPlayer';
 import { useHls } from '../../hooks/useHls';
+import { useMediaSession } from '../../hooks/useMediaSession';
 import { CastDeviceSelector } from '../CastDeviceSelector';
 import { CastControls } from '../CastControls';
 import { formatTime, percentage } from '../../utils/videoHelpers';
@@ -122,6 +123,21 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         setStreamErrorToast(t('player', 'sleepTimerPaused'));
         setTimeout(() => setStreamErrorToast(null), 5000);
     }, [videoRef, t]));
+
+    // OS media integration: hardware media keys + Windows media overlay (SMTC)
+    useMediaSession({
+        videoRef,
+        playing: state.playing,
+        title,
+        poster,
+        contentType,
+        seasonNumber,
+        episodeNumber,
+        onNext: onNextEpisode,
+        onPrevious: onPreviousEpisode,
+        canGoNext,
+        canGoPrevious
+    });
 
 
     const [showControls, setShowControls] = useState(true);
