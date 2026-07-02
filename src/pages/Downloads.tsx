@@ -3,6 +3,7 @@ import { Download, Trash2, Play, FolderOpen, HardDrive, Film, Tv, AlertTriangle,
 import { downloadService } from '../services/downloadService';
 import type { DownloadItem, StorageInfo } from '../services/downloadService';
 import { useLanguage } from '../services/languageService';
+import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 
 // Type for grouped series
 type SeriesGroup = {
@@ -51,6 +52,22 @@ export function Downloads() {
         isOpen: false,
         movie: null
     });
+
+    // Live TV recordings (DVR files on disk)
+    interface RecordingFile { name: string; path: string; sizeBytes: number; mtimeMs: number; recording: boolean }
+    const [showRecordings, setShowRecordings] = useState(false);
+    const [recordings, setRecordings] = useState<RecordingFile[]>([]);
+    const [playingRecording, setPlayingRecording] = useState<RecordingFile | null>(null);
+
+    const loadRecordings = useCallback(() => {
+        window.ipcRenderer.invoke('dvr:list-files')
+            .then(result => setRecordings(result?.success ? result.files : []))
+            .catch(() => setRecordings([]));
+    }, []);
+
+    useEffect(() => {
+        loadRecordings();
+    }, [loadRecordings, showRecordings]);
 
     const loadData = useCallback(async () => {
         setDownloads(downloadService.getDownloads());
@@ -238,14 +255,14 @@ export function Downloads() {
                         <p className="subtitle">{t('downloads', 'emptyText')}</p>
                     </div>
                     <button
-                        onClick={() => window.ipcRenderer.invoke('dvr:open-folder')}
+                        onClick={() => setShowRecordings(v => !v)}
                         title={t('downloads', 'recordingsTooltip')}
                         style={{
                             marginLeft: 'auto',
                             padding: '10px 18px',
                             borderRadius: 12,
-                            border: '1px solid rgba(239, 68, 68, 0.5)',
-                            background: 'rgba(239, 68, 68, 0.12)',
+                            border: showRecordings ? '1px solid #ef4444' : '1px solid rgba(239, 68, 68, 0.5)',
+                            background: showRecordings ? 'rgba(239, 68, 68, 0.25)' : 'rgba(239, 68, 68, 0.12)',
                             color: '#fca5a5',
                             fontSize: 14,
                             fontWeight: 600,
@@ -255,9 +272,73 @@ export function Downloads() {
                             gap: 8
                         }}
                     >
-                        ⏺ {t('downloads', 'recordings')}
+                        ⏺ {t('downloads', 'recordings')} {recordings.length > 0 ? `(${recordings.length})` : ''}
                     </button>
                 </header>
+
+                {/* Recordings (live TV DVR files) */}
+                {showRecordings && (
+                    <div style={{
+                        margin: '0 0 20px',
+                        padding: 18,
+                        borderRadius: 16,
+                        background: 'rgba(239, 68, 68, 0.06)',
+                        border: '1px solid rgba(239, 68, 68, 0.25)'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                            <h3 style={{ color: 'white', fontSize: 16, margin: 0 }}>⏺ {t('downloads', 'recordings')}</h3>
+                            <button
+                                onClick={() => window.ipcRenderer.invoke('dvr:open-folder')}
+                                style={{ marginLeft: 'auto', padding: '6px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: 12, cursor: 'pointer' }}
+                            >
+                                <FolderOpen size={13} style={{ verticalAlign: -2, marginRight: 5 }} />
+                                {t('downloads', 'openFolder')}
+                            </button>
+                        </div>
+                        {recordings.length === 0 ? (
+                            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, margin: 0 }}>
+                                {t('downloads', 'noRecordings')}
+                            </p>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {recordings.map(rec => (
+                                    <div key={rec.path} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, background: 'rgba(0,0,0,0.25)' }}>
+                                        <span style={{ fontSize: 16, flexShrink: 0 }}>{rec.recording ? '🔴' : '📼'}</span>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <div style={{ color: 'white', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {rec.name.replace(/\.ts$/i, '')}
+                                            </div>
+                                            <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>
+                                                {downloadService.formatBytes(rec.sizeBytes)} · {new Date(rec.mtimeMs).toLocaleString('pt-BR')}
+                                                {rec.recording && <span style={{ color: '#ef4444', fontWeight: 700 }}> · GRAVANDO</span>}
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => setPlayingRecording(rec)}
+                                            title={t('liveTV', 'watchNow')}
+                                            style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to))', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}
+                                        >
+                                            <Play size={12} style={{ verticalAlign: -2, marginRight: 4 }} fill="white" />
+                                            {t('liveTV', 'watchNow')}
+                                        </button>
+                                        <button
+                                            onClick={async () => {
+                                                if (rec.recording) return;
+                                                await window.ipcRenderer.invoke('dvr:delete-file', { path: rec.path });
+                                                loadRecordings();
+                                            }}
+                                            disabled={rec.recording}
+                                            title={t('downloads', 'delete')}
+                                            style={{ padding: 8, borderRadius: 8, border: '1px solid rgba(239,68,68,0.4)', background: 'transparent', color: '#fca5a5', cursor: rec.recording ? 'not-allowed' : 'pointer', opacity: rec.recording ? 0.4 : 1, flexShrink: 0 }}
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Storage Info */}
                 <div className="storage-card">
@@ -893,6 +974,19 @@ export function Downloads() {
                         </div>
                     </div>
                 </>
+            )}
+
+            {/* Recording playback (local .ts file via file:// URL, same scheme
+                the offline downloads use) */}
+            {playingRecording && (
+                <AsyncVideoPlayer
+                    movie={{ name: playingRecording.name.replace(/\.ts$/i, ''), stream_id: playingRecording.path }}
+                    buildStreamUrl={async () => `file:///${playingRecording.path.replace(/\\/g, '/')}`}
+                    onClose={() => setPlayingRecording(null)}
+                    customTitle={playingRecording.name.replace(/\.ts$/i, '')}
+                    contentId={`rec-${playingRecording.path}`}
+                    contentType="movie"
+                />
             )}
         </>
     );

@@ -31,6 +31,8 @@ const invokeChannels = new Set([
     'dlna:set-volume',
     'dlna:stop',
     'dvr:active',
+    'dvr:delete-file',
+    'dvr:list-files',
     'dvr:open-folder',
     'dvr:start',
     'dvr:stop',

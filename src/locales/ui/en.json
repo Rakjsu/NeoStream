@@ -626,7 +626,8 @@
   "downloads": {
     "title": "Downloads",
     "recordings": "Recordings",
-    "recordingsTooltip": "Open the live TV recordings folder",
+    "recordingsTooltip": "View and play live TV recordings",
+    "noRecordings": "No recordings yet. Use the ⏺ button in the live player or schedule from the guide.",
     "emptyTitle": "No downloads yet",
     "emptyText": "Download movies and series to watch offline",
     "storageUsed": "Used",
