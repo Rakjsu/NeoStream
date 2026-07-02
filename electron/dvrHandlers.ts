@@ -122,6 +122,51 @@ export function setupDvrHandlers() {
         return { success: true }
     })
 
+    // Recordings on disk (the in-app "Gravações" list).
+    ipcMain.handle('dvr:list-files', async () => {
+        try {
+            const dir = recordingsDir()
+            fs.mkdirSync(dir, { recursive: true })
+            const activeFiles = new Set(Array.from(active.values()).map(r => r.file))
+            const files = fs.readdirSync(dir)
+                .filter(name => name.toLowerCase().endsWith('.ts'))
+                .map(name => {
+                    const full = path.join(dir, name)
+                    const stat = fs.statSync(full)
+                    return {
+                        name,
+                        path: full,
+                        sizeBytes: stat.size,
+                        mtimeMs: stat.mtimeMs,
+                        recording: activeFiles.has(full),
+                    }
+                })
+                .sort((a, b) => b.mtimeMs - a.mtimeMs)
+            return { success: true, files }
+        } catch (err) {
+            return { success: false, error: String(err) }
+        }
+    })
+
+    ipcMain.handle('dvr:delete-file', async (_e, data: { path?: string }) => {
+        try {
+            const dir = recordingsDir()
+            const target = path.resolve(String(data?.path || ''))
+            // Only files inside the recordings folder can be deleted.
+            if (!target.startsWith(path.resolve(dir) + path.sep)) {
+                return { success: false, error: 'Caminho fora da pasta de gravações' }
+            }
+            // Never delete a file that is still being written.
+            if (Array.from(active.values()).some(r => r.file === target)) {
+                return { success: false, error: 'Gravação em andamento' }
+            }
+            fs.unlinkSync(target)
+            return { success: true }
+        } catch (err) {
+            return { success: false, error: String(err) }
+        }
+    })
+
     // Stop everything on quit so files finalize.
     app.on('before-quit', () => {
         for (const rec of active.values()) {

@@ -626,7 +626,8 @@
   "downloads": {
     "title": "Downloads",
     "recordings": "Gravações",
-    "recordingsTooltip": "Abrir a pasta de gravações da TV ao vivo",
+    "recordingsTooltip": "Ver e reproduzir as gravações da TV ao vivo",
+    "noRecordings": "Nenhuma gravação ainda. Use o botão ⏺ no player ao vivo ou agende pelo guia.",
     "emptyTitle": "Nenhum download ainda",
     "emptyText": "Baixe filmes e séries para assistir offline",
     "storageUsed": "Usado",

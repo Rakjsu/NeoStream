@@ -626,7 +626,8 @@
   "downloads": {
     "title": "Descargas",
     "recordings": "Grabaciones",
-    "recordingsTooltip": "Abrir la carpeta de grabaciones de TV en vivo",
+    "recordingsTooltip": "Ver y reproducir las grabaciones de TV en vivo",
+    "noRecordings": "Aún no hay grabaciones. Usa el botón ⏺ en el reproductor en vivo o programa desde la guía.",
     "emptyTitle": "Ninguna descarga aún",
     "emptyText": "Descarga películas y series para ver sin conexión",
     "storageUsed": "Usado",
