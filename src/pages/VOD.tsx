@@ -167,7 +167,8 @@ export function VOD() {
     }, []);
 
     useEffect(() => {
-        fetchStreams();
+        // Deferred: fetchStreams flips loading state synchronously on entry.
+        queueMicrotask(() => { void fetchStreams(); });
     }, [fetchStreams]);
 
     const filteredStreams = streams.filter(stream => {
@@ -203,10 +204,12 @@ export function VOD() {
     const windowStart = gridWindow.ready ? gridWindow.start : 0;
     const windowEnd = gridWindow.ready ? gridWindow.end : Math.min(visibleCount, filteredStreams.length);
 
-    // Reset on filter change
+    // Reset on filter change (deferred setState)
     useEffect(() => {
-        setVisibleCount(itemsPerPage);
-        setSelectedMovie(null);
+        queueMicrotask(() => {
+            setVisibleCount(itemsPerPage);
+            setSelectedMovie(null);
+        });
         // Back to the top so the window recomputes from row 0.
         if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
     }, [searchQuery, selectedCategory, itemsPerPage]);
@@ -214,7 +217,7 @@ export function VOD() {
     // Fetch TMDB data
     useEffect(() => {
         if (!selectedMovie) {
-            setTmdbData(null);
+            queueMicrotask(() => setTmdbData(null));
             return;
         }
 

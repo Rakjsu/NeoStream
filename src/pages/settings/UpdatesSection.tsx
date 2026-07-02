@@ -33,7 +33,8 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
     };
 
     useEffect(() => {
-        loadUpdateConfig();
+        // Deferred: loadUpdateConfig sets state synchronously after the await resolves early.
+        queueMicrotask(() => { void loadUpdateConfig(); });
         window.ipcRenderer.invoke('system:get-config').then(result => {
             if (result?.success && result.config) setSystemConfig(result.config);
         }).catch(() => { /* main handler absent in old builds */ });

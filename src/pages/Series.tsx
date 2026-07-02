@@ -179,7 +179,10 @@ export function Series() {
         }
     };
 
-    useEffect(() => { fetchSeries(); }, []);
+    useEffect(() => {
+        // Deferred: fetchSeries flips loading state synchronously on entry.
+        queueMicrotask(() => { void fetchSeries(); });
+    }, []);
 
     const filteredSeries = series.filter(s => {
         const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -213,10 +216,12 @@ export function Series() {
     const windowStart = gridWindow.ready ? gridWindow.start : 0;
     const windowEnd = gridWindow.ready ? gridWindow.end : Math.min(visibleCount, filteredSeries.length);
 
-    // Reset on filter change
+    // Reset on filter change (deferred setState)
     useEffect(() => {
-        setVisibleCount(itemsPerPage);
-        setSelectedSeries(null);
+        queueMicrotask(() => {
+            setVisibleCount(itemsPerPage);
+            setSelectedSeries(null);
+        });
         if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
     }, [searchQuery, selectedCategory, itemsPerPage]);
 
@@ -287,7 +292,7 @@ export function Series() {
                 }
             });
         } else {
-            setSeriesInfo(null);
+            queueMicrotask(() => setSeriesInfo(null));
         }
     }, [selectedSeries]);
 

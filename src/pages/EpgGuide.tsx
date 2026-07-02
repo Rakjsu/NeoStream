@@ -231,9 +231,9 @@ export function EpgGuide() {
         [categoryStreams, visibleRows]
     );
 
-    // Reset windowed rows when category changes
+    // Reset windowed rows when category changes (deferred setState)
     useEffect(() => {
-        setVisibleRows(INITIAL_ROWS);
+        queueMicrotask(() => setVisibleRows(INITIAL_ROWS));
         if (scrollRef.current) scrollRef.current.scrollTop = 0;
     }, [selectedCategory]);
 
@@ -244,9 +244,9 @@ export function EpgGuide() {
             const cached = epgCache.get(channel.name);
             if (cached) {
                 if (epgByChannel[channel.name] === undefined) {
-                    setEpgByChannel(prev =>
+                    queueMicrotask(() => setEpgByChannel(prev =>
                         prev[channel.name] === undefined ? { ...prev, [channel.name]: cached } : prev
-                    );
+                    ));
                 }
                 continue;
             }
@@ -313,7 +313,7 @@ export function EpgGuide() {
         const index = categoryStreams.findIndex(s => s.name === pendingScrollChannel);
         if (index === -1) return;
         if (index >= visibleRows) {
-            setVisibleRows(index + 1);
+            queueMicrotask(() => setVisibleRows(index + 1));
             return;
         }
         const row = rowRefs.current.get(pendingScrollChannel);

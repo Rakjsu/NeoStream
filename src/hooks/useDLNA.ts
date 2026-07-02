@@ -152,9 +152,9 @@ export function useDLNA(videoUrl: string, videoTitle: string, subtitleVtt?: stri
         }
     };
 
-    // Load devices on mount
+    // Load devices on mount (deferred: loadDevices flips loading state on entry)
     useEffect(() => {
-        void loadDevices();
+        queueMicrotask(() => { void loadDevices(); });
     }, [loadDevices]);
 
     // Cast to device

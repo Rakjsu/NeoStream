@@ -224,7 +224,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     }, [pipResumeTime, state.duration, videoRef]);
 
     useEffect(() => {
-        resetHideControlsTimer();
+        // Deferred: the reset shows the controls (setState) synchronously.
+        queueMicrotask(resetHideControlsTimer);
         return () => {
             if (hideControlsTimeoutRef.current) {
                 clearTimeout(hideControlsTimeoutRef.current);
@@ -463,9 +464,9 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         };
     }, [onNextEpisode, canGoNext, videoRef]);
 
-    // Countdown reached zero → advance.
+    // Countdown reached zero → advance (deferred; advancing sets state).
     useEffect(() => {
-        if (nextEpCountdown === 0) goToNextEpisode(true);
+        if (nextEpCountdown === 0) queueMicrotask(() => goToNextEpisode(true));
     }, [nextEpCountdown, goToNextEpisode]);
 
     // Drop any pending countdown when the source changes or on unmount.

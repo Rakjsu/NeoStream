@@ -89,7 +89,8 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
 
     useEffect(() => {
         if (isOpen && categories.length === 0) {
-            void fetchCategories();
+            // Deferred: fetchCategories sets loading synchronously on entry.
+            queueMicrotask(() => { void fetchCategories(); });
         }
     }, [isOpen, categories.length, fetchCategories]);
 

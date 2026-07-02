@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { watchProgressService, type SeriesProgress } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
 import { ContentDetailModal } from '../components/ContentDetailModal';
@@ -322,7 +322,7 @@ export function Home() {
             return bTime - aTime;
         });
 
-        setContinueWatching(items.slice(0, 30));
+        queueMicrotask(() => setContinueWatching(items.slice(0, 30)));
     }, [allSeries, allMovies, refreshTrigger]);
 
     // Build personalized recommendations ("Porque você assistiu X") from local
@@ -593,7 +593,8 @@ export function Home() {
     };
 
     // Content card component with hover preview - NO STATE to prevent re-renders
-    const ContentCard = ({ item, type, showProgress = false, rating, onRemove }: {
+    const renderContentCard = ({ item, type, showProgress = false, rating, onRemove, key }: {
+        key: string;
         item: ContinueWatchingItem | SeriesData | MovieData;
         type: 'continue' | 'series' | 'movie';
         showProgress?: boolean;
@@ -620,6 +621,7 @@ export function Home() {
 
         return (
             <div
+                key={key}
                 className="content-card"
                 style={{
                     position: 'relative',
@@ -854,15 +856,16 @@ export function Home() {
         );
     };
 
-    // Carousel Section component with drag scroll
-    const ContentSection = ({ title, items, type, showProgress = false, sectionIndex = 0 }: {
+    // Carousel section renderer with drag scroll. Plain function (NOT a
+    // component): called inline so React reconciles the elements in place —
+    // no per-render remount, carousel scroll position survives re-renders.
+    const renderContentSection = ({ title, items, type, showProgress = false, sectionIndex = 0 }: {
         title: string;
         items: HomeContentItem[];
         type: 'continue' | 'series' | 'movie' | 'recommendations';
         showProgress?: boolean;
         sectionIndex?: number;
     }) => {
-        const containerRef = useRef<HTMLDivElement>(null);
 
         // Filter out hidden items for Kids profile
         // Helper to normalize names (same as indexedDBCache)
@@ -884,8 +887,10 @@ export function Home() {
 
         if (visibleItems.length === 0) return null;
 
-        const scroll = (direction: 'left' | 'right') => {
-            const container = containerRef.current;
+        // The arrows find their carousel track through the section root —
+        // no element state needed (this is a plain render function).
+        const scroll = (e: React.MouseEvent<HTMLButtonElement>, direction: 'left' | 'right') => {
+            const container = e.currentTarget.closest('[data-carousel-section]')?.querySelector<HTMLDivElement>('[data-carousel-track]');
             if (!container) return;
             const scrollAmount = 340; // ~2 cards
             const newPosition = direction === 'left'
@@ -896,6 +901,7 @@ export function Home() {
 
         return (
             <div
+                data-carousel-section
                 style={{
                     marginBottom: 32,
                     position: 'relative',
@@ -931,7 +937,7 @@ export function Home() {
                     <div style={{ display: 'flex', gap: 8 }}>
                         <button
                             className="nav-arrow nav-arrow-left"
-                            onClick={() => scroll('left')}
+                            onClick={(e) => scroll(e, 'left')}
                             style={{
                                 width: 36,
                                 height: 36,
@@ -953,7 +959,7 @@ export function Home() {
                         </button>
                         <button
                             className="nav-arrow nav-arrow-right"
-                            onClick={() => scroll('right')}
+                            onClick={(e) => scroll(e, 'right')}
                             style={{
                                 width: 36,
                                 height: 36,
@@ -978,7 +984,7 @@ export function Home() {
 
                 {/* Carousel container */}
                 <div
-                    ref={containerRef}
+                    data-carousel-track
                     style={{
                         display: 'flex',
                         gap: 16,
@@ -1002,16 +1008,14 @@ export function Home() {
                             ? (isSeries ? 'series' : 'movie')
                             : type === 'continue' ? type : type;
 
-                        return (
-                            <ContentCard
-                                key={`${type}-${itemId}-${index}`}
-                                item={item}
-                                type={cardType as 'continue' | 'series' | 'movie'}
-                                showProgress={showProgress}
-                                rating={isSeries ? (item as SeriesData).rating : (item as MovieData).rating}
-                                onRemove={isContinueItem ? () => removeFromContinue(continueItem.id, continueItem.type) : undefined}
-                            />
-                        );
+                        return renderContentCard({
+                            key: `${type}-${itemId}-${index}`,
+                            item,
+                            type: cardType as 'continue' | 'series' | 'movie',
+                            showProgress,
+                            rating: isSeries ? (item as SeriesData).rating : (item as MovieData).rating,
+                            onRemove: isContinueItem ? () => removeFromContinue(continueItem.id, continueItem.type) : undefined
+                        });
                     })}
                 </div>
 
@@ -1388,43 +1392,44 @@ export function Home() {
                 </div >
 
                 {/* Continue Watching Section */}
-                < ContentSection
-                    title={`⏯️ ${t('home', 'continueWatching')}`}
-                    items={continueWatching}
-                    type="continue"
-                    showProgress={true}
-                    sectionIndex={0}
-                />
+                {renderContentSection({
+                    title: `⏯️ ${t('home', 'continueWatching')}`,
+                    items: continueWatching,
+                    type: 'continue',
+                    showProgress: true,
+                    sectionIndex: 0
+                })}
 
                 {/* Next Episodes Section */}
                 <NextEpisodes allSeries={allSeries} />
 
                 {/* Personalized Recommendations ("Porque você assistiu X") */}
                 {recommendationGroups.map((group, index) => (
-                    <ContentSection
-                        key={`rec-${group.seedName}`}
-                        title={`💡 ${becauseYouWatchedTitle(group.seedName)}`}
-                        items={group.items.map(rec => rec.item)}
-                        type="recommendations"
-                        sectionIndex={1 + index}
-                    />
+                    <div key={`rec-${group.seedName}`}>
+                        {renderContentSection({
+                            title: `💡 ${becauseYouWatchedTitle(group.seedName)}`,
+                            items: group.items.map(rec => rec.item),
+                            type: 'recommendations',
+                            sectionIndex: 1 + index
+                        })}
+                    </div>
                 ))}
 
                 {/* Recently Added Series */}
-                < ContentSection
-                    title={`🆕 ${t('home', 'recentSeries')}`}
-                    items={recentSeries}
-                    type="series"
-                    sectionIndex={2}
-                />
+                {renderContentSection({
+                    title: `🆕 ${t('home', 'recentSeries')}`,
+                    items: recentSeries,
+                    type: 'series',
+                    sectionIndex: 2
+                })}
 
                 {/* Recently Added Movies */}
-                < ContentSection
-                    title={`🎬 ${t('home', 'recentMovies')}`}
-                    items={recentMovies}
-                    type="movie"
-                    sectionIndex={3}
-                />
+                {renderContentSection({
+                    title: `🎬 ${t('home', 'recentMovies')}`,
+                    items: recentMovies,
+                    type: 'movie',
+                    sectionIndex: 3
+                })}
 
                 {/* Quick Access */}
                 < div style={{ marginTop: 40 }}>

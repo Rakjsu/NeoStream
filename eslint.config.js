@@ -19,13 +19,5 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
-    rules: {
-      // react-hooks 7.1 novelties that flag ~23 long-standing patterns in the
-      // legacy pages (init-on-mount loads, components defined in render).
-      // Downgraded to warnings until the dedicated cleanup round — new code
-      // should NOT add occurrences.
-      'react-hooks/set-state-in-effect': 'warn',
-      'react-hooks/static-components': 'warn',
-    },
   },
 ])

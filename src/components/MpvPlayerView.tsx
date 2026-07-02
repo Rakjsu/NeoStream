@@ -246,18 +246,22 @@ export function MpvPlayerView({
     useEffect(() => {
         if (prefsAppliedRef.current || tracks.length === 0 || !contentKey) return;
         prefsAppliedRef.current = true;
-        try {
-            const all = JSON.parse(localStorage.getItem(prefsStorageKey()) || '{}');
-            const chosen = choosePreferredTracks(tracks, all[contentKey]);
-            if (chosen.audioId !== undefined) {
-                setAudioTrackId(chosen.audioId);
-                mpvService.setAudioTrack(chosen.audioId);
-            }
-            if (chosen.subtitleId !== undefined) {
-                setSubtitleTrackId(chosen.subtitleId);
-                mpvService.setSubtitleTrack(chosen.subtitleId);
-            }
-        } catch { /* best-effort */ }
+        // Deferred: applying the saved pick sets state; keep it off the
+        // effect's synchronous path.
+        queueMicrotask(() => {
+            try {
+                const all = JSON.parse(localStorage.getItem(prefsStorageKey()) || '{}');
+                const chosen = choosePreferredTracks(tracks, all[contentKey]);
+                if (chosen.audioId !== undefined) {
+                    setAudioTrackId(chosen.audioId);
+                    mpvService.setAudioTrack(chosen.audioId);
+                }
+                if (chosen.subtitleId !== undefined) {
+                    setSubtitleTrackId(chosen.subtitleId);
+                    mpvService.setSubtitleTrack(chosen.subtitleId);
+                }
+            } catch { /* best-effort */ }
+        });
     }, [tracks, contentKey]);
 
     const cycleAudioTrack = useCallback(() => {

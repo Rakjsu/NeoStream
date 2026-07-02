@@ -293,7 +293,7 @@ export function GlobalSearch() {
     // anything added since the last open.
     useEffect(() => {
         if (open) {
-            setRecent(getRecentSearches());
+            queueMicrotask(() => setRecent(getRecentSearches()));
             // After the overlay paints
             requestAnimationFrame(() => inputRef.current?.focus());
         }
