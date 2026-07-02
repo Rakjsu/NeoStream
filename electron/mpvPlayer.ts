@@ -445,6 +445,27 @@ export function setupMpvHandlers() {
         return { success: sendCommand(['set_property', 'sid', value]) }
     })
 
+    // External subtitle (searched/downloaded by the renderer as VTT text):
+    // write to a temp file and sub-add it selected. mpv reads VTT natively.
+    ipcMain.handle('mpv:add-subtitle', async (_event, payload: { content?: string; title?: string; lang?: string }) => {
+        try {
+            if (typeof payload?.content !== 'string' || payload.content.length === 0) {
+                return { success: false, error: 'empty subtitle content' }
+            }
+            const fs = await import('node:fs/promises')
+            const filePath = path.join(app.getPath('temp'), `neostream-sub-${Date.now()}.vtt`)
+            await fs.writeFile(filePath, payload.content, 'utf-8')
+            const title = typeof payload.title === 'string' && payload.title ? payload.title : 'NeoStream'
+            const lang = typeof payload.lang === 'string' && payload.lang ? payload.lang : 'und'
+            const success = sendCommand(['sub-add', filePath, 'select', title, lang])
+            log.info('[MPV] sub-add', filePath, '->', success)
+            return { success }
+        } catch (error) {
+            log.error('[MPV] sub-add failed:', error)
+            return { success: false, error: String(error) }
+        }
+    })
+
     // EXPERIMENTAL — one-click MPV install. Single in-flight download; the
     // controller doubles as the guard (null = idle).
     let downloadController: AbortController | null = null

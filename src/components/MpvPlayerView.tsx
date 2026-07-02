@@ -21,6 +21,7 @@ import { watchProgressService } from '../services/watchProgressService';
 import { useLanguage } from '../services/languageService';
 import { profileService } from '../services/profileService';
 import { trackPrefKey, trackLang, choosePreferredTracks, type TrackPref } from '../utils/mpvTrackPrefs';
+import { autoFetchSubtitle, cleanupSubtitleUrl, SUBTITLE_LANGUAGE_OPTIONS } from '../services/subtitleService';
 
 /** Must match MPV_CONTROLS_HEIGHT in electron/mpvProtocol.ts. */
 const CONTROLS_HEIGHT = 96;
@@ -82,6 +83,10 @@ export function MpvPlayerView({
     const [subtitleTrackId, setSubtitleTrackId] = useState<number | null>(null);
     /** While the user drags the seek slider, show the drag value instead of polled time. */
     const [seekDrag, setSeekDrag] = useState<number | null>(null);
+    // External subtitle search (OpenSubtitles → temp .vtt → mpv sub-add)
+    const [showSubSearch, setShowSubSearch] = useState(false);
+    const [subSearchBusy, setSubSearchBusy] = useState(false);
+    const [subSearchMsg, setSubSearchMsg] = useState<string | null>(null);
 
     const closedRef = useRef(false);
     const lastProgressSaveRef = useRef(0);
@@ -285,6 +290,33 @@ export function MpvPlayerView({
         savePref({ subLang: next ? trackLang(next) : 'off' });
     }, [tracks, subtitleTrackId, savePref]);
 
+    // Search an external subtitle for this content and hand it to mpv.
+    const searchExternalSubtitle = useCallback(async (language: string, label: string) => {
+        setShowSubSearch(false);
+        setSubSearchBusy(true);
+        setSubSearchMsg(t('player', 'fetchingSubtitles'));
+        try {
+            const result = await autoFetchSubtitle({
+                title,
+                season: seasonNumber,
+                episode: episodeNumber,
+                language
+            });
+            if (result?.vttContent) {
+                const ok = await mpvService.addSubtitle(result.vttContent, label, result.language);
+                setSubSearchMsg(ok ? `💬 ${label}` : t('player', 'errorLoadingSubtitles'));
+                cleanupSubtitleUrl(result.url);
+            } else {
+                setSubSearchMsg(t('player', 'noSubtitlesFound'));
+            }
+        } catch {
+            setSubSearchMsg(t('player', 'errorLoadingSubtitles'));
+        } finally {
+            setSubSearchBusy(false);
+            setTimeout(() => setSubSearchMsg(null), 4000);
+        }
+    }, [title, seasonNumber, episodeNumber, t]);
+
     const toggleMute = useCallback(() => {
         const current = latestRef.current.volume ?? 100;
         if (current > 0) {
@@ -386,6 +418,7 @@ export function MpvPlayerView({
                 </div>
 
                 <div className="mpv-view-controls" style={{ height: CONTROLS_HEIGHT }}>
+                    {subSearchMsg && <div className="mpv-view-subsearch-msg">{subSearchMsg}</div>}
                     {!isLive && (
                         <input
                             className="mpv-view-seek"
@@ -434,6 +467,31 @@ export function MpvPlayerView({
                                 >
                                     🎧 {trackLabel(audioTracks.find(tr => tr.id === audioTrackId), '—')}
                                 </button>
+                            )}
+                            {!isLive && (
+                                <div style={{ position: 'relative' }}>
+                                    <button
+                                        className="mpv-view-btn"
+                                        onClick={() => setShowSubSearch(v => !v)}
+                                        disabled={subSearchBusy}
+                                        title={t('player', 'subtitleLanguage')}
+                                    >
+                                        {subSearchBusy ? '⏳' : '🔍'}💬
+                                    </button>
+                                    {showSubSearch && (
+                                        <div className="mpv-view-subsearch">
+                                            {SUBTITLE_LANGUAGE_OPTIONS.map(opt => (
+                                                <button
+                                                    key={opt.code}
+                                                    className="mpv-view-subsearch-option"
+                                                    onClick={() => void searchExternalSubtitle(opt.code, opt.label)}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             )}
                             {subTracks.length > 0 && (
                                 <button
@@ -487,6 +545,50 @@ export function MpvPlayerView({
 }
 
 const viewStyles = `
+    .mpv-view-subsearch {
+        position: absolute;
+        bottom: calc(100% + 8px);
+        right: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        background: rgba(10, 10, 14, 0.95);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 10px;
+        padding: 6px;
+        min-width: 170px;
+        z-index: 10;
+    }
+
+    .mpv-view-subsearch-option {
+        background: transparent;
+        border: none;
+        color: rgba(255, 255, 255, 0.85);
+        font-size: 13px;
+        text-align: left;
+        padding: 7px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+    .mpv-view-subsearch-option:hover {
+        background: rgba(var(--ns-accent-rgb), 0.25);
+        color: white;
+    }
+
+    .mpv-view-subsearch-msg {
+        position: absolute;
+        top: -34px;
+        right: 16px;
+        background: rgba(10, 10, 14, 0.9);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        padding: 5px 12px;
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 12px;
+        font-weight: 600;
+    }
+
     .mpv-view-backdrop {
         position: fixed;
         inset: 0;
