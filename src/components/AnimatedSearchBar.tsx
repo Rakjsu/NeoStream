@@ -21,8 +21,9 @@ export function AnimatedSearchBar({ value, onChange, placeholder = "Buscar..." }
     useEffect(() => () => debouncedOnChange.cancel(), [debouncedOnChange]);
 
     // Keep the draft in sync when the parent clears/sets the value externally.
+    // (Deferred to a microtask — render-phase setState trips cascading renders.)
     useEffect(() => {
-        setDraft(value);
+        queueMicrotask(() => setDraft(value));
     }, [value]);
 
     useEffect(() => {

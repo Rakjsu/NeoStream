@@ -33,7 +33,8 @@ export function PlaylistsSection() {
     };
 
     useEffect(() => {
-        refresh();
+        // Deferred: refresh flips loading state synchronously on entry.
+        queueMicrotask(() => { void refresh(); });
     }, []);
 
     const hostOf = (url: string) => {

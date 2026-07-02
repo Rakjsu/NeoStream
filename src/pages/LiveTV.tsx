@@ -182,9 +182,11 @@ export function LiveTV() {
     useEffect(() => {
         // Allow EPG fetch if we have any identifier (epg_channel_id OR name)
         if (!selectedChannel || (!selectedChannel.epg_channel_id && !selectedChannel.name)) {
-            setEpgData([]);
-            setCurrentProgram(null);
-            setUpcomingPrograms([]);
+            queueMicrotask(() => {
+                setEpgData([]);
+                setCurrentProgram(null);
+                setUpcomingPrograms([]);
+            });
             return;
         }
 
@@ -275,8 +277,11 @@ export function LiveTV() {
     }, [isKidsProfile]);
 
     useEffect(() => {
-        void fetchStreams();
-        void fetchCategories();
+        // Deferred: both loaders flip loading state synchronously on entry.
+        queueMicrotask(() => {
+            void fetchStreams();
+            void fetchCategories();
+        });
     }, [fetchCategories]);
 
     const filteredStreams = streams.filter(stream => {
@@ -307,10 +312,12 @@ export function LiveTV() {
     const windowStart = gridWindow.ready ? gridWindow.start : 0;
     const windowEnd = gridWindow.ready ? gridWindow.end : Math.min(visibleCount, filteredStreams.length);
 
-    // Reset visible count when search or category changes
+    // Reset visible count when search or category changes (deferred setState)
     useEffect(() => {
-        setVisibleCount(itemsPerPage);
-        setSelectedChannel(null);
+        queueMicrotask(() => {
+            setVisibleCount(itemsPerPage);
+            setSelectedChannel(null);
+        });
         if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
     }, [searchQuery, selectedCategory, itemsPerPage]);
 

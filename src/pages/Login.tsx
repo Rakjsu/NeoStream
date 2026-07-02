@@ -38,7 +38,8 @@ export function Login() {
 
     useEffect(() => {
         if (step === 'playlist-name') {
-            fetchCounts();
+            // Deferred: fetchCounts flips loading state synchronously on entry.
+            queueMicrotask(() => { void fetchCounts(); });
         }
     }, [step]);
 
