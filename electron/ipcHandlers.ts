@@ -8,14 +8,17 @@ import { formatTimeshiftStart } from './timeshiftProtocol'
 import {
     activatePlaylist,
     deactivatePlaylists,
+    exportPlaylistsForBackup,
     findPlaylist,
     getActivePlaylistIdPublic,
+    importPlaylistsFromBackup,
     listPublicPlaylists,
     migratePlaylistsOnStartup,
     removePlaylist,
     renameStoredPlaylist,
     saveAndActivatePlaylist,
 } from './playlistManager'
+import type { PlaylistBackupEntry } from './playlistManager'
 
 import log from './logger'
 // Store for window state (for custom maximize)
@@ -780,6 +783,27 @@ export function setupIpcHandlers() {
             return { success: true, json }
         } catch (error: unknown) {
             log.error('[Backup] Load error:', getErrorMessage(error))
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
+    // Full playlist entries for the backup file (passwords included — the
+    // renderer immediately encodes them into the payload it writes to disk).
+    ipcMain.handle('backup:export-playlists', () => {
+        try {
+            return { success: true, playlists: exportPlaylistsForBackup() }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
+    // Restore playlists from a backup (no provider validation — may be offline).
+    ipcMain.handle('backup:import-playlists', (_, { playlists }: { playlists: PlaylistBackupEntry[] }) => {
+        try {
+            const imported = importPlaylistsFromBackup(Array.isArray(playlists) ? playlists : [])
+            return { success: true, imported }
+        } catch (error: unknown) {
+            log.error('[Backup] Playlist import error:', getErrorMessage(error))
             return { success: false, error: getErrorMessage(error) }
         }
     })

@@ -363,7 +363,7 @@
     "confirmImportConfirm": "Restore",
     "confirmImportCancel": "Cancel",
     "importSuccess": "Backup restored successfully! Restart the app to apply all changes.",
-    "credentialsNote": "IPTV provider credentials are NOT included in the backup."
+    "credentialsNote": "The backup includes your playlists (provider passwords encoded). Keep the file somewhere safe."
   },
   "diagnostics": {
     "title": "Diagnostics",

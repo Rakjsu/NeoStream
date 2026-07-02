@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLanguage } from '../../services/languageService';
-import { collectBackup, applyBackup } from '../../services/backupService';
+import { collectBackup, applyBackup, encodePlaylistPassword, decodePlaylistPassword, type BackupPlaylist } from '../../services/backupService';
 import { useSaveAnimation } from './useSaveAnimation';
 
 interface BackupFileResult {
@@ -24,7 +24,25 @@ export function BackupSection() {
         setSuccessMessage(null);
         setBusy(true);
         try {
-            const payload = collectBackup();
+            // Saved playlists come from the main-process store; passwords are
+            // base64-encoded before touching the file.
+            let playlists: BackupPlaylist[] = [];
+            try {
+                const exported = await window.ipcRenderer.invoke('backup:export-playlists') as {
+                    success: boolean;
+                    playlists?: { name: string; url: string; username: string; password: string }[];
+                };
+                if (exported.success && exported.playlists) {
+                    playlists = exported.playlists.map(p => ({
+                        name: p.name,
+                        url: p.url,
+                        username: p.username,
+                        passwordB64: encodePlaylistPassword(p.password)
+                    }));
+                }
+            } catch { /* main handler absent in old builds — export without playlists */ }
+
+            const payload = collectBackup(playlists);
             const result = await window.ipcRenderer.invoke(
                 'backup:save-file',
                 { json: JSON.stringify(payload, null, 2) }
@@ -63,12 +81,29 @@ export function BackupSection() {
         }
     };
 
-    const handleConfirmImport = () => {
+    const handleConfirmImport = async () => {
         if (!pendingImportJson) return;
 
         try {
             const parsed: unknown = JSON.parse(pendingImportJson);
-            applyBackup(parsed);
+            const report = applyBackup(parsed);
+
+            // v2 backups also carry saved playlists — restored in the main store.
+            if (report.playlists.length > 0) {
+                try {
+                    await window.ipcRenderer.invoke('backup:import-playlists', {
+                        playlists: report.playlists.map(p => ({
+                            name: p.name,
+                            url: p.url,
+                            username: p.username,
+                            password: decodePlaylistPassword(p.passwordB64)
+                        }))
+                    });
+                } catch (error) {
+                    console.error('[Backup] Playlist import failed:', error);
+                }
+            }
+
             setSuccessMessage(t('backup', 'importSuccess'));
         } catch (error) {
             console.error('[Backup] Apply failed:', error);
@@ -213,7 +248,7 @@ export function BackupSection() {
                                     color: 'white',
                                     boxShadow: '0 8px 24px rgba(239, 68, 68, 0.3)'
                                 }}
-                                onClick={handleConfirmImport}
+                                onClick={() => void handleConfirmImport()}
                             >
                                 {t('backup', 'confirmImportConfirm')}
                             </button>
