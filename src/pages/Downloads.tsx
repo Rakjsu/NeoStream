@@ -237,6 +237,26 @@ export function Downloads() {
                         <h1>{t('downloads', 'title')}</h1>
                         <p className="subtitle">{t('downloads', 'emptyText')}</p>
                     </div>
+                    <button
+                        onClick={() => window.ipcRenderer.invoke('dvr:open-folder')}
+                        title={t('downloads', 'recordingsTooltip')}
+                        style={{
+                            marginLeft: 'auto',
+                            padding: '10px 18px',
+                            borderRadius: 12,
+                            border: '1px solid rgba(239, 68, 68, 0.5)',
+                            background: 'rgba(239, 68, 68, 0.12)',
+                            color: '#fca5a5',
+                            fontSize: 14,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8
+                        }}
+                    >
+                        ⏺ {t('downloads', 'recordings')}
+                    </button>
                 </header>
 
                 {/* Storage Info */}

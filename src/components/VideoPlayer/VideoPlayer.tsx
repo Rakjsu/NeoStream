@@ -11,6 +11,7 @@ import { useSubtitleManager } from './useSubtitleManager';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { PlayerSettingsMenu } from './PlayerSettingsMenu';
 import { ForcedSubtitlesMenu } from './ForcedSubtitlesMenu';
+import { ChannelZapOverlay, type PlayerChannel } from './ChannelZapOverlay';
 import { useLanguage } from '../../services/languageService';
 import './VideoPlayer.css';
 
@@ -56,6 +57,9 @@ export interface VideoPlayerProps<TSwitchContent extends SwitchableContent = Swi
     // Live TV quality fallback
     liveQualityVariants?: QualityVariant<TSwitchContent>[];
     currentQualityIndex?: number;
+    // Live TV zapping (channel list inside the player)
+    channelList?: PlayerChannel[];
+    onSwitchChannel?: (id: string | number) => void;
 }
 
 function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableContent>({
@@ -82,7 +86,9 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     imdbId,
     isSubtitled,
     liveQualityVariants,
-    currentQualityIndex = 0
+    currentQualityIndex = 0,
+    channelList,
+    onSwitchChannel
 }: VideoPlayerProps<TSwitchContent>) {
     const { videoRef, state, controls } = useVideoPlayer();
     const { t } = useLanguage();
@@ -316,6 +322,64 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     }, [contentId, contentType, title, genre, videoRef]);
 
 
+    // Live TV recording (DVR) — ffmpeg in the main process copies the stream.
+    const [recording, setRecording] = useState<{ id: string; seconds: number } | null>(null);
+    const [recToast, setRecToast] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (contentType !== 'live') return;
+        const onProgress = (_e: unknown, data: { id: string; seconds: number }) => {
+            setRecording(prev => (prev && prev.id === data.id ? { ...prev, seconds: data.seconds } : prev));
+        };
+        const onStopped = (_e: unknown, data: { id: string; file: string; error?: string }) => {
+            setRecording(prev => (prev && prev.id === data.id ? null : prev));
+            setRecToast(data.error ? t('player', 'recordingFailed') : `${t('player', 'recordingSaved')}: ${data.file}`);
+            setTimeout(() => setRecToast(null), 6000);
+        };
+        window.ipcRenderer.on('dvr:progress', onProgress);
+        window.ipcRenderer.on('dvr:stopped', onStopped);
+        return () => {
+            window.ipcRenderer.off('dvr:progress', onProgress);
+            window.ipcRenderer.off('dvr:stopped', onStopped);
+        };
+    }, [contentType, t]);
+
+    const toggleRecording = async () => {
+        if (recording) {
+            await window.ipcRenderer.invoke('dvr:stop', { id: recording.id });
+            return;
+        }
+        const result = await window.ipcRenderer.invoke('dvr:start', { url: src, channelName: title || 'canal' });
+        if (result?.success) {
+            setRecording({ id: result.id, seconds: 0 });
+        } else {
+            setRecToast(`${t('player', 'recordingFailed')}${result?.error ? `: ${result.error}` : ''}`);
+            setTimeout(() => setRecToast(null), 5000);
+        }
+    };
+
+    // Live TV zapping: channel list overlay + PageUp/PageDown channel hop.
+    const [showChannelList, setShowChannelList] = useState(false);
+    const zapEnabled = contentType === 'live' && !!channelList?.length && !!onSwitchChannel;
+
+    useEffect(() => {
+        if (!zapEnabled) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== 'PageUp' && e.key !== 'PageDown') return;
+            e.preventDefault();
+            const list = channelList!;
+            const idx = list.findIndex(c => String(c.id) === String(contentId));
+            if (idx === -1) return;
+            // PageUp = previous channel in the list, PageDown = next (TV-style CH±).
+            const next = e.key === 'PageDown'
+                ? list[Math.min(list.length - 1, idx + 1)]
+                : list[Math.max(0, idx - 1)];
+            if (next && String(next.id) !== String(contentId)) onSwitchChannel!(next.id);
+        };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [zapEnabled, channelList, contentId, onSwitchChannel]);
+
     // Next-episode countdown when the video ends (cancelable, Netflix-style).
     const [nextEpCountdown, setNextEpCountdown] = useState<number | null>(null);
     const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -536,6 +600,48 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     >
                         {streamErrorToast === t('player', 'streamUnavailable') ? '⚠️' : '🔄'} {streamErrorToast}
                     </div>
+                )}
+
+                {/* Recording saved/failed toast */}
+                {recToast && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: '130px',
+                            left: '50%',
+                            transform: 'translateX(-50%)',
+                            padding: '12px 24px',
+                            background: recToast.startsWith(t('player', 'recordingFailed'))
+                                ? 'linear-gradient(135deg, #ef4444, #dc2626)'
+                                : 'linear-gradient(135deg, #10b981, #059669)',
+                            borderRadius: '10px',
+                            color: 'white',
+                            fontSize: '0.9rem',
+                            fontWeight: 600,
+                            zIndex: 1000,
+                            maxWidth: '80%',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            boxShadow: '0 4px 20px rgba(0,0,0,0.4)'
+                        }}
+                    >
+                        ⏺ {recToast}
+                    </div>
+                )}
+
+                {/* Live TV zapping overlay */}
+                {zapEnabled && (
+                    <ChannelZapOverlay
+                        channels={channelList!}
+                        currentId={contentId}
+                        visible={showChannelList}
+                        onSelect={(id) => {
+                            setShowChannelList(false);
+                            if (String(id) !== String(contentId)) onSwitchChannel!(id);
+                        }}
+                        onClose={() => setShowChannelList(false)}
+                    />
                 )}
 
                 {/* Next-episode countdown card (video ended, series with a next ep) */}
@@ -777,6 +883,37 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             audioTracks={audioTracks}
                             onSelectAudioTrack={handleSelectAudioTrack}
                         />
+
+                        {/* Channel list toggle (live TV zapping) */}
+                        {zapEnabled && (
+                            <button
+                                className="control-btn"
+                                onClick={() => setShowChannelList(v => !v)}
+                                title={t('player', 'channelList')}
+                                style={{ fontSize: 16 }}
+                            >
+                                📺
+                            </button>
+                        )}
+
+                        {/* Record toggle (live TV DVR) */}
+                        {contentType === 'live' && (
+                            <button
+                                className="control-btn"
+                                onClick={toggleRecording}
+                                title={recording ? t('player', 'stopRecording') : t('player', 'record')}
+                                style={{
+                                    fontSize: 14,
+                                    color: recording ? '#ef4444' : 'white',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6
+                                }}
+                            >
+                                <span>⏺</span>
+                                {recording && <span style={{ fontSize: 12, fontWeight: 700 }}>{formatTime(recording.seconds)}</span>}
+                            </button>
+                        )}
 
                         {/* Episode Navigation - Only show for series */}
                         {(onNextEpisode || onPreviousEpisode) && (

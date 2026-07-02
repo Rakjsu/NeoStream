@@ -1398,6 +1398,14 @@ export function LiveTV() {
                         contentId={playingChannel.stream_id.toString()}
                         contentType="live"
                         resumeTime={pipResumeTime}
+                        channelList={filteredStreams.map(s => ({ id: s.stream_id, name: s.name, logo: s.stream_icon }))}
+                        onSwitchChannel={(id) => {
+                            const next = filteredStreams.find(s => String(s.stream_id) === String(id));
+                            if (next) {
+                                setSelectedChannel(next);
+                                setPlayingChannel(next);
+                            }
+                        }}
                         liveQualityVariants={getChannelQualityVariants(playingChannel)}
                         onSwitchQuality={(channel: LiveStream) => {
                             setPlayingChannel(channel);
