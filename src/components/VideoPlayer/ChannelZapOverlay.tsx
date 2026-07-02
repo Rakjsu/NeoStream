@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export interface PlayerChannel {
     id: string | number;
     name: string;
     logo?: string;
+    /** Provider channel number (digit-jump uses it). */
+    num?: number;
 }
 
 interface ChannelZapOverlayProps {
@@ -22,12 +24,29 @@ interface ChannelZapOverlayProps {
 export function ChannelZapOverlay({ channels, currentId, visible, onSelect, onClose }: ChannelZapOverlayProps) {
     const listRef = useRef<HTMLDivElement>(null);
     const highlightRef = useRef<HTMLDivElement>(null);
+    const searchRef = useRef<HTMLInputElement>(null);
     // Highlight follows keyboard focus; starts at the playing channel.
     const highlightIdRef = useRef<string | number | undefined>(currentId);
+    const [query, setQuery] = useState('');
 
-    // Reset highlight to the playing channel every time the list opens.
+    const normalized = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const filtered = useMemo(() => {
+        const q = normalized(query.trim());
+        if (!q) return channels;
+        return channels.filter(ch =>
+            normalized(ch.name).includes(q) || (ch.num !== undefined && String(ch.num).startsWith(q)));
+    }, [channels, query]);
+
+    // Reset highlight + search every time the list opens; focus the input.
+    // (The query reset happens inside the timeout — async, not render-phase.)
     useEffect(() => {
-        if (visible) highlightIdRef.current = currentId;
+        if (!visible) return;
+        highlightIdRef.current = currentId;
+        const t = setTimeout(() => {
+            setQuery('');
+            searchRef.current?.focus();
+        }, 60);
+        return () => clearTimeout(t);
     }, [visible, currentId]);
 
     // Scroll the highlighted row into view when opening.
@@ -41,18 +60,16 @@ export function ChannelZapOverlay({ channels, currentId, visible, onSelect, onCl
     useEffect(() => {
         if (!visible) return;
         const onKey = (e: KeyboardEvent) => {
-            const idx = channels.findIndex(c => c.id === highlightIdRef.current);
+            const list = filtered;
+            const idx = list.findIndex(c => c.id === highlightIdRef.current);
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
                 e.preventDefault();
                 e.stopPropagation();
                 const next = e.key === 'ArrowDown'
-                    ? Math.min(channels.length - 1, idx + 1)
+                    ? Math.min(list.length - 1, idx + 1)
                     : Math.max(0, idx - 1);
-                highlightIdRef.current = channels[next]?.id;
-                // Re-render via scroll: simplest is to force through DOM — the
-                // highlight is read during render, so poke React with a state
-                // in the parent? Keep it simple: use scrollIntoView on next tick.
-                const el = listRef.current?.querySelector(`[data-ch="${String(channels[next]?.id)}"]`) as HTMLElement | null;
+                highlightIdRef.current = list[next]?.id;
+                const el = listRef.current?.querySelector(`[data-ch="${String(list[next]?.id)}"]`) as HTMLElement | null;
                 el?.scrollIntoView({ block: 'nearest' });
                 // Visual highlight via class toggling (no re-render needed).
                 listRef.current?.querySelectorAll('.zap-row.kb-focus').forEach(n => n.classList.remove('kb-focus'));
@@ -60,7 +77,10 @@ export function ChannelZapOverlay({ channels, currentId, visible, onSelect, onCl
             } else if (e.key === 'Enter') {
                 e.preventDefault();
                 e.stopPropagation();
-                if (highlightIdRef.current !== undefined) onSelect(highlightIdRef.current);
+                // With a search active and no keyboard highlight in the filtered
+                // list, Enter picks the first result.
+                const target = idx >= 0 ? highlightIdRef.current : list[0]?.id;
+                if (target !== undefined) onSelect(target);
             } else if (e.key === 'Escape') {
                 e.preventDefault();
                 e.stopPropagation();
@@ -69,7 +89,7 @@ export function ChannelZapOverlay({ channels, currentId, visible, onSelect, onCl
         };
         document.addEventListener('keydown', onKey, true);
         return () => document.removeEventListener('keydown', onKey, true);
-    }, [visible, channels, onSelect, onClose]);
+    }, [visible, filtered, onSelect, onClose]);
 
     if (!visible) return null;
 
@@ -94,8 +114,32 @@ export function ChannelZapOverlay({ channels, currentId, visible, onSelect, onCl
             <div style={{ padding: '18px 20px 10px', color: 'white', fontSize: 16, fontWeight: 700 }}>
                 📺 Canais
             </div>
+            <div style={{ padding: '0 16px 10px' }}>
+                <input
+                    ref={searchRef}
+                    type="text"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Buscar canal ou número..."
+                    style={{
+                        width: '100%',
+                        padding: '9px 12px',
+                        borderRadius: 10,
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        background: 'rgba(255, 255, 255, 0.08)',
+                        color: 'white',
+                        fontSize: 13,
+                        outline: 'none'
+                    }}
+                />
+            </div>
             <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '0 12px 16px' }}>
-                {channels.map(ch => {
+                {filtered.length === 0 && (
+                    <div style={{ padding: 16, textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>
+                        Nenhum canal encontrado
+                    </div>
+                )}
+                {filtered.map(ch => {
                     const isCurrent = ch.id === currentId;
                     return (
                         <div
@@ -128,6 +172,7 @@ export function ChannelZapOverlay({ channels, currentId, visible, onSelect, onCl
                                 <span style={{ width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>📺</span>
                             )}
                             <span style={{ color: 'white', fontSize: 13, fontWeight: isCurrent ? 700 : 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {ch.num !== undefined && <span style={{ color: 'rgba(255,255,255,0.45)', marginRight: 6 }}>{ch.num}</span>}
                                 {ch.name}
                             </span>
                             {isCurrent && <span style={{ marginLeft: 'auto', color: 'var(--ns-accent-light)', fontSize: 11, flexShrink: 0 }}>● AO VIVO</span>}
