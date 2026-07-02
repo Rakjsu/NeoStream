@@ -162,8 +162,6 @@ export function Series() {
         };
     }, []);
 
-    useEffect(() => { fetchSeries(); }, []);
-
     const fetchSeries = async () => {
         setLoading(true);
         setError('');
@@ -180,6 +178,8 @@ export function Series() {
             setLoading(false);
         }
     };
+
+    useEffect(() => { fetchSeries(); }, []);
 
     const filteredSeries = series.filter(s => {
         const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());

@@ -45,7 +45,7 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
 
         // Get buffer settings synchronously
         const config = playbackService.getConfig();
-        let bufferSeconds = 15;
+        let bufferSeconds: number;
         if (config.bufferSize === 'intelligent') {
             const cached = playbackService.getCachedBufferSeconds();
             bufferSeconds = cached || 15;

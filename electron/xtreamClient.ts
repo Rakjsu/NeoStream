@@ -54,7 +54,7 @@ export class XtreamClient {
             })
         } catch (error: unknown) {
             if (isTlsCertificateError(error)) {
-                throw new Error(getInvalidCertificateGuidance())
+                throw new Error(getInvalidCertificateGuidance(), { cause: error })
             }
 
             throw error
@@ -106,24 +106,24 @@ export class XtreamClient {
 
             // Mensagens de erro mais específicas
             if (isNetworkError(error) && (error.code === 'ENOTFOUND' || error.message.includes('ENOTFOUND'))) {
-                throw new Error(`Servidor não encontrado: ${this.baseUrl}\n\nVerifique se a URL está correta.`);
+                throw new Error(`Servidor não encontrado: ${this.baseUrl}\n\nVerifique se a URL está correta.`, { cause: error });
             }
 
             if (isNetworkError(error) && (error.code === 'ECONNREFUSED' || error.message.includes('ECONNREFUSED'))) {
-                throw new Error(`Conexão recusada: ${this.baseUrl}\n\nO servidor pode estar offline.`);
+                throw new Error(`Conexão recusada: ${this.baseUrl}\n\nO servidor pode estar offline.`, { cause: error });
             }
 
             if (isNetworkError(error) && (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED' || error.message.includes('timeout'))) {
-                throw new Error(`Tempo esgotado ao conectar em: ${this.baseUrl}\n\nO servidor demorou muito para responder.`);
+                throw new Error(`Tempo esgotado ao conectar em: ${this.baseUrl}\n\nO servidor demorou muito para responder.`, { cause: error });
             }
 
             if (isTlsCertificateError(error)) {
-                throw new Error(getInvalidCertificateGuidance());
+                throw new Error(getInvalidCertificateGuidance(), { cause: error });
             }
 
             // Erro de rede genérico
             if (isNetworkError(error) && error.request && !error.response) {
-                throw new Error(`Falha na conexão com: ${this.baseUrl}\n\nVerifique sua internet e se o servidor está acessível.`);
+                throw new Error(`Falha na conexão com: ${this.baseUrl}\n\nVerifique sua internet e se o servidor está acessível.`, { cause: error });
             }
 
             throw error;

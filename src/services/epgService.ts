@@ -939,8 +939,8 @@ export const epgService = {
             const arId = this.getOpenEpgArgentinaId(channel);
             const usaId = this.getOpenEpgUSAId(channel);
 
-            let source = '';
-            let epgId = '';
+            let source: string;
+            let epgId: string;
 
             if (ptId) {
                 source = 'Open-EPG Portugal';

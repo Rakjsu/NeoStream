@@ -22,6 +22,16 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
     const { language, setLanguage, t, languages } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
 
+    const loadUpdateConfig = async () => {
+        const config = await updateService.getConfig();
+        setUpdateConfig(config);
+
+        if (config.lastCheck) {
+            const date = new Date(config.lastCheck);
+            setLastCheckDate(date.toLocaleString('pt-BR'));
+        }
+    };
+
     useEffect(() => {
         loadUpdateConfig();
         window.ipcRenderer.invoke('system:get-config').then(result => {
@@ -34,16 +44,6 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
         setSystemConfig(next);
         await window.ipcRenderer.invoke('system:set-config', { [key]: value }).catch(() => undefined);
         triggerSaveAnimation(key);
-    };
-
-    const loadUpdateConfig = async () => {
-        const config = await updateService.getConfig();
-        setUpdateConfig(config);
-
-        if (config.lastCheck) {
-            const date = new Date(config.lastCheck);
-            setLastCheckDate(date.toLocaleString('pt-BR'));
-        }
     };
 
     const handleUpdateConfigChange = async <K extends keyof UpdateConfig>(key: K, value: UpdateConfig[K]) => {
