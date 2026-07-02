@@ -316,27 +316,59 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     }, [contentId, contentType, title, genre, videoRef]);
 
 
-    // Go to next episode when video ends
+    // Next-episode countdown when the video ends (cancelable, Netflix-style).
+    const [nextEpCountdown, setNextEpCountdown] = useState<number | null>(null);
+    const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    const clearNextEpCountdown = useCallback(() => {
+        if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
+        }
+        setNextEpCountdown(null);
+    }, []);
+
+    const goToNextEpisode = useCallback((autoPlay: boolean) => {
+        clearNextEpCountdown();
+        localStorage.setItem('shouldAutoPlayNextEpisode', autoPlay ? 'true' : 'false');
+        onNextEpisode?.();
+    }, [clearNextEpCountdown, onNextEpisode]);
+
     useEffect(() => {
         if (!videoRef.current || !onNextEpisode || !canGoNext) return;
 
         const video = videoRef.current;
 
         const handleEnded = async () => {
-            // Check if auto-play is enabled to determine if we should auto-start
             const { playbackService } = await import('../../services/playbackService');
             const config = playbackService.getConfig();
 
-            // Always go to next episode, but store the auto-play preference
-            // The next video will check localStorage for shouldAutoPlay
-            localStorage.setItem('shouldAutoPlayNextEpisode', config.autoPlayNextEpisode ? 'true' : 'false');
+            if (!config.autoPlayNextEpisode) {
+                // Autoplay off: offer the next episode, don't count down.
+                setNextEpCountdown(-1);
+                return;
+            }
 
-            onNextEpisode();
+            // Count down from 5, then advance (the 0-watcher effect below fires it).
+            setNextEpCountdown(5);
+            countdownTimerRef.current = setInterval(() => {
+                setNextEpCountdown(prev => (prev === null ? null : prev - 1));
+            }, 1000);
         };
 
         video.addEventListener('ended', handleEnded);
-        return () => video.removeEventListener('ended', handleEnded);
+        return () => {
+            video.removeEventListener('ended', handleEnded);
+        };
     }, [onNextEpisode, canGoNext, videoRef]);
+
+    // Countdown reached zero → advance.
+    useEffect(() => {
+        if (nextEpCountdown === 0) goToNextEpisode(true);
+    }, [nextEpCountdown, goToNextEpisode]);
+
+    // Drop any pending countdown when the source changes or on unmount.
+    useEffect(() => clearNextEpCountdown, [src, clearNextEpCountdown]);
 
     // Add mousemove listener - works both in and out of fullscreen
     useEffect(() => {
@@ -503,6 +535,64 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                         }}
                     >
                         {streamErrorToast === t('player', 'streamUnavailable') ? '⚠️' : '🔄'} {streamErrorToast}
+                    </div>
+                )}
+
+                {/* Next-episode countdown card (video ended, series with a next ep) */}
+                {nextEpCountdown !== null && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            right: 32,
+                            bottom: 110,
+                            zIndex: 1001,
+                            padding: '18px 22px',
+                            borderRadius: 14,
+                            background: 'rgba(10, 10, 25, 0.92)',
+                            border: '1px solid rgba(var(--ns-accent-rgb), 0.4)',
+                            boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)',
+                            animation: 'fadeIn 0.25s ease-in-out',
+                            minWidth: 260
+                        }}
+                    >
+                        <div style={{ color: 'white', fontSize: 15, fontWeight: 600, marginBottom: 12 }}>
+                            {nextEpCountdown > 0
+                                ? `${t('player', 'nextEpisodeIn')} ${nextEpCountdown}s`
+                                : t('player', 'nextEpisode')}
+                        </div>
+                        <div style={{ display: 'flex', gap: 10 }}>
+                            <button
+                                onClick={() => goToNextEpisode(true)}
+                                style={{
+                                    flex: 1,
+                                    padding: '10px 16px',
+                                    borderRadius: 10,
+                                    border: 'none',
+                                    background: 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to))',
+                                    color: 'white',
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                ▶ {t('player', 'watchNow')}
+                            </button>
+                            <button
+                                onClick={clearNextEpCountdown}
+                                style={{
+                                    padding: '10px 16px',
+                                    borderRadius: 10,
+                                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                                    background: 'transparent',
+                                    color: 'white',
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                {t('player', 'cancelAutoplay')}
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
