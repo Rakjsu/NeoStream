@@ -75,6 +75,9 @@ export function MpvPlayerView({
     const [paused, setPaused] = useState(false);
     const [volume, setVolume] = useState<number | null>(null);
     const [fullscreen, setFullscreen] = useState(false);
+    const [tracks, setTracks] = useState<import('../services/mpvService').MpvTrack[]>([]);
+    const [audioTrackId, setAudioTrackId] = useState<number | null>(null);
+    const [subtitleTrackId, setSubtitleTrackId] = useState<number | null>(null);
     /** While the user drags the seek slider, show the drag value instead of polled time. */
     const [seekDrag, setSeekDrag] = useState<number | null>(null);
 
@@ -151,6 +154,9 @@ export function MpvPlayerView({
                 setPaused(status.paused);
                 setVolume(status.volume);
                 setFullscreen(status.fullscreen);
+                setTracks(status.tracks ?? []);
+                setAudioTrackId(status.audioTrackId ?? null);
+                setSubtitleTrackId(status.subtitleTrackId ?? null);
                 persistProgress(status.timePos, status.duration);
             }, STATUS_POLL_INTERVAL_MS);
         };
@@ -209,6 +215,33 @@ export function MpvPlayerView({
         setVolume(clamped);
         mpvService.setVolume(clamped);
     }, []);
+
+    // Cycle buttons (the mpv window covers everything above the controls
+    // strip, so dropdown menus can't render — cycling fits the 96px bar).
+    const trackLabel = (track: import('../services/mpvService').MpvTrack | undefined, fallback: string) =>
+        track ? (track.lang?.toUpperCase() || track.title || `#${track.id}`) : fallback;
+
+    const audioTracks = tracks.filter(tr => tr.type === 'audio');
+    const subTracks = tracks.filter(tr => tr.type === 'sub');
+
+    const cycleAudioTrack = useCallback(() => {
+        const list = tracks.filter(tr => tr.type === 'audio');
+        if (list.length < 2) return;
+        const idx = list.findIndex(tr => tr.id === audioTrackId);
+        const next = list[(idx + 1) % list.length];
+        setAudioTrackId(next.id);
+        mpvService.setAudioTrack(next.id);
+    }, [tracks, audioTrackId]);
+
+    const cycleSubtitleTrack = useCallback(() => {
+        const list = tracks.filter(tr => tr.type === 'sub');
+        if (list.length === 0) return;
+        const idx = subtitleTrackId === null ? -1 : list.findIndex(tr => tr.id === subtitleTrackId);
+        // off → 1 → 2 → ... → off
+        const next = idx + 1 < list.length ? list[idx + 1] : null;
+        setSubtitleTrackId(next ? next.id : null);
+        mpvService.setSubtitleTrack(next ? next.id : null);
+    }, [tracks, subtitleTrackId]);
 
     const toggleMute = useCallback(() => {
         const current = latestRef.current.volume ?? 100;
@@ -351,6 +384,24 @@ export function MpvPlayerView({
                         <div className="mpv-view-title" title={title}>{title}</div>
 
                         <div className="mpv-view-controls-right">
+                            {audioTracks.length > 1 && (
+                                <button
+                                    className="mpv-view-btn"
+                                    onClick={cycleAudioTrack}
+                                    title={`${t('player', 'audioTrack')} (${audioTracks.length})`}
+                                >
+                                    🎧 {trackLabel(audioTracks.find(tr => tr.id === audioTrackId), '—')}
+                                </button>
+                            )}
+                            {subTracks.length > 0 && (
+                                <button
+                                    className="mpv-view-btn"
+                                    onClick={cycleSubtitleTrack}
+                                    title={`${t('player', 'subtitleLanguage')} (${subTracks.length})`}
+                                >
+                                    💬 {subtitleTrackId === null ? t('player', 'subtitlesOff') : trackLabel(subTracks.find(tr => tr.id === subtitleTrackId), '—')}
+                                </button>
+                            )}
                             <button
                                 className="mpv-view-btn"
                                 onClick={toggleMute}
