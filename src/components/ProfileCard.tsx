@@ -1,4 +1,5 @@
 import type { Profile } from '../types/profile';
+import { ACCENT_PRESETS } from '../services/themeService';
 
 interface ProfileCardProps {
     profile: Profile;
@@ -8,6 +9,7 @@ interface ProfileCardProps {
 
 export function ProfileCard({ profile, onClick, onEdit }: ProfileCardProps) {
     const isImageAvatar = profile.avatar.startsWith('data:image') || profile.avatar.startsWith('http');
+    const accent = ACCENT_PRESETS.find(p => p.id === profile.accentColor);
 
     return (
         <div
@@ -45,7 +47,8 @@ export function ProfileCard({ profile, onClick, onEdit }: ProfileCardProps) {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    border: '3px solid rgba(255, 255, 255, 0.2)'
+                    border: accent ? `3px solid ${accent.accent}` : '3px solid rgba(255, 255, 255, 0.2)',
+                    boxShadow: accent ? `0 0 18px rgba(${accent.rgb}, 0.45)` : undefined
                 }}
             >
                 {isImageAvatar ? (

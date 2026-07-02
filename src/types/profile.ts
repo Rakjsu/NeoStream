@@ -28,6 +28,8 @@ export interface Profile {
     pin?: string; // SHA-256 hash (optional)
     isKids?: boolean; // Kids profile with content filtering
     preferredQuality?: '4k' | 'fhd' | 'hd' | 'sd' | 'auto'; // Preferred quality for live TV
+    /** Theme accent preset id (themeService AccentId) applied when this profile activates. */
+    accentColor?: string;
     watchLater: WatchLaterItem[];
     continueWatching: ContinueWatchingItem[];
     createdAt: string; // ISO date string
@@ -44,6 +46,7 @@ export interface CreateProfileData {
     avatar: string;
     pin?: string; // Plain text, will be hashed
     isKids?: boolean;
+    accentColor?: string;
 }
 
 export interface UpdateProfileData {
@@ -52,4 +55,5 @@ export interface UpdateProfileData {
     pin?: string | null; // null to remove PIN
     isKids?: boolean;
     preferredQuality?: '4k' | 'fhd' | 'hd' | 'sd' | 'auto';
+    accentColor?: string;
 }
