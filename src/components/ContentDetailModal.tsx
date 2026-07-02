@@ -1,12 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { searchSeriesByName, searchMovieByName, fetchMovieTrailer, fetchSeriesTrailer, type TMDBSeriesDetails, type TMDBMovieDetails } from '../services/tmdb';
 import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
+import { profileService } from '../services/profileService';
 import { watchLaterService } from '../services/watchLater';
 import { favoritesService } from '../services/favoritesService';
 import { downloadService } from '../services/downloadService';
 import { useLanguage } from '../services/languageService';
 import { extractYouTubeId } from '../utils/youtube';
+import { episodeDisplayTitle, sortedSeasonKeys } from '../utils/seriesEpisodes';
 
 interface ContentDetailModalProps {
     isOpen: boolean;
@@ -76,9 +78,31 @@ export function ContentDetailModal({
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [showDownloadModal, setShowDownloadModal] = useState(false);
     const [trailerUrl, setTrailerUrl] = useState<string | null>(null);
-    const [trailerMuted, setTrailerMuted] = useState(true);
+    const trailerFrameRef = useRef<HTMLIFrameElement>(null);
+    // Trailer sound preference, remembered per profile (default muted so autoplay works).
+    const soundPrefKey = () => `neostream_trailer_muted_${profileService.getActiveProfile()?.id ?? 'default'}`;
+    const [trailerMuted, setTrailerMuted] = useState<boolean>(() => {
+        try { return localStorage.getItem(`neostream_trailer_muted_${profileService.getActiveProfile()?.id ?? 'default'}`) !== '0'; } catch { return true; }
+    });
+    // Narrow window → stack episodes below the trailer instead of beside it.
+    const [narrow, setNarrow] = useState<boolean>(() => typeof window !== 'undefined' && window.innerWidth < 900);
+    // Lightweight windowing for long episode lists (uniform-height rows).
+    const [epScroll, setEpScroll] = useState({ top: 0, height: 0 });
     const modalRef = useRef<HTMLDivElement>(null);
     const { t } = useLanguage();
+
+    // Mute/unmute the YouTube trailer in place via the IFrame API (no reload).
+    const sendToTrailer = (func: 'mute' | 'unMute') => {
+        trailerFrameRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*');
+    };
+    const toggleTrailerSound = () => {
+        setTrailerMuted(prev => {
+            const next = !prev;
+            sendToTrailer(next ? 'mute' : 'unMute');
+            try { localStorage.setItem(soundPrefKey(), next ? '1' : '0'); } catch { /* ignore */ }
+            return next;
+        });
+    };
 
     // Fetch series info for episodes
     useEffect(() => {
@@ -183,35 +207,8 @@ export function ContentDetailModal({
     }, [isOpen, contentData.name, contentType]);
 
     // Helper function to get clean episode title
-    const getEpisodeTitle = (ep: SeriesEpisode): string => {
-        const epNum = Number(ep.episode_num);
-        const rawTitle = ep.title || '';
-
-        // Clean the title - remove series name, season/episode markers, etc.
-        const cleanTitle = rawTitle
-            .replace(/^(.*?)[\s\-–—]*S\d+[\s\-:.]*E\d+[\s\-:.–—]*/i, '') // Remove "SeriesName S01E01 -"
-            .replace(/\s*(?:\[|\()?S\d+[\s.-]*E\d+(?:\]|\))?\s*/gi, '') // Remove [S01E01] or (S01.E01)
-            .replace(/\s*-\s*Temporada\s*\d+\s*Epis[óo]dio\s*\d+\s*/gi, '') // Remove "Temporada X Epi..."
-            .replace(/\s*Temp\s*\d+\s*Ep\s*\d+\s*/gi, '') // Remove "Temp X Ep Y"
-            .replace(/Episode\s*\d+/gi, '') // Remove "Episode X"
-            .replace(/^\d+\.?\s*/, '') // Remove leading numbers like "1. " or "01 "
-            .trim();
-
-        // Check if remaining title is valid (not empty or generic)
-        const genericPatterns = [
-            /^ep\s*\d+$/i,
-            /^\d+$/,
-            /^temporada\s*\d+\s*episodio\s*\d+$/i,
-            /^episode$/i
-        ];
-        const isValidTitle = cleanTitle.length > 0 && !genericPatterns.some(p => p.test(cleanTitle));
-
-        if (isValidTitle) {
-            return cleanTitle;
-        }
-
-        return `Episódio ${epNum}`;
-    };
+    const getEpisodeTitle = (ep: SeriesEpisode): string =>
+        episodeDisplayTitle(ep.title, Number(ep.episode_num));
 
     // Fetch trailer from TMDB if not provided by API
     useEffect(() => {
@@ -246,6 +243,36 @@ export function ContentDetailModal({
         window.addEventListener('keydown', handleEscape);
         return () => window.removeEventListener('keydown', handleEscape);
     }, [onClose]);
+
+    // Stack episodes below the trailer on narrow windows.
+    useEffect(() => {
+        const onResize = () => setNarrow(window.innerWidth < 900);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+    }, []);
+
+    // Keyboard: ↑/↓ move the selected episode, Enter plays it (series only).
+    useEffect(() => {
+        if (!isOpen || contentType !== 'series') return;
+        const onKey = (e: KeyboardEvent) => {
+            const eps = seriesInfo?.episodes?.[selectedSeason] || [];
+            if (!eps.length) return;
+            const idx = eps.findIndex(ep => Number(ep.episode_num) === selectedEpisode);
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const nextEp = eps[Math.min(idx + 1, eps.length - 1)];
+                if (nextEp) setSelectedEpisode(Number(nextEp.episode_num));
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                const prevEp = eps[Math.max(idx - 1, 0)];
+                if (prevEp) setSelectedEpisode(Number(prevEp.episode_num));
+            } else if (e.key === 'Enter') {
+                onPlay(selectedSeason, selectedEpisode);
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [isOpen, contentType, seriesInfo, selectedSeason, selectedEpisode, onPlay]);
 
     // Close when clicking outside
     const handleBackdropClick = (e: React.MouseEvent) => {
@@ -312,14 +339,42 @@ export function ContentDetailModal({
         }
     };
 
+    // Per-episode watch state for the selected season, computed once per
+    // change instead of two service lookups per row per render.
+    const episodeProgressMap = useMemo(() => {
+        const map = new Map<number, { watched: boolean; pct: number }>();
+        if (contentType !== 'series') return map;
+        const eps = seriesInfo?.episodes?.[selectedSeason] || [];
+        for (const ep of eps) {
+            const epNum = Number(ep.episode_num);
+            const watched = watchProgressService.isEpisodeWatched(contentId, selectedSeason, epNum);
+            const prog = watched ? null : watchProgressService.getEpisodeProgress(contentId, selectedSeason, epNum);
+            const pct = (prog && prog.duration > 0) ? Math.min(100, (prog.currentTime / prog.duration) * 100) : 0;
+            map.set(epNum, { watched, pct });
+        }
+        return map;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [contentType, seriesInfo, selectedSeason, contentId, isOpen]);
+
     if (!isOpen) return null;
 
     const tmdbDetails = tmdbData as TmdbDetails | null;
     const overview = tmdbDetails?.overview || contentData.plot || t('contentModal', 'noDescription');
     const rating = contentData.rating || tmdbDetails?.vote_average?.toFixed(1);
     const genres = contentData.genre || tmdbDetails?.genres?.map((g) => g.name).join(', ');
-    const seasons = seriesInfo?.episodes ? Object.keys(seriesInfo.episodes).sort((a, b) => Number(a) - Number(b)) : [];
+    const seasons = sortedSeasonKeys(seriesInfo?.episodes);
     const episodes = seriesInfo?.episodes?.[selectedSeason] || [];
+
+    // Windowing for long seasons: uniform rows → render only the visible
+    // slice with top/bottom spacers keeping the scrollbar honest.
+    const EP_ROW_H = 52;
+    const EP_OVERSCAN = 8;
+    const windowEpisodes = episodes.length > 60;
+    const epStart = windowEpisodes ? Math.max(0, Math.floor(epScroll.top / EP_ROW_H) - EP_OVERSCAN) : 0;
+    const epEnd = windowEpisodes
+        ? Math.min(episodes.length, Math.ceil((epScroll.top + (epScroll.height || 360)) / EP_ROW_H) + EP_OVERSCAN)
+        : episodes.length;
+    const visibleEpisodes = episodes.slice(epStart, epEnd);
 
     // Check movie progress
     const movieProgress = contentType === 'movie' ? movieProgressService.getMoviePositionById(contentId) : null;
@@ -403,9 +458,10 @@ export function ContentDetailModal({
                     ✕
                 </button>
 
-                {/* Top row: trailer on the left, episodes beside it (series) */}
+                {/* Top row: trailer on the left, episodes beside it (series); stacks on narrow */}
                 <div style={{
                     display: 'flex',
+                    flexDirection: (contentType === 'series' && narrow) ? 'column' : 'row',
                     alignItems: 'stretch',
                     flexShrink: 0
                 }}>
@@ -423,11 +479,12 @@ export function ContentDetailModal({
                         if (trailerId) {
                             return (
                                 <iframe
-                                    key={trailerMuted ? 'muted' : 'unmuted'}
-                                    src={`https://www.youtube-nocookie.com/embed/${trailerId}?autoplay=1&mute=${trailerMuted ? 1 : 0}&controls=0&modestbranding=1&rel=0&playsinline=1&loop=1&playlist=${trailerId}`}
+                                    ref={trailerFrameRef}
+                                    src={`https://www.youtube-nocookie.com/embed/${trailerId}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&playsinline=1&loop=1&playlist=${trailerId}&enablejsapi=1`}
                                     title={`${contentData.name} trailer`}
                                     referrerPolicy="strict-origin-when-cross-origin"
                                     allow="autoplay; encrypted-media; picture-in-picture"
+                                    onLoad={() => { if (!trailerMuted) window.setTimeout(() => sendToTrailer('unMute'), 600); }}
                                     style={{
                                         position: 'absolute',
                                         top: '50%',
@@ -461,7 +518,7 @@ export function ContentDetailModal({
                     {/* Mute / unmute toggle (only when a trailer is playing) */}
                     {extractYouTubeId(trailerUrl) && (
                         <button
-                            onClick={() => setTrailerMuted(m => !m)}
+                            onClick={toggleTrailerSound}
                             title={trailerMuted ? t('contentModal', 'unmute') : t('contentModal', 'mute')}
                             aria-label={trailerMuted ? 'Ativar som' : 'Silenciar'}
                             style={{
@@ -489,15 +546,26 @@ export function ContentDetailModal({
 
                 {/* Episodes beside the trailer (series only) */}
                 {contentType === 'series' && (
-                <div style={{
+                <div style={narrow ? {
+                    width: '100%',
+                    flexShrink: 0,
+                    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                    background: 'rgba(0, 0, 0, 0.25)'
+                } : {
                     width: 320,
                     flexShrink: 0,
                     position: 'relative',
                     borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
                     background: 'rgba(0, 0, 0, 0.25)'
                 }}>
-                    {/* Absolute inner so this column takes the trailer's height, then scrolls */}
-                    <div style={{
+                    {/* Wide: absolute inner takes the trailer's height then scrolls. Narrow: normal flow with its own cap. */}
+                    <div style={narrow ? {
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 12,
+                        padding: 14,
+                        maxHeight: 300
+                    } : {
                         position: 'absolute',
                         inset: 14,
                         display: 'flex',
@@ -525,15 +593,26 @@ export function ContentDetailModal({
                                     ))}
                                 </div>
 
-                                {/* Episode List (fills the remaining height, scrolls) */}
-                                <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'rgba(0, 0, 0, 0.2)', borderRadius: 12, padding: 8 }}>
-                                    {episodes.map((ep: SeriesEpisode, index: number) => {
+                                {/* Episode List (fills the remaining height, scrolls; windowed for long seasons) */}
+                                <div
+                                    style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'rgba(0, 0, 0, 0.2)', borderRadius: 12, padding: 8 }}
+                                    onScroll={windowEpisodes ? (e) => {
+                                        const el = e.currentTarget;
+                                        setEpScroll({ top: el.scrollTop, height: el.clientHeight });
+                                    } : undefined}
+                                >
+                                    {windowEpisodes && epStart > 0 && (
+                                        <div style={{ height: epStart * EP_ROW_H }} aria-hidden="true" />
+                                    )}
+                                    {visibleEpisodes.map((ep: SeriesEpisode, index: number) => {
                                         const epNum = Number(ep.episode_num);
                                         const isSelected = epNum === selectedEpisode;
-                                        const isWatched = watchProgressService.isEpisodeWatched(contentId, selectedSeason, epNum);
+                                        const state = episodeProgressMap.get(epNum);
+                                        const isWatched = state?.watched ?? false;
+                                        const pct = state?.pct ?? 0;
                                         return (
-                                            <div key={ep.id || index} onClick={() => setSelectedEpisode(epNum)}
-                                                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
+                                            <div key={ep.id || (epStart + index)} onClick={() => setSelectedEpisode(epNum)}
+                                                style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, cursor: 'pointer',
                                                     background: isSelected ? 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.15))' : 'transparent',
                                                     border: isSelected ? '1px solid rgba(var(--ns-accent-rgb), 0.4)' : '1px solid transparent', opacity: isWatched ? 0.6 : 1, transition: 'all 0.2s' }}>
                                                 <span style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, background: isWatched ? 'linear-gradient(135deg, #10b981, #059669)' : 'rgba(var(--ns-accent-rgb), 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'white' }}>
@@ -545,9 +624,17 @@ export function ContentDetailModal({
                                                 {isSelected && (
                                                     <span style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'white' }}>▶</span>
                                                 )}
+                                                {pct > 0 && (
+                                                    <div style={{ position: 'absolute', left: 14, right: 14, bottom: 3, height: 3, borderRadius: 2, background: 'rgba(255, 255, 255, 0.15)' }}>
+                                                        <div style={{ height: '100%', width: `${pct}%`, borderRadius: 2, background: 'var(--ns-accent)' }} />
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })}
+                                    {windowEpisodes && epEnd < episodes.length && (
+                                        <div style={{ height: (episodes.length - epEnd) * EP_ROW_H }} aria-hidden="true" />
+                                    )}
                                 </div>
                             </>
                         )}
@@ -734,11 +821,11 @@ export function ContentDetailModal({
                             {contentType === 'series'
                                 ? downloadService.getOfflineEpisodePath(contentData.name, selectedSeason, selectedEpisode)
                                     ? `${t('contentModal', 'offlineSeason')}${selectedSeason} ${t('contentModal', 'episode')}${selectedEpisode}`
-                                    : `${t('contentModal', 'watchSeason')}${selectedSeason} ${t('contentModal', 'episode')}${selectedEpisode}`
+                                    : `${(episodeProgressMap.get(selectedEpisode)?.pct ?? 0) > 0 ? t('contentModal', 'continueSeason') : t('contentModal', 'watchSeason')}${selectedSeason} ${t('contentModal', 'episode')}${selectedEpisode}${(episodeProgressMap.get(selectedEpisode)?.pct ?? 0) > 0 ? ` · ${Math.round(episodeProgressMap.get(selectedEpisode)!.pct)}%` : ''}`
                                 : downloadService.isDownloaded(contentData.name, 'movie')
                                     ? t('contentModal', 'watchOffline')
                                     : hasMovieProgress
-                                        ? t('contentModal', 'continueWatching')
+                                        ? `${t('contentModal', 'continueWatching')} · ${Math.round(movieProgress!.progress)}%`
                                         : t('contentModal', 'watchMovie')
                             }
                         </button>

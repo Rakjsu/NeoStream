@@ -107,7 +107,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         }
     }, [contentType, liveQualityVariants, currentQualityIndex, onSwitchVersion, t]);
 
-    useHls({ src, videoRef, onStreamError: handleStreamError });
+    const hlsRef = useHls({ src, videoRef, onStreamError: handleStreamError });
 
 
     const [showControls, setShowControls] = useState(true);
@@ -128,8 +128,34 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         isForcedSubtitle,
         forcedEnabledForSession,
         handleSubtitleToggle,
+        handleSubtitleLanguageSelect,
+        handleSubtitlesOff,
         handleForcedSessionToggle
     } = useSubtitleManager({ title, tmdbId, imdbId, seasonNumber, episodeNumber, videoRef });
+
+    // HLS audio tracks — snapshotted when the settings menu opens (live
+    // streams occasionally expose more than one language).
+    const [audioTracks, setAudioTracks] = useState<{ id: number; label: string; active: boolean }[]>([]);
+    useEffect(() => {
+        if (!showSettings) return;
+        const hls = hlsRef.current;
+        if (!hls || !hls.audioTracks || hls.audioTracks.length === 0) {
+            setAudioTracks([]);
+            return;
+        }
+        setAudioTracks(hls.audioTracks.map((track, i) => ({
+            id: i,
+            label: track.name || track.lang || `Áudio ${i + 1}`,
+            active: i === hls.audioTrack
+        })));
+    }, [showSettings, hlsRef]);
+
+    const handleSelectAudioTrack = (id: number) => {
+        const hls = hlsRef.current;
+        if (!hls) return;
+        hls.audioTrack = id;
+        setAudioTracks(tracks => tracks.map(tr => ({ ...tr, active: tr.id === id })));
+    };
     const containerRef = useRef<HTMLDivElement>(null);
     const progressRef = useRef<HTMLDivElement>(null);
 
@@ -654,6 +680,12 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             onSetPlaybackRate={controls.setPlaybackRate}
                             showSettings={showSettings}
                             setShowSettings={setShowSettings}
+                            subtitlesEnabled={subtitlesEnabled}
+                            subtitleLanguage={subtitleLanguage}
+                            onSelectSubtitleLanguage={handleSubtitleLanguageSelect}
+                            onDisableSubtitles={handleSubtitlesOff}
+                            audioTracks={audioTracks}
+                            onSelectAudioTrack={handleSelectAudioTrack}
                         />
 
                         {/* Episode Navigation - Only show for series */}
