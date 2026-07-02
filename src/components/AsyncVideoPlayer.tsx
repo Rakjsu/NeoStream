@@ -59,7 +59,7 @@ interface AsyncVideoPlayerProps<TMovie extends MediaItem, TVersion extends Media
     liveQualityVariants?: LiveQualityVariant<TVersion>[];
     onSwitchQuality?: (channel: TVersion) => void;
     // Live TV zapping (channel list inside the player)
-    channelList?: { id: string | number; name: string; logo?: string }[];
+    channelList?: { id: string | number; name: string; logo?: string; num?: number }[];
     onSwitchChannel?: (id: string | number) => void;
 }
 

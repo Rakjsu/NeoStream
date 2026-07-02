@@ -362,6 +362,35 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     const [showChannelList, setShowChannelList] = useState(false);
     const zapEnabled = contentType === 'live' && !!channelList?.length && !!onSwitchChannel;
 
+    // TV-style digit jump: type the channel number, it switches after a beat.
+    const [digitBuffer, setDigitBuffer] = useState('');
+    const digitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => {
+        if (!zapEnabled) return;
+        const onKey = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement | null;
+            if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+            if (!/^[0-9]$/.test(e.key)) return;
+            e.preventDefault();
+            setDigitBuffer(prev => {
+                const next = (prev + e.key).slice(0, 4);
+                if (digitTimerRef.current) clearTimeout(digitTimerRef.current);
+                digitTimerRef.current = setTimeout(() => {
+                    setDigitBuffer('');
+                    const num = Number(next);
+                    const hit = channelList!.find(c => c.num === num);
+                    if (hit && String(hit.id) !== String(contentId)) onSwitchChannel!(hit.id);
+                }, 1400);
+                return next;
+            });
+        };
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('keydown', onKey);
+            if (digitTimerRef.current) clearTimeout(digitTimerRef.current);
+        };
+    }, [zapEnabled, channelList, contentId, onSwitchChannel]);
+
     useEffect(() => {
         if (!zapEnabled) return;
         const onKey = (e: KeyboardEvent) => {
@@ -627,6 +656,27 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                         }}
                     >
                         ⏺ {recToast}
+                    </div>
+                )}
+
+                {/* Digit-jump OSD (typing a channel number) */}
+                {digitBuffer && (
+                    <div style={{
+                        position: 'absolute',
+                        top: 24,
+                        right: 32,
+                        zIndex: 1003,
+                        padding: '10px 22px',
+                        borderRadius: 12,
+                        background: 'rgba(0, 0, 0, 0.75)',
+                        border: '1px solid rgba(var(--ns-accent-rgb), 0.5)',
+                        color: 'white',
+                        fontSize: 30,
+                        fontWeight: 700,
+                        letterSpacing: 4,
+                        fontVariantNumeric: 'tabular-nums'
+                    }}>
+                        {digitBuffer}
                     </div>
                 )}
 
