@@ -115,6 +115,14 @@ async function getAuthToken(): Promise<string | null> {
     }
 }
 
+/** Languages offered in the player's subtitle menu. */
+export const SUBTITLE_LANGUAGE_OPTIONS: { code: string; label: string }[] = [
+    { code: 'pt-br', label: 'Português (BR)' },
+    { code: 'pt-pt', label: 'Português (PT)' },
+    { code: 'en', label: 'English' },
+    { code: 'es', label: 'Español' },
+];
+
 /**
  * Search for subtitles on OpenSubtitles
  */
@@ -263,6 +271,8 @@ export async function autoFetchSubtitle(params: {
     imdbId?: string;
     season?: number;
     episode?: number;
+    /** Explicit language pick from the player menu — strict, no fallback chain. */
+    language?: string;
 }): Promise<{ url: string; language: string; vttContent: string; warning?: string } | null> {
     try {
         // Get user's preferred subtitle language from settings
@@ -273,9 +283,13 @@ export async function autoFetchSubtitle(params: {
         const config = playbackService.getConfig();
 
         // Build language priority based on user preference
-        const preferredLang = config.subtitleLanguage;
+        const preferredLang = params.language || config.subtitleLanguage;
         let preferredLanguages: string[];
 
+        if (params.language) {
+            // The user picked this language explicitly — search only it.
+            preferredLanguages = [params.language];
+        } else
         switch (preferredLang) {
             case 'pt-br':
                 preferredLanguages = ['pt-br', 'pt', 'en'];

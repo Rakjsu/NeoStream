@@ -1,10 +1,17 @@
 import { Settings } from 'lucide-react';
 import { useLanguage } from '../../services/languageService';
+import { SUBTITLE_LANGUAGE_OPTIONS } from '../../services/subtitleService';
 
 import type { MovieVersion } from '../../services/movieVersionService';
 
 export interface SwitchableContent {
     stream_id?: string | number;
+}
+
+export interface PlayerAudioTrack {
+    id: number;
+    label: string;
+    active: boolean;
 }
 
 const playbackRates = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
@@ -19,6 +26,14 @@ export interface PlayerSettingsMenuProps<TSwitchContent extends SwitchableConten
     onSetPlaybackRate: (rate: number) => void;
     showSettings: boolean;
     setShowSettings: (show: boolean) => void;
+    /** Subtitle language picker (movies/series). */
+    subtitlesEnabled?: boolean;
+    subtitleLanguage?: string | null;
+    onSelectSubtitleLanguage?: (code: string) => void;
+    onDisableSubtitles?: () => void;
+    /** HLS audio tracks (live streams with more than one). */
+    audioTracks?: PlayerAudioTrack[];
+    onSelectAudioTrack?: (id: number) => void;
 }
 
 // Gear settings menu: movie version / live quality switcher, or playback speed.
@@ -31,7 +46,13 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
     playbackRate,
     onSetPlaybackRate,
     showSettings,
-    setShowSettings
+    setShowSettings,
+    subtitlesEnabled,
+    subtitleLanguage,
+    onSelectSubtitleLanguage,
+    onDisableSubtitles,
+    audioTracks,
+    onSelectAudioTrack
 }: PlayerSettingsMenuProps<TSwitchContent>) {
     const { t } = useLanguage();
 
@@ -159,6 +180,62 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
                                         }}
                                     >
                                         {rate}x
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Subtitle language picker (movies/series) */}
+                    {contentType !== 'live' && onSelectSubtitleLanguage && (
+                        <div className="settings-section">
+                            <span className="settings-label">{t('player', 'subtitleLanguage')}</span>
+                            <div className="settings-options">
+                                <button
+                                    className={`settings-option ${!subtitlesEnabled ? 'active' : ''}`}
+                                    onClick={() => {
+                                        onDisableSubtitles?.();
+                                        setShowSettings(false);
+                                    }}
+                                >
+                                    {t('player', 'subtitlesOff')}
+                                </button>
+                                {SUBTITLE_LANGUAGE_OPTIONS.map(opt => {
+                                    const norm = (subtitleLanguage || '').toLowerCase();
+                                    const isActive = !!subtitlesEnabled &&
+                                        (norm === opt.code || norm === opt.code.split('-')[0]);
+                                    return (
+                                        <button
+                                            key={opt.code}
+                                            className={`settings-option ${isActive ? 'active' : ''}`}
+                                            onClick={() => {
+                                                onSelectSubtitleLanguage(opt.code);
+                                                setShowSettings(false);
+                                            }}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Audio tracks (HLS streams exposing more than one) */}
+                    {audioTracks && audioTracks.length > 1 && onSelectAudioTrack && (
+                        <div className="settings-section">
+                            <span className="settings-label">{t('player', 'audioTrack')}</span>
+                            <div className="settings-options">
+                                {audioTracks.map(track => (
+                                    <button
+                                        key={track.id}
+                                        className={`settings-option ${track.active ? 'active' : ''}`}
+                                        onClick={() => {
+                                            onSelectAudioTrack(track.id);
+                                            setShowSettings(false);
+                                        }}
+                                    >
+                                        {track.label}
                                     </button>
                                 ))}
                             </div>

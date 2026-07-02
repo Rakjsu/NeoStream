@@ -211,6 +211,55 @@ export function useSubtitleManager({
         }
     };
 
+    // Explicit language pick from the settings menu (strict — no fallback chain).
+    const handleSubtitleLanguageSelect = async (lang: string) => {
+        if (!title) return;
+        if (subtitleUrl) cleanupSubtitleUrl(subtitleUrl);
+        setSubtitleLoading(true);
+        setIsForcedSubtitle(false);
+        try {
+            const result = await autoFetchSubtitle({
+                title,
+                tmdbId,
+                imdbId,
+                season: seasonNumber,
+                episode: episodeNumber,
+                language: lang
+            });
+            if (result) {
+                setSubtitleUrl(result.url);
+                setSubtitleLanguage(result.language);
+                setVttContent(result.vttContent);
+                setSubtitlesEnabled(true);
+            } else {
+                setSubtitleWarning(`${t('player', 'noSubtitlesFound')} (${lang.toUpperCase()})`);
+                setTimeout(() => setSubtitleWarning(null), 4000);
+            }
+        } catch (error) {
+            console.error('Error fetching subtitles for language:', error);
+        } finally {
+            setSubtitleLoading(false);
+        }
+    };
+
+    // Turn subtitles fully off (settings menu "Desligada").
+    const handleSubtitlesOff = () => {
+        setSubtitlesEnabled(false);
+        setIsForcedSubtitle(false);
+        if (subtitleUrl) {
+            cleanupSubtitleUrl(subtitleUrl);
+            setSubtitleUrl(null);
+            setSubtitleLanguage(null);
+            setVttContent(null);
+        }
+        const video = videoRef.current;
+        if (video && video.textTracks.length > 0) {
+            for (let i = 0; i < video.textTracks.length; i++) {
+                video.textTracks[i].mode = 'hidden';
+            }
+        }
+    };
+
     // Forced-subtitles session toggle (settings dropdown row)
     const handleForcedSessionToggle = async () => {
         const newValue = !forcedEnabledForSession;
@@ -269,6 +318,8 @@ export function useSubtitleManager({
         isForcedSubtitle,
         forcedEnabledForSession,
         handleSubtitleToggle,
+        handleSubtitleLanguageSelect,
+        handleSubtitlesOff,
         handleForcedSessionToggle
     };
 }

@@ -821,11 +821,11 @@ export function ContentDetailModal({
                             {contentType === 'series'
                                 ? downloadService.getOfflineEpisodePath(contentData.name, selectedSeason, selectedEpisode)
                                     ? `${t('contentModal', 'offlineSeason')}${selectedSeason} ${t('contentModal', 'episode')}${selectedEpisode}`
-                                    : `${t('contentModal', 'watchSeason')}${selectedSeason} ${t('contentModal', 'episode')}${selectedEpisode}`
+                                    : `${(episodeProgressMap.get(selectedEpisode)?.pct ?? 0) > 0 ? t('contentModal', 'continueSeason') : t('contentModal', 'watchSeason')}${selectedSeason} ${t('contentModal', 'episode')}${selectedEpisode}${(episodeProgressMap.get(selectedEpisode)?.pct ?? 0) > 0 ? ` · ${Math.round(episodeProgressMap.get(selectedEpisode)!.pct)}%` : ''}`
                                 : downloadService.isDownloaded(contentData.name, 'movie')
                                     ? t('contentModal', 'watchOffline')
                                     : hasMovieProgress
-                                        ? t('contentModal', 'continueWatching')
+                                        ? `${t('contentModal', 'continueWatching')} · ${Math.round(movieProgress!.progress)}%`
                                         : t('contentModal', 'watchMovie')
                             }
                         </button>
