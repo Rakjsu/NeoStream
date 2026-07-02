@@ -115,6 +115,13 @@ class MpvService {
         await window.ipcRenderer.invoke('mpv:set-subtitle-track', { id }).catch(() => undefined);
     }
 
+    /** Load an external subtitle (VTT text) and select it. */
+    async addSubtitle(content: string, title: string, lang: string): Promise<boolean> {
+        const result = await window.ipcRenderer.invoke('mpv:add-subtitle', { content, title, lang })
+            .catch(() => ({ success: false })) as { success: boolean };
+        return result.success === true;
+    }
+
     /** Polled status snapshot ({ running:false, ... } when nothing is playing). */
     async getStatus(): Promise<MpvStatus | null> {
         try {
