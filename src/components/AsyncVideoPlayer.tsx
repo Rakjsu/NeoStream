@@ -61,6 +61,9 @@ interface AsyncVideoPlayerProps<TMovie extends MediaItem, TVersion extends Media
     // Live TV zapping (channel list inside the player)
     channelList?: { id: string | number; name: string; logo?: string; num?: number }[];
     onSwitchChannel?: (id: string | number) => void;
+    /** End-of-video countdown texts (movie queue). */
+    nextCountdownLabel?: string;
+    nextActionLabel?: string;
 }
 
 function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem = TMovie>({
@@ -71,6 +74,8 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
     onPreviousEpisode,
     canGoNext,
     canGoPrevious,
+    nextCountdownLabel,
+    nextActionLabel,
     currentEpisode,
     customTitle,
     seriesId,
@@ -432,6 +437,8 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
                         onClose={onClose}
                         autoPlay={true}
                         onNextEpisode={onNextEpisode}
+                        nextCountdownLabel={nextCountdownLabel}
+                        nextActionLabel={nextActionLabel}
                         onPreviousEpisode={onPreviousEpisode}
                         canGoNext={canGoNext}
                         canGoPrevious={canGoPrevious}

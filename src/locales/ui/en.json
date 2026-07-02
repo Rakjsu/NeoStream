@@ -547,6 +547,8 @@
     "subtitlesOff": "Off",
     "audioTrack": "Audio track",
     "nextEpisodeIn": "Next episode in",
+    "upNextIn": "Up next in",
+    "upNext": "Up next",
     "watchNow": "Watch now",
     "cancelAutoplay": "Cancel",
     "channelList": "Channel list (PgUp/PgDn to zap)",

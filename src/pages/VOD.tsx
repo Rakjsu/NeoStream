@@ -171,6 +171,17 @@ export function VOD() {
         queueMicrotask(() => { void fetchStreams(); });
     }, [fetchStreams]);
 
+    // First "Assistir Depois" movie present in the catalog (excluding the one
+    // playing) — the end-of-movie countdown offers it as "A seguir".
+    const getNextQueuedMovie = (currentId: string): VODStream | null => {
+        for (const queued of watchLaterService.getAll()) {
+            if (queued.type !== 'movie' || queued.id === currentId) continue;
+            const found = streams.find(s => String(s.stream_id) === queued.id);
+            if (found && isItemVisible(found)) return found;
+        }
+        return null;
+    };
+
     const filteredStreams = streams.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
 
@@ -548,6 +559,20 @@ export function VOD() {
                         setPlayingMovie(null);
                         setPipResumeTime(null);
                     }}
+                    // "Assistir Depois" doubles as the play queue: when the
+                    // movie ends, offer the next queued movie with the same
+                    // countdown used for series episodes.
+                    canGoNext={!!getNextQueuedMovie(String(playingMovie.stream_id))}
+                    onNextEpisode={() => {
+                        const next = getNextQueuedMovie(String(playingMovie.stream_id));
+                        if (!next) return;
+                        // The finished movie leaves the queue.
+                        watchLaterService.remove(String(playingMovie.stream_id), 'movie');
+                        setPipResumeTime(null);
+                        setPlayingMovie(next);
+                    }}
+                    nextCountdownLabel={t('player', 'upNextIn')}
+                    nextActionLabel={t('player', 'upNext')}
                     resumeTime={pipResumeTime !== null ? pipResumeTime : (movieProgressService.getMoviePositionById(playingMovie.stream_id.toString())?.currentTime || null)}
                     onTimeUpdate={(currentTime, duration) => {
                         if (Math.floor(currentTime) % 5 === 0) {
