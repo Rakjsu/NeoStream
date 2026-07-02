@@ -12,6 +12,7 @@ import {
     addRecentSearch,
     clearRecentSearches
 } from '../utils/searchRank';
+import { searchConfigService, type SearchConfig } from '../services/searchConfigService';
 
 /**
  * sessionStorage bridge: the section pages (LiveTV/VOD/Series) don't support
@@ -321,15 +322,19 @@ export function GlobalSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `open` forces recompute per open; parental unlock state lives outside React
     const gate = useMemo<GateConfig>(() => computeGate(data), [data, open]);
 
+    // Search scope from Settings → Busca, re-read on each open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `open` forces re-read; config lives outside React
+    const searchConfig = useMemo<SearchConfig>(() => searchConfigService.getConfig(), [open]);
+
     const groups = useMemo<ResultGroup[]>(() => {
         const trimmed = query.trim();
         if (!data || !trimmed) return [];
         const result: ResultGroup[] = [];
         let offset = 0;
         const sections: Array<{ kind: SectionKind; emoji: string; label: string; items: SearchItem[] }> = [
-            { kind: 'live', emoji: '📺', label: t('nav', 'liveTV'), items: data.live },
-            { kind: 'vod', emoji: '🎬', label: t('nav', 'movies'), items: data.vod },
-            { kind: 'series', emoji: '📺', label: t('nav', 'series'), items: data.series }
+            { kind: 'live', emoji: '📺', label: t('nav', 'liveTV'), items: searchConfig.live ? data.live : [] },
+            { kind: 'vod', emoji: '🎬', label: t('nav', 'movies'), items: searchConfig.vod ? data.vod : [] },
+            { kind: 'series', emoji: '📺', label: t('nav', 'series'), items: searchConfig.series ? data.series : [] }
         ];
         for (const section of sections) {
             const visible = gate.blockAdult
@@ -341,7 +346,7 @@ export function GlobalSearch() {
             offset += matched.length;
         }
         return result;
-    }, [data, query, t, gate]);
+    }, [data, query, t, gate, searchConfig]);
 
     const flatResults = useMemo(() => groups.flatMap(g => g.items), [groups]);
 
@@ -359,7 +364,7 @@ export function GlobalSearch() {
 
     useEffect(() => {
         const trimmed = query.trim();
-        if (trimmed.length < 3 || !data) {
+        if (trimmed.length < 3 || !data || !searchConfig.epg) {
             queueMicrotask(() => setEpgHits([]));
             return;
         }
@@ -389,7 +394,7 @@ export function GlobalSearch() {
             })
             .catch(() => { /* provider without xmltv — section simply absent */ });
         return () => { cancelled = true; };
-    }, [query, data, liveByEpgId, gate]);
+    }, [query, data, liveByEpgId, gate, searchConfig.epg]);
 
     // Keep the selected row in view while navigating with the keyboard
     useEffect(() => {

@@ -724,6 +724,19 @@
     "scheduleRecording": "Record this program",
     "cancelRecording": "Cancel recording"
   },
+  "searchConfig": {
+    "title": "Search",
+    "description": "Choose what the global search (Ctrl+K) can look for",
+    "liveLabel": "Live channels",
+    "liveDesc": "Include live TV channels in results",
+    "vodLabel": "Movies",
+    "vodDesc": "Include movies in results",
+    "seriesLabel": "Series",
+    "seriesDesc": "Include series in results",
+    "epgLabel": "TV Guide (programs)",
+    "epgDesc": "Search program names in the guide (requires provider EPG)",
+    "note": "Kids profile and parental control filters still apply on top of these options."
+  },
   "search": {
     "placeholder": "Search channels, movies and series...",
     "noResults": "No results found",
