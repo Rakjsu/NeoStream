@@ -1065,6 +1065,9 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                                                 currentTime: state.currentTime,
                                                 seasonNumber,
                                                 episodeNumber,
+                                                channelList: contentType === 'live'
+                                                    ? channelList?.map(c => ({ id: c.id, name: c.name }))
+                                                    : undefined,
                                                 onExpand: (time: number) => {
                                                     if (videoRef.current) {
                                                         videoRef.current.currentTime = time;
