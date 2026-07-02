@@ -9,6 +9,7 @@ import { profileService } from '../services/profileService';
 import { parentalService } from '../services/parentalService';
 import { useLanguage } from '../services/languageService';
 import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
+import { MultiView } from '../components/MultiView';
 import { isReplayable, replayDurationMinutes } from '../utils/epgGuide';
 import { getTimeshiftUrl } from '../services/timeshiftService';
 
@@ -97,6 +98,8 @@ export function LiveTV() {
     const [pipResumeTime, setPipResumeTime] = useState<number | null>(null);
     // Catch-up/replay playback (timeshift) of an already-aired program
     const [replayPlayback, setReplayPlayback] = useState<{ channel: LiveStream; program: EPGProgram } | null>(null);
+    // Multi-view mosaic (2x2 simultaneous live channels)
+    const [showMultiView, setShowMultiView] = useState(false);
     const { t } = useLanguage();
 
     // Calculate items per page based on window dimensions
@@ -811,6 +814,27 @@ export function LiveTV() {
                 onChange={setSearchQuery}
                 placeholder={t('login', 'searchChannels')}
             />
+            {/* Multi-view entry (2x2 mosaic of live channels) */}
+            <button
+                onClick={() => setShowMultiView(true)}
+                title="Multi-view: assista até 4 canais ao mesmo tempo"
+                style={{
+                    position: 'absolute',
+                    top: 12,
+                    right: 76,
+                    zIndex: 20,
+                    padding: '9px 16px',
+                    borderRadius: 12,
+                    border: '1px solid rgba(var(--ns-accent-rgb), 0.5)',
+                    background: 'rgba(var(--ns-accent-rgb), 0.15)',
+                    color: 'var(--ns-accent-light)',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                }}
+            >
+                🔲 Multi-view
+            </button>
             <CategoryMenu
                 onSelectCategory={setSelectedCategory}
                 selectedCategory={selectedCategory}
@@ -1437,6 +1461,14 @@ export function LiveTV() {
                     customTitle={`${replayPlayback.program.title} — ${replayPlayback.channel.name}`}
                     contentId={`${replayPlayback.channel.stream_id}-ts-${replayPlayback.program.start}`}
                     contentType="live"
+                />
+            )}
+
+            {showMultiView && (
+                <MultiView
+                    channels={filteredStreams.map(s => ({ id: s.stream_id, name: s.name, logo: s.stream_icon }))}
+                    initialChannelId={selectedChannel?.stream_id}
+                    onClose={() => setShowMultiView(false)}
                 />
             )}
         </div >
