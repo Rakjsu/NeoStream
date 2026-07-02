@@ -460,7 +460,14 @@
     "last7Days": "Last 7 Days",
     "totalAccumulated": "Total accumulated",
     "longestStreak": "Longest streak",
-    "days": "days"
+    "days": "days",
+    "last30Days": "Last 30 Days",
+    "typeShare": "Breakdown by Type",
+    "topContent": "Most Watched This Month",
+    "topGenres": "Favorite Genres This Month",
+    "dailyAverage": "Daily average (30 days)",
+    "busiestDay": "Most active day",
+    "noData": "No data yet — watch something to see your stats"
   },
   "parental": {
     "title": "Parental Control",

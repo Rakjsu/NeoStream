@@ -360,7 +360,14 @@
     "last7Days": "Últimos 7 Dias",
     "totalAccumulated": "Total acumulado",
     "longestStreak": "Maior sequência",
-    "days": "dias"
+    "days": "dias",
+    "last30Days": "Últimos 30 Dias",
+    "typeShare": "Distribuição por Tipo",
+    "topContent": "Mais Assistidos do Mês",
+    "topGenres": "Gêneros Favoritos do Mês",
+    "dailyAverage": "Média diária (30 dias)",
+    "busiestDay": "Dia mais ativo",
+    "noData": "Sem dados ainda — assista algo para ver suas estatísticas"
   },
   "parental": {
     "title": "Controle Parental",
