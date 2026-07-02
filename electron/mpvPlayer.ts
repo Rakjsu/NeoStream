@@ -432,6 +432,19 @@ export function setupMpvHandlers() {
 
     ipcMain.handle('mpv:status', () => getStatusSnapshot())
 
+    // Track switching — the reason MPV beats the web player for MP4s
+    // (Chromium can't switch embedded MP4 audio tracks).
+    ipcMain.handle('mpv:set-audio-track', (_event, payload: { id?: number }) => {
+        if (typeof payload?.id !== 'number') return { success: false }
+        return { success: sendCommand(['set_property', 'aid', payload.id]) }
+    })
+
+    ipcMain.handle('mpv:set-subtitle-track', (_event, payload: { id?: number | null }) => {
+        // null turns subtitles off.
+        const value = typeof payload?.id === 'number' ? payload.id : 'no'
+        return { success: sendCommand(['set_property', 'sid', value]) }
+    })
+
     // EXPERIMENTAL — one-click MPV install. Single in-flight download; the
     // controller doubles as the guard (null = idle).
     let downloadController: AbortController | null = null
