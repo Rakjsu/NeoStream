@@ -17,6 +17,8 @@ import {
     MPV_WINDOW_TITLE,
     OBSERVED_PROPERTIES,
     parseIpcLine,
+    parseTrackList,
+    parseTrackSelection,
     serializeIpcCommand,
 } from './mpvProtocol'
 
@@ -169,6 +171,9 @@ describe('applyIpcMessage', () => {
             eofReached: false,
             volume: null,
             fullscreen: false,
+            tracks: [],
+            audioTrackId: null,
+            subtitleTrackId: null,
         })
 
         status = applyIpcMessage(status, { event: 'property-change', name: 'eof-reached', data: true })
@@ -245,5 +250,54 @@ describe('buildPathCandidates', () => {
         expect(candidates).toContain('C:\\Program Files (x86)\\mpv\\mpv.exe')
         expect(candidates).toContain('C:\\Users\\test\\AppData\\Local\\Programs\\mpv\\mpv.exe')
         expect(candidates).toContain('D:\\choco\\bin\\mpv.exe')
+    })
+})
+
+describe('track switching (aid/sid/track-list)', () => {
+    it('observes track-list, aid and sid', () => {
+        expect(OBSERVED_PROPERTIES).toContain('track-list')
+        expect(OBSERVED_PROPERTIES).toContain('aid')
+        expect(OBSERVED_PROPERTIES).toContain('sid')
+    })
+
+    it('parseTrackList keeps audio/sub tracks and drops video/garbage', () => {
+        const tracks = parseTrackList([
+            { id: 1, type: 'video', title: 'V' },
+            { id: 1, type: 'audio', title: 'Português', lang: 'pt', default: true },
+            { id: 2, type: 'audio', lang: 'en' },
+            { id: 1, type: 'sub', lang: 'pt' },
+            { type: 'audio' },
+            'noise',
+            null,
+        ])
+        expect(tracks).toEqual([
+            { id: 1, type: 'audio', title: 'Português', lang: 'pt', isDefault: true },
+            { id: 2, type: 'audio', title: null, lang: 'en', isDefault: false },
+            { id: 1, type: 'sub', title: null, lang: 'pt', isDefault: false },
+        ])
+    })
+
+    it('parseTrackList tolerates non-array payloads', () => {
+        expect(parseTrackList(undefined)).toEqual([])
+        expect(parseTrackList('x')).toEqual([])
+    })
+
+    it('parseTrackSelection maps false/no to null', () => {
+        expect(parseTrackSelection(2)).toBe(2)
+        expect(parseTrackSelection(false)).toBeNull()
+        expect(parseTrackSelection('no')).toBeNull()
+    })
+
+    it('applyIpcMessage folds track properties into the status', () => {
+        let status = createInitialStatus(true)
+        status = applyIpcMessage(status, {
+            event: 'property-change', name: 'track-list',
+            data: [{ id: 1, type: 'audio', lang: 'pt' }, { id: 1, type: 'sub', lang: 'en' }],
+        })
+        status = applyIpcMessage(status, { event: 'property-change', name: 'aid', data: 1 })
+        status = applyIpcMessage(status, { event: 'property-change', name: 'sid', data: false })
+        expect(status.tracks).toHaveLength(2)
+        expect(status.audioTrackId).toBe(1)
+        expect(status.subtitleTrackId).toBeNull()
     })
 })
