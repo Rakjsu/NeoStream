@@ -34,6 +34,18 @@ interface SearchItem {
     icon: string;
     kind: SectionKind;
     categoryIds: string[];
+    /** Live channels only: xmltv id, used to join EPG program results. */
+    epgChannelId?: string;
+}
+
+/** One EPG program hit (global search), already joined to its channel. */
+interface EpgHit {
+    title: string;
+    startMs: number;
+    endMs: number;
+    /** Already airing when the search ran (render stays pure). */
+    airing: boolean;
+    channel: SearchItem;
 }
 
 interface SearchCategory {
@@ -55,6 +67,7 @@ interface RawStream {
     stream_icon?: string;
     cover?: string;
     category_id?: string | string[];
+    epg_channel_id?: string;
 }
 
 const SECTION_ROUTES: Record<SectionKind, string> = {
@@ -84,7 +97,10 @@ function mapItems(data: unknown, kind: SectionKind): SearchItem[] {
             kind,
             categoryIds: Array.isArray(raw.category_id)
                 ? raw.category_id
-                : raw.category_id ? [raw.category_id] : []
+                : raw.category_id ? [raw.category_id] : [],
+            epgChannelId: kind === 'live' && typeof raw.epg_channel_id === 'string'
+                ? raw.epg_channel_id.toLowerCase()
+                : undefined
         });
     }
     return items;
@@ -329,6 +345,52 @@ export function GlobalSearch() {
 
     const flatResults = useMemo(() => groups.flatMap(g => g.items), [groups]);
 
+    // EPG program hits (mouse-only extra section below the ranked groups).
+    const [epgHits, setEpgHits] = useState<EpgHit[]>([]);
+    const liveByEpgId = useMemo(() => {
+        const map = new Map<string, SearchItem>();
+        for (const channel of data?.live ?? []) {
+            if (channel.epgChannelId && !map.has(channel.epgChannelId)) {
+                map.set(channel.epgChannelId, channel);
+            }
+        }
+        return map;
+    }, [data]);
+
+    useEffect(() => {
+        const trimmed = query.trim();
+        if (trimmed.length < 3 || !data) {
+            queueMicrotask(() => setEpgHits([]));
+            return;
+        }
+        let cancelled = false;
+        // Promise.resolve guard: older preloads throw synchronously on
+        // unknown channels — the EPG section is then simply absent.
+        Promise.resolve()
+            .then(() => window.ipcRenderer.invoke('epg:provider-search', { query: trimmed }))
+            .then((result: { success?: boolean; programs?: { title: string; start: string; end: string; channel_id: string }[] }) => {
+                if (cancelled || !result?.success || !Array.isArray(result.programs)) return;
+                const hits: EpgHit[] = [];
+                for (const program of result.programs) {
+                    const channel = liveByEpgId.get(program.channel_id.toLowerCase());
+                    if (!channel) continue; // program's channel isn't in this playlist
+                    if (gate.blockAdult && !isItemAllowed(channel, gate)) continue;
+                    const startMs = Date.parse(program.start);
+                    hits.push({
+                        title: program.title,
+                        startMs,
+                        endMs: Date.parse(program.end),
+                        airing: startMs <= Date.now(),
+                        channel
+                    });
+                    if (hits.length >= 6) break;
+                }
+                setEpgHits(hits);
+            })
+            .catch(() => { /* provider without xmltv — section simply absent */ });
+        return () => { cancelled = true; };
+    }, [query, data, liveByEpgId, gate]);
+
     // Keep the selected row in view while navigating with the keyboard
     useEffect(() => {
         const el = listRef.current?.querySelector('[data-selected="true"]');
@@ -351,6 +413,20 @@ export function GlobalSearch() {
         if (typed) addRecentSearch(typed);
         navigate(SECTION_ROUTES[item.kind]);
         // Covers the "already on that page" case (no remount on same-route navigate)
+        window.dispatchEvent(new Event(GLOBAL_SEARCH_EVENT));
+        setOpen(false);
+        setInputValue('');
+        setQuery('');
+    }, [navigate, query]);
+
+    // EPG hit: land on LiveTV filtered to the channel of the program.
+    const activateEpg = useCallback((hit: EpgHit) => {
+        try {
+            sessionStorage.setItem(GLOBAL_SEARCH_TERM_KEY, hit.channel.name);
+        } catch { /* navigation still works, just unfiltered */ }
+        const typed = query.trim();
+        if (typed) addRecentSearch(typed);
+        navigate(SECTION_ROUTES.live);
         window.dispatchEvent(new Event(GLOBAL_SEARCH_EVENT));
         setOpen(false);
         setInputValue('');
@@ -402,7 +478,7 @@ export function GlobalSearch() {
     if (!open) return null;
 
     const trimmedQuery = query.trim();
-    const showNoResults = !!data && !!trimmedQuery && flatResults.length === 0;
+    const showNoResults = !!data && !!trimmedQuery && flatResults.length === 0 && epgHits.length === 0;
     // Recents show only when the input is empty (keyed off the live value so it
     // hides the instant the user types) and we're not loading/erroring.
     const showRecents = !loading && !loadError && inputValue.trim() === '' && recent.length > 0;
@@ -528,6 +604,45 @@ export function GlobalSearch() {
                                 })}
                             </div>
                         ))}
+
+                        {epgHits.length > 0 && !!trimmedQuery && (
+                            <div className="gsearch-group">
+                                <div className="gsearch-group-header">
+                                    <span>📅</span>
+                                    <span>{t('search', 'epgGroup')}</span>
+                                </div>
+                                {epgHits.map((hit, i) => {
+                                    const fmt = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                                    return (
+                                        <button
+                                            key={`epg-${hit.channel.id}-${hit.startMs}-${i}`}
+                                            type="button"
+                                            className="gsearch-item"
+                                            onClick={() => activateEpg(hit)}
+                                        >
+                                            <div className="gsearch-thumb">
+                                                {hit.channel.icon ? (
+                                                    <LazyImage
+                                                        src={hit.channel.icon}
+                                                        alt={hit.channel.name}
+                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                        fallback={<div className="gsearch-thumb-fallback">📅</div>}
+                                                    />
+                                                ) : (
+                                                    <div className="gsearch-thumb-fallback">📅</div>
+                                                )}
+                                            </div>
+                                            <div className="gsearch-item-info">
+                                                <div className="gsearch-item-name">{hit.title}</div>
+                                                <div className="gsearch-item-meta">
+                                                    {hit.airing ? '🔴 ' : ''}{hit.channel.name} · {fmt(hit.startMs)}–{fmt(hit.endMs)}
+                                                </div>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
 
                     <div className="gsearch-footer">
@@ -706,6 +821,22 @@ const globalSearchStyles = `
     color: white;
     font-size: 18px;
     font-weight: 700;
+}
+
+.gsearch-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    text-align: left;
+}
+
+.gsearch-item-meta {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.45);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .gsearch-item-name {

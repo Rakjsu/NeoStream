@@ -727,6 +727,7 @@
   "search": {
     "placeholder": "Search channels, movies and series...",
     "noResults": "No results found",
+    "epgGroup": "TV Guide (programs)",
     "loading": "Loading catalog...",
     "loadError": "Failed to load catalog",
     "hint": "↑↓ navigate · Enter open · Esc close",

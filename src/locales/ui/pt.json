@@ -727,6 +727,7 @@
   "search": {
     "placeholder": "Buscar canais, filmes e séries...",
     "noResults": "Nenhum resultado encontrado",
+    "epgGroup": "Guia de TV (programas)",
     "loading": "Carregando catálogo...",
     "loadError": "Falha ao carregar o catálogo",
     "hint": "↑↓ navegar · Enter abrir · Esc fechar",

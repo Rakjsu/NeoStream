@@ -4,6 +4,8 @@
 import { describe, it, expect } from 'vitest'
 import {
     buildDefaultWindow,
+    normalizeEpgText,
+    searchEpgIndex,
     buildSimpleDataTableUrl,
     buildXmltvUrl,
     decodeBase64Utf8,
@@ -18,6 +20,7 @@ import {
     PROVIDER_EPG_FUTURE_WINDOW_MS,
     PROVIDER_EPG_PAST_WINDOW_MS,
 } from './providerEpgProtocol'
+import type { ProviderEpgProgram } from './providerEpgProtocol'
 
 describe('normalizeServerUrl / URL builders', () => {
     it('strips trailing slashes from the server url', () => {
@@ -266,5 +269,49 @@ describe('parseSimpleDataTable', () => {
         expect(parseSimpleDataTable({}, 'x', NOW)).toEqual([])
         expect(parseSimpleDataTable({ epg_listings: 'nope' }, 'x', NOW)).toEqual([])
         expect(parseSimpleDataTable({ epg_listings: [{ title: 'a' }] }, 'x', NOW)).toEqual([])
+    })
+})
+
+describe('searchEpgIndex', () => {
+    const NOW = Date.parse('2026-07-02T20:00:00Z')
+    const prog = (title: string, channel: string, startOffsetH: number, durH = 1): ProviderEpgProgram => ({
+        id: `${channel}-${title}`,
+        title,
+        channel_id: channel,
+        start: new Date(NOW + startOffsetH * 3600_000).toISOString(),
+        end: new Date(NOW + (startOffsetH + durH) * 3600_000).toISOString(),
+    })
+    const index = new Map<string, ProviderEpgProgram[]>([
+        ['globo.br', [prog('Jornal Nacional', 'globo.br', 0.5), prog('Novela das Nove', 'globo.br', 1.5)]],
+        ['sbt.br', [prog('Jornal do SBT', 'sbt.br', -0.5), prog('Filme antigo', 'sbt.br', -5, 1)]],
+        ['band.br', [prog('Jornal da Band', 'band.br', 48)]],
+    ])
+
+    it('encontra por substring sem acentos e ordena por início', () => {
+        const hits = searchEpgIndex(index, 'jornal', NOW)
+        expect(hits.map(h => h.title)).toEqual(['Jornal do SBT', 'Jornal Nacional'])
+    })
+
+    it('exclui programas já encerrados e além do horizonte de 36h', () => {
+        const titles = searchEpgIndex(index, 'a', NOW).map(h => h.title)
+        expect(titles).not.toContain('Filme antigo')
+        expect(titles).not.toContain('Jornal da Band')
+    })
+
+    it('é insensível a acentos e caixa', () => {
+        expect(searchEpgIndex(index, 'JORNAL NACIONÁL'.normalize('NFD').replace(/[̀-ͯ]/g, ''), NOW)
+            .some(h => h.title === 'Jornal Nacional')).toBe(true)
+        expect(searchEpgIndex(index, 'novela', NOW)[0].title).toBe('Novela das Nove')
+    })
+
+    it('ignora consultas curtas e respeita o limite', () => {
+        expect(searchEpgIndex(index, 'j', NOW)).toEqual([])
+        expect(searchEpgIndex(index, 'jornal', NOW, 1)).toHaveLength(1)
+    })
+})
+
+describe('normalizeEpgText', () => {
+    it('minúsculas + sem acentos', () => {
+        expect(normalizeEpgText('  Ação & Aventura  ')).toBe('acao & aventura')
     })
 })
