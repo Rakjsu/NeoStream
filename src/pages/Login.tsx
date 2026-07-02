@@ -22,12 +22,6 @@ export function Login() {
         password: ''
     });
 
-    useEffect(() => {
-        if (step === 'playlist-name') {
-            fetchCounts();
-        }
-    }, [step]);
-
     const fetchCounts = async () => {
         setLoadingCounts(true);
         try {
@@ -41,6 +35,12 @@ export function Login() {
             setLoadingCounts(false);
         }
     };
+
+    useEffect(() => {
+        if (step === 'playlist-name') {
+            fetchCounts();
+        }
+    }, [step]);
 
     const handleCredentialsSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
