@@ -35,6 +35,22 @@ function saveStorageData(data: ProfilesData): void {
     }
 }
 
+export const GUEST_PROFILE_ID = 'guest';
+
+/**
+ * Wipe every per-profile localStorage key belonging to the guest profile.
+ * Matches `<base>_guest` and `<base>_guest__pl_<playlistId>` forms.
+ */
+function purgeGuestData(): void {
+    const pattern = /_guest(__pl_|$)/;
+    const doomed: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && pattern.test(key)) doomed.push(key);
+    }
+    doomed.forEach(key => localStorage.removeItem(key));
+}
+
 // Generate unique ID
 function generateId(): string {
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -60,6 +76,12 @@ export const profileService = {
         const profile = data.profiles.find(p => p.id === profileId);
         if (!profile) return false;
 
+        // Leaving the guest session: wipe its data and drop the entry.
+        if (data.activeProfileId === GUEST_PROFILE_ID && profileId !== GUEST_PROFILE_ID) {
+            purgeGuestData();
+            data.profiles = data.profiles.filter(p => p.id !== GUEST_PROFILE_ID);
+        }
+
         data.activeProfileId = profileId;
         profile.lastUsed = new Date().toISOString();
         saveStorageData(data);
@@ -78,16 +100,50 @@ export const profileService = {
     // Clear active profile (logout)
     clearActiveProfile(): void {
         const data = getStorageData();
+        if (data.activeProfileId === GUEST_PROFILE_ID) {
+            purgeGuestData();
+            data.profiles = data.profiles.filter(p => p.id !== GUEST_PROFILE_ID);
+        }
         data.activeProfileId = null;
         saveStorageData(data);
+    },
+
+    /**
+     * Start a fresh guest session: temporary profile that leaves no trace —
+     * any previous guest data is wiped now, and again when the session ends
+     * (profile switch or logout). Doesn't count toward the profile limit.
+     */
+    startGuestSession(): Profile {
+        purgeGuestData();
+        const data = getStorageData();
+        const now = new Date().toISOString();
+        const guest: Profile = {
+            id: GUEST_PROFILE_ID,
+            name: 'Convidado',
+            avatar: '🎭',
+            isGuest: true,
+            watchLater: [],
+            continueWatching: [],
+            createdAt: now,
+            lastUsed: now
+        };
+        data.profiles = [...data.profiles.filter(p => p.id !== GUEST_PROFILE_ID), guest];
+        data.activeProfileId = GUEST_PROFILE_ID;
+        saveStorageData(data);
+        return guest;
+    },
+
+    /** True while a guest session is active. */
+    isGuestActive(): boolean {
+        return this.getActiveProfile()?.isGuest === true;
     },
 
     // Create new profile
     async createProfile(profileData: CreateProfileData): Promise<Profile | null> {
         const data = getStorageData();
 
-        // Check limit
-        if (data.profiles.length >= MAX_PROFILES) {
+        // Check limit (the transient guest entry doesn't count)
+        if (data.profiles.filter(p => !p.isGuest).length >= MAX_PROFILES) {
             console.error(`Cannot create profile: maximum of ${MAX_PROFILES} profiles reached`);
             return null;
         }

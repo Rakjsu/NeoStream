@@ -81,6 +81,7 @@
     "createProfile": "Create Profile",
     "addProfile": "Add Profile",
     "manageProfiles": "Manage Profiles",
+    "guestSession": "Continue as guest (no history)",
     "whoIsWatching": "Who is watching?",
     "deleteProfile": "Delete Profile",
     "confirmDelete": "Are you sure you want to delete this profile?",
