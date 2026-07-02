@@ -58,6 +58,9 @@ interface AsyncVideoPlayerProps<TMovie extends MediaItem, TVersion extends Media
     // For live TV quality switching
     liveQualityVariants?: LiveQualityVariant<TVersion>[];
     onSwitchQuality?: (channel: TVersion) => void;
+    // Live TV zapping (channel list inside the player)
+    channelList?: { id: string | number; name: string; logo?: string }[];
+    onSwitchChannel?: (id: string | number) => void;
 }
 
 function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem = TMovie>({
@@ -80,7 +83,9 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
     allMovies,
     onSwitchVersion,
     liveQualityVariants,
-    onSwitchQuality
+    onSwitchQuality,
+    channelList,
+    onSwitchChannel
 }: AsyncVideoPlayerProps<TMovie, TVersion>) {
     const [streamUrl, setStreamUrl] = useState<string>('');
     const [loading, setLoading] = useState(true);
@@ -456,6 +461,8 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
                         isSubtitled={/\[L\]/i.test(movie.name || customTitle || '')}
                         liveQualityVariants={liveQualityVariants}
                         currentQualityIndex={liveQualityVariants ? liveQualityVariants.findIndex(v => v.channel.stream_id === movie.stream_id) : 0}
+                        channelList={channelList}
+                        onSwitchChannel={onSwitchChannel}
                         onTimeUpdate={(currentTime, duration) => {
                             // Call external onTimeUpdate if provided
                             if (externalOnTimeUpdate) {

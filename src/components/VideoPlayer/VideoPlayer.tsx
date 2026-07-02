@@ -11,6 +11,7 @@ import { useSubtitleManager } from './useSubtitleManager';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { PlayerSettingsMenu } from './PlayerSettingsMenu';
 import { ForcedSubtitlesMenu } from './ForcedSubtitlesMenu';
+import { ChannelZapOverlay, type PlayerChannel } from './ChannelZapOverlay';
 import { useLanguage } from '../../services/languageService';
 import './VideoPlayer.css';
 
@@ -56,6 +57,9 @@ export interface VideoPlayerProps<TSwitchContent extends SwitchableContent = Swi
     // Live TV quality fallback
     liveQualityVariants?: QualityVariant<TSwitchContent>[];
     currentQualityIndex?: number;
+    // Live TV zapping (channel list inside the player)
+    channelList?: PlayerChannel[];
+    onSwitchChannel?: (id: string | number) => void;
 }
 
 function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableContent>({
@@ -82,7 +86,9 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     imdbId,
     isSubtitled,
     liveQualityVariants,
-    currentQualityIndex = 0
+    currentQualityIndex = 0,
+    channelList,
+    onSwitchChannel
 }: VideoPlayerProps<TSwitchContent>) {
     const { videoRef, state, controls } = useVideoPlayer();
     const { t } = useLanguage();
@@ -316,6 +322,28 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     }, [contentId, contentType, title, genre, videoRef]);
 
 
+    // Live TV zapping: channel list overlay + PageUp/PageDown channel hop.
+    const [showChannelList, setShowChannelList] = useState(false);
+    const zapEnabled = contentType === 'live' && !!channelList?.length && !!onSwitchChannel;
+
+    useEffect(() => {
+        if (!zapEnabled) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key !== 'PageUp' && e.key !== 'PageDown') return;
+            e.preventDefault();
+            const list = channelList!;
+            const idx = list.findIndex(c => String(c.id) === String(contentId));
+            if (idx === -1) return;
+            // PageUp = previous channel in the list, PageDown = next (TV-style CH±).
+            const next = e.key === 'PageDown'
+                ? list[Math.min(list.length - 1, idx + 1)]
+                : list[Math.max(0, idx - 1)];
+            if (next && String(next.id) !== String(contentId)) onSwitchChannel!(next.id);
+        };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [zapEnabled, channelList, contentId, onSwitchChannel]);
+
     // Next-episode countdown when the video ends (cancelable, Netflix-style).
     const [nextEpCountdown, setNextEpCountdown] = useState<number | null>(null);
     const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -536,6 +564,20 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     >
                         {streamErrorToast === t('player', 'streamUnavailable') ? '⚠️' : '🔄'} {streamErrorToast}
                     </div>
+                )}
+
+                {/* Live TV zapping overlay */}
+                {zapEnabled && (
+                    <ChannelZapOverlay
+                        channels={channelList!}
+                        currentId={contentId}
+                        visible={showChannelList}
+                        onSelect={(id) => {
+                            setShowChannelList(false);
+                            if (String(id) !== String(contentId)) onSwitchChannel!(id);
+                        }}
+                        onClose={() => setShowChannelList(false)}
+                    />
                 )}
 
                 {/* Next-episode countdown card (video ended, series with a next ep) */}
@@ -777,6 +819,18 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             audioTracks={audioTracks}
                             onSelectAudioTrack={handleSelectAudioTrack}
                         />
+
+                        {/* Channel list toggle (live TV zapping) */}
+                        {zapEnabled && (
+                            <button
+                                className="control-btn"
+                                onClick={() => setShowChannelList(v => !v)}
+                                title={t('player', 'channelList')}
+                                style={{ fontSize: 16 }}
+                            >
+                                📺
+                            </button>
+                        )}
 
                         {/* Episode Navigation - Only show for series */}
                         {(onNextEpisode || onPreviousEpisode) && (
