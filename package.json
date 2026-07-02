@@ -3,7 +3,7 @@
   "productName": "NeoStream IPTV",
   "private": true,
   "version": "3.21.0",
-  "description": "Advanced IPTV player with auto-update support",
+  "description": "Player IPTV completo: TV ao vivo com guia EPG, catch-up e DVR (gravação manual e agendada), filmes e séries com metadados TMDB e trailers, multi-view 2x2, zapping, perfis com controle parental, cast DLNA/AirPlay, downloads offline, MPV opcional, gamepad e auto-update",
   "author": "Rakjsu",
   "main": "dist-electron/main.js",
   "type": "module",
