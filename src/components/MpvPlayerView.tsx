@@ -19,6 +19,8 @@ import { mpvService } from '../services/mpvService';
 import { movieProgressService } from '../services/movieProgressService';
 import { watchProgressService } from '../services/watchProgressService';
 import { useLanguage } from '../services/languageService';
+import { profileService } from '../services/profileService';
+import { trackPrefKey, trackLang, choosePreferredTracks, type TrackPref } from '../utils/mpvTrackPrefs';
 
 /** Must match MPV_CONTROLS_HEIGHT in electron/mpvProtocol.ts. */
 const CONTROLS_HEIGHT = 96;
@@ -224,6 +226,40 @@ export function MpvPlayerView({
     const audioTracks = tracks.filter(tr => tr.type === 'audio');
     const subTracks = tracks.filter(tr => tr.type === 'sub');
 
+    // Track choice remembered per content (movie/series), per profile — keyed
+    // by LANGUAGE so it carries across episodes of the same series.
+    const prefsStorageKey = () => `neostream_mpv_tracks_${profileService.getActiveProfile()?.id ?? 'default'}`;
+    const contentKey = trackPrefKey(movieId, seriesId);
+
+    const savePref = useCallback((patch: Partial<TrackPref>) => {
+        if (!contentKey) return;
+        try {
+            const key = prefsStorageKey();
+            const all = JSON.parse(localStorage.getItem(key) || '{}');
+            all[contentKey] = { audioLang: null, subLang: null, ...all[contentKey], ...patch };
+            localStorage.setItem(key, JSON.stringify(all));
+        } catch { /* best-effort */ }
+    }, [contentKey]);
+
+    // Re-apply the remembered choice once the file's tracks show up.
+    const prefsAppliedRef = useRef(false);
+    useEffect(() => {
+        if (prefsAppliedRef.current || tracks.length === 0 || !contentKey) return;
+        prefsAppliedRef.current = true;
+        try {
+            const all = JSON.parse(localStorage.getItem(prefsStorageKey()) || '{}');
+            const chosen = choosePreferredTracks(tracks, all[contentKey]);
+            if (chosen.audioId !== undefined) {
+                setAudioTrackId(chosen.audioId);
+                mpvService.setAudioTrack(chosen.audioId);
+            }
+            if (chosen.subtitleId !== undefined) {
+                setSubtitleTrackId(chosen.subtitleId);
+                mpvService.setSubtitleTrack(chosen.subtitleId);
+            }
+        } catch { /* best-effort */ }
+    }, [tracks, contentKey]);
+
     const cycleAudioTrack = useCallback(() => {
         const list = tracks.filter(tr => tr.type === 'audio');
         if (list.length < 2) return;
@@ -231,7 +267,8 @@ export function MpvPlayerView({
         const next = list[(idx + 1) % list.length];
         setAudioTrackId(next.id);
         mpvService.setAudioTrack(next.id);
-    }, [tracks, audioTrackId]);
+        savePref({ audioLang: trackLang(next) });
+    }, [tracks, audioTrackId, savePref]);
 
     const cycleSubtitleTrack = useCallback(() => {
         const list = tracks.filter(tr => tr.type === 'sub');
@@ -241,7 +278,8 @@ export function MpvPlayerView({
         const next = idx + 1 < list.length ? list[idx + 1] : null;
         setSubtitleTrackId(next ? next.id : null);
         mpvService.setSubtitleTrack(next ? next.id : null);
-    }, [tracks, subtitleTrackId]);
+        savePref({ subLang: next ? trackLang(next) : 'off' });
+    }, [tracks, subtitleTrackId, savePref]);
 
     const toggleMute = useCallback(() => {
         const current = latestRef.current.volume ?? 100;
