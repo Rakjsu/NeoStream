@@ -263,7 +263,7 @@
     "confirmImportConfirm": "Restaurar",
     "confirmImportCancel": "Cancelar",
     "importSuccess": "Backup restaurado com sucesso! Reinicie o aplicativo para aplicar todas as alterações.",
-    "credentialsNote": "As credenciais do provedor IPTV não são incluídas no backup."
+    "credentialsNote": "O backup inclui suas playlists (com as senhas dos provedores codificadas). Guarde o arquivo em local seguro."
   },
   "diagnostics": {
     "title": "Diagnóstico",

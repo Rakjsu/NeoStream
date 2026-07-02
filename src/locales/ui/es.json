@@ -363,7 +363,7 @@
     "confirmImportConfirm": "Restaurar",
     "confirmImportCancel": "Cancelar",
     "importSuccess": "¡Copia restaurada con éxito! Reinicia la aplicación para aplicar todos los cambios.",
-    "credentialsNote": "Las credenciales del proveedor IPTV NO se incluyen en la copia de seguridad."
+    "credentialsNote": "La copia incluye tus playlists (contraseñas de proveedores codificadas). Guarda el archivo en un lugar seguro."
   },
   "diagnostics": {
     "title": "Diagnóstico",

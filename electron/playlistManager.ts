@@ -145,3 +145,48 @@ export function deactivatePlaylists() {
     store.delete('activePlaylistId')
     mirrorAuth(null)
 }
+
+// ---- Backup export/import -------------------------------------------------
+
+export interface PlaylistBackupEntry {
+    name: string
+    url: string
+    username: string
+    password: string
+}
+
+/** Full playlist entries for the backup file (passwords stay in main until here). */
+export function exportPlaylistsForBackup(): PlaylistBackupEntry[] {
+    return getPlaylists().map(p => ({
+        name: p.name,
+        url: p.url,
+        username: p.username,
+        password: p.password
+    }))
+}
+
+/**
+ * Import playlists from a backup WITHOUT activating or validating against the
+ * provider (the machine may be offline during a restore). Existing entries
+ * (same url+username) keep their password unless the backup differs.
+ */
+export function importPlaylistsFromBackup(entries: PlaylistBackupEntry[]): number {
+    let playlists = getPlaylists()
+    let imported = 0
+    for (const entry of entries) {
+        if (!entry?.url?.trim() || !entry?.username?.trim() || typeof entry.password !== 'string') continue
+        const result = upsertPlaylist(playlists, {
+            name: entry.name,
+            url: entry.url,
+            username: entry.username,
+            password: entry.password
+        })
+        playlists = result.playlists
+        imported++
+    }
+    if (imported > 0) {
+        store.set('playlists', playlists)
+        log.info('[Playlists] Imported', imported, 'playlist(s) from backup')
+    }
+    return imported
+}

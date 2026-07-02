@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { collectBackup, applyBackup, BACKUP_VERSION, BACKUP_APP } from './backupService';
+import {
+    collectBackup, applyBackup, BACKUP_VERSION, BACKUP_APP,
+    encodePlaylistPassword, decodePlaylistPassword, sanitizeBackupPlaylists
+} from './backupService';
 
 describe('backupService', () => {
     beforeEach(() => {
@@ -18,6 +21,10 @@ describe('backupService', () => {
             localStorage.setItem('usage_stats_abc123', '{}');
             localStorage.setItem('neostream_language', 'pt');
             localStorage.setItem('playerVolume', '0.8');
+            localStorage.setItem('neostream_theme', '{"bg":"amoled"}');
+            localStorage.setItem('neostream_mpv_tracks_abc123', '{}');
+            localStorage.setItem('scheduled_recordings_abc123', '[]');
+            localStorage.setItem('program_reminders_abc123', '[]');
 
             const backup = collectBackup();
 
@@ -27,12 +34,16 @@ describe('backupService', () => {
             expect(Object.keys(backup.data).sort()).toEqual([
                 'movie_watch_progress',
                 'neostream_language',
+                'neostream_theme',
+                'neostream_mpv_tracks_abc123',
                 'neostream_profile_abc123',
                 'neostream_profiles',
                 'parentalConfig',
                 'playbackConfig',
                 'playbackConfig_abc123',
                 'playerVolume',
+                'program_reminders_abc123',
+                'scheduled_recordings_abc123',
                 'series_watch_progress_abc123',
                 'usage_stats_abc123',
             ].sort());
@@ -76,6 +87,37 @@ describe('backupService', () => {
         });
     });
 
+    describe('playlists (v2)', () => {
+        it('faz round-trip da senha em base64 (incluindo unicode)', () => {
+            for (const pw of ['abc123', 'çãé!@#', 'p@ss wörd senha']) {
+                expect(decodePlaylistPassword(encodePlaylistPassword(pw))).toBe(pw);
+            }
+        });
+
+        it('exporta playlists no payload e devolve sanitizadas no apply', () => {
+            const playlists = [{ name: 'Casa', url: 'http://x.tv', username: 'u', passwordB64: encodePlaylistPassword('s3nh4') }];
+            const backup = collectBackup(playlists);
+            expect(backup.playlists).toEqual(playlists);
+
+            const report = applyBackup(JSON.parse(JSON.stringify(backup)));
+            expect(report.playlists).toEqual(playlists);
+        });
+
+        it('ignora playlists em backups v1 e entradas malformadas', () => {
+            const v1 = { version: 1, exportedAt: 'x', app: BACKUP_APP, data: {}, playlists: [{ url: 'http://x', username: 'u', passwordB64: 'YQ==' }] };
+            expect(applyBackup(v1).playlists).toEqual([]);
+
+            expect(sanitizeBackupPlaylists([
+                null,
+                'x',
+                { url: '', username: 'u', passwordB64: 'YQ==' },
+                { url: 'http://ok', username: 'u' },
+                { url: 'http://ok', username: 'u', passwordB64: '%%%invalid%%%' },
+                { url: 'http://ok', username: 'u', passwordB64: 'YQ==' }
+            ])).toEqual([{ name: '', url: 'http://ok', username: 'u', passwordB64: 'YQ==' }]);
+        });
+    });
+
     describe('applyBackup validation', () => {
         const validPayload = () => ({
             version: BACKUP_VERSION,
@@ -84,9 +126,10 @@ describe('backupService', () => {
             data: { neostream_language: 'pt' }
         });
 
-        it('rejects unsupported versions', () => {
-            expect(() => applyBackup({ ...validPayload(), version: 2 })).toThrow(/version/);
+        it('rejects unsupported versions but accepts v1', () => {
+            expect(() => applyBackup({ ...validPayload(), version: 3 })).toThrow(/version/);
             expect(() => applyBackup({ ...validPayload(), version: undefined })).toThrow(/version/);
+            expect(applyBackup({ ...validPayload(), version: 1 }).applied).toBe(1);
         });
 
         it('rejects payloads from other apps', () => {
