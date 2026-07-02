@@ -18,6 +18,7 @@ const invokeChannels = new Set([
     'categories:get-vod',
     'content:get-counts',
     'diagnostics:export-report',
+    'diagnostics:provider-health',
     'diagnostics:open-logs',
     'dlna:add-device',
     'dlna:cast',
