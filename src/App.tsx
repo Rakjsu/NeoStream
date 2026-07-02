@@ -14,6 +14,7 @@ import { reminderService } from './services/reminderService';
 import { movieProgressService } from './services/movieProgressService';
 import { activePlaylistService } from './services/activePlaylistService';
 import { useState, useEffect, lazy, Suspense } from 'react';
+import { useGamepadNavigation } from './hooks/useGamepadNavigation';
 
 const Home = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })));
 const LiveTV = lazy(() => import('./pages/LiveTV').then(m => ({ default: m.LiveTV })));
@@ -72,6 +73,9 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [profileSelected, setProfileSelected] = useState(false);
+
+  // Couch mode: navigate the whole app with a gamepad (D-pad/A/B/LB/RB).
+  useGamepadNavigation();
 
   useEffect(() => {
     // Force refresh content by clearing cache timestamp

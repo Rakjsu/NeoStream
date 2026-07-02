@@ -19,7 +19,16 @@ export const MPV_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWe
  * Properties we observe over the IPC pipe. The observe id is the array
  * index + 1 (mpv requires a non-zero id per observer).
  */
-export const OBSERVED_PROPERTIES = ['time-pos', 'duration', 'pause', 'eof-reached', 'volume', 'fullscreen'] as const
+export const OBSERVED_PROPERTIES = ['time-pos', 'duration', 'pause', 'eof-reached', 'volume', 'fullscreen', 'track-list', 'aid', 'sid'] as const
+
+/** Audio/subtitle track parsed from mpv's track-list (MP4s carry several). */
+export interface MpvTrack {
+    id: number
+    type: 'audio' | 'sub'
+    title: string | null
+    lang: string | null
+    isDefault: boolean
+}
 
 export interface MpvStatus {
     running: boolean
@@ -30,10 +39,44 @@ export interface MpvStatus {
     /** 0..100 (mpv allows >100 but we never set it above 100). */
     volume: number | null
     fullscreen: boolean
+    /** Audio + subtitle tracks of the current file (empty until loaded). */
+    tracks: MpvTrack[]
+    /** Selected audio track id (null = none). */
+    audioTrackId: number | null
+    /** Selected subtitle track id (null = subtitles off). */
+    subtitleTrackId: number | null
 }
 
 export function createInitialStatus(running = false): MpvStatus {
-    return { running, timePos: null, duration: null, paused: false, eofReached: false, volume: null, fullscreen: false }
+    return {
+        running, timePos: null, duration: null, paused: false, eofReached: false,
+        volume: null, fullscreen: false, tracks: [], audioTrackId: null, subtitleTrackId: null
+    }
+}
+
+/** Parse mpv's raw track-list into the audio/sub tracks the UI offers. */
+export function parseTrackList(data: unknown): MpvTrack[] {
+    if (!Array.isArray(data)) return []
+    const tracks: MpvTrack[] = []
+    for (const raw of data) {
+        if (!raw || typeof raw !== 'object') continue
+        const t = raw as Record<string, unknown>
+        if (t.type !== 'audio' && t.type !== 'sub') continue
+        if (typeof t.id !== 'number') continue
+        tracks.push({
+            id: t.id,
+            type: t.type,
+            title: typeof t.title === 'string' ? t.title : null,
+            lang: typeof t.lang === 'string' ? t.lang : null,
+            isDefault: t.default === true,
+        })
+    }
+    return tracks
+}
+
+/** mpv reports aid/sid as a number, or false when off — normalize to id|null. */
+export function parseTrackSelection(data: unknown): number | null {
+    return typeof data === 'number' ? data : null
 }
 
 /**
@@ -206,6 +249,12 @@ export function applyIpcMessage(status: MpvStatus, message: MpvIpcMessage): MpvS
                 return { ...status, volume: typeof message.data === 'number' ? message.data : null }
             case 'fullscreen':
                 return { ...status, fullscreen: message.data === true }
+            case 'track-list':
+                return { ...status, tracks: parseTrackList(message.data) }
+            case 'aid':
+                return { ...status, audioTrackId: parseTrackSelection(message.data) }
+            case 'sid':
+                return { ...status, subtitleTrackId: parseTrackSelection(message.data) }
             default:
                 return status
         }

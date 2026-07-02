@@ -69,3 +69,9 @@ body {
     scrollbar-width: thin;
     scrollbar-color: rgba(var(--ns-accent-rgb), 0.5) rgba(0, 0, 0, 0.2);
 }
+/* Gamepad (couch mode) focus ring — applied by useGamepadNavigation */
+.gp-focus {
+    outline: 3px solid var(--ns-accent) !important;
+    outline-offset: 2px;
+    border-radius: 12px;
+}

@@ -6,6 +6,14 @@
  * `mpvEnabled` flag in playbackService (per-profile playback settings).
  */
 
+export interface MpvTrack {
+    id: number;
+    type: 'audio' | 'sub';
+    title: string | null;
+    lang: string | null;
+    isDefault: boolean;
+}
+
 export interface MpvStatus {
     running: boolean;
     timePos: number | null;
@@ -14,6 +22,9 @@ export interface MpvStatus {
     eofReached: boolean;
     volume: number | null;
     fullscreen: boolean;
+    tracks: MpvTrack[];
+    audioTrackId: number | null;
+    subtitleTrackId: number | null;
 }
 
 export interface MpvAvailability {
@@ -92,6 +103,16 @@ class MpvService {
 
     async stop(): Promise<void> {
         await window.ipcRenderer.invoke('mpv:stop').catch(() => undefined);
+    }
+
+    /** Switch the audio track (MP4s often carry dub + original). */
+    async setAudioTrack(id: number): Promise<void> {
+        await window.ipcRenderer.invoke('mpv:set-audio-track', { id }).catch(() => undefined);
+    }
+
+    /** Switch the subtitle track; null turns subtitles off. */
+    async setSubtitleTrack(id: number | null): Promise<void> {
+        await window.ipcRenderer.invoke('mpv:set-subtitle-track', { id }).catch(() => undefined);
     }
 
     /** Polled status snapshot ({ running:false, ... } when nothing is playing). */

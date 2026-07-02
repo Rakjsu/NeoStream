@@ -1,0 +1,15 @@
+{
+    "seasons": [],
+    "info": {},
+    "episodes": {
+        "1": [
+            { "id": "30101", "episode_num": 1, "title": "Cidade Invisível S01E01 - Encontro", "container_extension": "mp4" },
+            { "id": "30102", "episode_num": 2, "title": "Cidade Invisível S01E02 - Rastros", "container_extension": "mp4" },
+            { "id": "30103", "episode_num": 3, "title": "Cidade Invisível S01E03 - Segredos", "container_extension": "mp4" }
+        ],
+        "2": [
+            { "id": "30201", "episode_num": 1, "title": "Cidade Invisível S02E01 - Retorno", "container_extension": "mp4" },
+            { "id": "30202", "episode_num": 2, "title": "Cidade Invisível S02E02 - Marangatu", "container_extension": "mp4" }
+        ]
+    }
+}
