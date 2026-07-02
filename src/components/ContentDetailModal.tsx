@@ -384,6 +384,7 @@ export function ContentDetailModal({
         <div
             ref={modalRef}
             onClick={handleBackdropClick}
+            data-overlay="modal"
             style={{
                 position: 'fixed',
                 inset: 0,
