@@ -32,6 +32,9 @@ let tray: Tray | null = null
 let quitting = false
 let balloonShown = false
 
+// Last playback state reported by the renderer (drives the tray media items).
+let mediaState = { hasMedia: false, playing: false, title: '' }
+
 function applyLoginItem(config: SystemConfig) {
     // Packaged only — in dev this would register the bare electron.exe.
     if (!app.isPackaged) return
@@ -46,11 +49,38 @@ function showWindow(getWin: () => BrowserWindow | null) {
     win.focus()
 }
 
+function sendToRenderer(getWin: () => BrowserWindow | null, channel: string, ...args: unknown[]) {
+    const win = getWin()
+    if (win && !win.isDestroyed()) win.webContents.send(channel, ...args)
+}
+
 function buildTrayMenu(getWin: () => BrowserWindow | null) {
     if (!tray) return
     const config = getConfig()
+    const title = mediaState.title.length > 34 ? `${mediaState.title.slice(0, 33)}…` : mediaState.title
+    const mediaItems: Electron.MenuItemConstructorOptions[] = mediaState.hasMedia
+        ? [
+            {
+                label: mediaState.playing ? `⏸ Pausar — ${title}` : `▶ Reproduzir — ${title}`,
+                click: () => sendToRenderer(getWin, 'media:control', 'togglePlay'),
+            },
+            {
+                label: '⏹ Parar reprodução',
+                click: () => sendToRenderer(getWin, 'media:control', 'stop'),
+            },
+            { type: 'separator' },
+        ]
+        : []
     tray.setContextMenu(Menu.buildFromTemplate([
         { label: 'Abrir NeoStream', click: () => showWindow(getWin) },
+        ...mediaItems,
+        {
+            label: '⏺ Gravações',
+            click: () => {
+                showWindow(getWin)
+                sendToRenderer(getWin, 'tray:navigate', '/dashboard/downloads')
+            },
+        },
         { type: 'separator' },
         {
             label: 'Fechar para a bandeja',
@@ -89,6 +119,16 @@ export function setupTrayMode(getWin: () => BrowserWindow | null) {
     }
 
     applyLoginItem(getConfig())
+
+    // Renderer reports player state; the tray menu mirrors it.
+    ipcMain.on('media:state', (_e, state: { hasMedia?: boolean; playing?: boolean; title?: string }) => {
+        mediaState = {
+            hasMedia: state?.hasMedia === true,
+            playing: state?.playing === true,
+            title: typeof state?.title === 'string' ? state.title : '',
+        }
+        buildTrayMenu(getWin)
+    })
 
     ipcMain.handle('system:get-config', () => ({ success: true, config: getConfig() }))
     ipcMain.handle('system:set-config', (_e, partial: Partial<SystemConfig>) => {
