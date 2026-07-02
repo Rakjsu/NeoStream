@@ -18,6 +18,7 @@ import { setupMpvHandlers } from './mpvPlayer'
 import { setupNotifyHandlers } from './notifyHandlers'
 import { setupDiagnosticsHandlers } from './diagnosticsHandlers'
 import { setupDvrHandlers } from './dvrHandlers'
+import { setupTrayMode, attachCloseToTray } from './trayMode'
 import { setupYouTubeEmbedFix } from './youtubeEmbedFix'
 
 // ES module equivalent of __dirname
@@ -76,6 +77,10 @@ function createWindow() {
         win?.unmaximize()
     })
 
+    // Close button hides to the tray (scheduled recordings/reminders keep
+    // running) unless the user disabled it or is quitting via the tray menu.
+    attachCloseToTray(win)
+
     // Test active push message to Renderer-process.
     win.webContents.on('did-finish-load', () => {
         win?.webContents.send('main-process-message', (new Date).toLocaleString())
@@ -103,6 +108,9 @@ app.on('activate', () => {
 
 app.whenReady().then(() => {
     createWindow()
+
+    // Tray icon + "start with Windows" + close-to-tray IPC.
+    setupTrayMode(() => win)
 
     // Initialize auto-updater after window is created
     if (win) {

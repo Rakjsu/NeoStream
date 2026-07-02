@@ -17,12 +17,24 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
         lastCheck: 0
     });
     const [lastCheckDate, setLastCheckDate] = useState<string>('');
+    // System behavior (tray + autostart) lives in the MAIN process store.
+    const [systemConfig, setSystemConfig] = useState<{ closeToTray: boolean; openAtLogin: boolean }>({ closeToTray: true, openAtLogin: false });
     const { language, setLanguage, t, languages } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
 
     useEffect(() => {
         loadUpdateConfig();
+        window.ipcRenderer.invoke('system:get-config').then(result => {
+            if (result?.success && result.config) setSystemConfig(result.config);
+        }).catch(() => { /* main handler absent in old builds */ });
     }, []);
+
+    const handleSystemConfigChange = async (key: 'closeToTray' | 'openAtLogin', value: boolean) => {
+        const next = { ...systemConfig, [key]: value };
+        setSystemConfig(next);
+        await window.ipcRenderer.invoke('system:set-config', { [key]: value }).catch(() => undefined);
+        triggerSaveAnimation(key);
+    };
 
     const loadUpdateConfig = async () => {
         const config = await updateService.getConfig();
@@ -105,6 +117,44 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
                         <span className="toggle-slider"></span>
                     </label>
                     {saveAnimation === 'autoInstall' && (
+                        <span className="save-indicator">✓ Salvo</span>
+                    )}
+                </div>
+
+                {/* System: close to tray */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>{t('updates', 'closeToTray')}</label>
+                        <p>{t('updates', 'closeToTrayDesc')}</p>
+                    </div>
+                    <label className="toggle-switch">
+                        <input
+                            type="checkbox"
+                            checked={systemConfig.closeToTray}
+                            onChange={(e) => handleSystemConfigChange('closeToTray', e.target.checked)}
+                        />
+                        <span className="toggle-slider"></span>
+                    </label>
+                    {saveAnimation === 'closeToTray' && (
+                        <span className="save-indicator">✓ Salvo</span>
+                    )}
+                </div>
+
+                {/* System: start with Windows */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>{t('updates', 'openAtLogin')}</label>
+                        <p>{t('updates', 'openAtLoginDesc')}</p>
+                    </div>
+                    <label className="toggle-switch">
+                        <input
+                            type="checkbox"
+                            checked={systemConfig.openAtLogin}
+                            onChange={(e) => handleSystemConfigChange('openAtLogin', e.target.checked)}
+                        />
+                        <span className="toggle-slider"></span>
+                    </label>
+                    {saveAnimation === 'openAtLogin' && (
                         <span className="save-indicator">✓ Salvo</span>
                     )}
                 </div>

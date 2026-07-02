@@ -85,6 +85,8 @@ const invokeChannels = new Set([
     'security:get-certificate-settings',
     'security:set-allow-invalid-provider-certificates',
     'streams:get-live',
+    'system:get-config',
+    'system:set-config',
     'streams:get-live-url',
     'streams:get-series',
     'streams:get-series-url',
