@@ -63,6 +63,15 @@ export const profileService = {
         data.activeProfileId = profileId;
         profile.lastUsed = new Date().toISOString();
         saveStorageData(data);
+
+        // Profile-personalized accent: switching profiles re-themes the app.
+        if (profile.accentColor) {
+            void import('./themeService').then(({ themeService, ACCENT_PRESETS }) => {
+                if (ACCENT_PRESETS.some(p => p.id === profile.accentColor)) {
+                    themeService.setTheme({ accent: profile.accentColor as typeof ACCENT_PRESETS[number]['id'] });
+                }
+            });
+        }
         return true;
     },
 
@@ -101,6 +110,7 @@ export const profileService = {
             avatar: profileData.avatar,
             pin: profileData.pin ? await hashPin(profileData.pin) : undefined,
             isKids: profileData.isKids || false,
+            accentColor: profileData.accentColor,
             watchLater: [],
             continueWatching: [],
             createdAt: now,
@@ -148,6 +158,10 @@ export const profileService = {
 
         if (updates.preferredQuality !== undefined) {
             profile.preferredQuality = updates.preferredQuality;
+        }
+
+        if (updates.accentColor !== undefined) {
+            profile.accentColor = updates.accentColor;
         }
 
         saveStorageData(data);

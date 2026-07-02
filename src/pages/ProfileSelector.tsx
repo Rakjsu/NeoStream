@@ -4,6 +4,7 @@ import type { Profile } from '../types/profile';
 import { ProfileCard } from '../components/ProfileCard';
 import { CreateProfileModal } from '../components/CreateProfileModal';
 import { useLanguage } from '../services/languageService';
+import { ACCENT_PRESETS } from '../services/themeService';
 
 interface ProfileSelectorProps {
     onProfileSelected: () => void;
@@ -261,6 +262,34 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                                         {avatar}
                                     </button>
                                 ))}
+                            </div>
+                            {/* Profile accent color — becomes the app theme when the profile activates */}
+                            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 12, flexWrap: 'wrap' }}>
+                                {ACCENT_PRESETS.map((preset) => {
+                                    const isActive = editingProfile.accentColor === preset.id;
+                                    return (
+                                        <button
+                                            key={preset.id}
+                                            title={preset.id}
+                                            onClick={() => {
+                                                const next = isActive ? '' : preset.id;
+                                                void profileService.updateProfile(editingProfile.id, { accentColor: next });
+                                                setEditingProfile({ ...editingProfile, accentColor: next });
+                                                loadProfiles();
+                                            }}
+                                            style={{
+                                                width: 30,
+                                                height: 30,
+                                                borderRadius: '50%',
+                                                cursor: 'pointer',
+                                                background: `linear-gradient(135deg, ${preset.accent}, ${preset.gradTo})`,
+                                                border: isActive ? '3px solid white' : '3px solid transparent',
+                                                boxShadow: isActive ? `0 0 10px ${preset.accent}` : 'none',
+                                                transition: 'all 0.15s ease'
+                                            }}
+                                        />
+                                    );
+                                })}
                             </div>
                         </div>
                         <div className="pin-modal-buttons">
