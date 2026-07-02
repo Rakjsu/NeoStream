@@ -508,3 +508,25 @@
 :-ms-fullscreen .video-player-loading {
     z-index: 2147483647 !important;
 }
+/* Sleep timer countdown chip (top-right, discreet) */
+.sleep-timer-chip {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    padding: 6px 12px;
+    background: rgba(0, 0, 0, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    z-index: 1000;
+    pointer-events: none;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+:fullscreen .sleep-timer-chip,
+:-webkit-full-screen .sleep-timer-chip {
+    z-index: 2147483647 !important;
+}

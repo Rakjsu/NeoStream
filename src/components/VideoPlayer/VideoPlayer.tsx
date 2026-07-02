@@ -10,6 +10,7 @@ import { SubtitleOverlay } from './SubtitleOverlay';
 import { useSubtitleManager } from './useSubtitleManager';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { PlayerSettingsMenu } from './PlayerSettingsMenu';
+import { useSleepTimer, formatSleepCountdown } from './useSleepTimer';
 import { ForcedSubtitlesMenu } from './ForcedSubtitlesMenu';
 import { ChannelZapOverlay, type PlayerChannel } from './ChannelZapOverlay';
 import { useLanguage } from '../../services/languageService';
@@ -114,6 +115,13 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     }, [contentType, liveQualityVariants, currentQualityIndex, onSwitchVersion, t]);
 
     const hlsRef = useHls({ src, videoRef, onStreamError: handleStreamError });
+
+    // Sleep timer: pauses playback when the countdown hits zero.
+    const sleepTimer = useSleepTimer(useCallback(() => {
+        videoRef.current?.pause();
+        setStreamErrorToast(t('player', 'sleepTimerPaused'));
+        setTimeout(() => setStreamErrorToast(null), 5000);
+    }, [videoRef, t]));
 
 
     const [showControls, setShowControls] = useState(true);
@@ -603,6 +611,14 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     </div>
                 )}
 
+                {/* Sleep timer countdown chip (discreet, top-right; always visible
+                    in the final minute even with controls hidden) */}
+                {sleepTimer.active && (showControls || sleepTimer.remainingSeconds <= 60) && (
+                    <div className="sleep-timer-chip" title={t('player', 'sleepTimer')}>
+                        🌙 {formatSleepCountdown(sleepTimer.remainingSeconds)}
+                    </div>
+                )}
+
                 {/* Stream Fallback Toast */}
                 {streamErrorToast && (
                     <div
@@ -932,6 +948,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             onDisableSubtitles={handleSubtitlesOff}
                             audioTracks={audioTracks}
                             onSelectAudioTrack={handleSelectAudioTrack}
+                            sleepTimerMinutes={sleepTimer.selectedMinutes}
+                            onSetSleepTimer={(minutes) => minutes ? sleepTimer.start(minutes) : sleepTimer.cancel()}
                         />
 
                         {/* Channel list toggle (live TV zapping) */}
