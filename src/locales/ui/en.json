@@ -798,6 +798,12 @@
     "cancelReminder": "Cancel reminder",
     "cancelRecording": "Cancel recording"
   },
+  "sort": {
+    "title": "Sort by",
+    "recent": "Most recent",
+    "name": "Name (A–Z)",
+    "rating": "Top rated"
+  },
   "search": {
     "placeholder": "Search channels, movies and series...",
     "noResults": "No results found",

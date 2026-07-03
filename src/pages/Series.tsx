@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { SortSelect } from '../components/SortSelect';
+import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { getBackdropUrl } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
 import { favoritesService } from '../services/favoritesService';
@@ -48,6 +50,7 @@ export function Series() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [sortBy, setSortBy] = useState<CatalogSort>('recent');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [selectedSeries, setSelectedSeries] = useState<Series | null>(null);
     const [playingSeries, setPlayingSeries] = useState<Series | null>(null);
@@ -195,7 +198,11 @@ export function Series() {
         queueMicrotask(() => { void fetchSeries(); });
     }, []);
 
-    const filteredSeries = series.filter(s => {
+    const sortedSeries = sortBy === 'recent'
+        ? series
+        : [...series].sort((a, b) => compareCatalogItems(sortBy, a, b));
+
+    const filteredSeries = sortedSeries.filter(s => {
         const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
 
         // Kids profile + Parental Control filtering
@@ -418,6 +425,7 @@ export function Series() {
                     onChange={setSearchQuery}
                     placeholder={t('login', 'searchSeries')}
                 />
+                <SortSelect value={sortBy} onChange={setSortBy} />
 
                 <CategoryMenu
                     onSelectCategory={setSelectedCategory}

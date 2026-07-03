@@ -798,6 +798,12 @@
     "cancelReminder": "Cancelar lembrete",
     "cancelRecording": "Cancelar gravação"
   },
+  "sort": {
+    "title": "Ordenar por",
+    "recent": "Mais recentes",
+    "name": "Nome (A–Z)",
+    "rating": "Melhor avaliados"
+  },
   "search": {
     "placeholder": "Buscar canais, filmes e séries...",
     "noResults": "Nenhum resultado encontrado",

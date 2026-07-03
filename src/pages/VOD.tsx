@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { SortSelect } from '../components/SortSelect';
+import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { fetchMovieDetails, searchMovieByName, type TMDBMovieDetails, getBackdropUrl } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
 import { favoritesService } from '../services/favoritesService';
@@ -52,6 +54,7 @@ export function VOD() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [sortBy, setSortBy] = useState<CatalogSort>('recent');
     const [selectedMovie, setSelectedMovie] = useState<VODStream | null>(null);
     const [tmdbData, setTmdbData] = useState<TMDBMovieDetails | null>(null);
     const [playingMovie, setPlayingMovie] = useState<VODStream | null>(null);
@@ -182,7 +185,11 @@ export function VOD() {
         return null;
     };
 
-    const filteredStreams = streams.filter(stream => {
+    const sortedStreams = sortBy === 'recent'
+        ? streams
+        : [...streams].sort((a, b) => compareCatalogItems(sortBy, a, b));
+
+    const filteredStreams = sortedStreams.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
 
         // Kids profile + Parental Control gating (categories, cached ratings, hidden items)
@@ -396,6 +403,7 @@ export function VOD() {
                     onChange={setSearchQuery}
                     placeholder={t('login', 'searchMovies')}
                 />
+                <SortSelect value={sortBy} onChange={setSortBy} />
 
                 <CategoryMenu
                     onSelectCategory={setSelectedCategory}

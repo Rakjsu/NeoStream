@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { SortSelect } from '../components/SortSelect';
+import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
@@ -83,6 +85,7 @@ export function LiveTV() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [sortBy, setSortBy] = useState<CatalogSort>('recent');
     const [selectedChannel, setSelectedChannel] = useState<LiveStream | null>(null);
     const [playingChannel, setPlayingChannel] = useState<LiveStream | null>(null);
     const [epgData, setEpgData] = useState<EPGProgram[]>([]);
@@ -291,7 +294,11 @@ export function LiveTV() {
         });
     }, [fetchCategories]);
 
-    const filteredStreams = streams.filter(stream => {
+    const sortedStreams = sortBy === 'recent'
+        ? streams
+        : [...streams].sort((a, b) => compareCatalogItems(sortBy, a, b));
+
+    const filteredStreams = sortedStreams.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
         if (selectedCategory === 'FAVORITES') {
             return matchesSearch && favoriteChannelIds.has(String(stream.stream_id));
@@ -832,6 +839,7 @@ export function LiveTV() {
                 onChange={setSearchQuery}
                 placeholder={t('login', 'searchChannels')}
             />
+            <SortSelect value={sortBy} onChange={setSortBy} withRating={false} right={216} />
             {/* Multi-view entry (2x2 mosaic of live channels) */}
             <button
                 onClick={() => setShowMultiView(true)}
