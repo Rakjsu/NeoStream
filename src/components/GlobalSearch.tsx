@@ -85,6 +85,15 @@ const MAX_PER_CATEGORY = 8;
 let sessionCache: SearchData | null = null;
 let sessionCachePromise: Promise<SearchData> | null = null;
 
+// Periodic catalog refresh (catalogRefreshService): drop the session cache so
+// the next open refetches the lists.
+if (typeof window !== 'undefined') {
+    window.addEventListener('neostream-catalog-refresh', () => {
+        sessionCache = null;
+        sessionCachePromise = null;
+    });
+}
+
 function mapItems(data: unknown, kind: SectionKind): SearchItem[] {
     if (!Array.isArray(data)) return [];
     const items: SearchItem[] = [];
