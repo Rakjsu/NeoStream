@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { AgendaPanel } from '../components/AgendaPanel';
 import { Download, Trash2, Play, FolderOpen, HardDrive, Film, Tv, AlertTriangle, X, RefreshCw } from 'lucide-react';
 import { downloadService } from '../services/downloadService';
 import type { DownloadItem, StorageInfo } from '../services/downloadService';
@@ -56,6 +57,7 @@ export function Downloads() {
     // Live TV recordings (DVR files on disk)
     interface RecordingFile { name: string; path: string; sizeBytes: number; mtimeMs: number; recording: boolean }
     const [showRecordings, setShowRecordings] = useState(false);
+    const [showAgenda, setShowAgenda] = useState(false);
     const [recordings, setRecordings] = useState<RecordingFile[]>([]);
     const [playingRecording, setPlayingRecording] = useState<RecordingFile | null>(null);
 
@@ -255,10 +257,30 @@ export function Downloads() {
                         <p className="subtitle">{t('downloads', 'emptyText')}</p>
                     </div>
                     <button
+                        onClick={() => setShowAgenda(v => !v)}
+                        title={t('agenda', 'title')}
+                        style={{
+                            marginLeft: 'auto',
+                            padding: '10px 18px',
+                            borderRadius: 12,
+                            border: showAgenda ? '1px solid #3b82f6' : '1px solid rgba(59, 130, 246, 0.5)',
+                            background: showAgenda ? 'rgba(59, 130, 246, 0.25)' : 'rgba(59, 130, 246, 0.12)',
+                            color: '#93c5fd',
+                            fontSize: 14,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8
+                        }}
+                    >
+                        🗓️ {t('agenda', 'title')}
+                    </button>
+                    <button
                         onClick={() => setShowRecordings(v => !v)}
                         title={t('downloads', 'recordingsTooltip')}
                         style={{
-                            marginLeft: 'auto',
+                            marginLeft: 12,
                             padding: '10px 18px',
                             borderRadius: 12,
                             border: showRecordings ? '1px solid #ef4444' : '1px solid rgba(239, 68, 68, 0.5)',
@@ -275,6 +297,9 @@ export function Downloads() {
                         ⏺ {t('downloads', 'recordings')} {recordings.length > 0 ? `(${recordings.length})` : ''}
                     </button>
                 </header>
+
+                {/* Unified agenda (reminders + scheduled recordings) */}
+                {showAgenda && <AgendaPanel />}
 
                 {/* Recordings (live TV DVR files) */}
                 {showRecordings && (

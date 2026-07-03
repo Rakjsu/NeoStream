@@ -779,6 +779,16 @@
     "pipZap": "Switch channel in PiP",
     "clickThrough": "Click-through mode"
   },
+  "agenda": {
+    "title": "Schedule",
+    "empty": "Nothing scheduled — set reminders or recordings from the TV guide",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "recordingNow": "RECORDING",
+    "cancel": "Cancel",
+    "cancelReminder": "Cancel reminder",
+    "cancelRecording": "Cancel recording"
+  },
   "search": {
     "placeholder": "Search channels, movies and series...",
     "noResults": "No results found",
