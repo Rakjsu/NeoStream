@@ -49,7 +49,9 @@ export function MultiView({ channels, initialChannelId, onClose }: MultiViewProp
     }, [channels, pickerQuery]);
 
     return (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: '#000', display: 'flex', flexDirection: 'column' }}>
+        // top: 36 = CustomTitleBar height — it sits at z-index 99999 and would
+        // cover this overlay's own top bar (✕ Fechar) if we used inset: 0.
+        <div style={{ position: 'fixed', top: 36, left: 0, right: 0, bottom: 0, zIndex: 9000, background: '#000', display: 'flex', flexDirection: 'column' }}>
             {/* Top bar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', background: 'rgba(15, 15, 35, 0.95)' }}>
                 <span style={{ color: 'white', fontWeight: 700, fontSize: 15 }}>🔲 Multi-view</span>
