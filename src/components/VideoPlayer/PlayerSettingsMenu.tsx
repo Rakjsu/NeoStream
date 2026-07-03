@@ -41,6 +41,9 @@ export interface PlayerSettingsMenuProps<TSwitchContent extends SwitchableConten
     /** Subtitle sync (seconds; undefined hides the section). */
     subtitleOffset?: number;
     onAdjustSubtitleOffset?: (delta: number) => void;
+    /** Aspect ratio mode. */
+    aspectMode?: 'original' | 'stretch' | 'fill' | 'zoom';
+    onSetAspectMode?: (mode: 'original' | 'stretch' | 'fill' | 'zoom') => void;
 }
 
 // Gear settings menu: movie version / live quality switcher, or playback speed.
@@ -63,7 +66,9 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
     sleepTimerMinutes,
     onSetSleepTimer,
     subtitleOffset,
-    onAdjustSubtitleOffset
+    onAdjustSubtitleOffset,
+    aspectMode,
+    onSetAspectMode
 }: PlayerSettingsMenuProps<TSwitchContent>) {
     const { t } = useLanguage();
 
@@ -274,6 +279,29 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
                                 >
                                     +0,5s
                                 </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Aspect ratio: how the video fills the stage */}
+                    {aspectMode !== undefined && onSetAspectMode && (
+                        <div className="settings-section">
+                            <span className="settings-label">{t('player', 'aspectRatio')}</span>
+                            <div className="settings-options">
+                                {([
+                                    ['original', t('player', 'aspectOriginal')],
+                                    ['stretch', t('player', 'aspectStretch')],
+                                    ['fill', t('player', 'aspectFill')],
+                                    ['zoom', t('player', 'aspectZoom')]
+                                ] as const).map(([mode, label]) => (
+                                    <button
+                                        key={mode}
+                                        className={`settings-option ${aspectMode === mode ? 'active' : ''}`}
+                                        onClick={() => onSetAspectMode(mode)}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
                             </div>
                         </div>
                     )}

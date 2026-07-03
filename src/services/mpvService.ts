@@ -115,6 +115,11 @@ class MpvService {
         await window.ipcRenderer.invoke('mpv:set-subtitle-track', { id }).catch(() => undefined);
     }
 
+    /** Override the display aspect: -1 = source, or "16:9" / "4:3". */
+    async setAspect(aspect: -1 | '16:9' | '4:3'): Promise<void> {
+        await window.ipcRenderer.invoke('mpv:set-aspect', { aspect }).catch(() => undefined);
+    }
+
     /** Nudge subtitle timing by delta seconds (positive = subtitles later). */
     async adjustSubtitleDelay(delta: number): Promise<void> {
         await window.ipcRenderer.invoke('mpv:sub-delay', { delta }).catch(() => undefined);
