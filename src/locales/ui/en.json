@@ -595,6 +595,8 @@
     "becauseYouWatched": "Because you watched {name}",
     "recommendations": "Recommended For You",
     "recentSeries": "Recent Series",
+    "newEpisodes": "New episodes in your series",
+    "newEpisodesBadge": "🆕 New eps",
     "recentMovies": "Recent Movies",
     "series": "SERIES",
     "movie": "MOVIE",
