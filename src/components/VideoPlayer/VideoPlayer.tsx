@@ -65,6 +65,13 @@ export interface VideoPlayerProps<TSwitchContent extends SwitchableContent = Swi
     /** Override the end-of-video countdown texts (e.g. movie queue: "A seguir em"). */
     nextCountdownLabel?: string;
     nextActionLabel?: string;
+    /** Live TV mini-EPG shown under the title (now / next + progress). */
+    liveEpg?: {
+        nowTitle: string;
+        timeRange?: string;
+        progressPct?: number;
+        nextTitle?: string;
+    };
 }
 
 function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableContent>({
@@ -95,7 +102,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     channelList,
     onSwitchChannel,
     nextCountdownLabel,
-    nextActionLabel
+    nextActionLabel,
+    liveEpg
 }: VideoPlayerProps<TSwitchContent>) {
     const { videoRef, state, controls } = useVideoPlayer();
     const { t } = useLanguage();
@@ -602,6 +610,27 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
 
             {title && showControls && (
                 <div className="video-player-title">{title}</div>
+            )}
+
+            {/* Live mini-EPG: what's on now / next, right under the title */}
+            {contentType === 'live' && liveEpg && showControls && (
+                <div className="live-epg-bar">
+                    <div className="live-epg-now">
+                        <span className="live-epg-dot" />
+                        <span className="live-epg-now-title">{liveEpg.nowTitle}</span>
+                        {liveEpg.timeRange && <span className="live-epg-time">{liveEpg.timeRange}</span>}
+                    </div>
+                    {typeof liveEpg.progressPct === 'number' && (
+                        <div className="live-epg-progress">
+                            <div className="live-epg-progress-fill" style={{ width: `${Math.min(100, Math.max(0, liveEpg.progressPct))}%` }} />
+                        </div>
+                    )}
+                    {liveEpg.nextTitle && (
+                        <div className="live-epg-next">
+                            {t('player', 'epgNext')}: {liveEpg.nextTitle}
+                        </div>
+                    )}
+                </div>
             )}
 
             <div

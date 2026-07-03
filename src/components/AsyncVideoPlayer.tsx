@@ -64,6 +64,8 @@ interface AsyncVideoPlayerProps<TMovie extends MediaItem, TVersion extends Media
     /** End-of-video countdown texts (movie queue). */
     nextCountdownLabel?: string;
     nextActionLabel?: string;
+    /** Live TV mini-EPG (now/next) shown under the player title. */
+    liveEpg?: { nowTitle: string; timeRange?: string; progressPct?: number; nextTitle?: string };
 }
 
 function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem = TMovie>({
@@ -76,6 +78,7 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
     canGoPrevious,
     nextCountdownLabel,
     nextActionLabel,
+    liveEpg,
     currentEpisode,
     customTitle,
     seriesId,
@@ -439,6 +442,7 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
                         onNextEpisode={onNextEpisode}
                         nextCountdownLabel={nextCountdownLabel}
                         nextActionLabel={nextActionLabel}
+                        liveEpg={liveEpg}
                         onPreviousEpisode={onPreviousEpisode}
                         canGoNext={canGoNext}
                         canGoPrevious={canGoPrevious}
