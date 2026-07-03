@@ -183,6 +183,13 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     // Subtitle sync offset (seconds); adjusted from the gear menu in 0.5s steps.
     const [subtitleOffset, setSubtitleOffset] = useState(0);
+    // Aspect ratio mode (gear menu): how the video fills the stage.
+    const [aspectMode, setAspectMode] = useState<'original' | 'stretch' | 'fill' | 'zoom'>('original');
+    const aspectStyle: React.CSSProperties =
+        aspectMode === 'stretch' ? { objectFit: 'fill' }
+        : aspectMode === 'fill' ? { objectFit: 'cover' }
+        : aspectMode === 'zoom' ? { objectFit: 'contain', transform: 'scale(1.33)' }
+        : { objectFit: 'contain' };
     const [hoverPosition, setHoverPosition] = useState(0);
     const {
         subtitlesEnabled,
@@ -650,6 +657,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                 <video
                     ref={videoRef}
                     className="video-fullwidth"
+                    style={aspectStyle}
                     poster={poster}
                     onClick={controls.togglePlay}
                     crossOrigin="anonymous"
@@ -1023,6 +1031,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             onDisableSubtitles={handleSubtitlesOff}
                             audioTracks={audioTracks}
                             onSelectAudioTrack={handleSelectAudioTrack}
+                            aspectMode={aspectMode}
+                            onSetAspectMode={setAspectMode}
                             subtitleOffset={contentType !== 'live' && subtitlesEnabled ? subtitleOffset : undefined}
                             onAdjustSubtitleOffset={(delta) => setSubtitleOffset(prev => Math.round((prev + delta) * 2) / 2)}
                             sleepTimerMinutes={sleepTimer.selectedMinutes}

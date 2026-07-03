@@ -90,6 +90,22 @@ export function MpvPlayerView({
         void mpvService.adjustSubtitleDelay(delta);
     }, []);
 
+    // Aspect override cycle: source → 16:9 → 4:3 → source…
+    const ASPECTS: Array<{ value: -1 | '16:9' | '4:3'; label: string }> = [
+        { value: -1, label: 'Auto' },
+        { value: '16:9', label: '16:9' },
+        { value: '4:3', label: '4:3' }
+    ];
+    const [aspectIndex, setAspectIndex] = useState(0);
+    const cycleAspect = useCallback(() => {
+        setAspectIndex(prev => {
+            const next = (prev + 1) % ASPECTS.length;
+            void mpvService.setAspect(ASPECTS[next].value);
+            return next;
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ASPECTS is a render-stable literal
+    }, []);
+
     // External subtitle search (OpenSubtitles → temp .vtt → mpv sub-add)
     const [showSubSearch, setShowSubSearch] = useState(false);
     const [subSearchBusy, setSubSearchBusy] = useState(false);
@@ -500,6 +516,13 @@ export function MpvPlayerView({
                                     )}
                                 </div>
                             )}
+                            <button
+                                className="mpv-view-btn"
+                                onClick={cycleAspect}
+                                title={`${t('player', 'aspectRatio')}: ${ASPECTS[aspectIndex].label}`}
+                            >
+                                📐 {ASPECTS[aspectIndex].label}
+                            </button>
                             {!isLive && (subTracks.length > 0 || subDelay !== 0) && (
                                 <>
                                     <button

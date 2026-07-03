@@ -445,6 +445,13 @@ export function setupMpvHandlers() {
         return { success: sendCommand(['set_property', 'sid', value]) }
     })
 
+    // Aspect override: -1 = source aspect; "16:9" / "4:3" stretch to ratio.
+    ipcMain.handle('mpv:set-aspect', (_event, payload: { aspect?: string | number }) => {
+        const aspect = payload?.aspect
+        if (aspect !== -1 && aspect !== '16:9' && aspect !== '4:3') return { success: false }
+        return { success: sendCommand(['set_property', 'video-aspect-override', aspect]) }
+    })
+
     // Subtitle sync: nudge mpv's sub-delay (seconds; positive = later).
     ipcMain.handle('mpv:sub-delay', (_event, payload: { delta?: number }) => {
         const delta = typeof payload?.delta === 'number' && isFinite(payload.delta) ? payload.delta : null
