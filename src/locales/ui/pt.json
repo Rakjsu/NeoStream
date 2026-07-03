@@ -788,6 +788,16 @@
     "pipZap": "Trocar canal no PiP",
     "clickThrough": "Modo clique-através"
   },
+  "agenda": {
+    "title": "Agenda",
+    "empty": "Nada agendado — marque lembretes ou gravações pelo guia de TV",
+    "today": "Hoje",
+    "tomorrow": "Amanhã",
+    "recordingNow": "GRAVANDO",
+    "cancel": "Cancelar",
+    "cancelReminder": "Cancelar lembrete",
+    "cancelRecording": "Cancelar gravação"
+  },
   "search": {
     "placeholder": "Buscar canais, filmes e séries...",
     "noResults": "Nenhum resultado encontrado",
