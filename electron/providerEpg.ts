@@ -12,6 +12,9 @@
  */
 import { ipcMain } from 'electron'
 import store from './store'
+import axios from 'axios'
+import { findPlaylist, getActivePlaylistIdPublic } from './playlistManager'
+import { parseM3uHeader } from './m3uProtocol'
 import log from './logger'
 import { getProviderHttpsAgent, registerApprovedProviderUrl } from './certificatePolicy'
 import {
@@ -178,7 +181,28 @@ function ensureXmltvIndex(): Promise<void> {
         }
 
         try {
-            const url = buildXmltvUrl(credentials.url, credentials.username, credentials.password)
+            // M3U playlists point at their own XMLTV via the #EXTM3U url-tvg
+            // header; Xtream keeps the classic {server}/xmltv.php.
+            let url = buildXmltvUrl(credentials.url, credentials.username, credentials.password)
+            const activeId = getActivePlaylistIdPublic()
+            const activeEntry = activeId ? findPlaylist(activeId) : undefined
+            if (activeEntry?.type === 'm3u') {
+                const head = await axios.get(activeEntry.url, {
+                    timeout: 15000,
+                    responseType: 'text',
+                    transformResponse: [(d: unknown) => d],
+                    // first ~64KB is plenty for the header line
+                    headers: { Range: 'bytes=0-65535' },
+                    validateStatus: (code) => code === 200 || code === 206
+                }).then(r => String(r.data ?? '')).catch(() => '')
+                const { urlTvg } = parseM3uHeader(head)
+                if (!urlTvg) {
+                    xmltvAvailability = 'unavailable'
+                    log.info('[Provider EPG] M3U playlist has no url-tvg — provider EPG disabled')
+                    return
+                }
+                url = urlTvg
+            }
             const xml = await fetchXmltvWithCache(url)
 
             if (!xml || !looksLikeXmltv(xml)) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseM3u, m3uCategories, m3uToLiveStreams, looksLikeM3u } from './m3uProtocol'
+import { parseM3u, m3uCategories, m3uToLiveStreams, m3uToVodStreams, classifyM3uChannels, parseM3uHeader, looksLikeM3u } from './m3uProtocol'
 
 const SAMPLE = `#EXTM3U
 #EXTINF:-1 tvg-id="globo.br" tvg-logo="http://x/globo.png" group-title="Abertos",Globo SP
@@ -73,5 +73,50 @@ describe('looksLikeM3u', () => {
         expect(looksLikeM3u('﻿  #EXTM3U\n')).toBe(true)
         expect(looksLikeM3u('<!DOCTYPE html><html>')).toBe(false)
         expect(looksLikeM3u('{"user_info":{}}')).toBe(false)
+    })
+})
+
+describe('parseM3uHeader', () => {
+    it('extrai url-tvg do cabeçalho', () => {
+        expect(parseM3uHeader('#EXTM3U url-tvg="http://x/guide.xml"\n#EXTINF:-1,A\nhttp://a/1\n'))
+            .toEqual({ urlTvg: 'http://x/guide.xml' })
+        expect(parseM3uHeader('#EXTM3U x-tvg-url="https://y/epg.xml"\n')).toEqual({ urlTvg: 'https://y/epg.xml' })
+    })
+
+    it('sem cabeçalho ou url inválida → vazio', () => {
+        expect(parseM3uHeader('#EXTINF:-1,A\nhttp://a/1\n')).toEqual({})
+        expect(parseM3uHeader('#EXTM3U url-tvg="ftp://nope"\n')).toEqual({})
+        expect(parseM3uHeader('#EXTM3U\n')).toEqual({})
+    })
+})
+
+describe('classifyM3uChannels / m3uToVodStreams', () => {
+    const channels = parseM3u([
+        '#EXTM3U',
+        '#EXTINF:-1 group-title="Abertos",Globo',
+        'http://a/globo.m3u8',
+        '#EXTINF:-1 group-title="FILMES | Ação",Matrix',
+        'http://a/matrix.mp4',
+        '#EXTINF:-1 group-title="Movies VIP",Duna',
+        'http://a/duna.mkv?token=1',
+        '#EXTINF:-1,Avulso',
+        'http://a/avulso.ts'
+    ].join('\n'))
+
+    it('separa live de vod por group-title', () => {
+        const { live, vod } = classifyM3uChannels(channels)
+        expect(live.map(c => c.name)).toEqual(['Globo', 'Avulso'])
+        expect(vod.map(c => c.name)).toEqual(['Matrix', 'Duna'])
+    })
+
+    it('vod ganha shape Xtream com container do url e ids deslocados', () => {
+        const vod = m3uToVodStreams(classifyM3uChannels(channels).vod)
+        expect(vod[0]).toMatchObject({
+            name: 'Matrix',
+            stream_id: 100001,
+            container_extension: 'mp4',
+            direct_source: 'http://a/matrix.mp4'
+        })
+        expect(vod[1].container_extension).toBe('mkv')
     })
 })

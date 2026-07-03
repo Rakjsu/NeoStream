@@ -1499,7 +1499,7 @@ export function LiveTV() {
                             progressPct: epgService.getProgramProgress(currentProgram),
                             nextTitle: upcomingPrograms[0]?.title
                         } : undefined}
-                        channelList={filteredStreams.map(s => ({ id: s.stream_id, name: s.name, logo: s.stream_icon, num: s.num, favorite: favoriteChannelIds.has(String(s.stream_id)) }))}
+                        channelList={filteredStreams.map(s => ({ id: s.stream_id, name: s.name, logo: s.stream_icon, num: s.num, favorite: favoriteChannelIds.has(String(s.stream_id)), directUrl: s.direct_source || undefined }))}
                         onSwitchChannel={(id) => {
                             const next = filteredStreams.find(s => String(s.stream_id) === String(id));
                             if (next) {

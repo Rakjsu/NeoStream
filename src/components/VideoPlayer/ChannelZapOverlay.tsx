@@ -8,6 +8,8 @@ export interface PlayerChannel {
     num?: number;
     /** Starred channel (⭐ filter in the overlay). */
     favorite?: boolean;
+    /** Direct play URL (M3U playlists) — used by the PiP zap. */
+    directUrl?: string;
 }
 
 interface ChannelZapOverlayProps {
