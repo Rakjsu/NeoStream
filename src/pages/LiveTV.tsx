@@ -101,6 +101,9 @@ export function LiveTV() {
     const [replayPlayback, setReplayPlayback] = useState<{ channel: LiveStream; program: EPGProgram } | null>(null);
     // Multi-view mosaic (2x2 simultaneous live channels)
     const [showMultiView, setShowMultiView] = useState(false);
+    // Favorite channel ids (⭐): re-read whenever the star toggles.
+    const [favoriteChannelIds, setFavoriteChannelIds] = useState<Set<string>>(() =>
+        new Set(favoritesService.getAll().filter(f => f.type === 'channel').map(f => f.id)));
     const { t } = useLanguage();
 
     // Calculate items per page based on window dimensions
@@ -290,6 +293,10 @@ export function LiveTV() {
 
     const filteredStreams = streams.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
+        if (selectedCategory === 'FAVORITES') {
+            return matchesSearch && favoriteChannelIds.has(String(stream.stream_id));
+        }
+
         const matchesCategory = !selectedCategory || selectedCategory === 'all' || stream.category_id === selectedCategory;
 
         // Parental Control: block channels from adult categories
@@ -1049,6 +1056,45 @@ export function LiveTV() {
                                     </button>
 
                                     <button
+                                        onClick={() => {
+                                            const id = String(selectedChannel.stream_id);
+                                            if (favoriteChannelIds.has(id)) {
+                                                favoritesService.remove(id, 'channel');
+                                            } else {
+                                                favoritesService.add({
+                                                    id,
+                                                    type: 'channel',
+                                                    title: selectedChannel.name,
+                                                    poster: selectedChannel.stream_icon || '',
+                                                    streamId: selectedChannel.stream_id
+                                                });
+                                            }
+                                            setFavoriteChannelIds(new Set(
+                                                favoritesService.getAll().filter(f => f.type === 'channel').map(f => f.id)));
+                                        }}
+                                        title={favoriteChannelIds.has(String(selectedChannel.stream_id))
+                                            ? t('liveTV', 'unfavoriteChannel')
+                                            : t('liveTV', 'favoriteChannel')}
+                                        style={{
+                                            padding: '14px 20px',
+                                            background: favoriteChannelIds.has(String(selectedChannel.stream_id))
+                                                ? 'rgba(251, 191, 36, 0.2)'
+                                                : 'rgba(255, 255, 255, 0.05)',
+                                            color: favoriteChannelIds.has(String(selectedChannel.stream_id)) ? '#fbbf24' : 'rgba(255, 255, 255, 0.9)',
+                                            fontWeight: '600',
+                                            fontSize: '17px',
+                                            borderRadius: '12px',
+                                            border: favoriteChannelIds.has(String(selectedChannel.stream_id))
+                                                ? '1px solid rgba(251, 191, 36, 0.5)'
+                                                : '1px solid rgba(255, 255, 255, 0.15)',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                                        }}
+                                    >
+                                        {favoriteChannelIds.has(String(selectedChannel.stream_id)) ? '⭐' : '☆'}
+                                    </button>
+
+                                    <button
                                         onClick={() => setSelectedChannel(null)}
                                         style={{
                                             padding: '14px 24px',
@@ -1439,7 +1485,7 @@ export function LiveTV() {
                             progressPct: epgService.getProgramProgress(currentProgram),
                             nextTitle: upcomingPrograms[0]?.title
                         } : undefined}
-                        channelList={filteredStreams.map(s => ({ id: s.stream_id, name: s.name, logo: s.stream_icon, num: s.num }))}
+                        channelList={filteredStreams.map(s => ({ id: s.stream_id, name: s.name, logo: s.stream_icon, num: s.num, favorite: favoriteChannelIds.has(String(s.stream_id)) }))}
                         onSwitchChannel={(id) => {
                             const next = filteredStreams.find(s => String(s.stream_id) === String(id));
                             if (next) {

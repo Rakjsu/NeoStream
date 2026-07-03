@@ -157,6 +157,7 @@
     "allChannels": "Todos os Canais",
     "allSeries": "Todas as Séries",
     "continueWatching": "Continue Assistindo",
+    "favoriteChannels": "Canais favoritos",
     "completedSeries": "Séries Finalizadas",
     "watchedMovies": "Filmes Assistidos"
   },
@@ -164,6 +165,8 @@
     "scheduleTitle": "Grade Horária",
     "live": "AO VIVO",
     "watchNow": "Assistir Agora",
+    "favoriteChannel": "Favoritar canal",
+    "unfavoriteChannel": "Remover dos favoritos",
     "close": "Fechar",
     "nowPlaying": "AGORA",
     "upNext": "A Seguir",
