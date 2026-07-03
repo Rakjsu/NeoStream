@@ -137,6 +137,24 @@ function startMockServer() {
     const server = http.createServer((req, res) => {
         const url = new URL(req.url, 'http://127.0.0.1');
 
+        // Extended-M3U playlist (M3U playlist support, round 22+).
+        if (url.pathname === '/lista.m3u') {
+            const origin = `http://${req.headers.host}`;
+            const m3u = [
+                '#EXTM3U',
+                '#EXTINF:-1 tvg-id="m3u-um" tvg-logo="" group-title="Abertos M3U",Canal M3U Um',
+                `${origin}/live/stream-um.m3u8`,
+                '#EXTINF:-1 group-title="Abertos M3U",Canal M3U Dois',
+                `${origin}/live/stream-dois.m3u8`,
+                '#EXTINF:-1 group-title="Esportes M3U",Canal M3U Esporte',
+                `${origin}/live/stream-esporte.m3u8`,
+                ''
+            ].join('\n');
+            res.writeHead(200, { 'Content-Type': 'application/x-mpegurl; charset=utf-8' });
+            res.end(m3u);
+            return;
+        }
+
         // Provider XMLTV EPG (main process: electron/providerEpg.ts).
         if (url.pathname === '/xmltv.php') {
             const user = url.searchParams.get('username');
