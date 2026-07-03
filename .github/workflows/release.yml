@@ -31,7 +31,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci || (sleep 15 && npm ci) || (sleep 60 && npm ci)
 
       # --publish never: electron-builder only builds; the release step
       # below uploads. (With GH_TOKEN visible, builder would double-publish.)
