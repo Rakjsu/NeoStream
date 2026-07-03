@@ -124,6 +124,27 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         setTimeout(() => setStreamErrorToast(null), 5000);
     }, [videoRef, t]));
 
+    // Tray menu mirror: report playback state; obey play/pause/stop clicks.
+    useEffect(() => {
+        try {
+            window.ipcRenderer?.send('media:state', { hasMedia: true, playing: state.playing, title: title || '' });
+        } catch { /* older preloads block the channel */ }
+    }, [state.playing, title]);
+    useEffect(() => () => {
+        try {
+            window.ipcRenderer?.send('media:state', { hasMedia: false, playing: false, title: '' });
+        } catch { /* ignore */ }
+    }, []);
+    useEffect(() => {
+        if (!window.ipcRenderer) return;
+        const handler = (_event: unknown, action: unknown) => {
+            if (action === 'togglePlay') controls.togglePlay();
+            else if (action === 'stop') onClose?.();
+        };
+        window.ipcRenderer.on('media:control', handler);
+        return () => { window.ipcRenderer?.off('media:control', handler); };
+    }, [controls, onClose]);
+
     // OS media integration: hardware media keys + Windows media overlay (SMTC)
     useMediaSession({
         videoRef,

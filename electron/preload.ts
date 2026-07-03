@@ -114,12 +114,15 @@ const invokeChannels = new Set([
 
 const sendChannels = new Set([
     'log:renderer',
+    'media:state',
     'pip:control',
     'pip:state',
 ])
 
 const receiveChannels = new Set([
     'download:progress',
+    'media:control',
+    'tray:navigate',
     'dvr:progress',
     'dvr:stopped',
     'main-process-message',
