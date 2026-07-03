@@ -28,7 +28,7 @@
  * via the `geometry` and `window-minimized` properties.
  */
 
-import { app, ipcMain, BrowserWindow, net as electronNet } from 'electron'
+import { app, ipcMain, BrowserWindow, net as electronNet, screen } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import net from 'node:net'
@@ -154,6 +154,19 @@ function sendCommand(command: ReadonlyArray<string | number | boolean>): boolean
 }
 
 /**
+ * Geometry for the mpv window in PHYSICAL pixels. Electron bounds are DIP;
+ * mpv interprets --geometry as physical pixels, so on displays with scaling
+ * (e.g. 125%) the raw DIP values land the window offset and undersized.
+ * The controls strip is subtracted in DIP (it's a CSS height) before the
+ * conversion; dipToScreenRect handles per-monitor scale factors.
+ */
+function embeddedGeometryFor(win: BrowserWindow) {
+    const dip = computeMpvGeometry(win.getContentBounds())
+    if (process.platform !== 'win32') return dip
+    return screen.dipToScreenRect(win, { x: dip.x, y: dip.y, width: dip.width, height: dip.height })
+}
+
+/**
  * Re-position the mpv window over the app window's client area (minus the
  * controls strip). No-op while minimized (geometry would be stale) or while
  * mpv is fullscreen (mpv owns the whole screen; geometry is re-applied when
@@ -163,8 +176,7 @@ function applyGeometryFromWindow(current: MpvSession) {
     const win = current.followWindow
     if (!win || win.isDestroyed() || win.isMinimized()) return
     if (current.status.fullscreen) return
-    const geometry = computeMpvGeometry(win.getContentBounds())
-    sendCommand(['set_property', 'geometry', formatMpvGeometry(geometry)])
+    sendCommand(['set_property', 'geometry', formatMpvGeometry(embeddedGeometryFor(win))])
 }
 
 /**
@@ -307,7 +319,7 @@ export async function launchMpv(
         url: options.url,
         title: options.title,
         startSeconds: options.start,
-        geometry: embedTarget ? computeMpvGeometry(embedTarget.getContentBounds()) : undefined,
+        geometry: embedTarget ? embeddedGeometryFor(embedTarget) : undefined,
     })
 
     try {
