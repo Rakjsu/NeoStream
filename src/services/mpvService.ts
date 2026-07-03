@@ -115,6 +115,11 @@ class MpvService {
         await window.ipcRenderer.invoke('mpv:set-subtitle-track', { id }).catch(() => undefined);
     }
 
+    /** Nudge subtitle timing by delta seconds (positive = subtitles later). */
+    async adjustSubtitleDelay(delta: number): Promise<void> {
+        await window.ipcRenderer.invoke('mpv:sub-delay', { delta }).catch(() => undefined);
+    }
+
     /** Load an external subtitle (VTT text) and select it. */
     async addSubtitle(content: string, title: string, lang: string): Promise<boolean> {
         const result = await window.ipcRenderer.invoke('mpv:add-subtitle', { content, title, lang })

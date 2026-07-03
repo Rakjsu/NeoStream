@@ -173,6 +173,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     const [showDeviceSelector, setShowDeviceSelector] = useState(false);
     const [castingDevice, setCastingDevice] = useState<{ id: string; name: string } | null>(null);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
+    // Subtitle sync offset (seconds); adjusted from the gear menu in 0.5s steps.
+    const [subtitleOffset, setSubtitleOffset] = useState(0);
     const [hoverPosition, setHoverPosition] = useState(0);
     const {
         subtitlesEnabled,
@@ -629,6 +631,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     vttContent={vttContent}
                     videoRef={videoRef}
                     enabled={subtitlesEnabled}
+                    offsetSeconds={subtitleOffset}
                 />
 
                 {/* Subtitle Warning Toast */}
@@ -991,6 +994,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             onDisableSubtitles={handleSubtitlesOff}
                             audioTracks={audioTracks}
                             onSelectAudioTrack={handleSelectAudioTrack}
+                            subtitleOffset={contentType !== 'live' && subtitlesEnabled ? subtitleOffset : undefined}
+                            onAdjustSubtitleOffset={(delta) => setSubtitleOffset(prev => Math.round((prev + delta) * 2) / 2)}
                             sleepTimerMinutes={sleepTimer.selectedMinutes}
                             onSetSleepTimer={(minutes) => minutes ? sleepTimer.start(minutes) : sleepTimer.cancel()}
                         />

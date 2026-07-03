@@ -16,6 +16,8 @@ interface SubtitleOverlayProps {
     vttContent: string | null;
     videoRef: React.RefObject<HTMLVideoElement | null>;
     enabled: boolean;
+    /** Sync adjustment in seconds: positive shows subtitles LATER. */
+    offsetSeconds?: number;
 }
 
 /**
@@ -91,7 +93,8 @@ function parseVTT(vttContent: string): SubtitleCue[] {
 export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
     vttContent,
     videoRef,
-    enabled
+    enabled,
+    offsetSeconds = 0
 }) => {
     const [currentText, setCurrentText] = useState<string>('');
 
@@ -109,7 +112,8 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
             return;
         }
 
-        const currentTime = videoRef.current.currentTime;
+        // Positive offset delays the subtitles (cue matches later video time).
+        const currentTime = videoRef.current.currentTime - offsetSeconds;
 
         // Find matching cue (binary search would be more efficient for large files)
         const activeCue = cues.find(cue =>
@@ -117,7 +121,7 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
         );
 
         setCurrentText(activeCue?.text || '');
-    }, [cues, videoRef]);
+    }, [cues, videoRef, offsetSeconds]);
 
     // Listen to video timeupdate event
     useEffect(() => {

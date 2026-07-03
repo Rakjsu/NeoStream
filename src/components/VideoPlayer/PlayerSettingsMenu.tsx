@@ -38,6 +38,9 @@ export interface PlayerSettingsMenuProps<TSwitchContent extends SwitchableConten
     /** Sleep timer (null = off, otherwise the armed duration in minutes). */
     sleepTimerMinutes?: number | null;
     onSetSleepTimer?: (minutes: number | null) => void;
+    /** Subtitle sync (seconds; undefined hides the section). */
+    subtitleOffset?: number;
+    onAdjustSubtitleOffset?: (delta: number) => void;
 }
 
 // Gear settings menu: movie version / live quality switcher, or playback speed.
@@ -58,7 +61,9 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
     audioTracks,
     onSelectAudioTrack,
     sleepTimerMinutes,
-    onSetSleepTimer
+    onSetSleepTimer,
+    subtitleOffset,
+    onAdjustSubtitleOffset
 }: PlayerSettingsMenuProps<TSwitchContent>) {
     const { t } = useLanguage();
 
@@ -245,6 +250,30 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
                                         {track.label}
                                     </button>
                                 ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Subtitle sync: shift subtitles in 0.5s steps */}
+                    {subtitleOffset !== undefined && onAdjustSubtitleOffset && (
+                        <div className="settings-section">
+                            <span className="settings-label">{t('player', 'subtitleSync')}</span>
+                            <div className="settings-options" style={{ alignItems: 'center' }}>
+                                <button
+                                    className="settings-option"
+                                    onClick={() => onAdjustSubtitleOffset(-0.5)}
+                                >
+                                    −0,5s
+                                </button>
+                                <span style={{ minWidth: 64, textAlign: 'center', fontVariantNumeric: 'tabular-nums', color: subtitleOffset === 0 ? 'rgba(255,255,255,0.5)' : 'white', fontSize: 13, fontWeight: 600 }}>
+                                    {subtitleOffset > 0 ? '+' : ''}{subtitleOffset.toFixed(1)}s
+                                </span>
+                                <button
+                                    className="settings-option"
+                                    onClick={() => onAdjustSubtitleOffset(0.5)}
+                                >
+                                    +0,5s
+                                </button>
                             </div>
                         </div>
                     )}

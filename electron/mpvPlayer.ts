@@ -445,6 +445,13 @@ export function setupMpvHandlers() {
         return { success: sendCommand(['set_property', 'sid', value]) }
     })
 
+    // Subtitle sync: nudge mpv's sub-delay (seconds; positive = later).
+    ipcMain.handle('mpv:sub-delay', (_event, payload: { delta?: number }) => {
+        const delta = typeof payload?.delta === 'number' && isFinite(payload.delta) ? payload.delta : null
+        if (delta === null) return { success: false }
+        return { success: sendCommand(['add', 'sub-delay', delta]) }
+    })
+
     // External subtitle (searched/downloaded by the renderer as VTT text):
     // write to a temp file and sub-add it selected. mpv reads VTT natively.
     ipcMain.handle('mpv:add-subtitle', async (_event, payload: { content?: string; title?: string; lang?: string }) => {

@@ -510,6 +510,7 @@
     "subtitles": "Legendas",
     "audio": "Áudio",
     "subtitleLanguage": "Legenda",
+    "subtitleSync": "Sincronia da legenda",
     "sleepTimer": "Timer de desligamento",
     "sleepTimerOff": "Desligado",
     "sleepTimerPaused": "Reprodução pausada pelo timer",
