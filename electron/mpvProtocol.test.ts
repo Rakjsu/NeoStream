@@ -66,6 +66,7 @@ describe('buildMpvArgs', () => {
         expect(args).toContain('--no-border')
         expect(args).toContain('--ontop')
         expect(args).toContain('--no-osc')
+        expect(args).toContain('--window-dragging=no')
         expect(args).toContain('--geometry=1280x624+100+50')
         expect(args.some((a) => a.startsWith('--autofit'))).toBe(false)
     })
