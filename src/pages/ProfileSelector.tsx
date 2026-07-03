@@ -28,7 +28,8 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
         setIsLoading(true);
         // Simulate loading delay for animation
         setTimeout(() => {
-            const allProfiles = profileService.getAllProfiles();
+            // The transient guest entry never shows as a regular card.
+            const allProfiles = profileService.getAllProfiles().filter(p => !p.isGuest);
             setProfiles(allProfiles);
             setIsLoading(false);
         }, 500);
@@ -201,6 +202,20 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                         </div>
                     )}
                 </div>
+
+                {/* Guest session: temporary profile, wiped on switch/logout */}
+                {!isManaging && (
+                    <button
+                        className="manage-btn guest-btn"
+                        onClick={() => {
+                            profileService.startGuestSession();
+                            onProfileSelected();
+                        }}
+                    >
+                        <span>🎭</span>
+                        <span>{t('profile', 'guestSession')}</span>
+                    </button>
+                )}
 
                 {/* Manage Profiles Button */}
                 <button
@@ -647,6 +662,11 @@ const profileSelectorStyles = `
 }
 
 /* Manage Button */
+.guest-btn {
+    margin-bottom: 12px;
+    opacity: 0.85;
+}
+
 .manage-btn {
     display: flex;
     align-items: center;

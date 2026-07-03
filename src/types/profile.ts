@@ -27,6 +27,7 @@ export interface Profile {
     avatar: string; // Base64 image data or emoji
     pin?: string; // SHA-256 hash (optional)
     isKids?: boolean; // Kids profile with content filtering
+    isGuest?: boolean; // Temporary guest profile — data wiped when the session ends
     preferredQuality?: '4k' | 'fhd' | 'hd' | 'sd' | 'auto'; // Preferred quality for live TV
     /** Theme accent preset id (themeService AccentId) applied when this profile activates. */
     accentColor?: string;

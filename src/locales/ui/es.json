@@ -81,6 +81,7 @@
     "createProfile": "Crear Perfil",
     "addProfile": "Añadir Perfil",
     "manageProfiles": "Gestionar Perfiles",
+    "guestSession": "Entrar como invitado (sin historial)",
     "whoIsWatching": "¿Quién está viendo?",
     "deleteProfile": "Eliminar Perfil",
     "confirmDelete": "¿Estás seguro de que deseas eliminar este perfil?",
