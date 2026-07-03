@@ -37,7 +37,7 @@
     "hls.js": "^1.6.15",
     "i18next": "^26.3.4",
     "i18next-browser-languagedetector": "^8.2.0",
-    "lucide-react": "^0.554.0",
+    "lucide-react": "^1.23.0",
     "node-fetch": "^3.3.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -47,12 +47,12 @@
     "vidstack": "^1.12.13"
   },
   "devDependencies": {
-    "@electron/packager": "^19.0.1",
+    "@electron/packager": "^20.0.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4.1.17",
     "@testing-library/jest-dom": "^6.9.1",
-    "@types/node": "^24.10.1",
+    "@types/node": "^26.1.0",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.3",
