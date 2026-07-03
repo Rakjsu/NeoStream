@@ -12,6 +12,7 @@ import { useSubtitleManager } from './useSubtitleManager';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { PlayerSettingsMenu } from './PlayerSettingsMenu';
 import { useSleepTimer, formatSleepCountdown } from './useSleepTimer';
+import { aspectPrefs, aspectPrefKey } from '../../utils/aspectPrefs';
 import { ForcedSubtitlesMenu } from './ForcedSubtitlesMenu';
 import { ChannelZapOverlay, type PlayerChannel } from './ChannelZapOverlay';
 import { useLanguage } from '../../services/languageService';
@@ -185,8 +186,18 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     const [subtitleOffset, setSubtitleOffset] = useState(0);
     // Aspect ratio mode (gear menu): how the video fills the stage.
     // Default 'fill' (cover) = the player's historical rendering; 'original'
-    // shows the full frame uncropped (letterbox for 4:3 content).
+    // shows the full frame uncropped (letterbox for 4:3 content). The chosen
+    // mode is remembered per content (utils/aspectPrefs), so a 4:3 channel
+    // keeps its mode across sessions and zapping.
     const [aspectMode, setAspectMode] = useState<'original' | 'stretch' | 'fill' | 'zoom'>('fill');
+    useEffect(() => {
+        const saved = aspectPrefs.get(aspectPrefKey(contentType, contentId));
+        queueMicrotask(() => setAspectMode(saved ?? 'fill'));
+    }, [contentType, contentId]);
+    const chooseAspectMode = useCallback((mode: 'original' | 'stretch' | 'fill' | 'zoom') => {
+        setAspectMode(mode);
+        aspectPrefs.set(aspectPrefKey(contentType, contentId), mode);
+    }, [contentType, contentId]);
     const aspectStyle: React.CSSProperties =
         aspectMode === 'stretch' ? { objectFit: 'fill' }
         : aspectMode === 'fill' ? { objectFit: 'cover' }
@@ -1034,7 +1045,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             audioTracks={audioTracks}
                             onSelectAudioTrack={handleSelectAudioTrack}
                             aspectMode={aspectMode}
-                            onSetAspectMode={setAspectMode}
+                            onSetAspectMode={chooseAspectMode}
                             subtitleOffset={contentType !== 'live' && subtitlesEnabled ? subtitleOffset : undefined}
                             onAdjustSubtitleOffset={(delta) => setSubtitleOffset(prev => Math.round((prev + delta) * 2) / 2)}
                             sleepTimerMinutes={sleepTimer.selectedMinutes}
