@@ -806,6 +806,17 @@
     "name": "Nome (A–Z)",
     "rating": "Melhor avaliados"
   },
+  "storage": {
+    "title": "Armazenamento",
+    "description": "Quanto o app ocupa em disco, por área",
+    "downloads": "Downloads offline",
+    "recordings": "Gravações (DVR)",
+    "catalogCache": "Cache do catálogo",
+    "epgCache": "Cache do EPG",
+    "clear": "Limpar",
+    "measure": "Medir uso",
+    "refresh": "Atualizar"
+  },
   "search": {
     "placeholder": "Buscar canais, filmes e séries...",
     "noResults": "Nenhum resultado encontrado",

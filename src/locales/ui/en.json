@@ -806,6 +806,17 @@
     "name": "Name (A–Z)",
     "rating": "Top rated"
   },
+  "storage": {
+    "title": "Storage",
+    "description": "How much disk the app uses, per area",
+    "downloads": "Offline downloads",
+    "recordings": "Recordings (DVR)",
+    "catalogCache": "Catalog cache",
+    "epgCache": "EPG cache",
+    "clear": "Clear",
+    "measure": "Measure usage",
+    "refresh": "Refresh"
+  },
   "search": {
     "placeholder": "Search channels, movies and series...",
     "noResults": "No results found",
