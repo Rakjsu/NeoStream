@@ -551,6 +551,7 @@
     "subtitles": "Subtitles",
     "audio": "Audio",
     "subtitleLanguage": "Subtitle",
+    "subtitleSync": "Subtitle sync",
     "sleepTimer": "Sleep timer",
     "sleepTimerOff": "Off",
     "sleepTimerPaused": "Playback paused by sleep timer",

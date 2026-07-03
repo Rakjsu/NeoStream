@@ -83,6 +83,13 @@ export function MpvPlayerView({
     const [subtitleTrackId, setSubtitleTrackId] = useState<number | null>(null);
     /** While the user drags the seek slider, show the drag value instead of polled time. */
     const [seekDrag, setSeekDrag] = useState<number | null>(null);
+    // Subtitle sync offset (display only; mpv holds the real sub-delay)
+    const [subDelay, setSubDelay] = useState(0);
+    const nudgeSubDelay = useCallback((delta: number) => {
+        setSubDelay(prev => Math.round((prev + delta) * 2) / 2);
+        void mpvService.adjustSubtitleDelay(delta);
+    }, []);
+
     // External subtitle search (OpenSubtitles → temp .vtt → mpv sub-add)
     const [showSubSearch, setShowSubSearch] = useState(false);
     const [subSearchBusy, setSubSearchBusy] = useState(false);
@@ -492,6 +499,29 @@ export function MpvPlayerView({
                                         </div>
                                     )}
                                 </div>
+                            )}
+                            {!isLive && (subTracks.length > 0 || subDelay !== 0) && (
+                                <>
+                                    <button
+                                        className="mpv-view-btn"
+                                        onClick={() => nudgeSubDelay(-0.5)}
+                                        title={`${t('player', 'subtitleSync')} −0,5s`}
+                                    >
+                                        💬−
+                                    </button>
+                                    {subDelay !== 0 && (
+                                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', fontVariantNumeric: 'tabular-nums' }}>
+                                            {subDelay > 0 ? '+' : ''}{subDelay.toFixed(1)}s
+                                        </span>
+                                    )}
+                                    <button
+                                        className="mpv-view-btn"
+                                        onClick={() => nudgeSubDelay(0.5)}
+                                        title={`${t('player', 'subtitleSync')} +0,5s`}
+                                    >
+                                        💬+
+                                    </button>
+                                </>
                             )}
                             {subTracks.length > 0 && (
                                 <button

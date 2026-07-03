@@ -66,6 +66,7 @@ const invokeChannels = new Set([
     'mpv:seek',
     'mpv:add-subtitle',
     'mpv:set-audio-track',
+    'mpv:sub-delay',
     'mpv:set-fullscreen',
     'mpv:set-path',
     'mpv:set-subtitle-track',
