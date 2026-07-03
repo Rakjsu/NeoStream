@@ -166,6 +166,10 @@ export function buildMpvArgs(pipeName: string, options: MpvLaunchOptions): strin
                 '--no-border', // borderless: blends with the app window underneath
                 '--ontop', // keep the video above the app even when our controls are clicked
                 '--no-osc', // controls live in the React UI, not mpv's on-screen controller
+                // Clicking-and-dragging the video area must NOT move the mpv
+                // window — it is glued over the app and only the geometry
+                // property may reposition it.
+                '--window-dragging=no',
                 `--geometry=${formatMpvGeometry(options.geometry)}`,
             ]
             : ['--autofit=70%']),
