@@ -9,6 +9,8 @@ import { profileService } from '../services/profileService';
 import { indexedDBCache } from '../services/indexedDBCache';
 import { searchMovieByName, searchSeriesByName, isKidsFriendly } from '../services/tmdb';
 import { getHomeRecommendations, type RecommendationGroup } from '../services/recommendationService';
+import { newEpisodesService } from '../services/newEpisodesService';
+import { favoritesService } from '../services/favoritesService';
 import { useLanguage } from '../services/languageService';
 
 interface ContentCounts {
@@ -71,6 +73,7 @@ export function Home() {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [continueWatching, setContinueWatching] = useState<ContinueWatchingItem[]>([]);
     const [recentSeries, setRecentSeries] = useState<SeriesData[]>([]);
+    const [updatedSeries, setUpdatedSeries] = useState<SeriesData[]>([]);
     const [recentMovies, setRecentMovies] = useState<MovieData[]>([]);
     const [allSeries, setAllSeries] = useState<SeriesData[]>([]);
     const [allMovies, setAllMovies] = useState<MovieData[]>([]);
@@ -324,6 +327,20 @@ export function Home() {
 
         queueMicrotask(() => setContinueWatching(items.slice(0, 30)));
     }, [allSeries, allMovies, refreshTrigger]);
+
+    // Followed series with new episodes (provider last_modified bumped since
+    // the user last opened them) — feeds the "Novos episódios" row.
+    useEffect(() => {
+        if (allSeries.length === 0) return;
+        queueMicrotask(() => {
+            const followed = new Set<string>([
+                ...favoritesService.getAll().filter(f => f.type === 'series').map(f => f.id),
+                ...watchProgressService.getContinueWatching().keys()
+            ]);
+            setUpdatedSeries(newEpisodesService.getUpdatedSeries(allSeries, followed).slice(0, 20));
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- length-only dep, same rationale as the recommendations effect
+    }, [allSeries.length, refreshTrigger]);
 
     // Build personalized recommendations ("Porque você assistiu X") from local
     // watch history + genre/category/franchise scoring (recommendationService).
@@ -1398,6 +1415,14 @@ export function Home() {
                     type: 'continue',
                     showProgress: true,
                     sectionIndex: 0
+                })}
+
+                {/* New episodes on followed series */}
+                {updatedSeries.length > 0 && renderContentSection({
+                    title: `📣 ${t('home', 'newEpisodes')}`,
+                    items: updatedSeries,
+                    type: 'series',
+                    sectionIndex: 1
                 })}
 
                 {/* Next Episodes Section */}

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { getBackdropUrl } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
 import { favoritesService } from '../services/favoritesService';
+import { newEpisodesService } from '../services/newEpisodesService';
 import { watchProgressService } from '../services/watchProgressService';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
@@ -87,7 +88,17 @@ export function Series() {
         items: series,
         getItemName: (s) => s.name,
         getItemCategoryIds: (s) => Array.isArray(s.category_id) ? s.category_id : [s.category_id],
-        onAllowed: setSelectedSeries
+        onAllowed: (s) => {
+            // Opening the series consumes its "new episodes" badge.
+            newEpisodesService.markSeen(s.series_id, s.last_modified);
+            setUpdatedSeriesIds(prev => {
+                if (!prev.has(String(s.series_id))) return prev;
+                const next = new Set(prev);
+                next.delete(String(s.series_id));
+                return next;
+            });
+            setSelectedSeries(s);
+        }
     });
 
     // Close any open previews when this page mounts
@@ -215,6 +226,21 @@ export function Series() {
     });
     const windowStart = gridWindow.ready ? gridWindow.start : 0;
     const windowEnd = gridWindow.ready ? gridWindow.end : Math.min(visibleCount, filteredSeries.length);
+
+    // Followed series (favorites/in progress) whose provider last_modified
+    // bumped since the user last opened them → "new episodes" badge.
+    const [updatedSeriesIds, setUpdatedSeriesIds] = useState<Set<string>>(new Set());
+    useEffect(() => {
+        if (series.length === 0) return;
+        queueMicrotask(() => {
+            const followed = new Set<string>([
+                ...favoritesService.getAll().filter(f => f.type === 'series').map(f => f.id),
+                ...watchProgressService.getContinueWatching().keys()
+            ]);
+            const updated = newEpisodesService.getUpdatedSeries(series, followed);
+            setUpdatedSeriesIds(new Set(updated.map(u => String(u.series_id))));
+        });
+    }, [series]);
 
     // Reset on filter change (deferred setState)
     useEffect(() => {
@@ -485,6 +511,24 @@ export function Series() {
                                                     setRefresh(r => r + 1);
                                                 }}
                                             >
+                                                {/* New episodes badge */}
+                                                {updatedSeriesIds.has(String(s.series_id)) && (
+                                                    <span style={{
+                                                        position: 'absolute',
+                                                        bottom: 10,
+                                                        left: 10,
+                                                        background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                                                        borderRadius: 8,
+                                                        padding: '4px 9px',
+                                                        fontSize: 11,
+                                                        fontWeight: 700,
+                                                        color: 'white',
+                                                        letterSpacing: '0.4px',
+                                                        zIndex: 5,
+                                                        boxShadow: '0 2px 8px rgba(0,0,0,0.4)'
+                                                    }}>{t('home', 'newEpisodesBadge')}</span>
+                                                )}
+
                                                 {/* Saved Badge */}
                                                 {isSaved && (
                                                     <span style={{
