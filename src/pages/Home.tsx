@@ -10,6 +10,7 @@ import { indexedDBCache } from '../services/indexedDBCache';
 import { searchMovieByName, searchSeriesByName, isKidsFriendly } from '../services/tmdb';
 import { getHomeRecommendations, type RecommendationGroup } from '../services/recommendationService';
 import { newEpisodesService } from '../services/newEpisodesService';
+import { newEpisodeNotifier } from '../services/newEpisodeNotifier';
 import { favoritesService } from '../services/favoritesService';
 import { useLanguage } from '../services/languageService';
 
@@ -349,7 +350,17 @@ export function Home() {
                 ...favoritesService.getAll().filter(f => f.type === 'series').map(f => f.id),
                 ...watchProgressService.getContinueWatching().keys()
             ]);
-            setUpdatedSeries(newEpisodesService.getUpdatedSeries(allSeries, followed).slice(0, 20));
+            const updated = newEpisodesService.getUpdatedSeries(allSeries, followed).slice(0, 20);
+            setUpdatedSeries(updated);
+            // Opt-in native notification (first computation only primes).
+            newEpisodeNotifier.maybeNotify(
+                updated.map(u => ({ id: String(u.series_id), name: u.name })),
+                {
+                    title: t('home', 'newEpisodes'),
+                    one: t('home', 'newEpisodesNotifyOne'),
+                    many: t('home', 'newEpisodesNotifyMany')
+                }
+            );
         });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- length-only dep, same rationale as the recommendations effect
     }, [allSeries.length, refreshTrigger]);

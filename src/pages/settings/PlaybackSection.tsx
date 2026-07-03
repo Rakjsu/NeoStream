@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { catalogRefreshService, REFRESH_INTERVAL_OPTIONS, type RefreshIntervalHours } from '../../services/catalogRefreshService';
+import { newEpisodeNotifier } from '../../services/newEpisodeNotifier';
 import { playbackService } from '../../services/playbackService';
 import type { PlaybackConfig } from '../../services/playbackService';
 import { mpvService } from '../../services/mpvService';
@@ -16,6 +17,7 @@ type MpvDownloadState =
 
 export function PlaybackSection() {
     const [refreshInterval, setRefreshInterval] = useState<RefreshIntervalHours>(() => catalogRefreshService.getIntervalHours());
+    const [notifyNewEpisodes, setNotifyNewEpisodes] = useState<boolean>(() => newEpisodeNotifier.isEnabled());
     const [playbackConfig, setPlaybackConfig] = useState<PlaybackConfig>(playbackService.getConfig());
     const { t } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
@@ -112,6 +114,24 @@ export function PlaybackSection() {
                             </option>
                         ))}
                     </select>
+                </div>
+
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>{t('playback', 'notifyNewEpisodes')}</label>
+                        <p>{t('playback', 'notifyNewEpisodesDesc')}</p>
+                    </div>
+                    <label className="toggle-switch">
+                        <input
+                            type="checkbox"
+                            checked={notifyNewEpisodes}
+                            onChange={(e) => {
+                                newEpisodeNotifier.setEnabled(e.target.checked);
+                                setNotifyNewEpisodes(e.target.checked);
+                            }}
+                        />
+                        <span className="toggle-slider"></span>
+                    </label>
                 </div>
 
                 <div className="setting-item">
