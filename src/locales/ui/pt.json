@@ -427,6 +427,8 @@
     "description": "Ajuste a reprodução de vídeo e áudio",
     "bufferSize": "Tamanho do Buffer",
     "catalogRefresh": "Atualizar catálogo automaticamente",
+    "transcodeRescue": "Conversão de resgate (ffmpeg)",
+    "transcodeRescueDesc": "Quando um canal/filme não abre por codec (H.265, AC3), converte na hora pra um formato compatível",
     "notifyNewEpisodes": "Notificar novos episódios",
     "notifyNewEpisodesDesc": "Notificação do sistema quando o catálogo atualiza e uma série seguida ganha episódios",
     "catalogRefreshDesc": "Recarrega as listas do provedor em segundo plano no intervalo escolhido",
@@ -563,6 +565,8 @@
     "disableSubtitles": "Desativar Legendas",
     "errorLoadingSubtitles": "Erro ao carregar legendas forçadas",
     "streamFallback": "Alternando para",
+    "transcodeTrying": "Stream incompatível — convertendo com ffmpeg...",
+    "transcodeActive": "Convertido: reproduzindo via ffmpeg",
     "streamUnavailable": "Stream indisponível. Nenhuma alternativa encontrada."
   },
   "notifications": {

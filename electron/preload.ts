@@ -101,6 +101,8 @@ const invokeChannels = new Set([
     'storage:clear-cache',
     'storage:open-area',
     'storage:usage',
+    'transcode:start',
+    'transcode:stop',
     'streams:get-live',
     'system:get-config',
     'system:set-config',
