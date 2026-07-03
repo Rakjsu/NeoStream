@@ -1429,6 +1429,12 @@ export function LiveTV() {
                         contentId={playingChannel.stream_id.toString()}
                         contentType="live"
                         resumeTime={pipResumeTime}
+                        liveEpg={currentProgram ? {
+                            nowTitle: currentProgram.title,
+                            timeRange: `${epgService.formatTime(currentProgram.start)} - ${epgService.formatTime(currentProgram.end)}`,
+                            progressPct: epgService.getProgramProgress(currentProgram),
+                            nextTitle: upcomingPrograms[0]?.title
+                        } : undefined}
                         channelList={filteredStreams.map(s => ({ id: s.stream_id, name: s.name, logo: s.stream_icon, num: s.num }))}
                         onSwitchChannel={(id) => {
                             const next = filteredStreams.find(s => String(s.stream_id) === String(id));

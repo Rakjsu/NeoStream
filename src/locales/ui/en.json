@@ -564,6 +564,7 @@
     "cancelAutoplay": "Cancel",
     "channelList": "Channel list (PgUp/PgDn to zap)",
     "liveBadge": "LIVE",
+    "epgNext": "Up next",
     "previousChannel": "Previous channel",
     "nextChannel": "Next channel",
     "record": "Record channel",

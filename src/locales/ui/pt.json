@@ -523,6 +523,7 @@
     "cancelAutoplay": "Cancelar",
     "channelList": "Lista de canais (PgUp/PgDn troca)",
     "liveBadge": "AO VIVO",
+    "epgNext": "A seguir",
     "previousChannel": "Canal anterior",
     "nextChannel": "Próximo canal",
     "record": "Gravar canal",
