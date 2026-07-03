@@ -21,6 +21,7 @@ import { setupDvrHandlers } from './dvrHandlers'
 import { setupTrayMode, attachCloseToTray } from './trayMode'
 import { setupStorageManager } from './storageManager'
 import { setupAutoBackup } from './autoBackup'
+import { setupTranscoder } from './transcoder'
 import { setupYouTubeEmbedFix } from './youtubeEmbedFix'
 
 // ES module equivalent of __dirname
@@ -115,6 +116,7 @@ app.whenReady().then(() => {
     setupTrayMode(() => win)
     setupStorageManager()
     setupAutoBackup(() => win)
+    setupTranscoder()
 
     // Initialize auto-updater after window is created
     if (win) {

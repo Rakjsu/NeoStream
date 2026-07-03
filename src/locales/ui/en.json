@@ -296,6 +296,8 @@
     "description": "Adjust video and audio playback",
     "bufferSize": "Buffer Size",
     "catalogRefresh": "Auto-refresh catalog",
+    "transcodeRescue": "Rescue transcoding (ffmpeg)",
+    "transcodeRescueDesc": "When a channel/movie fails due to codecs (H.265, AC3), converts it on the fly to a compatible format",
     "notifyNewEpisodes": "Notify new episodes",
     "notifyNewEpisodesDesc": "System notification when the catalog refreshes and a followed series gets episodes",
     "catalogRefreshDesc": "Reloads the provider lists in the background at the chosen interval",
@@ -604,6 +606,8 @@
     "disableSubtitles": "Disable Subtitles",
     "errorLoadingSubtitles": "Error loading forced subtitles",
     "streamFallback": "Switching to",
+    "transcodeTrying": "Incompatible stream — converting with ffmpeg...",
+    "transcodeActive": "Converted: playing via ffmpeg",
     "streamUnavailable": "Stream unavailable. No alternative found."
   },
   "home": {

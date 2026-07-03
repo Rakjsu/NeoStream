@@ -129,7 +129,76 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         }
     }, [contentType, liveQualityVariants, currentQualityIndex, onSwitchVersion, t]);
 
-    const hlsRef = useHls({ src, videoRef, onStreamError: handleStreamError });
+    // ---- Rescue transcode -------------------------------------------------
+    // Fatal media errors (HEVC/AC3 the browser can't play) trigger a one-shot
+    // ffmpeg rescue: the main process re-encodes the stream into a local live
+    // HLS and the player swaps to it. Reset per src; disabled by config.
+    const [rescue, setRescue] = useState<{ src: string; id: string } | null>(null);
+    const rescueAttemptedRef = useRef<string | null>(null);
+
+    const attemptRescue = useCallback(() => {
+        if (!src || rescueAttemptedRef.current === src) return;
+        if (localStorage.getItem('neostream_transcode_rescue') === '0') return;
+        rescueAttemptedRef.current = src;
+        setStreamErrorToast(t('player', 'transcodeTrying'));
+        void (async () => {
+            try {
+                const result = await window.ipcRenderer.invoke('transcode:start', { url: src }) as {
+                    success: boolean; id?: string; playUrl?: string;
+                };
+                if (result.success && result.playUrl && result.id) {
+                    setRescue({ src: result.playUrl, id: result.id });
+                    setStreamErrorToast(t('player', 'transcodeActive'));
+                    setTimeout(() => setStreamErrorToast(null), 5000);
+                } else {
+                    setStreamErrorToast(null);
+                }
+            } catch {
+                setStreamErrorToast(null);
+            }
+        })();
+    }, [src, t]);
+
+    // New source: drop any previous rescue session (deferred setState).
+    useEffect(() => {
+        rescueAttemptedRef.current = null;
+        queueMicrotask(() => setRescue(prev => {
+            if (prev) void window.ipcRenderer.invoke('transcode:stop', { id: prev.id }).catch(() => undefined);
+            return null;
+        }));
+    }, [src]);
+    useEffect(() => () => {
+        setRescue(prev => {
+            if (prev) void window.ipcRenderer.invoke('transcode:stop', { id: prev.id }).catch(() => undefined);
+            return prev;
+        });
+    }, []);
+
+    const combinedStreamError = useCallback(() => {
+        // Live quality-variant fallback first (existing behavior); when there
+        // is nothing to fall back to, try the ffmpeg rescue.
+        if (contentType === 'live' && liveQualityVariants && liveQualityVariants.length > 1) {
+            handleStreamError();
+            return;
+        }
+        attemptRescue();
+    }, [contentType, liveQualityVariants, handleStreamError, attemptRescue]);
+
+    const hlsRef = useHls({ src: rescue?.src ?? src, videoRef, onStreamError: combinedStreamError });
+
+    // Direct-file playback errors (mp4/mkv the <video> can't decode) don't go
+    // through hls.js — listen on the element too.
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        const onError = () => {
+            const code = video.error?.code;
+            // 3 = MEDIA_ERR_DECODE, 4 = MEDIA_ERR_SRC_NOT_SUPPORTED
+            if (code === 3 || code === 4) attemptRescue();
+        };
+        video.addEventListener('error', onError);
+        return () => video.removeEventListener('error', onError);
+    }, [videoRef, attemptRescue]);
 
     // Sleep timer: pauses playback when the countdown hits zero.
     const sleepTimer = useSleepTimer(useCallback(() => {

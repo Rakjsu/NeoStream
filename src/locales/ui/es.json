@@ -296,6 +296,8 @@
     "description": "Ajusta la reproducción de video y audio",
     "bufferSize": "Tamaño del Buffer",
     "catalogRefresh": "Actualizar catálogo automáticamente",
+    "transcodeRescue": "Conversión de rescate (ffmpeg)",
+    "transcodeRescueDesc": "Cuando un canal/película falla por códecs (H.265, AC3), lo convierte al vuelo a un formato compatible",
     "notifyNewEpisodes": "Notificar nuevos episodios",
     "notifyNewEpisodesDesc": "Notificación del sistema cuando el catálogo se actualiza y una serie seguida gana episodios",
     "catalogRefreshDesc": "Recarga las listas del proveedor en segundo plano en el intervalo elegido",
@@ -604,6 +606,8 @@
     "disableSubtitles": "Desactivar Subtítulos",
     "errorLoadingSubtitles": "Error al cargar subtítulos forzados",
     "streamFallback": "Cambiando a",
+    "transcodeTrying": "Stream incompatible — convirtiendo con ffmpeg...",
+    "transcodeActive": "Convertido: reproduciendo vía ffmpeg",
     "streamUnavailable": "Stream no disponible. No se encontró alternativa."
   },
   "home": {
