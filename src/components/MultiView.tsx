@@ -5,6 +5,8 @@ export interface MultiViewChannel {
     id: string | number;
     name: string;
     logo?: string;
+    /** Starred channel — sorted first (with a star) in the tile picker. */
+    favorite?: boolean;
 }
 
 interface MultiViewProps {
@@ -29,6 +31,14 @@ export function MultiView({ channels, initialChannelId, onClose }: MultiViewProp
     const [audioSlot, setAudioSlot] = useState(0);
     const [pickerSlot, setPickerSlot] = useState<number | null>(null);
     const [pickerQuery, setPickerQuery] = useState('');
+    // Mosaic layout: 2x2 (4 tiles), 1 big + 2 (3 tiles) or side by side (2).
+    const [layout, setLayout] = useState<'2x2' | '1+2' | 'side'>('2x2');
+    const slotCount = layout === '2x2' ? 4 : layout === '1+2' ? 3 : 2;
+
+    // Shrinking the layout can hide the audible tile — fall back to tile 0.
+    useEffect(() => {
+        if (audioSlot >= slotCount) queueMicrotask(() => setAudioSlot(0));
+    }, [audioSlot, slotCount]);
 
     // Esc closes the picker first, then the mosaic.
     useEffect(() => {
@@ -44,8 +54,9 @@ export function MultiView({ channels, initialChannelId, onClose }: MultiViewProp
 
     const filteredChannels = useMemo(() => {
         const q = pickerQuery.trim().toLowerCase();
-        if (!q) return channels;
-        return channels.filter(c => c.name.toLowerCase().includes(q));
+        const base = q ? channels.filter(c => c.name.toLowerCase().includes(q)) : channels;
+        // Favorites first, original order preserved inside each group.
+        return [...base.filter(c => c.favorite), ...base.filter(c => !c.favorite)];
     }, [channels, pickerQuery]);
 
     return (
@@ -58,17 +69,44 @@ export function MultiView({ channels, initialChannelId, onClose }: MultiViewProp
                 <span style={{ color: 'rgba(255,255,255,0.45)', fontSize: 12 }}>
                     Clique num quadro para levar o áudio · Esc sai
                 </span>
+                <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+                    {([['2x2', '⊞'], ['1+2', '◧'], ['side', '◫']] as const).map(([value, icon]) => (
+                        <button
+                            key={value}
+                            onClick={() => setLayout(value)}
+                            title={value === '2x2' ? '4 canais (2×2)' : value === '1+2' ? '1 grande + 2' : '2 lado a lado'}
+                            style={{
+                                padding: '8px 12px',
+                                borderRadius: 10,
+                                border: layout === value ? '1px solid var(--ns-accent)' : '1px solid rgba(255,255,255,0.25)',
+                                background: layout === value ? 'rgba(var(--ns-accent-rgb), 0.25)' : 'transparent',
+                                color: 'white',
+                                fontSize: 14,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {icon}
+                        </button>
+                    ))}
+                </div>
                 <button
                     onClick={onClose}
-                    style={{ marginLeft: 'auto', padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                    style={{ padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
                 >
                     ✕ Fechar
                 </button>
             </div>
 
             {/* 2x2 grid */}
-            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gridTemplateRows: '1fr 1fr', gap: 4, padding: 4 }}>
-                {slots.map((channel, i) => (
+            <div style={{
+                flex: 1,
+                display: 'grid',
+                gridTemplateColumns: layout === '1+2' ? '2fr 1fr' : '1fr 1fr',
+                gridTemplateRows: layout === 'side' ? '1fr' : '1fr 1fr',
+                gap: 4,
+                padding: 4
+            }}>
+                {slots.slice(0, slotCount).map((channel, i) => (
                     <div
                         key={i}
                         onClick={() => channel && setAudioSlot(i)}
@@ -78,7 +116,8 @@ export function MultiView({ channels, initialChannelId, onClose }: MultiViewProp
                             borderRadius: 10,
                             overflow: 'hidden',
                             border: channel && audioSlot === i ? '2px solid var(--ns-accent)' : '2px solid transparent',
-                            cursor: channel ? 'pointer' : 'default'
+                            cursor: channel ? 'pointer' : 'default',
+                            gridRow: layout === '1+2' && i === 0 ? '1 / 3' : undefined
                         }}
                     >
                         {channel ? (
@@ -90,16 +129,29 @@ export function MultiView({ channels, initialChannelId, onClose }: MultiViewProp
                                     </span>
                                     {audioSlot === i && <span style={{ fontSize: 13 }}>🔊</span>}
                                 </div>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        setSlots(prev => prev.map((s, idx) => idx === i ? null : s));
-                                    }}
-                                    title="Remover canal"
-                                    style={{ position: 'absolute', top: 8, right: 10, zIndex: 2, width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.6)', color: 'white', cursor: 'pointer', fontSize: 13 }}
-                                >
-                                    ✕
-                                </button>
+                                <div style={{ position: 'absolute', top: 8, right: 10, zIndex: 2, display: 'flex', gap: 6 }}>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setPickerQuery('');
+                                            setPickerSlot(i);
+                                        }}
+                                        title="Trocar canal"
+                                        style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.6)', color: 'white', cursor: 'pointer', fontSize: 13 }}
+                                    >
+                                        🔄
+                                    </button>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSlots(prev => prev.map((s, idx) => idx === i ? null : s));
+                                        }}
+                                        title="Remover canal"
+                                        style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.6)', color: 'white', cursor: 'pointer', fontSize: 13 }}
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
                             </>
                         ) : (
                             <button
@@ -146,7 +198,8 @@ export function MultiView({ channels, initialChannelId, onClose }: MultiViewProp
                                     {ch.logo
                                         ? <img src={ch.logo} alt="" style={{ width: 26, height: 26, objectFit: 'contain', flexShrink: 0 }} loading="lazy" onError={(e) => { (e.target as HTMLImageElement).style.visibility = 'hidden'; }} />
                                         : <span style={{ width: 26, textAlign: 'center', flexShrink: 0 }}>📺</span>}
-                                    <span style={{ color: 'white', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ch.name}</span>
+                                    <span style={{ color: 'white', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{ch.name}</span>
+                                    {ch.favorite && <span style={{ flexShrink: 0, fontSize: 12 }}>⭐</span>}
                                 </div>
                             ))}
                         </div>

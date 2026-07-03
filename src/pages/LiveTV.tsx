@@ -6,6 +6,7 @@ import { LazyImage } from '../components/LazyImage';
 import { useWindowedGrid } from '../hooks/useWindowedGrid';
 import { epgService } from '../services/epgService';
 import { profileService } from '../services/profileService';
+import { favoritesService } from '../services/favoritesService';
 import { parentalService } from '../services/parentalService';
 import { useLanguage } from '../services/languageService';
 import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
@@ -1482,7 +1483,18 @@ export function LiveTV() {
 
             {showMultiView && (
                 <MultiView
-                    channels={filteredStreams.map(s => ({ id: s.stream_id, name: s.name, logo: s.stream_icon }))}
+                    channels={(() => {
+                        // Channel favorites land with #102; the string cast keeps
+                        // this branch compiling before and after that merge.
+                        const favoriteIds = new Set(favoritesService.getAll()
+                            .filter(f => (f.type as string) === 'channel').map(f => f.id));
+                        return filteredStreams.map(s => ({
+                            id: s.stream_id,
+                            name: s.name,
+                            logo: s.stream_icon,
+                            favorite: favoriteIds.has(String(s.stream_id))
+                        }));
+                    })()}
                     initialChannelId={selectedChannel?.stream_id}
                     onClose={() => setShowMultiView(false)}
                 />
