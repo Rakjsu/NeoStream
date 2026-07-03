@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { catalogRefreshService } from './services/catalogRefreshService';
 import { tvModeService } from './services/tvModeService';
+import { collectBackup, encodePlaylistPassword, type BackupPlaylist } from './services/backupService';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Welcome } from './pages/Welcome';
 import { Login } from './pages/Login';
@@ -75,6 +76,33 @@ function RouteBoundary({ name, children }: { name: string; children: React.React
 
 // Background catalog refresh clock (interval set in Settings -> Reproducao).
 catalogRefreshService.start();
+
+// Auto-backup: the main-process clock asks, the renderer collects the same
+// payload as the manual export and hands it back to be written to disk.
+if (typeof window !== 'undefined' && window.ipcRenderer) {
+    window.ipcRenderer.on('backup:auto-collect', () => {
+        void (async () => {
+            let playlists: BackupPlaylist[] = [];
+            try {
+                const exported = await window.ipcRenderer.invoke('backup:export-playlists') as {
+                    success: boolean;
+                    playlists?: { name: string; url: string; username: string; password: string }[];
+                };
+                if (exported.success && exported.playlists) {
+                    playlists = exported.playlists.map(p => ({
+                        name: p.name,
+                        url: p.url,
+                        username: p.username,
+                        passwordB64: encodePlaylistPassword(p.password)
+                    }));
+                }
+            } catch { /* export without playlists */ }
+            const payload = collectBackup(playlists);
+            await window.ipcRenderer.invoke('backup:auto-save', { json: JSON.stringify(payload, null, 2) })
+                .catch(() => undefined);
+        })();
+    });
+}
 // TV mode scale/focus (Settings -> Aparencia).
 tvModeService.apply();
 
