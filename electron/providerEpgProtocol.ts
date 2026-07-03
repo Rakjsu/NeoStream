@@ -291,3 +291,48 @@ export function parseSimpleDataTable(payload: unknown, channelId: string, nowMs:
     programs.sort((a, b) => a.start.localeCompare(b.start))
     return programs
 }
+
+// ---- Program search (global search overlay) --------------------------------
+
+/** Lowercase + strip accents, for diacritics-insensitive program matching. */
+export function normalizeEpgText(value: string): string {
+    return value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .trim()
+}
+
+const SEARCH_HORIZON_MS = 36 * 60 * 60 * 1000
+
+/**
+ * Search the in-memory xmltv index by program title. Only airing/upcoming
+ * programs count (end > now, start within the next 36h); results come back
+ * sorted by start time, capped at `limit`.
+ */
+export function searchEpgIndex(
+    index: ReadonlyMap<string, ProviderEpgProgram[]>,
+    query: string,
+    nowMs: number,
+    limit: number = 20
+): ProviderEpgProgram[] {
+    const needle = normalizeEpgText(query)
+    if (needle.length < 2) return []
+
+    const horizon = nowMs + SEARCH_HORIZON_MS
+    const hits: Array<{ program: ProviderEpgProgram; startMs: number }> = []
+
+    for (const programs of index.values()) {
+        for (const program of programs) {
+            const startMs = Date.parse(program.start)
+            const endMs = Date.parse(program.end)
+            if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) continue
+            if (endMs <= nowMs || startMs >= horizon) continue
+            if (!normalizeEpgText(program.title).includes(needle)) continue
+            hits.push({ program, startMs })
+        }
+    }
+
+    hits.sort((a, b) => a.startMs - b.startMs)
+    return hits.slice(0, limit).map(h => h.program)
+}

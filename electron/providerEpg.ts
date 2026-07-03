@@ -20,6 +20,7 @@ import {
     looksLikeXmltv,
     parseSimpleDataTable,
     parseXmltvIndexWithMeta,
+    searchEpgIndex,
 } from './providerEpgProtocol'
 import type { ProviderEpgProgram } from './providerEpgProtocol'
 
@@ -261,6 +262,21 @@ export function setupProviderEpgHandlers() {
         try {
             await ensureXmltvIndex()
             return { success: true, available: xmltvAvailability === 'ready' }
+        } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : String(error) }
+        }
+    })
+
+    // Program search for the global search overlay (title, airing/upcoming).
+    ipcMain.handle('epg:provider-search', async (_, args: { query?: string }) => {
+        try {
+            const query = typeof args?.query === 'string' ? args.query : ''
+            if (query.trim().length < 2) return { success: true, programs: [] }
+            await ensureXmltvIndex()
+            if (xmltvAvailability !== 'ready' || !xmltvIndex) {
+                return { success: true, programs: [] }
+            }
+            return { success: true, programs: searchEpgIndex(xmltvIndex, query, Date.now()) }
         } catch (error) {
             return { success: false, error: error instanceof Error ? error.message : String(error) }
         }
