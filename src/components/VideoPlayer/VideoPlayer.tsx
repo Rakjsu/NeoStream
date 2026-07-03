@@ -184,7 +184,9 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     // Subtitle sync offset (seconds); adjusted from the gear menu in 0.5s steps.
     const [subtitleOffset, setSubtitleOffset] = useState(0);
     // Aspect ratio mode (gear menu): how the video fills the stage.
-    const [aspectMode, setAspectMode] = useState<'original' | 'stretch' | 'fill' | 'zoom'>('original');
+    // Default 'fill' (cover) = the player's historical rendering; 'original'
+    // shows the full frame uncropped (letterbox for 4:3 content).
+    const [aspectMode, setAspectMode] = useState<'original' | 'stretch' | 'fill' | 'zoom'>('fill');
     const aspectStyle: React.CSSProperties =
         aspectMode === 'stretch' ? { objectFit: 'fill' }
         : aspectMode === 'fill' ? { objectFit: 'cover' }
