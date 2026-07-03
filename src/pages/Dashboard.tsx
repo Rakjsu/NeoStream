@@ -3,9 +3,13 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
 import { GlobalSearch } from '../components/GlobalSearch';
 import { ShortcutsOverlay } from '../components/ShortcutsOverlay';
+import { useSpatialNavigation } from '../hooks/useSpatialNavigation';
 
 export function Dashboard() {
     const navigate = useNavigate();
+
+    // TV mode phase 2: arrows move focus geometrically, Backspace goes back.
+    useSpatialNavigation();
 
     // Tray menu shortcuts (e.g. "⏺ Gravações") navigate the running app.
     useEffect(() => {
