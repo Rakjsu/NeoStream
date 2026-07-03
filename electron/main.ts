@@ -19,6 +19,7 @@ import { setupNotifyHandlers } from './notifyHandlers'
 import { setupDiagnosticsHandlers } from './diagnosticsHandlers'
 import { setupDvrHandlers } from './dvrHandlers'
 import { setupTrayMode, attachCloseToTray } from './trayMode'
+import { setupStorageManager } from './storageManager'
 import { setupYouTubeEmbedFix } from './youtubeEmbedFix'
 
 // ES module equivalent of __dirname
@@ -111,6 +112,7 @@ app.whenReady().then(() => {
 
     // Tray icon + "start with Windows" + close-to-tray IPC.
     setupTrayMode(() => win)
+    setupStorageManager()
 
     // Initialize auto-updater after window is created
     if (win) {

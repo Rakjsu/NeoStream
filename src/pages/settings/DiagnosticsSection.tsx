@@ -83,6 +83,38 @@ export function DiagnosticsSection() {
         xmltv: 'EPG (xmltv.php)'
     };
 
+    // Storage overview (sizes measured in the main process)
+    interface StorageRow { area: string; bytes: number }
+    const [storageRows, setStorageRows] = useState<StorageRow[] | null>(null);
+    const [storageBusy, setStorageBusy] = useState(false);
+
+    const loadStorage = async () => {
+        setStorageBusy(true);
+        try {
+            const result = await window.ipcRenderer.invoke('storage:usage') as { success: boolean; areas?: StorageRow[] };
+            if (result.success && result.areas) setStorageRows(result.areas);
+        } catch { /* handler absent in old builds */ }
+        setStorageBusy(false);
+    };
+
+    const clearCache = async (area: string) => {
+        await window.ipcRenderer.invoke('storage:clear-cache', { area }).catch(() => undefined);
+        await loadStorage();
+    };
+
+    const formatBytes = (bytes: number) => {
+        if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+        if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+        return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    };
+
+    const STORAGE_LABELS: Record<string, { label: string; clearable: boolean }> = {
+        downloads: { label: t('storage', 'downloads'), clearable: false },
+        recordings: { label: t('storage', 'recordings'), clearable: false },
+        catalogCache: { label: t('storage', 'catalogCache'), clearable: true },
+        epgCache: { label: t('storage', 'epgCache'), clearable: true }
+    };
+
     const handleOpenLogs = async () => {
         setErrorMessage(null);
         setSuccessMessage(null);
@@ -195,6 +227,51 @@ export function DiagnosticsSection() {
                     >
                         <span>{healthBusy ? '⏳' : '📡'}</span>
                         <span>{healthBusy ? t('diagnostics', 'healthTesting') : t('diagnostics', 'healthTest')}</span>
+                    </button>
+                </div>
+
+                {/* Storage overview */}
+                <div className="setting-item" style={{ alignItems: 'flex-start' }}>
+                    <div className="setting-info">
+                        <label>💽 {t('storage', 'title')}</label>
+                        <p>{t('storage', 'description')}</p>
+                        {storageRows && (
+                            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {storageRows.map(row => (
+                                    <div key={row.area} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+                                        <span style={{ color: 'rgba(255,255,255,0.8)', minWidth: 190 }}>
+                                            {STORAGE_LABELS[row.area]?.label ?? row.area}
+                                        </span>
+                                        <span style={{ color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums', minWidth: 80 }}>
+                                            {formatBytes(row.bytes)}
+                                        </span>
+                                        <button
+                                            onClick={() => void window.ipcRenderer.invoke('storage:open-area', { area: row.area })}
+                                            style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.6)', fontSize: 11, cursor: 'pointer' }}
+                                        >
+                                            📂
+                                        </button>
+                                        {STORAGE_LABELS[row.area]?.clearable && row.bytes > 0 && (
+                                            <button
+                                                onClick={() => void clearCache(row.area)}
+                                                style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.1)', color: '#fca5a5', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                                            >
+                                                {t('storage', 'clear')}
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <button
+                        className="check-btn"
+                        style={{ width: 'auto', padding: '14px 24px' }}
+                        onClick={() => void loadStorage()}
+                        disabled={storageBusy}
+                    >
+                        <span>{storageBusy ? '⏳' : '💽'}</span>
+                        <span>{storageRows ? t('storage', 'refresh') : t('storage', 'measure')}</span>
                     </button>
                 </div>
 
