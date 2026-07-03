@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { catalogRefreshService, REFRESH_INTERVAL_OPTIONS, type RefreshIntervalHours } from '../../services/catalogRefreshService';
 import { playbackService } from '../../services/playbackService';
 import type { PlaybackConfig } from '../../services/playbackService';
 import { mpvService } from '../../services/mpvService';
@@ -14,6 +15,7 @@ type MpvDownloadState =
     | { phase: 'error' };
 
 export function PlaybackSection() {
+    const [refreshInterval, setRefreshInterval] = useState<RefreshIntervalHours>(() => catalogRefreshService.getIntervalHours());
     const [playbackConfig, setPlaybackConfig] = useState<PlaybackConfig>(playbackService.getConfig());
     const { t } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
@@ -90,6 +92,28 @@ export function PlaybackSection() {
             </div>
 
             <div className="settings-group">
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>{t('playback', 'catalogRefresh')}</label>
+                        <p>{t('playback', 'catalogRefreshDesc')}</p>
+                    </div>
+                    <select
+                        className="setting-select"
+                        value={refreshInterval}
+                        onChange={(e) => {
+                            const hours = Number(e.target.value) as RefreshIntervalHours;
+                            catalogRefreshService.setIntervalHours(hours);
+                            setRefreshInterval(hours);
+                        }}
+                    >
+                        {REFRESH_INTERVAL_OPTIONS.map(hours => (
+                            <option key={hours} value={hours}>
+                                {hours === 0 ? t('playback', 'catalogRefreshOff') : `${hours}h`}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
                 <div className="setting-item">
                     <div className="setting-info">
                         <label>{t('playback', 'bufferSize')}</label>

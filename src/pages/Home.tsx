@@ -80,6 +80,18 @@ export function Home() {
     const [recommendationGroups, setRecommendationGroups] = useState<RecommendationGroup[]>([]);
     const [isVisible, setIsVisible] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
+    // Bumped by the periodic catalog refresh; the fetch effect depends on it.
+    const [catalogTick, setCatalogTick] = useState(0);
+
+    useEffect(() => {
+        const onCatalogRefresh = () => {
+            dataCache.timestamp = 0; // invalidate the module cache
+            setCatalogTick(prev => prev + 1);
+            setRefreshTrigger(prev => prev + 1);
+        };
+        window.addEventListener('neostream-catalog-refresh', onCatalogRefresh);
+        return () => window.removeEventListener('neostream-catalog-refresh', onCatalogRefresh);
+    }, []);
 
     // Kids profile state
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
@@ -226,7 +238,7 @@ export function Home() {
         // Update time every minute (not every second to prevent re-renders)
         const interval = setInterval(() => setCurrentTime(new Date()), 60000);
         return () => clearInterval(interval);
-    }, []);
+    }, [catalogTick]);
 
     // Listen for mini player expand event to reopen full player
     useEffect(() => {
