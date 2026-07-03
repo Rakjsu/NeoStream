@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLanguage } from '../../services/languageService';
 import { collectBackup, applyBackup, encodePlaylistPassword, decodePlaylistPassword, type BackupPlaylist } from '../../services/backupService';
 import { useSaveAnimation } from './useSaveAnimation';
@@ -18,6 +18,28 @@ export function BackupSection() {
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [pendingImportJson, setPendingImportJson] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    // Auto-backup config (lives in the main process store)
+    const [autoBackup, setAutoBackup] = useState<{ enabled: boolean; dirPath: string; lastBackupAt: number } | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        window.ipcRenderer.invoke('backup:auto-config-get')
+            .then((result: { success: boolean; config?: { enabled: boolean; dirPath: string; lastBackupAt: number } }) => {
+                if (!cancelled && result?.success && result.config) setAutoBackup(result.config);
+            })
+            .catch(() => undefined);
+        return () => { cancelled = true; };
+    }, []);
+
+    const handleAutoBackupToggle = async (enabled: boolean) => {
+        if (enabled && !autoBackup?.dirPath) {
+            const picked = await window.ipcRenderer.invoke('backup:choose-dir') as { success: boolean; config?: { enabled: boolean; dirPath: string; lastBackupAt: number } };
+            if (!picked.success || !picked.config) return; // canceled
+            setAutoBackup(picked.config);
+        }
+        const result = await window.ipcRenderer.invoke('backup:auto-config-set', { enabled }) as { success: boolean; config?: { enabled: boolean; dirPath: string; lastBackupAt: number } };
+        if (result.success && result.config) setAutoBackup(result.config);
+    };
 
     const handleExport = async () => {
         setErrorMessage(null);
@@ -159,6 +181,28 @@ export function BackupSection() {
                         <span>📥</span>
                         <span>{t('backup', 'importButton')}</span>
                     </button>
+                </div>
+
+                {/* Scheduled automatic backup */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>🗓️ {t('backup', 'autoTitle')}</label>
+                        <p>
+                            {t('backup', 'autoDesc')}
+                            {autoBackup?.dirPath ? ` · ${autoBackup.dirPath}` : ''}
+                            {autoBackup?.lastBackupAt
+                                ? ` · ${t('backup', 'autoLast')}: ${new Date(autoBackup.lastBackupAt).toLocaleDateString()}`
+                                : ''}
+                        </p>
+                    </div>
+                    <label className="toggle-switch">
+                        <input
+                            type="checkbox"
+                            checked={autoBackup?.enabled ?? false}
+                            onChange={(e) => void handleAutoBackupToggle(e.target.checked)}
+                        />
+                        <span className="toggle-slider"></span>
+                    </label>
                 </div>
 
                 {/* Credentials are not part of the backup */}

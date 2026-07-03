@@ -11,6 +11,10 @@ const invokeChannels = new Set([
     'auth:get-credentials',
     'auth:login',
     'auth:logout',
+    'backup:auto-config-get',
+    'backup:auto-config-set',
+    'backup:auto-save',
+    'backup:choose-dir',
     'backup:export-playlists',
     'backup:import-playlists',
     'backup:load-file',
@@ -126,6 +130,7 @@ const sendChannels = new Set([
 ])
 
 const receiveChannels = new Set([
+    'backup:auto-collect',
     'download:progress',
     'media:control',
     'tray:navigate',
