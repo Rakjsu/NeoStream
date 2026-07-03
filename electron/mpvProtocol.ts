@@ -86,6 +86,14 @@ export function parseTrackSelection(data: unknown): number | null {
  */
 export const MPV_CONTROLS_HEIGHT = 96
 
+/**
+ * Top strip (px) left uncovered so the app's frameless-window title bar
+ * (CustomTitleBar) stays visible and clickable during playback — it's the
+ * only drag/minimize/maximize surface the window has. Must match the height
+ * in CustomTitleBar.css and the backdrop top inset in MpvPlayerView.tsx.
+ */
+export const MPV_TITLEBAR_HEIGHT = 36
+
 export interface MpvGeometry {
     x: number
     y: number
@@ -96,17 +104,19 @@ export interface MpvGeometry {
 /**
  * Where the mpv window should sit, given the app window's content bounds
  * (screen coordinates of the client area): the full client area minus the
- * bottom strip reserved for the in-app controls bar.
+ * top strip for the app's title bar and the bottom strip for the in-app
+ * controls bar.
  */
 export function computeMpvGeometry(
     contentBounds: { x: number; y: number; width: number; height: number },
     controlsHeight: number = MPV_CONTROLS_HEIGHT,
+    titlebarHeight: number = MPV_TITLEBAR_HEIGHT,
 ): MpvGeometry {
     return {
         x: Math.round(contentBounds.x),
-        y: Math.round(contentBounds.y),
+        y: Math.round(contentBounds.y + titlebarHeight),
         width: Math.max(1, Math.round(contentBounds.width)),
-        height: Math.max(1, Math.round(contentBounds.height - controlsHeight)),
+        height: Math.max(1, Math.round(contentBounds.height - controlsHeight - titlebarHeight)),
     }
 }
 
@@ -166,6 +176,10 @@ export function buildMpvArgs(pipeName: string, options: MpvLaunchOptions): strin
                 '--no-border', // borderless: blends with the app window underneath
                 '--ontop', // keep the video above the app even when our controls are clicked
                 '--no-osc', // controls live in the React UI, not mpv's on-screen controller
+                // Clicking-and-dragging the video area must NOT move the mpv
+                // window — it is glued over the app and only the geometry
+                // property may reposition it.
+                '--window-dragging=no',
                 `--geometry=${formatMpvGeometry(options.geometry)}`,
             ]
             : ['--autofit=70%']),

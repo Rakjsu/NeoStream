@@ -13,6 +13,7 @@ import {
     extractIpcLines,
     formatMpvGeometry,
     MPV_CONTROLS_HEIGHT,
+    MPV_TITLEBAR_HEIGHT,
     MPV_USER_AGENT,
     MPV_WINDOW_TITLE,
     OBSERVED_PROPERTIES,
@@ -66,6 +67,7 @@ describe('buildMpvArgs', () => {
         expect(args).toContain('--no-border')
         expect(args).toContain('--ontop')
         expect(args).toContain('--no-osc')
+        expect(args).toContain('--window-dragging=no')
         expect(args).toContain('--geometry=1280x624+100+50')
         expect(args.some((a) => a.startsWith('--autofit'))).toBe(false)
     })
@@ -81,29 +83,29 @@ describe('buildMpvArgs', () => {
 })
 
 describe('computeMpvGeometry', () => {
-    it('reserves the controls strip at the bottom of the content bounds', () => {
+    it('reserves the title bar at the top and the controls strip at the bottom', () => {
         const geometry = computeMpvGeometry({ x: 200, y: 120, width: 1280, height: 720 })
 
         expect(geometry).toEqual({
             x: 200,
-            y: 120,
+            y: 120 + MPV_TITLEBAR_HEIGHT,
             width: 1280,
-            height: 720 - MPV_CONTROLS_HEIGHT,
+            height: 720 - MPV_CONTROLS_HEIGHT - MPV_TITLEBAR_HEIGHT,
         })
     })
 
-    it('accepts a custom controls height and never collapses below 1px', () => {
-        expect(computeMpvGeometry({ x: 0, y: 0, width: 800, height: 600 }, 100).height).toBe(500)
-        expect(computeMpvGeometry({ x: 0, y: 0, width: 800, height: 50 }, 100).height).toBe(1)
+    it('accepts custom strip heights and never collapses below 1px', () => {
+        expect(computeMpvGeometry({ x: 0, y: 0, width: 800, height: 600 }, 100, 0).height).toBe(500)
+        expect(computeMpvGeometry({ x: 0, y: 0, width: 800, height: 50 }, 100, 0).height).toBe(1)
         expect(computeMpvGeometry({ x: 0, y: 0, width: 0, height: 200 }).width).toBe(1)
     })
 
     it('rounds fractional bounds (scaled displays)', () => {
         const geometry = computeMpvGeometry({ x: 10.4, y: 20.6, width: 1000.5, height: 500.2 })
         expect(geometry.x).toBe(10)
-        expect(geometry.y).toBe(21)
+        expect(geometry.y).toBe(21 + MPV_TITLEBAR_HEIGHT)
         expect(geometry.width).toBe(1001)
-        expect(geometry.height).toBe(500 - MPV_CONTROLS_HEIGHT)
+        expect(geometry.height).toBe(500 - MPV_CONTROLS_HEIGHT - MPV_TITLEBAR_HEIGHT)
     })
 })
 

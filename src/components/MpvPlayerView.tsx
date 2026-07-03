@@ -644,7 +644,11 @@ const viewStyles = `
 
     .mpv-view-backdrop {
         position: fixed;
-        inset: 0;
+        /* 36px: leaves the app's CustomTitleBar visible/clickable while mpv
+           plays (drag, minimize, maximize, close). Must match
+           MPV_TITLEBAR_HEIGHT in electron/mpvProtocol.ts and the height in
+           CustomTitleBar.css. */
+        inset: 36px 0 0 0;
         z-index: 99999;
         background: #000;
         display: flex;
