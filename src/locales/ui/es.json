@@ -753,6 +753,26 @@
     "epgDesc": "Buscar nombres de programas en la guía (requiere EPG del proveedor)",
     "note": "Los filtros de perfil infantil y control parental siguen aplicándose sobre estas opciones."
   },
+  "shortcuts": {
+    "title": "Atajos de teclado",
+    "groupGeneral": "General",
+    "groupPlayer": "Reproductor",
+    "groupLive": "TV en vivo",
+    "groupPip": "PiP (ventana flotante)",
+    "globalSearch": "Búsqueda global",
+    "thisOverlay": "Este panel de atajos",
+    "closeOverlays": "Cerrar paneles y menús",
+    "playPause": "Reproducir / pausar",
+    "seek": "Atrás / adelante 10s",
+    "volume": "Volumen",
+    "mute": "Silencio",
+    "fullscreen": "Pantalla completa",
+    "subtitles": "Subtítulos",
+    "zapping": "Canal anterior / siguiente",
+    "digitJump": "Ir al canal por número",
+    "pipZap": "Cambiar canal en PiP",
+    "clickThrough": "Modo clic a través"
+  },
   "search": {
     "placeholder": "Buscar canales, películas y series...",
     "noResults": "No se encontraron resultados",

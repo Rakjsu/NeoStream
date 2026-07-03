@@ -753,6 +753,26 @@
     "epgDesc": "Search program names in the guide (requires provider EPG)",
     "note": "Kids profile and parental control filters still apply on top of these options."
   },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "groupGeneral": "General",
+    "groupPlayer": "Player",
+    "groupLive": "Live TV",
+    "groupPip": "PiP (floating window)",
+    "globalSearch": "Global search",
+    "thisOverlay": "This shortcuts panel",
+    "closeOverlays": "Close panels and menus",
+    "playPause": "Play / pause",
+    "seek": "Back / forward 10s",
+    "volume": "Volume",
+    "mute": "Mute",
+    "fullscreen": "Fullscreen",
+    "subtitles": "Subtitles",
+    "zapping": "Previous / next channel",
+    "digitJump": "Jump to channel by number",
+    "pipZap": "Switch channel in PiP",
+    "clickThrough": "Click-through mode"
+  },
   "search": {
     "placeholder": "Search channels, movies and series...",
     "noResults": "No results found",
