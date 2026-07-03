@@ -24,6 +24,8 @@ export interface PlaylistEntry {
     password: string
     userInfo?: unknown
     addedAt: number
+    /** 'xtream' (default, absent on legacy entries) or 'm3u'. */
+    type?: 'xtream' | 'm3u'
 }
 
 /** What the renderer is allowed to see — never includes the password. */
@@ -33,6 +35,7 @@ export interface PublicPlaylist {
     url: string
     username: string
     active: boolean
+    type: 'xtream' | 'm3u'
 }
 
 export interface AuthShape {
@@ -57,6 +60,7 @@ export function derivePlaylistName(url: string, username: string): string {
 
 export function toPublicPlaylist(entry: PlaylistEntry, activePlaylistId: string | undefined): PublicPlaylist {
     return {
+        type: entry.type ?? 'xtream',
         id: entry.id,
         name: entry.name,
         url: entry.url,
@@ -120,6 +124,7 @@ export interface UpsertInput {
     username: string
     password: string
     userInfo?: unknown
+    type?: 'xtream' | 'm3u'
 }
 
 export interface UpsertResult {
@@ -138,7 +143,8 @@ export function upsertPlaylist(playlists: PlaylistEntry[], input: UpsertInput): 
             ...existing,
             password: input.password,
             userInfo: input.userInfo ?? existing.userInfo,
-            name: input.name?.trim() || existing.name
+            name: input.name?.trim() || existing.name,
+            type: input.type ?? existing.type
         }
         return {
             playlists: playlists.map(p => (p.id === existing.id ? updated : p)),
@@ -153,7 +159,8 @@ export function upsertPlaylist(playlists: PlaylistEntry[], input: UpsertInput): 
         username: input.username,
         password: input.password,
         userInfo: input.userInfo,
-        addedAt: Date.now()
+        addedAt: Date.now(),
+        type: input.type
     }
     return { playlists: [...playlists, entry], entry }
 }

@@ -12,6 +12,7 @@ export interface PlaylistSummary {
     url: string
     username: string
     active: boolean
+    type: 'xtream' | 'm3u'
 }
 
 interface IpcResult {
@@ -29,6 +30,10 @@ export const playlistService = {
 
     async add(input: { name?: string; url: string; username: string; password: string }): Promise<IpcResult> {
         return await window.ipcRenderer.invoke('playlists:add', input) as IpcResult
+    },
+
+    async addM3u(input: { name?: string; url: string }): Promise<IpcResult & { channelCount?: number }> {
+        return await window.ipcRenderer.invoke('playlists:add-m3u', input) as IpcResult & { channelCount?: number }
     },
 
     async switchTo(id: string): Promise<IpcResult> {

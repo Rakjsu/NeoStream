@@ -20,6 +20,7 @@ export function PlaylistsSection() {
     const [showAddForm, setShowAddForm] = useState(false);
     const [adding, setAdding] = useState(false);
     const [form, setForm] = useState({ name: '', url: '', username: '', password: '' });
+    const [addType, setAddType] = useState<'xtream' | 'm3u'>('xtream');
 
     const refresh = async () => {
         setLoading(true);
@@ -96,6 +97,18 @@ export function PlaylistsSection() {
         setError('');
         setAdding(true);
         try {
+            if (addType === 'm3u') {
+                const m3uResult = await playlistService.addM3u({
+                    name: form.name.trim() || undefined,
+                    url: form.url.trim()
+                });
+                if (m3uResult.success) {
+                    playlistService.reloadIntoDashboard();
+                } else {
+                    setError(m3uResult.error || t('playlists', 'addError'));
+                }
+                return;
+            }
             const result = await playlistService.add({
                 name: form.name.trim() || undefined,
                 url: form.url.trim(),
@@ -144,7 +157,9 @@ export function PlaylistsSection() {
                                         )}
                                     </div>
                                     <div className="playlists-item-meta">
-                                        {hostOf(playlist.url)} · {playlist.username}
+                                        {playlist.type === 'm3u'
+                                            ? <>M3U · {hostOf(playlist.url)}</>
+                                            : <>{hostOf(playlist.url)} · {playlist.username}</>}
                                     </div>
                                 </div>
                                 <div className="playlists-item-actions">
@@ -180,6 +195,33 @@ export function PlaylistsSection() {
                 ) : (
                     <form className="playlists-add-form" onSubmit={handleAdd}>
                         <h3>{t('playlists', 'addTitle')}</h3>
+                        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                            {(['xtream', 'm3u'] as const).map(kind => (
+                                <button
+                                    key={kind}
+                                    type="button"
+                                    onClick={() => setAddType(kind)}
+                                    style={{
+                                        flex: 1,
+                                        padding: '9px 12px',
+                                        borderRadius: 10,
+                                        border: addType === kind ? '1px solid var(--ns-accent)' : '1px solid rgba(255,255,255,0.2)',
+                                        background: addType === kind ? 'rgba(var(--ns-accent-rgb), 0.2)' : 'transparent',
+                                        color: 'white',
+                                        fontSize: 13,
+                                        fontWeight: 600,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    {kind === 'xtream' ? 'Xtream Codes' : 'M3U'}
+                                </button>
+                            ))}
+                        </div>
+                        {addType === 'm3u' && (
+                            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '0 0 10px' }}>
+                                {t('playlists', 'm3uHint')}
+                            </p>
+                        )}
                         <input
                             type="text"
                             placeholder={t('playlists', 'namePlaceholder')}
@@ -195,22 +237,26 @@ export function PlaylistsSection() {
                             onChange={(e) => setForm({ ...form, url: e.target.value })}
                             disabled={adding}
                         />
-                        <input
-                            type="text"
-                            required
-                            placeholder={t('login', 'username')}
-                            value={form.username}
-                            onChange={(e) => setForm({ ...form, username: e.target.value })}
-                            disabled={adding}
-                        />
-                        <input
-                            type="password"
-                            required
-                            placeholder={t('login', 'password')}
-                            value={form.password}
-                            onChange={(e) => setForm({ ...form, password: e.target.value })}
-                            disabled={adding}
-                        />
+                        {addType === 'xtream' && (
+                            <>
+                                <input
+                                    type="text"
+                                    required
+                                    placeholder={t('login', 'username')}
+                                    value={form.username}
+                                    onChange={(e) => setForm({ ...form, username: e.target.value })}
+                                    disabled={adding}
+                                />
+                                <input
+                                    type="password"
+                                    required
+                                    placeholder={t('login', 'password')}
+                                    value={form.password}
+                                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                                    disabled={adding}
+                                />
+                            </>
+                        )}
                         <div className="playlists-add-actions">
                             <button
                                 type="button"

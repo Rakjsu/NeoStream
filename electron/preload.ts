@@ -86,6 +86,7 @@ const invokeChannels = new Set([
     'pip:getState',
     'pip:open',
     'playlists:add',
+    'playlists:add-m3u',
     'playlists:get-active-id',
     'playlists:list',
     'playlists:remove',
