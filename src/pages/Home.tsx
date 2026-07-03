@@ -196,7 +196,7 @@ export function Home() {
                 }
 
                 // Fetch series data
-                const seriesResult = await window.ipcRenderer.invoke('streams:get-series');
+                const seriesResult = await window.ipcRenderer.invoke('streams:get-series', { forceRefresh: catalogTick > 0 });
                 if (seriesResult.success && seriesResult.data) {
                     setAllSeries(seriesResult.data);
                     dataCache.series = seriesResult.data;
@@ -210,7 +210,7 @@ export function Home() {
                 }
 
                 // Fetch movies data
-                const moviesResult = await window.ipcRenderer.invoke('streams:get-vod');
+                const moviesResult = await window.ipcRenderer.invoke('streams:get-vod', { forceRefresh: catalogTick > 0 });
                 if (moviesResult.success && moviesResult.data) {
                     setAllMovies(moviesResult.data);
                     dataCache.movies = moviesResult.data;

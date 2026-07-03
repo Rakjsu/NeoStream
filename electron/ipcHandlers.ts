@@ -20,9 +20,38 @@ import {
 } from './playlistManager'
 import type { PlaylistBackupEntry } from './playlistManager'
 
+import { cachedCatalogFetch, invalidatePlaylistCache, type CatalogKind } from './catalogCache'
 import log from './logger'
 // Store for window state (for custom maximize)
 let savedWindowBounds: Electron.Rectangle | null = null
+
+/**
+ * Shared SWR body for the six catalog endpoints: instant repeat visits from
+ * the disk cache (15 min TTL) + stale fallback when the provider errors.
+ */
+async function catalogListHandler(
+    kind: CatalogKind,
+    method: 'getLiveStreams' | 'getVODStreams' | 'getSeries' | 'getLiveCategories' | 'getVodCategories' | 'getSeriesCategories',
+    payload?: { forceRefresh?: boolean }
+) {
+    try {
+        const auth = store.get('auth')
+        if (!auth.url || !auth.username || !auth.password) {
+            return { success: false, error: 'Not authenticated' }
+        }
+        const playlistId = getActivePlaylistIdPublic() ?? 'default'
+        const client = new XtreamClient(auth.url, auth.username, auth.password)
+        const result = await cachedCatalogFetch(
+            playlistId,
+            kind,
+            () => client[method](),
+            payload?.forceRefresh === true
+        )
+        return { success: true, data: result.data, fromCache: result.fromCache }
+    } catch (error: unknown) {
+        return { success: false, error: getErrorMessage(error) }
+    }
+}
 
 const getErrorMessage = (error: unknown): string =>
     error instanceof Error ? error.message : String(error)
@@ -200,6 +229,7 @@ export function setupIpcHandlers() {
 
     ipcMain.handle('playlists:remove', (_, { id }) => {
         try {
+            invalidatePlaylistCache(String(id))
             const outcome = removePlaylist(String(id))
             if (!outcome.removed) {
                 return { success: false, error: 'Playlist not found' }
@@ -285,106 +315,28 @@ export function setupIpcHandlers() {
     })
 
     // Get live streams
-    ipcMain.handle('streams:get-live', async () => {
-        try {
-            const auth = store.get('auth')
-            if (!auth.url || !auth.username || !auth.password) {
-                return { success: false, error: 'Not authenticated' }
-            }
-
-            const client = new XtreamClient(auth.url, auth.username, auth.password)
-            const streams = await client.getLiveStreams()
-
-            return { success: true, data: streams }
-        } catch (error: unknown) {
-            return { success: false, error: getErrorMessage(error) }
-        }
-    })
+    ipcMain.handle('streams:get-live', async (_event, payload?: { forceRefresh?: boolean }) =>
+        catalogListHandler('live', 'getLiveStreams', payload))
 
     // Get VOD streams
-    ipcMain.handle('streams:get-vod', async () => {
-        try {
-            const auth = store.get('auth')
-            if (!auth.url || !auth.username || !auth.password) {
-                return { success: false, error: 'Not authenticated' }
-            }
-
-            const client = new XtreamClient(auth.url, auth.username, auth.password)
-            const streams = await client.getVODStreams()
-
-            return { success: true, data: streams }
-        } catch (error: unknown) {
-            return { success: false, error: getErrorMessage(error) }
-        }
-    })
+    ipcMain.handle('streams:get-vod', async (_event, payload?: { forceRefresh?: boolean }) =>
+        catalogListHandler('vod', 'getVODStreams', payload))
 
     // Get series
-    ipcMain.handle('streams:get-series', async () => {
-        try {
-            const auth = store.get('auth')
-            if (!auth.url || !auth.username || !auth.password) {
-                return { success: false, error: 'Not authenticated' }
-            }
-
-            const client = new XtreamClient(auth.url, auth.username, auth.password)
-            const streams = await client.getSeries()
-
-            return { success: true, data: streams }
-        } catch (error: unknown) {
-            return { success: false, error: getErrorMessage(error) }
-        }
-    })
+    ipcMain.handle('streams:get-series', async (_event, payload?: { forceRefresh?: boolean }) =>
+        catalogListHandler('series', 'getSeries', payload))
 
     // Get live TV categories
-    ipcMain.handle('categories:get-live', async () => {
-        try {
-            const auth = store.get('auth')
-            if (!auth.url || !auth.username || !auth.password) {
-                return { success: false, error: 'Not authenticated' }
-            }
-
-            const client = new XtreamClient(auth.url, auth.username, auth.password)
-            const categories = await client.getLiveCategories()
-
-            return { success: true, data: categories }
-        } catch (error: unknown) {
-            return { success: false, error: getErrorMessage(error) }
-        }
-    })
+    ipcMain.handle('categories:get-live', async (_event, payload?: { forceRefresh?: boolean }) =>
+        catalogListHandler('live-categories', 'getLiveCategories', payload))
 
     // Get VOD categories
-    ipcMain.handle('categories:get-vod', async () => {
-        try {
-            const auth = store.get('auth')
-            if (!auth.url || !auth.username || !auth.password) {
-                return { success: false, error: 'Not authenticated' }
-            }
-
-            const client = new XtreamClient(auth.url, auth.username, auth.password)
-            const categories = await client.getVodCategories()
-
-            return { success: true, data: categories }
-        } catch (error: unknown) {
-            return { success: false, error: getErrorMessage(error) }
-        }
-    })
+    ipcMain.handle('categories:get-vod', async (_event, payload?: { forceRefresh?: boolean }) =>
+        catalogListHandler('vod-categories', 'getVodCategories', payload))
 
     // Get series categories  
-    ipcMain.handle('categories:get-series', async () => {
-        try {
-            const auth = store.get('auth')
-            if (!auth.url || !auth.username || !auth.password) {
-                return { success: false, error: 'Not authenticated' }
-            }
-
-            const client = new XtreamClient(auth.url, auth.username, auth.password)
-            const categories = await client.getSeriesCategories()
-
-            return { success: true, data: categories }
-        } catch (error: unknown) {
-            return { success: false, error: getErrorMessage(error) }
-        }
-    })
+    ipcMain.handle('categories:get-series', async (_event, payload?: { forceRefresh?: boolean }) =>
+        catalogListHandler('series-categories', 'getSeriesCategories', payload))
 
     // Fetch EPG from meuguia.tv (bypasses CORS)
     ipcMain.handle('epg:fetch-meuguia', async (_, channelSlug: string) => {
