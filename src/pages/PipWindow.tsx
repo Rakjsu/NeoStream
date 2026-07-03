@@ -16,6 +16,7 @@ import { playbackService } from '../services/playbackService';
 interface PipChannel {
     id: string | number;
     name: string;
+    directUrl?: string;
 }
 
 interface PipContent {
@@ -274,9 +275,13 @@ export function PipWindow() {
                 return;
             }
             const { url, username, password } = result.credentials;
+            // M3U playlists (sentinel username): the channel carries its URL.
+            const src = username === 'm3u' && target.directUrl
+                ? target.directUrl
+                : `${url}/live/${username}/${password}/${target.id}.m3u8`;
             setContent({
                 ...content,
-                src: `${url}/live/${username}/${password}/${target.id}.m3u8`,
+                src,
                 title: target.name,
                 contentId: String(target.id),
                 currentTime: 0

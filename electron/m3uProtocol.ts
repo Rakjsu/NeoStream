@@ -21,6 +21,33 @@ export interface M3uChannel {
 
 const ATTR_PATTERN = /([a-zA-Z0-9-]+)="([^"]*)"/g
 
+/** Attributes on the #EXTM3U header line (e.g. url-tvg="http://.../guide.xml"). */
+export function parseM3uHeader(text: string): { urlTvg?: string } {
+    const firstLine = text.replace(/^\uFEFF/, '').split(/\r?\n/, 1)[0] ?? ''
+    if (!firstLine.startsWith('#EXTM3U')) return {}
+    const attrs: Record<string, string> = {}
+    for (const match of firstLine.matchAll(ATTR_PATTERN)) {
+        attrs[match[1].toLowerCase()] = match[2]
+    }
+    const urlTvg = attrs['url-tvg'] || attrs['x-tvg-url']
+    return /^https?:\/\//.test(urlTvg ?? '') ? { urlTvg } : {}
+}
+
+const VOD_GROUP_PATTERN = /film|movie|vod|cine/i
+
+/**
+ * Split channels into live vs VOD by group-title heuristics ("FILMES | Ação",
+ * "Movies", "Cinema"...). Ungrouped entries stay live.
+ */
+export function classifyM3uChannels(channels: M3uChannel[]): { live: M3uChannel[]; vod: M3uChannel[] } {
+    const live: M3uChannel[] = []
+    const vod: M3uChannel[] = []
+    for (const channel of channels) {
+        (channel.group && VOD_GROUP_PATTERN.test(channel.group) ? vod : live).push(channel)
+    }
+    return { live, vod }
+}
+
 /** Parse extended-M3U text into channels. Tolerates CRLF, BOM and junk lines. */
 export function parseM3u(text: string): M3uChannel[] {
     const channels: M3uChannel[] = []
@@ -119,6 +146,39 @@ export function m3uToLiveStreams(channels: M3uChannel[]): M3uLiveStream[] {
         tv_archive: 0,
         direct_source: channel.url,
         tv_archive_duration: 0
+    }))
+}
+
+/** Xtream-compatible VOD stream shape (subset the renderer uses). */
+export interface M3uVodStream {
+    num: number
+    name: string
+    stream_type: 'movie'
+    stream_id: number
+    stream_icon: string
+    rating: string
+    category_id: string
+    container_extension: string
+    added: string
+    direct_source: string
+}
+
+/** VOD channels → Xtream VOD shape (ids offset by 100000 to avoid clashing with live). */
+export function m3uToVodStreams(vodChannels: M3uChannel[]): M3uVodStream[] {
+    const categories = m3uCategories(vodChannels)
+    const categoryIdOf = new Map(categories.map(c => [c.category_name, c.category_id]))
+
+    return vodChannels.map((channel, i) => ({
+        num: i + 1,
+        name: channel.name,
+        stream_type: 'movie',
+        stream_id: 100000 + i + 1,
+        stream_icon: channel.logo || '',
+        rating: '',
+        category_id: categoryIdOf.get(channel.group || 'M3U') || 'm3u-0',
+        container_extension: (channel.url.match(/\.([a-z0-9]{2,4})(?:\?|$)/i)?.[1] ?? 'mp4').toLowerCase(),
+        added: '',
+        direct_source: channel.url
     }))
 }
 

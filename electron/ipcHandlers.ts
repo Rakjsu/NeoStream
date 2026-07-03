@@ -21,7 +21,7 @@ import {
 import type { PlaylistBackupEntry } from './playlistManager'
 
 import { cachedCatalogFetch, invalidatePlaylistCache, type CatalogKind } from './catalogCache'
-import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uCategories } from './m3uProtocol'
+import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uToVodStreams, m3uCategories, classifyM3uChannels } from './m3uProtocol'
 import log from './logger'
 // Store for window state (for custom maximize)
 let savedWindowBounds: Electron.Rectangle | null = null
@@ -65,7 +65,9 @@ async function catalogListHandler(
         // other catalog kinds are simply empty (phase 1 covers live TV).
         const activeEntry = playlistId !== 'default' ? findPlaylist(playlistId) : undefined
         if (activeEntry?.type === 'm3u') {
-            if (kind !== 'live' && kind !== 'live-categories') {
+            // Phase 2: movie groups ("FILMES | ...") feed the VOD page; series
+            // still empty (SxxEyy episode grouping is phase 3).
+            if (kind === 'series' || kind === 'series-categories') {
                 return { success: true, data: [], fromCache: true }
             }
             const result = await cachedCatalogFetch(
@@ -73,7 +75,14 @@ async function catalogListHandler(
                 kind,
                 async () => {
                     const channels = await fetchM3uChannels(activeEntry.url)
-                    return kind === 'live' ? m3uToLiveStreams(channels) : m3uCategories(channels)
+                    const { live, vod } = classifyM3uChannels(channels)
+                    switch (kind) {
+                        case 'live': return m3uToLiveStreams(live)
+                        case 'live-categories': return m3uCategories(live)
+                        case 'vod': return m3uToVodStreams(vod)
+                        case 'vod-categories': return m3uCategories(vod)
+                        default: return []
+                    }
                 },
                 payload?.forceRefresh === true
             )
@@ -611,6 +620,18 @@ export function setupIpcHandlers() {
             const auth = store.get('auth')
             if (!auth.url || !auth.username || !auth.password) {
                 return { success: false, error: 'Not authenticated' }
+            }
+
+            // M3U playlists: the movie's own URL is the stream URL.
+            const activeId = getActivePlaylistIdPublic()
+            const activeEntry = activeId ? findPlaylist(activeId) : undefined
+            if (activeEntry?.type === 'm3u') {
+                const channels = await fetchM3uChannels(activeEntry.url)
+                const vod = m3uToVodStreams(classifyM3uChannels(channels).vod)
+                const movie = vod.find(v => v.stream_id === Number(streamId))
+                if (!movie) return { success: false, error: 'Filme não encontrado na lista M3U' }
+                registerApprovedProviderUrl(movie.direct_source, activeEntry.url)
+                return { success: true, url: movie.direct_source }
             }
 
             const client = new XtreamClient(auth.url, auth.username, auth.password)

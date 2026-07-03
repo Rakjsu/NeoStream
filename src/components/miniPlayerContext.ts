@@ -4,6 +4,8 @@ import { createContext, useContext } from 'react';
 export interface MiniPlayerChannel {
     id: string | number;
     name: string;
+    /** Direct play URL (M3U playlists). */
+    directUrl?: string;
 }
 
 export interface MiniPlayerContent {
