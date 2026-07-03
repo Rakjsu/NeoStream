@@ -180,8 +180,11 @@ export function LiveTV() {
 
     // Fetch EPG when channel is selected
     useEffect(() => {
+        // The guide follows the selected channel — or the PLAYING one, so the
+        // player's mini-EPG survives "Assistir Agora" clearing the side panel.
+        const epgChannel = selectedChannel ?? playingChannel;
         // Allow EPG fetch if we have any identifier (epg_channel_id OR name)
-        if (!selectedChannel || (!selectedChannel.epg_channel_id && !selectedChannel.name)) {
+        if (!epgChannel || (!epgChannel.epg_channel_id && !epgChannel.name)) {
             queueMicrotask(() => {
                 setEpgData([]);
                 setCurrentProgram(null);
@@ -192,9 +195,9 @@ export function LiveTV() {
 
         const fetchEPG = async () => {
             try {
-                console.log('[EPG] Fetching EPG for channel:', selectedChannel.name, 'EPG ID:', selectedChannel.epg_channel_id);
+                console.log('[EPG] Fetching EPG for channel:', epgChannel.name, 'EPG ID:', epgChannel.epg_channel_id);
                 // Pass both EPG ID and channel name (for Open-EPG Portugal and meuguia.tv fallback)
-                const programs = await epgService.fetchChannelEPG(selectedChannel.epg_channel_id || '', selectedChannel.name, selectedChannel.stream_id);
+                const programs = await epgService.fetchChannelEPG(epgChannel.epg_channel_id || '', epgChannel.name, epgChannel.stream_id);
                 console.log('[EPG] Got programs:', programs.length);
                 setEpgData(programs);
 
@@ -217,7 +220,7 @@ export function LiveTV() {
         return () => {
             if (intervalId) clearInterval(intervalId);
         };
-    }, [selectedChannel]);
+    }, [selectedChannel, playingChannel]);
 
     const fetchStreams = async () => {
         setLoading(true);
