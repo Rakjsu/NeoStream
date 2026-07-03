@@ -217,6 +217,7 @@
     "empty": "No saved playlists",
     "add": "Add playlist",
     "addTitle": "New playlist",
+    "m3uHint": "Paste an M3U/M3U8 list URL — channels land in Live TV with groups as categories (phase 1: channels only)",
     "namePlaceholder": "Playlist name (optional)",
     "addConfirm": "Add",
     "adding": "Validating...",

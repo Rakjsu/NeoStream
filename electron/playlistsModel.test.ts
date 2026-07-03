@@ -174,6 +174,7 @@ describe('toPublicPlaylist', () => {
     it('exposes no password and flags the active playlist', () => {
         const pub = toPublicPlaylist(entry(), 'pl_a')
         expect(pub).toEqual({
+            type: 'xtream',
             id: 'pl_a',
             name: 'Playlist A',
             url: 'http://a.example.com:8080',

@@ -217,6 +217,7 @@
     "empty": "Nenhuma playlist salva",
     "add": "Adicionar playlist",
     "addTitle": "Nova playlist",
+    "m3uHint": "Cole a URL de uma lista M3U/M3U8 — os canais entram na TV ao Vivo com os grupos como categorias (fase 1: só canais)",
     "namePlaceholder": "Nome da playlist (opcional)",
     "addConfirm": "Adicionar",
     "adding": "Validando...",

@@ -485,6 +485,12 @@ export function LiveTV() {
 
             if (result.success) {
                 const { url, username, password } = result.credentials;
+                // M3U playlists carry the play URL on the channel itself
+                // (username sentinel 'm3u'); Xtream keeps the classic URL so
+                // providers that fill direct_source don't change behavior.
+                if (username === 'm3u' && channel.direct_source?.startsWith('http')) {
+                    return channel.direct_source;
+                }
                 const streamUrl = `${url}/live/${username}/${password}/${channel.stream_id}.m3u8`;
                 return streamUrl;
             }

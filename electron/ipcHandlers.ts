@@ -21,6 +21,7 @@ import {
 import type { PlaylistBackupEntry } from './playlistManager'
 
 import { cachedCatalogFetch, invalidatePlaylistCache, type CatalogKind } from './catalogCache'
+import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uCategories } from './m3uProtocol'
 import log from './logger'
 // Store for window state (for custom maximize)
 let savedWindowBounds: Electron.Rectangle | null = null
@@ -29,6 +30,25 @@ let savedWindowBounds: Electron.Rectangle | null = null
  * Shared SWR body for the six catalog endpoints: instant repeat visits from
  * the disk cache (15 min TTL) + stale fallback when the provider errors.
  */
+/** Download + parse an M3U document (shared by add and the SWR fetcher). */
+async function fetchM3uChannels(url: string) {
+    const response = await axios.get(url, {
+        timeout: 20000,
+        responseType: 'text',
+        transformResponse: [(data: unknown) => data],
+        httpsAgent: getProviderHttpsAgent(url, url)
+    })
+    const text = String(response.data ?? '')
+    if (!looksLikeM3u(text)) {
+        throw new Error('A URL não devolveu uma lista M3U válida')
+    }
+    const channels = parseM3u(text)
+    if (channels.length === 0) {
+        throw new Error('Lista M3U sem canais')
+    }
+    return channels
+}
+
 async function catalogListHandler(
     kind: CatalogKind,
     method: 'getLiveStreams' | 'getVODStreams' | 'getSeries' | 'getLiveCategories' | 'getVodCategories' | 'getSeriesCategories',
@@ -40,6 +60,26 @@ async function catalogListHandler(
             return { success: false, error: 'Not authenticated' }
         }
         const playlistId = getActivePlaylistIdPublic() ?? 'default'
+
+        // M3U playlists: live channels come from the parsed document; the
+        // other catalog kinds are simply empty (phase 1 covers live TV).
+        const activeEntry = playlistId !== 'default' ? findPlaylist(playlistId) : undefined
+        if (activeEntry?.type === 'm3u') {
+            if (kind !== 'live' && kind !== 'live-categories') {
+                return { success: true, data: [], fromCache: true }
+            }
+            const result = await cachedCatalogFetch(
+                playlistId,
+                kind,
+                async () => {
+                    const channels = await fetchM3uChannels(activeEntry.url)
+                    return kind === 'live' ? m3uToLiveStreams(channels) : m3uCategories(channels)
+                },
+                payload?.forceRefresh === true
+            )
+            return { success: true, data: result.data, fromCache: result.fromCache }
+        }
+
         const client = new XtreamClient(auth.url, auth.username, auth.password)
         const result = await cachedCatalogFetch(
             playlistId,
@@ -205,11 +245,43 @@ export function setupIpcHandlers() {
         }
     })
 
+    // Add an M3U playlist (phase 1: live channels only).
+    ipcMain.handle('playlists:add-m3u', async (_, { name, url }) => {
+        try {
+            const m3uUrl = String(url ?? '').trim()
+            if (!/^https?:\/\//.test(m3uUrl)) {
+                return { success: false, error: 'URL inválida' }
+            }
+            const channels = await fetchM3uChannels(m3uUrl)
+
+            const entry = saveAndActivatePlaylist({
+                name: typeof name === 'string' && name.trim() ? name.trim() : `M3U (${channels.length} canais)`,
+                url: m3uUrl,
+                username: 'm3u',
+                password: 'm3u',
+                type: 'm3u'
+            })
+            resetProviderEpgState()
+
+            return { success: true, playlistId: entry.id, channelCount: channels.length }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
     ipcMain.handle('playlists:switch', async (_, { id }) => {
         try {
             const target = findPlaylist(String(id))
             if (!target) {
                 return { success: false, error: 'Playlist not found' }
+            }
+
+            if (target.type === 'm3u') {
+                // M3U has no auth endpoint — validate by refetching the list.
+                await fetchM3uChannels(target.url)
+                activatePlaylist(target.id)
+                resetProviderEpgState()
+                return { success: true }
             }
 
             // Revalidate before switching — a dead provider should not take
