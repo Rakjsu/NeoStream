@@ -62,6 +62,9 @@ export interface VideoPlayerProps<TSwitchContent extends SwitchableContent = Swi
     // Live TV zapping (channel list inside the player)
     channelList?: PlayerChannel[];
     onSwitchChannel?: (id: string | number) => void;
+    /** Override the end-of-video countdown texts (e.g. movie queue: "A seguir em"). */
+    nextCountdownLabel?: string;
+    nextActionLabel?: string;
 }
 
 function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableContent>({
@@ -90,7 +93,9 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     liveQualityVariants,
     currentQualityIndex = 0,
     channelList,
-    onSwitchChannel
+    onSwitchChannel,
+    nextCountdownLabel,
+    nextActionLabel
 }: VideoPlayerProps<TSwitchContent>) {
     const { videoRef, state, controls } = useVideoPlayer();
     const { t } = useLanguage();
@@ -767,8 +772,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     >
                         <div style={{ color: 'white', fontSize: 15, fontWeight: 600, marginBottom: 12 }}>
                             {nextEpCountdown > 0
-                                ? `${t('player', 'nextEpisodeIn')} ${nextEpCountdown}s`
-                                : t('player', 'nextEpisode')}
+                                ? `${nextCountdownLabel ?? t('player', 'nextEpisodeIn')} ${nextEpCountdown}s`
+                                : (nextActionLabel ?? t('player', 'nextEpisode'))}
                         </div>
                         <div style={{ display: 'flex', gap: 10 }}>
                             <button

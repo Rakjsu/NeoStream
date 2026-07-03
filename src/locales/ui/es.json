@@ -557,6 +557,8 @@
     "subtitlesOff": "Desactivado",
     "audioTrack": "Pista de audio",
     "nextEpisodeIn": "Próximo episodio en",
+    "upNextIn": "A continuación en",
+    "upNext": "A continuación",
     "watchNow": "Ver ahora",
     "cancelAutoplay": "Cancelar",
     "channelList": "Lista de canales (PgUp/PgDn cambia)",
