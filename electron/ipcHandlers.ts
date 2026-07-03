@@ -787,6 +787,40 @@ export function setupIpcHandlers() {
         }
     })
 
+    // Provider health: probe the active provider's endpoints with timings.
+    ipcMain.handle('diagnostics:provider-health', async () => {
+        const auth = store.get('auth')
+        if (!auth.url || !auth.username || !auth.password) {
+            return { success: false, error: 'Not authenticated' }
+        }
+        const base = String(auth.url).replace(/\/$/, '')
+        const creds = `username=${encodeURIComponent(auth.username)}&password=${encodeURIComponent(auth.password)}`
+
+        const probe = async (name: string, url: string) => {
+            const startedAt = Date.now()
+            try {
+                const response = await axios.get(url, {
+                    timeout: 8000,
+                    validateStatus: () => true,
+                    responseType: 'stream',
+                    httpsAgent: getProviderHttpsAgent(url, base)
+                })
+                const body = response.data as { destroy?: () => void } | undefined
+                body?.destroy?.()
+                return { name, ok: response.status >= 200 && response.status < 400, status: response.status, ms: Date.now() - startedAt }
+            } catch (error: unknown) {
+                return { name, ok: false, status: null, ms: Date.now() - startedAt, error: getErrorMessage(error) }
+            }
+        }
+
+        const results = await Promise.all([
+            probe('player_api', `${base}/player_api.php?${creds}`),
+            probe('live_streams', `${base}/player_api.php?${creds}&action=get_live_streams`),
+            probe('xmltv', `${base}/xmltv.php?${creds}`)
+        ])
+        return { success: true, results }
+    })
+
     // Full playlist entries for the backup file (passwords included — the
     // renderer immediately encodes them into the payload it writes to disk).
     ipcMain.handle('backup:export-playlists', () => {

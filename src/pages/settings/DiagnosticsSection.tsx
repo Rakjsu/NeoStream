@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLanguage } from '../../services/languageService';
 import { diagnosticsService } from '../../services/diagnosticsService';
+import { classifyLatency, overallStatus, LATENCY_COLORS, type ProbeResult } from '../../utils/providerHealth';
 
 interface ExportReportResult {
     success: boolean;
@@ -49,6 +50,37 @@ export function DiagnosticsSection() {
         } finally {
             setBusy(false);
         }
+    };
+
+    // Provider health probe (endpoints + latency, measured in the main process)
+    const [healthResults, setHealthResults] = useState<ProbeResult[] | null>(null);
+    const [healthBusy, setHealthBusy] = useState(false);
+    const [healthError, setHealthError] = useState<string | null>(null);
+
+    const handleHealthCheck = async () => {
+        setHealthBusy(true);
+        setHealthError(null);
+        try {
+            const result = await window.ipcRenderer.invoke('diagnostics:provider-health') as {
+                success: boolean; results?: ProbeResult[]; error?: string;
+            };
+            if (result.success && result.results) {
+                setHealthResults(result.results);
+            } else {
+                setHealthError(t('diagnostics', 'healthError'));
+            }
+        } catch (error) {
+            console.error('[Diagnostics] Health check failed:', error);
+            setHealthError(t('diagnostics', 'healthError'));
+        } finally {
+            setHealthBusy(false);
+        }
+    };
+
+    const ENDPOINT_LABELS: Record<string, string> = {
+        player_api: 'API (player_api.php)',
+        live_streams: t('diagnostics', 'healthChannels'),
+        xmltv: 'EPG (xmltv.php)'
     };
 
     const handleOpenLogs = async () => {
@@ -125,6 +157,44 @@ export function DiagnosticsSection() {
                         onClick={handleOpenLogs}
                     >
                         📂 {t('diagnostics', 'openLogs')}
+                    </button>
+                </div>
+
+                {/* Provider health */}
+                <div className="setting-item" style={{ alignItems: 'flex-start' }}>
+                    <div className="setting-info">
+                        <label>{t('diagnostics', 'healthTitle')}</label>
+                        <p>{t('diagnostics', 'healthDesc')}</p>
+                        {healthResults && (
+                            <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div style={{ fontWeight: 700, fontSize: 13, color: overallStatus(healthResults) === 'online' ? '#10b981' : overallStatus(healthResults) === 'degraded' ? '#f59e0b' : '#ef4444' }}>
+                                    {overallStatus(healthResults) === 'online' ? `✅ ${t('diagnostics', 'healthOnline')}`
+                                        : overallStatus(healthResults) === 'degraded' ? `⚠️ ${t('diagnostics', 'healthDegraded')}`
+                                        : `❌ ${t('diagnostics', 'healthOffline')}`}
+                                </div>
+                                {healthResults.map(result => (
+                                    <div key={result.name} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+                                        <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: result.ok ? LATENCY_COLORS[classifyLatency(result.ms)] : '#ef4444' }} />
+                                        <span style={{ color: 'rgba(255,255,255,0.8)', minWidth: 180 }}>{ENDPOINT_LABELS[result.name] || result.name}</span>
+                                        <span style={{ color: 'rgba(255,255,255,0.5)', fontVariantNumeric: 'tabular-nums' }}>
+                                            {result.ok ? `${result.ms} ms` : (result.error || `HTTP ${result.status ?? '—'}`)}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {healthError && (
+                            <p style={{ color: '#ef4444', marginTop: 8 }}>⚠️ {healthError}</p>
+                        )}
+                    </div>
+                    <button
+                        className="check-btn"
+                        style={{ width: 'auto', padding: '14px 24px' }}
+                        onClick={handleHealthCheck}
+                        disabled={healthBusy}
+                    >
+                        <span>{healthBusy ? '⏳' : '📡'}</span>
+                        <span>{healthBusy ? t('diagnostics', 'healthTesting') : t('diagnostics', 'healthTest')}</span>
                     </button>
                 </div>
 
