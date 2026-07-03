@@ -25,6 +25,12 @@ export interface DailyStats {
     live: number;
 }
 
+export interface ContentTotal {
+    name: string;
+    type: 'movie' | 'series' | 'live';
+    seconds: number;
+}
+
 export interface UsageStats {
     totalWatchTimeSeconds: number;
     totalWatchTimeThisMonth: number;
@@ -34,6 +40,8 @@ export interface UsageStats {
     longestStreak: number;
     dailyStats: DailyStats[];
     lastWatchDate: string | null;
+    /** All-time per-content watch totals (fuels the Wrapped retrospective). */
+    contentTotals?: Record<string, ContentTotal>;
 }
 
 class UsageStatsService {
@@ -230,6 +238,23 @@ class UsageStatsService {
                     hourBucket: hourBucketOf(new Date().getHours())
                 });
             }
+        }
+
+        // All-time per-content totals (Wrapped retrospective). Bounded: when
+        // the map grows past 400 entries, keep the 300 most-watched.
+        if (!stats.contentTotals) stats.contentTotals = {};
+        const total = stats.contentTotals[contentId] ?? { name: contentName, type: contentType, seconds: 0 };
+        total.seconds += seconds;
+        total.name = contentName;
+        stats.contentTotals[contentId] = total;
+        const totalIds = Object.keys(stats.contentTotals);
+        if (totalIds.length > 400) {
+            const kept = totalIds
+                .sort((a, b) => stats.contentTotals![b].seconds - stats.contentTotals![a].seconds)
+                .slice(0, 300);
+            const next: Record<string, ContentTotal> = {};
+            for (const id of kept) next[id] = stats.contentTotals[id];
+            stats.contentTotals = next;
         }
 
         // Update watch streak

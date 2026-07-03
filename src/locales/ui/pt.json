@@ -601,6 +601,27 @@
     "fixesTitle": "Melhorias Gerais",
     "fixesItems": "Traduções de controles da janela (minimizar, maximizar, fechar)|Scrollbars consistentes em todas as páginas|Notificações agora limpam corretamente"
   },
+  "wrapped": {
+    "open": "Retrospectiva",
+    "kicker": "Sua retrospectiva NeoStream",
+    "hoursLine": "de conteúdo assistido até hoje",
+    "titlesLine": "{n} títulos e canais diferentes",
+    "personaKicker": "Seu perfil de espectador",
+    "persona_cinephile": "Cinéfilo de carteirinha",
+    "persona_binger": "Maratonista de séries",
+    "persona_zapper": "Zapeador ao vivo",
+    "persona_explorer": "Explorador de tudo um pouco",
+    "topKicker": "Seus campeões de tela",
+    "habitsKicker": "Seus hábitos",
+    "streakLine": "dias seguidos na sua maior sequência",
+    "weekdayLine": "Seu dia favorito é {day}",
+    "emptyTitle": "Ainda estamos te conhecendo",
+    "emptyDesc": "Assista mais um pouco e volte aqui pra ver sua retrospectiva",
+    "close": "Fechar",
+    "prev": "Anterior",
+    "next": "Próximo",
+    "done": "Concluir"
+  },
   "welcome": {
     "noChannels": "Nenhuma playlist configurada",
     "addPlaylistHint": "Adicione uma playlist do seu provedor IPTV para começar a assistir",
