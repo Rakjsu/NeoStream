@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useLanguage } from '../../services/languageService';
+import { tvModeService } from '../../services/tvModeService';
 import {
     ACCENT_PRESETS,
     BACKGROUND_PRESETS,
@@ -8,6 +10,7 @@ import {
 export function AppearanceSection() {
     const { t } = useLanguage();
     const { theme, setTheme } = useTheme();
+    const [tvMode, setTvMode] = useState<boolean>(() => tvModeService.isEnabled());
 
     return (
         <div className="section-card">
@@ -20,6 +23,25 @@ export function AppearanceSection() {
             </div>
 
             <div className="settings-group">
+                {/* TV mode (10-foot UI) */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>📺 {t('appearance', 'tvMode')}</label>
+                        <p>{t('appearance', 'tvModeDesc')}</p>
+                    </div>
+                    <label className="toggle-switch">
+                        <input
+                            type="checkbox"
+                            checked={tvMode}
+                            onChange={(e) => {
+                                tvModeService.setEnabled(e.target.checked);
+                                setTvMode(e.target.checked);
+                            }}
+                        />
+                        <span className="toggle-slider"></span>
+                    </label>
+                </div>
+
                 {/* Background variant */}
                 <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '16px' }}>
                     <div className="setting-info">
