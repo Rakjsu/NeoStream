@@ -1,5 +1,6 @@
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { catalogRefreshService } from './services/catalogRefreshService';
+import { tvModeService } from './services/tvModeService';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Welcome } from './pages/Welcome';
 import { Login } from './pages/Login';
@@ -74,6 +75,8 @@ function RouteBoundary({ name, children }: { name: string; children: React.React
 
 // Background catalog refresh clock (interval set in Settings -> Reproducao).
 catalogRefreshService.start();
+// TV mode scale/focus (Settings -> Aparencia).
+tvModeService.apply();
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);

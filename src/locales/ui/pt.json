@@ -469,6 +469,8 @@
     "title": "Aparência",
     "description": "Personalize as cores do aplicativo",
     "background": "Fundo",
+    "tvMode": "Modo TV (tela grande)",
+    "tvModeDesc": "Aumenta a interface (~25%) e reforça o foco do teclado/controle — ideal pra usar no sofá",
     "backgroundDesc": "Escolha o estilo de fundo do aplicativo",
     "backgroundDefault": "Padrão",
     "backgroundAmoled": "AMOLED (preto puro)",

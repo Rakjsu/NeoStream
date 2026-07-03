@@ -75,3 +75,18 @@ body {
     outline-offset: 2px;
     border-radius: 12px;
 }
+
+
+/* TV mode (10-foot UI): stronger, always-visible focus ring for remote/gamepad
+   navigation. The zoom itself is applied by tvModeService via body.style.zoom. */
+.tv-mode :focus-visible {
+    outline: 3px solid var(--ns-accent) !important;
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+.tv-mode button:focus-visible,
+.tv-mode [role="button"]:focus-visible {
+    transform: scale(1.04);
+    transition: transform 0.15s ease;
+}
