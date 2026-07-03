@@ -705,6 +705,62 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                         )}
                     </button>
 
+                    {/* Favorite channels - Special Category (Live only) */}
+                    {type === 'live' && (
+                        <button
+                            onClick={() => {
+                                onSelectCategory('FAVORITES');
+                                setIsOpen(false);
+                            }}
+                            style={{
+                                width: '100%',
+                                padding: '16px 20px',
+                                background: selectedCategory === 'FAVORITES'
+                                    ? 'rgba(251, 191, 36, 0.15)'
+                                    : 'rgba(255, 255, 255, 0.03)',
+                                border: selectedCategory === 'FAVORITES'
+                                    ? '2px solid #fbbf24'
+                                    : '2px solid rgba(255, 255, 255, 0.05)',
+                                borderRadius: '12px',
+                                color: selectedCategory === 'FAVORITES' ? '#fbbf24' : 'white',
+                                fontSize: '15px',
+                                fontWeight: selectedCategory === 'FAVORITES' ? '600' : '500',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '14px',
+                                cursor: 'pointer',
+                                marginBottom: '12px',
+                                textAlign: 'left',
+                                transition: 'all 0.3s ease'
+                            }}
+                        >
+                            <div style={{
+                                width: '40px',
+                                height: '40px',
+                                borderRadius: '10px',
+                                background: selectedCategory === 'FAVORITES'
+                                    ? 'rgba(251, 191, 36, 0.2)'
+                                    : 'rgba(255, 255, 255, 0.1)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '20px'
+                            }}>
+                                ⭐
+                            </div>
+                            <span style={{ flex: 1 }}>{t('categories', 'favoriteChannels')}</span>
+                            {selectedCategory === 'FAVORITES' && (
+                                <div style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    background: '#fbbf24',
+                                    boxShadow: '0 0 12px rgba(251, 191, 36, 0.8)'
+                                }}></div>
+                            )}
+                        </button>
+                    )}
+
                     {/* Continue Watching - Special Category (Series and VOD) */}
                     {(type === 'series' || type === 'vod') && (
                         <button

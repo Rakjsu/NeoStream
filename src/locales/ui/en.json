@@ -157,6 +157,7 @@
     "allChannels": "All Channels",
     "allSeries": "All Series",
     "continueWatching": "Continue Watching",
+    "favoriteChannels": "Favorite channels",
     "completedSeries": "Completed Series",
     "watchedMovies": "Watched Movies"
   },
@@ -164,6 +165,8 @@
     "scheduleTitle": "TV Schedule",
     "live": "LIVE",
     "watchNow": "Watch Now",
+    "favoriteChannel": "Favorite channel",
+    "unfavoriteChannel": "Remove from favorites",
     "close": "Close",
     "nowPlaying": "NOW",
     "upNext": "Up Next",

@@ -157,6 +157,7 @@
     "allChannels": "Todos los Canales",
     "allSeries": "Todas las Series",
     "continueWatching": "Continuar Viendo",
+    "favoriteChannels": "Canales favoritos",
     "completedSeries": "Series Finalizadas",
     "watchedMovies": "Películas Vistas"
   },
@@ -164,6 +165,8 @@
     "scheduleTitle": "Programación",
     "live": "EN VIVO",
     "watchNow": "Ver Ahora",
+    "favoriteChannel": "Canal favorito",
+    "unfavoriteChannel": "Quitar de favoritos",
     "close": "Cerrar",
     "nowPlaying": "AHORA",
     "upNext": "A Continuación",

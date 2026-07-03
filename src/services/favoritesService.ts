@@ -7,9 +7,11 @@ import { playlistScopedKey, hasKnownPlaylistId } from './activePlaylistService';
 // per-profile-only key `neostream_profile_${profileId}` is the migration source.
 const KEY_BASE = 'neostream_profile';
 
+export type FavoriteType = 'series' | 'movie' | 'channel';
+
 export interface FavoriteItem {
     id: string;
-    type: 'series' | 'movie';
+    type: FavoriteType;
     title: string;
     poster: string;
     rating?: string;
@@ -64,7 +66,7 @@ export const favoritesService = {
     },
 
     // Remove item from favorites
-    remove(id: string, type: 'series' | 'movie'): boolean {
+    remove(id: string, type: FavoriteType): boolean {
         const activeProfile = profileService.getActiveProfile();
         if (!activeProfile) return false;
 
@@ -93,7 +95,7 @@ export const favoritesService = {
     },
 
     // Check if item is in favorites
-    has(id: string, type: 'series' | 'movie'): boolean {
+    has(id: string, type: FavoriteType): boolean {
         const favorites = this.getAll();
         return favorites.some(i => i.id === id && i.type === type);
     },

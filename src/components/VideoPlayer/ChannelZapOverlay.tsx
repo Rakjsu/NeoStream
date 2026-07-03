@@ -6,6 +6,8 @@ export interface PlayerChannel {
     logo?: string;
     /** Provider channel number (digit-jump uses it). */
     num?: number;
+    /** Starred channel (⭐ filter in the overlay). */
+    favorite?: boolean;
 }
 
 interface ChannelZapOverlayProps {
@@ -28,14 +30,17 @@ export function ChannelZapOverlay({ channels, currentId, visible, onSelect, onCl
     // Highlight follows keyboard focus; starts at the playing channel.
     const highlightIdRef = useRef<string | number | undefined>(currentId);
     const [query, setQuery] = useState('');
+    const [onlyFavorites, setOnlyFavorites] = useState(false);
+    const hasFavorites = useMemo(() => channels.some(ch => ch.favorite), [channels]);
 
     const normalized = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     const filtered = useMemo(() => {
+        const base = onlyFavorites ? channels.filter(ch => ch.favorite) : channels;
         const q = normalized(query.trim());
-        if (!q) return channels;
-        return channels.filter(ch =>
+        if (!q) return base;
+        return base.filter(ch =>
             normalized(ch.name).includes(q) || (ch.num !== undefined && String(ch.num).startsWith(q)));
-    }, [channels, query]);
+    }, [channels, query, onlyFavorites]);
 
     // Reset highlight + search every time the list opens; focus the input.
     // (The query reset happens inside the timeout — async, not render-phase.)
@@ -111,8 +116,26 @@ export function ChannelZapOverlay({ channels, currentId, visible, onSelect, onCl
             <style>{`
                 .zap-row.kb-focus { outline: 2px solid var(--ns-accent); outline-offset: -2px; }
             `}</style>
-            <div style={{ padding: '18px 20px 10px', color: 'white', fontSize: 16, fontWeight: 700 }}>
-                📺 Canais
+            <div style={{ padding: '18px 20px 10px', color: 'white', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>📺 Canais</span>
+                {hasFavorites && (
+                    <button
+                        onClick={() => setOnlyFavorites(v => !v)}
+                        title="Só favoritos"
+                        style={{
+                            padding: '4px 12px',
+                            borderRadius: 8,
+                            border: onlyFavorites ? '1px solid rgba(251, 191, 36, 0.6)' : '1px solid rgba(255,255,255,0.2)',
+                            background: onlyFavorites ? 'rgba(251, 191, 36, 0.2)' : 'transparent',
+                            color: onlyFavorites ? '#fbbf24' : 'rgba(255,255,255,0.7)',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            cursor: 'pointer'
+                        }}
+                    >
+                        ⭐
+                    </button>
+                )}
             </div>
             <div style={{ padding: '0 16px 10px' }}>
                 <input

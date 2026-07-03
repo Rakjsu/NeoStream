@@ -14,8 +14,16 @@ interface ProviderEpisode {
     container_extension?: string;
 }
 
+/** Catalog favorites only — channel favorites live in LiveTV's ⭐ category. */
+type CatalogFavorite = FavoriteItem & { type: 'series' | 'movie' };
+
+const loadCatalogFavorites = (): CatalogFavorite[] =>
+    favoritesService.getAll().filter(
+        (item): item is CatalogFavorite => item.type !== 'channel'
+    );
+
 export function Favorites() {
-    const [items, setItems] = useState<FavoriteItem[]>(() => favoritesService.getAll());
+    const [items, setItems] = useState<CatalogFavorite[]>(loadCatalogFavorites);
     const [removingId, setRemovingId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'all' | 'movies' | 'series'>('all');
     const navigate = useNavigate();
@@ -48,7 +56,7 @@ export function Favorites() {
     } | null>(null);
 
     const loadItems = useCallback(() => {
-        setItems(favoritesService.getAll());
+        setItems(loadCatalogFavorites());
     }, []);
 
     const removeItem = useCallback((id: string, type: 'series' | 'movie') => {
@@ -73,7 +81,7 @@ export function Favorites() {
         return `${hours}h ${mins}min ${t('home', 'hRemaining').replace('h ', '')}`;
     };
 
-    const handleItemClick = (item: FavoriteItem) => {
+    const handleItemClick = (item: CatalogFavorite) => {
         setSelectedContent({
             id: item.id,
             type: item.type,
