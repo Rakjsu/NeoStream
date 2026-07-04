@@ -22,6 +22,8 @@ import type { PlaylistBackupEntry } from './playlistManager'
 
 import { cachedCatalogFetch, invalidatePlaylistCache, type CatalogKind } from './catalogCache'
 import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uToVodStreams, m3uCategories, classifyM3uChannels } from './m3uProtocol'
+import { normalizeMac, stalkerChannelsToLiveStreams, stalkerGenresToCategories, STALKER_SENTINEL } from './stalkerProtocol'
+import { StalkerClient, resolvePortal } from './stalkerClient'
 import log from './logger'
 // Store for window state (for custom maximize)
 let savedWindowBounds: Electron.Rectangle | null = null
@@ -84,6 +86,24 @@ async function catalogListHandler(
                         default: return []
                     }
                 },
+                payload?.forceRefresh === true
+            )
+            return { success: true, data: result.data, fromCache: result.fromCache }
+        }
+
+        // Stalker portals: live channels/genres from the portal API; VOD and
+        // series are empty in phase 1.
+        if (activeEntry?.type === 'stalker') {
+            if (kind !== 'live' && kind !== 'live-categories') {
+                return { success: true, data: [], fromCache: true }
+            }
+            const stalker = new StalkerClient(activeEntry.url, activeEntry.username)
+            const result = await cachedCatalogFetch(
+                playlistId,
+                kind,
+                async () => kind === 'live'
+                    ? stalkerChannelsToLiveStreams(await stalker.getAllChannels())
+                    : stalkerGenresToCategories(await stalker.getGenres()),
                 payload?.forceRefresh === true
             )
             return { success: true, data: result.data, fromCache: result.fromCache }
@@ -278,6 +298,52 @@ export function setupIpcHandlers() {
         }
     })
 
+    ipcMain.handle('playlists:add-stalker', async (_, { name, url, mac }) => {
+        try {
+            const normalizedMac = normalizeMac(String(mac ?? ''))
+            if (!normalizedMac) {
+                return { success: false, error: 'MAC inválido (esperado AA:BB:CC:DD:EE:FF)' }
+            }
+            const rawUrl = String(url ?? '').trim()
+            if (!rawUrl) {
+                return { success: false, error: 'URL do portal inválida' }
+            }
+
+            const { loadUrl, client } = await resolvePortal(rawUrl, normalizedMac)
+            const channels = await client.getAllChannels()
+
+            const entry = saveAndActivatePlaylist({
+                name: typeof name === 'string' && name.trim() ? name.trim() : `Stalker (${channels.length} canais)`,
+                url: loadUrl,
+                username: normalizedMac,
+                password: STALKER_SENTINEL,
+                type: 'stalker'
+            })
+            resetProviderEpgState()
+
+            return { success: true, playlistId: entry.id, channelCount: channels.length }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
+    // Resolve a stalker channel cmd into a playable URL at play time (some
+    // portals mint per-play tokenized links via create_link).
+    ipcMain.handle('stalker:create-link', async (_, { cmd }: { cmd?: string }) => {
+        try {
+            const playlistId = getActivePlaylistIdPublic()
+            const activeEntry = playlistId ? findPlaylist(playlistId) : undefined
+            if (activeEntry?.type !== 'stalker') {
+                return { success: false, error: 'Playlist ativa não é Stalker' }
+            }
+            const stalker = new StalkerClient(activeEntry.url, activeEntry.username)
+            const playUrl = await stalker.createLink(String(cmd ?? ''))
+            return { success: true, url: playUrl }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
     ipcMain.handle('playlists:switch', async (_, { id }) => {
         try {
             const target = findPlaylist(String(id))
@@ -288,6 +354,15 @@ export function setupIpcHandlers() {
             if (target.type === 'm3u') {
                 // M3U has no auth endpoint — validate by refetching the list.
                 await fetchM3uChannels(target.url)
+                activatePlaylist(target.id)
+                resetProviderEpgState()
+                return { success: true }
+            }
+
+            if (target.type === 'stalker') {
+                // Validate by re-doing the handshake with the stored MAC.
+                const stalker = new StalkerClient(target.url, target.username)
+                await stalker.handshake()
                 activatePlaylist(target.id)
                 resetProviderEpgState()
                 return { success: true }

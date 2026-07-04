@@ -24,8 +24,8 @@ export interface PlaylistEntry {
     password: string
     userInfo?: unknown
     addedAt: number
-    /** 'xtream' (default, absent on legacy entries) or 'm3u'. */
-    type?: 'xtream' | 'm3u'
+    /** 'xtream' (default, absent on legacy entries), 'm3u' or 'stalker'. */
+    type?: 'xtream' | 'm3u' | 'stalker'
 }
 
 /** What the renderer is allowed to see — never includes the password. */
@@ -35,7 +35,7 @@ export interface PublicPlaylist {
     url: string
     username: string
     active: boolean
-    type: 'xtream' | 'm3u'
+    type: 'xtream' | 'm3u' | 'stalker'
 }
 
 export interface AuthShape {
@@ -124,7 +124,7 @@ export interface UpsertInput {
     username: string
     password: string
     userInfo?: unknown
-    type?: 'xtream' | 'm3u'
+    type?: 'xtream' | 'm3u' | 'stalker'
 }
 
 export interface UpsertResult {

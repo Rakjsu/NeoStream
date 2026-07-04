@@ -491,6 +491,15 @@ export function LiveTV() {
                 if (username === 'm3u' && channel.direct_source?.startsWith('http')) {
                     return channel.direct_source;
                 }
+                // Stalker portals: direct_source carries the raw cmd; the main
+                // process resolves it (create_link) into a playable URL.
+                if (password === 'stalker' && channel.direct_source) {
+                    const link = await window.ipcRenderer.invoke('stalker:create-link', {
+                        cmd: channel.direct_source
+                    }) as { success: boolean; url?: string; error?: string };
+                    if (link.success && link.url) return link.url;
+                    throw new Error(link.error || 'Falha ao resolver o canal Stalker');
+                }
                 const streamUrl = `${url}/live/${username}/${password}/${channel.stream_id}.m3u8`;
                 return streamUrl;
             }

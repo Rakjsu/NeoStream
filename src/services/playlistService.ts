@@ -12,7 +12,7 @@ export interface PlaylistSummary {
     url: string
     username: string
     active: boolean
-    type: 'xtream' | 'm3u'
+    type: 'xtream' | 'm3u' | 'stalker'
 }
 
 interface IpcResult {
@@ -34,6 +34,10 @@ export const playlistService = {
 
     async addM3u(input: { name?: string; url: string }): Promise<IpcResult & { channelCount?: number }> {
         return await window.ipcRenderer.invoke('playlists:add-m3u', input) as IpcResult & { channelCount?: number }
+    },
+
+    async addStalker(input: { name?: string; url: string; mac: string }): Promise<IpcResult & { channelCount?: number }> {
+        return await window.ipcRenderer.invoke('playlists:add-stalker', input) as IpcResult & { channelCount?: number }
     },
 
     async switchTo(id: string): Promise<IpcResult> {

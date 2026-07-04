@@ -218,6 +218,7 @@
     "add": "Adicionar playlist",
     "addTitle": "Nova playlist",
     "m3uHint": "Cole a URL de uma lista M3U/M3U8 — os canais entram na TV ao Vivo com os grupos como categorias (fase 1: só canais)",
+    "stalkerHint": "Informe a URL do portal (ex.: http://portal.tv/c/) e o MAC da sua conta (00:1A:79:...)",
     "namePlaceholder": "Nome da playlist (opcional)",
     "addConfirm": "Adicionar",
     "adding": "Validando...",
