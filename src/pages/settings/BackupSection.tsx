@@ -20,6 +20,8 @@ export function BackupSection() {
     const [busy, setBusy] = useState(false);
     // Auto-backup config (lives in the main process store)
     const [autoBackup, setAutoBackup] = useState<{ enabled: boolean; dirPath: string; lastBackupAt: number } | null>(null);
+    // Machine sync config (lives in the main process store)
+    const [syncConfig, setSyncConfig] = useState<{ enabled: boolean; dirPath: string; machineId: string; lastSyncAt: number } | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -28,8 +30,36 @@ export function BackupSection() {
                 if (!cancelled && result?.success && result.config) setAutoBackup(result.config);
             })
             .catch(() => undefined);
-        return () => { cancelled = true; };
-    }, []);
+        window.ipcRenderer.invoke('sync:config-get')
+            .then((result: { success: boolean; config?: { enabled: boolean; dirPath: string; machineId: string; lastSyncAt: number } }) => {
+                if (!cancelled && result?.success && result.config) setSyncConfig(result.config);
+            })
+            .catch(() => undefined);
+        const onSyncApplied = (event: Event) => {
+            const added = (event as CustomEvent<{ added: number }>).detail?.added ?? 0;
+            if (added > 0) setSuccessMessage(t('backup', 'syncApplied').replace('{n}', String(added)));
+        };
+        window.addEventListener('neostream:sync-applied', onSyncApplied);
+        return () => {
+            cancelled = true;
+            window.removeEventListener('neostream:sync-applied', onSyncApplied);
+        };
+    }, [t]);
+
+    const handleSyncToggle = async (enabled: boolean) => {
+        if (enabled && !syncConfig?.dirPath) {
+            const picked = await window.ipcRenderer.invoke('sync:choose-dir') as { success: boolean; config?: { enabled: boolean; dirPath: string; machineId: string; lastSyncAt: number } };
+            if (!picked.success || !picked.config) return; // canceled
+            setSyncConfig(picked.config);
+        }
+        const result = await window.ipcRenderer.invoke('sync:config-set', { enabled }) as { success: boolean; config?: { enabled: boolean; dirPath: string; machineId: string; lastSyncAt: number } };
+        if (result.success && result.config) setSyncConfig(result.config);
+    };
+
+    const handleSyncNow = async () => {
+        await window.ipcRenderer.invoke('sync:run-now').catch(() => undefined);
+        setSuccessMessage(t('backup', 'syncStarted'));
+    };
 
     const handleAutoBackupToggle = async (enabled: boolean) => {
         if (enabled && !autoBackup?.dirPath) {
@@ -204,6 +234,41 @@ export function BackupSection() {
                         <span className="toggle-slider"></span>
                     </label>
                 </div>
+
+                {/* Multi-machine sync over a synced folder */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>🔄 {t('backup', 'syncTitle')}</label>
+                        <p>
+                            {t('backup', 'syncDesc')}
+                            {syncConfig?.dirPath ? ` · ${syncConfig.dirPath}` : ''}
+                            {syncConfig?.lastSyncAt
+                                ? ` · ${t('backup', 'syncLast')}: ${new Date(syncConfig.lastSyncAt).toLocaleString()}`
+                                : ''}
+                        </p>
+                    </div>
+                    <label className="toggle-switch">
+                        <input
+                            type="checkbox"
+                            checked={syncConfig?.enabled ?? false}
+                            onChange={(e) => void handleSyncToggle(e.target.checked)}
+                        />
+                        <span className="toggle-slider"></span>
+                    </label>
+                </div>
+
+                {syncConfig?.enabled && (
+                    <div className="backup-actions" style={{ display: 'flex', gap: 12 }}>
+                        <button
+                            className="check-btn"
+                            style={{ width: 'auto', padding: '10px 20px' }}
+                            onClick={() => void handleSyncNow()}
+                        >
+                            <span>🔄</span>
+                            <span>{t('backup', 'syncNow')}</span>
+                        </button>
+                    </div>
+                )}
 
                 {/* Credentials are not part of the backup */}
                 <div className="certificate-warning">

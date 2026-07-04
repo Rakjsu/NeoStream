@@ -22,6 +22,11 @@ const invokeChannels = new Set([
     'categories:get-live',
     'playlists:add-stalker',
     'stalker:create-link',
+    'sync:config-get',
+    'sync:config-set',
+    'sync:choose-dir',
+    'sync:run-now',
+    'sync:save',
     'categories:get-series',
     'categories:get-vod',
     'content:get-counts',
@@ -135,6 +140,7 @@ const sendChannels = new Set([
 
 const receiveChannels = new Set([
     'backup:auto-collect',
+    'sync:apply-remote',
     'download:progress',
     'media:control',
     'tray:navigate',
