@@ -1,12 +1,25 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tv, Plus, Settings, Sparkles, X, Globe } from 'lucide-react';
+import { Tv, Plus, Settings, Sparkles, X, Globe, Link2, Archive, ArrowLeft } from 'lucide-react';
 import { useLanguage, languageService } from '../services/languageService';
+import { playlistService } from '../services/playlistService';
+import { applyBackup, decodePlaylistPassword } from '../services/backupService';
+
+// First-run onboarding: step 1 picks the language, step 2 offers the three
+// ways in (Xtream account, M3U list, restore a backup). The page only renders
+// while no playlist is configured, so it doubles as the empty state.
+type WizardStep = 'language' | 'connect';
 
 export function Welcome() {
     const navigate = useNavigate();
     const { t, language } = useLanguage();
     const [showSettings, setShowSettings] = useState(false);
+    const [step, setStep] = useState<WizardStep>('language');
+    const [connectMode, setConnectMode] = useState<'menu' | 'm3u'>('menu');
+    const [m3uName, setM3uName] = useState('');
+    const [m3uUrl, setM3uUrl] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
 
     const handleLanguageChange = (lang: 'pt' | 'en' | 'es') => {
         languageService.setLanguage(lang);
@@ -17,6 +30,58 @@ export function Welcome() {
         { code: 'en', name: 'English', flag: '🇺🇸' },
         { code: 'es', name: 'Español', flag: '🇪🇸' }
     ];
+
+    const handleAddM3u = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setBusy(true);
+        try {
+            const result = await playlistService.addM3u({
+                name: m3uName.trim() || undefined,
+                url: m3uUrl.trim()
+            });
+            if (result.success) {
+                playlistService.reloadIntoDashboard();
+            } else {
+                setError(result.error || t('welcome', 'm3uError'));
+            }
+        } catch {
+            setError(t('welcome', 'm3uError'));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const handleRestoreBackup = async () => {
+        setError('');
+        setBusy(true);
+        try {
+            const result = await window.ipcRenderer.invoke('backup:load-file') as {
+                success: boolean; canceled?: boolean; json?: string;
+            };
+            if (!result.success || !result.json) {
+                if (!result.canceled) setError(t('welcome', 'restoreError'));
+                return;
+            }
+            // Fresh install: nothing to overwrite, apply directly.
+            const report = applyBackup(JSON.parse(result.json));
+            if (report.playlists.length > 0) {
+                await window.ipcRenderer.invoke('backup:import-playlists', {
+                    playlists: report.playlists.map(p => ({
+                        name: p.name,
+                        url: p.url,
+                        username: p.username,
+                        password: decodePlaylistPassword(p.passwordB64)
+                    }))
+                }).catch(() => undefined);
+            }
+            playlistService.reloadIntoDashboard();
+        } catch {
+            setError(t('welcome', 'restoreError'));
+        } finally {
+            setBusy(false);
+        }
+    };
 
     return (
         <>
@@ -44,40 +109,135 @@ export function Welcome() {
                         </div>
                     </div>
 
-                    {/* Message */}
-                    <div className="welcome-message">
-                        <h2>{t('welcome', 'noChannels') || 'Nenhuma playlist configurada'}</h2>
-                        <p>{t('welcome', 'addPlaylistHint') || 'Adicione uma playlist do seu provedor IPTV para começar a assistir'}</p>
+                    {/* Wizard progress */}
+                    <div className="welcome-steps" aria-hidden="true">
+                        <span className={`welcome-step-dot ${step === 'language' ? 'active' : 'done'}`} />
+                        <span className={`welcome-step-dot ${step === 'connect' ? 'active' : ''}`} />
                     </div>
 
-                    {/* Action Cards */}
-                    <div className="welcome-cards">
-                        <button
-                            className="welcome-card welcome-card-primary"
-                            onClick={() => navigate('/login')}
-                        >
-                            <div className="welcome-card-icon">
-                                <Plus size={24} />
+                    {step === 'language' && (
+                        <>
+                            <div className="welcome-message">
+                                <h2>{t('welcome', 'stepLanguageTitle')}</h2>
+                                <p>{t('welcome', 'stepLanguageDesc')}</p>
                             </div>
-                            <div className="welcome-card-text">
-                                <span className="welcome-card-title">{t('welcome', 'addPlaylist') || 'Adicionar Playlist'}</span>
-                                <span className="welcome-card-desc">{t('welcome', 'addPlaylistDesc') || 'Conecte sua conta IPTV'}</span>
+                            <div className="welcome-lang-cards">
+                                {languageOptions.map((lang) => (
+                                    <button
+                                        key={lang.code}
+                                        className={`welcome-lang-card ${language === lang.code ? 'welcome-lang-active' : ''}`}
+                                        onClick={() => handleLanguageChange(lang.code)}
+                                    >
+                                        <span className="welcome-lang-flag">{lang.flag}</span>
+                                        <span>{lang.name}</span>
+                                    </button>
+                                ))}
                             </div>
-                        </button>
+                            <button className="welcome-continue" onClick={() => setStep('connect')}>
+                                {t('welcome', 'continue')}
+                            </button>
+                        </>
+                    )}
 
-                        <button
-                            className="welcome-card welcome-card-secondary"
-                            onClick={() => setShowSettings(true)}
-                        >
-                            <div className="welcome-card-icon">
-                                <Settings size={24} />
+                    {step === 'connect' && connectMode === 'menu' && (
+                        <>
+                            <div className="welcome-message">
+                                <h2>{t('welcome', 'noChannels') || 'Nenhuma playlist configurada'}</h2>
+                                <p>{t('welcome', 'addPlaylistHint') || 'Adicione uma playlist do seu provedor IPTV para começar a assistir'}</p>
                             </div>
-                            <div className="welcome-card-text">
-                                <span className="welcome-card-title">{t('welcome', 'settings') || 'Configurações'}</span>
-                                <span className="welcome-card-desc">{t('welcome', 'settingsDesc') || 'Personalize o aplicativo'}</span>
+                            <div className="welcome-cards">
+                                <button
+                                    className="welcome-card welcome-card-primary"
+                                    onClick={() => navigate('/login')}
+                                >
+                                    <div className="welcome-card-icon">
+                                        <Plus size={24} />
+                                    </div>
+                                    <div className="welcome-card-text">
+                                        <span className="welcome-card-title">{t('welcome', 'addPlaylist') || 'Adicionar Playlist'}</span>
+                                        <span className="welcome-card-desc">{t('welcome', 'addPlaylistDesc') || 'Conecte sua conta IPTV'}</span>
+                                    </div>
+                                </button>
+
+                                <button
+                                    className="welcome-card welcome-card-secondary"
+                                    onClick={() => { setError(''); setConnectMode('m3u'); }}
+                                >
+                                    <div className="welcome-card-icon">
+                                        <Link2 size={24} />
+                                    </div>
+                                    <div className="welcome-card-text">
+                                        <span className="welcome-card-title">{t('welcome', 'connectM3u')}</span>
+                                        <span className="welcome-card-desc">{t('welcome', 'connectM3uDesc')}</span>
+                                    </div>
+                                </button>
+
+                                <button
+                                    className="welcome-card welcome-card-secondary"
+                                    onClick={() => void handleRestoreBackup()}
+                                    disabled={busy}
+                                >
+                                    <div className="welcome-card-icon">
+                                        <Archive size={24} />
+                                    </div>
+                                    <div className="welcome-card-text">
+                                        <span className="welcome-card-title">{t('welcome', 'restoreBackup')}</span>
+                                        <span className="welcome-card-desc">{t('welcome', 'restoreBackupDesc')}</span>
+                                    </div>
+                                </button>
+
+                                <button
+                                    className="welcome-card welcome-card-secondary"
+                                    onClick={() => setShowSettings(true)}
+                                >
+                                    <div className="welcome-card-icon">
+                                        <Settings size={24} />
+                                    </div>
+                                    <div className="welcome-card-text">
+                                        <span className="welcome-card-title">{t('welcome', 'settings') || 'Configurações'}</span>
+                                        <span className="welcome-card-desc">{t('welcome', 'settingsDesc') || 'Personalize o aplicativo'}</span>
+                                    </div>
+                                </button>
                             </div>
-                        </button>
-                    </div>
+                            <button className="welcome-back" onClick={() => setStep('language')}>
+                                <ArrowLeft size={14} /> {t('welcome', 'back')}
+                            </button>
+                        </>
+                    )}
+
+                    {step === 'connect' && connectMode === 'm3u' && (
+                        <>
+                            <div className="welcome-message">
+                                <h2>{t('welcome', 'connectM3u')}</h2>
+                                <p>{t('welcome', 'connectM3uHint')}</p>
+                            </div>
+                            <form className="welcome-m3u-form" onSubmit={(e) => void handleAddM3u(e)}>
+                                <input
+                                    type="text"
+                                    placeholder={t('welcome', 'm3uName')}
+                                    value={m3uName}
+                                    onChange={(e) => setM3uName(e.target.value)}
+                                    disabled={busy}
+                                />
+                                <input
+                                    type="url"
+                                    placeholder="http://exemplo.com/lista.m3u"
+                                    value={m3uUrl}
+                                    onChange={(e) => setM3uUrl(e.target.value)}
+                                    required
+                                    disabled={busy}
+                                />
+                                <button type="submit" className="welcome-continue" disabled={busy || !m3uUrl.trim()}>
+                                    {busy ? t('welcome', 'm3uAdding') : t('welcome', 'm3uAdd')}
+                                </button>
+                            </form>
+                            <button className="welcome-back" onClick={() => { setError(''); setConnectMode('menu'); }}>
+                                <ArrowLeft size={14} /> {t('welcome', 'back')}
+                            </button>
+                        </>
+                    )}
+
+                    {error && <p className="welcome-error">⚠️ {error}</p>}
 
                     {/* Footer */}
                     <p className="welcome-footer">
@@ -131,6 +291,134 @@ export function Welcome() {
 }
 
 const welcomeStyles = `
+.welcome-steps {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 28px;
+}
+
+.welcome-step-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    transition: all 0.3s ease;
+}
+
+.welcome-step-dot.active {
+    background: var(--ns-accent);
+    width: 24px;
+    border-radius: 4px;
+}
+
+.welcome-step-dot.done {
+    background: rgba(255, 255, 255, 0.4);
+}
+
+.welcome-lang-cards {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 28px;
+}
+
+.welcome-lang-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 18px 26px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.welcome-lang-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateY(-2px);
+}
+
+.welcome-lang-active {
+    border-color: var(--ns-accent);
+    background: rgba(99, 102, 241, 0.12);
+}
+
+.welcome-lang-flag {
+    font-size: 28px;
+}
+
+.welcome-continue {
+    padding: 14px 44px;
+    background: linear-gradient(135deg, var(--ns-accent-dark), var(--ns-accent));
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.welcome-continue:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);
+}
+
+.welcome-continue:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.welcome-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 20px;
+    padding: 8px 16px;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.welcome-back:hover {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.welcome-m3u-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 380px;
+    margin: 0 auto;
+}
+
+.welcome-m3u-form input {
+    padding: 13px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: white;
+    font-size: 14px;
+    outline: none;
+}
+
+.welcome-m3u-form input:focus {
+    border-color: var(--ns-accent);
+}
+
+.welcome-error {
+    margin-top: 16px;
+    color: #fca5a5;
+    font-size: 13px;
+}
+
 .welcome-container {
     min-height: 100vh;
     display: flex;
