@@ -9,6 +9,7 @@ import {
     busiestWeekday
 } from '../../services/statsDashboardHelpers';
 import { useLanguage } from '../../services/languageService';
+import { WrappedOverlay } from '../../components/WrappedOverlay';
 
 const TYPE_COLORS = { movies: '#3b82f6', series: '#10b981', live: '#f59e0b' } as const;
 const LOCALE_BY_LANGUAGE: Record<string, string> = { pt: 'pt-BR', en: 'en-US', es: 'es-ES' };
@@ -17,6 +18,7 @@ export function StatsSection() {
     // Load usage stats
     const [usageStats] = useState<UsageStats | null>(() => usageStatsService.getStats());
     const [weeklyStats] = useState<DailyStats[]>(() => usageStatsService.getWeeklyStats());
+    const [showWrapped, setShowWrapped] = useState(false);
     const { t, language } = useLanguage();
 
     const today = new Date().toISOString().split('T')[0];
@@ -93,7 +95,17 @@ export function StatsSection() {
                     <h2>{t('stats', 'title')}</h2>
                     <p>{t('stats', 'description')}</p>
                 </div>
+                <button
+                    className="check-btn"
+                    style={{ width: 'auto', padding: '10px 20px', marginLeft: 'auto' }}
+                    onClick={() => setShowWrapped(true)}
+                >
+                    <span>🎁</span>
+                    <span>{t('wrapped', 'open')}</span>
+                </button>
             </div>
+
+            {showWrapped && <WrappedOverlay onClose={() => setShowWrapped(false)} />}
 
             <div className="settings-group">
                 {/* Main Stats Cards */}
