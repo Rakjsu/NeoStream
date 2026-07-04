@@ -155,6 +155,51 @@ function startMockServer() {
             return;
         }
 
+        // Stalker/Ministra portal (round 26+). Single endpoint keyed by
+        // type/action, JSON wrapped in {js: ...} like the real middleware.
+        if (url.pathname === '/portal.php') {
+            const origin = `http://${req.headers.host}`;
+            const action = url.searchParams.get('action');
+            const reply = (js) => {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ js }));
+            };
+            if (action === 'handshake') {
+                reply({ token: 'E2E-STALKER-TOKEN' });
+                return;
+            }
+            if (action === 'get_profile') {
+                reply({ id: 1, name: 'e2e' });
+                return;
+            }
+            if (action === 'get_genres') {
+                reply([
+                    { id: '*', title: 'All' },
+                    { id: '1', title: 'Abertos STK' },
+                    { id: '2', title: 'Esportes STK' }
+                ]);
+                return;
+            }
+            if (action === 'get_all_channels') {
+                reply({
+                    data: [
+                        { id: 501, name: 'Canal STK Um', number: 1, logo: '', tv_genre_id: '1', cmd: `ffmpeg ${origin}/live/stk-um.m3u8`, xmltv_id: 'stk-um' },
+                        { id: 502, name: 'Canal STK Dois', number: 2, logo: '', tv_genre_id: '1', cmd: `ffmpeg ${origin}/live/stk-dois.m3u8`, xmltv_id: '' },
+                        { id: 503, name: 'Canal STK Esporte', number: 3, logo: '', tv_genre_id: '2', cmd: `ffmpeg ${origin}/live/stk-esporte.m3u8`, xmltv_id: '' }
+                    ]
+                });
+                return;
+            }
+            if (action === 'create_link') {
+                const cmd = url.searchParams.get('cmd') || '';
+                const match = cmd.match(/https?:\/\/\S+/);
+                reply({ cmd: `ffmpeg ${match ? match[0] : `${origin}/live/stk-um.m3u8`}?play_token=E2E` });
+                return;
+            }
+            reply({});
+            return;
+        }
+
         // Provider XMLTV EPG (main process: electron/providerEpg.ts).
         if (url.pathname === '/xmltv.php') {
             const user = url.searchParams.get('username');

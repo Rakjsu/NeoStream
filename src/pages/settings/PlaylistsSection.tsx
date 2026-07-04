@@ -19,8 +19,8 @@ export function PlaylistsSection() {
     // Add form
     const [showAddForm, setShowAddForm] = useState(false);
     const [adding, setAdding] = useState(false);
-    const [form, setForm] = useState({ name: '', url: '', username: '', password: '' });
-    const [addType, setAddType] = useState<'xtream' | 'm3u'>('xtream');
+    const [form, setForm] = useState({ name: '', url: '', username: '', password: '', mac: '' });
+    const [addType, setAddType] = useState<'xtream' | 'm3u' | 'stalker'>('xtream');
 
     const refresh = async () => {
         setLoading(true);
@@ -109,6 +109,19 @@ export function PlaylistsSection() {
                 }
                 return;
             }
+            if (addType === 'stalker') {
+                const stalkerResult = await playlistService.addStalker({
+                    name: form.name.trim() || undefined,
+                    url: form.url.trim(),
+                    mac: form.mac.trim()
+                });
+                if (stalkerResult.success) {
+                    playlistService.reloadIntoDashboard();
+                } else {
+                    setError(stalkerResult.error || t('playlists', 'addError'));
+                }
+                return;
+            }
             const result = await playlistService.add({
                 name: form.name.trim() || undefined,
                 url: form.url.trim(),
@@ -159,7 +172,9 @@ export function PlaylistsSection() {
                                     <div className="playlists-item-meta">
                                         {playlist.type === 'm3u'
                                             ? <>M3U · {hostOf(playlist.url)}</>
-                                            : <>{hostOf(playlist.url)} · {playlist.username}</>}
+                                            : playlist.type === 'stalker'
+                                                ? <>Stalker · {hostOf(playlist.url)} · {playlist.username}</>
+                                                : <>{hostOf(playlist.url)} · {playlist.username}</>}
                                     </div>
                                 </div>
                                 <div className="playlists-item-actions">
@@ -196,7 +211,7 @@ export function PlaylistsSection() {
                     <form className="playlists-add-form" onSubmit={handleAdd}>
                         <h3>{t('playlists', 'addTitle')}</h3>
                         <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                            {(['xtream', 'm3u'] as const).map(kind => (
+                            {(['xtream', 'm3u', 'stalker'] as const).map(kind => (
                                 <button
                                     key={kind}
                                     type="button"
@@ -213,13 +228,18 @@ export function PlaylistsSection() {
                                         cursor: 'pointer'
                                     }}
                                 >
-                                    {kind === 'xtream' ? 'Xtream Codes' : 'M3U'}
+                                    {kind === 'xtream' ? 'Xtream Codes' : kind === 'm3u' ? 'M3U' : 'Stalker/MAC'}
                                 </button>
                             ))}
                         </div>
                         {addType === 'm3u' && (
                             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '0 0 10px' }}>
                                 {t('playlists', 'm3uHint')}
+                            </p>
+                        )}
+                        {addType === 'stalker' && (
+                            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '0 0 10px' }}>
+                                {t('playlists', 'stalkerHint')}
                             </p>
                         )}
                         <input
@@ -237,6 +257,16 @@ export function PlaylistsSection() {
                             onChange={(e) => setForm({ ...form, url: e.target.value })}
                             disabled={adding}
                         />
+                        {addType === 'stalker' && (
+                            <input
+                                type="text"
+                                required
+                                placeholder="00:1A:79:XX:XX:XX"
+                                value={form.mac}
+                                onChange={(e) => setForm({ ...form, mac: e.target.value })}
+                                disabled={adding}
+                            />
+                        )}
                         {addType === 'xtream' && (
                             <>
                                 <input

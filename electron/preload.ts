@@ -20,6 +20,8 @@ const invokeChannels = new Set([
     'backup:load-file',
     'backup:save-file',
     'categories:get-live',
+    'playlists:add-stalker',
+    'stalker:create-link',
     'sync:config-get',
     'sync:config-set',
     'sync:choose-dir',
