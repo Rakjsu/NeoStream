@@ -32,7 +32,7 @@ export function CastDeviceSelector({
 }: CastDeviceSelectorProps) {
     const dlna = useDLNA(videoUrl, videoTitle, subtitleVtt);
     const airplay = useAirPlay(videoUrl, videoTitle);
-    const chromecast = useChromecast(videoUrl, videoTitle, /\.m3u8(\?|$)/.test(videoUrl));
+    const chromecast = useChromecast(videoUrl, videoTitle, /\.m3u8(\?|$)/.test(videoUrl), subtitleVtt);
     const { devices: dlnaDevices, discoverDevices, castToDevice, addDevice, error: dlnaError, isDiscovering } = dlna;
     const { devices: airplayDevices, castToDevice: castToAirPlayDevice } = airplay;
     const { devices: chromecastDevices, castToDevice: castToChromecast } = chromecast;
