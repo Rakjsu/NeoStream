@@ -266,6 +266,7 @@
     "webRemoteTitle": "Control por el móvil",
     "webRemoteDesc": "Abre un mando en el navegador del móvil (misma Wi-Fi) con play/pausa, volumen y saltar",
     "webRemoteOpen": "Abre en el móvil",
+    "webRemotePin": "PIN de emparejamiento",
     "webRemoteHint": "Mantén la app abierta en el ordenador. Solo funciona en la misma red local."
   },
   "welcome": {

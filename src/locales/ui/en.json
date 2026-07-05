@@ -291,6 +291,7 @@
     "webRemoteTitle": "Phone remote",
     "webRemoteDesc": "Opens a remote in your phone's browser (same Wi-Fi) with play/pause, volume and skip",
     "webRemoteOpen": "Open on your phone",
+    "webRemotePin": "Pairing PIN",
     "webRemoteHint": "Keep the app open on the computer. Works only on the same local network."
   },
   "welcome": {

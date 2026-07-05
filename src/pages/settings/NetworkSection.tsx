@@ -4,7 +4,7 @@ import { useSaveAnimation } from './useSaveAnimation';
 
 export function NetworkSection() {
     const [allowInvalidProviderCertificates, setAllowInvalidProviderCertificates] = useState(true);
-    const [webRemote, setWebRemote] = useState<{ enabled: boolean; url: string | null }>({ enabled: false, url: null });
+    const [webRemote, setWebRemote] = useState<{ enabled: boolean; url: string | null; pin: string | null }>({ enabled: false, url: null, pin: null });
     const { t } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
 
@@ -19,16 +19,16 @@ export function NetworkSection() {
                 console.error('Failed to load certificate settings:', error);
             }
             try {
-                const result = await window.ipcRenderer.invoke('web-remote:get-config') as { success: boolean; enabled?: boolean; url?: string | null };
-                if (result.success) setWebRemote({ enabled: result.enabled ?? false, url: result.url ?? null });
+                const result = await window.ipcRenderer.invoke('web-remote:get-config') as { success: boolean; enabled?: boolean; url?: string | null; pin?: string | null };
+                if (result.success) setWebRemote({ enabled: result.enabled ?? false, url: result.url ?? null, pin: result.pin ?? null });
             } catch { /* handler absent in old builds */ }
         })();
     }, []);
 
     const handleWebRemoteToggle = async (value: boolean) => {
         const result = await window.ipcRenderer.invoke('web-remote:set-enabled', { enabled: value })
-            .catch(() => null) as { success: boolean; enabled?: boolean; url?: string | null } | null;
-        if (result?.success) setWebRemote({ enabled: result.enabled ?? false, url: result.url ?? null });
+            .catch(() => null) as { success: boolean; enabled?: boolean; url?: string | null; pin?: string | null } | null;
+        if (result?.success) setWebRemote({ enabled: result.enabled ?? false, url: result.url ?? null, pin: result.pin ?? null });
         triggerSaveAnimation('webRemote');
     };
 
@@ -106,6 +106,12 @@ export function NetworkSection() {
                         <a href={webRemote.url} style={{ color: 'var(--ns-accent-light)', fontWeight: 700 }} onClick={(e) => e.preventDefault()}>
                             {webRemote.url}
                         </a>
+                        {webRemote.pin && (
+                            <div style={{ marginTop: 12, fontSize: 14 }}>
+                                {t('network', 'webRemotePin')}:{' '}
+                                <strong style={{ fontSize: 22, letterSpacing: 4, color: 'var(--ns-accent-light)' }}>{webRemote.pin}</strong>
+                            </div>
+                        )}
                         <p style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>{t('network', 'webRemoteHint')}</p>
                     </div>
                 )}
