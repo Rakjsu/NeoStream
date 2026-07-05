@@ -88,6 +88,9 @@ export function LiveTV() {
     const [sortBy, setSortBy] = useState<CatalogSort>('recent');
     const [selectedChannel, setSelectedChannel] = useState<LiveStream | null>(null);
     const [playingChannel, setPlayingChannel] = useState<LiveStream | null>(null);
+    // Latest playlist + playing channel for the media:control zap handler,
+    // kept in a ref so the handler stays stable (no re-subscribe per render).
+    const zapRef = useRef<{ list: LiveStream[]; current: LiveStream | null }>({ list: [], current: null });
     const [epgData, setEpgData] = useState<EPGProgram[]>([]);
     const [currentProgram, setCurrentProgram] = useState<EPGProgram | null>(null);
     const [upcomingPrograms, setUpcomingPrograms] = useState<EPGProgram[]>([]);
@@ -320,6 +323,33 @@ export function LiveTV() {
 
         return matchesSearch && matchesCategory;
     });
+
+    // Keep the zap ref current for the media:control handler (written in an
+    // effect — refs must not be mutated during render).
+    useEffect(() => {
+        zapRef.current = { list: filteredStreams, current: playingChannel };
+    });
+
+    // Tray + phone web-remote next/previous → channel zap while a channel is
+    // playing (togglePlay/stop/volume/seek are handled by the player itself).
+    useEffect(() => {
+        if (!window.ipcRenderer) return;
+        const handler = (_event: unknown, action: unknown) => {
+            if (action !== 'next' && action !== 'previous') return;
+            const { list, current } = zapRef.current;
+            if (!current || list.length === 0) return;
+            const index = list.findIndex(s => s.stream_id === current.stream_id);
+            if (index < 0) return;
+            const delta = action === 'next' ? 1 : -1;
+            const target = list[(index + delta + list.length) % list.length];
+            if (target) {
+                setSelectedChannel(target);
+                setPlayingChannel(target);
+            }
+        };
+        window.ipcRenderer.on('media:control', handler);
+        return () => { window.ipcRenderer?.off('media:control', handler); };
+    }, []);
 
     // Windowed rendering (same mechanism as VOD/Series).
     const gridWindow = useWindowedGrid({
