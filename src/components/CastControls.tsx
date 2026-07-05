@@ -6,11 +6,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Pause, Square, Volume2, Tv } from 'lucide-react';
 import { castControls, type CastStatus } from '../hooks/useDLNA';
+import { chromecastControls } from '../hooks/useChromecast';
 import { formatTime } from '../utils/videoHelpers';
 
 interface CastControlsProps {
     deviceId: string;
     deviceName: string;
+    /** Which backend the session runs on (default DLNA). */
+    deviceType?: 'dlna' | 'chromecast';
     onSessionEnded: () => void;
 }
 
@@ -22,7 +25,8 @@ const COMMAND_GRACE_MS = 12000;
 const STOPPED_POLLS_TO_END = 4;
 const FAILED_POLLS_TO_END = 6;
 
-export function CastControls({ deviceId, deviceName, onSessionEnded }: CastControlsProps) {
+export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSessionEnded }: CastControlsProps) {
+    const remote = deviceType === 'chromecast' ? chromecastControls : castControls;
     const [status, setStatus] = useState<CastStatus | null>(null);
     const [pendingVolume, setPendingVolume] = useState<number | null>(null);
     const stoppedPolls = useRef(0);
@@ -51,7 +55,7 @@ export function CastControls({ deviceId, deviceName, onSessionEnded }: CastContr
         const poll = async () => {
             const inGrace = Date.now() - lastCommandAt.current < COMMAND_GRACE_MS;
             try {
-                const result = await castControls.getStatus();
+                const result = await remote.getStatus();
                 if (cancelled) return;
                 if (!result.success) {
                     // Session explicitly cleared in the main process — end now.
@@ -99,7 +103,7 @@ export function CastControls({ deviceId, deviceName, onSessionEnded }: CastContr
             cancelled = true;
             clearInterval(interval);
         };
-    }, [deviceId, endSession]);
+    }, [deviceId, endSession, remote]);
 
     const isPlaying = /PLAYING|TRANSITIONING/i.test(status?.state || '');
     const duration = status?.duration || 0;
@@ -108,26 +112,26 @@ export function CastControls({ deviceId, deviceName, onSessionEnded }: CastContr
 
     const handleTogglePlay = async () => {
         markCommand();
-        if (isPlaying) await castControls.pause();
-        else await castControls.resume();
+        if (isPlaying) await remote.pause();
+        else await remote.resume();
     };
 
     const handleSeek = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const seconds = Number(event.target.value);
         markCommand();
         setStatus(prev => prev ? { ...prev, position: seconds } : prev);
-        await castControls.seek(seconds);
+        await remote.seek(seconds);
     };
 
     const handleVolume = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const level = Number(event.target.value);
         setPendingVolume(level);
-        await castControls.setVolume(level);
+        await remote.setVolume(level);
         setPendingVolume(null);
     };
 
     const handleStop = async () => {
-        await castControls.stop(deviceId);
+        await remote.stop(deviceId);
         endSession();
     };
 

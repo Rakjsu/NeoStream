@@ -224,6 +224,7 @@
     "ago": "atrás",
     "now": "ahora",
     "programReminder": "Recordatorio de Programa",
+    "wrappedAnnual": "Retrospectiva",
     "programReminderStarting": "{title} está comenzando en {channel}"
   },
   "changelog": {

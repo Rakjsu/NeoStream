@@ -28,6 +28,7 @@ const invokeChannels = new Set([
     'cast:get-status',
     'web-remote:get-config',
     'web-remote:set-enabled',
+    'cast:set-volume',
     'categories:get-live',
     'playlists:add-stalker',
     'stalker:create-link',

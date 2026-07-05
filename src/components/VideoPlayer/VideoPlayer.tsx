@@ -257,7 +257,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [showDeviceSelector, setShowDeviceSelector] = useState(false);
-    const [castingDevice, setCastingDevice] = useState<{ id: string; name: string } | null>(null);
+    const [castingDevice, setCastingDevice] = useState<{ id: string; name: string; type: 'dlna' | 'chromecast' } | null>(null);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     // Subtitle sync offset (seconds); adjusted from the gear menu in 0.5s steps.
     const [subtitleOffset, setSubtitleOffset] = useState(0);
@@ -1284,8 +1284,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                         subtitleVtt={vttContent}
                         onClose={() => setShowDeviceSelector(false)}
                         onDeviceSelected={(device) => {
-                            if (device.type === 'dlna') {
-                                setCastingDevice({ id: device.id, name: device.name });
+                            if (device.type === 'dlna' || device.type === 'chromecast') {
+                                setCastingDevice({ id: device.id, name: device.name, type: device.type });
                                 // Pause local playback — the TV took over.
                                 if (state.playing) controls.togglePlay();
                             }
@@ -1294,12 +1294,13 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                 )
             }
 
-            {/* Mini remote while a DLNA cast session is active */}
+            {/* Mini remote while a DLNA/Chromecast cast session is active */}
             {
                 castingDevice && (
                     <CastControls
                         deviceId={castingDevice.id}
                         deviceName={castingDevice.name}
+                        deviceType={castingDevice.type}
                         onSessionEnded={() => setCastingDevice(null)}
                     />
                 )
