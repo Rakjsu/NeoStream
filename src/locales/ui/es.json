@@ -262,6 +262,12 @@
     "next": "Siguiente",
     "done": "Concluir"
   },
+  "network": {
+    "webRemoteTitle": "Control por el móvil",
+    "webRemoteDesc": "Abre un mando en el navegador del móvil (misma Wi-Fi) con play/pausa, volumen y saltar",
+    "webRemoteOpen": "Abre en el móvil",
+    "webRemoteHint": "Mantén la app abierta en el ordenador. Solo funciona en la misma red local."
+  },
   "welcome": {
     "stepLanguageTitle": "Bienvenido a NeoStream",
     "stepLanguageDesc": "Elige el idioma de la aplicación",
