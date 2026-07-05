@@ -1122,6 +1122,21 @@ export function setupDLNAHandlers() {
     log.info('[DLNA] IPC Handlers initialized with auto-discovery');
 }
 
+/** True for URLs only this machine can reach (loopback). */
+export function isLoopbackUrl(url: string): boolean {
+    return /^https?:\/\/(127\.|localhost([:/]|$))/i.test(url)
+}
+
+/**
+ * Wrap any upstream URL in the LAN proxy (Chromecast/AirPlay can then reach
+ * loopback sources like the rescue-transcode HLS). Playlists get their
+ * segment URIs rewritten by the proxy route, same as DLNA casting.
+ */
+export async function createLanProxyUrlFor(upstreamUrl: string, deviceHost: string): Promise<string> {
+    await ensureProxyServer()
+    return createProxyUrl(upstreamUrl, deviceHost)
+}
+
 /**
  * Serve a WebVTT subtitle on the LAN for a Chromecast text track. Reuses the
  * DLNA proxy server; returns the URL reachable from the device's subnet.

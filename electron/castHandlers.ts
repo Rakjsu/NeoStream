@@ -9,7 +9,7 @@ import { ipcMain } from 'electron'
 import { Bonjour, type Browser, type Service } from 'bonjour-service'
 import log from './logger'
 import { CastSession, type CastMediaInput } from './castClient'
-import { registerCastSubtitleVtt } from './dlnaHandlers'
+import { registerCastSubtitleVtt, isLoopbackUrl, createLanProxyUrlFor } from './dlnaHandlers'
 
 interface CastDevice {
     id: string
@@ -65,8 +65,13 @@ export function setupCastHandlers(): void {
         try {
             const device = devices.get(String(payload?.deviceId ?? ''))
             if (!device) return { success: false, error: 'Dispositivo não encontrado' }
-            const url = String(payload?.url ?? '')
+            let url = String(payload?.url ?? '')
             if (!/^https?:\/\//.test(url)) return { success: false, error: 'URL inválida' }
+            // Loopback sources (rescue transcode) ride the LAN proxy so the
+            // device can actually reach them.
+            if (isLoopbackUrl(url)) {
+                url = await createLanProxyUrlFor(url, device.host)
+            }
 
             // Current subtitle rides along as a WebVTT text track served on LAN.
             let subtitleUrl: string | undefined
