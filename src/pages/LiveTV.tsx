@@ -96,6 +96,11 @@ export function LiveTV() {
     const [progressTick, setProgressTick] = useState(0);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const gridRef = useRef<HTMLDivElement>(null);
+    // Phone web-remote guide: fresh channel list for the tap-to-switch handler
+    // (avoids re-subscribing the media:control listener on every zap) + the
+    // last-pushed signature so we don't spam identical guides down the socket.
+    const zapStreamsRef = useRef<LiveStream[]>([]);
+    const lastGuideSigRef = useRef<string>('');
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const [allowedCategoryIds, setAllowedCategoryIds] = useState<Set<string>>(new Set());
     const [blockedCategoryIds, setBlockedCategoryIds] = useState<Set<string>>(new Set());
@@ -229,6 +234,32 @@ export function LiveTV() {
         };
     }, [selectedChannel, playingChannel]);
 
+    // Phone web-remote → "trocar canal": the server forwards a playChannel
+    // command over the shared media:control channel. Look the id up in the
+    // gated list (same filter the phone sees) and zap to it. Subscribed once;
+    // the current channel list lives in a ref to keep this handler stable.
+    useEffect(() => {
+        const handler = (_e: unknown, action: string, arg?: unknown) => {
+            if (action !== 'playChannel') return;
+            const id = String(arg ?? '');
+            const channel = zapStreamsRef.current.find(s => String(s.stream_id) === id);
+            if (channel) {
+                setSelectedChannel(null);
+                setPlayingChannel(channel);
+            }
+        };
+        window.ipcRenderer.on('media:control', handler);
+        return () => window.ipcRenderer.off('media:control', handler);
+    }, []);
+
+    // Tell the phone guide the page is gone (shows the "open TV ao vivo" hint)
+    // when LiveTV unmounts.
+    useEffect(() => {
+        return () => {
+            window.ipcRenderer.send('web-remote:guide', { channels: [], playingId: '', epg: null });
+        };
+    }, []);
+
     const fetchStreams = async () => {
         setLoading(true);
         setError('');
@@ -338,6 +369,41 @@ export function LiveTV() {
         });
         if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
     }, [searchQuery, selectedCategory, itemsPerPage]);
+
+    // Push the second-screen guide to the phone web-remote: the gated channel
+    // list (so the phone can't switch to a blocked channel) + the now/next EPG
+    // of the playing channel. Guarded by a signature so identical guides don't
+    // spam the socket on every unrelated re-render. The main-side listener is
+    // always registered; when the remote is off it just broadcasts to nobody.
+    useEffect(() => {
+        // Keep the tap-to-switch handler's channel list fresh (mutated here in
+        // an effect, never during render).
+        zapStreamsRef.current = filteredStreams;
+        const channels = filteredStreams.map(s => ({
+            id: String(s.stream_id),
+            name: s.name,
+            logo: s.stream_icon || '',
+        }));
+        const playingId = playingChannel ? String(playingChannel.stream_id) : '';
+        const epg = currentProgram
+            ? {
+                now: currentProgram.title,
+                nowStart: epgService.formatTime(currentProgram.start),
+                nowEnd: epgService.formatTime(currentProgram.end),
+                next: upcomingPrograms[0]?.title || '',
+            }
+            : null;
+        const sig = [
+            channels.length,
+            channels[0]?.id ?? '',
+            channels[channels.length - 1]?.id ?? '',
+            playingId,
+            epg ? `${epg.now}|${epg.nowStart}|${epg.next}` : '',
+        ].join('~');
+        if (sig === lastGuideSigRef.current) return;
+        lastGuideSigRef.current = sig;
+        window.ipcRenderer.send('web-remote:guide', { channels, playingId, epg });
+    });
 
     // Find quality variants for a channel (e.g., Globo SP matches Globo [4K])
     const getChannelQualityVariants = (channel: LiveStream) => {

@@ -35,10 +35,31 @@ interface ClientSocket {
     buffer: Uint8Array
 }
 
+interface GuideChannel {
+    id: string
+    name: string
+    logo: string
+}
+interface GuideEpg {
+    now: string
+    nowStart: string
+    nowEnd: string
+    next: string
+}
+interface GuideState {
+    channels: GuideChannel[]
+    playingId: string
+    epg: GuideEpg | null
+}
+
 let server: http.Server | null = null
 let serverPort = 0
 const clients = new Set<ClientSocket>()
 let mediaState = { hasMedia: false, playing: false, title: '' }
+// Second-screen guide: the live channel list + now/next EPG of the playing
+// channel, pushed by the LiveTV renderer while it's mounted. Null until the
+// user opens the TV ao vivo page (the phone shows a hint in the meantime).
+let guideState: GuideState | null = null
 
 function getConfig(): WebRemoteConfig {
     return { enabled: false, ...(store.get('webRemote') as Partial<WebRemoteConfig> | undefined) }
@@ -58,13 +79,45 @@ function stateMessage(): string {
     return JSON.stringify({ type: 'state', ...mediaState })
 }
 
-function broadcastState(): void {
-    const frame = encodeTextFrame(stateMessage())
+function guideMessage(): string {
+    return JSON.stringify({ type: 'guide', ...(guideState ?? { channels: [], playingId: '', epg: null }) })
+}
+
+function broadcast(text: string): void {
+    const frame = encodeTextFrame(text)
     for (const client of clients) {
         try {
             client.socket.write(frame)
         } catch { /* dropped on next read */ }
     }
+}
+
+function broadcastState(): void {
+    broadcast(stateMessage())
+}
+
+/** Sanitize the untrusted guide payload coming from the renderer. */
+function sanitizeGuide(raw: unknown): GuideState {
+    const obj = (raw ?? {}) as Record<string, unknown>
+    const rawChannels = Array.isArray(obj.channels) ? obj.channels : []
+    const channels: GuideChannel[] = rawChannels.slice(0, 600).map((c) => {
+        const ch = (c ?? {}) as Record<string, unknown>
+        return {
+            id: String(ch.id ?? ''),
+            name: typeof ch.name === 'string' ? ch.name.slice(0, 160) : '',
+            logo: typeof ch.logo === 'string' ? ch.logo.slice(0, 500) : '',
+        }
+    }).filter((c) => c.id && c.name)
+    const rawEpg = obj.epg as Record<string, unknown> | null | undefined
+    const epg: GuideEpg | null = rawEpg && typeof rawEpg === 'object'
+        ? {
+            now: typeof rawEpg.now === 'string' ? rawEpg.now.slice(0, 200) : '',
+            nowStart: typeof rawEpg.nowStart === 'string' ? rawEpg.nowStart : '',
+            nowEnd: typeof rawEpg.nowEnd === 'string' ? rawEpg.nowEnd : '',
+            next: typeof rawEpg.next === 'string' ? rawEpg.next.slice(0, 200) : '',
+        }
+        : null
+    return { channels, playingId: String(obj.playingId ?? ''), epg }
 }
 
 function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
@@ -76,8 +129,9 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
     socket.write(buildHandshakeResponse(key))
     const client: ClientSocket = { socket, buffer: new Uint8Array(0) }
     clients.add(client)
-    // Send the current state immediately.
+    // Send the current state + guide snapshot immediately.
     socket.write(encodeTextFrame(stateMessage()))
+    if (guideState) socket.write(encodeTextFrame(guideMessage()))
 
     socket.on('data', (chunk: Buffer) => {
         const glued = new Uint8Array(client.buffer.length + chunk.length)
@@ -113,6 +167,8 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     // The renderer's media:control handler maps these to player actions.
     if (command.action === 'seek') {
         win.webContents.send('media:control', 'seek', command.seconds)
+    } else if (command.action === 'playChannel') {
+        win.webContents.send('media:control', 'playChannel', command.channelId)
     } else {
         win.webContents.send('media:control', command.action)
     }
@@ -128,6 +184,13 @@ export function setupWebRemote(): void {
             title: typeof state?.title === 'string' ? state.title : '',
         }
         broadcastState()
+    })
+
+    // The LiveTV page pushes its channel list + now/next EPG here while it's
+    // mounted, so the phone can show a second-screen guide and tap to switch.
+    ipcMain.on('web-remote:guide', (_e, raw: unknown) => {
+        guideState = sanitizeGuide(raw)
+        broadcast(guideMessage())
     })
 
     ipcMain.handle('web-remote:get-config', () => ({

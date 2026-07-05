@@ -122,9 +122,10 @@ export function decodeFrames(buffer: Uint8Array): { frames: DecodedFrame[]; rest
 export type RemoteCommand =
     | { action: 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' }
     | { action: 'seek'; seconds: number }
+    | { action: 'playChannel'; channelId: string }
 
 const VALID_ACTIONS = new Set([
-    'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'seek',
+    'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'seek', 'playChannel',
 ])
 
 /** Validate a command coming off the wire (untrusted phone input). */
@@ -143,5 +144,10 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return null
         return { action: 'seek', seconds }
     }
-    return { action: action as Exclude<RemoteCommand['action'], 'seek'> }
+    if (action === 'playChannel') {
+        const channelId = (parsed as { channelId?: unknown }).channelId
+        if (typeof channelId !== 'string' || !channelId) return null
+        return { action: 'playChannel', channelId }
+    }
+    return { action: action as 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' }
 }

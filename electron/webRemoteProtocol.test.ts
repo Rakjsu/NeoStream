@@ -66,10 +66,17 @@ describe('parseRemoteCommand', () => {
         expect(parseRemoteCommand('{"action":"togglePlay"}')).toEqual({ action: 'togglePlay' })
         expect(parseRemoteCommand('{"action":"seek","seconds":30}')).toEqual({ action: 'seek', seconds: 30 })
     })
+    it('aceita playChannel com id de canal', () => {
+        expect(parseRemoteCommand('{"action":"playChannel","channelId":"1234"}'))
+            .toEqual({ action: 'playChannel', channelId: '1234' })
+    })
     it('rejeita lixo e ações desconhecidas', () => {
         expect(parseRemoteCommand('não-json')).toBeNull()
         expect(parseRemoteCommand('{"action":"rm -rf"}')).toBeNull()
         expect(parseRemoteCommand('{"action":"seek"}')).toBeNull() // seconds ausente
+        expect(parseRemoteCommand('{"action":"playChannel"}')).toBeNull() // channelId ausente
+        expect(parseRemoteCommand('{"action":"playChannel","channelId":""}')).toBeNull() // id vazio
+        expect(parseRemoteCommand('{"action":"playChannel","channelId":42}')).toBeNull() // id não-string
         expect(parseRemoteCommand('42')).toBeNull()
     })
 })

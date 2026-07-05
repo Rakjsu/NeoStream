@@ -148,6 +148,7 @@ const sendChannels = new Set([
     'media:state',
     'pip:control',
     'pip:state',
+    'web-remote:guide',
 ])
 
 const receiveChannels = new Set([
