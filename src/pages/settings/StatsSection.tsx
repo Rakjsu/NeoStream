@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usageStatsService, type UsageStats, type DailyStats } from '../../services/usageStatsService';
 import {
     aggregateTopContent,
@@ -20,6 +20,13 @@ export function StatsSection() {
     const [weeklyStats] = useState<DailyStats[]>(() => usageStatsService.getWeeklyStats());
     const [showWrapped, setShowWrapped] = useState(false);
     const { t, language } = useLanguage();
+
+    // The annual Wrapped notification opens the overlay via this event.
+    useEffect(() => {
+        const open = () => setShowWrapped(true);
+        window.addEventListener('neostream:open-wrapped', open);
+        return () => window.removeEventListener('neostream:open-wrapped', open);
+    }, []);
 
     const today = new Date().toISOString().split('T')[0];
     const monthlyStats = fillLastNDays(usageStats?.dailyStats || [], 30, today);

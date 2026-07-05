@@ -168,19 +168,68 @@ export function stopAppPayload(requestId: number, sessionId: string): string {
 
 export function loadMediaPayload(
     requestId: number,
-    media: { url: string; title: string; contentType: string; live: boolean },
+    media: { url: string; title: string; contentType: string; live: boolean; subtitleUrl?: string; subtitleLanguage?: string },
 ): string {
+    // Optional WebVTT side-load: one TEXT track, active from the start. The
+    // URL must be reachable by the device (the DLNA proxy serves it on LAN).
+    const tracks = media.subtitleUrl
+        ? [{
+            trackId: 1,
+            type: 'TEXT',
+            subtype: 'SUBTITLES',
+            trackContentId: media.subtitleUrl,
+            trackContentType: 'text/vtt',
+            language: media.subtitleLanguage || 'pt',
+            name: 'Legenda',
+        }]
+        : undefined
     return JSON.stringify({
         type: 'LOAD',
         requestId,
         autoplay: true,
+        ...(tracks ? { activeTrackIds: [1] } : {}),
         media: {
             contentId: media.url,
             contentType: media.contentType,
             streamType: media.live ? 'LIVE' : 'BUFFERED',
             metadata: { metadataType: 0, title: media.title },
+            ...(tracks ? { tracks, textTrackStyle: { backgroundColor: '#00000000', edgeType: 'OUTLINE', edgeColor: '#000000FF' } } : {}),
         },
     })
+}
+
+/** media GET_STATUS (prompts a fresh MEDIA_STATUS with currentTime). */
+export function getMediaStatusPayload(requestId: number, mediaSessionId?: number | null): string {
+    return JSON.stringify({
+        type: 'GET_STATUS',
+        requestId,
+        ...(typeof mediaSessionId === 'number' ? { mediaSessionId } : {}),
+    })
+}
+
+/** Receiver-level volume (0..1). */
+export function setVolumePayload(requestId: number, level: number): string {
+    return JSON.stringify({
+        type: 'SET_VOLUME',
+        requestId,
+        volume: { level: Math.min(1, Math.max(0, level)) },
+    })
+}
+
+/** currentTime/duration out of a MEDIA_STATUS, or null when absent. */
+export function extractMediaTimes(mediaStatusJson: unknown): { currentTime: number | null; duration: number | null } | null {
+    if (mediaStatusJson === null || typeof mediaStatusJson !== 'object') return null
+    const status = (mediaStatusJson as { status?: unknown }).status
+    if (!Array.isArray(status) || status.length === 0) return null
+    const entry = status[0]
+    if (entry === null || typeof entry !== 'object') return null
+    const e = entry as Record<string, unknown>
+    const currentTime = typeof e.currentTime === 'number' ? e.currentTime : null
+    const mediaInfo = e.media
+    const duration = mediaInfo !== null && typeof mediaInfo === 'object' && typeof (mediaInfo as { duration?: unknown }).duration === 'number'
+        ? (mediaInfo as { duration: number }).duration
+        : null
+    return { currentTime, duration }
 }
 
 export function mediaCommandPayload(

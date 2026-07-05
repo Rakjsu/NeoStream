@@ -159,6 +159,22 @@ if (typeof window !== 'undefined' && window.ipcRenderer) {
         })();
     });
 }
+// Annual Wrapped invite: once per December, if there's enough watch data.
+if (typeof window !== 'undefined') {
+    void import('./services/wrappedAnnual').then(({ wrappedAnnualService }) => {
+        const payload = wrappedAnnualService.maybeNotify();
+        if (payload) {
+            void import('./services/episodeNotificationService').then(({ appNotificationService }) => {
+                appNotificationService.addNotification({
+                    type: 'wrapped_annual',
+                    title: payload.title,
+                    message: payload.message,
+                });
+            });
+        }
+    });
+}
+
 // TV mode scale/focus (Settings -> Aparencia).
 tvModeService.apply();
 
