@@ -43,6 +43,7 @@ const EXACT_KEYS = [
     'parentalConfig',         // parental control config (PIN hash included)
     'playerVolume',           // last player volume
     'watchLater',             // legacy pre-profile watch-later list
+    'neostream_sync_tombstones', // deletions ledger (sync propagates removals)
 ];
 
 // Keys included when they start with one of these prefixes

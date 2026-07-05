@@ -1,6 +1,7 @@
 // Favorites localStorage utility (adapted for profiles)
 import { profileService } from './profileService';
 import { playlistScopedKey, hasKnownPlaylistId } from './activePlaylistService';
+import { syncTombstones, tombstoneItemKey } from './syncTombstones';
 
 // localStorage key base. Per-profile per-playlist key is
 // `neostream_profile_${profileId}__pl_${activePlaylistId}`; the legacy
@@ -76,6 +77,8 @@ export const favoritesService = {
                 (i: FavoriteItem) => !(i.id === id && i.type === type)
             );
             this.saveProfileData({ ...profileData, favorites });
+            // Deletions ledger so the machine sync propagates the removal.
+            syncTombstones.record(playlistScopedKey(KEY_BASE, activeProfile.id), tombstoneItemKey(id, type));
             return true;
         } catch (error) {
             console.error('Error removing from favorites:', error);
