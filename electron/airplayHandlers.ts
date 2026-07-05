@@ -13,6 +13,7 @@ import http from 'http';
 import { Bonjour, type Browser, type Service } from 'bonjour-service';
 
 import log from './logger'
+import { isLoopbackUrl, createLanProxyUrlFor } from './dlnaHandlers'
 
 interface AirPlayDevice {
     id: string
@@ -153,6 +154,11 @@ export function setupAirPlayHandlers() {
             const device = discoveredDevices.get(deviceId);
             if (!device) {
                 throw new Error('Device not found');
+            }
+
+            // Loopback sources (rescue transcode) ride the DLNA LAN proxy.
+            if (typeof url === 'string' && isLoopbackUrl(url)) {
+                url = await createLanProxyUrlFor(url, device.host);
             }
 
             await airplayRequest(

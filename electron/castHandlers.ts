@@ -9,6 +9,7 @@ import { ipcMain } from 'electron'
 import { Bonjour, type Browser, type Service } from 'bonjour-service'
 import log from './logger'
 import { CastSession, type CastMediaInput } from './castClient'
+import { isLoopbackUrl, createLanProxyUrlFor } from './dlnaHandlers'
 
 interface CastDevice {
     id: string
@@ -64,8 +65,13 @@ export function setupCastHandlers(): void {
         try {
             const device = devices.get(String(payload?.deviceId ?? ''))
             if (!device) return { success: false, error: 'Dispositivo não encontrado' }
-            const url = String(payload?.url ?? '')
+            let url = String(payload?.url ?? '')
             if (!/^https?:\/\//.test(url)) return { success: false, error: 'URL inválida' }
+            // Loopback sources (rescue transcode) ride the LAN proxy so the
+            // device can actually reach them.
+            if (isLoopbackUrl(url)) {
+                url = await createLanProxyUrlFor(url, device.host)
+            }
 
             stopActiveSession()
             const session = new CastSession(device.host, device.name)
