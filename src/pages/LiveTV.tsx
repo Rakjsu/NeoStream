@@ -243,12 +243,36 @@ export function LiveTV() {
     // the current channel list lives in a ref to keep this handler stable.
     useEffect(() => {
         const handler = (_e: unknown, action: string, arg?: unknown) => {
-            if (action !== 'playChannel') return;
-            const id = String(arg ?? '');
-            const channel = zapStreamsRef.current.find(s => String(s.stream_id) === id);
-            if (channel) {
-                setSelectedChannel(null);
-                setPlayingChannel(channel);
+            if (action === 'playChannel') {
+                const id = String(arg ?? '');
+                const channel = zapStreamsRef.current.find(s => String(s.stream_id) === id);
+                if (channel) {
+                    setSelectedChannel(null);
+                    setPlayingChannel(channel);
+                }
+                return;
+            }
+            if (action === 'requestEpg') {
+                // Phone tapped a channel's ⓘ: fetch its now/next on demand and
+                // push it back to the guide. Best-effort — silent on failure.
+                const id = String(arg ?? '');
+                const channel = zapStreamsRef.current.find(s => String(s.stream_id) === id);
+                if (!channel) return;
+                void (async () => {
+                    try {
+                        const programs = await epgService.fetchChannelEPG(
+                            channel.epg_channel_id || '', channel.name, channel.stream_id);
+                        const current = epgService.getCurrentProgram(programs);
+                        const next = epgService.getUpcomingPrograms(programs, current, 1)[0] || null;
+                        window.ipcRenderer.send('web-remote:channel-epg', {
+                            channelId: id,
+                            now: current?.title || '',
+                            nowStart: current ? epgService.formatTime(current.start) : '',
+                            nowEnd: current ? epgService.formatTime(current.end) : '',
+                            next: next?.title || '',
+                        });
+                    } catch { /* keep quiet; phone shows "sem info" */ }
+                })();
             }
         };
         window.ipcRenderer.on('media:control', handler);

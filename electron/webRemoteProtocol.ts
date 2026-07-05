@@ -123,9 +123,10 @@ export type RemoteCommand =
     | { action: 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' }
     | { action: 'seek'; seconds: number }
     | { action: 'playChannel'; channelId: string }
+    | { action: 'requestEpg'; channelId: string }
 
 const VALID_ACTIONS = new Set([
-    'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'seek', 'playChannel',
+    'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'seek', 'playChannel', 'requestEpg',
 ])
 
 /** Validate a command coming off the wire (untrusted phone input). */
@@ -144,10 +145,10 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return null
         return { action: 'seek', seconds }
     }
-    if (action === 'playChannel') {
+    if (action === 'playChannel' || action === 'requestEpg') {
         const channelId = (parsed as { channelId?: unknown }).channelId
         if (typeof channelId !== 'string' || !channelId) return null
-        return { action: 'playChannel', channelId }
+        return { action, channelId }
     }
     return { action: action as 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' }
 }

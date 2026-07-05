@@ -70,6 +70,11 @@ describe('parseRemoteCommand', () => {
         expect(parseRemoteCommand('{"action":"playChannel","channelId":"1234"}'))
             .toEqual({ action: 'playChannel', channelId: '1234' })
     })
+    it('aceita requestEpg com id de canal', () => {
+        expect(parseRemoteCommand('{"action":"requestEpg","channelId":"77"}'))
+            .toEqual({ action: 'requestEpg', channelId: '77' })
+        expect(parseRemoteCommand('{"action":"requestEpg"}')).toBeNull()
+    })
     it('rejeita lixo e ações desconhecidas', () => {
         expect(parseRemoteCommand('não-json')).toBeNull()
         expect(parseRemoteCommand('{"action":"rm -rf"}')).toBeNull()

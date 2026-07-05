@@ -81,7 +81,12 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
   .chitem.playing { border-color: var(--accent); background: rgba(99,102,241,.16); }
   .chitem img { width: 40px; height: 40px; border-radius: 8px; object-fit: contain; background: rgba(0,0,0,.3); flex: none; }
   .chitem .ph { width: 40px; height: 40px; border-radius: 8px; background: rgba(255,255,255,.08); display: flex; align-items: center; justify-content: center; font-size: 18px; flex: none; }
-  .chitem .nm { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chitem .nm { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chinfo { flex: none; width: 34px; height: 34px; border-radius: 8px; border: none; cursor: pointer;
+    background: rgba(255,255,255,.08); color: #fff; font-size: 15px; }
+  .chinfo:active { background: rgba(255,255,255,.18); }
+  .chepg { margin: 6px 4px 2px 52px; font-size: 12px; color: rgba(255,255,255,.6); line-height: 1.5; }
+  .chepg .p { color: #fff; font-weight: 600; }
   .empty { font-size: 13px; color: rgba(255,255,255,.4); text-align: center; padding: 24px 0; }
 </style>
 </head>
@@ -153,6 +158,8 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     var ws;
     var guide = { channels: [], playingId: '', epg: null };
     var filter = '';
+    var epgCache = {};   // channelId → { now, nowStart, nowEnd, next }
+    var openEpg = {};    // channelId → true while its EPG panel is expanded
 
     function showPinPrompt(message) {
       pinCard.style.display = 'block';
@@ -189,6 +196,9 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
           } else if (msg.type === 'guide') {
             guide = { channels: msg.channels || [], playingId: msg.playingId || '', epg: msg.epg || null };
             renderGuide();
+          } else if (msg.type === 'channelEpg') {
+            epgCache[msg.channelId] = { now: msg.now, nowStart: msg.nowStart, nowEnd: msg.nowEnd, next: msg.next };
+            if (openEpg[msg.channelId]) renderGuide();
           }
         } catch (e) {}
       };
@@ -231,8 +241,22 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         var logo = c.logo
           ? '<img src="' + esc(c.logo) + '" onerror="this.style.display=\\'none\\'" alt="">'
           : '<div class="ph">📺</div>';
-        html += '<div class="chitem' + (isPlaying ? ' playing' : '') + '" data-id="' + esc(c.id) + '">'
-          + logo + '<div class="nm">' + esc(c.name) + '</div></div>';
+        var epgHtml = '';
+        if (openEpg[c.id]) {
+          var e = epgCache[c.id];
+          if (e) {
+            epgHtml = '<div class="chepg"><div class="p">' + esc(e.now || 'Sem informação') + '</div>'
+              + (e.nowStart ? '<div>' + esc(e.nowStart + (e.nowEnd ? ' – ' + e.nowEnd : '')) + '</div>' : '')
+              + (e.next ? '<div>A seguir: ' + esc(e.next) + '</div>' : '') + '</div>';
+          } else {
+            epgHtml = '<div class="chepg">Carregando…</div>';
+          }
+        }
+        html += '<div class="chrow">'
+          + '<div class="chitem' + (isPlaying ? ' playing' : '') + '" data-id="' + esc(c.id) + '">'
+          + logo + '<div class="nm">' + esc(c.name) + '</div>'
+          + '<button class="chinfo" data-info="' + esc(c.id) + '" title="Programação">ⓘ</button></div>'
+          + epgHtml + '</div>';
       }
       chlistEl.innerHTML = html || '<div class="empty">Nenhum canal encontrado.</div>';
     }
@@ -240,7 +264,18 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     chsearchEl.addEventListener('input', function () { filter = chsearchEl.value; renderGuide(); });
 
     chlistEl.addEventListener('click', function (ev) {
-      var item = ev.target.closest ? ev.target.closest('.chitem') : null;
+      if (!ev.target.closest) return;
+      // The ⓘ button toggles the on-demand EPG panel (fetch once, then cached).
+      var info = ev.target.closest('.chinfo');
+      if (info) {
+        var iid = info.getAttribute('data-info');
+        if (openEpg[iid]) delete openEpg[iid];
+        else { openEpg[iid] = true; if (!epgCache[iid]) sendCmd('requestEpg', null, iid); }
+        renderGuide();
+        return;
+      }
+      // Tapping the rest of the row switches to that channel.
+      var item = ev.target.closest('.chitem');
       if (!item) return;
       var id = item.getAttribute('data-id');
       if (id) sendCmd('playChannel', null, id);
@@ -261,7 +296,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       if (!ws || ws.readyState !== 1) return;
       var payload = { action: action };
       if (action === 'seek') payload.seconds = sec;
-      if (action === 'playChannel') payload.channelId = channelId;
+      if (action === 'playChannel' || action === 'requestEpg') payload.channelId = channelId;
       ws.send(JSON.stringify(payload));
     }
 
