@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, X, Check, CheckCheck, Download, Tv, AlertCircle } from 'lucide-react';
+import { Bell, X, Check, CheckCheck, Download, Tv, AlertCircle, Sparkles } from 'lucide-react';
 import { appNotificationService, type AppNotification } from '../services/episodeNotificationService';
 import { useLanguage } from '../services/languageService';
 
@@ -63,6 +63,10 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads, 
                 onNavigateToGuide();
                 setIsOpen(false);
             }
+        } else if (notification.type === 'wrapped_annual') {
+            // The stats dashboard opens the Wrapped overlay on this event.
+            window.dispatchEvent(new CustomEvent('neostream:open-wrapped'));
+            setIsOpen(false);
         }
     };
 
@@ -94,6 +98,8 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads, 
                 return <Download size={16} color="#3b82f6" />;
             case 'program_reminder':
                 return <Bell size={16} color="#fbbf24" />;
+            case 'wrapped_annual':
+                return <Sparkles size={16} color="var(--ns-accent)" />;
             default:
                 return <Bell size={16} />;
         }
@@ -126,6 +132,7 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads, 
             case 'download_failed': return t('notifications', 'downloadFailed');
             case 'download_started': return t('notifications', 'downloadStarted');
             case 'program_reminder': return t('notifications', 'programReminder');
+            case 'wrapped_annual': return t('notifications', 'wrappedAnnual');
             default: return t('notifications', 'notification');
         }
     };
