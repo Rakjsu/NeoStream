@@ -10,6 +10,7 @@ import { setupIpcHandlers } from './ipcHandlers'
 log.info('NeoStream main process starting')
 import { setupDLNAHandlers } from './dlnaHandlers'
 import { setupAirPlayHandlers } from './airplayHandlers'
+import { setupCastHandlers, teardownCast } from './castHandlers'
 import { setupDownloadHandlers } from './downloadHandlers'
 import { initializeAutoUpdater } from './autoUpdater'
 import { setupPipHandlers } from './pipHandlers'
@@ -39,6 +40,8 @@ app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,VaapiVideoEnc
 setupIpcHandlers()
 setupDLNAHandlers()
 setupAirPlayHandlers()
+setupCastHandlers()
+app.on('before-quit', () => teardownCast())
 setupDownloadHandlers()
 setupCertificateErrorHandler()
 setupMpvHandlers() // EXPERIMENTAL — MPV PoC
