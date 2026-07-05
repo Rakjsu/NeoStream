@@ -45,7 +45,17 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
 </head>
 <body>
   <div class="brand">Neo<span>Stream</span> · Controle</div>
-  <div class="card">
+
+  <div class="card" id="pin-card" style="display:none">
+    <div class="title">Digite o PIN</div>
+    <div class="status">O código aparece em Configurações → Rede no computador</div>
+    <input id="pin-input" inputmode="numeric" maxlength="4" placeholder="0000"
+      style="margin-top:16px;width:140px;font-size:28px;text-align:center;letter-spacing:8px;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;">
+    <div><button class="wide" id="pin-ok" style="margin-top:16px">Conectar</button></div>
+    <div class="status off" id="pin-err" style="margin-top:10px;min-height:16px"></div>
+  </div>
+
+  <div class="card" id="remote-card" style="display:none">
     <div class="title" id="title">—</div>
     <div class="status" id="status">Conectando…</div>
     <div class="row seek">
@@ -67,14 +77,36 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
   (function () {
     var titleEl = document.getElementById('title');
     var statusEl = document.getElementById('status');
+    var pinCard = document.getElementById('pin-card');
+    var remoteCard = document.getElementById('remote-card');
+    var pinInput = document.getElementById('pin-input');
+    var pinErr = document.getElementById('pin-err');
     var ws;
 
-    function connect() {
-      ws = new WebSocket('ws://' + location.host + '/');
-      ws.onopen = function () { statusEl.textContent = 'Conectado'; statusEl.className = 'status on'; };
-      ws.onclose = function () {
+    function showPinPrompt(message) {
+      pinCard.style.display = 'block';
+      remoteCard.style.display = 'none';
+      pinErr.textContent = message || '';
+      pinInput.value = '';
+      pinInput.focus();
+    }
+
+    function connect(pin) {
+      ws = new WebSocket('ws://' + location.host + '/?pin=' + encodeURIComponent(pin));
+      ws.onopen = function () {
+        localStorage.setItem('neostream_remote_pin', pin);
+        pinCard.style.display = 'none';
+        remoteCard.style.display = 'block';
+        statusEl.textContent = 'Conectado'; statusEl.className = 'status on';
+      };
+      ws.onclose = function (ev) {
+        // 1006 with no prior open + wrong PIN → the server refused (401).
+        if (remoteCard.style.display === 'none') {
+          showPinPrompt('PIN incorreto. Confira o código no computador.');
+          return;
+        }
         statusEl.textContent = 'Reconectando…'; statusEl.className = 'status off';
-        setTimeout(connect, 1500);
+        setTimeout(function () { connect(pin); }, 1500);
       };
       ws.onmessage = function (ev) {
         try {
@@ -87,7 +119,18 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         } catch (e) {}
       };
     }
-    connect();
+
+    document.getElementById('pin-ok').addEventListener('click', function () {
+      var pin = (pinInput.value || '').trim();
+      if (pin.length === 4) connect(pin);
+      else pinErr.textContent = 'O PIN tem 4 dígitos.';
+    });
+    pinInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') document.getElementById('pin-ok').click(); });
+
+    // Try the remembered PIN first; prompt only if it fails.
+    var saved = localStorage.getItem('neostream_remote_pin');
+    if (saved && saved.length === 4) connect(saved);
+    else showPinPrompt('');
 
     function send(action, sec) {
       if (!ws || ws.readyState !== 1) return;
@@ -96,7 +139,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       ws.send(JSON.stringify(payload));
     }
 
-    document.querySelectorAll('button').forEach(function (btn) {
+    document.querySelectorAll('#remote-card button').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var cmd = btn.getAttribute('data-cmd');
         var sec = btn.getAttribute('data-sec');
