@@ -444,6 +444,10 @@
     "healthOnline": "Provider responding normally",
     "healthDegraded": "Provider partially failing",
     "healthOffline": "Provider is down",
+    "healthM3uDownload": "M3U list download",
+    "healthM3uParse": "Parsing the list channels",
+    "healthStalkerHandshake": "Stalker portal handshake",
+    "healthStalkerChannels": "Portal channel list",
     "healthChannels": "Channel list",
     "openLogsDesc": "Opens the folder where main.log is written",
     "openLogsError": "Could not open the logs folder"

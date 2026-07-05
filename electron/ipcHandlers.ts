@@ -933,6 +933,38 @@ export function setupIpcHandlers() {
             }
         }
 
+        // Non-Xtream playlists get type-appropriate checks: the M3U document
+        // itself, or the portal handshake + channel list.
+        const activeId = getActivePlaylistIdPublic()
+        const activeEntry = activeId ? findPlaylist(activeId) : undefined
+
+        if (activeEntry?.type === 'm3u') {
+            const startedAt = Date.now()
+            const download = await probe('m3u_download', activeEntry.url)
+            const parseResult = await fetchM3uChannels(activeEntry.url)
+                .then(channels => ({ name: 'm3u_parse', ok: channels.length > 0, status: null, ms: Date.now() - startedAt, error: undefined as string | undefined }))
+                .catch((error: unknown) => ({ name: 'm3u_parse', ok: false, status: null, ms: Date.now() - startedAt, error: getErrorMessage(error) as string | undefined }))
+            return { success: true, results: [download, parseResult] }
+        }
+
+        if (activeEntry?.type === 'stalker') {
+            const stalker = new StalkerClient(activeEntry.url, activeEntry.username)
+            const timed = async (name: string, run: () => Promise<unknown>) => {
+                const startedAt = Date.now()
+                try {
+                    await run()
+                    return { name, ok: true, status: null, ms: Date.now() - startedAt }
+                } catch (error: unknown) {
+                    return { name, ok: false, status: null, ms: Date.now() - startedAt, error: getErrorMessage(error) }
+                }
+            }
+            const handshake = await timed('stalker_handshake', () => stalker.handshake())
+            const channels = handshake.ok
+                ? await timed('stalker_channels', () => stalker.getAllChannels())
+                : { name: 'stalker_channels', ok: false, status: null, ms: 0, error: 'handshake falhou' }
+            return { success: true, results: [handshake, channels] }
+        }
+
         const results = await Promise.all([
             probe('player_api', `${base}/player_api.php?${creds}`),
             probe('live_streams', `${base}/player_api.php?${creds}&action=get_live_streams`),
