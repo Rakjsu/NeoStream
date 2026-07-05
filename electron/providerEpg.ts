@@ -186,6 +186,37 @@ function ensureXmltvIndex(): Promise<void> {
             let url = buildXmltvUrl(credentials.url, credentials.username, credentials.password)
             const activeId = getActivePlaylistIdPublic()
             const activeEntry = activeId ? findPlaylist(activeId) : undefined
+
+            // Stalker portals: no XMLTV endpoint — pull the portal EPG
+            // (get_epg_info) and synthesize an XMLTV document so the rest of
+            // the pipeline (index, mini-EPG, guide, search) works unchanged.
+            if (activeEntry?.type === 'stalker') {
+                const { StalkerClient } = await import('./stalkerClient')
+                const { buildXmltvFromStalkerEpg } = await import('./stalkerProtocol')
+                const stalker = new StalkerClient(activeEntry.url, activeEntry.username)
+                let syntheticXml = ''
+                try {
+                    const [channels, epg] = await Promise.all([stalker.getAllChannels(), stalker.getEpgInfo(24)])
+                    syntheticXml = buildXmltvFromStalkerEpg(channels, epg)
+                } catch (error) {
+                    log.info('[Provider EPG] Stalker portal EPG unavailable:', error instanceof Error ? error.message : String(error))
+                }
+                if (!syntheticXml || !looksLikeXmltv(syntheticXml)) {
+                    xmltvAvailability = 'unavailable'
+                    return
+                }
+                const parseStart = Date.now()
+                const parsed = parseXmltvIndexWithMeta(syntheticXml)
+                xmltvIndex = parsed.index
+                providerUtcOffsetMinutes = parsed.utcOffsetMinutes
+                xmltvAvailability = 'ready'
+                let programCount = 0
+                for (const programs of xmltvIndex.values()) programCount += programs.length
+                log.info('[Provider EPG] Stalker EPG indexed', xmltvIndex.size, 'channels /', programCount,
+                    'programs in', Date.now() - parseStart, 'ms')
+                return
+            }
+
             if (activeEntry?.type === 'm3u') {
                 const head = await axios.get(activeEntry.url, {
                     timeout: 15000,

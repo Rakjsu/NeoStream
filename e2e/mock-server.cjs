@@ -180,6 +180,38 @@ function startMockServer() {
                 ]);
                 return;
             }
+            if (action === 'get_categories') {
+                // vod categories (type=vod)
+                reply([
+                    { id: '*', title: 'All' },
+                    { id: '3', title: 'Ação STK' }
+                ]);
+                return;
+            }
+            if (action === 'get_ordered_list') {
+                // Single-page VOD listing (type=vod)
+                reply({
+                    total_items: 2,
+                    max_page_items: 14,
+                    data: [
+                        { id: 901, name: 'Filme STK Um', screenshot_uri: '', cmd: `auto ${origin}/movie/stk-um.mp4`, category_id: '3', year: 2026 },
+                        { id: 902, name: 'Filme STK Dois', screenshot_uri: '', cmd: `auto ${origin}/movie/stk-dois.mp4`, category_id: '3', year: 2025 }
+                    ]
+                });
+                return;
+            }
+            if (action === 'get_epg_info') {
+                const now = Math.floor(Date.now() / 1000);
+                reply({
+                    data: {
+                        '501': [
+                            { name: 'Programa STK Agora', descr: 'ao vivo', start_timestamp: now - 1800, stop_timestamp: now + 1800 },
+                            { name: 'Programa STK Depois', descr: '', start_timestamp: now + 1800, stop_timestamp: now + 5400 }
+                        ]
+                    }
+                });
+                return;
+            }
             if (action === 'get_all_channels') {
                 reply({
                     data: [

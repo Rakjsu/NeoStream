@@ -18,10 +18,15 @@ import {
     extractStreamUrl,
     parseChannels,
     parseGenres,
+    parseVodItems,
+    parseTotalItems,
+    parseEpgPrograms,
     portalCandidates,
     unwrapJs,
     type StalkerChannel,
     type StalkerGenre,
+    type StalkerVodItem,
+    type StalkerEpgProgram,
 } from './stalkerProtocol'
 
 const TIMEOUT_MS = 20000
@@ -122,14 +127,14 @@ export class StalkerClient {
     }
 
     /**
-     * Resolve a channel `cmd` to a playable URL. Tries create_link (needed by
-     * portals that mint per-play tokens); falls back to the URL embedded in
-     * the cmd itself when create_link is unavailable.
+     * Resolve a channel/movie `cmd` to a playable URL. Tries create_link
+     * (needed by portals that mint per-play tokens); falls back to the URL
+     * embedded in the cmd itself when create_link is unavailable.
      */
-    async createLink(cmd: string): Promise<string> {
+    async createLink(cmd: string, kind: 'itv' | 'vod' = 'itv'): Promise<string> {
         try {
             const resolved = await this.callWithRetry(
-                buildStalkerQuery('itv', 'create_link', { cmd, series: '', forced_storage: 'undefined', disable_ad: '0', download: '0' }),
+                buildStalkerQuery(kind, 'create_link', { cmd, series: '', forced_storage: 'undefined', disable_ad: '0', download: '0' }),
                 body => {
                     const js = unwrapJs<{ cmd?: string }>(body)
                     if (js === null || typeof js.cmd !== 'string') return null
@@ -141,8 +146,60 @@ export class StalkerClient {
             log.warn('[Stalker] create_link falhou, usando cmd direto:', error instanceof Error ? error.message : String(error))
         }
         const direct = extractStreamUrl(cmd)
-        if (!direct) throw new Error('Canal sem URL reproduzível')
+        if (!direct) throw new Error('Conteúdo sem URL reproduzível')
         return direct
+    }
+
+    async getVodCategories(): Promise<StalkerGenre[]> {
+        return this.callWithRetry(buildStalkerQuery('vod', 'get_categories'), body => {
+            const js = unwrapJs(body)
+            if (js === null) return null
+            const genres = parseGenres(js)
+            return genres.length > 0 ? genres : null
+        })
+    }
+
+    /**
+     * Full VOD listing via the paginated get_ordered_list, capped at
+     * `maxItems` (portals can host tens of thousands of titles; the cap is
+     * logged so truncation is never silent).
+     */
+    async getVodItems(maxItems = 2000): Promise<StalkerVodItem[]> {
+        const items: StalkerVodItem[] = []
+        let total = Infinity
+        for (let page = 1; page <= 500 && items.length < Math.min(total, maxItems); page++) {
+            const js = await (async () => {
+                const query = buildStalkerQuery('vod', 'get_ordered_list', { p: String(page) })
+                const first = unwrapJs(await this.rawCall(query, await this.getToken()))
+                if (first !== null) return first
+                return unwrapJs(await this.rawCall(query, await this.getToken(true)))
+            })()
+            if (js === null) break
+            if (page === 1) {
+                const parsedTotal = parseTotalItems(js)
+                if (parsedTotal > 0) total = parsedTotal
+            }
+            const pageItems = parseVodItems(js)
+            if (pageItems.length === 0) break
+            items.push(...pageItems)
+        }
+        if (items.length >= maxItems && total > maxItems) {
+            log.warn(`[Stalker] catálogo VOD truncado em ${maxItems} de ${total} títulos`)
+        }
+        return items.slice(0, maxItems)
+    }
+
+    /** Portal EPG for the whole lineup (period in hours). */
+    async getEpgInfo(periodHours = 24): Promise<Map<string, StalkerEpgProgram[]>> {
+        return this.callWithRetry(
+            buildStalkerQuery('itv', 'get_epg_info', { period: String(periodHours) }),
+            body => {
+                const js = unwrapJs(body)
+                if (js === null) return null
+                const programs = parseEpgPrograms(js)
+                return programs.size > 0 ? programs : null
+            },
+        )
     }
 }
 

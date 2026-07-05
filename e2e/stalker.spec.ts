@@ -67,4 +67,9 @@ test('stalker: adicionar portal por URL+MAC leva os canais pra TV ao Vivo', asyn
     await page.locator('.settings-nav .nav-item', { hasText: 'Playlists' }).click();
     await expect(page.getByText('Portal E2E')).toBeVisible();
     await expect(page.getByText(/Stalker · .*00:1A:79:AB:CD:EF/)).toBeVisible();
+
+    // Phase 2: portal VOD feeds the movies page.
+    await page.locator('button.nav-item[title="Filmes"]').click();
+    await expect(page.getByText('Filme STK Um').first()).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText('Filme STK Dois').first()).toBeVisible();
 });

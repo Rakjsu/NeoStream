@@ -266,19 +266,28 @@ export function PipWindow() {
 
         try {
             setIsLoading(true);
-            const result = await window.ipcRenderer.invoke('auth:get-credentials') as {
-                success: boolean;
-                credentials: { url: string; username: string; password: string };
-            };
-            if (!result.success) {
-                setIsLoading(false);
-                return;
+            // The main process resolves the URL per playlist type (Xtream
+            // classic URL, M3U direct URL, Stalker create_link).
+            let src: string | null = null;
+            const resolved = await window.ipcRenderer.invoke('streams:get-live-url', { streamId: target.id })
+                .catch(() => null) as { success: boolean; url?: string } | null;
+            if (resolved?.success && resolved.url) {
+                src = resolved.url;
+            } else {
+                // Fallback: rebuild locally the way older builds did.
+                const result = await window.ipcRenderer.invoke('auth:get-credentials') as {
+                    success: boolean;
+                    credentials: { url: string; username: string; password: string };
+                };
+                if (!result.success) {
+                    setIsLoading(false);
+                    return;
+                }
+                const { url, username, password } = result.credentials;
+                src = username === 'm3u' && target.directUrl
+                    ? target.directUrl
+                    : `${url}/live/${username}/${password}/${target.id}.m3u8`;
             }
-            const { url, username, password } = result.credentials;
-            // M3U playlists (sentinel username): the channel carries its URL.
-            const src = username === 'm3u' && target.directUrl
-                ? target.directUrl
-                : `${url}/live/${username}/${password}/${target.id}.m3u8`;
             setContent({
                 ...content,
                 src,
