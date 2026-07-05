@@ -249,6 +249,7 @@
     "ago": "ago",
     "now": "now",
     "programReminder": "Program Reminder",
+    "wrappedAnnual": "Wrapped",
     "programReminderStarting": "{title} is starting on {channel}"
   },
   "changelog": {
