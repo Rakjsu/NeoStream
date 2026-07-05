@@ -204,6 +204,8 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         win.webContents.send('media:control', 'seek', command.seconds)
     } else if (command.action === 'playChannel') {
         win.webContents.send('media:control', 'playChannel', command.channelId)
+    } else if (command.action === 'requestEpg') {
+        win.webContents.send('media:control', 'requestEpg', command.channelId)
     } else {
         win.webContents.send('media:control', command.action)
     }
@@ -226,6 +228,23 @@ export function setupWebRemote(): void {
     ipcMain.on('web-remote:guide', (_e, raw: unknown) => {
         guideState = sanitizeGuide(raw)
         broadcast(guideMessage())
+    })
+
+    // On-demand EPG for a single channel: the renderer answers a requestEpg by
+    // fetching that channel's now/next and pushing it here, relayed to phones.
+    ipcMain.on('web-remote:channel-epg', (_e, raw: unknown) => {
+        const obj = (raw ?? {}) as Record<string, unknown>
+        const channelId = String(obj.channelId ?? '')
+        if (!channelId) return
+        const str = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '')
+        broadcast(JSON.stringify({
+            type: 'channelEpg',
+            channelId,
+            now: str(obj.now, 200),
+            nowStart: str(obj.nowStart, 20),
+            nowEnd: str(obj.nowEnd, 20),
+            next: str(obj.next, 200),
+        }))
     })
 
     ipcMain.handle('web-remote:get-config', () => ({
