@@ -101,6 +101,36 @@ export function setupCastHandlers(): void {
         }
     })
 
+    ipcMain.handle('cast:play-queue', async (_e, payload: { deviceId?: string; items?: { url?: string; title?: string; contentType?: string }[] }) => {
+        try {
+            const device = devices.get(String(payload?.deviceId ?? ''))
+            if (!device) return { success: false, error: 'Dispositivo não encontrado' }
+            const items = (payload?.items ?? [])
+                .filter(i => typeof i?.url === 'string' && /^https?:\/\//.test(i.url))
+                .map(i => ({
+                    url: String(i.url),
+                    title: String(i.title ?? 'NeoStream'),
+                    contentType: String(i.contentType ?? (String(i.url).includes('.m3u8') ? 'application/x-mpegurl' : 'video/mp4')),
+                    live: false,
+                }))
+            if (items.length === 0) return { success: false, error: 'Fila vazia' }
+
+            stopActiveSession()
+            const session = new CastSession(device.host, device.name)
+            await session.startQueue(items)
+            activeSession = session
+            return { success: true, count: items.length }
+        } catch (error) {
+            log.error('[Cast] play-queue failed:', error)
+            return { success: false, error: error instanceof Error ? error.message : String(error) }
+        }
+    })
+
+    ipcMain.handle('cast:queue-skip', (_e, { direction }: { direction?: 'next' | 'prev' }) => {
+        if (direction === 'next' || direction === 'prev') activeSession?.queueSkip(direction)
+        return { success: activeSession !== null }
+    })
+
     ipcMain.handle('cast:pause', () => {
         activeSession?.pause()
         return { success: activeSession !== null }

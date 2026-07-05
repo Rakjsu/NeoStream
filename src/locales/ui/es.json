@@ -701,6 +701,13 @@
     "locale": "es-ES"
   },
   "watchLater": {
+    "castQueue": "Transmitir cola",
+    "castingQueue": "Transmitiendo...",
+    "castResolving": "Preparando la cola...",
+    "castNoDevice": "No se encontró Chromecast",
+    "castNoUrls": "No se pudo resolver las películas",
+    "castQueued": "{n} películas en cola en {device}",
+    "castError": "Error al transmitir la cola",
     "title": "Mi Lista",
     "emptyTitle": "Tu lista está vacía",
     "emptyText": "Agrega películas y series para ver después haciendo clic en",

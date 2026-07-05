@@ -701,6 +701,13 @@
     "locale": "en-US"
   },
   "watchLater": {
+    "castQueue": "Cast queue",
+    "castingQueue": "Casting...",
+    "castResolving": "Preparing the queue...",
+    "castNoDevice": "No Chromecast found",
+    "castNoUrls": "Could not resolve the movies",
+    "castQueued": "{n} movies queued on {device}",
+    "castError": "Failed to cast the queue",
     "title": "My List",
     "emptyTitle": "Your list is empty",
     "emptyText": "Add movies and series to watch later by clicking the",

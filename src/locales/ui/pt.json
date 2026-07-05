@@ -701,6 +701,13 @@
     "locale": "pt-BR"
   },
   "watchLater": {
+    "castQueue": "Transmitir fila",
+    "castingQueue": "Transmitindo...",
+    "castResolving": "Preparando a fila...",
+    "castNoDevice": "Nenhum Chromecast encontrado",
+    "castNoUrls": "Não foi possível resolver os filmes",
+    "castQueued": "{n} filmes na fila do {device}",
+    "castError": "Falha ao transmitir a fila",
     "title": "Minha Lista",
     "emptyTitle": "Sua lista está vazia",
     "emptyText": "Adicione filmes e séries para assistir depois clicando no botão",

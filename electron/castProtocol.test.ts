@@ -6,6 +6,8 @@ import {
     extractFrames,
     connectPayload,
     loadMediaPayload,
+    queueLoadPayload,
+    queueSkipPayload,
     getMediaStatusPayload,
     setVolumePayload,
     extractMediaTimes,
@@ -120,5 +122,25 @@ describe('fase 2: status, volume e legendas', () => {
         const times = extractMediaTimes({ status: [{ currentTime: 42.5, media: { duration: 3600 } }] });
         expect(times).toEqual({ currentTime: 42.5, duration: 3600 });
         expect(extractMediaTimes({ status: [] })).toBeNull();
+    });
+});
+
+describe('fila de cast (QUEUE_LOAD)', () => {
+    it('queueLoadPayload monta os itens com autoplay e metadata', () => {
+        const payload = JSON.parse(queueLoadPayload(5, [
+            { url: 'http://x/a.mp4', title: 'A', contentType: 'video/mp4' },
+            { url: 'http://x/b.m3u8', title: 'B', contentType: 'application/x-mpegurl' },
+        ], 1));
+        expect(payload.type).toBe('QUEUE_LOAD');
+        expect(payload.startIndex).toBe(1);
+        expect(payload.items).toHaveLength(2);
+        expect(payload.items[0]).toMatchObject({ autoplay: true });
+        expect(payload.items[1].media).toMatchObject({ contentId: 'http://x/b.m3u8', streamType: 'BUFFERED' });
+        expect(payload.items[0].media.metadata.title).toBe('A');
+    });
+
+    it('queueSkipPayload gera QUEUE_NEXT/QUEUE_PREV com a sessão', () => {
+        expect(JSON.parse(queueSkipPayload(3, 7, 'next'))).toEqual({ type: 'QUEUE_NEXT', requestId: 3, mediaSessionId: 7 });
+        expect(JSON.parse(queueSkipPayload(3, 7, 'prev')).type).toBe('QUEUE_PREV');
     });
 });
