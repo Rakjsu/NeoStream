@@ -12,6 +12,7 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import os from 'node:os'
 import path from 'node:path'
+import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import Store from 'electron-store'
 import log from './logger'
@@ -98,11 +99,58 @@ export function setupSyncFolder(getWin: () => BrowserWindow | null) {
             .catch(error => log.warn('[Sync] cycle read failed:', error))
     }
 
+    // Near-realtime: watch the synced folder and run a cycle shortly after
+    // another machine's file changes. Synced-folder clients (Dropbox, Drive,
+    // OneDrive) write files in bursts, so changes are debounced; our own
+    // file's events are filtered out to avoid write→watch→write loops.
+    let watcher: fs.FSWatcher | null = null
+    let watchDebounce: NodeJS.Timeout | null = null
+    const WATCH_DEBOUNCE_MS = 5000
+
+    const stopWatcher = () => {
+        if (watchDebounce) {
+            clearTimeout(watchDebounce)
+            watchDebounce = null
+        }
+        watcher?.close()
+        watcher = null
+    }
+
+    const startWatcher = () => {
+        stopWatcher()
+        const config = getConfig()
+        if (!config.enabled || !config.dirPath) return
+        try {
+            watcher = fs.watch(config.dirPath, (_event, fileName) => {
+                const machineId = fileName ? machineIdFromFileName(String(fileName)) : null
+                if (!machineId || machineId === config.machineId) return
+                if (watchDebounce) clearTimeout(watchDebounce)
+                watchDebounce = setTimeout(() => {
+                    watchDebounce = null
+                    log.info('[Sync] mudança detectada na pasta (', machineId, ') — sincronizando')
+                    startCycle()
+                }, WATCH_DEBOUNCE_MS)
+            })
+            watcher.on('error', error => {
+                log.warn('[Sync] watcher error (desligado até o próximo ciclo):', error)
+                stopWatcher()
+            })
+            log.info('[Sync] watching', config.dirPath)
+        } catch (error) {
+            log.warn('[Sync] fs.watch indisponível para a pasta:', error)
+        }
+    }
+
     ipcMain.handle('sync:config-get', () => ({ success: true, config: getConfig() }))
 
     ipcMain.handle('sync:config-set', (_e, partial: { enabled?: boolean }) => {
         const next = setConfig({ enabled: partial?.enabled === true })
-        if (next.enabled) startCycle()
+        if (next.enabled) {
+            startCycle()
+            startWatcher()
+        } else {
+            stopWatcher()
+        }
         return { success: true, config: next }
     })
 
@@ -116,6 +164,7 @@ export function setupSyncFolder(getWin: () => BrowserWindow | null) {
             return { success: false, canceled: true }
         }
         const config = setConfig({ dirPath: result.filePaths[0] })
+        startWatcher()
         return { success: true, config }
     })
 
@@ -141,7 +190,10 @@ export function setupSyncFolder(getWin: () => BrowserWindow | null) {
         }
     })
 
-    setTimeout(startCycle, BOOT_DELAY_MS)
+    setTimeout(() => {
+        startCycle()
+        startWatcher()
+    }, BOOT_DELAY_MS)
     setInterval(startCycle, CYCLE_EVERY_MS)
 
     log.info('[Sync] folder sync initialized')
