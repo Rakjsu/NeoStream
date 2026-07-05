@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDLNA, type DLNADevice } from '../hooks/useDLNA';
 import { useAirPlay } from '../hooks/useAirPlay';
+import { useChromecast, type ChromecastDevice } from '../hooks/useChromecast';
 import { useLanguage } from '../services/languageService';
 
 export interface CastDevice {
     id: string;
     name: string;
-    type: 'dlna' | 'airplay';
+    type: 'dlna' | 'airplay' | 'chromecast';
     available: boolean;
     source?: 'discovered' | 'manual';
     isSamsung?: boolean;
@@ -31,8 +32,10 @@ export function CastDeviceSelector({
 }: CastDeviceSelectorProps) {
     const dlna = useDLNA(videoUrl, videoTitle, subtitleVtt);
     const airplay = useAirPlay(videoUrl, videoTitle);
+    const chromecast = useChromecast(videoUrl, videoTitle, /\.m3u8(\?|$)/.test(videoUrl));
     const { devices: dlnaDevices, discoverDevices, castToDevice, addDevice, error: dlnaError, isDiscovering } = dlna;
     const { devices: airplayDevices, castToDevice: castToAirPlayDevice } = airplay;
+    const { devices: chromecastDevices, castToDevice: castToChromecast } = chromecast;
     const [view, setView] = useState<'list' | 'add'>('list');
     const [deviceName, setDeviceName] = useState('');
     const [deviceIP, setDeviceIP] = useState('');
@@ -62,6 +65,25 @@ export function CastDeviceSelector({
         }
         setCasting(false);
     }, [castToDevice, dlnaError, onClose, onDeviceSelected, t]);
+
+    const handleChromecast = useCallback(async (device: ChromecastDevice) => {
+        setCasting(true);
+        setCastError(null);
+        const success = await castToChromecast(device);
+        if (success) {
+            onDeviceSelected({
+                id: device.id,
+                name: device.name,
+                type: 'chromecast',
+                available: true,
+                cast: () => { }
+            });
+            setTimeout(() => onClose(), 500);
+        } else {
+            setCastError(t('cast', 'failedToTransmit'));
+        }
+        setCasting(false);
+    }, [castToChromecast, onClose, onDeviceSelected, t]);
 
     // Auto-discover on mount
     useEffect(() => {
@@ -94,8 +116,19 @@ export function CastDeviceSelector({
             });
         });
 
+        chromecastDevices.forEach(device => {
+            devices.push({
+                id: device.id,
+                name: device.name,
+                type: 'chromecast',
+                available: device.available,
+                source: 'discovered',
+                cast: () => { void handleChromecast(device); }
+            });
+        });
+
         return devices;
-    }, [airplayDevices, castToAirPlayDevice, dlnaDevices, handleCast]);
+    }, [airplayDevices, castToAirPlayDevice, chromecastDevices, dlnaDevices, handleCast, handleChromecast]);
 
     const handleAddDevice = async () => {
         if (!deviceIP) {
@@ -122,12 +155,14 @@ export function CastDeviceSelector({
 
     const getDeviceIcon = (type: string, source?: string) => {
         if (type === 'airplay') return '🍎';
+        if (type === 'chromecast') return '📡';
         return source === 'discovered' ? '📺' : '🖥️';
     };
 
     const getDeviceTypeName = (type: string) => {
         switch (type) {
             case 'airplay': return 'Apple AirPlay';
+            case 'chromecast': return 'Chromecast';
             default: return 'DLNA/UPnP';
         }
     };
