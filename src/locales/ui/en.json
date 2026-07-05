@@ -125,6 +125,9 @@
     "confirmDeleteCancel": "Cancel"
   },
   "cast": {
+    "subtitleFetch": "Fetch subtitle (OpenSubtitles)",
+    "subtitleReady": "Subtitle ready to cast",
+    "subtitleNotFound": "No subtitle found",
     "title": "Cast to TV",
     "selectDevice": "Select a device",
     "searchNetwork": "Search network",
@@ -291,6 +294,7 @@
     "webRemoteTitle": "Phone remote",
     "webRemoteDesc": "Opens a remote in your phone's browser (same Wi-Fi) with play/pause, volume and skip",
     "webRemoteOpen": "Open on your phone",
+    "webRemotePin": "Pairing PIN",
     "webRemoteHint": "Keep the app open on the computer. Works only on the same local network."
   },
   "welcome": {
@@ -701,6 +705,13 @@
     "locale": "en-US"
   },
   "watchLater": {
+    "castQueue": "Cast queue",
+    "castingQueue": "Casting...",
+    "castResolving": "Preparing the queue...",
+    "castNoDevice": "No Chromecast found",
+    "castNoUrls": "Could not resolve the movies",
+    "castQueued": "{n} movies queued on {device}",
+    "castError": "Failed to cast the queue",
     "title": "My List",
     "emptyTitle": "Your list is empty",
     "emptyText": "Add movies and series to watch later by clicking the",

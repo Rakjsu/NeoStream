@@ -125,6 +125,9 @@
     "confirmDeleteCancel": "Cancelar"
   },
   "cast": {
+    "subtitleFetch": "Buscar subtítulo (OpenSubtitles)",
+    "subtitleReady": "Subtítulo listo para transmitir",
+    "subtitleNotFound": "No se encontró subtítulo",
     "title": "Transmitir a TV",
     "selectDevice": "Selecciona un dispositivo",
     "searchNetwork": "Buscar en la red",
@@ -266,6 +269,7 @@
     "webRemoteTitle": "Control por el móvil",
     "webRemoteDesc": "Abre un mando en el navegador del móvil (misma Wi-Fi) con play/pausa, volumen y saltar",
     "webRemoteOpen": "Abre en el móvil",
+    "webRemotePin": "PIN de emparejamiento",
     "webRemoteHint": "Mantén la app abierta en el ordenador. Solo funciona en la misma red local."
   },
   "welcome": {
@@ -701,6 +705,13 @@
     "locale": "es-ES"
   },
   "watchLater": {
+    "castQueue": "Transmitir cola",
+    "castingQueue": "Transmitiendo...",
+    "castResolving": "Preparando la cola...",
+    "castNoDevice": "No se encontró Chromecast",
+    "castNoUrls": "No se pudo resolver las películas",
+    "castQueued": "{n} películas en cola en {device}",
+    "castError": "Error al transmitir la cola",
     "title": "Mi Lista",
     "emptyTitle": "Tu lista está vacía",
     "emptyText": "Agrega películas y series para ver después haciendo clic en",
