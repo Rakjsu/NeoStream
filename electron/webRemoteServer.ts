@@ -10,6 +10,7 @@
  */
 
 import http from 'node:http'
+import crypto from 'node:crypto'
 import os from 'node:os'
 import type { Socket } from 'node:net'
 import { BrowserWindow, ipcMain } from 'electron'
@@ -54,12 +55,19 @@ interface GuideState {
 
 let server: http.Server | null = null
 let serverPort = 0
+let sessionPin = ''
 const clients = new Set<ClientSocket>()
 let mediaState = { hasMedia: false, playing: false, title: '' }
 // Second-screen guide: the live channel list + now/next EPG of the playing
 // channel, pushed by the LiveTV renderer while it's mounted. Null until the
 // user opens the TV ao vivo page (the phone shows a hint in the meantime).
 let guideState: GuideState | null = null
+
+/** Fresh 4-digit pairing PIN (regenerated each time the server starts). */
+function newPin(): string {
+    // crypto.randomInt keeps it uniform; padded to 4 digits.
+    return String(crypto.randomInt(0, 10000)).padStart(4, '0')
+}
 
 function getConfig(): WebRemoteConfig {
     return { enabled: false, ...(store.get('webRemote') as Partial<WebRemoteConfig> | undefined) }
@@ -123,6 +131,14 @@ function sanitizeGuide(raw: unknown): GuideState {
 function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
     const key = request.headers['sec-websocket-key']
     if (typeof key !== 'string') {
+        socket.destroy()
+        return
+    }
+    // PIN gate: the page connects to ws://host/?pin=NNNN. A wrong/absent PIN
+    // is refused before the WebSocket is established.
+    const url = new URL(request.url || '/', 'http://localhost')
+    if (url.searchParams.get('pin') !== sessionPin) {
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
         socket.destroy()
         return
     }
@@ -197,6 +213,7 @@ export function setupWebRemote(): void {
         success: true,
         enabled: getConfig().enabled,
         url: serverPort ? `http://${getLanAddress()}:${serverPort}/` : null,
+        pin: serverPort ? sessionPin : null,
     }))
 
     ipcMain.handle('web-remote:set-enabled', async (_e, { enabled }: { enabled?: boolean }) => {
@@ -207,6 +224,7 @@ export function setupWebRemote(): void {
             success: true,
             enabled: enabled === true,
             url: serverPort ? `http://${getLanAddress()}:${serverPort}/` : null,
+            pin: serverPort ? sessionPin : null,
         }
     })
 
@@ -216,10 +234,13 @@ export function setupWebRemote(): void {
 
 function start(): Promise<void> {
     if (server) return Promise.resolve()
+    sessionPin = newPin()
     return new Promise<void>((resolve) => {
         server = http.createServer((req, res) => {
             if (req.url === '/' || req.url === '/index.html') {
                 res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
+                // PIN is NOT injected — the phone must enter the code shown on
+                // the desktop settings screen (the page prompts + stores it).
                 res.end(REMOTE_PAGE_HTML)
                 return
             }
@@ -244,6 +265,7 @@ function stop(): void {
     server?.close()
     server = null
     serverPort = 0
+    sessionPin = ''
 }
 
 export function teardownWebRemote(): void {

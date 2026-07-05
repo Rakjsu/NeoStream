@@ -125,6 +125,9 @@
     "confirmDeleteCancel": "Cancelar"
   },
   "cast": {
+    "subtitleFetch": "Buscar legenda (OpenSubtitles)",
+    "subtitleReady": "Legenda pronta pra transmitir",
+    "subtitleNotFound": "Nenhuma legenda encontrada",
     "title": "Transmitir para TV",
     "selectDevice": "Selecione um dispositivo",
     "searchNetwork": "Buscar na rede",
@@ -641,6 +644,7 @@
     "webRemoteTitle": "Controle pelo celular",
     "webRemoteDesc": "Abre um controle remoto no navegador do celular (mesma rede Wi-Fi) com play/pause, volume e avançar/voltar",
     "webRemoteOpen": "Abra no celular",
+    "webRemotePin": "PIN de pareamento",
     "webRemoteHint": "Mantenha o app aberto no computador. Só funciona na mesma rede local."
   },
   "welcome": {
@@ -701,6 +705,13 @@
     "locale": "pt-BR"
   },
   "watchLater": {
+    "castQueue": "Transmitir fila",
+    "castingQueue": "Transmitindo...",
+    "castResolving": "Preparando a fila...",
+    "castNoDevice": "Nenhum Chromecast encontrado",
+    "castNoUrls": "Não foi possível resolver os filmes",
+    "castQueued": "{n} filmes na fila do {device}",
+    "castError": "Falha ao transmitir a fila",
     "title": "Minha Lista",
     "emptyTitle": "Sua lista está vazia",
     "emptyText": "Adicione filmes e séries para assistir depois clicando no botão",

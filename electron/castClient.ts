@@ -26,6 +26,8 @@ import {
     launchPayload,
     stopAppPayload,
     loadMediaPayload,
+    queueLoadPayload,
+    queueSkipPayload,
     mediaCommandPayload,
     seekPayload,
     getMediaStatusPayload,
@@ -134,6 +136,26 @@ export class CastSession {
 
     /** Connect, launch the media receiver and LOAD the given media. */
     async start(media: CastMediaInput): Promise<void> {
+        await this.connectAndLaunch()
+        this.send(this.transportId!, NS_CONNECTION, connectPayload())
+        this.send(this.transportId!, NS_MEDIA, loadMediaPayload(this.requestId++, media))
+        log.info('[Cast] LOAD enviado para', this.deviceName, '(', media.live ? 'LIVE' : 'BUFFERED', ')')
+    }
+
+    /** Connect, launch the receiver and QUEUE_LOAD a list of items. */
+    async startQueue(items: CastMediaInput[], startIndex = 0): Promise<void> {
+        await this.connectAndLaunch()
+        this.send(this.transportId!, NS_CONNECTION, connectPayload())
+        this.send(this.transportId!, NS_MEDIA, queueLoadPayload(
+            this.requestId++,
+            items.map(i => ({ url: i.url, title: i.title, contentType: i.contentType })),
+            startIndex,
+        ))
+        log.info('[Cast] QUEUE_LOAD enviado para', this.deviceName, `(${items.length} itens)`)
+    }
+
+    /** TLS connect + heartbeat + LAUNCH; resolves once transportId is known. */
+    private async connectAndLaunch(): Promise<void> {
         await new Promise<void>((resolve, reject) => {
             const socket = tls.connect(
                 { host: this.host, port: CAST_PORT, rejectUnauthorized: false },
@@ -196,11 +218,6 @@ export class CastSession {
         })
         this.send(CAST_RECEIVER_ID, NS_RECEIVER, launchPayload(this.requestId++))
         await launched
-
-        // Connect to the app and load the media.
-        this.send(this.transportId!, NS_CONNECTION, connectPayload())
-        this.send(this.transportId!, NS_MEDIA, loadMediaPayload(this.requestId++, media))
-        log.info('[Cast] LOAD enviado para', this.deviceName, '(', media.live ? 'LIVE' : 'BUFFERED', ')')
     }
 
     // RECEIVER_STATUS fan-out (start() waits on it; handleMessage feeds it).
@@ -225,6 +242,12 @@ export class CastSession {
     seek(seconds: number): void {
         if (this.transportId && this.mediaSessionId !== null) {
             this.send(this.transportId, NS_MEDIA, seekPayload(this.requestId++, this.mediaSessionId, seconds))
+        }
+    }
+
+    queueSkip(direction: 'next' | 'prev'): void {
+        if (this.transportId && this.mediaSessionId !== null) {
+            this.send(this.transportId, NS_MEDIA, queueSkipPayload(this.requestId++, this.mediaSessionId, direction))
         }
     }
 
