@@ -165,17 +165,17 @@ export function MiniPlayerProvider({ children }: { children: ReactNode }) {
 
                 const { url, username, password } = result.credentials;
 
-                // Fetch series info to get episodes
-                const response = await fetch(
-                    `${url}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${data.seriesId}`
-                );
+                // Episodes via IPC (works for Xtream, M3U and Stalker alike).
+                const infoResult = await window.ipcRenderer.invoke('series:get-info', {
+                    seriesId: data.seriesId
+                }) as { success: boolean; info?: SeriesInfoResponse };
 
-                if (!response.ok) {
+                if (!infoResult.success || !infoResult.info) {
                     window.ipcRenderer.send(data.responseChannel, null);
                     return;
                 }
 
-                const seriesData = await response.json() as SeriesInfoResponse;
+                const seriesData = infoResult.info;
                 const episodes = seriesData.episodes || {};
                 
                 // Find next episode

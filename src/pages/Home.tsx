@@ -1692,9 +1692,11 @@ export function Home() {
                             if (result.success) {
                                 const { url, username, password } = result.credentials;
                                 if (content.type === 'series') {
-                                    // Fetch episode info for series
-                                    const seriesInfoRes = await fetch(`${url}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${content.id}`);
-                                    const seriesInfo = await seriesInfoRes.json();
+                                    // Episodes + play URL via IPC (Xtream, M3U e Stalker).
+                                    const infoResult = await window.ipcRenderer.invoke('series:get-info', { seriesId: content.id }) as {
+                                        success: boolean; info?: { episodes?: Record<string, SeriesEpisode[]> };
+                                    };
+                                    const seriesInfo = infoResult.info;
 
                                     // Store episode data for navigation
                                     if (seriesInfo?.episodes) {
@@ -1707,8 +1709,11 @@ export function Home() {
                                     const episodes = seriesInfo?.episodes?.[content.season || 1];
                                     const episode = episodes?.find((ep: SeriesEpisode) => Number(ep.episode_num) === (content.episode || 1));
                                     if (episode) {
-                                        const ext = episode.container_extension || 'mp4';
-                                        return `${url}/series/${username}/${password}/${episode.id}.${ext}`;
+                                        const urlResult = await window.ipcRenderer.invoke('streams:get-series-url', {
+                                            streamId: episode.id,
+                                            container: episode.container_extension || 'mp4'
+                                        }) as { success: boolean; url?: string };
+                                        if (urlResult.success && urlResult.url) return urlResult.url;
                                     }
                                     throw new Error('Episode not found');
                                 } else {
