@@ -21,12 +21,16 @@ import {
     parseVodItems,
     parseTotalItems,
     parseEpgPrograms,
+    parseSeriesItems,
+    parseSeasons,
     portalCandidates,
     unwrapJs,
     type StalkerChannel,
     type StalkerGenre,
     type StalkerVodItem,
     type StalkerEpgProgram,
+    type StalkerSeriesItem,
+    type StalkerSeason,
 } from './stalkerProtocol'
 
 const TIMEOUT_MS = 20000
@@ -131,10 +135,18 @@ export class StalkerClient {
      * (needed by portals that mint per-play tokens); falls back to the URL
      * embedded in the cmd itself when create_link is unavailable.
      */
-    async createLink(cmd: string, kind: 'itv' | 'vod' = 'itv'): Promise<string> {
+    async createLink(cmd: string, kind: 'itv' | 'vod' = 'itv', episode?: number): Promise<string> {
         try {
             const resolved = await this.callWithRetry(
-                buildStalkerQuery(kind, 'create_link', { cmd, series: '', forced_storage: 'undefined', disable_ad: '0', download: '0' }),
+                buildStalkerQuery(kind, 'create_link', {
+                    cmd,
+                    // Series episodes play through the season cmd + the episode
+                    // number in `series` (Ministra drill-down).
+                    series: episode !== undefined ? String(episode) : '',
+                    forced_storage: 'undefined',
+                    disable_ad: '0',
+                    download: '0'
+                }),
                 body => {
                     const js = unwrapJs<{ cmd?: string }>(body)
                     if (js === null || typeof js.cmd !== 'string') return null
@@ -187,6 +199,54 @@ export class StalkerClient {
             log.warn(`[Stalker] catálogo VOD truncado em ${maxItems} de ${total} títulos`)
         }
         return items.slice(0, maxItems)
+    }
+
+    async getSeriesCategories(): Promise<StalkerGenre[]> {
+        return this.callWithRetry(buildStalkerQuery('series', 'get_categories'), body => {
+            const js = unwrapJs(body)
+            if (js === null) return null
+            const genres = parseGenres(js)
+            return genres.length > 0 ? genres : null
+        })
+    }
+
+    /** Full series listing (paginated like VOD, same logged cap). */
+    async getSeriesItems(maxItems = 2000): Promise<StalkerSeriesItem[]> {
+        const items: StalkerSeriesItem[] = []
+        let total = Infinity
+        for (let page = 1; page <= 500 && items.length < Math.min(total, maxItems); page++) {
+            const js = await (async () => {
+                const query = buildStalkerQuery('series', 'get_ordered_list', { p: String(page) })
+                const first = unwrapJs(await this.rawCall(query, await this.getToken()))
+                if (first !== null) return first
+                return unwrapJs(await this.rawCall(query, await this.getToken(true)))
+            })()
+            if (js === null) break
+            if (page === 1) {
+                const parsedTotal = parseTotalItems(js)
+                if (parsedTotal > 0) total = parsedTotal
+            }
+            const pageItems = parseSeriesItems(js)
+            if (pageItems.length === 0) break
+            items.push(...pageItems)
+        }
+        if (items.length >= maxItems && total > maxItems) {
+            log.warn(`[Stalker] catálogo de séries truncado em ${maxItems} de ${total} títulos`)
+        }
+        return items.slice(0, maxItems)
+    }
+
+    /** Seasons (with episode number lists) of one portal series. */
+    async getSeasons(portalSeriesId: string): Promise<StalkerSeason[]> {
+        return this.callWithRetry(
+            buildStalkerQuery('series', 'get_ordered_list', { movie_id: portalSeriesId, p: '1' }),
+            body => {
+                const js = unwrapJs(body)
+                if (js === null) return null
+                const seasons = parseSeasons(js)
+                return seasons.length > 0 ? seasons : null
+            },
+        )
     }
 
     /** Portal EPG for the whole lineup (period in hours). */

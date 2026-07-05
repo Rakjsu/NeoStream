@@ -379,3 +379,154 @@ export function stalkerChannelsToLiveStreams(channels: StalkerChannel[]): {
         tv_archive_duration: 0,
     }))
 }
+
+/**
+ * Series drill-down (Ministra): `type=series&action=get_ordered_list` lists
+ * series; with `movie_id=<id>` it returns the SEASONS, each carrying a `cmd`
+ * and a `series` array with the episode numbers. Playing an episode is
+ * create_link(type=vod, cmd=<season cmd>, series=<episode number>).
+ */
+export interface StalkerSeriesItem {
+    id: string
+    name: string
+    logo: string
+    categoryId: string
+}
+
+/** Defensive mapping of one series get_ordered_list page. */
+export function parseSeriesItems(js: unknown): StalkerSeriesItem[] {
+    const data = (js as { data?: unknown } | null)?.data
+    if (!Array.isArray(data)) return []
+    const items: StalkerSeriesItem[] = []
+    for (const raw of data) {
+        if (raw === null || typeof raw !== 'object') continue
+        const v = raw as Record<string, unknown>
+        const name = typeof v.name === 'string' ? v.name : ''
+        const id = v.id !== undefined && v.id !== null ? String(v.id) : ''
+        if (!id || !name) continue
+        items.push({
+            id,
+            name,
+            logo: typeof v.screenshot_uri === 'string' ? v.screenshot_uri : '',
+            categoryId: v.category_id !== undefined && v.category_id !== null ? String(v.category_id) : '',
+        })
+    }
+    return items
+}
+
+export interface StalkerSeason {
+    id: string
+    name: string
+    cmd: string
+    episodes: number[]
+}
+
+/** Seasons of one series (get_ordered_list with movie_id). */
+export function parseSeasons(js: unknown): StalkerSeason[] {
+    const data = (js as { data?: unknown } | null)?.data
+    if (!Array.isArray(data)) return []
+    const seasons: StalkerSeason[] = []
+    for (const raw of data) {
+        if (raw === null || typeof raw !== 'object') continue
+        const v = raw as Record<string, unknown>
+        const cmd = typeof v.cmd === 'string' ? v.cmd : ''
+        const episodesRaw = Array.isArray(v.series) ? v.series : []
+        const episodes = episodesRaw.map(Number).filter(n => Number.isFinite(n) && n > 0)
+        if (!cmd || episodes.length === 0) continue
+        seasons.push({
+            id: v.id !== undefined && v.id !== null ? String(v.id) : '',
+            name: typeof v.name === 'string' ? v.name : '',
+            cmd,
+            episodes,
+        })
+    }
+    return seasons
+}
+
+/** Season display name → number ("Season 2" / "Temporada 2" / trailing digits), 1-based fallback. */
+export function seasonNumberOf(season: StalkerSeason, index: number): number {
+    const match = season.name.match(/(\d{1,2})\s*$/) ?? season.id.match(/:(\d{1,2})$/)
+    const n = match ? Number(match[1]) : NaN
+    return Number.isFinite(n) && n > 0 ? n : index + 1
+}
+
+/**
+ * Series list → the Xtream series shape (ids 500000+idx by portal order).
+ * `portal_id` keeps the portal's own id so series:get-info can drill down;
+ * the renderer ignores unknown fields.
+ */
+export function stalkerSeriesToList(items: StalkerSeriesItem[]): {
+    num: number
+    name: string
+    series_id: number
+    cover: string
+    category_id: string
+    plot: string
+    rating: string
+    last_modified: string
+    portal_id: string
+}[] {
+    return items.map((item, i) => ({
+        num: i + 1,
+        name: item.name,
+        series_id: 500000 + i + 1,
+        cover: item.logo,
+        category_id: item.categoryId ? `stk-ser-${item.categoryId}` : 'stk-ser-0',
+        plot: '',
+        rating: '',
+        last_modified: '',
+        portal_id: item.id,
+    }))
+}
+
+/** Series categories with a prefix distinct from live/vod. */
+export function stalkerSeriesCategories(genres: StalkerGenre[]): {
+    category_id: string
+    category_name: string
+    parent_id: number
+}[] {
+    return genres.map(g => ({
+        category_id: `stk-ser-${g.id}`,
+        category_name: g.title,
+        parent_id: 0,
+    }))
+}
+
+/**
+ * Episode "id" for the modal/get-series-url round trip. Numeric ids can't
+ * carry the season cmd, so it's a composite string the URL resolver parses.
+ */
+export function stalkerEpisodeId(portalSeriesId: string, seasonId: string, episode: number): string {
+    return `stk-ep|${portalSeriesId}|${seasonId}|${episode}`
+}
+
+export function parseStalkerEpisodeId(id: string): { portalSeriesId: string; seasonId: string; episode: number } | null {
+    const parts = String(id ?? '').split('|')
+    if (parts.length !== 4 || parts[0] !== 'stk-ep') return null
+    const episode = Number(parts[3])
+    if (!parts[1] || !parts[2] || !Number.isFinite(episode) || episode <= 0) return null
+    return { portalSeriesId: parts[1], seasonId: parts[2], episode }
+}
+
+/** Seasons → the get_series_info shape the modal consumes. */
+export function stalkerSeriesInfo(portalSeriesId: string, seasons: StalkerSeason[]): {
+    episodes: Record<string, { id: string; episode_num: number; title: string; container_extension: string; season: number }[]>
+} {
+    const episodes: Record<string, { id: string; episode_num: number; title: string; container_extension: string; season: number }[]> = {}
+    seasons.forEach((season, index) => {
+        const seasonNumber = seasonNumberOf(season, index)
+        const key = String(seasonNumber)
+        if (!episodes[key]) episodes[key] = []
+        for (const episodeNumber of season.episodes) {
+            episodes[key].push({
+                id: stalkerEpisodeId(portalSeriesId, season.id, episodeNumber),
+                episode_num: episodeNumber,
+                title: `${season.name || `Temporada ${seasonNumber}`} — Ep. ${episodeNumber}`,
+                container_extension: 'mp4',
+                season: seasonNumber,
+            })
+        }
+        episodes[key].sort((a, b) => a.episode_num - b.episode_num)
+    })
+    return { episodes }
+}
