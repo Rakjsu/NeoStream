@@ -1690,8 +1690,7 @@ export function Home() {
                         buildStreamUrl={async (content) => {
                             const result = await window.ipcRenderer.invoke('auth:get-credentials');
                             if (result.success) {
-                                const { url, username, password } = result.credentials;
-                                if (content.type === 'series') {
+                                                if (content.type === 'series') {
                                     // Episodes + play URL via IPC (Xtream, M3U e Stalker).
                                     const infoResult = await window.ipcRenderer.invoke('series:get-info', { seriesId: content.id }) as {
                                         success: boolean; info?: { episodes?: Record<string, SeriesEpisode[]> };
@@ -1717,11 +1716,13 @@ export function Home() {
                                     }
                                     throw new Error('Episode not found');
                                 } else {
-                                    // Movie stream
-                                    const movieInfoRes = await fetch(`${url}/player_api.php?username=${username}&password=${password}&action=get_vod_info&vod_id=${content.id}`);
-                                    const movieInfo = await movieInfoRes.json();
-                                    const ext = movieInfo?.movie_data?.container_extension || 'mp4';
-                                    return `${url}/movie/${username}/${password}/${content.id}.${ext}`;
+                                    // Movie URL via IPC (Xtream, M3U e Stalker).
+                                    const urlResult = await window.ipcRenderer.invoke('streams:get-vod-url', {
+                                        streamId: content.id,
+                                        container: 'mp4'
+                                    }) as { success: boolean; url?: string };
+                                    if (urlResult.success && urlResult.url) return urlResult.url;
+                                    throw new Error('Movie not found');
                                 }
                             }
                             throw new Error('Credentials not found');

@@ -163,7 +163,6 @@ export function MiniPlayerProvider({ children }: { children: ReactNode }) {
                     return;
                 }
 
-                const { url, username, password } = result.credentials;
 
                 // Episodes via IPC (works for Xtream, M3U and Stalker alike).
                 const infoResult = await window.ipcRenderer.invoke('series:get-info', {
@@ -198,8 +197,16 @@ export function MiniPlayerProvider({ children }: { children: ReactNode }) {
                 }
 
                 if (nextEpData) {
-                    // Build stream URL
-                    const streamUrl = `${url}/series/${username}/${password}/${nextEpData.id}.${nextEpData.container_extension || 'mp4'}`;
+                    // Resolve the episode URL via IPC (Xtream, M3U e Stalker).
+                    const urlResult = await window.ipcRenderer.invoke('streams:get-series-url', {
+                        streamId: nextEpData.id,
+                        container: nextEpData.container_extension || 'mp4'
+                    }) as { success: boolean; url?: string };
+                    if (!urlResult.success || !urlResult.url) {
+                        window.ipcRenderer.send(data.responseChannel, null);
+                        return;
+                    }
+                    const streamUrl = urlResult.url;
                     const title = `${seriesData.info?.name || 'Series'} - S${nextSeason}E${nextEpisode}`;
                     
                     window.ipcRenderer.send(data.responseChannel, {
