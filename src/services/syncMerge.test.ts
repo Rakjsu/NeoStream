@@ -103,3 +103,97 @@ describe('mergeSyncData', () => {
         expect(result.changed).toEqual({});
     });
 });
+
+describe('tombstones (remoções propagam)', () => {
+    const NOW = Date.parse('2026-07-05T12:00:00Z');
+    const tombKey = 'neostream_sync_tombstones';
+
+    it('tombstone remoto remove item local mesmo com arrays idênticos', () => {
+        const list = JSON.stringify([fav('a', '2026-01-01'), fav('b', '2026-01-01')]);
+        const result = mergeSyncData(
+            { 'neostream_watchlater_p1': list },
+            {
+                'neostream_watchlater_p1': list,
+                [tombKey]: JSON.stringify({ 'neostream_watchlater_p1': { 'a::movie': NOW - 1000 } }),
+            },
+            NOW,
+        );
+        const merged = JSON.parse(result.changed['neostream_watchlater_p1']);
+        expect(merged.map((i: { id: string }) => i.id)).toEqual(['b']);
+        expect(result.removedItems).toBe(1);
+        expect(result.changed[tombKey]).toContain('a::movie');
+    });
+
+    it('re-adicionar depois da remoção sobrevive (addedAt mais novo que o tombstone)', () => {
+        const deletedAt = Date.parse('2026-03-01T00:00:00Z');
+        const local = JSON.stringify([fav('a', '2026-04-01')]); // re-adicionado depois
+        const result = mergeSyncData(
+            { 'neostream_watchlater_p1': local },
+            {
+                'neostream_watchlater_p1': JSON.stringify([]),
+                [tombKey]: JSON.stringify({ 'neostream_watchlater_p1': { 'a::movie': deletedAt } }),
+            },
+            NOW,
+        );
+        expect(result.changed['neostream_watchlater_p1']).toBeUndefined();
+        expect(result.removedItems).toBe(0);
+    });
+
+    it('tombstone local barra item remoto (não volta do outro lado)', () => {
+        const result = mergeSyncData(
+            {
+                'neostream_watchlater_p1': JSON.stringify([]),
+                [tombKey]: JSON.stringify({ 'neostream_watchlater_p1': { 'x::movie': NOW - 5000 } }),
+            },
+            { 'neostream_watchlater_p1': JSON.stringify([fav('x', '2026-01-01')]) },
+            NOW,
+        );
+        expect(result.changed['neostream_watchlater_p1']).toBeUndefined();
+        expect(result.addedItems).toBe(0);
+    });
+
+    it('tombstones expiram depois de 30 dias', () => {
+        const old = NOW - 31 * 24 * 3600_000;
+        const result = mergeSyncData(
+            { 'neostream_watchlater_p1': JSON.stringify([fav('a', '2026-01-01')]) },
+            {
+                'neostream_watchlater_p1': JSON.stringify([fav('a', '2026-01-01')]),
+                [tombKey]: JSON.stringify({ 'neostream_watchlater_p1': { 'a::movie': old } }),
+            },
+            NOW,
+        );
+        // Expirado: nada removido, ledger mesclado vira vazio.
+        expect(result.removedItems).toBe(0);
+        expect(result.changed['neostream_watchlater_p1']).toBeUndefined();
+    });
+
+    it('favoritos dentro do objeto de perfil também respeitam o ledger', () => {
+        const profileKey = 'neostream_profile_p1__pl_x';
+        const local = JSON.stringify({ favorites: [fav('f1'), fav('f2')], other: 1 });
+        const result = mergeSyncData(
+            { [profileKey]: local },
+            {
+                [profileKey]: local,
+                [tombKey]: JSON.stringify({ [profileKey]: { 'f1::movie': NOW - 100 } }),
+            },
+            NOW,
+        );
+        const merged = JSON.parse(result.changed[profileKey]);
+        expect(merged.favorites.map((f: { id: string }) => f.id)).toEqual(['f2']);
+        expect(merged.other).toBe(1);
+    });
+
+    it('ledger sem a chave no remoto ainda aplica a remoção local', () => {
+        const result = mergeSyncData(
+            {
+                'neostream_watchlater_p1': JSON.stringify([fav('a', '2026-01-01')]),
+            },
+            {
+                [tombKey]: JSON.stringify({ 'neostream_watchlater_p1': { 'a::movie': NOW - 100 } }),
+            },
+            NOW,
+        );
+        expect(JSON.parse(result.changed['neostream_watchlater_p1'])).toEqual([]);
+        expect(result.removedItems).toBe(1);
+    });
+});

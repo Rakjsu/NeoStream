@@ -1,6 +1,7 @@
 // Watch Later localStorage utility (adapted for profiles, per-playlist scoped)
 import { profileService } from './profileService';
 import { playlistScopedKey, hasKnownPlaylistId } from './activePlaylistService';
+import { syncTombstones, tombstoneItemKey } from './syncTombstones';
 import type { Profile, WatchLaterItem } from '../types/profile';
 
 // Re-export type for compatibility
@@ -65,6 +66,8 @@ export const watchLaterService = {
                 i => !(i.id === id && i.type === type)
             );
             this.save(activeProfile, items);
+            // Deletions ledger so the machine sync propagates the removal.
+            syncTombstones.record(playlistScopedKey(KEY_BASE, activeProfile.id), tombstoneItemKey(id, type));
             return true;
         } catch (error) {
             console.error('Error removing from watch later:', error);
