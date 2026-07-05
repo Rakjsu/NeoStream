@@ -151,3 +151,37 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
     }
     return { action: action as 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' }
 }
+
+// -------------------------------------------------------------- PIN lockout --
+// A 4-digit PIN has only 10k combinations — trivially brute-forceable over the
+// LAN without a limit. These PURE helpers track failures per client and lock a
+// client out for a cooldown after too many misses. State lives in the caller
+// (a Map keyed by IP); the helpers just compute the next entry / gate.
+
+export interface PinGateEntry {
+    fails: number
+    lockedUntil: number
+}
+
+export const PIN_MAX_FAILS = 5
+export const PIN_LOCK_MS = 30_000
+
+/** True while the client is inside its cooldown window. */
+export function isPinLockedOut(entry: PinGateEntry | undefined, now: number): boolean {
+    return !!entry && entry.lockedUntil > now
+}
+
+/**
+ * Next entry after a wrong PIN. Reaching PIN_MAX_FAILS arms the cooldown and
+ * resets the counter; otherwise the failure count just grows.
+ */
+export function registerPinFailure(
+    entry: PinGateEntry | undefined,
+    now: number,
+    maxFails: number = PIN_MAX_FAILS,
+    lockMs: number = PIN_LOCK_MS,
+): PinGateEntry {
+    const fails = (entry?.fails ?? 0) + 1
+    if (fails >= maxFails) return { fails: 0, lockedUntil: now + lockMs }
+    return { fails, lockedUntil: 0 }
+}

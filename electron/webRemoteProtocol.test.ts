@@ -6,6 +6,10 @@ import {
     decodeFrames,
     encodePongFrame,
     parseRemoteCommand,
+    isPinLockedOut,
+    registerPinFailure,
+    PIN_MAX_FAILS,
+    PIN_LOCK_MS,
 } from './webRemoteProtocol'
 
 /** Mask a text payload as a browser client would (client→server frames). */
@@ -78,5 +82,29 @@ describe('parseRemoteCommand', () => {
         expect(parseRemoteCommand('{"action":"playChannel","channelId":""}')).toBeNull() // id vazio
         expect(parseRemoteCommand('{"action":"playChannel","channelId":42}')).toBeNull() // id não-string
         expect(parseRemoteCommand('42')).toBeNull()
+    })
+})
+
+describe('PIN lockout', () => {
+    it('conta falhas e só bloqueia ao atingir o limite', () => {
+        let entry = registerPinFailure(undefined, 1000)
+        expect(entry).toEqual({ fails: 1, lockedUntil: 0 })
+        for (let i = 2; i < PIN_MAX_FAILS; i++) {
+            entry = registerPinFailure(entry, 1000)
+            expect(entry.fails).toBe(i)
+            expect(entry.lockedUntil).toBe(0)
+        }
+        // A falha nº PIN_MAX_FAILS arma o cooldown e zera o contador.
+        entry = registerPinFailure(entry, 1000)
+        expect(entry.fails).toBe(0)
+        expect(entry.lockedUntil).toBe(1000 + PIN_LOCK_MS)
+    })
+    it('isPinLockedOut respeita a janela de cooldown', () => {
+        const locked = { fails: 0, lockedUntil: 5000 }
+        expect(isPinLockedOut(locked, 4999)).toBe(true)
+        expect(isPinLockedOut(locked, 5000)).toBe(false) // expirou
+        expect(isPinLockedOut(locked, 6000)).toBe(false)
+        expect(isPinLockedOut(undefined, 1)).toBe(false)
+        expect(isPinLockedOut({ fails: 2, lockedUntil: 0 }, 1)).toBe(false)
     })
 })
