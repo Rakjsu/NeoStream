@@ -22,6 +22,9 @@ import {
     encodePongFrame,
     decodeFrames,
     parseRemoteCommand,
+    isPinLockedOut,
+    registerPinFailure,
+    type PinGateEntry,
 } from './webRemoteProtocol'
 import { REMOTE_PAGE_HTML } from './webRemotePage'
 
@@ -56,6 +59,9 @@ interface GuideState {
 let server: http.Server | null = null
 let serverPort = 0
 let sessionPin = ''
+// Per-client PIN failure tracking, so a wrong PIN can't be brute-forced over
+// the LAN (10k combos). Keyed by remote IP; cleared on the server stopping.
+const pinGate = new Map<string, PinGateEntry>()
 const clients = new Set<ClientSocket>()
 let mediaState = { hasMedia: false, playing: false, title: '' }
 // Second-screen guide: the live channel list + now/next EPG of the playing
@@ -135,13 +141,26 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
         return
     }
     // PIN gate: the page connects to ws://host/?pin=NNNN. A wrong/absent PIN
-    // is refused before the WebSocket is established.
+    // is refused before the WebSocket is established; too many wrong PINs from
+    // the same client trip a cooldown (anti brute-force).
+    const ip = socket.remoteAddress || 'unknown'
+    const now = Date.now()
+    if (isPinLockedOut(pinGate.get(ip), now)) {
+        socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n')
+        socket.destroy()
+        return
+    }
     const url = new URL(request.url || '/', 'http://localhost')
     if (url.searchParams.get('pin') !== sessionPin) {
+        const entry = registerPinFailure(pinGate.get(ip), now)
+        pinGate.set(ip, entry)
+        if (entry.lockedUntil > now) log.warn(`[WebRemote] PIN bloqueado por tentativas: ${ip}`)
         socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
         socket.destroy()
         return
     }
+    // Correct PIN: clear any accumulated failures for this client.
+    pinGate.delete(ip)
     socket.write(buildHandshakeResponse(key))
     const client: ClientSocket = { socket, buffer: new Uint8Array(0) }
     clients.add(client)
@@ -266,6 +285,7 @@ function stop(): void {
     server = null
     serverPort = 0
     sessionPin = ''
+    pinGate.clear()
 }
 
 export function teardownWebRemote(): void {
