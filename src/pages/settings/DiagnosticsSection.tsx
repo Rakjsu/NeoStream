@@ -80,7 +80,11 @@ export function DiagnosticsSection() {
     const ENDPOINT_LABELS: Record<string, string> = {
         player_api: 'API (player_api.php)',
         live_streams: t('diagnostics', 'healthChannels'),
-        xmltv: 'EPG (xmltv.php)'
+        xmltv: 'EPG (xmltv.php)',
+        m3u_download: t('diagnostics', 'healthM3uDownload'),
+        m3u_parse: t('diagnostics', 'healthM3uParse'),
+        stalker_handshake: t('diagnostics', 'healthStalkerHandshake'),
+        stalker_channels: t('diagnostics', 'healthStalkerChannels')
     };
 
     // Storage overview (sizes measured in the main process)

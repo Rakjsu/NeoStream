@@ -149,6 +149,187 @@ export function extractStreamUrl(cmd: string): string | null {
     return match ? match[0] : null
 }
 
+/**
+ * Synthetic EPG channel id for a stalker channel. Portal EPG is keyed by the
+ * portal's own channel id, so the live streams and the synthesized XMLTV both
+ * use this id (a channel's xmltv_id often doesn't match any reachable XMLTV).
+ */
+export function stalkerEpgChannelId(id: string): string {
+    return `stk-ch-${id}`
+}
+
+export interface StalkerVodItem {
+    id: string
+    name: string
+    logo: string
+    cmd: string
+    categoryId: string
+    year: string
+    description: string
+}
+
+/** Defensive mapping of one vod get_ordered_list page. */
+export function parseVodItems(js: unknown): StalkerVodItem[] {
+    const data = (js as { data?: unknown } | null)?.data
+    if (!Array.isArray(data)) return []
+    const items: StalkerVodItem[] = []
+    for (const raw of data) {
+        if (raw === null || typeof raw !== 'object') continue
+        const v = raw as Record<string, unknown>
+        const cmd = typeof v.cmd === 'string' ? v.cmd : ''
+        const name = typeof v.name === 'string' ? v.name : ''
+        if (!cmd || !name) continue
+        items.push({
+            id: v.id !== undefined && v.id !== null ? String(v.id) : '',
+            name,
+            logo: typeof v.screenshot_uri === 'string' ? v.screenshot_uri : '',
+            cmd,
+            categoryId: v.category_id !== undefined && v.category_id !== null ? String(v.category_id) : '',
+            year: v.year !== undefined && v.year !== null ? String(v.year) : '',
+            description: typeof v.description === 'string' ? v.description : '',
+        })
+    }
+    return items
+}
+
+/** total_items from a paginated response (0 when absent/garbage). */
+export function parseTotalItems(js: unknown): number {
+    const total = (js as { total_items?: unknown } | null)?.total_items
+    const n = Number(total)
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+}
+
+/** VOD items → the Xtream VOD shape (ids offset like the M3U mapping). */
+export function stalkerVodToStreams(items: StalkerVodItem[]): {
+    num: number
+    name: string
+    stream_type: 'movie'
+    stream_id: number
+    stream_icon: string
+    rating: string
+    category_id: string
+    container_extension: string
+    added: string
+    direct_source: string
+}[] {
+    return items.map((item, i) => ({
+        num: i + 1,
+        name: item.name,
+        stream_type: 'movie',
+        stream_id: 200000 + i + 1,
+        stream_icon: item.logo,
+        rating: '',
+        category_id: item.categoryId ? `stk-vod-${item.categoryId}` : 'stk-vod-0',
+        container_extension: 'mp4', // create_link decides the real container
+        added: '',
+        direct_source: item.cmd,
+    }))
+}
+
+/** VOD categories → Xtream category shape (distinct prefix from live genres). */
+export function stalkerVodCategories(genres: StalkerGenre[]): {
+    category_id: string
+    category_name: string
+    parent_id: number
+}[] {
+    return genres.map(g => ({
+        category_id: `stk-vod-${g.id}`,
+        category_name: g.title,
+        parent_id: 0,
+    }))
+}
+
+export interface StalkerEpgProgram {
+    name: string
+    description: string
+    startTs: number
+    stopTs: number
+}
+
+/**
+ * Parse itv get_epg_info: programs keyed by portal channel id. Accepts both
+ * `{data: {chId: [...]}}` and the bare `{chId: [...]}` variants.
+ */
+export function parseEpgPrograms(js: unknown): Map<string, StalkerEpgProgram[]> {
+    const result = new Map<string, StalkerEpgProgram[]>()
+    if (js === null || typeof js !== 'object') return result
+    const wrapped = (js as { data?: unknown }).data
+    const source = wrapped !== null && typeof wrapped === 'object' && !Array.isArray(wrapped)
+        ? wrapped as Record<string, unknown>
+        : js as Record<string, unknown>
+
+    for (const [chId, rawList] of Object.entries(source)) {
+        if (!Array.isArray(rawList)) continue
+        const programs: StalkerEpgProgram[] = []
+        for (const raw of rawList) {
+            if (raw === null || typeof raw !== 'object') continue
+            const p = raw as Record<string, unknown>
+            const name = typeof p.name === 'string' ? p.name : ''
+            const startTs = Number(p.start_timestamp)
+            const stopTs = Number(p.stop_timestamp)
+            if (!name || !Number.isFinite(startTs) || !Number.isFinite(stopTs) || stopTs <= startTs) continue
+            programs.push({
+                name,
+                description: typeof p.descr === 'string' ? p.descr : '',
+                startTs,
+                stopTs,
+            })
+        }
+        if (programs.length > 0) result.set(String(chId), programs)
+    }
+    return result
+}
+
+function escapeXml(text: string): string {
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+}
+
+/** Unix seconds → XMLTV time ("YYYYMMDDHHMMSS +0000", UTC). */
+export function formatXmltvTime(unixSeconds: number): string {
+    const date = new Date(unixSeconds * 1000)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return (
+        `${date.getUTCFullYear()}${pad(date.getUTCMonth() + 1)}${pad(date.getUTCDate())}` +
+        `${pad(date.getUTCHours())}${pad(date.getUTCMinutes())}${pad(date.getUTCSeconds())} +0000`
+    )
+}
+
+/**
+ * Synthesize an XMLTV document from portal EPG so stalker playlists plug into
+ * the existing provider-EPG index (mini-EPG, guide, program search).
+ */
+export function buildXmltvFromStalkerEpg(
+    channels: StalkerChannel[],
+    epgByChannel: Map<string, StalkerEpgProgram[]>,
+): string {
+    const parts: string[] = ['<?xml version="1.0" encoding="UTF-8"?>', '<tv>']
+    for (const channel of channels) {
+        parts.push(
+            `<channel id="${escapeXml(stalkerEpgChannelId(channel.id))}">` +
+            `<display-name>${escapeXml(channel.name)}</display-name></channel>`,
+        )
+    }
+    for (const channel of channels) {
+        const programs = epgByChannel.get(channel.id)
+        if (!programs) continue
+        for (const program of programs) {
+            parts.push(
+                `<programme start="${formatXmltvTime(program.startTs)}" stop="${formatXmltvTime(program.stopTs)}" ` +
+                `channel="${escapeXml(stalkerEpgChannelId(channel.id))}">` +
+                `<title>${escapeXml(program.name)}</title>` +
+                (program.description ? `<desc>${escapeXml(program.description)}</desc>` : '') +
+                `</programme>`,
+            )
+        }
+    }
+    parts.push('</tv>')
+    return parts.join('\n')
+}
+
 /** Genre list → the Xtream category shape the renderer already renders. */
 export function stalkerGenresToCategories(genres: StalkerGenre[]): {
     category_id: string
@@ -187,7 +368,9 @@ export function stalkerChannelsToLiveStreams(channels: StalkerChannel[]): {
         stream_type: 'live',
         stream_id: Number(channel.id) || i + 1,
         stream_icon: channel.logo,
-        epg_channel_id: channel.xmltvId,
+        // Matches the synthesized XMLTV (buildXmltvFromStalkerEpg), which is
+        // keyed by portal channel id — not by the portal's xmltv_id.
+        epg_channel_id: stalkerEpgChannelId(channel.id),
         added: '',
         category_id: channel.genreId ? `stk-${channel.genreId}` : 'stk-0',
         custom_sid: '',

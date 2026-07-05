@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import {
+    buildXmltvFromStalkerEpg,
+    formatXmltvTime,
+    parseEpgPrograms,
+    parseTotalItems,
+    parseVodItems,
+    stalkerVodCategories,
+    stalkerVodToStreams,
     normalizeMac,
     portalCandidates,
     buildStalkerQuery,
@@ -130,7 +137,64 @@ describe('mapeamentos pro shape Xtream', () => {
             name: 'Canal Um',
             category_id: 'stk-2',
             direct_source: 'ffmpeg http://x/1.ts',
-            epg_channel_id: 'um.br',
+            epg_channel_id: 'stk-ch-10',
         })
+    })
+})
+
+describe('parseVodItems / parseTotalItems', () => {
+    it('mapeia itens de VOD defensivamente', () => {
+        const items = parseVodItems({
+            total_items: 37,
+            data: [
+                { id: 7, name: 'Filme Um', screenshot_uri: 'http://x/p.jpg', cmd: 'auto /media/7.mpg', category_id: 3, year: 2024, description: 'desc' },
+                { id: 8, name: '', cmd: 'x' },
+            ],
+        })
+        expect(items).toHaveLength(1)
+        expect(items[0]).toMatchObject({ id: '7', name: 'Filme Um', categoryId: '3', year: '2024' })
+        expect(parseTotalItems({ total_items: 37 })).toBe(37)
+        expect(parseTotalItems({ total_items: 'lixo' })).toBe(0)
+    })
+})
+
+describe('stalkerVodToStreams / stalkerVodCategories', () => {
+    it('vira o shape Xtream de VOD com ids deslocados e cmd em direct_source', () => {
+        const [movie] = stalkerVodToStreams([
+            { id: '7', name: 'Filme Um', logo: 'p.jpg', cmd: 'auto /media/7.mpg', categoryId: '3', year: '2024', description: '' },
+        ])
+        expect(movie).toMatchObject({
+            stream_id: 200001,
+            name: 'Filme Um',
+            category_id: 'stk-vod-3',
+            direct_source: 'auto /media/7.mpg',
+        })
+        expect(stalkerVodCategories([{ id: '3', title: 'Ação' }])[0]).toEqual({
+            category_id: 'stk-vod-3', category_name: 'Ação', parent_id: 0,
+        })
+    })
+})
+
+describe('EPG do portal → XMLTV sintético', () => {
+    it('parseEpgPrograms aceita {data:{ch:[...]}} e {ch:[...]}', () => {
+        const program = { name: 'Jornal', descr: 'noticias', start_timestamp: 1751700000, stop_timestamp: 1751703600 }
+        expect(parseEpgPrograms({ data: { '10': [program] } }).get('10')).toHaveLength(1)
+        expect(parseEpgPrograms({ '10': [program] }).get('10')).toHaveLength(1)
+        expect(parseEpgPrograms({ '10': [{ name: '', start_timestamp: 1, stop_timestamp: 2 }] }).size).toBe(0)
+    })
+
+    it('formatXmltvTime gera YYYYMMDDHHMMSS +0000 em UTC', () => {
+        expect(formatXmltvTime(0)).toBe('19700101000000 +0000')
+    })
+
+    it('buildXmltvFromStalkerEpg gera documento com canais e programas escapados', () => {
+        const xml = buildXmltvFromStalkerEpg(
+            [{ id: '10', name: 'Canal <Um> & Cia', number: 1, logo: '', genreId: '1', cmd: 'ffmpeg http://x/1.ts', xmltvId: '' }],
+            parseEpgPrograms({ '10': [{ name: 'Filme "X"', descr: '', start_timestamp: 1751700000, stop_timestamp: 1751703600 }] }),
+        )
+        expect(xml).toContain('<channel id="stk-ch-10">')
+        expect(xml).toContain('Canal &lt;Um&gt; &amp; Cia')
+        expect(xml).toContain('<title>Filme &quot;X&quot;</title>')
+        expect(xml).toContain('channel="stk-ch-10"')
     })
 })

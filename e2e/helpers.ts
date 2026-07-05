@@ -36,8 +36,16 @@ const MAIN_JS = path.join(ROOT, 'dist-electron', 'main.js');
  * credentials for the mock Xtream server, so the app boots authenticated
  * (lands on the profile selector).
  */
-export async function launchApp(options: { serverUrl?: string } = {}): Promise<LaunchedApp> {
+export async function launchApp(options: {
+    serverUrl?: string;
+    /** Extra electron-store files to pre-seed: store name (sans .json) → contents. */
+    extraStores?: Record<string, object>;
+} = {}): Promise<LaunchedApp> {
     const userDataDir = mkdtempSync(path.join(tmpdir(), 'neostream-e2e-'));
+
+    for (const [name, contents] of Object.entries(options.extraStores ?? {})) {
+        writeFileSync(path.join(userDataDir, `${name}.json`), JSON.stringify(contents), 'utf-8');
+    }
 
     if (options.serverUrl) {
         const config = {
