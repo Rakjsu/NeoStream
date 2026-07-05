@@ -884,6 +884,32 @@ export function setupIpcHandlers() {
         }
     })
 
+    // Wrapped retrospective card: the renderer draws a PNG on a canvas and
+    // hands the base64 over; main shows the save dialog and writes the bytes.
+    ipcMain.handle('wrapped:save-png', async (_, { dataUrl }: { dataUrl?: string }) => {
+        try {
+            const base64 = String(dataUrl ?? '').replace(/^data:image\/png;base64,/, '')
+            if (!base64 || /[^A-Za-z0-9+/=]/.test(base64)) {
+                return { success: false, error: 'PNG inválido' }
+            }
+            const year = new Date().getFullYear()
+            const result = await dialog.showSaveDialog({
+                title: 'Salvar retrospectiva',
+                defaultPath: `neostream-wrapped-${year}.png`,
+                filters: [{ name: 'PNG', extensions: ['png'] }]
+            })
+            if (result.canceled || !result.filePath) {
+                return { success: false, canceled: true }
+            }
+            const fs = await import('fs/promises')
+            await fs.writeFile(result.filePath, Buffer.from(base64, 'base64'))
+            log.info('[Wrapped] card salvo em', result.filePath)
+            return { success: true, path: result.filePath }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
     // Load a user-data backup JSON from a file chosen by the user
     ipcMain.handle('backup:load-file', async () => {
         try {
