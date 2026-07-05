@@ -7,6 +7,13 @@ import {
     parseVodItems,
     stalkerVodCategories,
     stalkerVodToStreams,
+    parseSeriesItems,
+    parseSeasons,
+    stalkerSeriesToList,
+    stalkerSeriesInfo,
+    stalkerEpisodeId,
+    parseStalkerEpisodeId,
+    seasonNumberOf,
     normalizeMac,
     portalCandidates,
     buildStalkerQuery,
@@ -196,5 +203,52 @@ describe('EPG do portal → XMLTV sintético', () => {
         expect(xml).toContain('Canal &lt;Um&gt; &amp; Cia')
         expect(xml).toContain('<title>Filme &quot;X&quot;</title>')
         expect(xml).toContain('channel="stk-ch-10"')
+    })
+})
+
+describe('séries do portal (fase 3)', () => {
+    it('parseSeriesItems e parseSeasons mapeiam defensivamente', () => {
+        const items = parseSeriesItems({ data: [
+            { id: 70, name: 'Serie Portal', screenshot_uri: 'c.jpg', category_id: 4 },
+            { id: 71, name: '' },
+        ] })
+        expect(items).toEqual([{ id: '70', name: 'Serie Portal', logo: 'c.jpg', categoryId: '4' }])
+
+        const seasons = parseSeasons({ data: [
+            { id: '70:1', name: 'Season 1', cmd: 'auto /media/70-1.mpg', series: [1, 2, 3] },
+            { id: '70:2', name: 'Season 2', cmd: 'auto /media/70-2.mpg', series: ['1', '2'] },
+            { id: '70:x', name: 'vazia', cmd: 'auto /x', series: [] },
+        ] })
+        expect(seasons).toHaveLength(2)
+        expect(seasons[1].episodes).toEqual([1, 2])
+    })
+
+    it('stalkerSeriesToList guarda o portal_id e desloca ids', () => {
+        const [serie] = stalkerSeriesToList([{ id: '70', name: 'Serie Portal', logo: '', categoryId: '4' }])
+        expect(serie).toMatchObject({ series_id: 500001, portal_id: '70', category_id: 'stk-ser-4' })
+    })
+
+    it('stalkerSeriesInfo monta o shape do modal com ids compostos', () => {
+        const info = stalkerSeriesInfo('70', parseSeasons({ data: [
+            { id: '70:1', name: 'Season 1', cmd: 'auto /m/1', series: [2, 1] },
+            { id: '70:2', name: 'Season 2', cmd: 'auto /m/2', series: [1] },
+        ] }))
+        expect(Object.keys(info.episodes)).toEqual(['1', '2'])
+        expect(info.episodes['1'].map(e => e.episode_num)).toEqual([1, 2])
+        expect(info.episodes['1'][0].id).toBe('stk-ep|70|70:1|1')
+    })
+
+    it('parseStalkerEpisodeId faz o round-trip e rejeita lixo', () => {
+        expect(parseStalkerEpisodeId(stalkerEpisodeId('70', '70:2', 5))).toEqual({
+            portalSeriesId: '70', seasonId: '70:2', episode: 5,
+        })
+        expect(parseStalkerEpisodeId('12345')).toBeNull()
+        expect(parseStalkerEpisodeId('stk-ep|70|x|zero')).toBeNull()
+    })
+
+    it('seasonNumberOf extrai do nome/id com fallback pro índice', () => {
+        expect(seasonNumberOf({ id: '70:3', name: 'Temporada 3', cmd: 'x', episodes: [1] }, 0)).toBe(3)
+        expect(seasonNumberOf({ id: '70:9', name: 'sem numero no nome', cmd: 'x', episodes: [1] }, 0)).toBe(9)
+        expect(seasonNumberOf({ id: 'abc', name: 'sem nada', cmd: 'x', episodes: [1] }, 4)).toBe(5)
     })
 })

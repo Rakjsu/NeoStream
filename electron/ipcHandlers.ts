@@ -22,7 +22,7 @@ import type { PlaylistBackupEntry } from './playlistManager'
 
 import { cachedCatalogFetch, invalidatePlaylistCache, type CatalogKind } from './catalogCache'
 import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uToVodStreams, m3uCategories, classifyM3uChannels, m3uToSeries, m3uSeriesInfo, findM3uEpisodeUrl } from './m3uProtocol'
-import { normalizeMac, stalkerChannelsToLiveStreams, stalkerGenresToCategories, stalkerVodToStreams, stalkerVodCategories, STALKER_SENTINEL } from './stalkerProtocol'
+import { normalizeMac, stalkerChannelsToLiveStreams, stalkerGenresToCategories, stalkerVodToStreams, stalkerVodCategories, stalkerSeriesToList, stalkerSeriesCategories, stalkerSeriesInfo, parseStalkerEpisodeId, STALKER_SENTINEL } from './stalkerProtocol'
 import { StalkerClient, resolvePortal } from './stalkerClient'
 import log from './logger'
 // Store for window state (for custom maximize)
@@ -90,12 +90,9 @@ async function catalogListHandler(
             return { success: true, data: result.data, fromCache: result.fromCache }
         }
 
-        // Stalker portals: live + VOD from the portal API (phase 2); series
-        // stay empty (portal series need season/episode drill-down — phase 3).
+        // Stalker portals: live + VOD (phase 2) + series (phase 3), all from
+        // the portal API through the same SWR cache.
         if (activeEntry?.type === 'stalker') {
-            if (kind === 'series' || kind === 'series-categories') {
-                return { success: true, data: [], fromCache: true }
-            }
             const stalker = new StalkerClient(activeEntry.url, activeEntry.username)
             const result = await cachedCatalogFetch(
                 playlistId,
@@ -106,6 +103,8 @@ async function catalogListHandler(
                         case 'live-categories': return stalkerGenresToCategories(await stalker.getGenres())
                         case 'vod': return stalkerVodToStreams(await stalker.getVodItems())
                         case 'vod-categories': return stalkerVodCategories(await stalker.getVodCategories())
+                        case 'series': return stalkerSeriesToList(await stalker.getSeriesItems())
+                        case 'series-categories': return stalkerSeriesCategories(await stalker.getSeriesCategories())
                         default: return []
                     }
                 },
@@ -763,6 +762,18 @@ export function setupIpcHandlers() {
                 return { success: true, url }
             }
 
+            // Stalker: composite episode id -> season cmd + create_link(series=N).
+            const stalkerEpisode = parseStalkerEpisodeId(String(streamId))
+            if (stalkerEpisode && activeEntry?.type === 'stalker') {
+                const stalker = new StalkerClient(activeEntry.url, activeEntry.username)
+                const seasons = await stalker.getSeasons(stalkerEpisode.portalSeriesId)
+                const season = seasons.find(item => item.id === stalkerEpisode.seasonId)
+                if (!season) return { success: false, error: 'Temporada não encontrada no portal' }
+                const url = await stalker.createLink(season.cmd, 'vod', stalkerEpisode.episode)
+                registerApprovedProviderUrl(url, activeEntry.url)
+                return { success: true, url }
+            }
+
             const client = new XtreamClient(auth.url, auth.username, auth.password)
             const url = client.getSeriesStreamUrl(streamId, container || 'mp4')
             registerApprovedProviderUrl(url, auth.url)
@@ -791,8 +802,18 @@ export function setupIpcHandlers() {
                 return { success: true, info: m3uSeriesInfo(series, Number(seriesId)) }
             }
             if (activeEntry?.type === 'stalker') {
-                // Portal series need Ministra season/episode drill-down (phase 3).
-                return { success: true, info: { episodes: {} } }
+                const stalker = new StalkerClient(activeEntry.url, activeEntry.username)
+                const cached = await cachedCatalogFetch(
+                    activeId ?? 'default',
+                    'series',
+                    async () => stalkerSeriesToList(await stalker.getSeriesItems()),
+                    false
+                )
+                const list = cached.data as ReturnType<typeof stalkerSeriesToList>
+                const target = list.find(item => item.series_id === Number(seriesId))
+                if (!target) return { success: false, error: 'Série não encontrada no portal' }
+                const seasons = await stalker.getSeasons(target.portal_id)
+                return { success: true, info: stalkerSeriesInfo(target.portal_id, seasons) }
             }
 
             const base = String(auth.url).replace(/\/$/, '')

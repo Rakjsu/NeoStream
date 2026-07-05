@@ -72,4 +72,8 @@ test('stalker: adicionar portal por URL+MAC leva os canais pra TV ao Vivo', asyn
     await page.locator('button.nav-item[title="Filmes"]').click();
     await expect(page.getByText('Filme STK Um').first()).toBeVisible({ timeout: 20000 });
     await expect(page.getByText('Filme STK Dois').first()).toBeVisible();
+
+    // Phase 3: portal series feed the series page.
+    await page.locator('button.nav-item[title="Séries"]').click();
+    await expect(page.getByText('Serie STK Portal').first()).toBeVisible({ timeout: 20000 });
 });

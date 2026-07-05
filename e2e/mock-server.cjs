@@ -187,11 +187,37 @@ function startMockServer() {
                 return;
             }
             if (action === 'get_categories') {
-                // vod categories (type=vod)
-                reply([
-                    { id: '*', title: 'All' },
-                    { id: '3', title: 'Ação STK' }
-                ]);
+                // categories for type=vod and type=series
+                reply(url.searchParams.get('type') === 'series'
+                    ? [
+                        { id: '*', title: 'All' },
+                        { id: '4', title: 'Drama STK' }
+                    ]
+                    : [
+                        { id: '*', title: 'All' },
+                        { id: '3', title: 'Ação STK' }
+                    ]);
+                return;
+            }
+            if (action === 'get_ordered_list' && url.searchParams.get('type') === 'series') {
+                // With movie_id -> the seasons of that series; without -> series list.
+                if (url.searchParams.get('movie_id')) {
+                    reply({
+                        total_items: 2,
+                        data: [
+                            { id: '70:1', name: 'Season 1', cmd: `auto ${origin}/series/stk-serie-s1.mpg`, series: [1, 2] },
+                            { id: '70:2', name: 'Season 2', cmd: `auto ${origin}/series/stk-serie-s2.mpg`, series: [1] }
+                        ]
+                    });
+                    return;
+                }
+                reply({
+                    total_items: 1,
+                    max_page_items: 14,
+                    data: [
+                        { id: 70, name: 'Serie STK Portal', screenshot_uri: '', category_id: '4' }
+                    ]
+                });
                 return;
             }
             if (action === 'get_ordered_list') {
