@@ -1282,6 +1282,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                         videoUrl={src}
                         videoTitle={title || 'Video'}
                         subtitleVtt={vttContent}
+                        tmdbId={tmdbId}
+                        imdbId={imdbId}
                         onClose={() => setShowDeviceSelector(false)}
                         onDeviceSelected={(device) => {
                             if (device.type === 'dlna' || device.type === 'chromecast') {
