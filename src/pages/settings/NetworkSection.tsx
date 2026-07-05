@@ -1,12 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useLanguage } from '../../services/languageService';
 import { useSaveAnimation } from './useSaveAnimation';
+import { qrToSvg } from '../../utils/qrEncoder';
 
 export function NetworkSection() {
     const [allowInvalidProviderCertificates, setAllowInvalidProviderCertificates] = useState(true);
     const [webRemote, setWebRemote] = useState<{ enabled: boolean; url: string | null }>({ enabled: false, url: null });
     const { t } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
+
+    // Offline QR of the LAN URL (own pure encoder — no lib, no network).
+    const webRemoteQr = useMemo(() => {
+        if (!webRemote.url) return null;
+        try {
+            return qrToSvg(webRemote.url, 4);
+        } catch {
+            return null;
+        }
+    }, [webRemote.url]);
 
     useEffect(() => {
         (async () => {
@@ -101,12 +112,20 @@ export function NetworkSection() {
                 </div>
 
                 {webRemote.enabled && webRemote.url && (
-                    <div className="certificate-warning" style={{ borderColor: 'rgba(99,102,241,0.4)', background: 'rgba(99,102,241,0.1)' }}>
-                        {t('network', 'webRemoteOpen')}:{' '}
-                        <a href={webRemote.url} style={{ color: 'var(--ns-accent-light)', fontWeight: 700 }} onClick={(e) => e.preventDefault()}>
-                            {webRemote.url}
-                        </a>
-                        <p style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>{t('network', 'webRemoteHint')}</p>
+                    <div className="certificate-warning" style={{ borderColor: 'rgba(99,102,241,0.4)', background: 'rgba(99,102,241,0.1)', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+                        {webRemoteQr && (
+                            <div
+                                style={{ width: 132, height: 132, flexShrink: 0, borderRadius: 8, overflow: 'hidden' }}
+                                dangerouslySetInnerHTML={{ __html: webRemoteQr }}
+                            />
+                        )}
+                        <div style={{ flex: '1 1 200px' }}>
+                            {t('network', 'webRemoteOpen')}:{' '}
+                            <a href={webRemote.url} style={{ color: 'var(--ns-accent-light)', fontWeight: 700 }} onClick={(e) => e.preventDefault()}>
+                                {webRemote.url}
+                            </a>
+                            <p style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>{t('network', 'webRemoteQrHint')}</p>
+                        </div>
                     </div>
                 )}
             </div>

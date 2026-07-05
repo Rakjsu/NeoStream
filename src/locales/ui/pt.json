@@ -641,7 +641,8 @@
     "webRemoteTitle": "Controle pelo celular",
     "webRemoteDesc": "Abre um controle remoto no navegador do celular (mesma rede Wi-Fi) com play/pause, volume e avançar/voltar",
     "webRemoteOpen": "Abra no celular",
-    "webRemoteHint": "Mantenha o app aberto no computador. Só funciona na mesma rede local."
+    "webRemoteHint": "Mantenha o app aberto no computador. Só funciona na mesma rede local.",
+    "webRemoteQrHint": "Aponte a câmera do celular pro código, ou abra a URL. O PIN aparece ao conectar."
   },
   "welcome": {
     "stepLanguageTitle": "Bem-vindo ao NeoStream",
