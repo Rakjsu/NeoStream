@@ -275,7 +275,7 @@ export function PlaybackSection() {
                 {/* EXPERIMENTAL — MPV PoC: external MPV player toggle */}
                 <div className="setting-item">
                     <div className="setting-info">
-                        <label>🧪 {t('playback', 'mpvEnabled') || 'Player MPV (experimental)'}</label>
+                        <label>🎞️ {t('playback', 'mpvEnabled') || 'Player MPV'}</label>
                         <p>{t('playback', 'mpvEnabledDesc') || 'Reproduz canais ao vivo e filmes em uma janela MPV externa.'}</p>
                     </div>
                     <label className="toggle-switch">

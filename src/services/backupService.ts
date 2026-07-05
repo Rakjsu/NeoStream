@@ -42,6 +42,7 @@ const EXACT_KEYS = [
     'neostream_theme',        // background + accent color (v2)
     'parentalConfig',         // parental control config (PIN hash included)
     'playerVolume',           // last player volume
+    'neostream_mpv_volume',   // last MPV volume (stable player)
     'watchLater',             // legacy pre-profile watch-later list
 ];
 
