@@ -40,6 +40,44 @@ function stopActiveSession(): void {
     activeSession = null
 }
 
+// Remembered volume so the phone's 🔇 can toggle back on.
+let preMuteVolume = 0.3
+
+/** True while a Chromecast session is playing (used by the phone remote). */
+export function isCastSessionActive(): boolean {
+    return activeSession?.isActive ?? false
+}
+
+/**
+ * Route a phone-remote transport command to the active cast session, so the
+ * same buttons that drive the local player drive the Chromecast when one is
+ * casting. Returns true if a live session handled it (else the caller falls
+ * back to the renderer's media:control). Seek is relative (± seconds), matching
+ * the phone's -30/+30 buttons; cast seek is absolute, so we add to currentTime.
+ */
+export function castRemoteControl(action: string, seconds?: number): boolean {
+    const s = activeSession
+    if (!s || !s.isActive) return false
+    const vol = s.status.volume ?? 0.5
+    switch (action) {
+        case 'togglePlay': if (s.status.playing) s.pause(); else s.resume(); break
+        case 'stop': stopActiveSession(); break
+        case 'seek':
+            if (typeof seconds === 'number' && Number.isFinite(seconds)) {
+                s.seek(Math.max(0, (s.status.currentTime ?? 0) + seconds))
+            }
+            break
+        case 'volumeUp': s.setVolume(Math.min(1, vol + 0.1)); break
+        case 'volumeDown': s.setVolume(Math.max(0, vol - 0.1)); break
+        case 'mute':
+            if (vol > 0) { preMuteVolume = vol; s.setVolume(0) }
+            else s.setVolume(preMuteVolume)
+            break
+        default: return false
+    }
+    return true
+}
+
 export function setupCastHandlers(): void {
     try {
         bonjour = new Bonjour()
