@@ -4,6 +4,7 @@ import { useSaveAnimation } from './useSaveAnimation';
 
 export function NetworkSection() {
     const [allowInvalidProviderCertificates, setAllowInvalidProviderCertificates] = useState(true);
+    const [webRemote, setWebRemote] = useState<{ enabled: boolean; url: string | null }>({ enabled: false, url: null });
     const { t } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
 
@@ -17,8 +18,19 @@ export function NetworkSection() {
             } catch (error) {
                 console.error('Failed to load certificate settings:', error);
             }
+            try {
+                const result = await window.ipcRenderer.invoke('web-remote:get-config') as { success: boolean; enabled?: boolean; url?: string | null };
+                if (result.success) setWebRemote({ enabled: result.enabled ?? false, url: result.url ?? null });
+            } catch { /* handler absent in old builds */ }
         })();
     }, []);
+
+    const handleWebRemoteToggle = async (value: boolean) => {
+        const result = await window.ipcRenderer.invoke('web-remote:set-enabled', { enabled: value })
+            .catch(() => null) as { success: boolean; enabled?: boolean; url?: string | null } | null;
+        if (result?.success) setWebRemote({ enabled: result.enabled ?? false, url: result.url ?? null });
+        triggerSaveAnimation('webRemote');
+    };
 
     const handleAllowInvalidProviderCertificatesChange = async (value: boolean) => {
         setAllowInvalidProviderCertificates(value);
@@ -66,6 +78,35 @@ export function NetworkSection() {
                 {allowInvalidProviderCertificates && (
                     <div className="certificate-warning">
                         <strong>Atenção:</strong> este modo não libera certificados inválidos nem CORS para TMDB, atualizações, GitHub ou domínios externos independentes. Ele vale apenas para o servidor IPTV salvo no app e hosts relacionados aprovados.
+                    </div>
+                )}
+
+                {/* Phone web remote */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>📱 {t('network', 'webRemoteTitle')}</label>
+                        <p>{t('network', 'webRemoteDesc')}</p>
+                    </div>
+                    <label className="toggle-switch">
+                        <input
+                            type="checkbox"
+                            checked={webRemote.enabled}
+                            onChange={(e) => void handleWebRemoteToggle(e.target.checked)}
+                        />
+                        <span className="toggle-slider"></span>
+                    </label>
+                    {saveAnimation === 'webRemote' && (
+                        <span className="save-indicator">{t('settings', 'saved')}</span>
+                    )}
+                </div>
+
+                {webRemote.enabled && webRemote.url && (
+                    <div className="certificate-warning" style={{ borderColor: 'rgba(99,102,241,0.4)', background: 'rgba(99,102,241,0.1)' }}>
+                        {t('network', 'webRemoteOpen')}:{' '}
+                        <a href={webRemote.url} style={{ color: 'var(--ns-accent-light)', fontWeight: 700 }} onClick={(e) => e.preventDefault()}>
+                            {webRemote.url}
+                        </a>
+                        <p style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>{t('network', 'webRemoteHint')}</p>
                     </div>
                 )}
             </div>

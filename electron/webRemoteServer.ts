@@ -1,0 +1,188 @@
+/**
+ * Phone remote: a tiny HTTP + WebSocket server on the LAN. The phone opens
+ * `http://<lan-ip>:<port>/` (a self-contained control page), which connects
+ * back over WebSocket to receive the current media state and send commands
+ * (play/pause, stop, volume, seek). Commands are forwarded to the renderer's
+ * existing `media:control` channel — the same one the tray menu uses.
+ *
+ * WebSocket is hand-rolled (webRemoteProtocol.ts) — no `ws` dependency, same
+ * from-scratch spirit as DLNA/Cast. Opt-in from Settings; off by default.
+ */
+
+import http from 'node:http'
+import os from 'node:os'
+import type { Socket } from 'node:net'
+import { BrowserWindow, ipcMain } from 'electron'
+import Store from 'electron-store'
+import log from './logger'
+import {
+    buildHandshakeResponse,
+    encodeTextFrame,
+    encodePongFrame,
+    decodeFrames,
+    parseRemoteCommand,
+} from './webRemoteProtocol'
+import { REMOTE_PAGE_HTML } from './webRemotePage'
+
+interface WebRemoteConfig {
+    enabled: boolean
+}
+
+const store = new Store<{ webRemote: WebRemoteConfig }>({ name: 'web-remote' })
+
+interface ClientSocket {
+    socket: Socket
+    buffer: Uint8Array
+}
+
+let server: http.Server | null = null
+let serverPort = 0
+const clients = new Set<ClientSocket>()
+let mediaState = { hasMedia: false, playing: false, title: '' }
+
+function getConfig(): WebRemoteConfig {
+    return { enabled: false, ...(store.get('webRemote') as Partial<WebRemoteConfig> | undefined) }
+}
+
+/** Best LAN IPv4 (first non-internal), or 127.0.0.1. */
+export function getLanAddress(): string {
+    for (const addresses of Object.values(os.networkInterfaces())) {
+        for (const addr of addresses ?? []) {
+            if (addr.family === 'IPv4' && !addr.internal) return addr.address
+        }
+    }
+    return '127.0.0.1'
+}
+
+function stateMessage(): string {
+    return JSON.stringify({ type: 'state', ...mediaState })
+}
+
+function broadcastState(): void {
+    const frame = encodeTextFrame(stateMessage())
+    for (const client of clients) {
+        try {
+            client.socket.write(frame)
+        } catch { /* dropped on next read */ }
+    }
+}
+
+function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
+    const key = request.headers['sec-websocket-key']
+    if (typeof key !== 'string') {
+        socket.destroy()
+        return
+    }
+    socket.write(buildHandshakeResponse(key))
+    const client: ClientSocket = { socket, buffer: new Uint8Array(0) }
+    clients.add(client)
+    // Send the current state immediately.
+    socket.write(encodeTextFrame(stateMessage()))
+
+    socket.on('data', (chunk: Buffer) => {
+        const glued = new Uint8Array(client.buffer.length + chunk.length)
+        glued.set(client.buffer, 0)
+        glued.set(chunk, client.buffer.length)
+        try {
+            const { frames, rest } = decodeFrames(glued)
+            client.buffer = rest
+            for (const frame of frames) {
+                if (frame.type === 'close') {
+                    socket.end()
+                } else if (frame.type === 'ping') {
+                    socket.write(encodePongFrame(frame.payload))
+                } else if (frame.type === 'text') {
+                    const command = parseRemoteCommand(frame.text)
+                    if (command) forwardCommand(command)
+                }
+            }
+        } catch (error) {
+            log.warn('[WebRemote] frame inválido, encerrando cliente:', error)
+            socket.destroy()
+        }
+    })
+    const drop = () => clients.delete(client)
+    socket.on('close', drop)
+    socket.on('error', drop)
+}
+
+function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
+    if (!command) return
+    const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
+    if (!win) return
+    // The renderer's media:control handler maps these to player actions.
+    if (command.action === 'seek') {
+        win.webContents.send('media:control', 'seek', command.seconds)
+    } else {
+        win.webContents.send('media:control', command.action)
+    }
+}
+
+export function setupWebRemote(): void {
+    // Mirror the renderer's player state (the tray listens too; multiple
+    // listeners are fine) so new WS clients get the latest snapshot.
+    ipcMain.on('media:state', (_e, state: { hasMedia?: boolean; playing?: boolean; title?: string }) => {
+        mediaState = {
+            hasMedia: state?.hasMedia === true,
+            playing: state?.playing === true,
+            title: typeof state?.title === 'string' ? state.title : '',
+        }
+        broadcastState()
+    })
+
+    ipcMain.handle('web-remote:get-config', () => ({
+        success: true,
+        enabled: getConfig().enabled,
+        url: serverPort ? `http://${getLanAddress()}:${serverPort}/` : null,
+    }))
+
+    ipcMain.handle('web-remote:set-enabled', async (_e, { enabled }: { enabled?: boolean }) => {
+        store.set('webRemote', { enabled: enabled === true })
+        if (enabled === true) await start()
+        else stop()
+        return {
+            success: true,
+            enabled: enabled === true,
+            url: serverPort ? `http://${getLanAddress()}:${serverPort}/` : null,
+        }
+    })
+
+    if (getConfig().enabled) void start()
+    log.info('[WebRemote] initialized')
+}
+
+function start(): Promise<void> {
+    if (server) return Promise.resolve()
+    return new Promise<void>((resolve) => {
+        server = http.createServer((req, res) => {
+            if (req.url === '/' || req.url === '/index.html') {
+                res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
+                res.end(REMOTE_PAGE_HTML)
+                return
+            }
+            res.writeHead(404)
+            res.end()
+        })
+        server.on('upgrade', (req, socket) => handleUpgrade(req, socket as Socket))
+        server.on('error', (error) => log.error('[WebRemote] server error:', error))
+        // Bind to all interfaces so the phone on the LAN can reach it.
+        server.listen(0, '0.0.0.0', () => {
+            const address = server?.address()
+            serverPort = typeof address === 'object' && address ? address.port : 0
+            log.info('[WebRemote] listening on', `${getLanAddress()}:${serverPort}`)
+            resolve()
+        })
+    })
+}
+
+function stop(): void {
+    for (const client of clients) client.socket.destroy()
+    clients.clear()
+    server?.close()
+    server = null
+    serverPort = 0
+}
+
+export function teardownWebRemote(): void {
+    stop()
+}

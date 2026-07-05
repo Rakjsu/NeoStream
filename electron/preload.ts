@@ -26,6 +26,8 @@ const invokeChannels = new Set([
     'cast:seek',
     'cast:stop',
     'cast:get-status',
+    'web-remote:get-config',
+    'web-remote:set-enabled',
     'categories:get-live',
     'playlists:add-stalker',
     'stalker:create-link',

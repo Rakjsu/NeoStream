@@ -220,13 +220,21 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     }, []);
     useEffect(() => {
         if (!window.ipcRenderer) return;
-        const handler = (_event: unknown, action: unknown) => {
+        const handler = (_event: unknown, action: unknown, arg?: unknown) => {
+            // Commands come from the tray menu AND the phone web-remote.
             if (action === 'togglePlay') controls.togglePlay();
             else if (action === 'stop') onClose?.();
+            else if (action === 'mute') controls.toggleMute();
+            else if (action === 'volumeUp') controls.setVolume(Math.min(1, state.volume + 0.1));
+            else if (action === 'volumeDown') controls.setVolume(Math.max(0, state.volume - 0.1));
+            else if (action === 'seek' && typeof arg === 'number') {
+                controls.seek(Math.max(0, Math.min(state.duration || 0, state.currentTime + arg)));
+            }
+            // 'next'/'previous' are list-level (zap) — ignored by the modal player.
         };
         window.ipcRenderer.on('media:control', handler);
         return () => { window.ipcRenderer?.off('media:control', handler); };
-    }, [controls, onClose]);
+    }, [controls, onClose, state.volume, state.duration, state.currentTime]);
 
     // OS media integration: hardware media keys + Windows media overlay (SMTC)
     useMediaSession({
