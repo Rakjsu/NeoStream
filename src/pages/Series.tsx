@@ -284,16 +284,15 @@ export function Series() {
     const buildSeriesStreamUrl = async (seriesItem: Series): Promise<string> => {
         void seriesItem;
         try {
-            const credResult = await window.ipcRenderer.invoke('auth:get-credentials');
-            if (credResult.success) {
-                const { url, username, password } = credResult.credentials;
-                const episodes = seriesInfo?.episodes?.[selectedSeason];
-                const episode = episodes?.find((ep) => Number(ep.episode_num) === selectedEpisode);
-
-                if (episode) {
-                    const ext = episode.container_extension || 'mp4';
-                    return `${url}/series/${username}/${password}/${episode.id}.${ext}`;
-                }
+            const episodes = seriesInfo?.episodes?.[selectedSeason];
+            const episode = episodes?.find((ep) => Number(ep.episode_num) === selectedEpisode);
+            if (episode) {
+                // Episode URL via IPC (Xtream, M3U e Stalker).
+                const urlResult = await window.ipcRenderer.invoke('streams:get-series-url', {
+                    streamId: episode.id,
+                    container: episode.container_extension || 'mp4'
+                }) as { success: boolean; url?: string };
+                if (urlResult.success && urlResult.url) return urlResult.url;
             }
             throw new Error('Credenciais não encontradas');
         } catch (error) {
