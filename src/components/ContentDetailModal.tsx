@@ -112,11 +112,11 @@ export function ContentDetailModal({
             setLoading(true);
             setLoadError(false);
         });
-        window.ipcRenderer.invoke('auth:get-credentials').then(result => {
-            if (result.success) {
-                const { url, username, password } = result.credentials;
-                fetch(`${url}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${contentId}`)
-                    .then(res => res.json())
+        // Episodes come via IPC: the main process proxies get_series_info for
+        // Xtream and builds the same shape from the parsed list for M3U.
+        window.ipcRenderer.invoke('series:get-info', { seriesId: contentId }).then(result => {
+            if ((result as { success: boolean }).success) {
+                Promise.resolve((result as { info: SeriesInfo }).info)
                     .then((data: SeriesInfo) => {
                         setSeriesInfo(data);
 

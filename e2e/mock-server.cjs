@@ -148,6 +148,12 @@ function startMockServer() {
                 `${origin}/live/stream-dois.m3u8`,
                 '#EXTINF:-1 group-title="Esportes M3U",Canal M3U Esporte',
                 `${origin}/live/stream-esporte.m3u8`,
+                '#EXTINF:-1 tvg-logo="" group-title="SÉRIES M3U",Serie Mock S01E01',
+                `${origin}/series/serie-mock-s01e01.mp4`,
+                '#EXTINF:-1 group-title="SÉRIES M3U",Serie Mock S01E02',
+                `${origin}/series/serie-mock-s01e02.mp4`,
+                '#EXTINF:-1 group-title="SÉRIES M3U",Serie Mock S02E01',
+                `${origin}/series/serie-mock-s02e01.mp4`,
                 ''
             ].join('\n');
             res.writeHead(200, { 'Content-Type': 'application/x-mpegurl; charset=utf-8' });

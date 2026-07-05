@@ -305,25 +305,24 @@ export function Series() {
     // Fetch series info when series is selected
     useEffect(() => {
         if (selectedSeries) {
-            window.ipcRenderer.invoke('auth:get-credentials').then(result => {
-                if (result.success) {
-                    const { url, username, password } = result.credentials;
-                    fetch(`${url}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${selectedSeries.series_id}`)
-                        .then(res => res.json())
-                        .then(data => {
-                            setSeriesInfo(data);
-                            const lastWatched = watchProgressService.getLastWatchedEpisode(String(selectedSeries.series_id));
-                            if (lastWatched) {
-                                setSelectedSeason(lastWatched.season);
-                                setSelectedEpisode(lastWatched.episode);
-                            } else {
-                                setSelectedSeason(1);
-                                setSelectedEpisode(1);
-                            }
-                        })
-                        .catch(() => setSeriesInfo(null));
-                }
-            });
+            // Main process resolves per playlist type (Xtream proxy / M3U grouping).
+            window.ipcRenderer.invoke('series:get-info', { seriesId: selectedSeries.series_id })
+                .then((result: { success: boolean; info?: unknown }) => {
+                    if (!result.success || result.info === undefined || result.info === null) {
+                        setSeriesInfo(null);
+                        return;
+                    }
+                    setSeriesInfo(result.info as Parameters<typeof setSeriesInfo>[0]);
+                    const lastWatched = watchProgressService.getLastWatchedEpisode(String(selectedSeries.series_id));
+                    if (lastWatched) {
+                        setSelectedSeason(lastWatched.season);
+                        setSelectedEpisode(lastWatched.episode);
+                    } else {
+                        setSelectedSeason(1);
+                        setSelectedEpisode(1);
+                    }
+                })
+                .catch(() => setSeriesInfo(null));
         } else {
             queueMicrotask(() => setSeriesInfo(null));
         }

@@ -34,18 +34,59 @@ export function parseM3uHeader(text: string): { urlTvg?: string } {
 }
 
 const VOD_GROUP_PATTERN = /film|movie|vod|cine/i
+const SERIES_GROUP_PATTERN = /s[eé]rie|series|show/i
+
+export interface M3uEpisodeTag {
+    season: number
+    episode: number
+    baseName: string
+}
+
+// "Nome S01E02", "Nome S01 E02", "Nome 1x02", "Nome.S1.E2" — season/episode
+// markers used by virtually every playlist that carries series as flat items.
+const EPISODE_TAG_PATTERNS = [
+    /^(.*?)[\s.\-_]*S(\d{1,2})[\s.\-_]*E(\d{1,3})(?:\b|_)/i,
+    /^(.*?)[\s.\-_]*\b(\d{1,2})x(\d{1,3})\b/,
+]
+
+/** Extract SxxEyy/1x02 from an item name, or null when it isn't an episode. */
+export function parseEpisodeTag(name: string): M3uEpisodeTag | null {
+    for (const pattern of EPISODE_TAG_PATTERNS) {
+        const match = String(name ?? '').match(pattern)
+        if (!match) continue
+        const baseName = match[1].replace(/[\s.\-_:]+$/, '').trim()
+        const season = Number(match[2])
+        const episode = Number(match[3])
+        if (!baseName || !Number.isFinite(season) || !Number.isFinite(episode) || episode === 0) continue
+        return { season: Math.max(1, season), episode, baseName }
+    }
+    return null
+}
 
 /**
- * Split channels into live vs VOD by group-title heuristics ("FILMES | Ação",
- * "Movies", "Cinema"...). Ungrouped entries stay live.
+ * Split channels into live / VOD / series. VOD groups by heuristic ("FILMES |
+ * Ação", "Movies"...); series (phase 3) are items with an SxxEyy tag in the
+ * name coming from a VOD- or series-looking group. Ungrouped entries stay live.
  */
-export function classifyM3uChannels(channels: M3uChannel[]): { live: M3uChannel[]; vod: M3uChannel[] } {
+export function classifyM3uChannels(channels: M3uChannel[]): { live: M3uChannel[]; vod: M3uChannel[]; series: M3uChannel[] } {
     const live: M3uChannel[] = []
     const vod: M3uChannel[] = []
+    const series: M3uChannel[] = []
     for (const channel of channels) {
-        (channel.group && VOD_GROUP_PATTERN.test(channel.group) ? vod : live).push(channel)
+        const group = channel.group ?? ''
+        const isVodGroup = group !== '' && VOD_GROUP_PATTERN.test(group)
+        const isSeriesGroup = group !== '' && SERIES_GROUP_PATTERN.test(group)
+        if ((isVodGroup || isSeriesGroup) && parseEpisodeTag(channel.name)) {
+            series.push(channel)
+        } else if (isVodGroup || isSeriesGroup) {
+            // Series-looking group without an episode tag: keep as a movie so
+            // the item stays reachable somewhere.
+            vod.push(channel)
+        } else {
+            live.push(channel)
+        }
     }
-    return { live, vod }
+    return { live, vod, series }
 }
 
 /** Parse extended-M3U text into channels. Tolerates CRLF, BOM and junk lines. */
@@ -180,6 +221,96 @@ export function m3uToVodStreams(vodChannels: M3uChannel[]): M3uVodStream[] {
         added: '',
         direct_source: channel.url
     }))
+}
+
+/** Xtream-compatible series list item (subset the renderer uses). */
+export interface M3uSeries {
+    num: number
+    name: string
+    series_id: number
+    cover: string
+    category_id: string
+    plot: string
+    rating: string
+    last_modified: string
+}
+
+/**
+ * Group episode items into series by base name (case-insensitive), sorted
+ * alphabetically so series_id (300000+idx) is stable for a given document.
+ */
+export function m3uToSeries(seriesChannels: M3uChannel[]): M3uSeries[] {
+    const categories = m3uCategories(seriesChannels)
+    const categoryIdOf = new Map(categories.map(c => [c.category_name, c.category_id]))
+
+    const byBase = new Map<string, { name: string; cover: string; group: string }>()
+    for (const channel of seriesChannels) {
+        const tag = parseEpisodeTag(channel.name)
+        if (!tag) continue
+        const key = tag.baseName.toLowerCase()
+        if (!byBase.has(key)) {
+            byBase.set(key, { name: tag.baseName, cover: channel.logo || '', group: channel.group || NO_GROUP })
+        }
+    }
+
+    return [...byBase.values()]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((entry, i) => ({
+            num: i + 1,
+            name: entry.name,
+            series_id: 300000 + i + 1,
+            cover: entry.cover,
+            category_id: categoryIdOf.get(entry.group) || 'm3u-0',
+            plot: '',
+            rating: '',
+            last_modified: '',
+        }))
+}
+
+export interface M3uEpisode {
+    id: number
+    episode_num: number
+    title: string
+    container_extension: string
+    season: number
+}
+
+/**
+ * Episodes of one series in the get_series_info shape the modal consumes:
+ * `{episodes: {"1": [{id, episode_num, title, container_extension}]}}`.
+ * Episode ids are 400000 + the item's index in seriesChannels (stable for a
+ * given document) so streams:get-series-url can find the URL back.
+ */
+export function m3uSeriesInfo(seriesChannels: M3uChannel[], seriesId: number): { episodes: Record<string, M3uEpisode[]> } {
+    const series = m3uToSeries(seriesChannels)
+    const target = series.find(s => s.series_id === Number(seriesId))
+    if (!target) return { episodes: {} }
+
+    const episodes: Record<string, M3uEpisode[]> = {}
+    seriesChannels.forEach((channel, index) => {
+        const tag = parseEpisodeTag(channel.name)
+        if (!tag || tag.baseName.toLowerCase() !== target.name.toLowerCase()) return
+        const seasonKey = String(tag.season)
+        if (!episodes[seasonKey]) episodes[seasonKey] = []
+        episodes[seasonKey].push({
+            id: 400000 + index + 1,
+            episode_num: tag.episode,
+            title: channel.name,
+            container_extension: (channel.url.match(/\.([a-z0-9]{2,4})(?:\?|$)/i)?.[1] ?? 'mp4').toLowerCase(),
+            season: tag.season,
+        })
+    })
+    for (const season of Object.values(episodes)) {
+        season.sort((a, b) => a.episode_num - b.episode_num)
+    }
+    return { episodes }
+}
+
+/** Play URL for an m3u episode id minted by m3uSeriesInfo, or null. */
+export function findM3uEpisodeUrl(seriesChannels: M3uChannel[], episodeId: number): string | null {
+    const index = Number(episodeId) - 400001
+    const channel = seriesChannels[index]
+    return channel && parseEpisodeTag(channel.name) ? channel.url : null
 }
 
 /** Cheap sanity check that a fetched body is an M3U document. */
