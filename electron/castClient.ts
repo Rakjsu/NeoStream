@@ -28,6 +28,9 @@ import {
     loadMediaPayload,
     mediaCommandPayload,
     seekPayload,
+    getMediaStatusPayload,
+    setVolumePayload,
+    extractMediaTimes,
     extractTransportId,
     extractSessionId,
     extractMediaSessionId,
@@ -42,6 +45,7 @@ export interface CastMediaInput {
     title: string
     contentType: string
     live: boolean
+    subtitleUrl?: string
 }
 
 export class CastSession {
@@ -53,6 +57,9 @@ export class CastSession {
     private sessionId: string | null = null
     private mediaSessionId: number | null = null
     private lastMediaState: string | null = null
+    private currentTime: number | null = null
+    private duration: number | null = null
+    private volumeLevel: number | null = null
     private closed = false
 
     constructor(
@@ -69,7 +76,23 @@ export class CastSession {
             deviceName: this.deviceName,
             playing: this.lastMediaState === 'PLAYING' || this.lastMediaState === 'BUFFERING',
             mediaState: this.lastMediaState,
+            currentTime: this.currentTime,
+            duration: this.duration,
+            volume: this.volumeLevel,
         }
+    }
+
+    /** Prompt the device for a fresh MEDIA_STATUS (updates currentTime). */
+    requestMediaStatus(): void {
+        if (this.transportId) {
+            this.send(this.transportId, NS_MEDIA, getMediaStatusPayload(this.requestId++, this.mediaSessionId))
+        }
+    }
+
+    /** Receiver-level volume (0..1). */
+    setVolume(level: number): void {
+        this.send(CAST_RECEIVER_ID, NS_RECEIVER, setVolumePayload(this.requestId++, level))
+        this.volumeLevel = Math.min(1, Math.max(0, level))
     }
 
     private send(destinationId: string, namespace: string, payloadUtf8: string): void {
@@ -100,6 +123,11 @@ export class CastSession {
             if (Array.isArray(statusList) && statusList[0] && typeof statusList[0] === 'object') {
                 const state = (statusList[0] as { playerState?: unknown }).playerState
                 if (typeof state === 'string') this.lastMediaState = state
+            }
+            const times = extractMediaTimes(payload)
+            if (times) {
+                if (times.currentTime !== null) this.currentTime = times.currentTime
+                if (times.duration !== null) this.duration = times.duration
             }
         }
     }

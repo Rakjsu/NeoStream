@@ -6,6 +6,9 @@ import {
     extractFrames,
     connectPayload,
     loadMediaPayload,
+    getMediaStatusPayload,
+    setVolumePayload,
+    extractMediaTimes,
     mediaCommandPayload,
     extractTransportId,
     extractSessionId,
@@ -90,3 +93,32 @@ describe('payloads e extração de status', () => {
         expect(extractMediaSessionId({ status: 'x' })).toBeNull()
     })
 })
+
+describe('fase 2: status, volume e legendas', () => {
+    it('LOAD com legenda inclui a track TEXT ativa', () => {
+        const payload = JSON.parse(loadMediaPayload(3, {
+            url: 'http://x/f.mp4', title: 'Filme', contentType: 'video/mp4', live: false,
+            subtitleUrl: 'http://192.168.0.2:1234/cast-sub/t.vtt', subtitleLanguage: 'pt',
+        }));
+        expect(payload.activeTrackIds).toEqual([1]);
+        expect(payload.media.tracks[0]).toMatchObject({ trackId: 1, type: 'TEXT', trackContentType: 'text/vtt' });
+    });
+
+    it('LOAD sem legenda não carrega tracks', () => {
+        const payload = JSON.parse(loadMediaPayload(3, { url: 'http://x/f.mp4', title: 'F', contentType: 'video/mp4', live: true }));
+        expect(payload.media.tracks).toBeUndefined();
+        expect(payload.activeTrackIds).toBeUndefined();
+    });
+
+    it('setVolumePayload limita 0..1 e getMediaStatusPayload leva a sessão', () => {
+        expect(JSON.parse(setVolumePayload(1, 1.7)).volume.level).toBe(1);
+        expect(JSON.parse(setVolumePayload(1, -2)).volume.level).toBe(0);
+        expect(JSON.parse(getMediaStatusPayload(2, 9)).mediaSessionId).toBe(9);
+    });
+
+    it('extractMediaTimes lê currentTime/duration do MEDIA_STATUS', () => {
+        const times = extractMediaTimes({ status: [{ currentTime: 42.5, media: { duration: 3600 } }] });
+        expect(times).toEqual({ currentTime: 42.5, duration: 3600 });
+        expect(extractMediaTimes({ status: [] })).toBeNull();
+    });
+});

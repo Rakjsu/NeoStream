@@ -23,7 +23,7 @@ interface CastCommandResult {
     error?: string;
 }
 
-export function useChromecast(videoUrl: string, videoTitle: string, isLive = false) {
+export function useChromecast(videoUrl: string, videoTitle: string, isLive = false, subtitleVtt?: string | null) {
     const [devices, setDevices] = useState<ChromecastDevice[]>([]);
     const [isCasting, setIsCasting] = useState(false);
 
@@ -60,7 +60,8 @@ export function useChromecast(videoUrl: string, videoTitle: string, isLive = fal
                 deviceId: device.id,
                 url: videoUrl,
                 title: videoTitle,
-                live: isLive
+                live: isLive,
+                subtitleVtt: subtitleVtt || undefined
             }) as CastCommandResult;
             setIsCasting(result.success);
             return result.success;
@@ -68,7 +69,7 @@ export function useChromecast(videoUrl: string, videoTitle: string, isLive = fal
             console.error('❌ Chromecast cast error:', error);
             return false;
         }
-    }, [videoUrl, videoTitle, isLive]);
+    }, [videoUrl, videoTitle, isLive, subtitleVtt]);
 
     const stopCasting = useCallback(async () => {
         await window.ipcRenderer.invoke('cast:stop').catch(() => undefined);
@@ -77,3 +78,35 @@ export function useChromecast(videoUrl: string, videoTitle: string, isLive = fal
 
     return { devices, discoverDevices, castToDevice, stopCasting, isCasting };
 }
+
+/** Mini-remote adapter for Chromecast sessions (mirrors useDLNA.castControls). */
+export const chromecastControls = {
+    pause: () => window.ipcRenderer.invoke('cast:pause') as Promise<{ success: boolean }>,
+    resume: () => window.ipcRenderer.invoke('cast:resume') as Promise<{ success: boolean }>,
+    seek: (seconds: number) => window.ipcRenderer.invoke('cast:seek', { seconds }) as Promise<{ success: boolean }>,
+    setVolume: (volume: number) =>
+        window.ipcRenderer.invoke('cast:set-volume', { level: volume / 100 }) as Promise<{ success: boolean }>,
+    // deviceId kept for signature parity with castControls (session is global).
+    stop: (deviceId: string) => {
+        void deviceId;
+        return window.ipcRenderer.invoke('cast:stop') as Promise<{ success: boolean }>;
+    },
+    getStatus: async () => {
+        const result = await window.ipcRenderer.invoke('cast:get-status') as {
+            success: boolean; active?: boolean; playing?: boolean; mediaState?: string | null;
+            currentTime?: number | null; duration?: number | null; volume?: number | null; deviceName?: string;
+        };
+        if (!result.success || !result.active) {
+            return { success: false, error: 'No active cast session' };
+        }
+        return {
+            success: true,
+            state: result.mediaState ?? (result.playing ? 'PLAYING' : 'PAUSED'),
+            position: result.currentTime ?? 0,
+            duration: result.duration ?? 0,
+            volume: typeof result.volume === 'number' ? Math.round(result.volume * 100) : null,
+            title: result.deviceName ?? '',
+            deviceId: 'chromecast',
+        };
+    },
+};

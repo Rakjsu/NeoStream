@@ -9,6 +9,7 @@ import { ipcMain } from 'electron'
 import { Bonjour, type Browser, type Service } from 'bonjour-service'
 import log from './logger'
 import { CastSession, type CastMediaInput } from './castClient'
+import { registerCastSubtitleVtt } from './dlnaHandlers'
 
 interface CastDevice {
     id: string
@@ -60,12 +61,22 @@ export function setupCastHandlers(): void {
         return { success: true, devices: [...devices.values()] }
     })
 
-    ipcMain.handle('cast:play', async (_e, payload: { deviceId?: string; url?: string; title?: string; contentType?: string; live?: boolean }) => {
+    ipcMain.handle('cast:play', async (_e, payload: { deviceId?: string; url?: string; title?: string; contentType?: string; live?: boolean; subtitleVtt?: string }) => {
         try {
             const device = devices.get(String(payload?.deviceId ?? ''))
             if (!device) return { success: false, error: 'Dispositivo não encontrado' }
             const url = String(payload?.url ?? '')
             if (!/^https?:\/\//.test(url)) return { success: false, error: 'URL inválida' }
+
+            // Current subtitle rides along as a WebVTT text track served on LAN.
+            let subtitleUrl: string | undefined
+            if (typeof payload?.subtitleVtt === 'string' && payload.subtitleVtt.trim()) {
+                try {
+                    subtitleUrl = await registerCastSubtitleVtt(payload.subtitleVtt, device.host)
+                } catch (error) {
+                    log.warn('[Cast] legenda indisponível para o cast:', error)
+                }
+            }
 
             stopActiveSession()
             const session = new CastSession(device.host, device.name)
@@ -74,6 +85,7 @@ export function setupCastHandlers(): void {
                 title: String(payload?.title ?? 'NeoStream'),
                 contentType: String(payload?.contentType ?? (url.includes('.m3u8') ? 'application/x-mpegurl' : 'video/mp4')),
                 live: payload?.live === true,
+                subtitleUrl,
             }
             await session.start(media)
             activeSession = session
@@ -104,11 +116,20 @@ export function setupCastHandlers(): void {
         return { success: true }
     })
 
-    ipcMain.handle('cast:get-status', () => ({
-        success: true,
-        active: activeSession?.isActive ?? false,
-        ...(activeSession?.status ?? {}),
-    }))
+    ipcMain.handle('cast:set-volume', (_e, { level }: { level?: number }) => {
+        if (typeof level === 'number' && Number.isFinite(level)) activeSession?.setVolume(level)
+        return { success: activeSession !== null }
+    })
+
+    ipcMain.handle('cast:get-status', () => {
+        // Prompt fresh times for the NEXT poll; return what we have now.
+        activeSession?.requestMediaStatus()
+        return {
+            success: true,
+            active: activeSession?.isActive ?? false,
+            ...(activeSession?.status ?? {}),
+        }
+    })
 
     log.info('[Cast] IPC handlers initialized')
 }

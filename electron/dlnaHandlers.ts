@@ -81,6 +81,8 @@ const PROXY_URL_MAX_ENTRIES = 5000;
 
 // token -> SRT subtitle content served at /dlna-sub/<token>.srt
 const proxySubtitles: Map<string, { srt: string; createdAt: number }> = new Map();
+// token -> raw WebVTT served at /cast-sub/<token>.vtt (Chromecast text track)
+const castSubtitles: Map<string, { vtt: string; createdAt: number }> = new Map();
 // token -> upstream URL remuxed by ffmpeg at /dlna-transcode/<token>
 const transcodeUrls: Map<string, { url: string; createdAt: number }> = new Map();
 const activeTranscodes: Set<ChildProcess> = new Set();
@@ -267,6 +269,25 @@ async function ensureProxyServer(): Promise<number> {
     proxyServer = http.createServer(async (request, response) => {
         try {
             const requestUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
+
+            // Chromecast subtitle route: raw WebVTT (Cast wants text/vtt).
+            if (requestUrl.pathname.startsWith('/cast-sub/')) {
+                const subToken = requestUrl.pathname.replace('/cast-sub/', '').replace(/\.vtt$/i, '')
+                const subtitle = castSubtitles.get(subToken)
+                if (!subtitle) {
+                    response.writeHead(404)
+                    response.end('Not found')
+                    return
+                }
+                const vttBuffer = Buffer.from(subtitle.vtt, 'utf8')
+                response.writeHead(200, {
+                    'Content-Type': 'text/vtt;charset=utf-8',
+                    'Content-Length': String(vttBuffer.length),
+                    'Access-Control-Allow-Origin': '*'
+                })
+                response.end(request.method === 'HEAD' ? undefined : vttBuffer)
+                return
+            }
 
             // Subtitle route: serve stored SRT content.
             if (requestUrl.pathname.startsWith('/dlna-sub/')) {
@@ -1099,4 +1120,19 @@ export function setupDLNAHandlers() {
     });
 
     log.info('[DLNA] IPC Handlers initialized with auto-discovery');
+}
+
+/**
+ * Serve a WebVTT subtitle on the LAN for a Chromecast text track. Reuses the
+ * DLNA proxy server; returns the URL reachable from the device's subnet.
+ */
+export async function registerCastSubtitleVtt(vtt: string, deviceHost: string): Promise<string> {
+    const port = await ensureProxyServer()
+    const token = Math.random().toString(36).slice(2) + Date.now().toString(36)
+    castSubtitles.set(token, { vtt, createdAt: Date.now() })
+    // Same 30-min sweep policy as the SRT map (small strings, low risk).
+    for (const [key, entry] of castSubtitles) {
+        if (Date.now() - entry.createdAt > 30 * 60_000) castSubtitles.delete(key)
+    }
+    return `http://${getLocalAddressForDevice(deviceHost)}:${port}/cast-sub/${token}.vtt`
 }
