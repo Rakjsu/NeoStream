@@ -420,6 +420,23 @@ export function MpvPlayerView({
         return () => window.removeEventListener('keydown', onKeyDown);
     }, [togglePause, seekBy, changeVolume, toggleFullscreen, toggleMute, stopPlayback, isLive]);
 
+    // Tray + phone web-remote commands (media:control) — MPV was deaf to this
+    // channel; now it responds like the HTML5 player does.
+    useEffect(() => {
+        if (!window.ipcRenderer) return;
+        const handler = (_event: unknown, action: unknown, arg?: unknown) => {
+            if (action === 'togglePlay') togglePause();
+            else if (action === 'stop') stopPlayback();
+            else if (action === 'mute') toggleMute();
+            else if (action === 'volumeUp') changeVolume((latestRef.current.volume ?? 100) + VOLUME_STEP);
+            else if (action === 'volumeDown') changeVolume((latestRef.current.volume ?? 100) - VOLUME_STEP);
+            else if (action === 'seek' && typeof arg === 'number' && !isLive) seekBy(arg);
+            // 'next'/'previous' are list-level (zap); ignored by the modal player.
+        };
+        window.ipcRenderer.on('media:control', handler);
+        return () => { window.ipcRenderer?.off('media:control', handler); };
+    }, [togglePause, stopPlayback, toggleMute, changeVolume, seekBy, isLive]);
+
     const shownTime = seekDrag ?? timePos;
     const seekMax = duration && duration > 0 ? duration : 0;
     const seekPercent = seekMax > 0 && shownTime !== null ? Math.min(100, (shownTime / seekMax) * 100) : 0;
