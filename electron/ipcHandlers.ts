@@ -22,7 +22,7 @@ import type { PlaylistBackupEntry } from './playlistManager'
 
 import { cachedCatalogFetch, invalidatePlaylistCache, type CatalogKind } from './catalogCache'
 import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uToVodStreams, m3uCategories, classifyM3uChannels } from './m3uProtocol'
-import { normalizeMac, stalkerChannelsToLiveStreams, stalkerGenresToCategories, STALKER_SENTINEL } from './stalkerProtocol'
+import { normalizeMac, stalkerChannelsToLiveStreams, stalkerGenresToCategories, stalkerVodToStreams, stalkerVodCategories, STALKER_SENTINEL } from './stalkerProtocol'
 import { StalkerClient, resolvePortal } from './stalkerClient'
 import log from './logger'
 // Store for window state (for custom maximize)
@@ -91,19 +91,25 @@ async function catalogListHandler(
             return { success: true, data: result.data, fromCache: result.fromCache }
         }
 
-        // Stalker portals: live channels/genres from the portal API; VOD and
-        // series are empty in phase 1.
+        // Stalker portals: live + VOD from the portal API (phase 2); series
+        // stay empty (portal series need season/episode drill-down — phase 3).
         if (activeEntry?.type === 'stalker') {
-            if (kind !== 'live' && kind !== 'live-categories') {
+            if (kind === 'series' || kind === 'series-categories') {
                 return { success: true, data: [], fromCache: true }
             }
             const stalker = new StalkerClient(activeEntry.url, activeEntry.username)
             const result = await cachedCatalogFetch(
                 playlistId,
                 kind,
-                async () => kind === 'live'
-                    ? stalkerChannelsToLiveStreams(await stalker.getAllChannels())
-                    : stalkerGenresToCategories(await stalker.getGenres()),
+                async () => {
+                    switch (kind) {
+                        case 'live': return stalkerChannelsToLiveStreams(await stalker.getAllChannels())
+                        case 'live-categories': return stalkerGenresToCategories(await stalker.getGenres())
+                        case 'vod': return stalkerVodToStreams(await stalker.getVodItems())
+                        case 'vod-categories': return stalkerVodCategories(await stalker.getVodCategories())
+                        default: return []
+                    }
+                },
                 payload?.forceRefresh === true
             )
             return { success: true, data: result.data, fromCache: result.fromCache }
@@ -709,6 +715,24 @@ export function setupIpcHandlers() {
                 return { success: true, url: movie.direct_source }
             }
 
+            // Stalker: find the movie in the (cached) VOD list, then mint the
+            // playable URL via create_link (type=vod).
+            if (activeEntry?.type === 'stalker') {
+                const stalker = new StalkerClient(activeEntry.url, activeEntry.username)
+                const cached = await cachedCatalogFetch(
+                    activeId ?? 'default',
+                    'vod',
+                    async () => stalkerVodToStreams(await stalker.getVodItems()),
+                    false
+                )
+                const vod = cached.data as ReturnType<typeof stalkerVodToStreams>
+                const movie = vod.find(v => v.stream_id === Number(streamId))
+                if (!movie) return { success: false, error: 'Filme não encontrado no portal' }
+                const url = await stalker.createLink(movie.direct_source, 'vod')
+                registerApprovedProviderUrl(url, activeEntry.url)
+                return { success: true, url }
+            }
+
             const client = new XtreamClient(auth.url, auth.username, auth.password)
             const containerExt = container || 'mp4'
             const url = client.getVodStreamUrl(Number(streamId), containerExt)
@@ -744,6 +768,32 @@ export function setupIpcHandlers() {
             const auth = store.get('auth')
             if (!auth.url || !auth.username || !auth.password) {
                 return { success: false, error: 'Not authenticated' }
+            }
+
+            // M3U/Stalker: the channel entry carries what playback needs
+            // (direct URL / portal cmd) — resolve from the cached live list so
+            // multi-view and PiP zap work on every playlist type.
+            const activeId = getActivePlaylistIdPublic()
+            const activeEntry = activeId ? findPlaylist(activeId) : undefined
+            if (activeEntry?.type === 'm3u' || activeEntry?.type === 'stalker') {
+                const cached = await cachedCatalogFetch(
+                    activeId ?? 'default',
+                    'live',
+                    async () => activeEntry.type === 'm3u'
+                        ? m3uToLiveStreams(classifyM3uChannels(await fetchM3uChannels(activeEntry.url)).live)
+                        : stalkerChannelsToLiveStreams(await new StalkerClient(activeEntry.url, activeEntry.username).getAllChannels()),
+                    false
+                )
+                const streams = cached.data as { stream_id: number; direct_source: string }[]
+                const channel = streams.find(s => s.stream_id === Number(streamId))
+                if (!channel?.direct_source) {
+                    return { success: false, error: 'Canal não encontrado na playlist ativa' }
+                }
+                const url = activeEntry.type === 'stalker'
+                    ? await new StalkerClient(activeEntry.url, activeEntry.username).createLink(channel.direct_source)
+                    : channel.direct_source
+                registerApprovedProviderUrl(url, activeEntry.url)
+                return { success: true, url }
             }
 
             const client = new XtreamClient(auth.url, auth.username, auth.password)
