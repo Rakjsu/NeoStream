@@ -24,6 +24,7 @@ import {
     parseRemoteCommand,
 } from './webRemoteProtocol'
 import { REMOTE_PAGE_HTML } from './webRemotePage'
+import { isCastSessionActive, castRemoteControl } from './castHandlers'
 
 interface WebRemoteConfig {
     enabled: boolean
@@ -84,7 +85,8 @@ export function getLanAddress(): string {
 }
 
 function stateMessage(): string {
-    return JSON.stringify({ type: 'state', ...mediaState })
+    // `casting` lets the phone show it's driving the Chromecast, not the app.
+    return JSON.stringify({ type: 'state', ...mediaState, casting: isCastSessionActive() })
 }
 
 function guideMessage(): string {
@@ -178,6 +180,15 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
+    // While a Chromecast is casting, transport commands drive the cast instead
+    // of the local player. Channel actions always go to the renderer.
+    if (command.action !== 'playChannel') {
+        const seconds = command.action === 'seek' ? command.seconds : undefined
+        if (castRemoteControl(command.action, seconds)) {
+            broadcastState() // refresh the phone's casting/playing indicator
+            return
+        }
+    }
     const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
     if (!win) return
     // The renderer's media:control handler maps these to player actions.

@@ -183,8 +183,9 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         try {
           var msg = JSON.parse(ev.data);
           if (msg.type === 'state') {
+            var cast = msg.casting ? '📡 ' : '';
             titleEl.textContent = msg.hasMedia ? (msg.title || 'Reproduzindo') : 'Nada tocando';
-            statusEl.textContent = msg.hasMedia ? (msg.playing ? '▶ Reproduzindo' : '⏸ Pausado') : 'Conectado';
+            statusEl.textContent = cast + (msg.hasMedia ? (msg.playing ? '▶ Reproduzindo' : '⏸ Pausado') : (msg.casting ? 'Transmitindo na TV' : 'Conectado'));
             statusEl.className = 'status on';
           } else if (msg.type === 'guide') {
             guide = { channels: msg.channels || [], playingId: msg.playingId || '', epg: msg.epg || null };
