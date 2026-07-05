@@ -444,6 +444,10 @@
     "healthOnline": "Proveedor respondiendo normalmente",
     "healthDegraded": "Proveedor con fallos parciales",
     "healthOffline": "Proveedor caído",
+    "healthM3uDownload": "Descarga de la lista M3U",
+    "healthM3uParse": "Lectura de los canales de la lista",
+    "healthStalkerHandshake": "Handshake del portal Stalker",
+    "healthStalkerChannels": "Lista de canales del portal",
     "healthChannels": "Lista de canales",
     "openLogsDesc": "Abre la carpeta donde se escribe main.log",
     "openLogsError": "No se pudo abrir la carpeta de registros"

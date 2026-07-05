@@ -300,6 +300,10 @@
     "healthOnline": "Provedor respondendo normalmente",
     "healthDegraded": "Provedor com problemas parciais",
     "healthOffline": "Provedor fora do ar",
+    "healthM3uDownload": "Download da lista M3U",
+    "healthM3uParse": "Leitura dos canais da lista",
+    "healthStalkerHandshake": "Handshake do portal Stalker",
+    "healthStalkerChannels": "Lista de canais do portal",
     "healthChannels": "Lista de canais",
     "openLogsDesc": "Abre a pasta onde o main.log é gravado",
     "openLogsError": "Não foi possível abrir a pasta de logs"
