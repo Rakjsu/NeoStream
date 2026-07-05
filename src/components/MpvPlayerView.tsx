@@ -1,5 +1,5 @@
 /**
- * EXPERIMENTAL — MPV playback engine, phase 2 (pseudo-embedded).
+ * MPV playback engine (pseudo-embedded, stable since v4.8).
  *
  * The mpv window is borderless/always-on-top and glued by the main process
  * over the app window's client area, except for a bottom strip of
@@ -199,6 +199,15 @@ export function MpvPlayerView({
                 return;
             }
             setPhase('playing');
+            // Volume remembered across sessions (mpv starts each launch at 100).
+            try {
+                const saved = Number(localStorage.getItem('neostream_mpv_volume'));
+                if (Number.isFinite(saved) && saved >= 0 && saved <= 100 && saved !== 100) {
+                    latestRef.current.volume = saved;
+                    setVolume(saved);
+                    mpvService.setVolume(saved);
+                }
+            } catch { /* volume memory is best-effort */ }
             startPolling();
         });
 
@@ -244,6 +253,7 @@ export function MpvPlayerView({
         latestRef.current.volume = clamped;
         setVolume(clamped);
         mpvService.setVolume(clamped);
+        try { localStorage.setItem('neostream_mpv_volume', String(clamped)); } catch { /* best-effort */ }
     }, []);
 
     // Cycle buttons (the mpv window covers everything above the controls
@@ -433,7 +443,7 @@ export function MpvPlayerView({
                 <div className="mpv-view-stage">
                     {phase === 'starting' && (
                         <div className="mpv-view-loading">
-                            <div className="mpv-view-badge">MPV · EXPERIMENTAL</div>
+                            <div className="mpv-view-badge">MPV</div>
                             <div className="mpv-view-loading-icon">🎞️</div>
                             <p>{t('playback', 'mpvStarting') || 'Abrindo o MPV...'}</p>
                         </div>
