@@ -21,7 +21,7 @@ import {
 import type { PlaylistBackupEntry } from './playlistManager'
 
 import { cachedCatalogFetch, invalidatePlaylistCache, type CatalogKind } from './catalogCache'
-import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uToVodStreams, m3uCategories, classifyM3uChannels } from './m3uProtocol'
+import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uToVodStreams, m3uCategories, classifyM3uChannels, m3uToSeries, m3uSeriesInfo, findM3uEpisodeUrl } from './m3uProtocol'
 import { normalizeMac, stalkerChannelsToLiveStreams, stalkerGenresToCategories, stalkerVodToStreams, stalkerVodCategories, STALKER_SENTINEL } from './stalkerProtocol'
 import { StalkerClient, resolvePortal } from './stalkerClient'
 import log from './logger'
@@ -67,22 +67,21 @@ async function catalogListHandler(
         // other catalog kinds are simply empty (phase 1 covers live TV).
         const activeEntry = playlistId !== 'default' ? findPlaylist(playlistId) : undefined
         if (activeEntry?.type === 'm3u') {
-            // Phase 2: movie groups ("FILMES | ...") feed the VOD page; series
-            // still empty (SxxEyy episode grouping is phase 3).
-            if (kind === 'series' || kind === 'series-categories') {
-                return { success: true, data: [], fromCache: true }
-            }
+            // Phase 3: SxxEyy items in movie/series groups become the series
+            // catalog; the rest of the movie groups stay VOD.
             const result = await cachedCatalogFetch(
                 playlistId,
                 kind,
                 async () => {
                     const channels = await fetchM3uChannels(activeEntry.url)
-                    const { live, vod } = classifyM3uChannels(channels)
+                    const { live, vod, series } = classifyM3uChannels(channels)
                     switch (kind) {
                         case 'live': return m3uToLiveStreams(live)
                         case 'live-categories': return m3uCategories(live)
                         case 'vod': return m3uToVodStreams(vod)
                         case 'vod-categories': return m3uCategories(vod)
+                        case 'series': return m3uToSeries(series)
+                        case 'series-categories': return m3uCategories(series)
                         default: return []
                     }
                 },
@@ -752,11 +751,57 @@ export function setupIpcHandlers() {
                 return { success: false, error: 'Not authenticated' }
             }
 
+            // M3U: the episode id maps back to an item in the parsed list.
+            const activeId = getActivePlaylistIdPublic()
+            const activeEntry = activeId ? findPlaylist(activeId) : undefined
+            if (activeEntry?.type === 'm3u') {
+                const channels = await fetchM3uChannels(activeEntry.url)
+                const { series } = classifyM3uChannels(channels)
+                const url = findM3uEpisodeUrl(series, Number(streamId))
+                if (!url) return { success: false, error: 'Episódio não encontrado na lista M3U' }
+                registerApprovedProviderUrl(url, activeEntry.url)
+                return { success: true, url }
+            }
+
             const client = new XtreamClient(auth.url, auth.username, auth.password)
             const url = client.getSeriesStreamUrl(streamId, container || 'mp4')
             registerApprovedProviderUrl(url, auth.url)
 
             return { success: true, url }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
+    // Series info (seasons/episodes). Xtream: proxied get_series_info (uses
+    // the provider HTTPS agent, unlike the old renderer-side fetch); M3U:
+    // built from the parsed list (SxxEyy grouping).
+    ipcMain.handle('series:get-info', async (_, { seriesId }: { seriesId?: number | string }) => {
+        try {
+            const auth = store.get('auth')
+            if (!auth.url || !auth.username || !auth.password) {
+                return { success: false, error: 'Not authenticated' }
+            }
+
+            const activeId = getActivePlaylistIdPublic()
+            const activeEntry = activeId ? findPlaylist(activeId) : undefined
+            if (activeEntry?.type === 'm3u') {
+                const channels = await fetchM3uChannels(activeEntry.url)
+                const { series } = classifyM3uChannels(channels)
+                return { success: true, info: m3uSeriesInfo(series, Number(seriesId)) }
+            }
+            if (activeEntry?.type === 'stalker') {
+                // Portal series need Ministra season/episode drill-down (phase 3).
+                return { success: true, info: { episodes: {} } }
+            }
+
+            const base = String(auth.url).replace(/\/$/, '')
+            const infoUrl = `${base}/player_api.php?username=${encodeURIComponent(auth.username)}&password=${encodeURIComponent(auth.password)}&action=get_series_info&series_id=${encodeURIComponent(String(seriesId ?? ''))}`
+            const response = await axios.get(infoUrl, {
+                timeout: 15000,
+                httpsAgent: getProviderHttpsAgent(infoUrl, base)
+            })
+            return { success: true, info: response.data }
         } catch (error: unknown) {
             return { success: false, error: getErrorMessage(error) }
         }

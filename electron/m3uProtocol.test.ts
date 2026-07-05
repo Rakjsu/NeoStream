@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseM3u, m3uCategories, m3uToLiveStreams, m3uToVodStreams, classifyM3uChannels, parseM3uHeader, looksLikeM3u } from './m3uProtocol'
+import { parseM3u, m3uCategories, m3uToLiveStreams, m3uToVodStreams, classifyM3uChannels, parseM3uHeader, looksLikeM3u, parseEpisodeTag, m3uToSeries, m3uSeriesInfo, findM3uEpisodeUrl } from './m3uProtocol'
 
 const SAMPLE = `#EXTM3U
 #EXTINF:-1 tvg-id="globo.br" tvg-logo="http://x/globo.png" group-title="Abertos",Globo SP
@@ -118,5 +118,61 @@ describe('classifyM3uChannels / m3uToVodStreams', () => {
             direct_source: 'http://a/matrix.mp4'
         })
         expect(vod[1].container_extension).toBe('mkv')
+    })
+})
+
+describe('parseEpisodeTag', () => {
+    it('reconhece SxxEyy, S01 E02 e 1x02 com baseName limpo', () => {
+        expect(parseEpisodeTag('Minha Serie S01E02')).toEqual({ season: 1, episode: 2, baseName: 'Minha Serie' })
+        expect(parseEpisodeTag('Minha.Serie.S2.E10')).toEqual({ season: 2, episode: 10, baseName: 'Minha.Serie' })
+        expect(parseEpisodeTag('Outra - 3x07')).toEqual({ season: 3, episode: 7, baseName: 'Outra' })
+    })
+    it('nomes sem tag retornam null', () => {
+        expect(parseEpisodeTag('Filme Legal (2026)')).toBeNull()
+        expect(parseEpisodeTag('')).toBeNull()
+    })
+})
+
+describe('series M3U (fase 3)', () => {
+    const seriesChannels = [
+        { name: 'Beta S01E02', url: 'http://x/beta-s01e02.mkv', logo: 'b.png', group: 'SÉRIES | Drama', tvgId: '' },
+        { name: 'Alfa S01E01', url: 'http://x/alfa-s01e01.mp4', logo: 'a.png', group: 'SÉRIES | Drama', tvgId: '' },
+        { name: 'Beta S01E01', url: 'http://x/beta-s01e01.mkv', logo: 'b.png', group: 'SÉRIES | Drama', tvgId: '' },
+        { name: 'Beta S02E01', url: 'http://x/beta-s02e01.mkv', logo: 'b.png', group: 'SÉRIES | Drama', tvgId: '' },
+    ]
+
+    it('classifica itens com tag em grupos de série/filme como séries', () => {
+        const { live, vod, series } = classifyM3uChannels([
+            { name: 'Canal Um', url: 'http://x/1.m3u8', logo: '', group: 'Abertos', tvgId: '' },
+            { name: 'Filme Legal', url: 'http://x/f.mp4', logo: '', group: 'FILMES | Ação', tvgId: '' },
+            ...seriesChannels,
+        ])
+        expect(live).toHaveLength(1)
+        expect(vod).toHaveLength(1)
+        expect(series).toHaveLength(4)
+    })
+
+    it('agrupa por baseName com ids estáveis (ordem alfabética)', () => {
+        const series = m3uToSeries(seriesChannels)
+        expect(series.map(s => s.name)).toEqual(['Alfa', 'Beta'])
+        expect(series[0].series_id).toBe(300001)
+        expect(series[1].series_id).toBe(300002)
+        expect(series[1].cover).toBe('b.png')
+    })
+
+    it('m3uSeriesInfo monta temporadas/episódios ordenados no shape do modal', () => {
+        const beta = m3uToSeries(seriesChannels).find(s => s.name === 'Beta')!
+        const info = m3uSeriesInfo(seriesChannels, beta.series_id)
+        expect(Object.keys(info.episodes)).toEqual(['1', '2'])
+        expect(info.episodes['1'].map(e => e.episode_num)).toEqual([1, 2])
+        expect(info.episodes['1'][0].container_extension).toBe('mkv')
+    })
+
+    it('findM3uEpisodeUrl resolve o id de volta pra URL do item', () => {
+        const beta = m3uToSeries(seriesChannels).find(s => s.name === 'Beta')!
+        const info = m3uSeriesInfo(seriesChannels, beta.series_id)
+        const episode = info.episodes['1'][0] // Beta S01E01 (índice 2 na lista)
+        expect(findM3uEpisodeUrl(seriesChannels, episode.id)).toBe('http://x/beta-s01e01.mkv')
+        expect(findM3uEpisodeUrl(seriesChannels, 499999)).toBeNull()
     })
 })
