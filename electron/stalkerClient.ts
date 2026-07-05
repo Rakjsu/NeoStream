@@ -172,33 +172,40 @@ export class StalkerClient {
     }
 
     /**
-     * Full VOD listing via the paginated get_ordered_list, capped at
-     * `maxItems` (portals can host tens of thousands of titles; the cap is
-     * logged so truncation is never silent).
+     * Walk a `type=get_ordered_list` catalog page by page, mapping each with
+     * `parse`, capped at `maxItems`. Portals can host tens of thousands of
+     * titles; the cap is logged so truncation is never silent.
      */
-    async getVodItems(maxItems = 2000): Promise<StalkerVodItem[]> {
-        const items: StalkerVodItem[] = []
+    private async fetchOrderedList<T>(
+        type: 'vod' | 'series',
+        parse: (js: unknown) => T[],
+        label: string,
+        maxItems: number,
+    ): Promise<T[]> {
+        const items: T[] = []
         let total = Infinity
         for (let page = 1; page <= 500 && items.length < Math.min(total, maxItems); page++) {
-            const js = await (async () => {
-                const query = buildStalkerQuery('vod', 'get_ordered_list', { p: String(page) })
-                const first = unwrapJs(await this.rawCall(query, await this.getToken()))
-                if (first !== null) return first
-                return unwrapJs(await this.rawCall(query, await this.getToken(true)))
-            })()
+            const query = buildStalkerQuery(type, 'get_ordered_list', { p: String(page) })
+            let js = unwrapJs(await this.rawCall(query, await this.getToken()))
+            if (js === null) js = unwrapJs(await this.rawCall(query, await this.getToken(true)))
             if (js === null) break
             if (page === 1) {
                 const parsedTotal = parseTotalItems(js)
                 if (parsedTotal > 0) total = parsedTotal
             }
-            const pageItems = parseVodItems(js)
+            const pageItems = parse(js)
             if (pageItems.length === 0) break
             items.push(...pageItems)
         }
         if (items.length >= maxItems && total > maxItems) {
-            log.warn(`[Stalker] catálogo VOD truncado em ${maxItems} de ${total} títulos`)
+            log.warn(`[Stalker] catálogo ${label} truncado em ${maxItems} de ${total} títulos`)
         }
         return items.slice(0, maxItems)
+    }
+
+    /** Full VOD listing (paginated). */
+    getVodItems(maxItems = 2000): Promise<StalkerVodItem[]> {
+        return this.fetchOrderedList('vod', parseVodItems, 'VOD', maxItems)
     }
 
     async getSeriesCategories(): Promise<StalkerGenre[]> {
@@ -210,30 +217,9 @@ export class StalkerClient {
         })
     }
 
-    /** Full series listing (paginated like VOD, same logged cap). */
-    async getSeriesItems(maxItems = 2000): Promise<StalkerSeriesItem[]> {
-        const items: StalkerSeriesItem[] = []
-        let total = Infinity
-        for (let page = 1; page <= 500 && items.length < Math.min(total, maxItems); page++) {
-            const js = await (async () => {
-                const query = buildStalkerQuery('series', 'get_ordered_list', { p: String(page) })
-                const first = unwrapJs(await this.rawCall(query, await this.getToken()))
-                if (first !== null) return first
-                return unwrapJs(await this.rawCall(query, await this.getToken(true)))
-            })()
-            if (js === null) break
-            if (page === 1) {
-                const parsedTotal = parseTotalItems(js)
-                if (parsedTotal > 0) total = parsedTotal
-            }
-            const pageItems = parseSeriesItems(js)
-            if (pageItems.length === 0) break
-            items.push(...pageItems)
-        }
-        if (items.length >= maxItems && total > maxItems) {
-            log.warn(`[Stalker] catálogo de séries truncado em ${maxItems} de ${total} títulos`)
-        }
-        return items.slice(0, maxItems)
+    /** Full series listing (paginated). */
+    getSeriesItems(maxItems = 2000): Promise<StalkerSeriesItem[]> {
+        return this.fetchOrderedList('series', parseSeriesItems, 'de séries', maxItems)
     }
 
     /** Seasons (with episode number lists) of one portal series. */
