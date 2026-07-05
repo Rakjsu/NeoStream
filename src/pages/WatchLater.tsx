@@ -86,6 +86,37 @@ export function WatchLater() {
     const movies = items.filter(item => item.type === 'movie');
     const series = items.filter(item => item.type === 'series');
 
+    // Cast the movie queue to the first Chromecast found (QUEUE_LOAD). Each
+    // movie's play URL is resolved via IPC (works for Xtream, M3U, Stalker).
+    const [castingQueue, setCastingQueue] = useState(false);
+    const [castMessage, setCastMessage] = useState<string | null>(null);
+    const castQueue = useCallback(async () => {
+        setCastingQueue(true);
+        setCastMessage(t('watchLater', 'castResolving'));
+        try {
+            const discover = await window.ipcRenderer.invoke('cast:discover') as { success: boolean; devices?: { id: string; name: string }[] };
+            const device = discover.devices?.[0];
+            if (!device) { setCastMessage(t('watchLater', 'castNoDevice')); return; }
+
+            const queue: { url: string; title: string }[] = [];
+            for (const movie of movies) {
+                const res = await window.ipcRenderer.invoke('streams:get-vod-url', { streamId: movie.id, container: 'mp4' })
+                    .catch(() => null) as { success: boolean; url?: string } | null;
+                if (res?.success && res.url) queue.push({ url: res.url, title: movie.name });
+            }
+            if (queue.length === 0) { setCastMessage(t('watchLater', 'castNoUrls')); return; }
+
+            const result = await window.ipcRenderer.invoke('cast:play-queue', { deviceId: device.id, items: queue })
+                .catch(() => null) as { success: boolean; count?: number } | null;
+            setCastMessage(result?.success
+                ? t('watchLater', 'castQueued').replace('{n}', String(result.count ?? queue.length)).replace('{device}', device.name)
+                : t('watchLater', 'castError'));
+        } finally {
+            setCastingQueue(false);
+            setTimeout(() => setCastMessage(null), 6000);
+        }
+    }, [movies, t]);
+
     const displayItems = activeTab === 'all' ? items :
         activeTab === 'movies' ? movies : series;
 
@@ -144,6 +175,12 @@ export function WatchLater() {
                     </div>
 
                     <div className="header-actions">
+                        {movies.length > 0 && (
+                            <button className="clear-all-btn" onClick={() => void castQueue()} disabled={castingQueue}>
+                                <span>📡</span>
+                                <span>{castingQueue ? t('watchLater', 'castingQueue') : t('watchLater', 'castQueue')}</span>
+                            </button>
+                        )}
                         {items.length > 0 && (
                             <button className="clear-all-btn" onClick={clearAll}>
                                 <span>🗑️</span>
@@ -151,6 +188,11 @@ export function WatchLater() {
                             </button>
                         )}
                     </div>
+                    {castMessage && (
+                        <div style={{ position: 'absolute', top: 12, right: 12, background: 'rgba(0,0,0,0.85)', padding: '8px 14px', borderRadius: 8, fontSize: 13, zIndex: 5 }}>
+                            {castMessage}
+                        </div>
+                    )}
                 </header>
 
                 {/* Tabs */}

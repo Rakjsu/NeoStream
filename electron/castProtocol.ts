@@ -198,6 +198,44 @@ export function loadMediaPayload(
     })
 }
 
+export interface QueueItemInput {
+    url: string
+    title: string
+    contentType: string
+}
+
+/**
+ * QUEUE_LOAD — play a list of items in sequence on the receiver. `startIndex`
+ * is the item to begin with; the rest auto-advance.
+ */
+export function queueLoadPayload(requestId: number, items: QueueItemInput[], startIndex = 0): string {
+    return JSON.stringify({
+        type: 'QUEUE_LOAD',
+        requestId,
+        startIndex,
+        repeatMode: 'REPEAT_OFF',
+        items: items.map(item => ({
+            autoplay: true,
+            preloadTime: 8,
+            media: {
+                contentId: item.url,
+                contentType: item.contentType,
+                streamType: 'BUFFERED',
+                metadata: { metadataType: 0, title: item.title },
+            },
+        })),
+    })
+}
+
+/** QUEUE_NEXT / QUEUE_PREV skip within an active queue. */
+export function queueSkipPayload(requestId: number, mediaSessionId: number, direction: 'next' | 'prev'): string {
+    return JSON.stringify({
+        type: direction === 'next' ? 'QUEUE_NEXT' : 'QUEUE_PREV',
+        requestId,
+        mediaSessionId,
+    })
+}
+
 /** media GET_STATUS (prompts a fresh MEDIA_STATUS with currentTime). */
 export function getMediaStatusPayload(requestId: number, mediaSessionId?: number | null): string {
     return JSON.stringify({
