@@ -125,6 +125,9 @@
     "confirmDeleteCancel": "Cancel"
   },
   "cast": {
+    "subtitleFetch": "Fetch subtitle (OpenSubtitles)",
+    "subtitleReady": "Subtitle ready to cast",
+    "subtitleNotFound": "No subtitle found",
     "title": "Cast to TV",
     "selectDevice": "Select a device",
     "searchNetwork": "Search network",

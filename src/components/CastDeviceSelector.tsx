@@ -17,8 +17,11 @@ export interface CastDevice {
 interface CastDeviceSelectorProps {
     videoUrl: string;
     videoTitle: string;
-    /** Current subtitle as WebVTT text — forwarded to the TV as SRT. */
+    /** Current subtitle as WebVTT text — forwarded to the TV. */
     subtitleVtt?: string | null;
+    /** Movie/series ids so a subtitle can be fetched here if none is loaded. */
+    tmdbId?: string | number;
+    imdbId?: string;
     onClose: () => void;
     onDeviceSelected: (device: CastDevice) => void;
 }
@@ -27,12 +30,18 @@ export function CastDeviceSelector({
     videoUrl,
     videoTitle,
     subtitleVtt,
+    tmdbId,
+    imdbId,
     onClose,
     onDeviceSelected
 }: CastDeviceSelectorProps) {
-    const dlna = useDLNA(videoUrl, videoTitle, subtitleVtt);
+    // A subtitle fetched here (VOD from M3U/Stalker has no embedded subs)
+    // overrides whatever the player had, and rides along in the cast.
+    const [fetchedVtt, setFetchedVtt] = useState<string | null>(null);
+    const effectiveVtt = fetchedVtt ?? subtitleVtt;
+    const dlna = useDLNA(videoUrl, videoTitle, effectiveVtt);
     const airplay = useAirPlay(videoUrl, videoTitle);
-    const chromecast = useChromecast(videoUrl, videoTitle, /\.m3u8(\?|$)/.test(videoUrl), subtitleVtt);
+    const chromecast = useChromecast(videoUrl, videoTitle, /\.m3u8(\?|$)/.test(videoUrl), effectiveVtt);
     const { devices: dlnaDevices, discoverDevices, castToDevice, addDevice, error: dlnaError, isDiscovering } = dlna;
     const { devices: airplayDevices, castToDevice: castToAirPlayDevice } = airplay;
     const { devices: chromecastDevices, castToDevice: castToChromecast } = chromecast;
@@ -42,7 +51,29 @@ export function CastDeviceSelector({
     const [devicePort, setDevicePort] = useState('9197');
     const [casting, setCasting] = useState(false);
     const [castError, setCastError] = useState<string | null>(null);
+    const [subBusy, setSubBusy] = useState(false);
+    const [subMsg, setSubMsg] = useState<string | null>(null);
     const { t } = useLanguage();
+
+    const fetchSubtitle = useCallback(async () => {
+        setSubBusy(true);
+        setSubMsg(null);
+        try {
+            const { autoFetchSubtitle, cleanupSubtitleUrl } = await import('../services/subtitleService');
+            const result = await autoFetchSubtitle({ title: videoTitle, tmdbId, imdbId });
+            if (result?.vttContent) {
+                setFetchedVtt(result.vttContent);
+                cleanupSubtitleUrl(result.url);
+                setSubMsg(t('cast', 'subtitleReady'));
+            } else {
+                setSubMsg(t('cast', 'subtitleNotFound'));
+            }
+        } catch {
+            setSubMsg(t('cast', 'subtitleNotFound'));
+        } finally {
+            setSubBusy(false);
+        }
+    }, [videoTitle, tmdbId, imdbId, t]);
 
     const handleCast = useCallback(async (device: DLNADevice) => {
         setCasting(true);
@@ -202,6 +233,20 @@ export function CastDeviceSelector({
                                 <span className="scan-icon">{isDiscovering ? '⏳' : '🔍'}</span>
                                 <span>{isDiscovering ? t('cast', 'searching') : t('cast', 'searchNetwork')}</span>
                             </button>
+
+                            {/* Attach an external subtitle (for VOD without embedded subs) */}
+                            <button
+                                className="scan-btn"
+                                style={{ marginTop: 8, opacity: effectiveVtt ? 0.75 : 1 }}
+                                onClick={() => void fetchSubtitle()}
+                                disabled={subBusy}
+                            >
+                                <span className="scan-icon">{subBusy ? '⏳' : effectiveVtt ? '✅' : '💬'}</span>
+                                <span>{effectiveVtt ? t('cast', 'subtitleReady') : t('cast', 'subtitleFetch')}</span>
+                            </button>
+                            {subMsg && !effectiveVtt && (
+                                <div className="cast-error" style={{ background: 'transparent' }}><span>{subMsg}</span></div>
+                            )}
 
                             {/* Error (cast attempt or device discovery) */}
                             {(castError || (!isDiscovering && dlnaError)) && (
