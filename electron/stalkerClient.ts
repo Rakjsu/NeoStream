@@ -9,6 +9,7 @@
 
 import axios from 'axios'
 import log from './logger'
+import { requestWithRetry } from './fetchRetry'
 import { getProviderHttpsAgent } from './certificatePolicy'
 import {
     STALKER_USER_AGENT,
@@ -56,7 +57,9 @@ export class StalkerClient {
 
     private async rawCall(query: string, token?: string): Promise<unknown> {
         const url = `${this.loadUrl}?${query}`
-        const response = await axios.get(url, {
+        // One retry for transient failures (network blip / 5xx); permanent
+        // portal errors (401/404) rethrow untouched.
+        const response = await requestWithRetry(() => axios.get(url, {
             timeout: TIMEOUT_MS,
             responseType: 'json',
             // Some portals answer JSON with text/html; parse defensively.
@@ -75,7 +78,7 @@ export class StalkerClient {
                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
             httpsAgent: getProviderHttpsAgent(this.loadUrl, this.loadUrl),
-        })
+        }))
         return response.data
     }
 

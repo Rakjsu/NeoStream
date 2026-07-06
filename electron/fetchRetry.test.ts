@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { fetchWithRetry, isTransientHttpStatus } from './fetchRetry'
+import { fetchWithRetry, requestWithRetry, isTransientHttpStatus } from './fetchRetry'
 
 const ok = { ok: true, status: 200 }
 const bad502 = { ok: false, status: 502 }
@@ -61,5 +61,37 @@ describe('fetchWithRetry', () => {
         }
         await fetchWithRetry(doFetch, { backoffMs: 1 })
         expect(calls).toBe(2)
+    })
+})
+
+describe('requestWithRetry (axios-style: lança em falha)', () => {
+    it('erro de rede (sem response) → re-tenta e devolve o sucesso', async () => {
+        const doRequest = vi.fn()
+            .mockRejectedValueOnce(new Error('ETIMEDOUT'))
+            .mockResolvedValueOnce({ data: 'ok' })
+        expect(await requestWithRetry(doRequest, { backoffMs: 1 })).toEqual({ data: 'ok' })
+        expect(doRequest).toHaveBeenCalledTimes(2)
+    })
+
+    it('erro com response 503 (transiente) → re-tenta', async () => {
+        const err = Object.assign(new Error('503'), { response: { status: 503 } })
+        const doRequest = vi.fn()
+            .mockRejectedValueOnce(err)
+            .mockResolvedValueOnce({ data: 'ok' })
+        expect(await requestWithRetry(doRequest, { backoffMs: 1 })).toEqual({ data: 'ok' })
+        expect(doRequest).toHaveBeenCalledTimes(2)
+    })
+
+    it('erro com response 404 (permanente) → relança direto, sem re-tentar', async () => {
+        const err = Object.assign(new Error('404'), { response: { status: 404 } })
+        const doRequest = vi.fn().mockRejectedValue(err)
+        await expect(requestWithRetry(doRequest, { backoffMs: 1 })).rejects.toThrow('404')
+        expect(doRequest).toHaveBeenCalledTimes(1)
+    })
+
+    it('duas falhas transientes → lança o último erro', async () => {
+        const doRequest = vi.fn(async () => { throw new Error('ECONNRESET') })
+        await expect(requestWithRetry(doRequest, { backoffMs: 1 })).rejects.toThrow('ECONNRESET')
+        expect(doRequest).toHaveBeenCalledTimes(2)
     })
 })
