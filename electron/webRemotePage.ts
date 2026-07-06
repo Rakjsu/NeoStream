@@ -67,6 +67,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
   .gsearch { width: 100%; max-width: 420px; }
   .cobar { height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); margin-top: 6px; overflow: hidden; }
   .cobar > span { display: block; height: 100%; background: var(--accent); }
+  .rechead { font-size: 12px; font-weight: 600; color: rgba(255,255,255,.55); text-transform: uppercase; letter-spacing: .4px; margin: 16px 0 2px; }
   .castprog { margin-top: 12px; }
   .casttime { font-size: 12px; color: rgba(255,255,255,.5); margin-top: 6px; text-align: center; }
   .castseek { -webkit-appearance: none; appearance: none; width: 100%; height: 5px; border-radius: 3px;
@@ -217,6 +218,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     <div id="continue" class="hidden">
       <div class="chlist" id="colist"></div>
       <div class="empty" id="co-empty">Carregando…</div>
+      <div class="chlist" id="reclist"></div>
     </div>
   </div>
 
@@ -269,6 +271,8 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     var colistEl = document.getElementById('colist');
     var coEmptyEl = document.getElementById('co-empty');
     var continueList = [];  // [{ kind, castId, name, cover, pct }]
+    var reclistEl = document.getElementById('reclist');
+    var recGroups = [];     // [{ seed, items: [{ kind, id, name, cover }] }]
     var gsearchEl = document.getElementById('gsearch');
     var searchEl = document.getElementById('search');
     var srlistEl = document.getElementById('srlist');
@@ -340,6 +344,9 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
           } else if (msg.type === 'continue') {
             continueList = msg.items || [];
             renderContinue();
+          } else if (msg.type === 'recommended') {
+            recGroups = msg.groups || [];
+            renderRecommended();
           } else if (msg.type === 'devices') {
             devices = msg.items || [];
             renderDevices();
@@ -645,6 +652,55 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       else sendCmd('castMovie', null, null, id);
     });
 
+    // -------------------------------------------- Recomendados ("porque você assistiu") --
+    function renderRecommended() {
+      var html = '';
+      for (var g = 0; g < recGroups.length; g++) {
+        var grp = recGroups[g];
+        if (!grp.items || !grp.items.length) continue;
+        html += '<div class="rechead">Porque você assistiu ' + esc(grp.seed) + '</div>';
+        for (var j = 0; j < grp.items.length; j++) {
+          var r = grp.items[j];
+          var icon = r.kind === 'series' ? '🎞️' : '🎬';
+          var logo = r.cover
+            ? '<img src="' + esc(r.cover) + '" onerror="this.style.display=\\'none\\'" alt="">'
+            : '<div class="ph">' + icon + '</div>';
+          if (r.kind === 'series') {
+            html += '<div class="chitem" data-recse="' + esc(r.id) + '">'
+              + logo + '<div class="nm">' + esc(r.name) + '</div>'
+              + '<span class="chinfo" title="Ver episódios">›</span></div>';
+          } else {
+            html += '<div class="chitem" data-recmv="' + esc(r.id) + '">'
+              + logo + '<div class="nm">' + esc(r.name) + '</div>'
+              + '<button class="chinfo" data-reccast="' + esc(r.id) + '" title="Transmitir na TV">📡</button></div>';
+          }
+        }
+      }
+      reclistEl.innerHTML = html;
+    }
+
+    reclistEl.addEventListener('click', function (ev) {
+      if (!ev.target.closest) return;
+      // 📡 (or the movie row itself) casts the movie; a series row drills into
+      // its episodes, same flow as tapping a series in the Séries tab.
+      var cast = ev.target.closest('.chinfo');
+      if (cast && cast.getAttribute('data-reccast')) { sendCmd('castMovie', null, null, cast.getAttribute('data-reccast')); return; }
+      var se = ev.target.closest('[data-recse]');
+      if (se) {
+        var sid = se.getAttribute('data-recse');
+        currentSeriesId = sid; episodes = [];
+        document.getElementById('ep-empty').textContent = 'Carregando episódios…';
+        document.getElementById('ep-empty').classList.remove('hidden');
+        eplistEl.innerHTML = '';
+        coEl.classList.add('hidden');
+        episodesEl.classList.remove('hidden');
+        sendCmd('requestSeriesInfo', null, null, null, sid);
+        return;
+      }
+      var mv = ev.target.closest('[data-recmv]');
+      if (mv) sendCmd('castMovie', null, null, mv.getAttribute('data-recmv'));
+    });
+
     chlistEl.addEventListener('click', function (ev) {
       if (!ev.target.closest) return;
       // The ⓘ button toggles the on-demand EPG panel (fetch once, then cached).
@@ -755,11 +811,13 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         renderSeries();
       }
       else if (view === 'continue') {
-        // Always re-request: progress changes as you watch on the PC.
+        // Always re-request: progress (and habits) change as you watch on the PC.
         coEl.classList.remove('hidden');
         coEmptyEl.textContent = 'Carregando…'; coEmptyEl.classList.remove('hidden');
         sendCmd('requestContinue');
+        sendCmd('requestRecommended');
         renderContinue();
+        renderRecommended();
       }
       else { controlEl.classList.remove('hidden'); }
     }
