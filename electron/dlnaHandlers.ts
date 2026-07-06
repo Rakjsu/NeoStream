@@ -170,7 +170,8 @@ async function getServiceControlUrl(location: string, serviceType: string): Prom
     if (cached) return cached
 
     const fetch = (await import('node-fetch')).default
-    const response = await fetch(location, { headers: { 'User-Agent': 'NeoStream IPTV DLNA/1.0' } })
+    // LAN device description: quick timeout so a powered-off TV fails fast.
+    const response = await fetch(location, { signal: AbortSignal.timeout(10000), headers: { 'User-Agent': 'NeoStream IPTV DLNA/1.0' } })
     if (!response.ok) {
         throw new Error(`Device description unavailable (HTTP ${response.status})`)
     }
@@ -636,6 +637,7 @@ async function enrichDeviceFromDescription(device: DlnaDevice, server?: string):
     try {
         const fetch = (await import('node-fetch')).default
         const response = await fetch(device.location, {
+            signal: AbortSignal.timeout(10000),
             headers: {
                 'User-Agent': 'NeoStream IPTV DLNA/1.0'
             }

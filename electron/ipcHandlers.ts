@@ -506,7 +506,8 @@ export function setupIpcHandlers() {
             const encodedSlug = encodeURIComponent(channelSlug)
             const url = `https://meuguia.tv/programacao/canal/${encodedSlug}`
             log.info('[EPG IPC] Fetching:', url)
-            const response = await fetch(url)
+            // Timeout: a hung EPG site must not hold the renderer's await forever.
+            const response = await fetch(url, { signal: AbortSignal.timeout(15000) })
             const html = await response.text()
             log.info('[EPG IPC] Response length:', html.length)
             return { success: true, html }
@@ -524,6 +525,7 @@ export function setupIpcHandlers() {
             const url = `https://mi.tv/br/async/channel/${channelSlug}/-300`
             log.info('[EPG IPC] Fetching mi.tv async API:', url)
             const response = await fetch(url, {
+                signal: AbortSignal.timeout(15000),
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
@@ -551,6 +553,7 @@ export function setupIpcHandlers() {
             log.info('[Fetch URL] Fetching:', url.substring(0, 100))
             const response = await fetch(url, {
                 agent: getProviderHttpsAgent(url),
+                signal: AbortSignal.timeout(20000),
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Accept': '*/*'
@@ -629,6 +632,8 @@ export function setupIpcHandlers() {
             const fetch = (await import('node-fetch')).default
             const response = await fetch(url, {
                 agent: getProviderHttpsAgent(url),
+                // Generous: EPG XML files are big; a failure falls back to stale cache.
+                signal: AbortSignal.timeout(60000),
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Accept': 'application/xml, text/xml, */*'
@@ -950,9 +955,10 @@ export function setupIpcHandlers() {
                 delete requestBody.authToken
             }
 
-            const options: { method: string; headers: Record<string, string>; body?: string } = {
+            const options: { method: string; headers: Record<string, string>; body?: string; signal?: AbortSignal } = {
                 method: method || 'GET',
-                headers
+                headers,
+                signal: AbortSignal.timeout(15000)
             }
 
             if (requestBody && method === 'POST') {
