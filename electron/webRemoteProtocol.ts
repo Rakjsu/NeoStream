@@ -157,6 +157,45 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
     return { action: action as 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' }
 }
 
+// ------------------------------------------------------------- LAN address --
+// A machine often has several non-internal IPv4s: the real Wi-Fi/Ethernet plus
+// VPN/virtual adapters (Radmin, ZeroTier, Hyper-V's vEthernet, WSL, VMware…).
+// The phone can only reach the REAL LAN one, so picking the first (as before)
+// broke pairing whenever a VPN adapter sorted first. Score by name + range.
+
+export interface NetAddress {
+    family: string | number
+    address: string
+    internal: boolean
+}
+
+const VIRTUAL_NAME = /vpn|virtual|vethernet|hyper-?v|zerotier|radmin|vmware|virtualbox|tailscale|\bwsl\b|loopback|\btap\b|\btun\b|hamachi|docker|bluetooth|npcap/i
+
+/** Score one candidate: real Wi-Fi/Ethernet on a private range ranks highest. */
+export function scoreLanCandidate(name: string, address: string): number {
+    let score = 0
+    if (VIRTUAL_NAME.test(name)) score -= 100
+    if (/^192\.168\./.test(address)) score += 30
+    else if (/^10\./.test(address)) score += 20
+    else if (/^172\.(1[6-9]|2\d|3[01])\./.test(address)) score += 10
+    if (/^169\.254\./.test(address)) score -= 50 // link-local (unconfigured)
+    return score
+}
+
+/** Best LAN IPv4 the phone can actually reach, or 127.0.0.1. */
+export function pickLanAddress(interfaces: Record<string, NetAddress[] | undefined>): string {
+    let best: string | null = null
+    let bestScore = -Infinity
+    for (const [name, addresses] of Object.entries(interfaces)) {
+        for (const addr of addresses ?? []) {
+            if ((addr.family !== 'IPv4' && addr.family !== 4) || addr.internal) continue
+            const score = scoreLanCandidate(name, addr.address)
+            if (score > bestScore) { bestScore = score; best = addr.address }
+        }
+    }
+    return best ?? '127.0.0.1'
+}
+
 // -------------------------------------------------------------- PIN lockout --
 // A 4-digit PIN has only 10k combinations — trivially brute-forceable over the
 // LAN without a limit. These PURE helpers track failures per client and lock a

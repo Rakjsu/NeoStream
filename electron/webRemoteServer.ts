@@ -26,7 +26,9 @@ import {
     parseRemoteCommand,
     isPinLockedOut,
     registerPinFailure,
+    pickLanAddress,
     type PinGateEntry,
+    type NetAddress,
 } from './webRemoteProtocol'
 import { REMOTE_PAGE_HTML } from './webRemotePage'
 import { isCastSessionActive, castRemoteControl } from './castHandlers'
@@ -90,14 +92,9 @@ function serverUrl(): string | null {
     return serverPort ? `${serverSecure ? 'https' : 'http'}://${getLanAddress()}:${serverPort}/` : null
 }
 
-/** Best LAN IPv4 (first non-internal), or 127.0.0.1. */
+/** Best LAN IPv4 the phone can reach (skips VPN/virtual adapters), or 127.0.0.1. */
 export function getLanAddress(): string {
-    for (const addresses of Object.values(os.networkInterfaces())) {
-        for (const addr of addresses ?? []) {
-            if (addr.family === 'IPv4' && !addr.internal) return addr.address
-        }
-    }
-    return '127.0.0.1'
+    return pickLanAddress(os.networkInterfaces() as Record<string, NetAddress[] | undefined>)
 }
 
 function stateMessage(): string {
