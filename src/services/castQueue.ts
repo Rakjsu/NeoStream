@@ -11,6 +11,16 @@ export interface CastQueueItem {
     /** Optional WebVTT text (main serves it on the LAN for the device). */
     subtitleVtt?: string
     subtitleLanguage?: string
+    /** Seconds into this item to start at (resume mid-episode). */
+    startTime?: number
+    /** Identity echoed in cast status while this item plays (watch history). */
+    meta?: {
+        contentId: string
+        contentType?: 'movie' | 'series' | 'live'
+        season?: number
+        episode?: number
+        title?: string
+    }
 }
 
 export type CastQueueResult =
@@ -22,6 +32,51 @@ export type CastQueueResult =
 interface DiscoverResult {
     success: boolean
     devices?: { id: string; name: string }[]
+}
+
+interface SeriesInfoEpisode {
+    id: number | string
+    episode_num: number | string
+    title?: string
+    container_extension?: string
+}
+
+/**
+ * Build the season's cast queue starting at `fromEpisode` (inclusive), so
+ * casting one episode gives ⏮/⏭ the rest of the season to move through.
+ * Resolves each episode's play URL; failed resolves are skipped. Returns an
+ * empty list when the series/season can't be resolved (caller falls back to
+ * a single cast). Never throws.
+ */
+export async function buildSeasonTailQueue(
+    seriesId: string,
+    season: number,
+    fromEpisode: number,
+): Promise<CastQueueItem[]> {
+    const info = await window.ipcRenderer.invoke('series:get-info', { seriesId }).catch(() => null) as
+        { success: boolean; info?: { episodes?: Record<string, SeriesInfoEpisode[]> } } | null
+    const eps = info?.success ? (info.info?.episodes?.[String(season)] ?? []) : []
+    const tail = eps.filter(ep => Number(ep.episode_num) >= fromEpisode)
+        .sort((a, b) => Number(a.episode_num) - Number(b.episode_num))
+    if (tail.length === 0) return []
+
+    const { episodeDisplayTitle } = await import('../utils/seriesEpisodes')
+    const queue: CastQueueItem[] = []
+    for (const ep of tail) {
+        const res = await window.ipcRenderer.invoke('streams:get-series-url', {
+            streamId: ep.id,
+            container: ep.container_extension || 'mp4',
+        }).catch(() => null) as { success: boolean; url?: string } | null
+        if (!res?.success || !res.url) continue
+        const epNum = Number(ep.episode_num)
+        const title = episodeDisplayTitle(ep.title || '', epNum)
+        queue.push({
+            url: res.url,
+            title: `T${season}:E${epNum} · ${title}`,
+            meta: { contentId: seriesId, contentType: 'series', season, episode: epNum, title },
+        })
+    }
+    return queue
 }
 
 /**

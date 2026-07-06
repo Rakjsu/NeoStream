@@ -180,6 +180,17 @@ describe('fila de cast (QUEUE_LOAD)', () => {
         expect(payload.items[1].media.tracks).toBeUndefined();
     });
 
+    it('queueLoadPayload aplica startTime só no item que retoma', () => {
+        const payload = JSON.parse(queueLoadPayload(7, [
+            { url: 'http://x/a.mp4', title: 'A', contentType: 'video/mp4', startTime: 613 },
+            { url: 'http://x/b.mp4', title: 'B', contentType: 'video/mp4' },
+            { url: 'http://x/c.mp4', title: 'C', contentType: 'video/mp4', startTime: 0 }, // 0 = do início
+        ]));
+        expect(payload.items[0].startTime).toBe(613);
+        expect(payload.items[1].startTime).toBeUndefined();
+        expect(payload.items[2].startTime).toBeUndefined();
+    });
+
     it('queueSkipPayload gera QUEUE_NEXT/QUEUE_PREV com a sessão', () => {
         expect(JSON.parse(queueSkipPayload(3, 7, 'next'))).toEqual({ type: 'QUEUE_NEXT', requestId: 3, mediaSessionId: 7 });
         expect(JSON.parse(queueSkipPayload(3, 7, 'prev')).type).toBe('QUEUE_PREV');

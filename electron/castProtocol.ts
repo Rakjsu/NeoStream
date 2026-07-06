@@ -208,6 +208,8 @@ export interface QueueItemInput {
     /** Optional WebVTT side-load, reachable by the device (served on LAN). */
     subtitleUrl?: string
     subtitleLanguage?: string
+    /** Seconds into the item to start at (resume). Omitted/0 = from the top. */
+    startTime?: number
 }
 
 /**
@@ -236,6 +238,8 @@ export function queueLoadPayload(requestId: number, items: QueueItemInput[], sta
             return {
                 autoplay: true,
                 preloadTime: 8,
+                // Resume support: the first (current) episode can start mid-way.
+                ...(typeof item.startTime === 'number' && item.startTime > 0 ? { startTime: item.startTime } : {}),
                 ...(tracks ? { activeTrackIds: [1] } : {}),
                 media: {
                     contentId: item.url,
