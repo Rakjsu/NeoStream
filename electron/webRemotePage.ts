@@ -308,7 +308,8 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
           var msg = JSON.parse(ev.data);
           if (msg.type === 'state') {
             var cast = msg.casting ? '📡 ' : '';
-            titleEl.textContent = msg.hasMedia ? (msg.title || 'Reproduzindo') : 'Nada tocando';
+            titleEl.textContent = msg.hasMedia ? (msg.title || 'Reproduzindo')
+              : (msg.casting && msg.castTitle ? msg.castTitle : 'Nada tocando');
             statusEl.textContent = cast + (msg.hasMedia ? (msg.playing ? '▶ Reproduzindo' : '⏸ Pausado') : (msg.casting ? 'Transmitindo na TV' : 'Conectado'));
             statusEl.className = 'status on';
             updateCastProgress(msg);

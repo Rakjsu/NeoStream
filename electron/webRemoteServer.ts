@@ -105,6 +105,8 @@ function stateMessage(): string {
         type: 'state', ...mediaState, casting: cs.active,
         castTime: cs.currentTime, castDuration: cs.duration,
         castPlaying: cs.playing,
+        // What's on the TV (episode/movie title) so the phone shows it.
+        castTitle: cs.title,
     })
 }
 
