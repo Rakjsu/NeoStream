@@ -32,7 +32,7 @@ import {
     vttToSrt,
     rewritePlaylistUris,
 } from './dlnaProtocol';
-import { planDlnaCommand, clampVolume, stepVolume, muteTarget } from './dlnaRemoteRouting';
+import { planDlnaCommand, clampVolume, stepVolume, muteTarget, type DlnaStatusRaw } from './dlnaRemoteRouting';
 
 const require = createRequire(import.meta.url);
 
@@ -1091,32 +1091,8 @@ export function setupDLNAHandlers() {
     ipcMain.handle('dlna:get-status', async () => {
         try {
             const session = requireSession();
-            const [transportInfo, positionInfo] = await Promise.all([
-                sendAvTransportAction(session.avTransportUrl, 'GetTransportInfo', '<InstanceID>0</InstanceID>', 5000),
-                sendAvTransportAction(session.avTransportUrl, 'GetPositionInfo', '<InstanceID>0</InstanceID>', 5000)
-            ]);
-
-            let volume: number | null = null;
-            if (session.renderingControlUrl) {
-                try {
-                    const volumeInfo = await sendUpnpAction(session.renderingControlUrl, RENDERING_CONTROL_SERVICE,
-                        'GetVolume', '<InstanceID>0</InstanceID><Channel>Master</Channel>', 5000);
-                    const parsed = Number(getXmlTagValue(volumeInfo, 'CurrentVolume'));
-                    volume = Number.isFinite(parsed) ? parsed : null;
-                } catch {
-                    // Volume is best-effort; some renderers refuse GetVolume.
-                }
-            }
-
-            return {
-                success: true,
-                deviceId: session.deviceId,
-                title: session.title,
-                state: getXmlTagValue(transportInfo, 'CurrentTransportState') || 'UNKNOWN',
-                position: parseUpnpTime(getXmlTagValue(positionInfo, 'RelTime')),
-                duration: parseUpnpTime(getXmlTagValue(positionInfo, 'TrackDuration')),
-                volume
-            };
+            const status = await fetchDlnaSessionStatus(session);
+            return { success: true, deviceId: session.deviceId, ...status };
         } catch (error: unknown) {
             return { success: false, error: getErrorMessage(error) };
         }
@@ -1165,6 +1141,46 @@ let preMuteDlnaVolume = 30
 
 export function isDlnaSessionActive(): boolean {
     return castSession !== null
+}
+
+/** Transport state + position + volume of one session (three SOAP calls). */
+async function fetchDlnaSessionStatus(session: CastSession): Promise<DlnaStatusRaw> {
+    const [transportInfo, positionInfo] = await Promise.all([
+        sendAvTransportAction(session.avTransportUrl, 'GetTransportInfo', '<InstanceID>0</InstanceID>', 5000),
+        sendAvTransportAction(session.avTransportUrl, 'GetPositionInfo', '<InstanceID>0</InstanceID>', 5000),
+    ])
+    let volume: number | null = null
+    if (session.renderingControlUrl) {
+        try {
+            const volumeInfo = await sendUpnpAction(session.renderingControlUrl, RENDERING_CONTROL_SERVICE,
+                'GetVolume', '<InstanceID>0</InstanceID><Channel>Master</Channel>', 5000)
+            const parsed = Number(getXmlTagValue(volumeInfo, 'CurrentVolume'))
+            volume = Number.isFinite(parsed) ? parsed : null
+        } catch {
+            // Volume is best-effort; some renderers refuse GetVolume.
+        }
+    }
+    return {
+        title: session.title,
+        state: getXmlTagValue(transportInfo, 'CurrentTransportState') || 'UNKNOWN',
+        position: parseUpnpTime(getXmlTagValue(positionInfo, 'RelTime')),
+        duration: parseUpnpTime(getXmlTagValue(positionInfo, 'TrackDuration')),
+        volume,
+    }
+}
+
+/**
+ * Snapshot for the phone remote's state broadcast — null when no session or
+ * when the renderer stopped answering (session likely gone).
+ */
+export async function getDlnaStatusSnapshot(): Promise<DlnaStatusRaw | null> {
+    const session = castSession
+    if (!session) return null
+    try {
+        return await fetchDlnaSessionStatus(session)
+    } catch {
+        return null
+    }
 }
 
 async function getDlnaVolume(session: CastSession): Promise<number> {
