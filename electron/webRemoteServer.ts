@@ -107,6 +107,9 @@ function stateMessage(): string {
         castPlaying: cs.playing,
         // What's on the TV (episode/movie title) so the phone shows it.
         castTitle: cs.title,
+        // 💬 toggle on the phone (hidden when the media has no track).
+        castSubAvailable: cs.subtitleAvailable,
+        castSubEnabled: cs.subtitleEnabled,
     })
 }
 

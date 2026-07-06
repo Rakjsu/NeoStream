@@ -49,9 +49,17 @@ export function isCastSessionActive(): boolean {
 }
 
 /** Snapshot of the active cast for the phone's progress bar (0s/0s when idle). */
-export function getCastStatus(): { active: boolean; playing: boolean; currentTime: number; duration: number; title: string; hasQueue: boolean } {
+export function getCastStatus(): {
+    active: boolean; playing: boolean; currentTime: number; duration: number;
+    title: string; hasQueue: boolean; subtitleAvailable: boolean; subtitleEnabled: boolean;
+} {
     const s = activeSession
-    if (!s?.isActive) return { active: false, playing: false, currentTime: 0, duration: 0, title: '', hasQueue: false }
+    if (!s?.isActive) {
+        return {
+            active: false, playing: false, currentTime: 0, duration: 0,
+            title: '', hasQueue: false, subtitleAvailable: false, subtitleEnabled: true,
+        }
+    }
     const status = s.status
     // What's playing: current queue item (episode) or the single-load meta.
     const currentItem = status.queue.find(item => item.itemId === status.currentItemId)
@@ -62,6 +70,8 @@ export function getCastStatus(): { active: boolean; playing: boolean; currentTim
         duration: Math.max(0, status.duration ?? 0),
         title: currentItem?.title || status.meta?.title || '',
         hasQueue: status.queue.length > 1,
+        subtitleAvailable: status.subtitleAvailable,
+        subtitleEnabled: status.subtitleEnabled,
     }
 }
 
@@ -98,6 +108,12 @@ export function castRemoteControl(action: string, seconds?: number): boolean {
         case 'mute':
             if (vol > 0) { preMuteVolume = vol; s.setVolume(0) }
             else s.setVolume(preMuteVolume)
+            break
+        case 'subtitle':
+            // 💬 toggle from the phone — only meaningful when the current
+            // media carries a track (the phone hides the button otherwise).
+            if (!s.status.subtitleAvailable) return false
+            s.setSubtitleEnabled(!s.status.subtitleEnabled)
             break
         default: return false
     }
