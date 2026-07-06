@@ -312,6 +312,18 @@ export function setupWebRemote(): void {
         }
     })
 
+    // Rotate the pairing PIN on demand: a new code + drop current clients so
+    // old pairings are revoked (the phone re-prompts, its saved PIN now fails).
+    ipcMain.handle('web-remote:regen-pin', () => {
+        if (!serverPort) return { success: false, error: 'Controle desativado' }
+        sessionPin = newPin()
+        pinGate.clear()
+        for (const client of clients) client.socket.destroy()
+        clients.clear()
+        log.info('[WebRemote] PIN regenerado')
+        return { success: true, pin: sessionPin }
+    })
+
     if (getConfig().enabled) void start()
     log.info('[WebRemote] initialized')
 }
