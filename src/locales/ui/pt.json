@@ -651,7 +651,7 @@
     "webRemoteDesc": "Abre um controle remoto no navegador do celular (mesma rede Wi-Fi) com play/pause, volume e avançar/voltar",
     "webRemoteOpen": "Abra no celular",
     "webRemotePin": "PIN de pareamento",
-    "webRemoteHint": "Mantenha o app aberto no computador. Só funciona na mesma rede local.",
+    "webRemoteHint": "Mantenha o app aberto no computador. Celular e PC na mesma rede Wi-Fi. Se não abrir, libere o app no Firewall do Windows (rede privada).",
     "webRemoteQrHint": "Aponte a câmera do celular pro código, ou abra a URL. O PIN aparece ao conectar.",
     "webRemoteHttps": "Conexão criptografada (HTTPS)",
     "webRemoteHttpsHint": "Usa um certificado próprio: o celular mostra um aviso de segurança uma vez, é só aceitar. Protege o tráfego na rede local."

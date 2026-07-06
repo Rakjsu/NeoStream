@@ -10,6 +10,8 @@ import {
     registerPinFailure,
     PIN_MAX_FAILS,
     PIN_LOCK_MS,
+    pickLanAddress,
+    scoreLanCandidate,
 } from './webRemoteProtocol'
 
 /** Mask a text payload as a browser client would (client→server frames). */
@@ -117,5 +119,28 @@ describe('PIN lockout', () => {
         expect(isPinLockedOut(locked, 6000)).toBe(false)
         expect(isPinLockedOut(undefined, 1)).toBe(false)
         expect(isPinLockedOut({ fails: 2, lockedUntil: 0 }, 1)).toBe(false)
+    })
+})
+
+describe('pickLanAddress (escolhe a LAN real, não VPN/virtual)', () => {
+    it('prefere Ethernet/Wi-Fi a Radmin VPN / ZeroTier / vEthernet', () => {
+        // Cenário real que quebrou o pareamento no celular.
+        const ifaces = {
+            'Radmin VPN': [{ family: 'IPv4', address: '26.236.80.97', internal: false }],
+            'Ethernet': [{ family: 'IPv4', address: '10.0.0.186', internal: false }],
+            'ZeroTier One [7439]': [{ family: 'IPv4', address: '10.142.93.25', internal: false }],
+            'vEthernet (Default Switch)': [{ family: 'IPv4', address: '172.23.96.1', internal: false }],
+            'Loopback': [{ family: 'IPv4', address: '127.0.0.1', internal: true }],
+        }
+        expect(pickLanAddress(ifaces)).toBe('10.0.0.186')
+    })
+    it('prefere 192.168 quando disponível e aceita family numérica', () => {
+        expect(pickLanAddress({ 'Wi-Fi': [{ family: 4, address: '192.168.1.7', internal: false }] })).toBe('192.168.1.7')
+    })
+    it('cai pra 127.0.0.1 sem candidato', () => {
+        expect(pickLanAddress({ 'Loopback': [{ family: 'IPv4', address: '127.0.0.1', internal: true }] })).toBe('127.0.0.1')
+    })
+    it('scoreLanCandidate penaliza nomes virtuais', () => {
+        expect(scoreLanCandidate('Ethernet', '10.0.0.5')).toBeGreaterThan(scoreLanCandidate('ZeroTier One', '10.0.0.5'))
     })
 })
