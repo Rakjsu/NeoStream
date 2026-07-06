@@ -93,6 +93,9 @@ export class CastSession {
     private reconnecting = false
     private reconnectAttempts = 0
     private readonly maxReconnectAttempts = 6
+    // Consecutive IDLE/FINISHED statuses — playback (or the whole queue) ended
+    // naturally. A few confirmations avoid closing on item-to-item transitions.
+    private finishedStatuses = 0
     private mediaMeta: CastMediaMeta | null = null
     // Queue casts: one meta per item, aligned with the QUEUE_LOAD order, so the
     // status echoes the identity of whichever episode is CURRENTLY playing.
@@ -181,8 +184,25 @@ export class CastSession {
             if (id !== null) this.mediaSessionId = id
             const statusList = payload.status
             if (Array.isArray(statusList) && statusList[0] && typeof statusList[0] === 'object') {
-                const state = (statusList[0] as { playerState?: unknown }).playerState
-                if (typeof state === 'string') this.lastMediaState = state
+                const st = statusList[0] as { playerState?: unknown; idleReason?: unknown; loadingItemId?: unknown }
+                if (typeof st.playerState === 'string') this.lastMediaState = st.playerState
+                // Natural end of playback: the receiver sits IDLE/FINISHED with
+                // nothing loading next (single media done or queue exhausted).
+                // Close the session so the app's "Transmitindo" UI clears itself
+                // instead of lingering on the receiver's splash screen forever.
+                // Queue guard: an item-to-item transition also flashes FINISHED,
+                // so only statuses on the LAST queue item count towards the end.
+                const onLastQueueItem = this.queueItems.length === 0 || this.currentItemId === null ||
+                    this.queueItems[this.queueItems.length - 1]?.itemId === this.currentItemId
+                if (st.playerState === 'IDLE' && st.idleReason === 'FINISHED' && st.loadingItemId == null && onLastQueueItem) {
+                    if (++this.finishedStatuses >= 3) {
+                        log.info('[Cast] reprodução concluída em', this.deviceName, '— encerrando a sessão')
+                        this.close()
+                        return
+                    }
+                } else {
+                    this.finishedStatuses = 0
+                }
             }
             const times = extractMediaTimes(payload)
             if (times) {
