@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { SortSelect } from '../components/SortSelect';
 import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { getBackdropUrl } from '../services/tmdb';
@@ -198,11 +198,14 @@ export function Series() {
         queueMicrotask(() => { void fetchSeries(); });
     }, []);
 
-    const sortedSeries = sortBy === 'recent'
-        ? series
-        : [...series].sort((a, b) => compareCatalogItems(sortBy, a, b));
+    // Memoized so a big library isn't re-sorted/re-filtered on every render
+    // (notably on every scroll frame — the windowed grid updates scrollTop state).
+    const sortedSeries = useMemo(
+        () => sortBy === 'recent' ? series : [...series].sort((a, b) => compareCatalogItems(sortBy, a, b)),
+        [series, sortBy]
+    );
 
-    const filteredSeries = sortedSeries.filter(s => {
+    const filteredSeries = useMemo(() => sortedSeries.filter(s => {
         const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
 
         // Kids profile + Parental Control filtering
@@ -222,7 +225,10 @@ export function Series() {
         const categories = Array.isArray(s.category_id) ? s.category_id : [s.category_id];
         const matchesCategory = !selectedCategory || selectedCategory === '' || selectedCategory === 'all' || categories.includes(selectedCategory);
         return matchesSearch && matchesCategory;
-    });
+    // isItemVisible reads parental/kids state that only changes via a profile/
+    // settings switch (which reloads the library), so it's intentionally omitted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [sortedSeries, searchQuery, selectedCategory]);
 
     // Windowed rendering (same mechanism as VOD): spacer rows keep the
     // scrollbar honest while only ~3 screens of cards stay mounted.
