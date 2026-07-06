@@ -115,6 +115,10 @@ function stateMessage(): string {
         // 💬 toggle on the phone (hidden when the media has no track).
         castSubAvailable: cs.subtitleAvailable,
         castSubEnabled: cs.subtitleEnabled,
+        // 🔊 absolute volume slider + audio-track picker on the phone.
+        castVolume: cs.volume,
+        castAudioTracks: cs.audioTracks,
+        castAudioActive: cs.activeAudioTrackId,
     })
 }
 
@@ -228,12 +232,18 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     // While a Chromecast is casting, transport commands drive the cast instead
     // of the local player. Channel/catalog actions always go to the renderer.
     if (!RENDERER_ONLY.has(command.action)) {
-        const seconds = command.action === 'seek' ? command.seconds : undefined
-        if (castRemoteControl(command.action, seconds)) {
+        const value = command.action === 'seek' ? command.seconds
+            : command.action === 'setVolume' ? command.level
+            : command.action === 'setAudioTrack' ? command.trackId
+            : undefined
+        if (castRemoteControl(command.action, value)) {
             broadcastState() // refresh the phone's casting/playing indicator
             return
         }
     }
+    // These two only make sense while a cast session is live; with none active
+    // there is nothing for the renderer to do with them.
+    if (command.action === 'setVolume' || command.action === 'setAudioTrack') return
     const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
     if (!win) return
     // The renderer's media:control handler maps these to player actions.

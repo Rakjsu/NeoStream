@@ -123,6 +123,15 @@ describe('parseRemoteCommand', () => {
         expect(parseRemoteCommand('{"action":"requestDevices"}')).toEqual({ action: 'requestDevices' })
         expect(parseRemoteCommand('{"action":"requestContinue"}')).toEqual({ action: 'requestContinue' })
         expect(parseRemoteCommand('{"action":"requestRecommended"}')).toEqual({ action: 'requestRecommended' })
+        // Volume absoluto: nível numérico com clamp; sem nível é inválido.
+        expect(parseRemoteCommand('{"action":"setVolume","level":0.35}')).toEqual({ action: 'setVolume', level: 0.35 })
+        expect(parseRemoteCommand('{"action":"setVolume","level":5}')).toEqual({ action: 'setVolume', level: 1 })
+        expect(parseRemoteCommand('{"action":"setVolume","level":-2}')).toEqual({ action: 'setVolume', level: 0 })
+        expect(parseRemoteCommand('{"action":"setVolume"}')).toBeNull()
+        expect(parseRemoteCommand('{"action":"setVolume","level":"alto"}')).toBeNull()
+        // Faixa de áudio: trackId numérico obrigatório.
+        expect(parseRemoteCommand('{"action":"setAudioTrack","trackId":2}')).toEqual({ action: 'setAudioTrack', trackId: 2 })
+        expect(parseRemoteCommand('{"action":"setAudioTrack"}')).toBeNull()
         expect(parseRemoteCommand('{"action":"castMovie","movieId":"42","deviceId":"tv1","deviceType":"dlna"}'))
             .toEqual({ action: 'castMovie', movieId: '42', target: { deviceId: 'tv1', deviceType: 'dlna' } })
         expect(parseRemoteCommand('{"action":"castEpisode","episodeId":"e1","deviceId":"cc1","deviceType":"chromecast"}'))

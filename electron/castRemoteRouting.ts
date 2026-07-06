@@ -23,6 +23,7 @@ export interface RoutableCastSession {
     setVolume(level: number): void
     queueSkip(direction: 'next' | 'prev'): void
     setSubtitleEnabled(enabled: boolean): void
+    setAudioTrack(trackId: number): void
 }
 
 export interface RouteResult {
@@ -38,6 +39,7 @@ export interface RouteResult {
 export function routeCastCommand(
     s: RoutableCastSession,
     action: string,
+    // Numeric payload: seek delta, setVolume level (0..1) or setAudioTrack id.
     seconds: number | undefined,
     preMuteVolume: number,
 ): RouteResult {
@@ -63,6 +65,18 @@ export function routeCastCommand(
                 return { handled: true, preMuteVolume }
             }
             return { handled: false, preMuteVolume }
+        case 'setVolume':
+            // Absolute volume from the phone's slider.
+            if (typeof seconds === 'number' && Number.isFinite(seconds)) {
+                s.setVolume(Math.min(1, Math.max(0, seconds)))
+            }
+            return { handled: true, preMuteVolume }
+        case 'setAudioTrack':
+            // The session ignores ids that aren't in the current track list.
+            if (typeof seconds === 'number' && Number.isFinite(seconds)) {
+                s.setAudioTrack(seconds)
+            }
+            return { handled: true, preMuteVolume }
         case 'volumeUp':
             s.setVolume(Math.min(1, vol + 0.1))
             return { handled: true, preMuteVolume }

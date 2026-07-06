@@ -68,6 +68,9 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
   .cobar { height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); margin-top: 6px; overflow: hidden; }
   .cobar > span { display: block; height: 100%; background: var(--accent); }
   .rechead { font-size: 12px; font-weight: 600; color: rgba(255,255,255,.55); text-transform: uppercase; letter-spacing: .4px; margin: 16px 0 2px; }
+  .castvol { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .castvol span { font-size: 14px; }
+  .castvol input { flex: 1; }
   .castprog { margin-top: 12px; }
   .casttime { font-size: 12px; color: rgba(255,255,255,.5); margin-top: 6px; text-align: center; }
   .castseek { -webkit-appearance: none; appearance: none; width: 100%; height: 5px; border-radius: 3px;
@@ -165,6 +168,11 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
           <input type="range" id="castseek" class="castseek" min="0" max="1000" value="0">
           <div class="casttime" id="casttime">0:00 / 0:00</div>
         </div>
+        <div class="castvol hidden" id="castvolrow">
+          <span>🔊</span>
+          <input type="range" id="castvol" class="castseek" min="0" max="100" value="50">
+        </div>
+        <select id="castaud" class="devsel hidden" title="Áudio"></select>
         <div class="row seek">
           <button class="ctl" data-cmd="previous" title="Anterior">⏮</button>
           <button class="ctl" data-cmd="seek" data-sec="-30" title="-30s">-30s</button>
@@ -267,6 +275,11 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     var casttimeEl = document.getElementById('casttime');
     var castsubEl = document.getElementById('castsub');
     var lastCastTime = 0, lastCastDur = 0, seekingCast = false;
+    var castvolrowEl = document.getElementById('castvolrow');
+    var castvolEl = document.getElementById('castvol');
+    var castaudEl = document.getElementById('castaud');
+    var draggingVol = false, volSendTimer = null;
+    var lastAudKey = '';  // signature of the last rendered track list
     var coEl = document.getElementById('continue');
     var colistEl = document.getElementById('colist');
     var coEmptyEl = document.getElementById('co-empty');
@@ -385,7 +398,55 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       } else {
         castsubEl.classList.add('hidden');
       }
+      // 🔊 absolute volume slider (only while casting and the receiver reports it).
+      if (msg.casting && typeof msg.castVolume === 'number') {
+        castvolrowEl.classList.remove('hidden');
+        if (!draggingVol) castvolEl.value = String(Math.round(msg.castVolume * 100));
+      } else {
+        castvolrowEl.classList.add('hidden');
+      }
+      // Audio-track picker — only when the media carries more than one track.
+      var tracks = (msg.casting && msg.castAudioTracks) || [];
+      if (tracks.length > 1) {
+        var key = tracks.map(function (t) { return t.trackId + ':' + t.name; }).join('|');
+        if (key !== lastAudKey) {
+          lastAudKey = key;
+          var opts = '';
+          for (var i = 0; i < tracks.length; i++) {
+            var t = tracks[i];
+            var label = t.name || t.language || ('Áudio ' + (i + 1));
+            opts += '<option value="' + t.trackId + '">🎧 ' + esc(label) + '</option>';
+          }
+          castaudEl.innerHTML = opts;
+        }
+        if (typeof msg.castAudioActive === 'number') castaudEl.value = String(msg.castAudioActive);
+        castaudEl.classList.remove('hidden');
+      } else {
+        castaudEl.classList.add('hidden');
+        lastAudKey = '';
+      }
     }
+
+    // Volume: live preview while dragging, throttled sends so the receiver
+    // isn't flooded; a final send lands on release.
+    castvolEl.addEventListener('input', function () {
+      draggingVol = true;
+      if (volSendTimer) return;
+      volSendTimer = setTimeout(function () {
+        volSendTimer = null;
+        sendCmd('setVolume', Number(castvolEl.value) / 100);
+      }, 200);
+    });
+    castvolEl.addEventListener('change', function () {
+      draggingVol = false;
+      if (volSendTimer) { clearTimeout(volSendTimer); volSendTimer = null; }
+      sendCmd('setVolume', Number(castvolEl.value) / 100);
+    });
+
+    castaudEl.addEventListener('change', function () {
+      var id = Number(castaudEl.value);
+      if (isFinite(id)) sendCmd('setAudioTrack', id);
+    });
 
     // Scrubbing: preview the time while dragging, then seek on release. Cast seek
     // is relative on the wire, so we send the delta from the last known position.
@@ -838,6 +899,8 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       if (!ws || ws.readyState !== 1) return;
       var payload = { action: action };
       if (action === 'seek') payload.seconds = sec;
+      if (action === 'setVolume') payload.level = sec;
+      if (action === 'setAudioTrack') payload.trackId = sec;
       if (action === 'playChannel' || action === 'requestEpg') payload.channelId = channelId;
       if (action === 'castMovie') payload.movieId = movieId;
       if (action === 'castMovieQueue') payload.movieIds = arg5;
