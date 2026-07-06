@@ -18,6 +18,18 @@ describe('generateSelfSignedCert', () => {
         expect(new Date(x509.validTo).getTime()).toBeGreaterThan(NOW)
     })
 
+    it('inclui os altNames no subjectAltName (IP + DNS)', () => {
+        const { cert } = generateSelfSignedCert(NOW, {
+            commonName: '192.168.0.5',
+            altNames: ['192.168.0.5', '127.0.0.1', 'localhost'],
+        })
+        const x509 = new crypto.X509Certificate(cert)
+        // Node renders SAN like "IP Address:192.168.0.5, DNS:localhost".
+        expect(x509.subjectAltName).toContain('192.168.0.5')
+        expect(x509.subjectAltName).toContain('127.0.0.1')
+        expect(x509.subjectAltName).toContain('localhost')
+    })
+
     it('faz um handshake TLS real (o par chave/cert é coerente)', async () => {
         const { cert, key } = generateSelfSignedCert(NOW)
         const server = https.createServer({ cert, key }, (_req, res) => { res.end('ok') })

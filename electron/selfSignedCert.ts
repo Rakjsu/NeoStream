@@ -71,6 +71,8 @@ function utcTime(date: Date): number[] {
 
 const OID_SHA256_RSA = '1.2.840.113549.1.1.11'
 const OID_COMMON_NAME = '2.5.4.3'
+const OID_SUBJECT_ALT_NAME = '2.5.29.17'
+const OID_BASIC_CONSTRAINTS = '2.5.29.19'
 
 /** AlgorithmIdentifier { sha256WithRSAEncryption, NULL }. */
 function sha256RsaAlg(): number[] {
@@ -80,6 +82,30 @@ function sha256RsaAlg(): number[] {
 /** Name = SEQ( SET( SEQ( OID(CN), UTF8String(cn) ) ) ). */
 function nameCN(cn: string): number[] {
     return seq(set(seq(oid(OID_COMMON_NAME), utf8(cn))))
+}
+
+const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/
+
+/** One GeneralName: IP → [7] 4 octets, otherwise DNS → [2] IA5String. */
+function generalName(name: string): number[] {
+    const m = name.match(IPV4_RE)
+    if (m) return der(0x87, [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])]) // [7] iPAddress
+    return der(0x82, [...Buffer.from(name, 'ascii')]) // [2] dNSName
+}
+
+/**
+ * subjectAltName extension (non-critical): browsers (esp. Chrome/Android)
+ * validate the host against the SAN, not the CN — without it they reject the
+ * cert outright, so the "accept once" flow never even appears.
+ */
+function sanExtension(altNames: string[]): number[] {
+    const names = seq(...altNames.map(generalName))
+    return seq(oid(OID_SUBJECT_ALT_NAME), der(0x04, names)) // Extension: OID + OCTET STRING(DER)
+}
+
+/** basicConstraints (critical): cA = FALSE (empty SEQUENCE defaults cA false). */
+function basicConstraintsExtension(): number[] {
+    return seq(oid(OID_BASIC_CONSTRAINTS), der(0x01, [0xff]), der(0x04, seq())) // OID + critical TRUE + OCTET STRING(SEQ{})
 }
 
 // ---------------------------------------------------------------- builder --
@@ -93,11 +119,13 @@ export interface SelfSignedResult {
 
 /**
  * Generate a fresh 2048-bit RSA key and a self-signed cert valid from `now`
- * for `validityDays`. `commonName` goes in both issuer and subject.
+ * for `validityDays`. `commonName` goes in both issuer and subject; `altNames`
+ * (IPs and/or DNS names) become the subjectAltName so browsers accept the host.
  */
 export function generateSelfSignedCert(
     now: number,
-    { commonName = 'NeoStream', validityDays = 3650 }: { commonName?: string; validityDays?: number } = {},
+    { commonName = 'NeoStream', validityDays = 3650, altNames = [] as string[] }:
+        { commonName?: string; validityDays?: number; altNames?: string[] } = {},
 ): SelfSignedResult {
     const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 })
 
@@ -111,6 +139,11 @@ export function generateSelfSignedCert(
     const serial = [...crypto.randomBytes(16)]
     serial[0] &= 0x7f
 
+    // v3 extensions: SAN (when host names given) + basicConstraints(cA=false).
+    const extensionList = [basicConstraintsExtension()]
+    if (altNames.length > 0) extensionList.push(sanExtension(altNames))
+    const extensions = der(0xa3, seq(...extensionList)) // [3] EXPLICIT Extensions
+
     const tbs = seq(
         der(0xa0, intFromNumber(2)),   // [0] version = v3 (INTEGER 2)
         integer(serial),
@@ -119,6 +152,7 @@ export function generateSelfSignedCert(
         seq(utcTime(notBefore), utcTime(notAfter)), // validity
         nameCN(commonName),            // subject
         spki,                          // subjectPublicKeyInfo (raw DER)
+        extensions,                    // [3] extensions
     )
 
     const signature = crypto.sign('sha256', Buffer.from(tbs), privateKey)
