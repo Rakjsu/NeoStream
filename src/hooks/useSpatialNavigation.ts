@@ -3,10 +3,16 @@ import { tvModeService } from '../services/tvModeService';
 import { pickSpatialTarget, type NavRect, type NavDirection } from '../utils/spatialNav';
 
 /**
- * TV mode phase 2: arrow keys move focus geometrically between focusable
- * elements (cards, buttons, nav), Backspace goes back. Active ONLY while TV
- * mode is on, and stands down whenever something more specific owns the keys
- * (inputs, the video player, open overlays that preventDefault).
+ * Arrow keys move focus geometrically between focusable elements (cards,
+ * buttons, nav); Backspace goes back (TV mode only).
+ *
+ * Two activation modes:
+ *  - TV mode ON: always active (10-foot remote/keyboard navigation).
+ *  - TV mode OFF: active only while the focus is already on a grid card
+ *    (Tab into the grid first), so page scrolling, selects and sliders keep
+ *    their arrow keys everywhere else.
+ * Stands down whenever something more specific owns the keys (inputs, the
+ * video player, open overlays/modals with their own arrow handling).
  */
 
 const FOCUSABLE_SELECTOR =
@@ -44,13 +50,24 @@ function visibleCandidates(): HTMLElement[] {
 export function useSpatialNavigation(): void {
     useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
-            if (!tvModeService.isEnabled()) return;
             if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey) return;
             if (isTyping(e.target)) return;
             // The player and its overlays own the arrows while mounted.
             if (document.querySelector('.video-player-container, .mpv-view-backdrop, .gsearch-overlay')) return;
 
+            const tvMode = tvModeService.isEnabled();
+            const current = document.activeElement as HTMLElement | null;
+            if (!tvMode) {
+                // Outside TV mode, arrows only act while a grid card holds
+                // focus — everywhere else the page keeps native scrolling and
+                // controls. Open modals keep their own arrow handling too
+                // (in TV mode the spatial engine drives them instead).
+                if (!current?.classList.contains('hover-preview-card')) return;
+                if (document.querySelector('[data-overlay="modal"], .cast-overlay')) return;
+            }
+
             if (e.key === 'Backspace') {
+                if (!tvMode) return; // back-on-Backspace is a 10-foot shortcut
                 e.preventDefault();
                 window.history.back();
                 return;
@@ -60,7 +77,6 @@ export function useSpatialNavigation(): void {
             if (!direction) return;
 
             const candidates = visibleCandidates();
-            const current = document.activeElement as HTMLElement | null;
             const currentRect: NavRect = current && candidates.includes(current)
                 ? current.getBoundingClientRect()
                 // Nothing focused: seed from the viewport's top-left corner.
