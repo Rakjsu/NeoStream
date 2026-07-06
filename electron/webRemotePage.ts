@@ -170,7 +170,8 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     }
 
     function connect(pin) {
-      ws = new WebSocket('ws://' + location.host + '/?pin=' + encodeURIComponent(pin));
+      var wsScheme = location.protocol === 'https:' ? 'wss://' : 'ws://';
+      ws = new WebSocket(wsScheme + location.host + '/?pin=' + encodeURIComponent(pin));
       ws.onopen = function () {
         localStorage.setItem('neostream_remote_pin', pin);
         pinCard.style.display = 'none';

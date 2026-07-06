@@ -5,7 +5,7 @@ import { qrToSvg } from '../../utils/qrEncoder';
 
 export function NetworkSection() {
     const [allowInvalidProviderCertificates, setAllowInvalidProviderCertificates] = useState(true);
-    const [webRemote, setWebRemote] = useState<{ enabled: boolean; url: string | null; pin: string | null }>({ enabled: false, url: null, pin: null });
+    const [webRemote, setWebRemote] = useState<{ enabled: boolean; https: boolean; url: string | null; pin: string | null }>({ enabled: false, https: false, url: null, pin: null });
     const { t } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
 
@@ -30,16 +30,28 @@ export function NetworkSection() {
                 console.error('Failed to load certificate settings:', error);
             }
             try {
-                const result = await window.ipcRenderer.invoke('web-remote:get-config') as { success: boolean; enabled?: boolean; url?: string | null; pin?: string | null };
-                if (result.success) setWebRemote({ enabled: result.enabled ?? false, url: result.url ?? null, pin: result.pin ?? null });
+                const result = await window.ipcRenderer.invoke('web-remote:get-config') as { success: boolean; enabled?: boolean; https?: boolean; url?: string | null; pin?: string | null };
+                if (result.success) setWebRemote({ enabled: result.enabled ?? false, https: result.https ?? false, url: result.url ?? null, pin: result.pin ?? null });
             } catch { /* handler absent in old builds */ }
         })();
     }, []);
 
+    type WebRemoteResult = { success: boolean; enabled?: boolean; https?: boolean; url?: string | null; pin?: string | null } | null;
+    const applyWebRemote = (result: WebRemoteResult) => {
+        if (result?.success) setWebRemote({ enabled: result.enabled ?? false, https: result.https ?? false, url: result.url ?? null, pin: result.pin ?? null });
+    };
+
     const handleWebRemoteToggle = async (value: boolean) => {
         const result = await window.ipcRenderer.invoke('web-remote:set-enabled', { enabled: value })
-            .catch(() => null) as { success: boolean; enabled?: boolean; url?: string | null; pin?: string | null } | null;
-        if (result?.success) setWebRemote({ enabled: result.enabled ?? false, url: result.url ?? null, pin: result.pin ?? null });
+            .catch(() => null) as WebRemoteResult;
+        applyWebRemote(result);
+        triggerSaveAnimation('webRemote');
+    };
+
+    const handleWebRemoteHttpsToggle = async (value: boolean) => {
+        const result = await window.ipcRenderer.invoke('web-remote:set-enabled', { https: value })
+            .catch(() => null) as WebRemoteResult;
+        applyWebRemote(result);
         triggerSaveAnimation('webRemote');
     };
 
@@ -131,6 +143,15 @@ export function NetworkSection() {
                                 </div>
                             )}
                             <p style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>{t('network', 'webRemoteQrHint')}</p>
+                            <label style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                                <input
+                                    type="checkbox"
+                                    checked={webRemote.https}
+                                    onChange={(e) => void handleWebRemoteHttpsToggle(e.target.checked)}
+                                />
+                                🔒 {t('network', 'webRemoteHttps')}
+                            </label>
+                            <p style={{ marginTop: 4, fontSize: 11, opacity: 0.6 }}>{t('network', 'webRemoteHttpsHint')}</p>
                         </div>
                     </div>
                 )}

@@ -10,12 +10,14 @@
  */
 
 import http from 'node:http'
+import https from 'node:https'
 import crypto from 'node:crypto'
 import os from 'node:os'
 import type { Socket } from 'node:net'
 import { BrowserWindow, ipcMain } from 'electron'
 import Store from 'electron-store'
 import log from './logger'
+import { generateSelfSignedCert } from './selfSignedCert'
 import {
     buildHandshakeResponse,
     encodeTextFrame,
@@ -31,6 +33,8 @@ import { isCastSessionActive, castRemoteControl } from './castHandlers'
 
 interface WebRemoteConfig {
     enabled: boolean
+    /** Opt-in: serve over HTTPS/wss with a self-signed cert (phone accepts once). */
+    https: boolean
 }
 
 const store = new Store<{ webRemote: WebRemoteConfig }>({ name: 'web-remote' })
@@ -57,8 +61,9 @@ interface GuideState {
     epg: GuideEpg | null
 }
 
-let server: http.Server | null = null
+let server: http.Server | https.Server | null = null
 let serverPort = 0
+let serverSecure = false
 let sessionPin = ''
 // Per-client PIN failure tracking, so a wrong PIN can't be brute-forced over
 // the LAN (10k combos). Keyed by remote IP; cleared on the server stopping.
@@ -77,7 +82,12 @@ function newPin(): string {
 }
 
 function getConfig(): WebRemoteConfig {
-    return { enabled: false, ...(store.get('webRemote') as Partial<WebRemoteConfig> | undefined) }
+    return { enabled: false, https: false, ...(store.get('webRemote') as Partial<WebRemoteConfig> | undefined) }
+}
+
+/** The LAN URL of the running server (http/https), or null when stopped. */
+function serverUrl(): string | null {
+    return serverPort ? `${serverSecure ? 'https' : 'http'}://${getLanAddress()}:${serverPort}/` : null
 }
 
 /** Best LAN IPv4 (first non-internal), or 127.0.0.1. */
@@ -261,18 +271,24 @@ export function setupWebRemote(): void {
     ipcMain.handle('web-remote:get-config', () => ({
         success: true,
         enabled: getConfig().enabled,
-        url: serverPort ? `http://${getLanAddress()}:${serverPort}/` : null,
+        https: getConfig().https,
+        url: serverUrl(),
         pin: serverPort ? sessionPin : null,
     }))
 
-    ipcMain.handle('web-remote:set-enabled', async (_e, { enabled }: { enabled?: boolean }) => {
-        store.set('webRemote', { enabled: enabled === true })
-        if (enabled === true) await start()
-        else stop()
+    ipcMain.handle('web-remote:set-enabled', async (_e, opts: { enabled?: boolean; https?: boolean }) => {
+        const current = getConfig()
+        const enabled = opts?.enabled ?? current.enabled
+        const useHttps = opts?.https ?? current.https
+        store.set('webRemote', { enabled, https: useHttps })
+        // Restart so an https toggle (or on/off) takes effect immediately.
+        stop()
+        if (enabled) await start()
         return {
             success: true,
-            enabled: enabled === true,
-            url: serverPort ? `http://${getLanAddress()}:${serverPort}/` : null,
+            enabled,
+            https: useHttps,
+            url: serverUrl(),
             pin: serverPort ? sessionPin : null,
         }
     })
@@ -284,25 +300,34 @@ export function setupWebRemote(): void {
 function start(): Promise<void> {
     if (server) return Promise.resolve()
     sessionPin = newPin()
+    serverSecure = getConfig().https
+    const handler = (req: http.IncomingMessage, res: http.ServerResponse) => {
+        if (req.url === '/' || req.url === '/index.html') {
+            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
+            // PIN is NOT injected — the phone must enter the code shown on
+            // the desktop settings screen (the page prompts + stores it).
+            res.end(REMOTE_PAGE_HTML)
+            return
+        }
+        res.writeHead(404)
+        res.end()
+    }
     return new Promise<void>((resolve) => {
-        server = http.createServer((req, res) => {
-            if (req.url === '/' || req.url === '/index.html') {
-                res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
-                // PIN is NOT injected — the phone must enter the code shown on
-                // the desktop settings screen (the page prompts + stores it).
-                res.end(REMOTE_PAGE_HTML)
-                return
-            }
-            res.writeHead(404)
-            res.end()
-        })
+        if (serverSecure) {
+            // Fresh self-signed cert per start (hand-rolled X.509). The phone
+            // accepts it once; the page connects over wss on the same port.
+            const { key, cert } = generateSelfSignedCert(Date.now())
+            server = https.createServer({ key, cert }, handler)
+        } else {
+            server = http.createServer(handler)
+        }
         server.on('upgrade', (req, socket) => handleUpgrade(req, socket as Socket))
         server.on('error', (error) => log.error('[WebRemote] server error:', error))
         // Bind to all interfaces so the phone on the LAN can reach it.
         server.listen(0, '0.0.0.0', () => {
             const address = server?.address()
             serverPort = typeof address === 'object' && address ? address.port : 0
-            log.info('[WebRemote] listening on', `${getLanAddress()}:${serverPort}`)
+            log.info('[WebRemote] listening on', `${serverUrl()}`)
             resolve()
         })
     })
@@ -314,6 +339,7 @@ function stop(): void {
     server?.close()
     server = null
     serverPort = 0
+    serverSecure = false
     sessionPin = ''
     pinGate.clear()
 }
