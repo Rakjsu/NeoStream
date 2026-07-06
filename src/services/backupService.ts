@@ -5,10 +5,14 @@
 //   - saved playlists from the main-process store (passwords base64-encoded —
 //     obfuscation for shoulder-surfing, NOT encryption; the UI warns that the
 //     file contains provider access data)
+// v3 adds the user's API keys, so a restore/new machine doesn't lose them:
+//   - TMDB key (localStorage, rides the normal data map)
+//   - OpenSubtitles credentials (live in the main-process store; the caller
+//     fetches/applies them over IPC — this module stays IPC-free)
 // Still EXCLUDED: caches (tmdb_*, EPG test results, contentLastFetch) and
 // transient flags (shouldAutoPlayNextEpisode, parentalUnlocked).
 
-export const BACKUP_VERSION = 2;
+export const BACKUP_VERSION = 3;
 export const BACKUP_APP = 'neostream';
 
 export interface BackupPlaylist {
@@ -19,6 +23,20 @@ export interface BackupPlaylist {
     passwordB64: string;
 }
 
+export interface BackupOpenSubtitles {
+    apiKey: string;
+    username: string;
+    /** base64(password) — same obfuscation note as the playlists. */
+    passwordB64: string;
+}
+
+/** Decoded form the callers hand to `opensubtitles:set-config`. */
+export interface OpenSubtitlesCreds {
+    apiKey: string;
+    username: string;
+    password: string;
+}
+
 export interface BackupPayload {
     version: number;
     exportedAt: string;
@@ -26,6 +44,8 @@ export interface BackupPayload {
     data: Record<string, string>;
     /** v2+: saved Xtream playlists (absent on v1 files). */
     playlists?: BackupPlaylist[];
+    /** v3+: the user's OpenSubtitles credentials (absent when not configured). */
+    openSubtitles?: BackupOpenSubtitles;
 }
 
 export interface ApplyReport {
@@ -45,6 +65,7 @@ const EXACT_KEYS = [
     'neostream_mpv_volume',   // last MPV volume (stable player)
     'watchLater',             // legacy pre-profile watch-later list
     'neostream_sync_tombstones', // deletions ledger (sync propagates removals)
+    'neostream_tmdb_api_key', // the user's own TMDB key (v3) — also synced
 ];
 
 // Keys included when they start with one of these prefixes
@@ -97,7 +118,27 @@ export function sanitizeBackupPlaylists(raw: unknown): BackupPlaylist[] {
     return result;
 }
 
-export function collectBackup(playlists: BackupPlaylist[] = []): BackupPayload {
+/** Validates the optional v3 OpenSubtitles block; null when absent/corrupted. */
+export function sanitizeBackupOpenSubtitles(raw: unknown): OpenSubtitlesCreds | null {
+    if (raw === null || typeof raw !== 'object') return null;
+    const os = raw as Record<string, unknown>;
+    if (typeof os.apiKey !== 'string' || !os.apiKey.trim()) return null;
+    const username = typeof os.username === 'string' ? os.username : '';
+    let password = '';
+    if (typeof os.passwordB64 === 'string' && os.passwordB64) {
+        try {
+            password = decodePlaylistPassword(os.passwordB64);
+        } catch {
+            return null; // corrupted base64 — drop the whole block
+        }
+    }
+    return { apiKey: os.apiKey.trim(), username, password };
+}
+
+export function collectBackup(
+    playlists: BackupPlaylist[] = [],
+    openSubtitles?: OpenSubtitlesCreds,
+): BackupPayload {
     const data: Record<string, string> = {};
 
     for (let i = 0; i < localStorage.length; i++) {
@@ -115,7 +156,15 @@ export function collectBackup(playlists: BackupPlaylist[] = []): BackupPayload {
         exportedAt: new Date().toISOString(),
         app: BACKUP_APP,
         data,
-        playlists
+        playlists,
+        // Only worth carrying when actually configured.
+        ...(openSubtitles?.apiKey ? {
+            openSubtitles: {
+                apiKey: openSubtitles.apiKey,
+                username: openSubtitles.username,
+                passwordB64: encodePlaylistPassword(openSubtitles.password),
+            },
+        } : {}),
     };
 }
 
@@ -124,7 +173,7 @@ export function collectBackup(playlists: BackupPlaylist[] = []): BackupPayload {
  * Returns the sanitized playlists (v2) for the caller to hand to the main
  * process — this module stays free of IPC so it remains unit-testable.
  */
-export function applyBackup(parsed: unknown): ApplyReport & { playlists: BackupPlaylist[] } {
+export function applyBackup(parsed: unknown): ApplyReport & { playlists: BackupPlaylist[]; openSubtitles: OpenSubtitlesCreds | null } {
     if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
         throw new Error('Invalid backup: payload is not an object');
     }
@@ -134,7 +183,7 @@ export function applyBackup(parsed: unknown): ApplyReport & { playlists: BackupP
     if (payload.app !== BACKUP_APP) {
         throw new Error(`Invalid backup: not a ${BACKUP_APP} backup file`);
     }
-    if (payload.version !== 1 && payload.version !== BACKUP_VERSION) {
+    if (typeof payload.version !== 'number' || payload.version < 1 || payload.version > BACKUP_VERSION) {
         throw new Error(`Invalid backup: unsupported version "${String(payload.version)}" (expected 1..${BACKUP_VERSION})`);
     }
     if (payload.data === null || typeof payload.data !== 'object' || Array.isArray(payload.data)) {
@@ -154,6 +203,7 @@ export function applyBackup(parsed: unknown): ApplyReport & { playlists: BackupP
     }
 
     const playlists = payload.version >= 2 ? sanitizeBackupPlaylists(payload.playlists) : [];
+    const openSubtitles = payload.version >= 3 ? sanitizeBackupOpenSubtitles(payload.openSubtitles) : null;
 
-    return { applied, skipped, playlistsImported: 0, playlists };
+    return { applied, skipped, playlistsImported: 0, playlists, openSubtitles };
 }

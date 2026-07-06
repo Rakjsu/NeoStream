@@ -118,6 +118,39 @@ describe('backupService', () => {
         });
     });
 
+    describe('chaves de API (v3)', () => {
+        it('inclui a chave TMDB no data map e a restaura no apply', () => {
+            localStorage.setItem('neostream_tmdb_api_key', 'minha-chave-tmdb');
+            const backup = collectBackup();
+            expect(backup.data['neostream_tmdb_api_key']).toBe('minha-chave-tmdb');
+
+            localStorage.clear();
+            applyBackup(JSON.parse(JSON.stringify(backup)));
+            expect(localStorage.getItem('neostream_tmdb_api_key')).toBe('minha-chave-tmdb');
+        });
+
+        it('exporta as credenciais OpenSubtitles (senha em base64) e devolve decodificadas no apply', () => {
+            const backup = collectBackup([], { apiKey: 'os-key', username: 'user', password: 'sênha!' });
+            expect(backup.openSubtitles).toEqual({
+                apiKey: 'os-key', username: 'user', passwordB64: encodePlaylistPassword('sênha!'),
+            });
+
+            const report = applyBackup(JSON.parse(JSON.stringify(backup)));
+            expect(report.openSubtitles).toEqual({ apiKey: 'os-key', username: 'user', password: 'sênha!' });
+        });
+
+        it('omite o bloco sem apiKey e ignora blocos malformados/legados', () => {
+            expect(collectBackup([], { apiKey: '', username: 'u', password: 'p' }).openSubtitles).toBeUndefined();
+            expect(collectBackup().openSubtitles).toBeUndefined();
+
+            // v2 (sem o campo) e blocos corrompidos viram null no apply.
+            const v2 = { version: 2, exportedAt: 'x', app: BACKUP_APP, data: {}, openSubtitles: { apiKey: 'k', passwordB64: 'YQ==' } };
+            expect(applyBackup(v2).openSubtitles).toBeNull();
+            const corrupted = { version: 3, exportedAt: 'x', app: BACKUP_APP, data: {}, openSubtitles: { apiKey: 'k', passwordB64: '%%%' } };
+            expect(applyBackup(corrupted).openSubtitles).toBeNull();
+        });
+    });
+
     describe('applyBackup validation', () => {
         const validPayload = () => ({
             version: BACKUP_VERSION,
@@ -126,10 +159,13 @@ describe('backupService', () => {
             data: { neostream_language: 'pt' }
         });
 
-        it('rejects unsupported versions but accepts v1', () => {
-            expect(() => applyBackup({ ...validPayload(), version: 3 })).toThrow(/version/);
+        it('rejects unsupported versions but accepts v1..v3', () => {
+            expect(() => applyBackup({ ...validPayload(), version: BACKUP_VERSION + 1 })).toThrow(/version/);
+            expect(() => applyBackup({ ...validPayload(), version: 0 })).toThrow(/version/);
             expect(() => applyBackup({ ...validPayload(), version: undefined })).toThrow(/version/);
             expect(applyBackup({ ...validPayload(), version: 1 }).applied).toBe(1);
+            expect(applyBackup({ ...validPayload(), version: 2 }).applied).toBe(1);
+            expect(applyBackup(validPayload()).applied).toBe(1);
         });
 
         it('rejects payloads from other apps', () => {

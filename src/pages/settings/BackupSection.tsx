@@ -94,7 +94,15 @@ export function BackupSection() {
                 }
             } catch { /* main handler absent in old builds — export without playlists */ }
 
-            const payload = collectBackup(playlists);
+            // v3: the user's OpenSubtitles credentials ride along too.
+            let openSubtitles: { apiKey: string; username: string; password: string } | undefined;
+            try {
+                const cfg = await window.ipcRenderer.invoke('opensubtitles:get-config') as
+                    { success: boolean; apiKey: string; username: string; password: string } | null;
+                if (cfg?.success && cfg.apiKey) openSubtitles = { apiKey: cfg.apiKey, username: cfg.username, password: cfg.password };
+            } catch { /* export without OpenSubtitles */ }
+
+            const payload = collectBackup(playlists, openSubtitles);
             const result = await window.ipcRenderer.invoke(
                 'backup:save-file',
                 { json: JSON.stringify(payload, null, 2) }
@@ -154,6 +162,12 @@ export function BackupSection() {
                 } catch (error) {
                     console.error('[Backup] Playlist import failed:', error);
                 }
+            }
+
+            // v3: restore is authoritative — apply the OpenSubtitles creds too.
+            if (report.openSubtitles) {
+                await window.ipcRenderer.invoke('opensubtitles:set-config', report.openSubtitles)
+                    .catch((error: unknown) => console.error('[Backup] OpenSubtitles restore failed:', error));
             }
 
             setSuccessMessage(t('backup', 'importSuccess'));
