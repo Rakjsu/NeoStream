@@ -15,6 +15,7 @@ import store from './store'
 import axios from 'axios'
 import { findPlaylist, getActivePlaylistIdPublic } from './playlistManager'
 import { parseM3uHeader } from './m3uProtocol'
+import { fetchWithRetry } from './fetchRetry'
 import log from './logger'
 import { getProviderHttpsAgent, registerApprovedProviderUrl } from './certificatePolicy'
 import {
@@ -126,12 +127,12 @@ async function fetchXmltvWithCache(url: string): Promise<string | null> {
 
     try {
         const fetch = (await import('node-fetch')).default
-        const response = await fetch(url, {
+        const response = await fetchWithRetry(() => fetch(url, {
             agent: getProviderHttpsAgent(url),
             // Generous: provider xmltv files are big; failure falls back to stale cache.
             signal: AbortSignal.timeout(60000),
             headers: FETCH_HEADERS
-        })
+        }))
 
         if (!response.ok) {
             log.warn('[Provider EPG] xmltv download failed: HTTP', response.status)
@@ -281,11 +282,11 @@ async function fetchSimpleDataTable(streamId: number, channelId: string): Promis
     try {
         const url = buildSimpleDataTableUrl(credentials.url, credentials.username, credentials.password, streamId)
         const fetch = (await import('node-fetch')).default
-        const response = await fetch(url, {
+        const response = await fetchWithRetry(() => fetch(url, {
             agent: getProviderHttpsAgent(url),
             signal: AbortSignal.timeout(20000),
             headers: FETCH_HEADERS
-        })
+        }))
 
         if (!response.ok) {
             log.warn('[Provider EPG] get_simple_data_table failed: HTTP', response.status, '— disabled for this session')
