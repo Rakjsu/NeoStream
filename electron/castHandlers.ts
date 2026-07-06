@@ -9,6 +9,7 @@ import { ipcMain } from 'electron'
 import { Bonjour, type Browser, type Service } from 'bonjour-service'
 import log from './logger'
 import { CastSession, type CastMediaInput, type CastMediaMeta } from './castClient'
+import { routeCastCommand } from './castRemoteRouting'
 import { registerCastSubtitleVtt, isLoopbackUrl, createLanProxyUrlFor } from './dlnaHandlers'
 
 interface CastDevice {
@@ -79,45 +80,16 @@ export function getCastStatus(): {
  * Route a phone-remote transport command to the active cast session, so the
  * same buttons that drive the local player drive the Chromecast when one is
  * casting. Returns true if a live session handled it (else the caller falls
- * back to the renderer's media:control). Seek is relative (± seconds), matching
- * the phone's -30/+30 buttons; cast seek is absolute, so we add to currentTime.
+ * back to the renderer's media:control). The branching itself lives in
+ * castRemoteRouting.ts (pure, unit-tested); this owns the module state.
  */
 export function castRemoteControl(action: string, seconds?: number): boolean {
     const s = activeSession
     if (!s || !s.isActive) return false
-    const vol = s.status.volume ?? 0.5
-    switch (action) {
-        case 'togglePlay': if (s.status.playing) s.pause(); else s.resume(); break
-        case 'stop': stopActiveSession(); break
-        case 'seek':
-            if (typeof seconds === 'number' && Number.isFinite(seconds)) {
-                s.seek(Math.max(0, (s.status.currentTime ?? 0) + seconds))
-            }
-            break
-        case 'next':
-        case 'previous':
-            // Queue cast (season/playlist): ⏮/⏭ skip episodes on the TV. With
-            // no queue the action falls through to the renderer (channel zap).
-            if ((s.status.queue?.length ?? 0) > 1) {
-                s.queueSkip(action === 'next' ? 'next' : 'prev')
-                break
-            }
-            return false
-        case 'volumeUp': s.setVolume(Math.min(1, vol + 0.1)); break
-        case 'volumeDown': s.setVolume(Math.max(0, vol - 0.1)); break
-        case 'mute':
-            if (vol > 0) { preMuteVolume = vol; s.setVolume(0) }
-            else s.setVolume(preMuteVolume)
-            break
-        case 'subtitle':
-            // 💬 toggle from the phone — only meaningful when the current
-            // media carries a track (the phone hides the button otherwise).
-            if (!s.status.subtitleAvailable) return false
-            s.setSubtitleEnabled(!s.status.subtitleEnabled)
-            break
-        default: return false
-    }
-    return true
+    const result = routeCastCommand(s, action, seconds, preMuteVolume)
+    preMuteVolume = result.preMuteVolume
+    if (result.stop) stopActiveSession()
+    return result.handled
 }
 
 export function setupCastHandlers(): void {
