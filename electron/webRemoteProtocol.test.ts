@@ -120,6 +120,7 @@ describe('parseRemoteCommand', () => {
     })
     it('aceita requestDevices e um alvo de cast opcional (deviceId+deviceType)', () => {
         expect(parseRemoteCommand('{"action":"requestDevices"}')).toEqual({ action: 'requestDevices' })
+        expect(parseRemoteCommand('{"action":"requestContinue"}')).toEqual({ action: 'requestContinue' })
         expect(parseRemoteCommand('{"action":"castMovie","movieId":"42","deviceId":"tv1","deviceType":"dlna"}'))
             .toEqual({ action: 'castMovie', movieId: '42', target: { deviceId: 'tv1', deviceType: 'dlna' } })
         expect(parseRemoteCommand('{"action":"castEpisode","episodeId":"e1","deviceId":"cc1","deviceType":"chromecast"}'))

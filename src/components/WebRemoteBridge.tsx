@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { CastQueueItem } from '../services/castQueue';
+import { watchProgressService } from '../services/watchProgressService';
+import { movieProgressService } from '../services/movieProgressService';
 
 /**
  * Always-mounted bridge for the phone web remote's catalog second-screen.
@@ -33,6 +35,9 @@ export function WebRemoteBridge() {
     const episodesRef = useRef<Map<string, { id: number | string; container: string; name: string }>>(new Map());
     // Last discovered cast targets, so a target id from the phone resolves a name.
     const devicesRef = useRef<Map<string, { name: string; type: CastTargetType }>>(new Map());
+    // Resume positions (seconds) for "continue watching" items, keyed by
+    // "movie:<id>" / "ep:<episodeId>", so a cast started from that tab resumes.
+    const resumeRef = useRef<Map<string, number>>(new Map());
 
     useEffect(() => {
         const sendCastResult = (status: 'ok' | 'no-device' | 'error', deviceName = '') =>
@@ -84,10 +89,18 @@ export function WebRemoteBridge() {
             window.ipcRenderer.send('web-remote:devices', { items });
         };
 
+        // Resume a Chromecast to a saved position: the castv2 LOAD has no
+        // currentTime field, so we SEEK once the media session is up.
+        const resumeChromecast = (seconds: number) => {
+            if (seconds <= 5) return; // not worth resuming a few seconds in
+            setTimeout(() => { void window.ipcRenderer.invoke('cast:seek', { seconds }).catch(() => undefined); }, 1500);
+        };
+
         // Cast a resolved playlist to a chosen device (or the first Chromecast when
         // the phone sent no target). Chromecast honours the whole queue; DLNA and
-        // AirPlay have no queue protocol, so they start the first item.
-        const startCast = async (items: CastQueueItem[], target?: CastTarget) => {
+        // AirPlay have no queue protocol, so they start the first item. `resumeAt`
+        // (seconds) resumes a Chromecast from where it was left off.
+        const startCast = async (items: CastQueueItem[], target?: CastTarget, resumeAt = 0) => {
             const queue = items.filter(i => i.url);
             if (queue.length === 0) { sendCastResult('error'); return; }
             const first = queue[0];
@@ -117,6 +130,7 @@ export function WebRemoteBridge() {
                     }).catch(() => null) as { success: boolean } | null;
                     ok = !!r?.success;
                 }
+                if (ok && resumeAt > 0 && target.deviceType === 'chromecast') resumeChromecast(resumeAt);
                 sendCastResult(ok ? 'ok' : 'error', name);
                 return;
             }
@@ -137,6 +151,7 @@ export function WebRemoteBridge() {
                 }).catch(() => null) as { success: boolean } | null;
                 ok = !!r?.success;
             }
+            if (ok && resumeAt > 0) resumeChromecast(resumeAt); // default target is a Chromecast
             sendCastResult(ok ? 'ok' : 'error', device.name);
         };
 
@@ -147,7 +162,7 @@ export function WebRemoteBridge() {
                 streamId: movie.stream_id,
                 container: movie.container_extension || 'mp4',
             }).catch(() => null) as { success: boolean; url?: string } | null;
-            await startCast([{ url: urlRes?.url ?? '', title: movie.name }], target);
+            await startCast([{ url: urlRes?.url ?? '', title: movie.name }], target, resumeRef.current.get('movie:' + movieId) ?? 0);
         };
 
         const castMovieQueue = async (movieIds: string[], target?: CastTarget) => {
@@ -193,8 +208,62 @@ export function WebRemoteBridge() {
                     map.set(id, { id: ep.id, container: ep.container_extension || 'mp4', name: label });
                 }
             }
-            episodesRef.current = map;
+            // Merge (don't wipe) so episodes resolved for "continue watching"
+            // survive a drill-down into another series and vice-versa.
+            for (const [k, v] of map) episodesRef.current.set(k, v);
             window.ipcRenderer.send('web-remote:series-info', { seriesId, episodes });
+        };
+
+        // Build the "continue watching" list (movies + the resume episode of each
+        // in-progress series), resolving the episode stream ids so a tap can cast
+        // straight to them, and record resume positions for a seek-after-load.
+        const pushContinue = async () => {
+            const vodRes = await window.ipcRenderer.invoke('streams:get-vod').catch(() => null) as
+                { success: boolean; data?: VodMovie[] } | null;
+            const vod = vodRes?.success ? (vodRes.data ?? []) : [];
+            const vodById = new Map<string, VodMovie>();
+            for (const m of vod) { vodById.set(String(m.stream_id), m); moviesRef.current.set(String(m.stream_id), m); }
+
+            const seriesRes = await window.ipcRenderer.invoke('streams:get-series').catch(() => null) as
+                { success: boolean; data?: SeriesItem[] } | null;
+            const coverBySeries = new Map<string, string>();
+            for (const s of seriesRes?.success ? (seriesRes.data ?? []) : []) coverBySeries.set(String(s.series_id), s.cover || '');
+
+            const items: { kind: 'movie' | 'series'; castId: string; name: string; cover: string; pct: number; at: number }[] = [];
+
+            for (const id of movieProgressService.getMoviesInProgress()) {
+                const p = movieProgressService.getMoviePositionById(id);
+                if (!p || p.completed) continue;
+                const movie = vodById.get(String(id));
+                resumeRef.current.set('movie:' + id, p.currentTime || 0);
+                items.push({
+                    kind: 'movie', castId: String(id), name: p.movieName || movie?.name || 'Filme',
+                    cover: movie?.stream_icon || '', pct: Math.round(p.progress || 0), at: p.watchedAt || 0,
+                });
+            }
+
+            for (const [seriesId, sp] of watchProgressService.getContinueWatching()) {
+                const info = await window.ipcRenderer.invoke('series:get-info', { seriesId }).catch(() => null) as
+                    { success: boolean; info?: { episodes?: Record<string, Episode[]> } } | null;
+                const seasonEps = info?.success ? (info.info?.episodes?.[String(sp.lastWatchedSeason)] ?? []) : [];
+                const ep = seasonEps.find(e => Number(e.episode_num) === sp.lastWatchedEpisode);
+                if (!ep) continue;
+                const episodeId = String(ep.id);
+                const tag = `T${sp.lastWatchedSeason}E${sp.lastWatchedEpisode}`;
+                episodesRef.current.set(episodeId, { id: ep.id, container: ep.container_extension || 'mp4', name: `${sp.seriesName} · ${tag}` });
+                const prog = watchProgressService.getEpisodeProgress(seriesId, sp.lastWatchedSeason, sp.lastWatchedEpisode);
+                const cur = prog?.currentTime || 0, dur = prog?.duration || 0;
+                resumeRef.current.set('ep:' + episodeId, cur);
+                items.push({
+                    kind: 'series', castId: episodeId, name: `${sp.seriesName} · ${tag}`,
+                    cover: coverBySeries.get(seriesId) || '', pct: dur > 0 ? Math.round((cur / dur) * 100) : 0, at: sp.lastWatchedAt || 0,
+                });
+            }
+
+            items.sort((a, b) => b.at - a.at);
+            window.ipcRenderer.send('web-remote:continue', {
+                items: items.slice(0, 40).map(({ kind, castId, name, cover, pct }) => ({ kind, castId, name, cover, pct })),
+            });
         };
 
         const castEpisode = async (episodeId: string, target?: CastTarget) => {
@@ -203,7 +272,7 @@ export function WebRemoteBridge() {
             const urlRes = await window.ipcRenderer.invoke('streams:get-series-url', {
                 streamId: ep.id, container: ep.container,
             }).catch(() => null) as { success: boolean; url?: string } | null;
-            await startCast([{ url: urlRes?.url ?? '', title: ep.name }], target);
+            await startCast([{ url: urlRes?.url ?? '', title: ep.name }], target, resumeRef.current.get('ep:' + episodeId) ?? 0);
         };
 
         const asTarget = (v: unknown): CastTarget | undefined => {
@@ -213,6 +282,7 @@ export function WebRemoteBridge() {
 
         const handler = (_e: unknown, action: string, arg?: unknown, target?: unknown) => {
             if (action === 'requestCatalog') void pushCatalog(typeof arg === 'string' ? arg : '');
+            else if (action === 'requestContinue') void pushContinue();
             else if (action === 'requestDevices') void pushDevices();
             else if (action === 'castMovie') void castMovie(String(arg ?? ''), asTarget(target));
             else if (action === 'castMovieQueue') void castMovieQueue(Array.isArray(arg) ? (arg as string[]) : [], asTarget(target));
