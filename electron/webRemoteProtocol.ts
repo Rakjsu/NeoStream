@@ -119,7 +119,7 @@ export type CastTargetType = 'chromecast' | 'dlna' | 'airplay'
 export interface CastTarget { deviceId: string; deviceType: CastTargetType }
 
 export type RemoteCommand =
-    | { action: 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' }
+    | { action: 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' | 'subtitle' }
     | { action: 'seek'; seconds: number }
     | { action: 'playChannel'; channelId: string }
     | { action: 'requestEpg'; channelId: string }
@@ -133,7 +133,7 @@ export type RemoteCommand =
     | { action: 'castEpisode'; episodeId: string; target?: CastTarget }
 
 const VALID_ACTIONS = new Set([
-    'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'seek', 'playChannel', 'requestEpg',
+    'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'playChannel', 'requestEpg',
     'requestCatalog', 'requestContinue', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
 ])
 
@@ -203,7 +203,7 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
     if (action === 'requestSeries') return { action: 'requestSeries', query: parseQuery(parsed) }
     if (action === 'requestContinue') return { action: 'requestContinue' }
     if (action === 'requestDevices') return { action: 'requestDevices' }
-    return { action: action as 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' }
+    return { action: action as 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' | 'subtitle' }
 }
 
 // ------------------------------------------------------------- LAN address --

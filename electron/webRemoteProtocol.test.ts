@@ -70,6 +70,7 @@ describe('frames', () => {
 describe('parseRemoteCommand', () => {
     it('aceita ações conhecidas', () => {
         expect(parseRemoteCommand('{"action":"togglePlay"}')).toEqual({ action: 'togglePlay' })
+        expect(parseRemoteCommand('{"action":"subtitle"}')).toEqual({ action: 'subtitle' })
         expect(parseRemoteCommand('{"action":"seek","seconds":30}')).toEqual({ action: 'seek', seconds: 30 })
     })
     it('aceita playChannel com id de canal', () => {

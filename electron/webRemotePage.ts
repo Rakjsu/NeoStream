@@ -168,6 +168,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
           <button class="ctl" data-cmd="volumeDown" title="Volume -">🔉</button>
           <button class="ctl" data-cmd="mute" title="Mudo">🔇</button>
           <button class="ctl" data-cmd="volumeUp" title="Volume +">🔊</button>
+          <button class="ctl hidden" data-cmd="subtitle" id="castsub" title="Legenda">💬</button>
           <button class="ctl wide" data-cmd="stop" title="Parar">⏹ Parar</button>
         </div>
       </div>
@@ -255,6 +256,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     var castprogEl = document.getElementById('castprog');
     var castseekEl = document.getElementById('castseek');
     var casttimeEl = document.getElementById('casttime');
+    var castsubEl = document.getElementById('castsub');
     var lastCastTime = 0, lastCastDur = 0, seekingCast = false;
     var coEl = document.getElementById('continue');
     var colistEl = document.getElementById('colist');
@@ -360,6 +362,14 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         casttimeEl.textContent = fmtTime(cur) + ' / ' + fmtTime(dur);
       } else {
         castprogEl.classList.add('hidden');
+      }
+      // 💬 only while casting media that carries a subtitle track; lit = active.
+      if (msg.casting && msg.castSubAvailable) {
+        castsubEl.classList.remove('hidden');
+        castsubEl.style.background = msg.castSubEnabled !== false
+          ? 'linear-gradient(135deg, #4f46e5, var(--accent))' : '';
+      } else {
+        castsubEl.classList.add('hidden');
       }
     }
 
