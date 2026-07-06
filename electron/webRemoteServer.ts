@@ -64,6 +64,10 @@ interface GuideState {
     epg: GuideEpg | null
 }
 
+// Stable port so the phone's installed PWA / bookmark survives app restarts.
+// Unassigned range; falls back to an ephemeral port when already in use.
+const PREFERRED_PORT = 8974
+
 let server: http.Server | https.Server | null = null
 let serverPort = 0
 let serverSecure = false
@@ -478,14 +482,28 @@ function start(): Promise<void> {
             server = http.createServer(handler)
         }
         server.on('upgrade', (req, socket) => handleUpgrade(req, socket as Socket))
-        server.on('error', (error) => log.error('[WebRemote] server error:', error))
-        // Bind to all interfaces so the phone on the LAN can reach it.
-        server.listen(0, '0.0.0.0', () => {
+        // Fixed port first: the phone's installed PWA keeps its URL across app
+        // restarts (an ephemeral port would break it every session). If the
+        // preferred port is taken, fall back to an ephemeral one — the QR code
+        // in Settings always shows the live URL.
+        const onListening = () => {
             const address = server?.address()
             serverPort = typeof address === 'object' && address ? address.port : 0
             log.info('[WebRemote] listening on', `${serverUrl()}`)
             resolve()
+        }
+        server.once('error', (error: NodeJS.ErrnoException) => {
+            if (error.code === 'EADDRINUSE' && server) {
+                log.warn(`[WebRemote] porta ${PREFERRED_PORT} ocupada — usando porta efêmera`)
+                server.on('error', (err) => log.error('[WebRemote] server error:', err))
+                server.listen(0, '0.0.0.0', onListening)
+                return
+            }
+            log.error('[WebRemote] server error:', error)
+            resolve() // don't hang the caller; enable() reports the URL as null
         })
+        // Bind to all interfaces so the phone on the LAN can reach it.
+        server.listen(PREFERRED_PORT, '0.0.0.0', onListening)
     })
 }
 
