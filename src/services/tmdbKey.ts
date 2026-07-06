@@ -19,6 +19,9 @@ export function getTmdbApiKey(): string {
     try {
         const own = (localStorage.getItem(STORAGE_KEY) || '').trim();
         if (own) return own;
+        // Gancho de E2E: simula o app instalado (sem fallback de .env), já que
+        // o vite build local embute o VITE_TMDB_API_KEY do dev.
+        if (localStorage.getItem('neostream_tmdb_ignore_env') === '1') return '';
     } catch { /* storage indisponível (testes) */ }
     return (import.meta.env.VITE_TMDB_API_KEY || '').trim();
 }
