@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SortSelect } from '../components/SortSelect';
 import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { fetchMovieDetails, searchMovieByName, type TMDBMovieDetails, getBackdropUrl } from '../services/tmdb';
@@ -185,11 +185,14 @@ export function VOD() {
         return null;
     };
 
-    const sortedStreams = sortBy === 'recent'
-        ? streams
-        : [...streams].sort((a, b) => compareCatalogItems(sortBy, a, b));
+    // Memoized so a big catalog isn't re-sorted/re-filtered on every render —
+    // notably on every scroll frame (the windowed grid updates scrollTop state).
+    const sortedStreams = useMemo(
+        () => sortBy === 'recent' ? streams : [...streams].sort((a, b) => compareCatalogItems(sortBy, a, b)),
+        [streams, sortBy]
+    );
 
-    const filteredStreams = sortedStreams.filter(stream => {
+    const filteredStreams = useMemo(() => sortedStreams.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
 
         // Kids profile + Parental Control gating (categories, cached ratings, hidden items)
@@ -209,7 +212,11 @@ export function VOD() {
 
         const matchesCategory = !selectedCategory || selectedCategory === '' || selectedCategory === 'all' || stream.category_id === selectedCategory;
         return matchesSearch && matchesCategory;
-    });
+    // isItemVisible reads parental/kids state that only changes via a profile/
+    // settings switch (which reloads streams / remounts this page), so it doesn't
+    // need to be a dep — keeping it out is what makes scrolling cheap.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [sortedStreams, searchQuery, selectedCategory]);
 
     // Windowed rendering: only ~3 screens of cards stay mounted while the
     // scrollbar reflects the full list (spacer rows keep the geometry).

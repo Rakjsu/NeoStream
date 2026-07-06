@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SortSelect } from '../components/SortSelect';
 import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { CategoryMenu } from '../components/CategoryMenu';
@@ -367,11 +367,14 @@ export function LiveTV() {
         });
     }, [fetchCategories]);
 
-    const sortedStreams = sortBy === 'recent'
-        ? streams
-        : [...streams].sort((a, b) => compareCatalogItems(sortBy, a, b));
+    // Memoized so the channel list isn't re-sorted/re-filtered on every render
+    // (notably every scroll frame — the windowed grid updates scrollTop state).
+    const sortedStreams = useMemo(
+        () => sortBy === 'recent' ? streams : [...streams].sort((a, b) => compareCatalogItems(sortBy, a, b)),
+        [streams, sortBy]
+    );
 
-    const filteredStreams = sortedStreams.filter(stream => {
+    const filteredStreams = useMemo(() => sortedStreams.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
         if (selectedCategory === 'FAVORITES') {
             return matchesSearch && favoriteChannelIds.has(String(stream.stream_id));
@@ -392,7 +395,7 @@ export function LiveTV() {
         }
 
         return matchesSearch && matchesCategory;
-    });
+    }), [sortedStreams, searchQuery, selectedCategory, favoriteChannelIds, blockedCategoryIds, isKidsProfile, allowedCategoryIds]);
 
     // Keep the zap ref current for the media:control handler (written in an
     // effect — refs must not be mutated during render).
