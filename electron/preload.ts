@@ -159,6 +159,7 @@ const sendChannels = new Set([
     'web-remote:series',
     'web-remote:series-info',
     'web-remote:continue',
+    'web-remote:recommended',
     'web-remote:devices',
     'web-remote:cast-result',
 ])
