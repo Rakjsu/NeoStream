@@ -150,7 +150,21 @@
     "errorAddingDevice": "Error adding device",
     "connected": "Connected",
     "discovered": "Discovered",
-    "queueHint": "Queue of {n} episodes — Chromecast gets them all; DLNA/AirPlay starts with the first."
+    "queueHint": "Queue of {n} episodes — Chromecast gets them all; DLNA/AirPlay starts with the first.",
+    "pause": "Pause",
+    "play": "Play",
+    "prevEpisode": "Previous episode",
+    "nextEpisode": "Next episode",
+    "subtitleOn": "Enable subtitles",
+    "subtitleOff": "Disable subtitles",
+    "audioTrack": "Audio track",
+    "queue": "Queue",
+    "live": "LIVE",
+    "connecting": "Connecting...",
+    "casting": "Casting",
+    "stopCast": "Stop casting",
+    "seekLabel": "Playback position",
+    "tvVolume": "TV volume"
   },
   "categories": {
     "title": "Categories",

@@ -161,3 +161,104 @@ describe('CastSession (socket fake)', () => {
         expect(session.isActive).toBe(false)
     })
 })
+
+describe('attemptReconnect (queda de conexão)', () => {
+    // O harness substitui attach/connectAndLaunch na instância; os backoffs
+    // exponenciais correm em timers fake.
+    function reconnectHarness() {
+        const base = fakeSession()
+        const r = base.s as unknown as {
+            reloadMedia: (() => void) | null
+            reconnecting: boolean
+            closed: boolean
+            reconnectAttempts: number
+            attemptReconnect: () => Promise<void>
+        }
+        const inst = base.session as unknown as {
+            attach: () => Promise<void>
+            connectAndLaunch: () => Promise<void>
+        }
+        r.reloadMedia = vi.fn()
+        return { ...base, r, inst }
+    }
+
+    it('re-adota a sessão via attach (blip de rede) sem recarregar a mídia', async () => {
+        vi.useFakeTimers()
+        const { session, s, r, inst } = reconnectHarness()
+        // Fiel ao real: attach reabre o transporte (repõe o socket).
+        inst.attach = vi.fn(async () => {
+            s.socket = { write: () => true, end: () => undefined }
+        })
+        inst.connectAndLaunch = vi.fn(async () => undefined)
+
+        const done = r.attemptReconnect()
+        await vi.advanceTimersByTimeAsync(1000) // 1º backoff
+        await done
+
+        expect(inst.attach).toHaveBeenCalledTimes(1)
+        expect(inst.connectAndLaunch).not.toHaveBeenCalled()
+        expect(r.reloadMedia).not.toHaveBeenCalled()
+        expect(r.reconnecting).toBe(false)
+        expect(r.reconnectAttempts).toBe(0) // resetado pro próximo incidente
+        expect(session.isActive).toBe(true) // controle retomado
+        vi.useRealTimers()
+    })
+
+    it('receiver morreu → relança e recarrega na última posição', async () => {
+        vi.useFakeTimers()
+        const { r, inst } = reconnectHarness()
+        inst.attach = vi.fn(async () => { throw new Error('nada rodando') })
+        inst.connectAndLaunch = vi.fn(async () => undefined)
+
+        const done = r.attemptReconnect()
+        await vi.advanceTimersByTimeAsync(1000)
+        await done
+
+        expect(inst.connectAndLaunch).toHaveBeenCalledTimes(1)
+        expect(r.reloadMedia).toHaveBeenCalledTimes(1)
+        expect(r.reconnecting).toBe(false)
+        vi.useRealTimers()
+    })
+
+    it('desiste depois de 6 tentativas com backoff exponencial', async () => {
+        vi.useFakeTimers()
+        const { r, inst } = reconnectHarness()
+        inst.attach = vi.fn(async () => { throw new Error('down') })
+        inst.connectAndLaunch = vi.fn(async () => { throw new Error('down') })
+
+        const done = r.attemptReconnect()
+        // Backoffs: 1s, 2s, 4s, 8s, 15s (cap), 15s.
+        for (const ms of [1000, 2000, 4000, 8000, 15000, 15000]) {
+            await vi.advanceTimersByTimeAsync(ms)
+        }
+        await done
+
+        expect(inst.attach).toHaveBeenCalledTimes(6)
+        expect(r.closed).toBe(true) // desistiu — sessão morta
+        expect(r.reconnecting).toBe(false)
+        vi.useRealTimers()
+    })
+
+    it('close() durante o backoff cancela a reconexão', async () => {
+        vi.useFakeTimers()
+        const { session, r, inst } = reconnectHarness()
+        inst.attach = vi.fn(async () => { throw new Error('down') })
+        inst.connectAndLaunch = vi.fn(async () => { throw new Error('down') })
+
+        const done = r.attemptReconnect()
+        session.close() // usuário parou no meio do backoff
+        await vi.advanceTimersByTimeAsync(1000)
+        await done
+
+        expect(inst.attach).not.toHaveBeenCalled()
+        expect(r.reconnecting).toBe(false)
+        vi.useRealTimers()
+    })
+
+    it('sem reloadMedia (nada foi carregado) → marca fechado e não tenta', async () => {
+        const { r } = reconnectHarness()
+        r.reloadMedia = null
+        await r.attemptReconnect()
+        expect(r.closed).toBe(true)
+    })
+})

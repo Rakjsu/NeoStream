@@ -150,7 +150,21 @@
     "errorAddingDevice": "Erro ao adicionar dispositivo",
     "connected": "Conectado",
     "discovered": "Descoberto",
-    "queueHint": "Fila de {n} episódios — o Chromecast recebe todos; DLNA/AirPlay começa pelo 1º."
+    "queueHint": "Fila de {n} episódios — o Chromecast recebe todos; DLNA/AirPlay começa pelo 1º.",
+    "pause": "Pausar",
+    "play": "Reproduzir",
+    "prevEpisode": "Episódio anterior",
+    "nextEpisode": "Próximo episódio",
+    "subtitleOn": "Ativar legenda",
+    "subtitleOff": "Desativar legenda",
+    "audioTrack": "Faixa de áudio",
+    "queue": "Fila",
+    "live": "AO VIVO",
+    "connecting": "Conectando...",
+    "casting": "Transmitindo",
+    "stopCast": "Parar transmissão",
+    "seekLabel": "Posição da reprodução",
+    "tvVolume": "Volume da TV"
   },
   "categories": {
     "title": "Categorias",
