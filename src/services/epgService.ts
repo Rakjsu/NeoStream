@@ -80,6 +80,24 @@ const openEpgUSAMappings: Record<string, string> = getMergedMappings('openepg-us
 // IDs use format: "Channel Name.br"
 const openEpgBrazilMappings: Record<string, string> = getMergedMappings('openepg-br', openEpgBrazilMappingsJson);
 
+/**
+ * Strip quality/codec suffixes from a channel name ("[FHD]", "(H265)",
+ * trailing "HD"...). Shared by every EPG source matcher — the tag patterns
+ * must stay in sync across sources, so they live in one place.
+ */
+function stripQualityTags(name: string): string {
+    return name
+        // Quality in brackets first: [FHD], [HD], [SD], [4K], [UHD], [M], [P]
+        .replace(/\s*\[(fhd|hd|sd|4k|uhd|m|p)\]/gi, '')
+        // Codec info in parentheses: (H265), (H264), (H266), (HEVC), (AVC)
+        .replace(/\s*\((h\.?265|h\.?264|h\.?266|hevc|avc)\)/gi, '')
+        // Quality in parentheses: (FHD), (HD), (SD), (PPV), (4K), (UHD)
+        .replace(/\s*\((fhd|hd|sd|4k|uhd|ppv)\)/gi, '')
+        // Remaining quality tags at the end without brackets
+        .replace(/\s+(fhd|hd|sd|4k|uhd)\s*$/gi, '')
+        .trim();
+}
+
 export const epgService = {
 
     // Main function to fetch EPG for a channel
@@ -172,19 +190,7 @@ export const epgService = {
         // Remove country prefixes: PT:, PT |, PT-, BR:, etc.
         let normalized = original.replace(/^(pt|br|portugal|brasil)\s*[:|]\s*/i, '');
 
-        // Remove quality in brackets first: [FHD], [HD], [SD], [4K], [UHD], [M], [P]
-        normalized = normalized.replace(/\s*\[(fhd|hd|sd|4k|uhd|m|p)\]/gi, '');
-
-        // Remove codec info in parentheses: (H265), (H264), (H266), (HEVC), (AVC)
-        normalized = normalized.replace(/\s*\((h\.?265|h\.?264|h\.?266|hevc|avc)\)/gi, '');
-
-        // Remove quality in parentheses: (FHD), (HD), (SD), (PPV), (4K), (UHD)
-        normalized = normalized.replace(/\s*\((fhd|hd|sd|4k|uhd|ppv)\)/gi, '');
-
-        // Remove remaining quality/tags at end without brackets
-        normalized = normalized.replace(/\s+(fhd|hd|sd|4k|uhd)\s*$/gi, '');
-
-        normalized = normalized.trim();
+        normalized = stripQualityTags(normalized);
 
         // Channels that conflict with Brazil (mi.tv) - only match if has PT prefix
         const conflictingChannels = ['vh1', 'mtv', 'mtv live', 'axn', 'fox', 'fox comedy', 'fox crime', 'fox life', 'fox movies', 'discovery', 'discovery channel', 'national geographic', 'nat geo wild', 'cartoon network', 'cartoonito', 'nickelodeon', 'disney channel', 'disney junior', 'cnn', 'syfy', 'amc', 'blaze', 'record', 'record tv', 'record news', 'globo', 'globo news', 'fashion tv', 'dog tv', 'dogtv', 'cancao nova', 'canção nova', 'tve', 'tve internacional', 'dazn 1', 'dazn 2', 'dazn 3', 'dazn 4', 'dazn 5', 'dazn 6', 'tlc', 'nick jr', 'bloomberg', 'e!', 'food network', 'star channel', 'star life', 'star movies', 'star crime', 'star comedy'];
@@ -264,19 +270,7 @@ export const epgService = {
         // Remove country prefixes: ARG |, ARG:, AR:, etc.
         let normalized = original.replace(/^(arg|ar|argentina)\s*[:|]\s*/i, '');
 
-        // Remove quality in brackets first: [FHD], [HD], [SD], [4K], [UHD], [M], [P]
-        normalized = normalized.replace(/\s*\[(fhd|hd|sd|4k|uhd|m|p)\]/gi, '');
-
-        // Remove codec info in parentheses: (H265), (H264), (H266), (HEVC), (AVC)
-        normalized = normalized.replace(/\s*\((h\.?265|h\.?264|h\.?266|hevc|avc)\)/gi, '');
-
-        // Remove quality in parentheses: (FHD), (HD), (SD), (PPV), (4K), (UHD)
-        normalized = normalized.replace(/\s*\((fhd|hd|sd|4k|uhd|ppv)\)/gi, '');
-
-        // Remove remaining quality/tags at end without brackets
-        normalized = normalized.replace(/\s+(fhd|hd|sd|4k|uhd)\s*$/gi, '');
-
-        normalized = normalized.trim();
+        normalized = stripQualityTags(normalized);
 
         // Channels that conflict with Brazil (mi.tv) - only match if has ARG prefix
         const conflictingChannels = ['hbo', 'hbo 2', 'hbo mundi', 'hbo plus', 'hbo pop', 'hbo signature', 'espn', 'espn 2', 'espn 3', 'fox sports', 'fox sports 2', 'fox sports 3', 'tnt', 'tnt sports', 'axn', 'discovery', 'cartoon network', 'nickelodeon', 'disney channel', 'disney jr', 'mtv', 'cnn', 'vh1', 'studio universal', 'universal channel', 'star channel'];
@@ -354,19 +348,7 @@ export const epgService = {
         // Remove country prefixes: USA:, USA |, US:, etc.
         let normalized = original.replace(/^(usa|us)\s*[:|]\s*/i, '');
 
-        // Remove quality in brackets first: [FHD], [HD], [SD], [4K], [UHD], [M], [P]
-        normalized = normalized.replace(/\s*\[(fhd|hd|sd|4k|uhd|m|p)\]/gi, '');
-
-        // Remove codec info in parentheses: (H265), (H264), (H266), (HEVC), (AVC)
-        normalized = normalized.replace(/\s*\((h\.?265|h\.?264|h\.?266|hevc|avc)\)/gi, '');
-
-        // Remove quality in parentheses: (FHD), (HD), (SD), (PPV), (4K), (UHD)
-        normalized = normalized.replace(/\s*\((fhd|hd|sd|4k|uhd|ppv)\)/gi, '');
-
-        // Remove remaining quality/tags at end without brackets
-        normalized = normalized.replace(/\s+(fhd|hd|sd|4k|uhd)\s*$/gi, '');
-
-        normalized = normalized.trim();
+        normalized = stripQualityTags(normalized);
 
         // Channels that conflict with Brazil (mi.tv) - only match if has USA prefix
         const conflictingChannels = ['tcm', 'tnt', 'tbs', 'amc', 'vh1', 'discovery channel', 'axn', 'mtv', 'fox sports', 'espn', 'espn 2', 'espn 3', 'espn 4', 'cartoon network', 'nickelodeon', 'disney channel', 'disney jr', 'disney xd', 'cnn', 'hbo', 'hbo 2', 'hbo comedy', 'hbo family', 'hbo signature', 'hbo zone', 'fox', 'a&e', 'a & e', 'aande', 'cinemax', 'paramount channel', 'syfy', 'animal planet', 'hgtv', 'tlc', 'trutv', 'boomerang', 'nick jr', 'bloomberg', 'comedy central', 'e!', 'e! entertainment', 'food network', 'lifetime', 'lifetime movies', 'discovery id'];
@@ -438,19 +420,7 @@ export const epgService = {
     getOpenEpgBrazilId(channelName: string): string | null {
         let normalized = channelName.toLowerCase().trim();
 
-        // Remove quality in brackets first: [FHD], [HD], [SD], [4K], [UHD], [M], [P]
-        normalized = normalized.replace(/\s*\[(fhd|hd|sd|4k|uhd|m|p)\]/gi, '');
-
-        // Remove codec info in parentheses: (H265), (H264), (H266), (HEVC), (AVC)
-        normalized = normalized.replace(/\s*\((h\.?265|h\.?264|h\.?266|hevc|avc)\)/gi, '');
-
-        // Remove quality in parentheses: (FHD), (HD), (SD), (PPV), (4K), (UHD)
-        normalized = normalized.replace(/\s*\((fhd|hd|sd|4k|uhd|ppv)\)/gi, '');
-
-        // Remove remaining quality/tags at end without brackets
-        normalized = normalized.replace(/\s+(fhd|hd|sd|4k|uhd)\s*$/gi, '');
-
-        normalized = normalized.trim();
+        normalized = stripQualityTags(normalized);
 
         const result = openEpgBrazilMappings[normalized] || null;
 
@@ -637,18 +607,7 @@ export const epgService = {
     // Get mi.tv slug from channel name
     getMiTVSlug(channelName: string): string {
         // Remove quality/codec/tag suffixes from channel name
-        const normalized = channelName
-            .toLowerCase()
-            .trim()
-            // Remove quality in brackets first: [FHD], [HD], [SD], [4K], [UHD], [M], [P]
-            .replace(/\s*\[(fhd|hd|sd|4k|uhd|m|p)\]/gi, '')
-            // Remove codec info in parentheses: (H265), (H264), (H266), (HEVC), (AVC)
-            .replace(/\s*\((h\.?265|h\.?264|h\.?266|hevc|avc)\)/gi, '')
-            // Remove quality in parentheses: (FHD), (HD), (SD), (PPV), (4K), (UHD)
-            .replace(/\s*\((fhd|hd|sd|4k|uhd|ppv)\)/gi, '')
-            // Remove remaining quality/tags at end without brackets: FHD, HD, SD at end
-            .replace(/\s+(fhd|hd|sd|4k|uhd)\s*$/gi, '')
-            .trim();
+        const normalized = stripQualityTags(channelName.toLowerCase().trim());
 
         // Check manual mappings first
         if (mitvMappings[normalized]) {
@@ -670,18 +629,7 @@ export const epgService = {
     // Get meuguia.tv slug from channel name
     getMeuGuiaSlug(channelName: string): string | null {
         // Remove quality/codec/tag suffixes
-        const normalized = channelName
-            .toLowerCase()
-            .trim()
-            // Remove quality in brackets first: [FHD], [HD], [SD], [4K], [UHD], [M], [P]
-            .replace(/\s*\[(fhd|hd|sd|4k|uhd|m|p)\]/gi, '')
-            // Remove codec info in parentheses: (H265), (H264), (H266), (HEVC), (AVC)
-            .replace(/\s*\((h\.?265|h\.?264|h\.?266|hevc|avc)\)/gi, '')
-            // Remove quality in parentheses: (FHD), (HD), (SD), (PPV), (4K), (UHD)
-            .replace(/\s*\((fhd|hd|sd|4k|uhd|ppv)\)/gi, '')
-            // Remove remaining quality/tags at end without brackets
-            .replace(/\s+(fhd|hd|sd|4k|uhd)\s*$/gi, '')
-            .trim();
+        const normalized = stripQualityTags(channelName.toLowerCase().trim());
         return meuguiaMappings[normalized] || null;
     },
 
