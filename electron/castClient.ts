@@ -29,6 +29,7 @@ import {
     queueLoadPayload,
     queueSkipPayload,
     queueJumpPayload,
+    editTracksPayload,
     mediaCommandPayload,
     seekPayload,
     getMediaStatusPayload,
@@ -100,6 +101,14 @@ export class CastSession {
     // Queue casts: one meta per item, aligned with the QUEUE_LOAD order, so the
     // status echoes the identity of whichever episode is CURRENTLY playing.
     private queueMetas: (CastMediaMeta | null)[] = []
+    // Subtitle track availability: single LOAD flag + per-queue-item flags
+    // (aligned like queueMetas). Whether the CURRENT media carries a track
+    // decides if the mini-remote shows the 💬 toggle at all.
+    private mediaHasSubtitle = false
+    private queueSubtitles: boolean[] = []
+    // Renderer-side toggle state; items load with their track active, so a
+    // queue advance resets this back to true (see handleMessage).
+    private subtitleEnabled = true
 
     /** Attach the content identity so status echoes it (renderer records history). */
     setMeta(meta: CastMediaMeta | null): void {
@@ -113,6 +122,23 @@ export class CastSession {
             if (idx >= 0 && idx < this.queueMetas.length) return this.queueMetas[idx] ?? this.mediaMeta
         }
         return this.mediaMeta
+    }
+
+    /** Whether the media currently playing carries a subtitle track. */
+    private get currentSubtitleAvailable(): boolean {
+        if (this.queueSubtitles.length > 0 && this.currentItemId !== null) {
+            const idx = this.queueItems.findIndex(item => item.itemId === this.currentItemId)
+            if (idx >= 0 && idx < this.queueSubtitles.length) return this.queueSubtitles[idx]
+        }
+        return this.mediaHasSubtitle
+    }
+
+    /** Toggle the WebVTT track mid-playback (EDIT_TRACKS_INFO). */
+    setSubtitleEnabled(enabled: boolean): void {
+        if (this.transportId && this.mediaSessionId !== null) {
+            this.send(this.transportId, NS_MEDIA, editTracksPayload(this.requestId++, this.mediaSessionId, enabled))
+            this.subtitleEnabled = enabled
+        }
     }
 
     constructor(
@@ -135,6 +161,8 @@ export class CastSession {
             queue: this.queueItems,
             currentItemId: this.currentItemId,
             meta: this.currentMeta,
+            subtitleAvailable: this.currentSubtitleAvailable,
+            subtitleEnabled: this.subtitleEnabled,
         }
     }
 
@@ -214,12 +242,17 @@ export class CastSession {
             const items = extractQueueItems(payload)
             if (items.length > 0) this.queueItems = items
             const currentItemId = extractCurrentItemId(payload)
-            if (currentItemId !== null) this.currentItemId = currentItemId
+            if (currentItemId !== null && currentItemId !== this.currentItemId) {
+                this.currentItemId = currentItemId
+                // A new queue item loads with its own track active again.
+                this.subtitleEnabled = true
+            }
         }
     }
 
     /** Connect, launch the media receiver and LOAD the given media (at startTime). */
     async start(media: CastMediaInput, startTime = 0): Promise<void> {
+        this.mediaHasSubtitle = !!media.subtitleUrl
         await this.connectAndLaunch()
         this.send(this.transportId!, NS_CONNECTION, connectPayload())
         this.send(this.transportId!, NS_MEDIA, loadMediaPayload(this.requestId++, media, startTime))
@@ -243,6 +276,7 @@ export class CastSession {
         // Per-item identity, aligned with the QUEUE_LOAD order — the status
         // echoes the CURRENT item's meta so history tracks the right episode.
         this.queueMetas = items.map(i => i.meta ?? null)
+        this.queueSubtitles = items.map(i => !!i.subtitleUrl)
         this.send(this.transportId!, NS_MEDIA, queueLoadPayload(this.requestId++, queueItems, startIndex))
         // On a dropped socket, re-queue from the item that was playing — at the
         // position it was at (its original startTime no longer applies).

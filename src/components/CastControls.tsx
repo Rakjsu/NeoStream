@@ -4,7 +4,7 @@
  * the TV stops and notifies the parent.
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, Square, Volume2, Tv, ListVideo, SkipBack, SkipForward } from 'lucide-react';
+import { Play, Pause, Square, Volume2, Tv, ListVideo, SkipBack, SkipForward, Subtitles } from 'lucide-react';
 import { castControls, type CastStatus } from '../hooks/useDLNA';
 import { chromecastControls } from '../hooks/useChromecast';
 import { formatTime } from '../utils/videoHelpers';
@@ -81,6 +81,8 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                     deviceId: result.deviceId || deviceId,
                     queue: result.queue ?? [],
                     currentItemId: result.currentItemId ?? null,
+                    subtitleAvailable: result.subtitleAvailable === true,
+                    subtitleEnabled: result.subtitleEnabled !== false,
                 });
 
                 // TV reports STOPPED/NO_MEDIA for several consecutive polls →
@@ -150,6 +152,15 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
         const direction = event.currentTarget.dataset.direction === 'prev' ? 'prev' : 'next';
         markCommand();
         await remote.queueSkip(direction);
+    };
+    // 💬 mid-cast subtitle toggle (EDIT_TRACKS_INFO) — optimistic UI, the next
+    // poll confirms the state echoed by the session.
+    const subtitleAvailable = status?.subtitleAvailable === true;
+    const subtitleEnabled = status?.subtitleEnabled !== false;
+    const handleSubtitleToggle = async () => {
+        markCommand();
+        setStatus(prev => prev ? { ...prev, subtitleEnabled: !subtitleEnabled } : prev);
+        await remote.setSubtitleEnabled(!subtitleEnabled);
     };
     // Passed directly to onClick (reads the itemId off the button) so the
     // react-hooks purity rule sees markCommand only via an event handler.
@@ -289,6 +300,22 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                         style={{ width: 64, height: 4, cursor: 'pointer', accentColor: 'var(--ns-accent)' }}
                     />
                 </div>
+            )}
+
+            {/* 💬 subtitle toggle — only when the current media carries a track */}
+            {subtitleAvailable && (
+                <button
+                    onClick={handleSubtitleToggle}
+                    title={subtitleEnabled ? 'Desativar legenda' : 'Ativar legenda'}
+                    aria-label={subtitleEnabled ? 'Desativar legenda' : 'Ativar legenda'}
+                    style={{
+                        background: subtitleEnabled ? 'rgba(var(--ns-accent-rgb), 0.8)' : 'rgba(255,255,255,0.08)',
+                        border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', display: 'flex', color: 'white',
+                        flexShrink: 0,
+                    }}
+                >
+                    <Subtitles size={14} />
+                </button>
             )}
 
             {/* Queue toggle — only when a Chromecast queue is active */}

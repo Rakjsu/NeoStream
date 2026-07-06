@@ -129,6 +129,7 @@ export const chromecastControls = {
             currentTime?: number | null; duration?: number | null; volume?: number | null; deviceName?: string;
             queue?: { itemId: number; title: string }[]; currentItemId?: number | null;
             meta?: { title?: string } | null;
+            subtitleAvailable?: boolean; subtitleEnabled?: boolean;
         };
         if (!result.success || !result.active) {
             return { success: false, error: 'No active cast session' };
@@ -147,10 +148,14 @@ export const chromecastControls = {
             deviceId: 'chromecast',
             queue,
             currentItemId: result.currentItemId ?? null,
+            subtitleAvailable: result.subtitleAvailable === true,
+            subtitleEnabled: result.subtitleEnabled !== false,
         };
     },
     queueJump: (itemId: number) =>
         window.ipcRenderer.invoke('cast:queue-jump', { itemId }) as Promise<{ success: boolean }>,
     queueSkip: (direction: 'next' | 'prev') =>
         window.ipcRenderer.invoke('cast:queue-skip', { direction }) as Promise<{ success: boolean }>,
+    setSubtitleEnabled: (enabled: boolean) =>
+        window.ipcRenderer.invoke('cast:set-subtitle', { enabled }) as Promise<{ success: boolean }>,
 };

@@ -253,6 +253,12 @@ export function setupCastHandlers(): void {
         return { success: activeSession !== null }
     })
 
+    // Toggle the WebVTT subtitle track mid-playback (EDIT_TRACKS_INFO).
+    ipcMain.handle('cast:set-subtitle', (_e, { enabled }: { enabled?: boolean }) => {
+        if (typeof enabled === 'boolean') activeSession?.setSubtitleEnabled(enabled)
+        return { success: activeSession !== null }
+    })
+
     ipcMain.handle('cast:get-status', () => {
         // Prompt fresh times for the NEXT poll; return what we have now.
         activeSession?.requestMediaStatus()
