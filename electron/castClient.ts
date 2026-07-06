@@ -32,13 +32,16 @@ import {
     mediaCommandPayload,
     seekPayload,
     getMediaStatusPayload,
+    getReceiverStatusPayload,
     setVolumePayload,
     extractMediaTimes,
     extractQueueItems,
     extractCurrentItemId,
     extractTransportId,
+    extractRunningAppId,
     extractSessionId,
     extractMediaSessionId,
+    CAST_MEDIA_APP_ID,
     type CastMessage,
     type QueueItemStatus,
 } from './castProtocol'
@@ -179,8 +182,8 @@ export class CastSession {
         log.info('[Cast] QUEUE_LOAD enviado para', this.deviceName, `(${items.length} itens)`)
     }
 
-    /** TLS connect + heartbeat + LAUNCH; resolves once transportId is known. */
-    private async connectAndLaunch(): Promise<void> {
+    /** TLS connect + data handler + virtual connection + heartbeat. */
+    private async connectTransport(): Promise<void> {
         await new Promise<void>((resolve, reject) => {
             const socket = tls.connect(
                 { host: this.host, port: CAST_PORT, rejectUnauthorized: false },
@@ -219,20 +222,18 @@ export class CastSession {
         this.heartbeatTimer = setInterval(() => {
             this.send(CAST_RECEIVER_ID, NS_HEARTBEAT, pingPayload())
         }, HEARTBEAT_MS)
+    }
 
-        // Launch the Default Media Receiver and wait for its transportId.
-        const launched = new Promise<void>((resolve, reject) => {
-            const timer = setTimeout(() => reject(new Error('o dispositivo não abriu o receptor de mídia')), LAUNCH_TIMEOUT_MS)
+    /** Wait for a RECEIVER_STATUS that satisfies `accept`, capturing transportId. */
+    private waitForReceiver(accept: (payload: unknown, transportId: string) => boolean, errorMsg: string): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(() => { this.receiverStatusListeners.delete(onData); reject(new Error(errorMsg)) }, LAUNCH_TIMEOUT_MS)
             const onData = (message: CastMessage) => {
                 let payload: unknown
-                try {
-                    payload = JSON.parse(message.payloadUtf8)
-                } catch {
-                    return
-                }
+                try { payload = JSON.parse(message.payloadUtf8) } catch { return }
                 if ((payload as { type?: string }).type !== 'RECEIVER_STATUS') return
                 const transportId = extractTransportId(payload)
-                if (!transportId) return
+                if (!transportId || !accept(payload, transportId)) return
                 this.transportId = transportId
                 this.sessionId = extractSessionId(payload)
                 clearTimeout(timer)
@@ -241,8 +242,34 @@ export class CastSession {
             }
             this.receiverStatusListeners.add(onData)
         })
+    }
+
+    /** TLS connect + heartbeat + LAUNCH; resolves once transportId is known. */
+    private async connectAndLaunch(): Promise<void> {
+        await this.connectTransport()
+        const launched = this.waitForReceiver(() => true, 'o dispositivo não abriu o receptor de mídia')
         this.send(CAST_RECEIVER_ID, NS_RECEIVER, launchPayload(this.requestId++))
         await launched
+    }
+
+    /**
+     * Adopt a Default Media Receiver session already running on the device (no
+     * LAUNCH) — used to resume control after the app restarts mid-cast. Only
+     * adopts CC1AD845 so it never hijacks Netflix/YouTube (their own receivers).
+     * Rejects if nothing castable is running.
+     */
+    async attach(): Promise<void> {
+        await this.connectTransport()
+        const attached = this.waitForReceiver(
+            (payload) => extractRunningAppId(payload) === CAST_MEDIA_APP_ID,
+            'nenhuma sessão de mídia ativa no dispositivo',
+        )
+        this.send(CAST_RECEIVER_ID, NS_RECEIVER, getReceiverStatusPayload(this.requestId++))
+        await attached
+        // Join the running app's virtual connection and pull its media status.
+        this.send(this.transportId!, NS_CONNECTION, connectPayload())
+        this.requestMediaStatus()
+        log.info('[Cast] sessão retomada em', this.deviceName)
     }
 
     // RECEIVER_STATUS fan-out (start() waits on it; handleMessage feeds it).

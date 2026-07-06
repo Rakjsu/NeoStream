@@ -183,6 +183,26 @@ export function setupCastHandlers(): void {
         return { success: activeSession !== null }
     })
 
+    // Resume control of a cast that's still running after the app restarted:
+    // attach to a device that has the Default Media Receiver playing (no LAUNCH,
+    // so it never grabs Netflix/YouTube). Best-effort — silent when nothing's on.
+    ipcMain.handle('cast:reconnect', async (_e, opts: { deviceId?: string } = {}) => {
+        if (activeSession?.isActive) {
+            return { success: true, active: true, deviceName: activeSession.deviceName, ...activeSession.status }
+        }
+        const device = opts?.deviceId ? devices.get(String(opts.deviceId)) : [...devices.values()][0]
+        if (!device) return { success: false, error: 'Nenhum dispositivo' }
+        try {
+            const session = new CastSession(device.host, device.name)
+            await session.attach()
+            activeSession = session
+            return { success: true, active: true, deviceId: device.id, deviceName: device.name, ...session.status }
+        } catch (error) {
+            log.info('[Cast] nada pra retomar em', device.name, '-', error instanceof Error ? error.message : error)
+            return { success: false, error: error instanceof Error ? error.message : String(error) }
+        }
+    })
+
     ipcMain.handle('cast:queue-jump', (_e, { itemId }: { itemId?: number }) => {
         if (typeof itemId === 'number' && Number.isFinite(itemId)) activeSession?.queueJump(itemId)
         return { success: activeSession !== null }
