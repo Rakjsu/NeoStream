@@ -33,6 +33,7 @@ import {
 import { renderRemotePage } from './webRemotePage'
 import { REMOTE_ICON_SVG, buildManifest, solidPng } from './webRemoteAssets'
 import { isCastSessionActive, castRemoteControl, getCastStatus } from './castHandlers'
+import { dlnaRemoteControl } from './dlnaHandlers'
 
 interface WebRemoteConfig {
     enabled: boolean
@@ -229,8 +230,9 @@ const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'requestCatalog', 'r
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
-    // While a Chromecast is casting, transport commands drive the cast instead
-    // of the local player. Channel/catalog actions always go to the renderer.
+    // While a cast session is live, transport commands drive the TV instead of
+    // the local player: Chromecast first, then an active DLNA session. Channel
+    // and catalog actions always go to the renderer.
     if (!RENDERER_ONLY.has(command.action)) {
         const value = command.action === 'seek' ? command.seconds
             : command.action === 'setVolume' ? command.level
@@ -240,6 +242,7 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
             broadcastState() // refresh the phone's casting/playing indicator
             return
         }
+        if (dlnaRemoteControl(command.action, value)) return
     }
     // These two only make sense while a cast session is live; with none active
     // there is nothing for the renderer to do with them.

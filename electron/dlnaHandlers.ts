@@ -32,6 +32,7 @@ import {
     vttToSrt,
     rewritePlaylistUris,
 } from './dlnaProtocol';
+import { planDlnaCommand, clampVolume, stepVolume, muteTarget } from './dlnaRemoteRouting';
 
 const require = createRequire(import.meta.url);
 
@@ -1152,4 +1153,94 @@ export async function registerCastSubtitleVtt(vtt: string, deviceHost: string): 
         if (Date.now() - entry.createdAt > 30 * 60_000) castSubtitles.delete(key)
     }
     return `http://${getLocalAddressForDevice(deviceHost)}:${port}/cast-sub/${token}.vtt`
+}
+
+// ===== Phone-remote transport for the active DLNA session ====================
+// Mirrors castRemoteControl (Chromecast): the web-remote server tries the
+// Chromecast session first, then this. Plans are pure (dlnaRemoteRouting);
+// the SOAP execution is fire-and-forget — the phone has no DLNA progress UI
+// yet, so failures just log.
+
+let preMuteDlnaVolume = 30
+
+export function isDlnaSessionActive(): boolean {
+    return castSession !== null
+}
+
+async function getDlnaVolume(session: CastSession): Promise<number> {
+    if (!session.renderingControlUrl) throw new Error('Device does not expose RenderingControl')
+    const info = await sendUpnpAction(session.renderingControlUrl, RENDERING_CONTROL_SERVICE,
+        'GetVolume', '<InstanceID>0</InstanceID><Channel>Master</Channel>', 5000)
+    const parsed = Number(getXmlTagValue(info, 'CurrentVolume'))
+    if (!Number.isFinite(parsed)) throw new Error('GetVolume sem CurrentVolume')
+    return parsed
+}
+
+async function setDlnaVolume(session: CastSession, level: number): Promise<void> {
+    if (!session.renderingControlUrl) throw new Error('Device does not expose RenderingControl')
+    await sendUpnpAction(session.renderingControlUrl, RENDERING_CONTROL_SERVICE, 'SetVolume',
+        `<InstanceID>0</InstanceID><Channel>Master</Channel><DesiredVolume>${clampVolume(level)}</DesiredVolume>`)
+}
+
+/**
+ * Route a phone-remote transport command to the active DLNA session. Returns
+ * true when a live session consumed the action (the SOAP round-trips run in
+ * the background); false lets the caller fall through to the renderer.
+ */
+export function dlnaRemoteControl(action: string, value?: number): boolean {
+    const session = castSession
+    if (!session) return false
+    const plan = planDlnaCommand(action, value)
+    if (!plan) return false
+
+    const run = async () => {
+        switch (plan.kind) {
+            case 'toggle': {
+                const info = await sendAvTransportAction(session.avTransportUrl, 'GetTransportInfo', '<InstanceID>0</InstanceID>', 5000)
+                const state = getXmlTagValue(info, 'CurrentTransportState')
+                if (state === 'PLAYING') {
+                    await sendAvTransportAction(session.avTransportUrl, 'Pause', '<InstanceID>0</InstanceID>')
+                } else {
+                    await sendAvTransportAction(session.avTransportUrl, 'Play', '<InstanceID>0</InstanceID><Speed>1</Speed>')
+                }
+                return
+            }
+            case 'stop':
+                await sendAvTransportAction(session.avTransportUrl, 'Stop', '<InstanceID>0</InstanceID>')
+                castSession = null
+                // Same teardown as dlna:stop — rescue transcodes die with the cast.
+                for (const ffmpeg of activeTranscodes) {
+                    try { ffmpeg.kill('SIGKILL') } catch { /* already dead */ }
+                }
+                activeTranscodes.clear()
+                return
+            case 'seekRelative': {
+                const pos = await sendAvTransportAction(session.avTransportUrl, 'GetPositionInfo', '<InstanceID>0</InstanceID>', 5000)
+                const current = parseUpnpTime(getXmlTagValue(pos, 'RelTime'))
+                const target = formatUpnpTime(Math.max(0, current + plan.seconds))
+                await sendAvTransportAction(session.avTransportUrl, 'Seek',
+                    `<InstanceID>0</InstanceID><Unit>REL_TIME</Unit><Target>${target}</Target>`)
+                return
+            }
+            case 'setVolume':
+                await setDlnaVolume(session, plan.level)
+                return
+            case 'volumeStep': {
+                const current = await getDlnaVolume(session)
+                await setDlnaVolume(session, stepVolume(current, plan.delta))
+                return
+            }
+            case 'muteToggle': {
+                const current = await getDlnaVolume(session)
+                const next = muteTarget(current, preMuteDlnaVolume)
+                preMuteDlnaVolume = next.preMute
+                await setDlnaVolume(session, next.level)
+                return
+            }
+            case 'noop':
+                return
+        }
+    }
+    void run().catch((error: unknown) => log.warn('[DLNA] comando do controle web falhou:', getErrorMessage(error)))
+    return true
 }
