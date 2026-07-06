@@ -49,6 +49,21 @@ function sha512Base64(filePath) {
     return crypto.createHash('sha512').update(fs.readFileSync(filePath)).digest('base64')
 }
 
+// electron-builder names mac artifacts on disk with a space/dot in the product
+// name ("NeoStream IPTV-…") but lists them in latest-mac.yml with a dash
+// ("NeoStream-IPTV-…"). Collapse all separators so the feed url still resolves
+// to the real file (content — hence sha512 — is equal).
+function normalizeName(s) {
+    return s.toLowerCase().replace(/[\s._-]+/g, '-')
+}
+
+/** The real filename in `releaseFiles` for a feed url, or null. */
+function resolveFileName(url, releaseFiles) {
+    if (releaseFiles.includes(url)) return url
+    const target = normalizeName(url)
+    return releaseFiles.find(f => normalizeName(f) === target) ?? null
+}
+
 function main() {
     if (!fs.existsSync(RELEASE_DIR)) {
         console.error(`[verify-update-feed] pasta não encontrada: ${RELEASE_DIR}`)
@@ -61,17 +76,6 @@ function main() {
         process.exit(1)
     }
 
-    // electron-builder names mac artifacts on disk with a space/dot in the
-    // product name ("NeoStream IPTV-…") but lists them in latest-mac.yml with a
-    // dash ("NeoStream-IPTV-…"). Match by a separator-insensitive key so the
-    // feed still resolves to the real file (content — hence sha512 — is equal).
-    const normalize = (s) => s.toLowerCase().replace(/[\s._-]+/g, '-')
-    const byNorm = new Map(releaseFiles.map(f => [normalize(f), f]))
-    const resolveFile = (url) => {
-        if (fs.existsSync(path.join(RELEASE_DIR, url))) return url
-        return byNorm.get(normalize(url)) ?? null
-    }
-
     let problems = 0
     for (const feed of feeds) {
         const entries = parseFeed(fs.readFileSync(path.join(RELEASE_DIR, feed), 'utf-8'))
@@ -81,7 +85,7 @@ function main() {
             continue
         }
         for (const entry of entries) {
-            const resolved = resolveFile(entry.url)
+            const resolved = resolveFileName(entry.url, releaseFiles)
             if (!resolved) {
                 console.error(`[verify-update-feed] ${feed}: arquivo ausente → ${entry.url}`)
                 problems++
@@ -110,4 +114,7 @@ function main() {
     console.log('[verify-update-feed] todos os feeds batem com os artefatos.')
 }
 
-main()
+// Run when invoked directly (CI); stay importable for tests.
+if (require.main === module) main()
+
+module.exports = { parseFeed, normalizeName, resolveFileName }
