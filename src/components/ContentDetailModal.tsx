@@ -291,6 +291,28 @@ export function ContentDetailModal({
     // Resolve every episode URL of the selected season (Xtream/M3U/Stalker, in
     // order) and open the device picker so the user chooses WHERE to cast —
     // Chromecast (whole queue via QUEUE_LOAD) or DLNA/AirPlay (first episode).
+    // Fetch subtitles for the first few queued episodes CONCURRENTLY, with an
+    // overall time cap so a slow/rate-limited OpenSubtitles lookup can't block
+    // the cast. Bounded (not the whole season) to avoid hammering the service;
+    // items keep their reference, so any subtitle that lands before the user
+    // picks a device still rides along. Failures degrade to "no subtitle".
+    const prefetchQueueSubtitles = async (queue: CastQueueItem[]) => {
+        const PREFETCH_MAX = 8;
+        try {
+            const { autoFetchSubtitle, cleanupSubtitleUrl } = await import('../services/subtitleService');
+            const jobs = queue.slice(0, PREFETCH_MAX).map(async (item) => {
+                try {
+                    const r = await autoFetchSubtitle({ title: item.title });
+                    if (r?.vttContent) { item.subtitleVtt = r.vttContent; cleanupSubtitleUrl(r.url); }
+                } catch { /* this episode just casts without a prefetched subtitle */ }
+            });
+            await Promise.race([
+                Promise.allSettled(jobs),
+                new Promise<void>((resolve) => setTimeout(resolve, 6000)),
+            ]);
+        } catch { /* subtitleService unavailable — cast without subtitles */ }
+    };
+
     const castSeason = async () => {
         const eps = seriesInfo?.episodes?.[selectedSeason] || [];
         if (eps.length === 0) return;
@@ -309,6 +331,7 @@ export function ContentDetailModal({
                 setCastSeasonMsg(t('contentModal', 'castNoUrls'));
                 setTimeout(() => setCastSeasonMsg(null), 6000);
             } else {
+                await prefetchQueueSubtitles(queue);
                 setCastSeasonMsg(null);
                 setSeasonQueue(queue); // opens <CastDeviceSelector>
             }
