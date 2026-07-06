@@ -31,8 +31,16 @@ interface DiscoverResult { success: boolean; devices?: { id: string | number; na
 export function WebRemoteBridge() {
     // Last fetched movie list, so castMovie can look up the container.
     const moviesRef = useRef<Map<string, VodMovie>>(new Map());
-    // Last fetched episodes (across a series' seasons), for castEpisode.
-    const episodesRef = useRef<Map<string, { id: number | string; container: string; name: string }>>(new Map());
+    // Last fetched episodes (across a series' seasons), for castEpisode. Carries
+    // the series/season/episode so a cast started here can write watch progress.
+    const episodesRef = useRef<Map<string, { id: number | string; container: string; name: string; seriesId?: string; season?: number; episode?: number }>>(new Map());
+    // What the phone is currently casting, so a poll can write "continue watching"
+    // progress back to the local history (the loop the app records when it plays).
+    const castingRef = useRef<
+        | { kind: 'movie'; id: string; name: string }
+        | { kind: 'episode'; seriesId: string; season: number; episode: number }
+        | null
+    >(null);
     // Last discovered cast targets, so a target id from the phone resolves a name.
     const devicesRef = useRef<Map<string, { name: string; type: CastTargetType }>>(new Map());
     // Resume positions (seconds) for "continue watching" items, keyed by
@@ -100,9 +108,9 @@ export function WebRemoteBridge() {
         // the phone sent no target). Chromecast honours the whole queue; DLNA and
         // AirPlay have no queue protocol, so they start the first item. `resumeAt`
         // (seconds) resumes a Chromecast from where it was left off.
-        const startCast = async (items: CastQueueItem[], target?: CastTarget, resumeAt = 0) => {
+        const startCast = async (items: CastQueueItem[], target?: CastTarget, resumeAt = 0): Promise<boolean> => {
             const queue = items.filter(i => i.url);
-            if (queue.length === 0) { sendCastResult('error'); return; }
+            if (queue.length === 0) { sendCastResult('error'); return false; }
             const first = queue[0];
 
             if (target) {
@@ -132,13 +140,14 @@ export function WebRemoteBridge() {
                 }
                 if (ok && resumeAt > 0 && target.deviceType === 'chromecast') resumeChromecast(resumeAt);
                 sendCastResult(ok ? 'ok' : 'error', name);
-                return;
+                // Only a Chromecast reports position back for the history poll.
+                return ok && target.deviceType === 'chromecast';
             }
 
             // No explicit target: legacy behaviour — first Chromecast on the LAN.
             const discover = await window.ipcRenderer.invoke('cast:discover').catch(() => null) as DiscoverResult | null;
             const device = discover?.devices?.[0];
-            if (!device) { sendCastResult('no-device'); return; }
+            if (!device) { sendCastResult('no-device'); return false; }
             const deviceId = String(device.id);
             let ok: boolean;
             if (queue.length > 1) {
@@ -153,6 +162,7 @@ export function WebRemoteBridge() {
             }
             if (ok && resumeAt > 0) resumeChromecast(resumeAt); // default target is a Chromecast
             sendCastResult(ok ? 'ok' : 'error', device.name);
+            return ok; // default target is a Chromecast → position is pollable
         };
 
         const castMovie = async (movieId: string, target?: CastTarget) => {
@@ -162,7 +172,8 @@ export function WebRemoteBridge() {
                 streamId: movie.stream_id,
                 container: movie.container_extension || 'mp4',
             }).catch(() => null) as { success: boolean; url?: string } | null;
-            await startCast([{ url: urlRes?.url ?? '', title: movie.name }], target, resumeRef.current.get('movie:' + movieId) ?? 0);
+            const pollable = await startCast([{ url: urlRes?.url ?? '', title: movie.name }], target, resumeRef.current.get('movie:' + movieId) ?? 0);
+            castingRef.current = pollable ? { kind: 'movie', id: movieId, name: movie.name } : null;
         };
 
         const castMovieQueue = async (movieIds: string[], target?: CastTarget) => {
@@ -177,6 +188,7 @@ export function WebRemoteBridge() {
                 if (urlRes?.success && urlRes.url) queue.push({ url: urlRes.url, title: movie.name });
             }
             await startCast(queue, target);
+            castingRef.current = null; // queues aren't single-item progress-tracked
         };
 
         const pushSeries = async (query = '') => {
@@ -198,14 +210,17 @@ export function WebRemoteBridge() {
                 { success: boolean; info?: { episodes?: Record<string, Episode[]> } } | null;
             const seasons = result?.success ? (result.info?.episodes ?? {}) : {};
             const episodes: { id: string; label: string }[] = [];
-            const map = new Map<string, { id: number | string; container: string; name: string }>();
+            const map = new Map<string, { id: number | string; container: string; name: string; seriesId?: string; season?: number; episode?: number }>();
             for (const seasonNum of Object.keys(seasons).sort((a, b) => Number(a) - Number(b))) {
                 for (const ep of seasons[seasonNum] ?? []) {
                     const id = String(ep.id);
                     const tag = `T${seasonNum}E${ep.episode_num}`;
                     const label = ep.title ? `${tag} · ${ep.title}` : tag;
                     episodes.push({ id, label });
-                    map.set(id, { id: ep.id, container: ep.container_extension || 'mp4', name: label });
+                    map.set(id, {
+                        id: ep.id, container: ep.container_extension || 'mp4', name: label,
+                        seriesId, season: Number(seasonNum), episode: Number(ep.episode_num),
+                    });
                 }
             }
             // Merge (don't wipe) so episodes resolved for "continue watching"
@@ -250,7 +265,10 @@ export function WebRemoteBridge() {
                 if (!ep) continue;
                 const episodeId = String(ep.id);
                 const tag = `T${sp.lastWatchedSeason}E${sp.lastWatchedEpisode}`;
-                episodesRef.current.set(episodeId, { id: ep.id, container: ep.container_extension || 'mp4', name: `${sp.seriesName} · ${tag}` });
+                episodesRef.current.set(episodeId, {
+                    id: ep.id, container: ep.container_extension || 'mp4', name: `${sp.seriesName} · ${tag}`,
+                    seriesId, season: sp.lastWatchedSeason, episode: sp.lastWatchedEpisode,
+                });
                 const prog = watchProgressService.getEpisodeProgress(seriesId, sp.lastWatchedSeason, sp.lastWatchedEpisode);
                 const cur = prog?.currentTime || 0, dur = prog?.duration || 0;
                 resumeRef.current.set('ep:' + episodeId, cur);
@@ -272,7 +290,10 @@ export function WebRemoteBridge() {
             const urlRes = await window.ipcRenderer.invoke('streams:get-series-url', {
                 streamId: ep.id, container: ep.container,
             }).catch(() => null) as { success: boolean; url?: string } | null;
-            await startCast([{ url: urlRes?.url ?? '', title: ep.name }], target, resumeRef.current.get('ep:' + episodeId) ?? 0);
+            const pollable = await startCast([{ url: urlRes?.url ?? '', title: ep.name }], target, resumeRef.current.get('ep:' + episodeId) ?? 0);
+            castingRef.current = pollable && ep.seriesId && ep.season != null && ep.episode != null
+                ? { kind: 'episode', seriesId: ep.seriesId, season: ep.season, episode: ep.episode }
+                : null;
         };
 
         const asTarget = (v: unknown): CastTarget | undefined => {
@@ -291,7 +312,25 @@ export function WebRemoteBridge() {
             else if (action === 'castEpisode') void castEpisode(String(arg ?? ''), asTarget(target));
         };
         window.ipcRenderer.on('media:control', handler);
-        return () => window.ipcRenderer.off('media:control', handler);
+
+        // While the phone is casting a movie/episode, mirror the Chromecast's
+        // position into the local watch history every ~5s, so "continuar
+        // assistindo" reflects what was watched on the TV. Clears when it stops.
+        const historyPoll = setInterval(() => {
+            const casting = castingRef.current;
+            if (!casting) return;
+            void (async () => {
+                const st = await window.ipcRenderer.invoke('cast:get-status').catch(() => null) as
+                    { success: boolean; active?: boolean; currentTime?: number | null; duration?: number | null } | null;
+                if (!st?.success || !st.active) { castingRef.current = null; return; }
+                const cur = st.currentTime ?? 0, dur = st.duration ?? 0;
+                if (dur <= 0 || cur <= 0) return;
+                if (casting.kind === 'movie') movieProgressService.saveMovieTime(casting.id, casting.name, cur, dur);
+                else watchProgressService.saveVideoTime(casting.seriesId, casting.season, casting.episode, cur, dur);
+            })();
+        }, 5000);
+
+        return () => { window.ipcRenderer.off('media:control', handler); clearInterval(historyPoll); };
     }, []);
 
     return null;
