@@ -3,6 +3,7 @@ import axios from 'axios'
 import { XtreamClient } from './xtreamClient'
 import store from './store'
 import { getCertificateSettings, getProviderHttpsAgent, registerApprovedProviderUrl, setAllowInvalidProviderCertificates } from './certificatePolicy'
+import { fetchWithRetry } from './fetchRetry'
 import { ensureProviderEpgLoaded, getProviderUtcOffsetMinutes, resetProviderEpgState, setupProviderEpgHandlers } from './providerEpg'
 import { formatTimeshiftStart } from './timeshiftProtocol'
 import {
@@ -506,8 +507,8 @@ export function setupIpcHandlers() {
             const encodedSlug = encodeURIComponent(channelSlug)
             const url = `https://meuguia.tv/programacao/canal/${encodedSlug}`
             log.info('[EPG IPC] Fetching:', url)
-            // Timeout: a hung EPG site must not hold the renderer's await forever.
-            const response = await fetch(url, { signal: AbortSignal.timeout(15000) })
+            // Timeout per try + one retry for transient failures (DNS blip, 502).
+            const response = await fetchWithRetry(() => fetch(url, { signal: AbortSignal.timeout(15000) }))
             const html = await response.text()
             log.info('[EPG IPC] Response length:', html.length)
             return { success: true, html }
@@ -524,13 +525,13 @@ export function setupIpcHandlers() {
             // Use the async API endpoint that returns rendered HTML content
             const url = `https://mi.tv/br/async/channel/${channelSlug}/-300`
             log.info('[EPG IPC] Fetching mi.tv async API:', url)
-            const response = await fetch(url, {
+            const response = await fetchWithRetry(() => fetch(url, {
                 signal: AbortSignal.timeout(15000),
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
                 }
-            })
+            }))
 
             if (!response.ok) {
                 log.info('[EPG IPC] mi.tv returned:', response.status)
@@ -551,14 +552,14 @@ export function setupIpcHandlers() {
         try {
             const fetch = (await import('node-fetch')).default
             log.info('[Fetch URL] Fetching:', url.substring(0, 100))
-            const response = await fetch(url, {
+            const response = await fetchWithRetry(() => fetch(url, {
                 agent: getProviderHttpsAgent(url),
                 signal: AbortSignal.timeout(20000),
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Accept': '*/*'
                 }
-            })
+            }))
 
             if (!response.ok) {
                 log.info('[Fetch URL] Response failed:', response.status)
@@ -630,7 +631,7 @@ export function setupIpcHandlers() {
             // Download fresh data
             log.info('[EPG Cache] Downloading from:', url)
             const fetch = (await import('node-fetch')).default
-            const response = await fetch(url, {
+            const response = await fetchWithRetry(() => fetch(url, {
                 agent: getProviderHttpsAgent(url),
                 // Generous: EPG XML files are big; a failure falls back to stale cache.
                 signal: AbortSignal.timeout(60000),
@@ -638,7 +639,7 @@ export function setupIpcHandlers() {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
                     'Accept': 'application/xml, text/xml, */*'
                 }
-            })
+            }))
 
             if (!response.ok) {
                 log.error('[EPG Cache] Download failed:', response.status)
