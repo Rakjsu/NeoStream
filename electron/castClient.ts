@@ -58,6 +58,15 @@ export interface CastMediaInput {
     subtitleLanguage?: string
 }
 
+/** Content identity echoed in status, so the renderer can record watch history. */
+export interface CastMediaMeta {
+    contentId: string
+    contentType?: 'movie' | 'series' | 'live'
+    season?: number
+    episode?: number
+    title?: string
+}
+
 export class CastSession {
     private socket: tls.TLSSocket | null = null
     private buffer: Uint8Array = new Uint8Array(0)
@@ -73,6 +82,19 @@ export class CastSession {
     private queueItems: QueueItemStatus[] = []
     private currentItemId: number | null = null
     private closed = false
+    // Auto-reconnect: remember how to re-LOAD what was playing (at the last known
+    // position) if the TLS socket drops mid-cast, and don't retry on a user stop.
+    private reloadMedia: (() => void) | null = null
+    private intentionalClose = false
+    private reconnecting = false
+    private reconnectAttempts = 0
+    private readonly maxReconnectAttempts = 6
+    private mediaMeta: CastMediaMeta | null = null
+
+    /** Attach the content identity so status echoes it (renderer records history). */
+    setMeta(meta: CastMediaMeta | null): void {
+        this.mediaMeta = meta
+    }
 
     constructor(
         readonly host: string,
@@ -80,7 +102,7 @@ export class CastSession {
     ) {}
 
     get isActive(): boolean {
-        return this.socket !== null && !this.closed
+        return (this.socket !== null && !this.closed) || this.reconnecting
     }
 
     get status() {
@@ -93,6 +115,7 @@ export class CastSession {
             volume: this.volumeLevel,
             queue: this.queueItems,
             currentItemId: this.currentItemId,
+            meta: this.mediaMeta,
         }
     }
 
@@ -159,11 +182,16 @@ export class CastSession {
         }
     }
 
-    /** Connect, launch the media receiver and LOAD the given media. */
-    async start(media: CastMediaInput): Promise<void> {
+    /** Connect, launch the media receiver and LOAD the given media (at startTime). */
+    async start(media: CastMediaInput, startTime = 0): Promise<void> {
         await this.connectAndLaunch()
         this.send(this.transportId!, NS_CONNECTION, connectPayload())
-        this.send(this.transportId!, NS_MEDIA, loadMediaPayload(this.requestId++, media))
+        this.send(this.transportId!, NS_MEDIA, loadMediaPayload(this.requestId++, media, startTime))
+        // On a dropped socket, re-LOAD this same media at wherever it had reached.
+        this.reloadMedia = () => {
+            this.send(this.transportId!, NS_CONNECTION, connectPayload())
+            this.send(this.transportId!, NS_MEDIA, loadMediaPayload(this.requestId++, media, this.currentTime ?? 0))
+        }
         log.info('[Cast] LOAD enviado para', this.deviceName, '(', media.live ? 'LIVE' : 'BUFFERED', ')')
     }
 
@@ -171,14 +199,17 @@ export class CastSession {
     async startQueue(items: CastMediaInput[], startIndex = 0): Promise<void> {
         await this.connectAndLaunch()
         this.send(this.transportId!, NS_CONNECTION, connectPayload())
-        this.send(this.transportId!, NS_MEDIA, queueLoadPayload(
-            this.requestId++,
-            items.map(i => ({
-                url: i.url, title: i.title, contentType: i.contentType,
-                subtitleUrl: i.subtitleUrl, subtitleLanguage: i.subtitleLanguage,
-            })),
-            startIndex,
-        ))
+        const queueItems = items.map(i => ({
+            url: i.url, title: i.title, contentType: i.contentType,
+            subtitleUrl: i.subtitleUrl, subtitleLanguage: i.subtitleLanguage,
+        }))
+        this.send(this.transportId!, NS_MEDIA, queueLoadPayload(this.requestId++, queueItems, startIndex))
+        // On a dropped socket, re-queue from the item that was playing.
+        this.reloadMedia = () => {
+            this.send(this.transportId!, NS_CONNECTION, connectPayload())
+            const idx = Math.max(0, this.currentItemId !== null ? this.currentItemId - 1 : startIndex)
+            this.send(this.transportId!, NS_MEDIA, queueLoadPayload(this.requestId++, queueItems, Math.min(idx, queueItems.length - 1)))
+        }
         log.info('[Cast] QUEUE_LOAD enviado para', this.deviceName, `(${items.length} itens)`)
     }
 
@@ -210,8 +241,11 @@ export class CastSession {
             }
         })
         socket.on('close', () => {
-            this.closed = true
             if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
+            // A user stop (or a give-up) is intentional; anything else is a drop.
+            if (this.intentionalClose || this.reconnecting) return
+            log.warn('[Cast] conexão caiu, tentando reconectar a', this.deviceName)
+            void this.attemptReconnect()
         })
         socket.on('error', (error) => {
             log.warn('[Cast] socket error:', error.message)
@@ -222,6 +256,56 @@ export class CastSession {
         this.heartbeatTimer = setInterval(() => {
             this.send(CAST_RECEIVER_ID, NS_HEARTBEAT, pingPayload())
         }, HEARTBEAT_MS)
+    }
+
+    /**
+     * The socket dropped mid-cast (Wi-Fi blip, device sleep). Reconnect with
+     * exponential backoff and re-LOAD what was playing at the last position, so
+     * the user doesn't have to re-cast by hand. Gives up after a few tries.
+     */
+    private resetConnectionState(): void {
+        this.socket = null
+        this.buffer = new Uint8Array(0)
+        this.transportId = null
+        this.sessionId = null
+        this.mediaSessionId = null
+    }
+
+    private async attemptReconnect(): Promise<void> {
+        if (this.intentionalClose || !this.reloadMedia) { this.closed = true; return }
+        this.reconnecting = true
+        while (this.reconnectAttempts < this.maxReconnectAttempts && !this.intentionalClose) {
+            this.reconnectAttempts++
+            const backoff = Math.min(1000 * 2 ** (this.reconnectAttempts - 1), 15000)
+            await new Promise((r) => setTimeout(r, backoff))
+            if (this.intentionalClose) { this.reconnecting = false; return }
+            try {
+                // Prefer re-adopting the session if it's still running on the device
+                // (network blip) — that regains control with NO playback interruption.
+                this.resetConnectionState()
+                try {
+                    await this.attach()
+                    this.reconnecting = false
+                    this.reconnectAttempts = 0
+                    log.info('[Cast] controle retomado (sessão seguia ativa) em', this.deviceName)
+                    return
+                } catch {
+                    // The receiver app stopped → relaunch and re-LOAD at the last position.
+                    this.resetConnectionState()
+                    await this.connectAndLaunch()
+                    this.reloadMedia()
+                    this.reconnecting = false
+                    this.reconnectAttempts = 0
+                    log.info('[Cast] recarregado na última posição em', this.deviceName)
+                    return
+                }
+            } catch (error) {
+                log.warn(`[Cast] reconexão ${this.reconnectAttempts}/${this.maxReconnectAttempts} falhou:`, error)
+            }
+        }
+        this.reconnecting = false
+        this.closed = true
+        log.warn('[Cast] desistindo da reconexão de', this.deviceName)
     }
 
     /** Wait for a RECEIVER_STATUS that satisfies `accept`, capturing transportId. */
@@ -305,6 +389,7 @@ export class CastSession {
 
     close(): void {
         if (this.closed) return
+        this.intentionalClose = true // user stop → don't auto-reconnect
         this.closed = true
         try {
             if (this.sessionId) {

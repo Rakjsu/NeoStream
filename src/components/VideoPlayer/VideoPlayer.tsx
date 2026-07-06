@@ -1284,6 +1284,12 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                         subtitleVtt={vttContent}
                         tmdbId={tmdbId}
                         imdbId={imdbId}
+                        contentId={contentId}
+                        contentType={contentType}
+                        seasonNumber={seasonNumber}
+                        episodeNumber={episodeNumber}
+                        // Continue from where the local player is (or the saved resume point).
+                        startPosition={state.currentTime || resumeTime || 0}
                         onClose={() => setShowDeviceSelector(false)}
                         onDeviceSelected={(device) => {
                             if (device.type === 'dlna' || device.type === 'chromecast') {

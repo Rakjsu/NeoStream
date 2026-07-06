@@ -1,4 +1,14 @@
 import { useState, useEffect } from 'react';
+import { movieProgressService } from '../services/movieProgressService';
+import { watchProgressService } from '../services/watchProgressService';
+
+interface CastMeta {
+    contentId: string;
+    contentType?: 'movie' | 'series' | 'live';
+    season?: number;
+    episode?: number;
+    title?: string;
+}
 
 /**
  * A small, always-mounted "Transmitindo na TV" pill (app root, page-independent).
@@ -7,6 +17,11 @@ import { useState, useEffect } from 'react';
  * (only the Default Media Receiver — never hijacks Netflix/YouTube). The full
  * transport controls stay in the player's CastControls; this is just presence
  * + a quick Stop, visible from any screen.
+ *
+ * Since it already polls cast:get-status, it's also where cast playback is
+ * mirrored into the local watch history (movies/episodes), so what you watch on
+ * the TV shows up in "continuar assistindo" — surviving reconnects, because the
+ * session keeps the content identity (meta) across a dropped socket.
  */
 export function GlobalCastIndicator() {
     const [device, setDevice] = useState<string | null>(null);
@@ -18,9 +33,22 @@ export function GlobalCastIndicator() {
 
         const poll = async () => {
             const result = await window.ipcRenderer.invoke('cast:get-status').catch(() => null) as
-                { success?: boolean; active?: boolean; deviceName?: string } | null;
+                { success?: boolean; active?: boolean; deviceName?: string;
+                  currentTime?: number | null; duration?: number | null; meta?: CastMeta | null } | null;
             if (cancelled) return;
-            setDevice(result?.success && result.active ? (result.deviceName || 'Chromecast') : null);
+            const active = !!(result?.success && result.active);
+            setDevice(active ? (result!.deviceName || 'Chromecast') : null);
+
+            // Mirror cast position into the local history (movies / episodes).
+            const meta = result?.meta;
+            const cur = result?.currentTime ?? 0, dur = result?.duration ?? 0;
+            if (active && meta?.contentId && meta.contentType !== 'live' && dur > 0 && cur > 0) {
+                if (meta.contentType === 'series' && meta.season != null && meta.episode != null) {
+                    watchProgressService.saveVideoTime(meta.contentId, meta.season, meta.episode, cur, dur);
+                } else if (meta.contentType !== 'series') {
+                    movieProgressService.saveMovieTime(meta.contentId, meta.title || '', cur, dur);
+                }
+            }
         };
         void poll();
         const id = setInterval(() => void poll(), 3000);

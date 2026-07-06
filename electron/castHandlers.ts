@@ -8,7 +8,7 @@
 import { ipcMain } from 'electron'
 import { Bonjour, type Browser, type Service } from 'bonjour-service'
 import log from './logger'
-import { CastSession, type CastMediaInput } from './castClient'
+import { CastSession, type CastMediaInput, type CastMediaMeta } from './castClient'
 import { registerCastSubtitleVtt, isLoopbackUrl, createLanProxyUrlFor } from './dlnaHandlers'
 
 interface CastDevice {
@@ -111,7 +111,7 @@ export function setupCastHandlers(): void {
         return { success: true, devices: [...devices.values()] }
     })
 
-    ipcMain.handle('cast:play', async (_e, payload: { deviceId?: string; url?: string; title?: string; contentType?: string; live?: boolean; subtitleVtt?: string }) => {
+    ipcMain.handle('cast:play', async (_e, payload: { deviceId?: string; url?: string; title?: string; contentType?: string; live?: boolean; subtitleVtt?: string; startPosition?: number; meta?: CastMediaMeta }) => {
         try {
             const device = devices.get(String(payload?.deviceId ?? ''))
             if (!device) return { success: false, error: 'Dispositivo não encontrado' }
@@ -142,7 +142,11 @@ export function setupCastHandlers(): void {
                 live: payload?.live === true,
                 subtitleUrl,
             }
-            await session.start(media)
+            // Resume from the given position (history / where the player was) and
+            // carry the content identity so the renderer can record watch progress.
+            const startPosition = typeof payload?.startPosition === 'number' && payload.startPosition > 0 ? payload.startPosition : 0
+            if (payload?.meta && payload.meta.contentId) session.setMeta(payload.meta)
+            await session.start(media, media.live ? 0 : startPosition)
             activeSession = session
             return { success: true }
         } catch (error) {

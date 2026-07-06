@@ -117,6 +117,15 @@ describe('fase 2: status, volume e legendas', () => {
         expect(payload.activeTrackIds).toBeUndefined();
     });
 
+    it('LOAD com startTime começa na posição (retomada/reconexão); LIVE ignora', () => {
+        const vod = JSON.parse(loadMediaPayload(3, { url: 'http://x/f.mp4', title: 'F', contentType: 'video/mp4', live: false }, 1800));
+        expect(vod.currentTime).toBe(1800);
+        const live = JSON.parse(loadMediaPayload(3, { url: 'http://x/s.m3u8', title: 'S', contentType: 'application/x-mpegurl', live: true }, 1800));
+        expect(live.currentTime).toBeUndefined();
+        const fresh = JSON.parse(loadMediaPayload(3, { url: 'http://x/f.mp4', title: 'F', contentType: 'video/mp4', live: false }));
+        expect(fresh.currentTime).toBeUndefined();
+    });
+
     it('setVolumePayload limita 0..1 e getMediaStatusPayload leva a sessão', () => {
         expect(JSON.parse(setVolumePayload(1, 1.7)).volume.level).toBe(1);
         expect(JSON.parse(setVolumePayload(1, -2)).volume.level).toBe(0);

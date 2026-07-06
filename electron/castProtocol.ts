@@ -169,6 +169,7 @@ export function stopAppPayload(requestId: number, sessionId: string): string {
 export function loadMediaPayload(
     requestId: number,
     media: { url: string; title: string; contentType: string; live: boolean; subtitleUrl?: string; subtitleLanguage?: string },
+    startTime = 0,
 ): string {
     // Optional WebVTT side-load: one TEXT track, active from the start. The
     // URL must be reachable by the device (the DLNA proxy serves it on LAN).
@@ -187,6 +188,8 @@ export function loadMediaPayload(
         type: 'LOAD',
         requestId,
         autoplay: true,
+        // Start position (resume / reconnect). LIVE ignores it.
+        ...(startTime > 0 && !media.live ? { currentTime: startTime } : {}),
         ...(tracks ? { activeTrackIds: [1] } : {}),
         media: {
             contentId: media.url,
