@@ -55,7 +55,7 @@ npm run build:win # build Windows (NSIS + portable)
 
 - **Stack:** Electron 43 · React 19 · TypeScript 6 · Vite 8 · Tailwind 4
 - **CI:** typecheck + lint + unit + E2E + `npm audit` em Windows/Linux/macOS; tag `v*.*.*` publica a release com feeds de auto-update
-- **Chave TMDB:** defina `VITE_TMDB_API_KEY` num `.env` local (nunca commitada)
+- **Chaves de API são do usuário:** os builds **não embutem** chave nenhuma. Cada pessoa configura as próprias em **Configurações → APIs** dentro do app — TMDB (gratuita: capas, sinopses, notas, trailers e controle parental) e OpenSubtitles (opcional: busca de legendas online). Ao adicionar a primeira playlist, o app guia a configuração. Para desenvolvimento local, `VITE_TMDB_API_KEY` e `OPEN_SUBTITLES_*` num `.env` (nunca commitado) valem como fallback.
 
 ---
 
