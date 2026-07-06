@@ -262,6 +262,20 @@ export function queueSkipPayload(requestId: number, mediaSessionId: number, dire
     })
 }
 
+/**
+ * EDIT_TRACKS_INFO — toggle the WebVTT TEXT track mid-playback. Our LOAD /
+ * QUEUE_LOAD items carry at most one track (trackId 1), so enabling means
+ * activeTrackIds [1] and disabling means [].
+ */
+export function editTracksPayload(requestId: number, mediaSessionId: number, subtitleEnabled: boolean): string {
+    return JSON.stringify({
+        type: 'EDIT_TRACKS_INFO',
+        requestId,
+        mediaSessionId,
+        activeTrackIds: subtitleEnabled ? [1] : [],
+    })
+}
+
 /** receiver GET_STATUS (prompts a RECEIVER_STATUS listing running apps). */
 export function getReceiverStatusPayload(requestId: number): string {
     return JSON.stringify({ type: 'GET_STATUS', requestId })

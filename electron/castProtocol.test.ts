@@ -9,6 +9,7 @@ import {
     queueLoadPayload,
     queueSkipPayload,
     queueJumpPayload,
+    editTracksPayload,
     extractQueueItems,
     extractCurrentItemId,
     getMediaStatusPayload,
@@ -189,6 +190,12 @@ describe('fila de cast (QUEUE_LOAD)', () => {
         expect(payload.items[0].startTime).toBe(613);
         expect(payload.items[1].startTime).toBeUndefined();
         expect(payload.items[2].startTime).toBeUndefined();
+    });
+
+    it('editTracksPayload liga/desliga a track de legenda (trackId 1)', () => {
+        expect(JSON.parse(editTracksPayload(6, 9, true)))
+            .toEqual({ type: 'EDIT_TRACKS_INFO', requestId: 6, mediaSessionId: 9, activeTrackIds: [1] });
+        expect(JSON.parse(editTracksPayload(7, 9, false)).activeTrackIds).toEqual([]);
     });
 
     it('queueSkipPayload gera QUEUE_NEXT/QUEUE_PREV com a sessão', () => {
