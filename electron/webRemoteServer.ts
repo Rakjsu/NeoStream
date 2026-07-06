@@ -205,7 +205,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 }
 
 // Actions that always go to the renderer (never routed to the cast session).
-const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'requestCatalog', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'requestCatalog', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
@@ -228,17 +228,19 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     } else if (command.action === 'requestEpg') {
         win.webContents.send('media:control', 'requestEpg', command.channelId)
     } else if (command.action === 'castMovie') {
-        win.webContents.send('media:control', 'castMovie', command.movieId)
+        win.webContents.send('media:control', 'castMovie', command.movieId, command.target)
     } else if (command.action === 'castMovieQueue') {
-        win.webContents.send('media:control', 'castMovieQueue', command.movieIds)
+        win.webContents.send('media:control', 'castMovieQueue', command.movieIds, command.target)
     } else if (command.action === 'castEpisode') {
-        win.webContents.send('media:control', 'castEpisode', command.episodeId)
+        win.webContents.send('media:control', 'castEpisode', command.episodeId, command.target)
     } else if (command.action === 'requestSeriesInfo') {
         win.webContents.send('media:control', 'requestSeriesInfo', command.seriesId)
     } else if (command.action === 'requestCatalog') {
         win.webContents.send('media:control', 'requestCatalog')
     } else if (command.action === 'requestSeries') {
         win.webContents.send('media:control', 'requestSeries')
+    } else if (command.action === 'requestDevices') {
+        win.webContents.send('media:control', 'requestDevices')
     } else {
         win.webContents.send('media:control', command.action)
     }
@@ -324,6 +326,30 @@ export function setupWebRemote(): void {
             }
         }).filter((e) => e.id && e.label)
         broadcast(JSON.stringify({ type: 'seriesInfo', seriesId, episodes }))
+    })
+
+    // Cast targets (Chromecast + DLNA + AirPlay) discovered by the bridge.
+    ipcMain.on('web-remote:devices', (_e, raw: unknown) => {
+        const obj = (raw ?? {}) as Record<string, unknown>
+        const rawItems = Array.isArray(obj.items) ? obj.items : []
+        const items = rawItems.slice(0, 50).map((c) => {
+            const it = (c ?? {}) as Record<string, unknown>
+            const type = it.type === 'dlna' || it.type === 'airplay' ? it.type : 'chromecast'
+            return {
+                id: String(it.id ?? ''),
+                name: typeof it.name === 'string' ? it.name.slice(0, 120) : '',
+                type,
+            }
+        }).filter((c) => c.id && c.name)
+        broadcast(JSON.stringify({ type: 'devices', items }))
+    })
+
+    // Result of a cast started from the phone (ok / no-device / error).
+    ipcMain.on('web-remote:cast-result', (_e, raw: unknown) => {
+        const obj = (raw ?? {}) as Record<string, unknown>
+        const status = obj.status === 'ok' || obj.status === 'no-device' ? obj.status : 'error'
+        const deviceName = typeof obj.deviceName === 'string' ? obj.deviceName.slice(0, 120) : ''
+        broadcast(JSON.stringify({ type: 'castResult', status, deviceName }))
     })
 
     ipcMain.handle('web-remote:get-config', () => ({

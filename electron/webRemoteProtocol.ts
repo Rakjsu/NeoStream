@@ -114,22 +114,38 @@ export function decodeFrames(buffer: Uint8Array): { frames: DecodedFrame[]; rest
     return { frames, rest: buffer.subarray(offset) }
 }
 
+/** Where a cast goes. Absent = legacy behaviour (first Chromecast on the LAN). */
+export type CastTargetType = 'chromecast' | 'dlna' | 'airplay'
+export interface CastTarget { deviceId: string; deviceType: CastTargetType }
+
 export type RemoteCommand =
     | { action: 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' }
     | { action: 'seek'; seconds: number }
     | { action: 'playChannel'; channelId: string }
     | { action: 'requestEpg'; channelId: string }
     | { action: 'requestCatalog' }
-    | { action: 'castMovie'; movieId: string }
-    | { action: 'castMovieQueue'; movieIds: string[] }
+    | { action: 'requestDevices' }
+    | { action: 'castMovie'; movieId: string; target?: CastTarget }
+    | { action: 'castMovieQueue'; movieIds: string[]; target?: CastTarget }
     | { action: 'requestSeries' }
     | { action: 'requestSeriesInfo'; seriesId: string }
-    | { action: 'castEpisode'; episodeId: string }
+    | { action: 'castEpisode'; episodeId: string; target?: CastTarget }
 
 const VALID_ACTIONS = new Set([
     'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'seek', 'playChannel', 'requestEpg',
-    'requestCatalog', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
+    'requestCatalog', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
 ])
+
+const CAST_TARGET_TYPES = new Set<CastTargetType>(['chromecast', 'dlna', 'airplay'])
+
+/** Extract an optional {deviceId, deviceType} target; ignores anything malformed. */
+function parseCastTarget(parsed: unknown): CastTarget | undefined {
+    const deviceId = (parsed as { deviceId?: unknown }).deviceId
+    const deviceType = (parsed as { deviceType?: unknown }).deviceType
+    if (typeof deviceId !== 'string' || !deviceId) return undefined
+    if (typeof deviceType !== 'string' || !CAST_TARGET_TYPES.has(deviceType as CastTargetType)) return undefined
+    return { deviceId, deviceType: deviceType as CastTargetType }
+}
 
 /** Validate a command coming off the wire (untrusted phone input). */
 export function parseRemoteCommand(text: string): RemoteCommand | null {
@@ -155,14 +171,14 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
     if (action === 'castMovie') {
         const movieId = (parsed as { movieId?: unknown }).movieId
         if (typeof movieId !== 'string' || !movieId) return null
-        return { action, movieId }
+        return { action, movieId, target: parseCastTarget(parsed) }
     }
     if (action === 'castMovieQueue') {
         const raw = (parsed as { movieIds?: unknown }).movieIds
         if (!Array.isArray(raw)) return null
         const movieIds = raw.filter((id): id is string => typeof id === 'string' && !!id).slice(0, 200)
         if (movieIds.length === 0) return null
-        return { action: 'castMovieQueue', movieIds }
+        return { action: 'castMovieQueue', movieIds, target: parseCastTarget(parsed) }
     }
     if (action === 'requestSeriesInfo') {
         const seriesId = (parsed as { seriesId?: unknown }).seriesId
@@ -172,10 +188,11 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
     if (action === 'castEpisode') {
         const episodeId = (parsed as { episodeId?: unknown }).episodeId
         if (typeof episodeId !== 'string' || !episodeId) return null
-        return { action, episodeId }
+        return { action, episodeId, target: parseCastTarget(parsed) }
     }
     if (action === 'requestCatalog') return { action: 'requestCatalog' }
     if (action === 'requestSeries') return { action: 'requestSeries' }
+    if (action === 'requestDevices') return { action: 'requestDevices' }
     return { action: action as 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' }
 }
 

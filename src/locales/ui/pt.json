@@ -149,7 +149,8 @@
     "failedToTransmit": "Falha ao transmitir",
     "errorAddingDevice": "Erro ao adicionar dispositivo",
     "connected": "Conectado",
-    "discovered": "Descoberto"
+    "discovered": "Descoberto",
+    "queueHint": "Fila de {n} episódios — o Chromecast recebe todos; DLNA/AirPlay começa pelo 1º."
   },
   "categories": {
     "title": "Categorias",

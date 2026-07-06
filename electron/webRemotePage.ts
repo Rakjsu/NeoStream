@@ -88,6 +88,23 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
   .chepg { margin: 6px 4px 2px 52px; font-size: 12px; color: rgba(255,255,255,.6); line-height: 1.5; }
   .chepg .p { color: #fff; font-weight: 600; }
   .empty { font-size: 13px; color: rgba(255,255,255,.4); text-align: center; padding: 24px 0; }
+  /* Device selector bar */
+  .devbar { display: flex; align-items: center; gap: 8px; width: 100%; max-width: 420px; }
+  .devlbl { font-size: 12px; color: rgba(255,255,255,.55); white-space: nowrap; }
+  .devsel {
+    flex: 1; min-width: 0; padding: 8px 10px; border-radius: 10px; font-size: 13px;
+    background: rgba(255,255,255,.06); color: #fff; border: 1px solid rgba(255,255,255,.12);
+  }
+  .devsel option { color: #000; }
+  /* Toast */
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    max-width: 90%; padding: 12px 18px; border-radius: 12px; font-size: 14px; font-weight: 600;
+    background: rgba(20,20,30,.95); color: #fff; border: 1px solid rgba(255,255,255,.15);
+    box-shadow: 0 8px 30px rgba(0,0,0,.5); z-index: 50; text-align: center;
+  }
+  .toast.ok { border-color: rgba(52,211,153,.5); }
+  .toast.err { border-color: rgba(252,165,165,.5); }
 </style>
 </head>
 <body>
@@ -108,6 +125,11 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       <div class="tab" id="tab-guide" data-view="guide">📺 Guia</div>
       <div class="tab" id="tab-catalog" data-view="catalog">🎬 Filmes</div>
       <div class="tab" id="tab-series" data-view="series">🎞️ Séries</div>
+    </div>
+
+    <div class="devbar">
+      <span class="devlbl">📡 Transmitir em</span>
+      <select id="devsel" class="devsel"><option value="">Automático (1ª TV)</option></select>
     </div>
 
     <div id="control">
@@ -163,6 +185,8 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       <div class="empty" id="ep-empty">Carregando episódios…</div>
     </div>
   </div>
+
+  <div id="toast" class="toast hidden"></div>
 <script>
   (function () {
     var titleEl = document.getElementById('title');
@@ -202,6 +226,12 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     var seriesRequested = false;
     var episodes = [];     // [{ id, label }]
     var currentSeriesId = '';
+    var devselEl = document.getElementById('devsel');
+    var toastEl = document.getElementById('toast');
+    var devices = [];      // [{ id, name, type }]
+    var devicesRequested = false;
+    var selDev = localStorage.getItem('neostream_remote_device') || '';  // "type:id" or ''
+    var toastTimer = null;
 
     function showPinPrompt(message) {
       pinCard.style.display = 'block';
@@ -219,6 +249,10 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         pinCard.style.display = 'none';
         connectedEl.style.display = 'flex';
         statusEl.textContent = 'Conectado'; statusEl.className = 'status on';
+        if (!devicesRequested) { devicesRequested = true; sendCmd('requestDevices'); }
+        // Land on the last tab the user was using (Guia/Filmes/Séries).
+        var savedTab = localStorage.getItem('neostream_remote_tab');
+        if (savedTab === 'guide' || savedTab === 'catalog' || savedTab === 'series') activateTab(savedTab);
       };
       ws.onclose = function () {
         // 1006 with no prior open + wrong PIN → the server refused (401).
@@ -251,10 +285,48 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
             renderSeries();
           } else if (msg.type === 'seriesInfo') {
             if (msg.seriesId === currentSeriesId) { episodes = msg.episodes || []; renderEpisodes(); }
+          } else if (msg.type === 'devices') {
+            devices = msg.items || [];
+            renderDevices();
+          } else if (msg.type === 'castResult') {
+            if (msg.status === 'ok') showToast('📡 Transmitindo' + (msg.deviceName ? ' em ' + msg.deviceName : ''), 'ok');
+            else if (msg.status === 'no-device') showToast('Nenhuma TV encontrada na rede', 'err');
+            else showToast('Falha ao transmitir', 'err');
           }
         } catch (e) {}
       };
     }
+
+    function showToast(text, kind) {
+      toastEl.textContent = text;
+      toastEl.className = 'toast ' + (kind || '');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toastEl.className = 'toast hidden'; }, 3500);
+    }
+
+    function devIcon(type) { return type === 'dlna' ? '📺' : (type === 'airplay' ? '🍎' : '📡'); }
+
+    function renderDevices() {
+      var cur = selDev;
+      var html = '<option value="">Automático (1ª TV)</option>';
+      for (var i = 0; i < devices.length; i++) {
+        var d = devices[i];
+        var val = d.type + ':' + d.id;
+        html += '<option value="' + esc(val) + '">' + devIcon(d.type) + ' ' + esc(d.name) + '</option>';
+      }
+      devselEl.innerHTML = html;
+      // Keep the saved choice if it is still present; otherwise fall back to auto.
+      var found = false;
+      for (var j = 0; j < devices.length; j++) { if (devices[j].type + ':' + devices[j].id === cur) { found = true; break; } }
+      devselEl.value = found ? cur : '';
+      if (!found && cur) { selDev = ''; localStorage.removeItem('neostream_remote_device'); }
+    }
+
+    if (devselEl) devselEl.addEventListener('change', function () {
+      selDev = devselEl.value || '';
+      if (selDev) localStorage.setItem('neostream_remote_device', selDev);
+      else localStorage.removeItem('neostream_remote_device');
+    });
 
     document.getElementById('pin-ok').addEventListener('click', function () {
       var pin = (pinInput.value || '').trim();
@@ -447,27 +519,35 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       if (id) sendCmd('playChannel', null, id);
     });
 
-    // Tab switching
+    // Switch to a tab (also used to restore the last tab after reconnecting).
+    function activateTab(view) {
+      document.querySelectorAll('.tab').forEach(function (t) {
+        t.classList.toggle('active', t.getAttribute('data-view') === view);
+      });
+      controlEl.classList.add('hidden'); guideEl.classList.add('hidden'); catalogEl.classList.add('hidden');
+      seriesEl.classList.add('hidden'); episodesEl.classList.add('hidden');
+      if (view === 'guide') { guideEl.classList.remove('hidden'); renderGuide(); }
+      else if (view === 'catalog') {
+        catalogEl.classList.remove('hidden');
+        if (!catalogRequested) { catalogRequested = true; sendCmd('requestCatalog'); }
+        renderCatalog();
+      }
+      else if (view === 'series') {
+        // Drill-down always re-enters at the series list, not a stale episodes view.
+        seriesEl.classList.remove('hidden'); currentSeriesId = '';
+        if (!seriesRequested) { seriesRequested = true; sendCmd('requestSeries'); }
+        renderSeries();
+      }
+      else { controlEl.classList.remove('hidden'); }
+    }
+
+    // Tab switching (remembers the choice so a reconnect lands on the same tab).
     document.querySelectorAll('.tab').forEach(function (tab) {
       tab.addEventListener('click', function () {
         var view = tab.getAttribute('data-view');
-        document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
-        tab.classList.add('active');
-        controlEl.classList.add('hidden'); guideEl.classList.add('hidden'); catalogEl.classList.add('hidden');
-        seriesEl.classList.add('hidden'); episodesEl.classList.add('hidden');
-        if (view === 'guide') { guideEl.classList.remove('hidden'); renderGuide(); }
-        else if (view === 'catalog') {
-          catalogEl.classList.remove('hidden');
-          if (!catalogRequested) { catalogRequested = true; sendCmd('requestCatalog'); }
-          renderCatalog();
-        }
-        else if (view === 'series') {
-          // Drill-down always re-enters at the series list, not a stale episodes view.
-          seriesEl.classList.remove('hidden'); currentSeriesId = '';
-          if (!seriesRequested) { seriesRequested = true; sendCmd('requestSeries'); }
-          renderSeries();
-        }
-        else { controlEl.classList.remove('hidden'); }
+        activateTab(view);
+        if (view && view !== 'control') localStorage.setItem('neostream_remote_tab', view);
+        else localStorage.removeItem('neostream_remote_tab');
       });
     });
 
@@ -482,6 +562,11 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       if (action === 'castMovieQueue') payload.movieIds = arg5;
       if (action === 'requestSeriesInfo') payload.seriesId = arg5;
       if (action === 'castEpisode') payload.episodeId = arg6;
+      // Attach the chosen cast target (type:id) to any cast action.
+      if ((action === 'castMovie' || action === 'castMovieQueue' || action === 'castEpisode') && selDev) {
+        var sep = selDev.indexOf(':');
+        if (sep > 0) { payload.deviceType = selDev.slice(0, sep); payload.deviceId = selDev.slice(sep + 1); }
+      }
       ws.send(JSON.stringify(payload));
     }
 
