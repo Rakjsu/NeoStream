@@ -158,6 +158,8 @@ const sendChannels = new Set([
     'web-remote:catalog',
     'web-remote:series',
     'web-remote:series-info',
+    'web-remote:devices',
+    'web-remote:cast-result',
 ])
 
 const receiveChannels = new Set([

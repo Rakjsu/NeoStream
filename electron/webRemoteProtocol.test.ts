@@ -107,6 +107,18 @@ describe('parseRemoteCommand', () => {
         expect(parseRemoteCommand('{"action":"castEpisode"}')).toBeNull() // episodeId ausente
         expect(parseRemoteCommand('{"action":"castEpisode","episodeId":""}')).toBeNull() // id vazio
     })
+    it('aceita requestDevices e um alvo de cast opcional (deviceId+deviceType)', () => {
+        expect(parseRemoteCommand('{"action":"requestDevices"}')).toEqual({ action: 'requestDevices' })
+        expect(parseRemoteCommand('{"action":"castMovie","movieId":"42","deviceId":"tv1","deviceType":"dlna"}'))
+            .toEqual({ action: 'castMovie', movieId: '42', target: { deviceId: 'tv1', deviceType: 'dlna' } })
+        expect(parseRemoteCommand('{"action":"castEpisode","episodeId":"e1","deviceId":"cc1","deviceType":"chromecast"}'))
+            .toEqual({ action: 'castEpisode', episodeId: 'e1', target: { deviceId: 'cc1', deviceType: 'chromecast' } })
+        // Alvo malformado é ignorado (cast cai no comportamento legado).
+        expect(parseRemoteCommand('{"action":"castMovie","movieId":"9","deviceType":"dlna"}'))
+            .toEqual({ action: 'castMovie', movieId: '9', target: undefined }) // deviceId ausente
+        expect(parseRemoteCommand('{"action":"castMovie","movieId":"9","deviceId":"x","deviceType":"roku"}'))
+            .toEqual({ action: 'castMovie', movieId: '9', target: undefined }) // tipo inválido
+    })
     it('rejeita lixo e ações desconhecidas', () => {
         expect(parseRemoteCommand('não-json')).toBeNull()
         expect(parseRemoteCommand('{"action":"rm -rf"}')).toBeNull()
