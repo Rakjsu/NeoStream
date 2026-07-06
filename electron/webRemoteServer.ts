@@ -31,6 +31,7 @@ import {
     type NetAddress,
 } from './webRemoteProtocol'
 import { REMOTE_PAGE_HTML } from './webRemotePage'
+import { REMOTE_ICON_SVG, buildManifest, solidPng } from './webRemoteAssets'
 import { isCastSessionActive, castRemoteControl, getCastStatus } from './castHandlers'
 
 interface WebRemoteConfig {
@@ -441,6 +442,23 @@ function start(): Promise<void> {
             // PIN is NOT injected — the phone must enter the code shown on
             // the desktop settings screen (the page prompts + stores it).
             res.end(REMOTE_PAGE_HTML)
+            return
+        }
+        // PWA assets: "Add to home screen" installs the remote as a real app.
+        if (req.url === '/manifest.webmanifest') {
+            res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'max-age=3600' })
+            res.end(buildManifest())
+            return
+        }
+        if (req.url === '/icon.svg') {
+            res.writeHead(200, { 'Content-Type': 'image/svg+xml; charset=utf-8', 'Cache-Control': 'max-age=86400' })
+            res.end(REMOTE_ICON_SVG)
+            return
+        }
+        if (req.url === '/icon.png') {
+            // iOS apple-touch-icon (can't take the SVG) — solid indigo square.
+            res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' })
+            res.end(solidPng(180, 0x4f, 0x46, 0xe5))
             return
         }
         res.writeHead(404)
