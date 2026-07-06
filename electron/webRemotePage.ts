@@ -56,7 +56,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
   .hint { font-size: 12px; color: rgba(255,255,255,.4); max-width: 420px; text-align: center; }
   .hidden { display: none !important; }
   /* Guide */
-  #guide, #catalog { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
+  #guide, #catalog, #series, #episodes { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
   .nowbar {
     background: linear-gradient(135deg, rgba(79,70,229,.25), rgba(99,102,241,.12));
     border: 1px solid rgba(99,102,241,.3); border-radius: 16px; padding: 14px 16px; text-align: left;
@@ -107,6 +107,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       <div class="tab active" id="tab-ctl" data-view="control">🎛️ Controle</div>
       <div class="tab" id="tab-guide" data-view="guide">📺 Guia</div>
       <div class="tab" id="tab-catalog" data-view="catalog">🎬 Filmes</div>
+      <div class="tab" id="tab-series" data-view="series">🎞️ Séries</div>
     </div>
 
     <div id="control">
@@ -149,6 +150,18 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       <div class="empty" id="mv-empty">Carregando filmes…</div>
       <button class="ctl wide hidden" id="mvqueue" style="margin: 4px auto 0; background: linear-gradient(135deg,#4f46e5,var(--accent));">📡 Transmitir fila</button>
     </div>
+
+    <div id="series" class="hidden">
+      <input class="chsearch" id="sesearch" placeholder="Buscar série…" autocomplete="off">
+      <div class="chlist" id="selist"></div>
+      <div class="empty" id="se-empty">Carregando séries…</div>
+    </div>
+
+    <div id="episodes" class="hidden">
+      <button class="ctl wide" id="ep-back" style="margin: 0 auto 2px">← Voltar</button>
+      <div class="chlist" id="eplist"></div>
+      <div class="empty" id="ep-empty">Carregando episódios…</div>
+    </div>
   </div>
 <script>
   (function () {
@@ -177,6 +190,18 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     var catalogRequested = false;
     var selected = {};   // movieId → true (multi-select for the cast queue)
     var mvqueueEl = document.getElementById('mvqueue');
+    var seriesEl = document.getElementById('series');
+    var episodesEl = document.getElementById('episodes');
+    var selistEl = document.getElementById('selist');
+    var sesearchEl = document.getElementById('sesearch');
+    var seEmptyEl = document.getElementById('se-empty');
+    var eplistEl = document.getElementById('eplist');
+    var epEmptyEl = document.getElementById('ep-empty');
+    var seriesList = [];   // [{ id, name, cover }]
+    var seFilter = '';
+    var seriesRequested = false;
+    var episodes = [];     // [{ id, label }]
+    var currentSeriesId = '';
 
     function showPinPrompt(message) {
       pinCard.style.display = 'block';
@@ -221,6 +246,11 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
           } else if (msg.type === 'catalog') {
             movies = msg.items || [];
             renderCatalog();
+          } else if (msg.type === 'series') {
+            seriesList = msg.items || [];
+            renderSeries();
+          } else if (msg.type === 'seriesInfo') {
+            if (msg.seriesId === currentSeriesId) { episodes = msg.episodes || []; renderEpisodes(); }
           }
         } catch (e) {}
       };
@@ -330,6 +360,75 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       if (ids.length) { sendCmd('castMovieQueue', null, null, null, ids); selected = {}; renderCatalog(); }
     });
 
+    // ------------------------------------------------------------- Séries --
+    function renderSeries() {
+      if (!seriesList.length) {
+        selistEl.innerHTML = ''; seEmptyEl.classList.remove('hidden');
+        seEmptyEl.textContent = seriesRequested ? 'Nenhuma série.' : 'Carregando séries…'; return;
+      }
+      seEmptyEl.classList.add('hidden');
+      var f = seFilter.toLowerCase();
+      var html = '';
+      for (var j = 0; j < seriesList.length; j++) {
+        var s = seriesList[j];
+        if (f && s.name.toLowerCase().indexOf(f) === -1) continue;
+        var logo = s.cover
+          ? '<img src="' + esc(s.cover) + '" onerror="this.style.display=\\'none\\'" alt="">'
+          : '<div class="ph">🎞️</div>';
+        html += '<div class="chitem" data-se="' + esc(s.id) + '" data-nm="' + esc(s.name) + '">'
+          + logo + '<div class="nm">' + esc(s.name) + '</div>'
+          + '<span class="chinfo" title="Ver episódios">›</span></div>';
+      }
+      selistEl.innerHTML = html || '<div class="empty">Nenhuma série encontrada.</div>';
+    }
+
+    sesearchEl.addEventListener('input', function () { seFilter = sesearchEl.value; renderSeries(); });
+
+    selistEl.addEventListener('click', function (ev) {
+      if (!ev.target.closest) return;
+      var item = ev.target.closest('.chitem');
+      if (!item) return;
+      var sid = item.getAttribute('data-se');
+      if (!sid) return;
+      currentSeriesId = sid;
+      episodes = [];
+      document.getElementById('ep-empty').textContent = 'Carregando episódios…';
+      document.getElementById('ep-empty').classList.remove('hidden');
+      eplistEl.innerHTML = '';
+      seriesEl.classList.add('hidden');
+      episodesEl.classList.remove('hidden');
+      sendCmd('requestSeriesInfo', null, null, null, sid);
+    });
+
+    function renderEpisodes() {
+      if (!episodes.length) {
+        eplistEl.innerHTML = ''; epEmptyEl.classList.remove('hidden');
+        epEmptyEl.textContent = 'Nenhum episódio.'; return;
+      }
+      epEmptyEl.classList.add('hidden');
+      var html = '';
+      for (var j = 0; j < episodes.length; j++) {
+        var e = episodes[j];
+        html += '<div class="chitem" data-ep="' + esc(e.id) + '">'
+          + '<div class="ph">▶️</div><div class="nm">' + esc(e.label) + '</div>'
+          + '<button class="chinfo" data-castep="' + esc(e.id) + '" title="Transmitir na TV">📡</button></div>';
+      }
+      eplistEl.innerHTML = html;
+    }
+
+    eplistEl.addEventListener('click', function (ev) {
+      if (!ev.target.closest) return;
+      var castBtn = ev.target.closest('.chinfo');
+      if (castBtn) { var eid = castBtn.getAttribute('data-castep'); if (eid) sendCmd('castEpisode', null, null, null, null, eid); }
+    });
+
+    var epBackEl = document.getElementById('ep-back');
+    epBackEl.addEventListener('click', function () {
+      episodesEl.classList.add('hidden');
+      seriesEl.classList.remove('hidden');
+      currentSeriesId = '';
+    });
+
     chlistEl.addEventListener('click', function (ev) {
       if (!ev.target.closest) return;
       // The ⓘ button toggles the on-demand EPG panel (fetch once, then cached).
@@ -355,23 +454,34 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
         tab.classList.add('active');
         controlEl.classList.add('hidden'); guideEl.classList.add('hidden'); catalogEl.classList.add('hidden');
+        seriesEl.classList.add('hidden'); episodesEl.classList.add('hidden');
         if (view === 'guide') { guideEl.classList.remove('hidden'); renderGuide(); }
         else if (view === 'catalog') {
           catalogEl.classList.remove('hidden');
           if (!catalogRequested) { catalogRequested = true; sendCmd('requestCatalog'); }
           renderCatalog();
         }
+        else if (view === 'series') {
+          // Drill-down always re-enters at the series list, not a stale episodes view.
+          seriesEl.classList.remove('hidden'); currentSeriesId = '';
+          if (!seriesRequested) { seriesRequested = true; sendCmd('requestSeries'); }
+          renderSeries();
+        }
         else { controlEl.classList.remove('hidden'); }
       });
     });
 
-    function sendCmd(action, sec, channelId, movieId, movieIds) {
+    // arg5 carries movieIds (castMovieQueue) or seriesId (requestSeriesInfo);
+    // arg6 carries episodeId (castEpisode). Positions are disjoint per action.
+    function sendCmd(action, sec, channelId, movieId, arg5, arg6) {
       if (!ws || ws.readyState !== 1) return;
       var payload = { action: action };
       if (action === 'seek') payload.seconds = sec;
       if (action === 'playChannel' || action === 'requestEpg') payload.channelId = channelId;
       if (action === 'castMovie') payload.movieId = movieId;
-      if (action === 'castMovieQueue') payload.movieIds = movieIds;
+      if (action === 'castMovieQueue') payload.movieIds = arg5;
+      if (action === 'requestSeriesInfo') payload.seriesId = arg5;
+      if (action === 'castEpisode') payload.episodeId = arg6;
       ws.send(JSON.stringify(payload));
     }
 

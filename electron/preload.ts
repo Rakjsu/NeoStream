@@ -156,6 +156,8 @@ const sendChannels = new Set([
     'web-remote:guide',
     'web-remote:channel-epg',
     'web-remote:catalog',
+    'web-remote:series',
+    'web-remote:series-info',
 ])
 
 const receiveChannels = new Set([

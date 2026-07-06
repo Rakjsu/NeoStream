@@ -96,6 +96,17 @@ describe('parseRemoteCommand', () => {
         expect(parseRemoteCommand('{"action":"castMovieQueue","movieIds":[]}')).toBeNull()
         expect(parseRemoteCommand('{"action":"castMovieQueue"}')).toBeNull()
     })
+    it('aceita requestSeries, requestSeriesInfo e castEpisode', () => {
+        expect(parseRemoteCommand('{"action":"requestSeries"}')).toEqual({ action: 'requestSeries' })
+        expect(parseRemoteCommand('{"action":"requestSeriesInfo","seriesId":"7"}'))
+            .toEqual({ action: 'requestSeriesInfo', seriesId: '7' })
+        expect(parseRemoteCommand('{"action":"requestSeriesInfo"}')).toBeNull() // seriesId ausente
+        expect(parseRemoteCommand('{"action":"requestSeriesInfo","seriesId":7}')).toBeNull() // não-string
+        expect(parseRemoteCommand('{"action":"castEpisode","episodeId":"e99"}'))
+            .toEqual({ action: 'castEpisode', episodeId: 'e99' })
+        expect(parseRemoteCommand('{"action":"castEpisode"}')).toBeNull() // episodeId ausente
+        expect(parseRemoteCommand('{"action":"castEpisode","episodeId":""}')).toBeNull() // id vazio
+    })
     it('rejeita lixo e ações desconhecidas', () => {
         expect(parseRemoteCommand('não-json')).toBeNull()
         expect(parseRemoteCommand('{"action":"rm -rf"}')).toBeNull()
