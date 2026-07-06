@@ -13,8 +13,8 @@ export function isTransientHttpStatus(status: number): boolean {
     return status >= 500 || status === 429
 }
 
+/** Anything with an HTTP status — node-fetch Response and axios responses fit. */
 interface ResponseLike {
-    ok: boolean
     status: number
 }
 
@@ -50,6 +50,41 @@ export async function fetchWithRetry<T extends ResponseLike>(
         } catch (error) {
             lastError = error
             if (attempt >= retries) throw error
+        }
+    }
+    throw lastError
+}
+
+/**
+ * Axios-style transiency: axios THROWS on non-2xx, carrying response.status.
+ * No response at all = network error / timeout → transient. A carried 4xx
+ * (404, 403, 401...) is permanent — retrying wouldn't help.
+ */
+export function isTransientRequestError(error: unknown): boolean {
+    const status = (error as { response?: { status?: unknown } } | null)?.response?.status
+    if (typeof status === 'number') return isTransientHttpStatus(status)
+    return true
+}
+
+/**
+ * fetchWithRetry's sibling for axios-style callers (throw on failure): retry
+ * once when the thrown error is transient; permanent errors rethrow untouched.
+ */
+export async function requestWithRetry<T>(
+    doRequest: () => Promise<T>,
+    options: FetchRetryOptions = {},
+): Promise<T> {
+    const retries = options.retries ?? 1
+    const backoffMs = options.backoffMs ?? 800
+
+    let lastError: unknown
+    for (let attempt = 0; attempt <= retries; attempt++) {
+        if (attempt > 0) await new Promise(resolve => setTimeout(resolve, backoffMs))
+        try {
+            return await doRequest()
+        } catch (error) {
+            lastError = error
+            if (attempt >= retries || !isTransientRequestError(error)) throw error
         }
     }
     throw lastError

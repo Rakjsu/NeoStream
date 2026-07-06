@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { fetchWithRetry } from './fetchRetry'
 import { getInvalidCertificateGuidance, getProviderHttpsAgent, isTlsCertificateError } from './certificatePolicy'
 import { buildTimeshiftM3u8Url, buildTimeshiftPhpUrl } from './timeshiftProtocol'
 
@@ -47,11 +48,13 @@ export class XtreamClient {
         const requestUrl = url.toString()
         let response
         try {
-            response = await axios.get(requestUrl, {
+            // One retry for transient failures (network blip / 5xx) so a
+            // momentary provider hiccup doesn't blank the catalog.
+            response = await fetchWithRetry(() => axios.get(requestUrl, {
                 timeout: 15000,
                 validateStatus: () => true,  // Don't throw on any status
                 httpsAgent: getProviderHttpsAgent(requestUrl, this.baseUrl)
-            })
+            }))
         } catch (error: unknown) {
             if (isTlsCertificateError(error)) {
                 throw new Error(getInvalidCertificateGuidance(), { cause: error })
@@ -76,11 +79,11 @@ export class XtreamClient {
             const fullUrl = url.toString();
             log.info('[XtreamClient] Authenticating to:', fullUrl.replace(this.password, '***'));
 
-            const response = await axios.get(fullUrl, {
+            const response = await fetchWithRetry(() => axios.get(fullUrl, {
                 timeout: 15000,
                 validateStatus: () => true,  // Don't throw on any status
                 httpsAgent: getProviderHttpsAgent(fullUrl, this.baseUrl)
-            });
+            }));
 
             log.info('[XtreamClient] Response status:', response.status, response.statusText);
             log.info('[XtreamClient] Response data:', response.data);

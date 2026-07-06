@@ -3,7 +3,7 @@ import axios from 'axios'
 import { XtreamClient } from './xtreamClient'
 import store from './store'
 import { getCertificateSettings, getProviderHttpsAgent, registerApprovedProviderUrl, setAllowInvalidProviderCertificates } from './certificatePolicy'
-import { fetchWithRetry } from './fetchRetry'
+import { fetchWithRetry, requestWithRetry } from './fetchRetry'
 import { ensureProviderEpgLoaded, getProviderUtcOffsetMinutes, resetProviderEpgState, setupProviderEpgHandlers } from './providerEpg'
 import { formatTimeshiftStart } from './timeshiftProtocol'
 import {
@@ -35,12 +35,14 @@ let savedWindowBounds: Electron.Rectangle | null = null
  */
 /** Download + parse an M3U document (shared by add and the SWR fetcher). */
 async function fetchM3uChannels(url: string) {
-    const response = await axios.get(url, {
+    // One retry for transient failures — a momentary 502 on first boot (no
+    // SWR cache yet) otherwise means an empty catalog.
+    const response = await requestWithRetry(() => axios.get(url, {
         timeout: 20000,
         responseType: 'text',
         transformResponse: [(data: unknown) => data],
         httpsAgent: getProviderHttpsAgent(url, url)
-    })
+    }))
     const text = String(response.data ?? '')
     if (!looksLikeM3u(text)) {
         throw new Error('A URL não devolveu uma lista M3U válida')
