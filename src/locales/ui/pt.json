@@ -654,7 +654,8 @@
     "webRemoteHint": "Mantenha o app aberto no computador. Só funciona na mesma rede local.",
     "webRemoteQrHint": "Aponte a câmera do celular pro código, ou abra a URL. O PIN aparece ao conectar.",
     "webRemoteHttps": "Conexão criptografada (HTTPS)",
-    "webRemoteHttpsHint": "Usa um certificado próprio: o celular mostra um aviso de segurança uma vez, é só aceitar. Protege o tráfego na rede local."
+    "webRemoteHttpsHint": "Usa um certificado próprio: o celular mostra um aviso de segurança uma vez, é só aceitar. Protege o tráfego na rede local.",
+    "webRemoteNewPin": "Gerar novo PIN"
   },
   "welcome": {
     "stepLanguageTitle": "Bem-vindo ao NeoStream",

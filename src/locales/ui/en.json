@@ -304,7 +304,8 @@
     "webRemoteHint": "Keep the app open on the computer. Works only on the same local network.",
     "webRemoteQrHint": "Point your phone camera at the code, or open the URL. The PIN shows when you connect.",
     "webRemoteHttps": "Encrypted connection (HTTPS)",
-    "webRemoteHttpsHint": "Uses a self-signed certificate: your phone shows a one-time security warning — just accept it. Encrypts traffic on the local network."
+    "webRemoteHttpsHint": "Uses a self-signed certificate: your phone shows a one-time security warning — just accept it. Encrypts traffic on the local network.",
+    "webRemoteNewPin": "New PIN"
   },
   "welcome": {
     "stepLanguageTitle": "Welcome to NeoStream",
