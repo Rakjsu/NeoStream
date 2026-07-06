@@ -59,6 +59,9 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
   #guide, #catalog, #series, #episodes, #continue { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
   .cobar { height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); margin-top: 6px; overflow: hidden; }
   .cobar > span { display: block; height: 100%; background: var(--accent); }
+  .castprog { margin-top: 12px; }
+  .castprog .cobar { height: 5px; }
+  .casttime { font-size: 12px; color: rgba(255,255,255,.5); margin-top: 6px; text-align: center; }
   .nowbar {
     background: linear-gradient(135deg, rgba(79,70,229,.25), rgba(99,102,241,.12));
     border: 1px solid rgba(99,102,241,.3); border-radius: 16px; padding: 14px 16px; text-align: left;
@@ -139,6 +142,10 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       <div class="card">
         <div class="title" id="title">—</div>
         <div class="status" id="status">Conectando…</div>
+        <div class="castprog hidden" id="castprog">
+          <div class="cobar"><span id="castbar" style="width:0%"></span></div>
+          <div class="casttime" id="casttime">0:00 / 0:00</div>
+        </div>
         <div class="row seek">
           <button class="ctl" data-cmd="previous" title="Anterior">⏮</button>
           <button class="ctl" data-cmd="seek" data-sec="-30" title="-30s">-30s</button>
@@ -234,6 +241,9 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     var seriesRequested = false;
     var episodes = [];     // [{ id, label }]
     var currentSeriesId = '';
+    var castprogEl = document.getElementById('castprog');
+    var castbarEl = document.getElementById('castbar');
+    var casttimeEl = document.getElementById('casttime');
     var coEl = document.getElementById('continue');
     var colistEl = document.getElementById('colist');
     var coEmptyEl = document.getElementById('co-empty');
@@ -283,6 +293,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
             titleEl.textContent = msg.hasMedia ? (msg.title || 'Reproduzindo') : 'Nada tocando';
             statusEl.textContent = cast + (msg.hasMedia ? (msg.playing ? '▶ Reproduzindo' : '⏸ Pausado') : (msg.casting ? 'Transmitindo na TV' : 'Conectado'));
             statusEl.className = 'status on';
+            updateCastProgress(msg);
           } else if (msg.type === 'guide') {
             guide = { channels: msg.channels || [], playingId: msg.playingId || '', epg: msg.epg || null };
             renderGuide();
@@ -310,6 +321,25 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
           }
         } catch (e) {}
       };
+    }
+
+    function fmtTime(s) {
+      s = Math.max(0, Math.floor(s || 0));
+      var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      var mm = (h > 0 && m < 10 ? '0' : '') + m, ss = (sec < 10 ? '0' : '') + sec;
+      return (h > 0 ? h + ':' : '') + mm + ':' + ss;
+    }
+
+    // Cast progress bar on the Controle card (only while casting with a duration).
+    function updateCastProgress(msg) {
+      var dur = msg.castDuration || 0, cur = msg.castTime || 0;
+      if (msg.casting && dur > 0) {
+        castprogEl.classList.remove('hidden');
+        castbarEl.style.width = Math.max(0, Math.min(100, (cur / dur) * 100)) + '%';
+        casttimeEl.textContent = fmtTime(cur) + ' / ' + fmtTime(dur);
+      } else {
+        castprogEl.classList.add('hidden');
+      }
     }
 
     function showToast(text, kind) {

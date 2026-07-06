@@ -31,7 +31,7 @@ import {
     type NetAddress,
 } from './webRemoteProtocol'
 import { REMOTE_PAGE_HTML } from './webRemotePage'
-import { isCastSessionActive, castRemoteControl } from './castHandlers'
+import { isCastSessionActive, castRemoteControl, getCastStatus } from './castHandlers'
 
 interface WebRemoteConfig {
     enabled: boolean
@@ -98,8 +98,14 @@ export function getLanAddress(): string {
 }
 
 function stateMessage(): string {
-    // `casting` lets the phone show it's driving the Chromecast, not the app.
-    return JSON.stringify({ type: 'state', ...mediaState, casting: isCastSessionActive() })
+    // `casting` lets the phone show it's driving the Chromecast, not the app;
+    // castTime/castDuration drive the cast progress bar on the Controle tab.
+    const cs = getCastStatus()
+    return JSON.stringify({
+        type: 'state', ...mediaState, casting: cs.active,
+        castTime: cs.currentTime, castDuration: cs.duration,
+        castPlaying: cs.playing,
+    })
 }
 
 function guideMessage(): string {
@@ -249,6 +255,12 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
 }
 
 export function setupWebRemote(): void {
+    // While casting, push fresh cast position to the phone every 2s so the
+    // Controle tab's progress bar advances (cheap: only when clients + casting).
+    setInterval(() => {
+        if (clients.size > 0 && isCastSessionActive()) broadcastState()
+    }, 2000)
+
     // Mirror the renderer's player state (the tray listens too; multiple
     // listeners are fine) so new WS clients get the latest snapshot.
     ipcMain.on('media:state', (_e, state: { hasMedia?: boolean; playing?: boolean; title?: string }) => {
