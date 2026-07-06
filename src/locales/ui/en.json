@@ -961,6 +961,9 @@
     "osStep1": "Create a free account at opensubtitles.com.",
     "osStep2": "On the API consumers page (button below), register a personal \"consumer\" — the API key shows up right away.",
     "osStep3": "Paste the key, username and password in the fields above and save.",
-    "osOpenSite": "Open opensubtitles.com/consumers"
+    "osOpenSite": "Open opensubtitles.com/consumers",
+    "osTest": "Test credentials",
+    "osTestOk": "Valid credentials — login OK!",
+    "osTestFail": "OpenSubtitles rejected them. Check the API key, username and password."
   }
 }

@@ -47,7 +47,8 @@ export function ApiKeysSection({ onboarding = false }: { onboarding?: boolean })
     // (electron-store); opcional, o player funciona sem.
     const [os, setOs] = useState<OsConfig>({ apiKey: '', username: '', password: '' });
     const [osConfigured, setOsConfigured] = useState(false);
-    const [osSaved, setOsSaved] = useState(false);
+    const [osTesting, setOsTesting] = useState(false);
+    const [osFeedback, setOsFeedback] = useState<'idle' | 'saved' | 'ok' | 'fail'>('idle');
 
     useEffect(() => {
         void (async () => {
@@ -63,7 +64,20 @@ export function ApiKeysSection({ onboarding = false }: { onboarding?: boolean })
     const handleOsSave = async () => {
         await window.ipcRenderer.invoke('opensubtitles:set-config', os).catch(() => null);
         setOsConfigured(!!os.apiKey.trim());
-        setOsSaved(true);
+        setOsFeedback('saved');
+    };
+
+    // O proxy do main lê as credenciais do store, então o teste salva o que
+    // está no formulário e tenta o /login de verdade na OpenSubtitles.
+    const handleOsTest = async () => {
+        setOsTesting(true);
+        setOsFeedback('idle');
+        await window.ipcRenderer.invoke('opensubtitles:set-config', os).catch(() => null);
+        setOsConfigured(!!os.apiKey.trim());
+        const res = await window.ipcRenderer.invoke('opensubtitles:request', { endpoint: '/login', method: 'POST' })
+            .catch(() => null) as { success: boolean; data?: { token?: string } } | null;
+        setOsTesting(false);
+        setOsFeedback(res?.success && res.data?.token ? 'ok' : 'fail');
     };
 
     const openOsSite = () => {
@@ -153,25 +167,30 @@ export function ApiKeysSection({ onboarding = false }: { onboarding?: boolean })
                     <input
                         id="os-key" className="apikeys-input" type="text" value={os.apiKey}
                         placeholder={t('apiKeys', 'keyPlaceholder')} autoComplete="off" spellCheck={false}
-                        onChange={(e) => { setOs({ ...os, apiKey: e.target.value }); setOsSaved(false); }}
+                        onChange={(e) => { setOs({ ...os, apiKey: e.target.value }); setOsFeedback('idle'); }}
                     />
                     <label className="apikeys-label" htmlFor="os-user" style={{ marginTop: 10 }}>{t('apiKeys', 'osUserLabel')}</label>
                     <input
                         id="os-user" className="apikeys-input" type="text" value={os.username}
                         autoComplete="off" spellCheck={false}
-                        onChange={(e) => { setOs({ ...os, username: e.target.value }); setOsSaved(false); }}
+                        onChange={(e) => { setOs({ ...os, username: e.target.value }); setOsFeedback('idle'); }}
                     />
                     <label className="apikeys-label" htmlFor="os-pass" style={{ marginTop: 10 }}>{t('apiKeys', 'osPassLabel')}</label>
                     <input
                         id="os-pass" className="apikeys-input" type="password" value={os.password}
                         autoComplete="off"
-                        onChange={(e) => { setOs({ ...os, password: e.target.value }); setOsSaved(false); }}
+                        onChange={(e) => { setOs({ ...os, password: e.target.value }); setOsFeedback('idle'); }}
                     />
                     <div className="apikeys-actions">
                         <button className="apikeys-btn primary" onClick={() => { void handleOsSave(); }}>
                             {t('apiKeys', 'save')}
                         </button>
-                        {osSaved && <span className="apikeys-feedback ok">✓ {t('apiKeys', 'saved')}</span>}
+                        <button className="apikeys-btn" onClick={() => { void handleOsTest(); }} disabled={osTesting || !os.apiKey.trim()}>
+                            {osTesting ? t('apiKeys', 'testing') : t('apiKeys', 'osTest')}
+                        </button>
+                        {osFeedback === 'saved' && <span className="apikeys-feedback ok">✓ {t('apiKeys', 'saved')}</span>}
+                        {osFeedback === 'ok' && <span className="apikeys-feedback ok">✓ {t('apiKeys', 'osTestOk')}</span>}
+                        {osFeedback === 'fail' && <span className="apikeys-feedback err">✗ {t('apiKeys', 'osTestFail')}</span>}
                     </div>
                 </div>
 
