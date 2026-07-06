@@ -221,7 +221,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 }
 
 // Actions that always go to the renderer (never routed to the cast session).
-const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'requestCatalog', 'requestContinue', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'requestCatalog', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
@@ -257,6 +257,8 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         win.webContents.send('media:control', 'requestSeries', command.query)
     } else if (command.action === 'requestContinue') {
         win.webContents.send('media:control', 'requestContinue')
+    } else if (command.action === 'requestRecommended') {
+        win.webContents.send('media:control', 'requestRecommended')
     } else if (command.action === 'requestDevices') {
         win.webContents.send('media:control', 'requestDevices')
     } else {
@@ -369,6 +371,31 @@ export function setupWebRemote(): void {
             }
         }).filter((c) => c.castId && c.name)
         broadcast(JSON.stringify({ type: 'continue', items }))
+    })
+
+    // Habit-based "porque você assistiu" rows built by the renderer bridge
+    // (same engine as the Home page), relayed to the phone's Continuar tab.
+    ipcMain.on('web-remote:recommended', (_e, raw: unknown) => {
+        const obj = (raw ?? {}) as Record<string, unknown>
+        const rawGroups = Array.isArray(obj.groups) ? obj.groups : []
+        const groups = rawGroups.slice(0, 5).map((g) => {
+            const grp = (g ?? {}) as Record<string, unknown>
+            const rawItems = Array.isArray(grp.items) ? grp.items : []
+            const items = rawItems.slice(0, 12).map((c) => {
+                const it = (c ?? {}) as Record<string, unknown>
+                return {
+                    kind: it.kind === 'series' ? 'series' : 'movie',
+                    id: String(it.id ?? ''),
+                    name: typeof it.name === 'string' ? it.name.slice(0, 200) : '',
+                    cover: typeof it.cover === 'string' ? it.cover.slice(0, 500) : '',
+                }
+            }).filter((c) => c.id && c.name)
+            return {
+                seed: typeof grp.seed === 'string' ? grp.seed.slice(0, 120) : '',
+                items,
+            }
+        }).filter((g) => g.seed && g.items.length > 0)
+        broadcast(JSON.stringify({ type: 'recommended', groups }))
     })
 
     // Cast targets (Chromecast + DLNA + AirPlay) discovered by the bridge.

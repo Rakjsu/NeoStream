@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { CastQueueItem } from '../services/castQueue';
 import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
+import { getHomeRecommendations, type RecMovie, type RecSeries } from '../services/recommendationService';
 
 /**
  * Always-mounted bridge for the phone web remote's catalog second-screen.
@@ -284,6 +285,41 @@ export function WebRemoteBridge() {
             });
         };
 
+        // Habit-based "porque você assistiu" rows for the phone's Continuar tab —
+        // same engine as the Home page, fed by the main-cached catalog lists.
+        const pushRecommended = async () => {
+            const vodRes = await window.ipcRenderer.invoke('streams:get-vod').catch(() => null) as
+                { success: boolean; data?: VodMovie[] } | null;
+            const vod = vodRes?.success ? (vodRes.data ?? []) : [];
+            // Register the movies so a castMovie for a recommended id resolves.
+            for (const m of vod) moviesRef.current.set(String(m.stream_id), m);
+            const seriesRes = await window.ipcRenderer.invoke('streams:get-series').catch(() => null) as
+                { success: boolean; data?: SeriesItem[] } | null;
+            const series = seriesRes?.success ? (seriesRes.data ?? []) : [];
+            const groups = await getHomeRecommendations(
+                vod as unknown as RecMovie[],
+                series as unknown as RecSeries[],
+            ).catch(() => []);
+            window.ipcRenderer.send('web-remote:recommended', {
+                groups: groups.slice(0, 5).map(g => ({
+                    seed: g.seedName,
+                    items: g.items.slice(0, 12).map(r => r.kind === 'vod'
+                        ? {
+                            kind: 'movie',
+                            id: String((r.item as RecMovie).stream_id),
+                            name: r.item.name,
+                            cover: (r.item as RecMovie).stream_icon || (r.item as RecMovie).cover || '',
+                        }
+                        : {
+                            kind: 'series',
+                            id: String((r.item as RecSeries).series_id),
+                            name: r.item.name,
+                            cover: (r.item as RecSeries).cover || '',
+                        }),
+                })),
+            });
+        };
+
         const castEpisode = async (episodeId: string, target?: CastTarget) => {
             const ep = episodesRef.current.get(episodeId);
             if (!ep) { sendCastResult('error'); return; }
@@ -304,6 +340,7 @@ export function WebRemoteBridge() {
         const handler = (_e: unknown, action: string, arg?: unknown, target?: unknown) => {
             if (action === 'requestCatalog') void pushCatalog(typeof arg === 'string' ? arg : '');
             else if (action === 'requestContinue') void pushContinue();
+            else if (action === 'requestRecommended') void pushRecommended();
             else if (action === 'requestDevices') void pushDevices();
             else if (action === 'castMovie') void castMovie(String(arg ?? ''), asTarget(target));
             else if (action === 'castMovieQueue') void castMovieQueue(Array.isArray(arg) ? (arg as string[]) : [], asTarget(target));

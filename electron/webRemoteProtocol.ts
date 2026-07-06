@@ -125,6 +125,7 @@ export type RemoteCommand =
     | { action: 'requestEpg'; channelId: string }
     | { action: 'requestCatalog'; query?: string }
     | { action: 'requestContinue' }
+    | { action: 'requestRecommended' }
     | { action: 'requestDevices' }
     | { action: 'castMovie'; movieId: string; target?: CastTarget }
     | { action: 'castMovieQueue'; movieIds: string[]; target?: CastTarget }
@@ -134,7 +135,7 @@ export type RemoteCommand =
 
 const VALID_ACTIONS = new Set([
     'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'playChannel', 'requestEpg',
-    'requestCatalog', 'requestContinue', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
+    'requestCatalog', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
 ])
 
 const CAST_TARGET_TYPES = new Set<CastTargetType>(['chromecast', 'dlna', 'airplay'])
@@ -202,6 +203,7 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
     if (action === 'requestCatalog') return { action: 'requestCatalog', query: parseQuery(parsed) }
     if (action === 'requestSeries') return { action: 'requestSeries', query: parseQuery(parsed) }
     if (action === 'requestContinue') return { action: 'requestContinue' }
+    if (action === 'requestRecommended') return { action: 'requestRecommended' }
     if (action === 'requestDevices') return { action: 'requestDevices' }
     return { action: action as 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' | 'subtitle' }
 }
