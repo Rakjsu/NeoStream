@@ -30,7 +30,7 @@ import {
     type PinGateEntry,
     type NetAddress,
 } from './webRemoteProtocol'
-import { REMOTE_PAGE_HTML } from './webRemotePage'
+import { renderRemotePage } from './webRemotePage'
 import { REMOTE_ICON_SVG, buildManifest, solidPng } from './webRemoteAssets'
 import { isCastSessionActive, castRemoteControl, getCastStatus } from './castHandlers'
 
@@ -276,7 +276,20 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     }
 }
 
+// Language of the served phone page — mirrors the app's i18next language
+// (the renderer pushes it on boot and on change); persisted so the very first
+// page load after a restart already comes localized.
+let remoteLang = (store.get('webRemoteLang') as string | undefined) || 'pt'
+
 export function setupWebRemote(): void {
+    ipcMain.on('app:language', (_e, raw: unknown) => {
+        const code = String(raw ?? '').slice(0, 2)
+        if (code === 'pt' || code === 'en' || code === 'es') {
+            remoteLang = code
+            store.set('webRemoteLang', code)
+        }
+    })
+
     // While casting, push fresh cast position to the phone every 2s so the
     // Controle tab's progress bar advances (cheap: only when clients + casting).
     setInterval(() => {
@@ -482,7 +495,7 @@ function start(): Promise<void> {
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
             // PIN is NOT injected — the phone must enter the code shown on
             // the desktop settings screen (the page prompts + stores it).
-            res.end(REMOTE_PAGE_HTML)
+            res.end(renderRemotePage(remoteLang))
             return
         }
         // PWA assets: "Add to home screen" installs the remote as a real app.
