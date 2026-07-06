@@ -961,6 +961,9 @@
     "osStep1": "Crie uma conta gratuita em opensubtitles.com.",
     "osStep2": "Na página de consumidores da API (botão abaixo), registre um \"consumer\" pessoal — a chave de API aparece na hora.",
     "osStep3": "Cole a chave, o usuário e a senha da conta nos campos acima e salve.",
-    "osOpenSite": "Abrir opensubtitles.com/consumers"
+    "osOpenSite": "Abrir opensubtitles.com/consumers",
+    "osTest": "Testar credenciais",
+    "osTestOk": "Credenciais válidas — login OK!",
+    "osTestFail": "A OpenSubtitles recusou. Confira a chave de API, o usuário e a senha."
   }
 }
