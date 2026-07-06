@@ -255,6 +255,11 @@ export function queueSkipPayload(requestId: number, mediaSessionId: number, dire
     })
 }
 
+/** receiver GET_STATUS (prompts a RECEIVER_STATUS listing running apps). */
+export function getReceiverStatusPayload(requestId: number): string {
+    return JSON.stringify({ type: 'GET_STATUS', requestId })
+}
+
 /** media GET_STATUS (prompts a fresh MEDIA_STATUS with currentTime). */
 export function getMediaStatusPayload(requestId: number, mediaSessionId?: number | null): string {
     return JSON.stringify({
@@ -349,6 +354,20 @@ export function extractTransportId(receiverStatusJson: unknown): string | null {
         if (app === null || typeof app !== 'object') continue
         const a = app as Record<string, unknown>
         if (typeof a.transportId === 'string' && a.transportId) return a.transportId
+    }
+    return null
+}
+
+/** appId of the running app in a RECEIVER_STATUS, or null (nothing running). */
+export function extractRunningAppId(receiverStatusJson: unknown): string | null {
+    if (receiverStatusJson === null || typeof receiverStatusJson !== 'object') return null
+    const status = (receiverStatusJson as { status?: { applications?: unknown } }).status
+    const apps = status?.applications
+    if (!Array.isArray(apps)) return null
+    for (const app of apps) {
+        if (app === null || typeof app !== 'object') continue
+        const id = (app as { appId?: unknown }).appId
+        if (typeof id === 'string' && id) return id
     }
     return null
 }

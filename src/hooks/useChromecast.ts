@@ -76,7 +76,19 @@ export function useChromecast(videoUrl: string, videoTitle: string, isLive = fal
         setIsCasting(false);
     }, []);
 
-    return { devices, discoverDevices, castToDevice, stopCasting, isCasting };
+    // Resume control of a cast still running after the app restarted. Returns
+    // the adopted device (for the caller to show the mini-remote), or null.
+    const reconnect = useCallback(async (): Promise<{ id: string; name: string } | null> => {
+        const result = await window.ipcRenderer.invoke('cast:reconnect').catch(() => null) as
+            { success: boolean; active?: boolean; deviceId?: string; deviceName?: string } | null;
+        if (result?.success && result.active && result.deviceId) {
+            setIsCasting(true);
+            return { id: result.deviceId, name: result.deviceName ?? 'Chromecast' };
+        }
+        return null;
+    }, []);
+
+    return { devices, discoverDevices, castToDevice, stopCasting, reconnect, isCasting };
 }
 
 /** Mini-remote adapter for Chromecast sessions (mirrors useDLNA.castControls). */

@@ -12,6 +12,8 @@ import {
     extractQueueItems,
     extractCurrentItemId,
     getMediaStatusPayload,
+    getReceiverStatusPayload,
+    extractRunningAppId,
     setVolumePayload,
     extractMediaTimes,
     mediaCommandPayload,
@@ -125,6 +127,16 @@ describe('fase 2: status, volume e legendas', () => {
         const times = extractMediaTimes({ status: [{ currentTime: 42.5, media: { duration: 3600 } }] });
         expect(times).toEqual({ currentTime: 42.5, duration: 3600 });
         expect(extractMediaTimes({ status: [] })).toBeNull();
+    });
+
+    it('getReceiverStatusPayload e extractRunningAppId (reconexão)', () => {
+        expect(JSON.parse(getReceiverStatusPayload(4))).toEqual({ type: 'GET_STATUS', requestId: 4 });
+        // Receptor de mídia rodando → devolve o appId (CC1AD845).
+        expect(extractRunningAppId({ status: { applications: [{ appId: 'CC1AD845', transportId: 'web-5' }] } }))
+            .toBe('CC1AD845');
+        // Nada rodando → null (nada pra retomar).
+        expect(extractRunningAppId({ status: { applications: [] } })).toBeNull();
+        expect(extractRunningAppId({})).toBeNull();
     });
 });
 
