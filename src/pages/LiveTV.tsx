@@ -703,8 +703,11 @@ export function LiveTV() {
                         50% { transform: scale(1.1); opacity: 0.8; }
                     }
                     @keyframes ringExpand {
-                        0% { transform: scale(0.8); opacity: 0.8; }
-                        100% { transform: scale(2); opacity: 0; }
+                        /* The keyframe transform REPLACES the inline one, so the
+                           centering translate must ride along — without it the
+                           rings anchored top-left and drifted out of the icon. */
+                        0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.8; }
+                        100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
                     }
                     @keyframes shimmerLoad {
                         0% { background-position: -200% 0; }
