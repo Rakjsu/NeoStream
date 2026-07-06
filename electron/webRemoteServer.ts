@@ -207,11 +207,14 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
     socket.on('error', drop)
 }
 
+// Actions that always go to the renderer (never routed to the cast session).
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'requestCatalog', 'castMovie'])
+
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
     // While a Chromecast is casting, transport commands drive the cast instead
-    // of the local player. Channel actions always go to the renderer.
-    if (command.action !== 'playChannel') {
+    // of the local player. Channel/catalog actions always go to the renderer.
+    if (!RENDERER_ONLY.has(command.action)) {
         const seconds = command.action === 'seek' ? command.seconds : undefined
         if (castRemoteControl(command.action, seconds)) {
             broadcastState() // refresh the phone's casting/playing indicator
@@ -227,6 +230,10 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         win.webContents.send('media:control', 'playChannel', command.channelId)
     } else if (command.action === 'requestEpg') {
         win.webContents.send('media:control', 'requestEpg', command.channelId)
+    } else if (command.action === 'castMovie') {
+        win.webContents.send('media:control', 'castMovie', command.movieId)
+    } else if (command.action === 'requestCatalog') {
+        win.webContents.send('media:control', 'requestCatalog')
     } else {
         win.webContents.send('media:control', command.action)
     }
@@ -266,6 +273,21 @@ export function setupWebRemote(): void {
             nowEnd: str(obj.nowEnd, 20),
             next: str(obj.next, 200),
         }))
+    })
+
+    // The renderer bridge answers requestCatalog with a page of movies here.
+    ipcMain.on('web-remote:catalog', (_e, raw: unknown) => {
+        const obj = (raw ?? {}) as Record<string, unknown>
+        const rawItems = Array.isArray(obj.items) ? obj.items : []
+        const items = rawItems.slice(0, 400).map((c) => {
+            const it = (c ?? {}) as Record<string, unknown>
+            return {
+                id: String(it.id ?? ''),
+                name: typeof it.name === 'string' ? it.name.slice(0, 200) : '',
+                cover: typeof it.cover === 'string' ? it.cover.slice(0, 500) : '',
+            }
+        }).filter((c) => c.id && c.name)
+        broadcast(JSON.stringify({ type: 'catalog', items }))
     })
 
     ipcMain.handle('web-remote:get-config', () => ({

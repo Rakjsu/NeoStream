@@ -79,6 +79,12 @@ describe('parseRemoteCommand', () => {
             .toEqual({ action: 'requestEpg', channelId: '77' })
         expect(parseRemoteCommand('{"action":"requestEpg"}')).toBeNull()
     })
+    it('aceita requestCatalog e castMovie', () => {
+        expect(parseRemoteCommand('{"action":"requestCatalog"}')).toEqual({ action: 'requestCatalog' })
+        expect(parseRemoteCommand('{"action":"castMovie","movieId":"42"}'))
+            .toEqual({ action: 'castMovie', movieId: '42' })
+        expect(parseRemoteCommand('{"action":"castMovie"}')).toBeNull() // movieId ausente
+    })
     it('rejeita lixo e ações desconhecidas', () => {
         expect(parseRemoteCommand('não-json')).toBeNull()
         expect(parseRemoteCommand('{"action":"rm -rf"}')).toBeNull()
