@@ -4,7 +4,7 @@
  * the TV stops and notifies the parent.
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, Square, Volume2, Tv, ListVideo, SkipBack, SkipForward, Subtitles } from 'lucide-react';
+import { Play, Pause, Square, Volume2, Tv, ListVideo, SkipBack, SkipForward, Subtitles, AudioLines } from 'lucide-react';
 import { castControls, type CastStatus } from '../hooks/useDLNA';
 import { chromecastControls } from '../hooks/useChromecast';
 import { formatTime } from '../utils/videoHelpers';
@@ -30,6 +30,7 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
     const [status, setStatus] = useState<CastStatus | null>(null);
     const [pendingVolume, setPendingVolume] = useState<number | null>(null);
     const [showQueue, setShowQueue] = useState(false);
+    const [showAudio, setShowAudio] = useState(false);
     const stoppedPolls = useRef(0);
     const failedPolls = useRef(0);
     // 0 = "treat mount time as the first command" — set on mount effect below.
@@ -83,6 +84,8 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                     currentItemId: result.currentItemId ?? null,
                     subtitleAvailable: result.subtitleAvailable === true,
                     subtitleEnabled: result.subtitleEnabled !== false,
+                    audioTracks: result.audioTracks ?? [],
+                    activeAudioTrackId: result.activeAudioTrackId ?? null,
                 });
 
                 // TV reports STOPPED/NO_MEDIA for several consecutive polls →
@@ -161,6 +164,16 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
         markCommand();
         setStatus(prev => prev ? { ...prev, subtitleEnabled: !subtitleEnabled } : prev);
         await remote.setSubtitleEnabled(!subtitleEnabled);
+    };
+    // 🔊 audio renditions — only HLS multi-audio ever reports more than one;
+    // progressive MP4/MKV can't switch, so the menu simply never shows there.
+    const audioTracks = status?.audioTracks ?? [];
+    const handleAudioClick = async (event: React.MouseEvent<HTMLButtonElement>) => {
+        const trackId = Number(event.currentTarget.dataset.trackId);
+        markCommand();
+        setShowAudio(false);
+        setStatus(prev => prev ? { ...prev, activeAudioTrackId: trackId } : prev);
+        await remote.setAudioTrack(trackId);
     };
     // Passed directly to onClick (reads the itemId off the button) so the
     // react-hooks purity rule sees markCommand only via an event handler.
@@ -316,6 +329,54 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                 >
                     <Subtitles size={14} />
                 </button>
+            )}
+
+            {/* 🔊 audio renditions — only when the receiver reports alternatives */}
+            {audioTracks.length > 1 && (
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <button
+                        onClick={() => setShowAudio(v => !v)}
+                        title="Faixa de áudio"
+                        aria-label="Faixa de áudio"
+                        style={{
+                            background: showAudio ? 'rgba(var(--ns-accent-rgb), 0.8)' : 'rgba(255,255,255,0.08)',
+                            border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', display: 'flex', color: 'white',
+                        }}
+                    >
+                        <AudioLines size={14} />
+                    </button>
+                    {showAudio && (
+                        <div style={{
+                            position: 'absolute', bottom: 'calc(100% + 10px)', right: 0, width: 220, maxHeight: 220,
+                            overflowY: 'auto', background: 'rgba(15,15,35,0.98)', border: '1px solid rgba(var(--ns-accent-rgb),0.4)',
+                            borderRadius: 12, padding: 6, boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+                        }}>
+                            {audioTracks.map((track, i) => {
+                                const isCurrent = track.trackId === status?.activeAudioTrackId;
+                                const label = track.name || track.language || `Áudio ${i + 1}`;
+                                return (
+                                    <button
+                                        key={track.trackId}
+                                        data-track-id={track.trackId}
+                                        onClick={handleAudioClick}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                                            padding: '8px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', color: 'white',
+                                            fontSize: 12, background: isCurrent ? 'rgba(var(--ns-accent-rgb),0.25)' : 'transparent',
+                                        }}
+                                    >
+                                        <span style={{ width: 18, flexShrink: 0, color: '#9ca3af', fontSize: 11 }}>
+                                            {isCurrent ? '🔊' : i + 1}
+                                        </span>
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {label}{track.language && track.name ? ` (${track.language})` : ''}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
             )}
 
             {/* Queue toggle — only when a Chromecast queue is active */}

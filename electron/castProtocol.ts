@@ -263,17 +263,60 @@ export function queueSkipPayload(requestId: number, mediaSessionId: number, dire
 }
 
 /**
- * EDIT_TRACKS_INFO — toggle the WebVTT TEXT track mid-playback. Our LOAD /
- * QUEUE_LOAD items carry at most one track (trackId 1), so enabling means
- * activeTrackIds [1] and disabling means [].
+ * EDIT_TRACKS_INFO — set the active tracks mid-playback. Callers compose the
+ * list: our sender-side WebVTT subtitle is trackId 1; receiver-side AUDIO
+ * tracks (HLS multi-audio) use the ids the device reports in MEDIA_STATUS.
  */
-export function editTracksPayload(requestId: number, mediaSessionId: number, subtitleEnabled: boolean): string {
+export function editTracksPayload(requestId: number, mediaSessionId: number, activeTrackIds: number[]): string {
     return JSON.stringify({
         type: 'EDIT_TRACKS_INFO',
         requestId,
         mediaSessionId,
-        activeTrackIds: subtitleEnabled ? [1] : [],
+        activeTrackIds,
     })
+}
+
+/** An AUDIO track the receiver reports for the current media (HLS multi-audio). */
+export interface AudioTrackInfo {
+    trackId: number
+    name: string
+    language: string
+}
+
+/**
+ * AUDIO tracks out of a MEDIA_STATUS. Only HLS with alternate renditions
+ * reports these; progressive MP4/MKV won't (the receiver can't switch there),
+ * so an empty list simply means "no switchable audio".
+ */
+export function extractAudioTracks(mediaStatusJson: unknown): AudioTrackInfo[] {
+    if (mediaStatusJson === null || typeof mediaStatusJson !== 'object') return []
+    const status = (mediaStatusJson as { status?: unknown }).status
+    if (!Array.isArray(status) || status.length === 0) return []
+    const media = (status[0] as { media?: { tracks?: unknown } }).media
+    const tracks = media?.tracks
+    if (!Array.isArray(tracks)) return []
+    const out: AudioTrackInfo[] = []
+    for (const track of tracks) {
+        if (track === null || typeof track !== 'object') continue
+        const t = track as { trackId?: unknown; type?: unknown; name?: unknown; language?: unknown }
+        if (t.type !== 'AUDIO' || typeof t.trackId !== 'number') continue
+        out.push({
+            trackId: t.trackId,
+            name: typeof t.name === 'string' ? t.name : '',
+            language: typeof t.language === 'string' ? t.language : '',
+        })
+    }
+    return out
+}
+
+/** The receiver's current activeTrackIds (audio + text), or null when absent. */
+export function extractActiveTrackIds(mediaStatusJson: unknown): number[] | null {
+    if (mediaStatusJson === null || typeof mediaStatusJson !== 'object') return null
+    const status = (mediaStatusJson as { status?: unknown }).status
+    if (!Array.isArray(status) || status.length === 0) return null
+    const ids = (status[0] as { activeTrackIds?: unknown }).activeTrackIds
+    if (!Array.isArray(ids)) return null
+    return ids.filter((id): id is number => typeof id === 'number')
 }
 
 /** receiver GET_STATUS (prompts a RECEIVER_STATUS listing running apps). */

@@ -10,6 +10,8 @@ import {
     queueSkipPayload,
     queueJumpPayload,
     editTracksPayload,
+    extractAudioTracks,
+    extractActiveTrackIds,
     extractQueueItems,
     extractCurrentItemId,
     getMediaStatusPayload,
@@ -192,10 +194,38 @@ describe('fila de cast (QUEUE_LOAD)', () => {
         expect(payload.items[2].startTime).toBeUndefined();
     });
 
-    it('editTracksPayload liga/desliga a track de legenda (trackId 1)', () => {
-        expect(JSON.parse(editTracksPayload(6, 9, true)))
+    it('editTracksPayload manda os activeTrackIds compostos (áudio + legenda)', () => {
+        expect(JSON.parse(editTracksPayload(6, 9, [1])))
             .toEqual({ type: 'EDIT_TRACKS_INFO', requestId: 6, mediaSessionId: 9, activeTrackIds: [1] });
-        expect(JSON.parse(editTracksPayload(7, 9, false)).activeTrackIds).toEqual([]);
+        expect(JSON.parse(editTracksPayload(7, 9, [])).activeTrackIds).toEqual([]);
+        expect(JSON.parse(editTracksPayload(8, 9, [3, 1])).activeTrackIds).toEqual([3, 1]);
+    });
+
+    it('extractAudioTracks lê só as faixas AUDIO do MEDIA_STATUS', () => {
+        const status = {
+            status: [{
+                media: {
+                    tracks: [
+                        { trackId: 1, type: 'TEXT', name: 'Legenda' },
+                        { trackId: 2, type: 'AUDIO', name: 'Português', language: 'pt-BR' },
+                        { trackId: 3, type: 'AUDIO', language: 'en' },
+                        { trackId: 'x', type: 'AUDIO' }, // id inválido → fora
+                    ],
+                },
+            }],
+        };
+        expect(extractAudioTracks(status)).toEqual([
+            { trackId: 2, name: 'Português', language: 'pt-BR' },
+            { trackId: 3, name: '', language: 'en' },
+        ]);
+        expect(extractAudioTracks({ status: [{}] })).toEqual([]);
+        expect(extractAudioTracks(null)).toEqual([]);
+    });
+
+    it('extractActiveTrackIds lê os ids ativos (ou null quando ausentes)', () => {
+        expect(extractActiveTrackIds({ status: [{ activeTrackIds: [2, 1, 'x'] }] })).toEqual([2, 1]);
+        expect(extractActiveTrackIds({ status: [{}] })).toBeNull();
+        expect(extractActiveTrackIds({})).toBeNull();
     });
 
     it('queueSkipPayload gera QUEUE_NEXT/QUEUE_PREV com a sessão', () => {
