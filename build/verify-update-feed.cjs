@@ -54,10 +54,22 @@ function main() {
         console.error(`[verify-update-feed] pasta não encontrada: ${RELEASE_DIR}`)
         process.exit(1)
     }
-    const feeds = fs.readdirSync(RELEASE_DIR).filter(f => /^latest.*\.yml$/.test(f))
+    const releaseFiles = fs.readdirSync(RELEASE_DIR)
+    const feeds = releaseFiles.filter(f => /^latest.*\.yml$/.test(f))
     if (feeds.length === 0) {
         console.error('[verify-update-feed] nenhum latest*.yml em release/ — nada pra verificar')
         process.exit(1)
+    }
+
+    // electron-builder names mac artifacts on disk with a space/dot in the
+    // product name ("NeoStream IPTV-…") but lists them in latest-mac.yml with a
+    // dash ("NeoStream-IPTV-…"). Match by a separator-insensitive key so the
+    // feed still resolves to the real file (content — hence sha512 — is equal).
+    const normalize = (s) => s.toLowerCase().replace(/[\s._-]+/g, '-')
+    const byNorm = new Map(releaseFiles.map(f => [normalize(f), f]))
+    const resolveFile = (url) => {
+        if (fs.existsSync(path.join(RELEASE_DIR, url))) return url
+        return byNorm.get(normalize(url)) ?? null
     }
 
     let problems = 0
@@ -69,12 +81,13 @@ function main() {
             continue
         }
         for (const entry of entries) {
-            const target = path.join(RELEASE_DIR, entry.url)
-            if (!fs.existsSync(target)) {
+            const resolved = resolveFile(entry.url)
+            if (!resolved) {
                 console.error(`[verify-update-feed] ${feed}: arquivo ausente → ${entry.url}`)
                 problems++
                 continue
             }
+            const target = path.join(RELEASE_DIR, resolved)
             const actualSize = fs.statSync(target).size
             if (typeof entry.size === 'number' && actualSize !== entry.size) {
                 console.error(`[verify-update-feed] ${feed}: tamanho não bate em ${entry.url} (feed ${entry.size} ≠ real ${actualSize})`)
