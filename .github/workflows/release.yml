@@ -49,6 +49,12 @@ jobs:
         if: runner.os == 'Windows'
         run: node build/build-custom-installer.cjs
 
+      # Guard the auto-update feed: latest*.yml must still match the artifacts
+      # on disk after every build step (incl. the custom installer). Catches a
+      # stale sha512 before it reaches users as a "checksum mismatch".
+      - name: Verify auto-update feed
+        run: node build/verify-update-feed.cjs
+
       - name: Attach artifacts to the release
         uses: softprops/action-gh-release@v2
         with:
