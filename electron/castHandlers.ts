@@ -139,18 +139,32 @@ export function setupCastHandlers(): void {
         }
     })
 
-    ipcMain.handle('cast:play-queue', async (_e, payload: { deviceId?: string; items?: { url?: string; title?: string; contentType?: string }[] }) => {
+    ipcMain.handle('cast:play-queue', async (_e, payload: { deviceId?: string; items?: { url?: string; title?: string; contentType?: string; subtitleVtt?: string; subtitleLanguage?: string }[] }) => {
         try {
             const device = devices.get(String(payload?.deviceId ?? ''))
             if (!device) return { success: false, error: 'Dispositivo não encontrado' }
-            const items = (payload?.items ?? [])
-                .filter(i => typeof i?.url === 'string' && /^https?:\/\//.test(i.url))
-                .map(i => ({
+            const raw = (payload?.items ?? []).filter(i => typeof i?.url === 'string' && /^https?:\/\//.test(i.url))
+            const items: CastMediaInput[] = []
+            for (const i of raw) {
+                // Each item's optional WebVTT rides the same LAN proxy as the
+                // single LOAD; a failed registration just drops that subtitle.
+                let subtitleUrl: string | undefined
+                if (typeof i.subtitleVtt === 'string' && i.subtitleVtt.trim()) {
+                    try {
+                        subtitleUrl = await registerCastSubtitleVtt(i.subtitleVtt, device.host)
+                    } catch (error) {
+                        log.warn('[Cast] legenda da fila indisponível:', error)
+                    }
+                }
+                items.push({
                     url: String(i.url),
                     title: String(i.title ?? 'NeoStream'),
                     contentType: String(i.contentType ?? (String(i.url).includes('.m3u8') ? 'application/x-mpegurl' : 'video/mp4')),
                     live: false,
-                }))
+                    subtitleUrl,
+                    subtitleLanguage: typeof i.subtitleLanguage === 'string' ? i.subtitleLanguage : undefined,
+                })
+            }
             if (items.length === 0) return { success: false, error: 'Fila vazia' }
 
             stopActiveSession()

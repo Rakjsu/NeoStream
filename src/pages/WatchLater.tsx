@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { watchLaterService, type WatchLaterItem } from '../services/watchLater';
-import { castResolvedQueue } from '../services/castQueue';
+import { castResolvedQueue, type CastQueueItem } from '../services/castQueue';
 import { ContentDetailModal } from '../components/ContentDetailModal';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { ResumeModal } from '../components/ResumeModal';
@@ -95,11 +95,21 @@ export function WatchLater() {
         setCastingQueue(true);
         setCastMessage(t('watchLater', 'castResolving'));
         try {
-            const queue: { url: string; title: string }[] = [];
+            // Best-effort subtitle per movie (few items here) so the cast queue
+            // carries legendas, same as the single-item cast. Failures skip.
+            const { autoFetchSubtitle } = await import('../services/subtitleService');
+            const queue: CastQueueItem[] = [];
             for (const movie of movies) {
                 const res = await window.ipcRenderer.invoke('streams:get-vod-url', { streamId: movie.id, container: 'mp4' })
                     .catch(() => null) as { success: boolean; url?: string } | null;
-                if (res?.success && res.url) queue.push({ url: res.url, title: movie.name });
+                if (!res?.success || !res.url) continue;
+                let subtitleVtt: string | undefined;
+                let subtitleLanguage: string | undefined;
+                try {
+                    const sub = await autoFetchSubtitle({ title: movie.name });
+                    if (sub?.vttContent) { subtitleVtt = sub.vttContent; subtitleLanguage = sub.language; }
+                } catch { /* best-effort: cast without subtitle */ }
+                queue.push({ url: res.url, title: movie.name, subtitleVtt, subtitleLanguage });
             }
 
             const result = await castResolvedQueue(queue);
