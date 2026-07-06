@@ -1,7 +1,7 @@
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { catalogRefreshService } from './services/catalogRefreshService';
 import { tvModeService } from './services/tvModeService';
-import { collectBackup, encodePlaylistPassword, sanitizeBackupPlaylists, decodePlaylistPassword, type BackupPlaylist } from './services/backupService';
+import { collectBackup, encodePlaylistPassword, sanitizeBackupPlaylists, sanitizeBackupOpenSubtitles, decodePlaylistPassword, type BackupPlaylist, type OpenSubtitlesCreds } from './services/backupService';
 import { mergeSyncData } from './services/syncMerge';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Welcome } from './pages/Welcome';
@@ -99,12 +99,24 @@ async function exportPlaylistsForBackup(): Promise<BackupPlaylist[]> {
     return [];
 }
 
+// The user's OpenSubtitles credentials (main-process store) for the v3 backup.
+async function exportOpenSubtitlesForBackup(): Promise<OpenSubtitlesCreds | undefined> {
+    try {
+        const cfg = await window.ipcRenderer.invoke('opensubtitles:get-config') as
+            ({ success: boolean } & OpenSubtitlesCreds) | null;
+        if (cfg?.success && cfg.apiKey) {
+            return { apiKey: cfg.apiKey, username: cfg.username, password: cfg.password };
+        }
+    } catch { /* export without OpenSubtitles */ }
+    return undefined;
+}
+
 // Auto-backup: the main-process clock asks, the renderer collects the same
 // payload as the manual export and hands it back to be written to disk.
 if (typeof window !== 'undefined' && window.ipcRenderer) {
     window.ipcRenderer.on('backup:auto-collect', () => {
         void (async () => {
-            const payload = collectBackup(await exportPlaylistsForBackup());
+            const payload = collectBackup(await exportPlaylistsForBackup(), await exportOpenSubtitlesForBackup());
             await window.ipcRenderer.invoke('backup:auto-save', { json: JSON.stringify(payload, null, 2) })
                 .catch(() => undefined);
         })();
@@ -148,10 +160,20 @@ if (typeof window !== 'undefined' && window.ipcRenderer) {
                             }))
                         }).catch(() => undefined);
                     }
+
+                    // OpenSubtitles creds: adopt from the other machine only when
+                    // we have none (same adopt-if-absent policy as scalar keys).
+                    const remoteOs = sanitizeBackupOpenSubtitles((parsed as { openSubtitles?: unknown }).openSubtitles);
+                    if (remoteOs) {
+                        const localOs = await exportOpenSubtitlesForBackup();
+                        if (!localOs) {
+                            await window.ipcRenderer.invoke('opensubtitles:set-config', remoteOs).catch(() => undefined);
+                        }
+                    }
                 } catch { /* skip corrupted remote file */ }
             }
 
-            const merged = collectBackup(await exportPlaylistsForBackup());
+            const merged = collectBackup(await exportPlaylistsForBackup(), await exportOpenSubtitlesForBackup());
             await window.ipcRenderer.invoke('sync:save', { json: JSON.stringify(merged, null, 2) })
                 .catch(() => undefined);
 

@@ -75,6 +75,10 @@ export function Welcome() {
                     }))
                 }).catch(() => undefined);
             }
+            // v3: the backup carries the OpenSubtitles credentials too.
+            if (report.openSubtitles) {
+                await window.ipcRenderer.invoke('opensubtitles:set-config', report.openSubtitles).catch(() => undefined);
+            }
             playlistService.reloadIntoDashboard(true);
         } catch {
             setError(t('welcome', 'restoreError'));
