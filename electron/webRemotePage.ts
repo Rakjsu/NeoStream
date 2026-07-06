@@ -9,12 +9,92 @@
  * a channel to switch (the LiveTV page pushes the guide data).
  */
 
-export const REMOTE_PAGE_HTML = `<!doctype html>
-<html lang="pt-BR">
+export type RemoteLang = 'pt' | 'en' | 'es'
+
+// Every user-facing string of the phone page, in the app's three languages.
+// Static HTML uses ${t.*}; the runtime script gets the whole dict as `L`.
+const STRINGS: Record<RemoteLang, Record<string, string>> = {
+    pt: {
+        htmlLang: 'pt-BR', brandSuffix: 'Controle',
+        pinTitle: 'Digite o PIN', pinHint: 'O c\u00f3digo aparece em Configura\u00e7\u00f5es \u2192 Rede no computador',
+        pinConnect: 'Conectar', pinWrong: 'PIN incorreto. Confira o c\u00f3digo no computador.', pinLen: 'O PIN tem 4 d\u00edgitos.',
+        tabControl: 'Controle', tabGuide: 'Guia', tabMovies: 'Filmes', tabSeries: 'S\u00e9ries', tabContinue: 'Continuar',
+        castTo: 'Transmitir em', devAuto: 'Autom\u00e1tico (1\u00aa TV)',
+        searchAllPh: 'Buscar filmes e s\u00e9ries\u2026', searchPrompt: 'Digite para buscar no acervo.', searching: 'Buscando\u2026', noResults: 'Nenhum resultado.',
+        connecting: 'Conectando\u2026', connected: 'Conectado', reconnecting: 'Reconectando\u2026',
+        prev: 'Anterior', playPause: 'Play/Pause', next: 'Pr\u00f3ximo', volDown: 'Volume -', mute: 'Mudo', volUp: 'Volume +',
+        subtitle: 'Legenda', audio: '\u00c1udio', stop: 'Parar',
+        hint: 'Mantenha o app aberto no computador. Este controle funciona na mesma rede Wi-Fi.',
+        nowOnTv: 'Agora na TV', noChannel: 'Nenhum canal tocando', searchChannel: 'Buscar canal\u2026',
+        guideEmpty: 'Abra a <b>TV ao vivo</b> no computador para ver os canais aqui.',
+        searchMovie: 'Buscar filme\u2026', loadingMovies: 'Carregando filmes\u2026', noMovies: 'Nenhum filme.', noMovieFound: 'Nenhum filme encontrado.',
+        castQueue: 'Transmitir fila',
+        searchSeries: 'Buscar s\u00e9rie\u2026', loadingSeries: 'Carregando s\u00e9ries\u2026', noSeries: 'Nenhuma s\u00e9rie.', noSeriesFound: 'Nenhuma s\u00e9rie encontrada.',
+        seeEpisodes: 'Ver epis\u00f3dios', back: 'Voltar', loadingEpisodes: 'Carregando epis\u00f3dios\u2026', noEpisodes: 'Nenhum epis\u00f3dio.',
+        loading: 'Carregando\u2026', nothingInProgress: 'Nada em andamento.', resumeOnTv: 'Retomar na TV', castToTv: 'Transmitir na TV',
+        becauseWatched: 'Porque voc\u00ea assistiu',
+        playing: 'Reproduzindo', paused: 'Pausado', nothingPlaying: 'Nada tocando', castingOnTv: 'Transmitindo na TV',
+        castingToast: 'Transmitindo', onDevice: ' em ', noTvFound: 'Nenhuma TV encontrada na rede', castFailed: 'Falha ao transmitir',
+        nextUp: 'A seguir: ', noInfo: 'Sem informa\u00e7\u00e3o', noChannelFound: 'Nenhum canal encontrado.', programming: 'Programa\u00e7\u00e3o',
+    },
+    en: {
+        htmlLang: 'en', brandSuffix: 'Remote',
+        pinTitle: 'Enter the PIN', pinHint: 'The code is shown under Settings \u2192 Network on the computer',
+        pinConnect: 'Connect', pinWrong: 'Wrong PIN. Check the code on the computer.', pinLen: 'The PIN has 4 digits.',
+        tabControl: 'Remote', tabGuide: 'Guide', tabMovies: 'Movies', tabSeries: 'Series', tabContinue: 'Continue',
+        castTo: 'Cast to', devAuto: 'Automatic (1st TV)',
+        searchAllPh: 'Search movies & series\u2026', searchPrompt: 'Type to search the library.', searching: 'Searching\u2026', noResults: 'No results.',
+        connecting: 'Connecting\u2026', connected: 'Connected', reconnecting: 'Reconnecting\u2026',
+        prev: 'Previous', playPause: 'Play/Pause', next: 'Next', volDown: 'Volume -', mute: 'Mute', volUp: 'Volume +',
+        subtitle: 'Subtitles', audio: 'Audio', stop: 'Stop',
+        hint: 'Keep the app open on the computer. This remote works on the same Wi-Fi network.',
+        nowOnTv: 'Now on TV', noChannel: 'No channel playing', searchChannel: 'Search channel\u2026',
+        guideEmpty: 'Open <b>Live TV</b> on the computer to see the channels here.',
+        searchMovie: 'Search movie\u2026', loadingMovies: 'Loading movies\u2026', noMovies: 'No movies.', noMovieFound: 'No movie found.',
+        castQueue: 'Cast queue',
+        searchSeries: 'Search series\u2026', loadingSeries: 'Loading series\u2026', noSeries: 'No series.', noSeriesFound: 'No series found.',
+        seeEpisodes: 'View episodes', back: 'Back', loadingEpisodes: 'Loading episodes\u2026', noEpisodes: 'No episodes.',
+        loading: 'Loading\u2026', nothingInProgress: 'Nothing in progress.', resumeOnTv: 'Resume on TV', castToTv: 'Cast to TV',
+        becauseWatched: 'Because you watched',
+        playing: 'Playing', paused: 'Paused', nothingPlaying: 'Nothing playing', castingOnTv: 'Casting to TV',
+        castingToast: 'Casting', onDevice: ' on ', noTvFound: 'No TV found on the network', castFailed: 'Failed to cast',
+        nextUp: 'Up next: ', noInfo: 'No information', noChannelFound: 'No channel found.', programming: 'Schedule',
+    },
+    es: {
+        htmlLang: 'es', brandSuffix: 'Control',
+        pinTitle: 'Ingresa el PIN', pinHint: 'El c\u00f3digo aparece en Configuraci\u00f3n \u2192 Red en la computadora',
+        pinConnect: 'Conectar', pinWrong: 'PIN incorrecto. Verifica el c\u00f3digo en la computadora.', pinLen: 'El PIN tiene 4 d\u00edgitos.',
+        tabControl: 'Control', tabGuide: 'Gu\u00eda', tabMovies: 'Pel\u00edculas', tabSeries: 'Series', tabContinue: 'Continuar',
+        castTo: 'Transmitir a', devAuto: 'Autom\u00e1tico (1\u00aa TV)',
+        searchAllPh: 'Buscar pel\u00edculas y series\u2026', searchPrompt: 'Escribe para buscar en el cat\u00e1logo.', searching: 'Buscando\u2026', noResults: 'Sin resultados.',
+        connecting: 'Conectando\u2026', connected: 'Conectado', reconnecting: 'Reconectando\u2026',
+        prev: 'Anterior', playPause: 'Play/Pausa', next: 'Siguiente', volDown: 'Volumen -', mute: 'Silencio', volUp: 'Volumen +',
+        subtitle: 'Subt\u00edtulos', audio: 'Audio', stop: 'Detener',
+        hint: 'Mant\u00e9n la app abierta en la computadora. Este control funciona en la misma red Wi-Fi.',
+        nowOnTv: 'Ahora en la TV', noChannel: 'Ning\u00fan canal en reproducci\u00f3n', searchChannel: 'Buscar canal\u2026',
+        guideEmpty: 'Abre <b>TV en vivo</b> en la computadora para ver los canales aqu\u00ed.',
+        searchMovie: 'Buscar pel\u00edcula\u2026', loadingMovies: 'Cargando pel\u00edculas\u2026', noMovies: 'No hay pel\u00edculas.', noMovieFound: 'No se encontr\u00f3 ninguna pel\u00edcula.',
+        castQueue: 'Transmitir cola',
+        searchSeries: 'Buscar serie\u2026', loadingSeries: 'Cargando series\u2026', noSeries: 'No hay series.', noSeriesFound: 'No se encontr\u00f3 ninguna serie.',
+        seeEpisodes: 'Ver episodios', back: 'Volver', loadingEpisodes: 'Cargando episodios\u2026', noEpisodes: 'No hay episodios.',
+        loading: 'Cargando\u2026', nothingInProgress: 'Nada en curso.', resumeOnTv: 'Reanudar en la TV', castToTv: 'Transmitir a la TV',
+        becauseWatched: 'Porque viste',
+        playing: 'Reproduciendo', paused: 'En pausa', nothingPlaying: 'Nada en reproducci\u00f3n', castingOnTv: 'Transmitiendo en la TV',
+        castingToast: 'Transmitiendo', onDevice: ' en ', noTvFound: 'No se encontr\u00f3 ninguna TV en la red', castFailed: 'Error al transmitir',
+        nextUp: 'A continuaci\u00f3n: ', noInfo: 'Sin informaci\u00f3n', noChannelFound: 'No se encontr\u00f3 ning\u00fan canal.', programming: 'Programaci\u00f3n',
+    },
+}
+
+/** Render the phone page in the app's language (anything unknown falls back to pt). */
+export function renderRemotePage(lang?: string): string {
+    const code: RemoteLang = lang === 'en' || lang === 'es' ? lang : 'pt'
+    const t = STRINGS[code]
+    return `<!doctype html>
+<html lang="${t.htmlLang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>NeoStream — Controle</title>
+<title>NeoStream — ${t.brandSuffix}</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/svg+xml" href="/icon.svg">
 <link rel="apple-touch-icon" href="/icon.png">
@@ -129,41 +209,41 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
 </style>
 </head>
 <body>
-  <div class="brand">Neo<span>Stream</span> · Controle</div>
+  <div class="brand">Neo<span>Stream</span> · ${t.brandSuffix}</div>
 
   <div class="card" id="pin-card" style="display:none">
-    <div class="title">Digite o PIN</div>
-    <div class="status">O código aparece em Configurações → Rede no computador</div>
+    <div class="title">${t.pinTitle}</div>
+    <div class="status">${t.pinHint}</div>
     <input id="pin-input" inputmode="numeric" maxlength="4" placeholder="0000"
       style="margin-top:16px;width:140px;font-size:28px;text-align:center;letter-spacing:8px;padding:10px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;">
-    <div><button class="ctl wide" id="pin-ok" style="margin-top:16px">Conectar</button></div>
+    <div><button class="ctl wide" id="pin-ok" style="margin-top:16px">${t.pinConnect}</button></div>
     <div class="status off" id="pin-err" style="margin-top:10px;min-height:16px"></div>
   </div>
 
   <div id="connected" style="display:none">
     <div class="tabs">
-      <div class="tab active" id="tab-ctl" data-view="control">🎛️ Controle</div>
-      <div class="tab" id="tab-guide" data-view="guide">📺 Guia</div>
-      <div class="tab" id="tab-catalog" data-view="catalog">🎬 Filmes</div>
-      <div class="tab" id="tab-series" data-view="series">🎞️ Séries</div>
-      <div class="tab" id="tab-continue" data-view="continue">⏯️ Continuar</div>
+      <div class="tab active" id="tab-ctl" data-view="control">🎛️ ${t.tabControl}</div>
+      <div class="tab" id="tab-guide" data-view="guide">📺 ${t.tabGuide}</div>
+      <div class="tab" id="tab-catalog" data-view="catalog">🎬 ${t.tabMovies}</div>
+      <div class="tab" id="tab-series" data-view="series">🎞️ ${t.tabSeries}</div>
+      <div class="tab" id="tab-continue" data-view="continue">⏯️ ${t.tabContinue}</div>
     </div>
 
     <div class="devbar">
-      <span class="devlbl">📡 Transmitir em</span>
-      <select id="devsel" class="devsel"><option value="">Automático (1ª TV)</option></select>
+      <span class="devlbl">📡 ${t.castTo}</span>
+      <select id="devsel" class="devsel"><option value="">${t.devAuto}</option></select>
     </div>
 
-    <input class="chsearch gsearch" id="gsearch" placeholder="🔍 Buscar filmes e séries…" autocomplete="off">
+    <input class="chsearch gsearch" id="gsearch" placeholder="🔍 ${t.searchAllPh}" autocomplete="off">
     <div id="search" class="hidden">
       <div class="chlist" id="srlist"></div>
-      <div class="empty" id="sr-empty">Digite para buscar no acervo.</div>
+      <div class="empty" id="sr-empty">${t.searchPrompt}</div>
     </div>
 
     <div id="control">
       <div class="card">
         <div class="title" id="title">—</div>
-        <div class="status" id="status">Conectando…</div>
+        <div class="status" id="status">${t.connecting}</div>
         <div class="castprog hidden" id="castprog">
           <input type="range" id="castseek" class="castseek" min="0" max="1000" value="0">
           <div class="casttime" id="casttime">0:00 / 0:00</div>
@@ -172,60 +252,60 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
           <span>🔊</span>
           <input type="range" id="castvol" class="castseek" min="0" max="100" value="50">
         </div>
-        <select id="castaud" class="devsel hidden" title="Áudio"></select>
+        <select id="castaud" class="devsel hidden" title="${t.audio}"></select>
         <div class="row seek">
-          <button class="ctl" data-cmd="previous" title="Anterior">⏮</button>
+          <button class="ctl" data-cmd="previous" title="${t.prev}">⏮</button>
           <button class="ctl" data-cmd="seek" data-sec="-30" title="-30s">-30s</button>
-          <button class="ctl primary" data-cmd="togglePlay" id="play" title="Play/Pause">⏯</button>
+          <button class="ctl primary" data-cmd="togglePlay" id="play" title="${t.playPause}">⏯</button>
           <button class="ctl" data-cmd="seek" data-sec="30" title="+30s">+30s</button>
-          <button class="ctl" data-cmd="next" title="Próximo">⏭</button>
+          <button class="ctl" data-cmd="next" title="${t.next}">⏭</button>
         </div>
         <div class="row">
-          <button class="ctl" data-cmd="volumeDown" title="Volume -">🔉</button>
-          <button class="ctl" data-cmd="mute" title="Mudo">🔇</button>
-          <button class="ctl" data-cmd="volumeUp" title="Volume +">🔊</button>
-          <button class="ctl hidden" data-cmd="subtitle" id="castsub" title="Legenda">💬</button>
-          <button class="ctl wide" data-cmd="stop" title="Parar">⏹ Parar</button>
+          <button class="ctl" data-cmd="volumeDown" title="${t.volDown}">🔉</button>
+          <button class="ctl" data-cmd="mute" title="${t.mute}">🔇</button>
+          <button class="ctl" data-cmd="volumeUp" title="${t.volUp}">🔊</button>
+          <button class="ctl hidden" data-cmd="subtitle" id="castsub" title="${t.subtitle}">💬</button>
+          <button class="ctl wide" data-cmd="stop" title="${t.stop}">⏹ ${t.stop}</button>
         </div>
       </div>
-      <div class="hint" style="margin-top:16px">Mantenha o app aberto no computador. Este controle funciona na mesma rede Wi-Fi.</div>
+      <div class="hint" style="margin-top:16px">${t.hint}</div>
     </div>
 
     <div id="guide" class="hidden">
       <div class="nowbar" id="nowbar">
-        <div class="lbl">Agora na TV</div>
-        <div class="ch" id="now-ch">Nenhum canal tocando</div>
+        <div class="lbl">${t.nowOnTv}</div>
+        <div class="ch" id="now-ch">${t.noChannel}</div>
         <div class="prog" id="now-prog"></div>
         <div class="time" id="now-time"></div>
         <div class="nxt" id="now-next"></div>
       </div>
-      <input class="chsearch" id="chsearch" placeholder="Buscar canal…" autocomplete="off">
+      <input class="chsearch" id="chsearch" placeholder="${t.searchChannel}" autocomplete="off">
       <div class="chlist" id="chlist"></div>
-      <div class="empty hidden" id="guide-empty">Abra a <b>TV ao vivo</b> no computador para ver os canais aqui.</div>
+      <div class="empty hidden" id="guide-empty">${t.guideEmpty}</div>
     </div>
 
     <div id="catalog" class="hidden">
-      <input class="chsearch" id="mvsearch" placeholder="Buscar filme…" autocomplete="off">
+      <input class="chsearch" id="mvsearch" placeholder="${t.searchMovie}" autocomplete="off">
       <div class="chlist" id="mvlist"></div>
-      <div class="empty" id="mv-empty">Carregando filmes…</div>
-      <button class="ctl wide hidden" id="mvqueue" style="margin: 4px auto 0; background: linear-gradient(135deg,#4f46e5,var(--accent));">📡 Transmitir fila</button>
+      <div class="empty" id="mv-empty">${t.loadingMovies}</div>
+      <button class="ctl wide hidden" id="mvqueue" style="margin: 4px auto 0; background: linear-gradient(135deg,#4f46e5,var(--accent));">📡 ${t.castQueue}</button>
     </div>
 
     <div id="series" class="hidden">
-      <input class="chsearch" id="sesearch" placeholder="Buscar série…" autocomplete="off">
+      <input class="chsearch" id="sesearch" placeholder="${t.searchSeries}" autocomplete="off">
       <div class="chlist" id="selist"></div>
-      <div class="empty" id="se-empty">Carregando séries…</div>
+      <div class="empty" id="se-empty">${t.loadingSeries}</div>
     </div>
 
     <div id="episodes" class="hidden">
-      <button class="ctl wide" id="ep-back" style="margin: 0 auto 2px">← Voltar</button>
+      <button class="ctl wide" id="ep-back" style="margin: 0 auto 2px">← ${t.back}</button>
       <div class="chlist" id="eplist"></div>
-      <div class="empty" id="ep-empty">Carregando episódios…</div>
+      <div class="empty" id="ep-empty">${t.loadingEpisodes}</div>
     </div>
 
     <div id="continue" class="hidden">
       <div class="chlist" id="colist"></div>
-      <div class="empty" id="co-empty">Carregando…</div>
+      <div class="empty" id="co-empty">${t.loading}</div>
       <div class="chlist" id="reclist"></div>
     </div>
   </div>
@@ -233,6 +313,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
   <div id="toast" class="toast hidden"></div>
 <script>
   (function () {
+    var L = ${JSON.stringify(t)};
     var titleEl = document.getElementById('title');
     var statusEl = document.getElementById('status');
     var pinCard = document.getElementById('pin-card');
@@ -314,7 +395,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         localStorage.setItem('neostream_remote_pin', pin);
         pinCard.style.display = 'none';
         connectedEl.style.display = 'flex';
-        statusEl.textContent = 'Conectado'; statusEl.className = 'status on';
+        statusEl.textContent = L.connected; statusEl.className = 'status on';
         if (!devicesRequested) { devicesRequested = true; sendCmd('requestDevices'); }
         // Land on the last tab the user was using (Guia/Filmes/Séries).
         var savedTab = localStorage.getItem('neostream_remote_tab');
@@ -323,10 +404,10 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       ws.onclose = function () {
         // 1006 with no prior open + wrong PIN → the server refused (401).
         if (connectedEl.style.display === 'none') {
-          showPinPrompt('PIN incorreto. Confira o código no computador.');
+          showPinPrompt(L.pinWrong);
           return;
         }
-        statusEl.textContent = 'Reconectando…'; statusEl.className = 'status off';
+        statusEl.textContent = L.reconnecting; statusEl.className = 'status off';
         setTimeout(function () { connect(pin); }, 1500);
       };
       ws.onmessage = function (ev) {
@@ -334,9 +415,9 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
           var msg = JSON.parse(ev.data);
           if (msg.type === 'state') {
             var cast = msg.casting ? '📡 ' : '';
-            titleEl.textContent = msg.hasMedia ? (msg.title || 'Reproduzindo')
-              : (msg.casting && msg.castTitle ? msg.castTitle : 'Nada tocando');
-            statusEl.textContent = cast + (msg.hasMedia ? (msg.playing ? '▶ Reproduzindo' : '⏸ Pausado') : (msg.casting ? 'Transmitindo na TV' : 'Conectado'));
+            titleEl.textContent = msg.hasMedia ? (msg.title || L.playing)
+              : (msg.casting && msg.castTitle ? msg.castTitle : L.nothingPlaying);
+            statusEl.textContent = cast + (msg.hasMedia ? (msg.playing ? '▶ ' + L.playing : '⏸ ' + L.paused) : (msg.casting ? L.castingOnTv : L.connected));
             statusEl.className = 'status on';
             updateCastProgress(msg);
           } else if (msg.type === 'guide') {
@@ -364,9 +445,9 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
             devices = msg.items || [];
             renderDevices();
           } else if (msg.type === 'castResult') {
-            if (msg.status === 'ok') showToast('📡 Transmitindo' + (msg.deviceName ? ' em ' + msg.deviceName : ''), 'ok');
-            else if (msg.status === 'no-device') showToast('Nenhuma TV encontrada na rede', 'err');
-            else showToast('Falha ao transmitir', 'err');
+            if (msg.status === 'ok') showToast('📡 ' + L.castingToast + (msg.deviceName ? L.onDevice + msg.deviceName : ''), 'ok');
+            else if (msg.status === 'no-device') showToast(L.noTvFound, 'err');
+            else showToast(L.castFailed, 'err');
           }
         } catch (e) {}
       };
@@ -414,7 +495,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
           var opts = '';
           for (var i = 0; i < tracks.length; i++) {
             var t = tracks[i];
-            var label = t.name || t.language || ('Áudio ' + (i + 1));
+            var label = t.name || t.language || (L.audio + ' ' + (i + 1));
             opts += '<option value="' + t.trackId + '">🎧 ' + esc(label) + '</option>';
           }
           castaudEl.innerHTML = opts;
@@ -476,7 +557,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
 
     function renderDevices() {
       var cur = selDev;
-      var html = '<option value="">Automático (1ª TV)</option>';
+      var html = '<option value="">' + L.devAuto + '</option>';
       for (var i = 0; i < devices.length; i++) {
         var d = devices[i];
         var val = d.type + ':' + d.id;
@@ -499,7 +580,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     document.getElementById('pin-ok').addEventListener('click', function () {
       var pin = (pinInput.value || '').trim();
       if (pin.length === 4) connect(pin);
-      else pinErr.textContent = 'O PIN tem 4 dígitos.';
+      else pinErr.textContent = L.pinLen;
     });
     pinInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') document.getElementById('pin-ok').click(); });
 
@@ -516,10 +597,10 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       var playing = null;
       for (var i = 0; i < channels.length; i++) { if (channels[i].id === guide.playingId) { playing = channels[i]; break; } }
       var epg = guide.epg;
-      document.getElementById('now-ch').textContent = playing ? playing.name : 'Nenhum canal tocando';
+      document.getElementById('now-ch').textContent = playing ? playing.name : L.noChannel;
       document.getElementById('now-prog').textContent = epg && epg.now ? epg.now : '';
       document.getElementById('now-time').textContent = epg && epg.nowStart ? (epg.nowStart + (epg.nowEnd ? ' – ' + epg.nowEnd : '')) : '';
-      document.getElementById('now-next').textContent = epg && epg.next ? 'A seguir: ' + epg.next : '';
+      document.getElementById('now-next').textContent = epg && epg.next ? L.nextUp + epg.next : '';
 
       if (!channels.length) { chlistEl.innerHTML = ''; emptyEl.classList.remove('hidden'); return; }
       emptyEl.classList.add('hidden');
@@ -537,26 +618,26 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         if (openEpg[c.id]) {
           var e = epgCache[c.id];
           if (e) {
-            epgHtml = '<div class="chepg"><div class="p">' + esc(e.now || 'Sem informação') + '</div>'
+            epgHtml = '<div class="chepg"><div class="p">' + esc(e.now || L.noInfo) + '</div>'
               + (e.nowStart ? '<div>' + esc(e.nowStart + (e.nowEnd ? ' – ' + e.nowEnd : '')) + '</div>' : '')
-              + (e.next ? '<div>A seguir: ' + esc(e.next) + '</div>' : '') + '</div>';
+              + (e.next ? '<div>' + L.nextUp + esc(e.next) + '</div>' : '') + '</div>';
           } else {
-            epgHtml = '<div class="chepg">Carregando…</div>';
+            epgHtml = '<div class="chepg">' + L.loading + '</div>';
           }
         }
         html += '<div class="chrow">'
           + '<div class="chitem' + (isPlaying ? ' playing' : '') + '" data-id="' + esc(c.id) + '">'
           + logo + '<div class="nm">' + esc(c.name) + '</div>'
-          + '<button class="chinfo" data-info="' + esc(c.id) + '" title="Programação">ⓘ</button></div>'
+          + '<button class="chinfo" data-info="' + esc(c.id) + '" title="' + L.programming + '">ⓘ</button></div>'
           + epgHtml + '</div>';
       }
-      chlistEl.innerHTML = html || '<div class="empty">Nenhum canal encontrado.</div>';
+      chlistEl.innerHTML = html || '<div class="empty">' + L.noChannelFound + '</div>';
     }
 
     chsearchEl.addEventListener('input', function () { filter = chsearchEl.value; renderGuide(); });
 
     function renderCatalog() {
-      if (!movies.length) { mvlistEl.innerHTML = ''; mvEmptyEl.classList.remove('hidden'); mvEmptyEl.textContent = catalogRequested ? 'Nenhum filme.' : 'Carregando filmes…'; return; }
+      if (!movies.length) { mvlistEl.innerHTML = ''; mvEmptyEl.classList.remove('hidden'); mvEmptyEl.textContent = catalogRequested ? L.noMovies : L.loadingMovies; return; }
       mvEmptyEl.classList.add('hidden');
       var f = mvFilter.toLowerCase();
       var html = '';
@@ -569,15 +650,15 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         var sel = selected[m.id];
         html += '<div class="chitem' + (sel ? ' playing' : '') + '" data-mv="' + esc(m.id) + '">'
           + logo + '<div class="nm">' + (sel ? '✓ ' : '') + esc(m.name) + '</div>'
-          + '<button class="chinfo" data-cast="' + esc(m.id) + '" title="Transmitir na TV">📡</button></div>';
+          + '<button class="chinfo" data-cast="' + esc(m.id) + '" title="' + L.castToTv + '">📡</button></div>';
       }
-      mvlistEl.innerHTML = html || '<div class="empty">Nenhum filme encontrado.</div>';
+      mvlistEl.innerHTML = html || '<div class="empty">' + L.noMovieFound + '</div>';
       updateQueueBar();
     }
 
     function updateQueueBar() {
       var n = Object.keys(selected).length;
-      if (n > 0) { mvqueueEl.classList.remove('hidden'); mvqueueEl.textContent = '📡 Transmitir fila (' + n + ')'; }
+      if (n > 0) { mvqueueEl.classList.remove('hidden'); mvqueueEl.textContent = '📡 ' + L.castQueue + ' (' + n + ')'; }
       else mvqueueEl.classList.add('hidden');
     }
 
@@ -608,7 +689,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     function renderSeries() {
       if (!seriesList.length) {
         selistEl.innerHTML = ''; seEmptyEl.classList.remove('hidden');
-        seEmptyEl.textContent = seriesRequested ? 'Nenhuma série.' : 'Carregando séries…'; return;
+        seEmptyEl.textContent = seriesRequested ? L.noSeries : L.loadingSeries; return;
       }
       seEmptyEl.classList.add('hidden');
       var f = seFilter.toLowerCase();
@@ -621,9 +702,9 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
           : '<div class="ph">🎞️</div>';
         html += '<div class="chitem" data-se="' + esc(s.id) + '" data-nm="' + esc(s.name) + '">'
           + logo + '<div class="nm">' + esc(s.name) + '</div>'
-          + '<span class="chinfo" title="Ver episódios">›</span></div>';
+          + '<span class="chinfo" title="' + L.seeEpisodes + '">›</span></div>';
       }
-      selistEl.innerHTML = html || '<div class="empty">Nenhuma série encontrada.</div>';
+      selistEl.innerHTML = html || '<div class="empty">' + L.noSeriesFound + '</div>';
     }
 
     sesearchEl.addEventListener('input', function () {
@@ -640,7 +721,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       if (!sid) return;
       currentSeriesId = sid;
       episodes = [];
-      document.getElementById('ep-empty').textContent = 'Carregando episódios…';
+      document.getElementById('ep-empty').textContent = L.loadingEpisodes;
       document.getElementById('ep-empty').classList.remove('hidden');
       eplistEl.innerHTML = '';
       seriesEl.classList.add('hidden');
@@ -651,7 +732,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     function renderEpisodes() {
       if (!episodes.length) {
         eplistEl.innerHTML = ''; epEmptyEl.classList.remove('hidden');
-        epEmptyEl.textContent = 'Nenhum episódio.'; return;
+        epEmptyEl.textContent = L.noEpisodes; return;
       }
       epEmptyEl.classList.add('hidden');
       var html = '';
@@ -659,7 +740,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         var e = episodes[j];
         html += '<div class="chitem" data-ep="' + esc(e.id) + '">'
           + '<div class="ph">▶️</div><div class="nm">' + esc(e.label) + '</div>'
-          + '<button class="chinfo" data-castep="' + esc(e.id) + '" title="Transmitir na TV">📡</button></div>';
+          + '<button class="chinfo" data-castep="' + esc(e.id) + '" title="' + L.castToTv + '">📡</button></div>';
       }
       eplistEl.innerHTML = html;
     }
@@ -681,7 +762,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     function renderContinue() {
       if (!continueList.length) {
         colistEl.innerHTML = ''; coEmptyEl.classList.remove('hidden');
-        coEmptyEl.textContent = 'Nada em andamento.'; return;
+        coEmptyEl.textContent = L.nothingInProgress; return;
       }
       coEmptyEl.classList.add('hidden');
       var html = '';
@@ -697,7 +778,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
           + '<div style="flex:1;min-width:0">'
           + '<div class="nm">' + esc(c.name) + '</div>'
           + '<div class="cobar"><span style="width:' + pct + '%"></span></div></div>'
-          + '<button class="chinfo" data-cocast="' + esc(c.castId) + '" data-kind="' + esc(c.kind) + '" title="Retomar na TV">📡</button></div>';
+          + '<button class="chinfo" data-cocast="' + esc(c.castId) + '" data-kind="' + esc(c.kind) + '" title="' + L.resumeOnTv + '">📡</button></div>';
       }
       colistEl.innerHTML = html;
     }
@@ -719,7 +800,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       for (var g = 0; g < recGroups.length; g++) {
         var grp = recGroups[g];
         if (!grp.items || !grp.items.length) continue;
-        html += '<div class="rechead">Porque você assistiu ' + esc(grp.seed) + '</div>';
+        html += '<div class="rechead">' + L.becauseWatched + ' ' + esc(grp.seed) + '</div>';
         for (var j = 0; j < grp.items.length; j++) {
           var r = grp.items[j];
           var icon = r.kind === 'series' ? '🎞️' : '🎬';
@@ -729,11 +810,11 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
           if (r.kind === 'series') {
             html += '<div class="chitem" data-recse="' + esc(r.id) + '">'
               + logo + '<div class="nm">' + esc(r.name) + '</div>'
-              + '<span class="chinfo" title="Ver episódios">›</span></div>';
+              + '<span class="chinfo" title="' + L.seeEpisodes + '">›</span></div>';
           } else {
             html += '<div class="chitem" data-recmv="' + esc(r.id) + '">'
               + logo + '<div class="nm">' + esc(r.name) + '</div>'
-              + '<button class="chinfo" data-reccast="' + esc(r.id) + '" title="Transmitir na TV">📡</button></div>';
+              + '<button class="chinfo" data-reccast="' + esc(r.id) + '" title="' + L.castToTv + '">📡</button></div>';
           }
         }
       }
@@ -750,7 +831,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       if (se) {
         var sid = se.getAttribute('data-recse');
         currentSeriesId = sid; episodes = [];
-        document.getElementById('ep-empty').textContent = 'Carregando episódios…';
+        document.getElementById('ep-empty').textContent = L.loadingEpisodes;
         document.getElementById('ep-empty').classList.remove('hidden');
         eplistEl.innerHTML = '';
         coEl.classList.add('hidden');
@@ -782,23 +863,23 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
 
     // ------------------------------------------------------ Busca unificada --
     function renderSearch() {
-      if (!gFilter) { srlistEl.innerHTML = ''; srEmptyEl.classList.remove('hidden'); srEmptyEl.textContent = 'Digite para buscar no acervo.'; return; }
+      if (!gFilter) { srlistEl.innerHTML = ''; srEmptyEl.classList.remove('hidden'); srEmptyEl.textContent = L.searchPrompt; return; }
       var html = '';
       for (var i = 0; i < srMovies.length; i++) {
         var m = srMovies[i];
         var logo = m.cover ? '<img src="' + esc(m.cover) + '" onerror="this.style.display=\\'none\\'" alt="">' : '<div class="ph">🎬</div>';
         html += '<div class="chitem" data-srmv="' + esc(m.id) + '">' + logo
           + '<div class="nm">' + esc(m.name) + '</div>'
-          + '<button class="chinfo" data-srcast="' + esc(m.id) + '" title="Transmitir na TV">📡</button></div>';
+          + '<button class="chinfo" data-srcast="' + esc(m.id) + '" title="' + L.castToTv + '">📡</button></div>';
       }
       for (var j = 0; j < srSeries.length; j++) {
         var s = srSeries[j];
         var slogo = s.cover ? '<img src="' + esc(s.cover) + '" onerror="this.style.display=\\'none\\'" alt="">' : '<div class="ph">🎞️</div>';
         html += '<div class="chitem" data-srse="' + esc(s.id) + '" data-nm="' + esc(s.name) + '">' + slogo
           + '<div class="nm">' + esc(s.name) + '</div>'
-          + '<span class="chinfo" title="Ver episódios">›</span></div>';
+          + '<span class="chinfo" title="' + L.seeEpisodes + '">›</span></div>';
       }
-      if (!html) { srlistEl.innerHTML = ''; srEmptyEl.classList.remove('hidden'); srEmptyEl.textContent = 'Nenhum resultado.'; return; }
+      if (!html) { srlistEl.innerHTML = ''; srEmptyEl.classList.remove('hidden'); srEmptyEl.textContent = L.noResults; return; }
       srEmptyEl.classList.add('hidden');
       srlistEl.innerHTML = html;
     }
@@ -811,7 +892,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         controlEl.classList.add('hidden'); guideEl.classList.add('hidden'); catalogEl.classList.add('hidden');
         seriesEl.classList.add('hidden'); episodesEl.classList.add('hidden'); coEl.classList.add('hidden');
         searchEl.classList.remove('hidden');
-        srEmptyEl.textContent = 'Buscando…'; srEmptyEl.classList.remove('hidden');
+        srEmptyEl.textContent = L.searching; srEmptyEl.classList.remove('hidden');
         if (gSearchTimer) clearTimeout(gSearchTimer);
         gSearchTimer = setTimeout(function () {
           if (ws && ws.readyState === 1) {
@@ -837,7 +918,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         var sid = se.getAttribute('data-srse');
         gsearchEl.value = ''; gFilter = ''; searchMode = false; searchEl.classList.add('hidden');
         currentSeriesId = sid; episodes = [];
-        document.getElementById('ep-empty').textContent = 'Carregando episódios…';
+        document.getElementById('ep-empty').textContent = L.loadingEpisodes;
         document.getElementById('ep-empty').classList.remove('hidden');
         eplistEl.innerHTML = '';
         episodesEl.classList.remove('hidden');
@@ -874,7 +955,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       else if (view === 'continue') {
         // Always re-request: progress (and habits) change as you watch on the PC.
         coEl.classList.remove('hidden');
-        coEmptyEl.textContent = 'Carregando…'; coEmptyEl.classList.remove('hidden');
+        coEmptyEl.textContent = L.loading; coEmptyEl.classList.remove('hidden');
         sendCmd('requestContinue');
         sendCmd('requestRecommended');
         renderContinue();
@@ -935,3 +1016,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
 </script>
 </body>
 </html>`
+}
+
+/** Default PT page (server picks the real language at request time). */
+export const REMOTE_PAGE_HTML = renderRemotePage('pt')
