@@ -237,6 +237,21 @@ export function LiveTV() {
         };
     }, [selectedChannel, playingChannel]);
 
+    // Turn the current program over locally on the 10s progress tick, from the
+    // already-fetched EPG (no network). Without this the "agora/a seguir" — in
+    // the mini-EPG and in the phone guide it feeds — only advances on the 60s
+    // refetch, so a boundary could sit up to a minute stale. Guarded by program
+    // id and deferred (queueMicrotask) so it just converges, never loops.
+    useEffect(() => {
+        if (epgData.length === 0) return;
+        const current = epgService.getCurrentProgram(epgData);
+        if ((current?.id ?? '') === (currentProgram?.id ?? '')) return;
+        queueMicrotask(() => {
+            setCurrentProgram(current);
+            setUpcomingPrograms(epgService.getUpcomingPrograms(epgData, current, 3));
+        });
+    }, [progressTick, epgData, currentProgram]);
+
     // Phone web-remote → "trocar canal": the server forwards a playChannel
     // command over the shared media:control channel. Look the id up in the
     // gated list (same filter the phone sees) and zap to it. Subscribed once;
