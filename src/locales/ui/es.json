@@ -951,6 +951,16 @@
     "openSite": "Abrir themoviedb.org/settings/api",
     "onboardingTitle": "¡Playlist agregada! Falta un paso…",
     "onboardingText": "Para la experiencia completa del catálogo — portadas bonitas, sinopsis, notas, tráilers y control parental — agrega abajo tu clave gratuita de TMDB. La app funciona sin ella, solo que sin estos extras.",
-    "privacyNote": "La clave se guarda solo en esta computadora y se usa únicamente en las consultas a TMDB. Nunca se envía a otros servidores."
+    "privacyNote": "La clave se guarda solo en esta computadora y se usa únicamente en las consultas a TMDB. Nunca se envía a otros servidores.",
+    "osWhyText": "Búsqueda de subtítulos online en el reproductor (opcional — la app funciona sin ella). Usa tu cuenta gratuita de OpenSubtitles: la clave de API más el usuario y la contraseña de la cuenta.",
+    "osStatusOptional": "Opcional",
+    "osKeyLabel": "Clave de API de OpenSubtitles",
+    "osUserLabel": "Usuario (cuenta OpenSubtitles)",
+    "osPassLabel": "Contraseña",
+    "osHowTitle": "Cómo conseguirla (gratis)",
+    "osStep1": "Crea una cuenta gratuita en opensubtitles.com.",
+    "osStep2": "En la página de consumidores de la API (botón de abajo), registra un \"consumer\" personal — la clave aparece al instante.",
+    "osStep3": "Pega la clave, el usuario y la contraseña en los campos de arriba y guarda.",
+    "osOpenSite": "Abrir opensubtitles.com/consumers"
   }
 }

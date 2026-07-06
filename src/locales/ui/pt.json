@@ -951,6 +951,16 @@
     "openSite": "Abrir themoviedb.org/settings/api",
     "onboardingTitle": "Playlist adicionada! Só falta um passo…",
     "onboardingText": "Para o catálogo aparecer completo — capas bonitas, sinopses, notas, trailers e controle parental — adicione a sua chave gratuita da TMDB abaixo. Sem ela o app funciona, mas sem esses extras.",
-    "privacyNote": "A chave fica salva só neste computador e é usada apenas nas consultas à TMDB. Nunca é enviada a outros servidores."
+    "privacyNote": "A chave fica salva só neste computador e é usada apenas nas consultas à TMDB. Nunca é enviada a outros servidores.",
+    "osWhyText": "Busca de legendas online no player (opcional — o app funciona sem). Use sua conta gratuita do OpenSubtitles: a chave de API + usuário e senha da conta.",
+    "osStatusOptional": "Opcional",
+    "osKeyLabel": "Chave de API do OpenSubtitles",
+    "osUserLabel": "Usuário (conta OpenSubtitles)",
+    "osPassLabel": "Senha",
+    "osHowTitle": "Como conseguir (gratuito)",
+    "osStep1": "Crie uma conta gratuita em opensubtitles.com.",
+    "osStep2": "Na página de consumidores da API (botão abaixo), registre um \"consumer\" pessoal — a chave de API aparece na hora.",
+    "osStep3": "Cole a chave, o usuário e a senha da conta nos campos acima e salve.",
+    "osOpenSite": "Abrir opensubtitles.com/consumers"
   }
 }
