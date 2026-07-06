@@ -139,6 +139,23 @@ describe('fila de cast (QUEUE_LOAD)', () => {
         expect(payload.items[0].media.metadata.title).toBe('A');
     });
 
+    it('queueLoadPayload embute a legenda WebVTT como track ativa por item', () => {
+        const payload = JSON.parse(queueLoadPayload(9, [
+            { url: 'http://x/a.mp4', title: 'A', contentType: 'video/mp4', subtitleUrl: 'http://x/a.vtt', subtitleLanguage: 'en' },
+            { url: 'http://x/b.mp4', title: 'B', contentType: 'video/mp4' }, // sem legenda
+        ]));
+        // Item com legenda: track TEXT + activeTrackIds.
+        expect(payload.items[0].activeTrackIds).toEqual([1]);
+        expect(payload.items[0].media.tracks).toHaveLength(1);
+        expect(payload.items[0].media.tracks[0]).toMatchObject({
+            trackId: 1, type: 'TEXT', subtype: 'SUBTITLES',
+            trackContentId: 'http://x/a.vtt', trackContentType: 'text/vtt', language: 'en',
+        });
+        // Item sem legenda: nada de tracks/activeTrackIds.
+        expect(payload.items[1].activeTrackIds).toBeUndefined();
+        expect(payload.items[1].media.tracks).toBeUndefined();
+    });
+
     it('queueSkipPayload gera QUEUE_NEXT/QUEUE_PREV com a sessão', () => {
         expect(JSON.parse(queueSkipPayload(3, 7, 'next'))).toEqual({ type: 'QUEUE_NEXT', requestId: 3, mediaSessionId: 7 });
         expect(JSON.parse(queueSkipPayload(3, 7, 'prev')).type).toBe('QUEUE_PREV');

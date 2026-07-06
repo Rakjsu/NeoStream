@@ -202,11 +202,15 @@ export interface QueueItemInput {
     url: string
     title: string
     contentType: string
+    /** Optional WebVTT side-load, reachable by the device (served on LAN). */
+    subtitleUrl?: string
+    subtitleLanguage?: string
 }
 
 /**
  * QUEUE_LOAD — play a list of items in sequence on the receiver. `startIndex`
- * is the item to begin with; the rest auto-advance.
+ * is the item to begin with; the rest auto-advance. Items with a subtitleUrl
+ * carry one active WebVTT TEXT track (same shape as the single LOAD).
  */
 export function queueLoadPayload(requestId: number, items: QueueItemInput[], startIndex = 0): string {
     return JSON.stringify({
@@ -214,16 +218,31 @@ export function queueLoadPayload(requestId: number, items: QueueItemInput[], sta
         requestId,
         startIndex,
         repeatMode: 'REPEAT_OFF',
-        items: items.map(item => ({
-            autoplay: true,
-            preloadTime: 8,
-            media: {
-                contentId: item.url,
-                contentType: item.contentType,
-                streamType: 'BUFFERED',
-                metadata: { metadataType: 0, title: item.title },
-            },
-        })),
+        items: items.map(item => {
+            const tracks = item.subtitleUrl
+                ? [{
+                    trackId: 1,
+                    type: 'TEXT',
+                    subtype: 'SUBTITLES',
+                    trackContentId: item.subtitleUrl,
+                    trackContentType: 'text/vtt',
+                    language: item.subtitleLanguage || 'pt',
+                    name: 'Legenda',
+                }]
+                : undefined
+            return {
+                autoplay: true,
+                preloadTime: 8,
+                ...(tracks ? { activeTrackIds: [1] } : {}),
+                media: {
+                    contentId: item.url,
+                    contentType: item.contentType,
+                    streamType: 'BUFFERED',
+                    metadata: { metadataType: 0, title: item.title },
+                    ...(tracks ? { tracks, textTrackStyle: { backgroundColor: '#00000000', edgeType: 'OUTLINE', edgeColor: '#000000FF' } } : {}),
+                },
+            }
+        }),
     })
 }
 

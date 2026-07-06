@@ -48,6 +48,7 @@ export interface CastMediaInput {
     contentType: string
     live: boolean
     subtitleUrl?: string
+    subtitleLanguage?: string
 }
 
 export class CastSession {
@@ -148,7 +149,10 @@ export class CastSession {
         this.send(this.transportId!, NS_CONNECTION, connectPayload())
         this.send(this.transportId!, NS_MEDIA, queueLoadPayload(
             this.requestId++,
-            items.map(i => ({ url: i.url, title: i.title, contentType: i.contentType })),
+            items.map(i => ({
+                url: i.url, title: i.title, contentType: i.contentType,
+                subtitleUrl: i.subtitleUrl, subtitleLanguage: i.subtitleLanguage,
+            })),
             startIndex,
         ))
         log.info('[Cast] QUEUE_LOAD enviado para', this.deviceName, `(${items.length} itens)`)

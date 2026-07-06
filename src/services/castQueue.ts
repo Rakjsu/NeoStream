@@ -8,6 +8,9 @@
 export interface CastQueueItem {
     url: string
     title: string
+    /** Optional WebVTT text (main serves it on the LAN for the device). */
+    subtitleVtt?: string
+    subtitleLanguage?: string
 }
 
 export type CastQueueResult =
