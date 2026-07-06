@@ -87,6 +87,17 @@ describe('parseRemoteCommand', () => {
             .toEqual({ action: 'castMovie', movieId: '42' })
         expect(parseRemoteCommand('{"action":"castMovie"}')).toBeNull() // movieId ausente
     })
+    it('aceita query opcional em requestCatalog e requestSeries', () => {
+        expect(parseRemoteCommand('{"action":"requestCatalog","query":"  Matrix "}'))
+            .toEqual({ action: 'requestCatalog', query: 'Matrix' }) // trim
+        expect(parseRemoteCommand('{"action":"requestSeries","query":"breaking"}'))
+            .toEqual({ action: 'requestSeries', query: 'breaking' })
+        // Query vazia/branca ou não-string vira undefined (browse normal).
+        expect(parseRemoteCommand('{"action":"requestCatalog","query":"   "}'))
+            .toEqual({ action: 'requestCatalog' })
+        expect(parseRemoteCommand('{"action":"requestCatalog","query":42}'))
+            .toEqual({ action: 'requestCatalog' })
+    })
     it('aceita castMovieQueue com ids válidos e filtra lixo', () => {
         expect(parseRemoteCommand('{"action":"castMovieQueue","movieIds":["1","2","3"]}'))
             .toEqual({ action: 'castMovieQueue', movieIds: ['1', '2', '3'] })
@@ -109,6 +120,7 @@ describe('parseRemoteCommand', () => {
     })
     it('aceita requestDevices e um alvo de cast opcional (deviceId+deviceType)', () => {
         expect(parseRemoteCommand('{"action":"requestDevices"}')).toEqual({ action: 'requestDevices' })
+        expect(parseRemoteCommand('{"action":"requestContinue"}')).toEqual({ action: 'requestContinue' })
         expect(parseRemoteCommand('{"action":"castMovie","movieId":"42","deviceId":"tv1","deviceType":"dlna"}'))
             .toEqual({ action: 'castMovie', movieId: '42', target: { deviceId: 'tv1', deviceType: 'dlna' } })
         expect(parseRemoteCommand('{"action":"castEpisode","episodeId":"e1","deviceId":"cc1","deviceType":"chromecast"}'))

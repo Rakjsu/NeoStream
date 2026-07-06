@@ -31,7 +31,7 @@ import {
     type NetAddress,
 } from './webRemoteProtocol'
 import { REMOTE_PAGE_HTML } from './webRemotePage'
-import { isCastSessionActive, castRemoteControl } from './castHandlers'
+import { isCastSessionActive, castRemoteControl, getCastStatus } from './castHandlers'
 
 interface WebRemoteConfig {
     enabled: boolean
@@ -98,8 +98,14 @@ export function getLanAddress(): string {
 }
 
 function stateMessage(): string {
-    // `casting` lets the phone show it's driving the Chromecast, not the app.
-    return JSON.stringify({ type: 'state', ...mediaState, casting: isCastSessionActive() })
+    // `casting` lets the phone show it's driving the Chromecast, not the app;
+    // castTime/castDuration drive the cast progress bar on the Controle tab.
+    const cs = getCastStatus()
+    return JSON.stringify({
+        type: 'state', ...mediaState, casting: cs.active,
+        castTime: cs.currentTime, castDuration: cs.duration,
+        castPlaying: cs.playing,
+    })
 }
 
 function guideMessage(): string {
@@ -205,7 +211,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 }
 
 // Actions that always go to the renderer (never routed to the cast session).
-const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'requestCatalog', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'requestCatalog', 'requestContinue', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
@@ -236,9 +242,11 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     } else if (command.action === 'requestSeriesInfo') {
         win.webContents.send('media:control', 'requestSeriesInfo', command.seriesId)
     } else if (command.action === 'requestCatalog') {
-        win.webContents.send('media:control', 'requestCatalog')
+        win.webContents.send('media:control', 'requestCatalog', command.query)
     } else if (command.action === 'requestSeries') {
-        win.webContents.send('media:control', 'requestSeries')
+        win.webContents.send('media:control', 'requestSeries', command.query)
+    } else if (command.action === 'requestContinue') {
+        win.webContents.send('media:control', 'requestContinue')
     } else if (command.action === 'requestDevices') {
         win.webContents.send('media:control', 'requestDevices')
     } else {
@@ -247,6 +255,12 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
 }
 
 export function setupWebRemote(): void {
+    // While casting, push fresh cast position to the phone every 2s so the
+    // Controle tab's progress bar advances (cheap: only when clients + casting).
+    setInterval(() => {
+        if (clients.size > 0 && isCastSessionActive()) broadcastState()
+    }, 2000)
+
     // Mirror the renderer's player state (the tray listens too; multiple
     // listeners are fine) so new WS clients get the latest snapshot.
     ipcMain.on('media:state', (_e, state: { hasMedia?: boolean; playing?: boolean; title?: string }) => {
@@ -326,6 +340,25 @@ export function setupWebRemote(): void {
             }
         }).filter((e) => e.id && e.label)
         broadcast(JSON.stringify({ type: 'seriesInfo', seriesId, episodes }))
+    })
+
+    // "Continue watching" list (movies + resume episodes) built by the bridge.
+    ipcMain.on('web-remote:continue', (_e, raw: unknown) => {
+        const obj = (raw ?? {}) as Record<string, unknown>
+        const rawItems = Array.isArray(obj.items) ? obj.items : []
+        const items = rawItems.slice(0, 40).map((c) => {
+            const it = (c ?? {}) as Record<string, unknown>
+            const kind = it.kind === 'series' ? 'series' : 'movie'
+            const pct = typeof it.pct === 'number' && Number.isFinite(it.pct) ? Math.max(0, Math.min(100, Math.round(it.pct))) : 0
+            return {
+                kind,
+                castId: String(it.castId ?? ''),
+                name: typeof it.name === 'string' ? it.name.slice(0, 200) : '',
+                cover: typeof it.cover === 'string' ? it.cover.slice(0, 500) : '',
+                pct,
+            }
+        }).filter((c) => c.castId && c.name)
+        broadcast(JSON.stringify({ type: 'continue', items }))
     })
 
     // Cast targets (Chromecast + DLNA + AirPlay) discovered by the bridge.

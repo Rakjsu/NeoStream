@@ -56,7 +56,12 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
   .hint { font-size: 12px; color: rgba(255,255,255,.4); max-width: 420px; text-align: center; }
   .hidden { display: none !important; }
   /* Guide */
-  #guide, #catalog, #series, #episodes { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
+  #guide, #catalog, #series, #episodes, #continue { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
+  .cobar { height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); margin-top: 6px; overflow: hidden; }
+  .cobar > span { display: block; height: 100%; background: var(--accent); }
+  .castprog { margin-top: 12px; }
+  .castprog .cobar { height: 5px; }
+  .casttime { font-size: 12px; color: rgba(255,255,255,.5); margin-top: 6px; text-align: center; }
   .nowbar {
     background: linear-gradient(135deg, rgba(79,70,229,.25), rgba(99,102,241,.12));
     border: 1px solid rgba(99,102,241,.3); border-radius: 16px; padding: 14px 16px; text-align: left;
@@ -125,6 +130,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       <div class="tab" id="tab-guide" data-view="guide">📺 Guia</div>
       <div class="tab" id="tab-catalog" data-view="catalog">🎬 Filmes</div>
       <div class="tab" id="tab-series" data-view="series">🎞️ Séries</div>
+      <div class="tab" id="tab-continue" data-view="continue">⏯️ Continuar</div>
     </div>
 
     <div class="devbar">
@@ -136,6 +142,10 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       <div class="card">
         <div class="title" id="title">—</div>
         <div class="status" id="status">Conectando…</div>
+        <div class="castprog hidden" id="castprog">
+          <div class="cobar"><span id="castbar" style="width:0%"></span></div>
+          <div class="casttime" id="casttime">0:00 / 0:00</div>
+        </div>
         <div class="row seek">
           <button class="ctl" data-cmd="previous" title="Anterior">⏮</button>
           <button class="ctl" data-cmd="seek" data-sec="-30" title="-30s">-30s</button>
@@ -184,6 +194,11 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       <div class="chlist" id="eplist"></div>
       <div class="empty" id="ep-empty">Carregando episódios…</div>
     </div>
+
+    <div id="continue" class="hidden">
+      <div class="chlist" id="colist"></div>
+      <div class="empty" id="co-empty">Carregando…</div>
+    </div>
   </div>
 
   <div id="toast" class="toast hidden"></div>
@@ -226,6 +241,13 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     var seriesRequested = false;
     var episodes = [];     // [{ id, label }]
     var currentSeriesId = '';
+    var castprogEl = document.getElementById('castprog');
+    var castbarEl = document.getElementById('castbar');
+    var casttimeEl = document.getElementById('casttime');
+    var coEl = document.getElementById('continue');
+    var colistEl = document.getElementById('colist');
+    var coEmptyEl = document.getElementById('co-empty');
+    var continueList = [];  // [{ kind, castId, name, cover, pct }]
     var devselEl = document.getElementById('devsel');
     var toastEl = document.getElementById('toast');
     var devices = [];      // [{ id, name, type }]
@@ -252,7 +274,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         if (!devicesRequested) { devicesRequested = true; sendCmd('requestDevices'); }
         // Land on the last tab the user was using (Guia/Filmes/Séries).
         var savedTab = localStorage.getItem('neostream_remote_tab');
-        if (savedTab === 'guide' || savedTab === 'catalog' || savedTab === 'series') activateTab(savedTab);
+        if (savedTab === 'guide' || savedTab === 'catalog' || savedTab === 'series' || savedTab === 'continue') activateTab(savedTab);
       };
       ws.onclose = function () {
         // 1006 with no prior open + wrong PIN → the server refused (401).
@@ -271,6 +293,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
             titleEl.textContent = msg.hasMedia ? (msg.title || 'Reproduzindo') : 'Nada tocando';
             statusEl.textContent = cast + (msg.hasMedia ? (msg.playing ? '▶ Reproduzindo' : '⏸ Pausado') : (msg.casting ? 'Transmitindo na TV' : 'Conectado'));
             statusEl.className = 'status on';
+            updateCastProgress(msg);
           } else if (msg.type === 'guide') {
             guide = { channels: msg.channels || [], playingId: msg.playingId || '', epg: msg.epg || null };
             renderGuide();
@@ -285,6 +308,9 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
             renderSeries();
           } else if (msg.type === 'seriesInfo') {
             if (msg.seriesId === currentSeriesId) { episodes = msg.episodes || []; renderEpisodes(); }
+          } else if (msg.type === 'continue') {
+            continueList = msg.items || [];
+            renderContinue();
           } else if (msg.type === 'devices') {
             devices = msg.items || [];
             renderDevices();
@@ -295,6 +321,25 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
           }
         } catch (e) {}
       };
+    }
+
+    function fmtTime(s) {
+      s = Math.max(0, Math.floor(s || 0));
+      var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      var mm = (h > 0 && m < 10 ? '0' : '') + m, ss = (sec < 10 ? '0' : '') + sec;
+      return (h > 0 ? h + ':' : '') + mm + ':' + ss;
+    }
+
+    // Cast progress bar on the Controle card (only while casting with a duration).
+    function updateCastProgress(msg) {
+      var dur = msg.castDuration || 0, cur = msg.castTime || 0;
+      if (msg.casting && dur > 0) {
+        castprogEl.classList.remove('hidden');
+        castbarEl.style.width = Math.max(0, Math.min(100, (cur / dur) * 100)) + '%';
+        casttimeEl.textContent = fmtTime(cur) + ' / ' + fmtTime(dur);
+      } else {
+        castprogEl.classList.add('hidden');
+      }
     }
 
     function showToast(text, kind) {
@@ -413,7 +458,11 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       else mvqueueEl.classList.add('hidden');
     }
 
-    mvsearchEl.addEventListener('input', function () { mvFilter = mvsearchEl.value; renderCatalog(); });
+    mvsearchEl.addEventListener('input', function () {
+      mvFilter = mvsearchEl.value;
+      renderCatalog();                                  // instant refine on loaded items
+      debouncedSearch('requestCatalog', mvFilter);      // full-catalog search
+    });
 
     mvlistEl.addEventListener('click', function (ev) {
       if (!ev.target.closest) return;
@@ -454,7 +503,11 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       selistEl.innerHTML = html || '<div class="empty">Nenhuma série encontrada.</div>';
     }
 
-    sesearchEl.addEventListener('input', function () { seFilter = sesearchEl.value; renderSeries(); });
+    sesearchEl.addEventListener('input', function () {
+      seFilter = sesearchEl.value;
+      renderSeries();                                   // instant refine on loaded items
+      debouncedSearch('requestSeries', seFilter);       // full-catalog search
+    });
 
     selistEl.addEventListener('click', function (ev) {
       if (!ev.target.closest) return;
@@ -501,6 +554,42 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       currentSeriesId = '';
     });
 
+    // ----------------------------------------------------- Continuar assistindo --
+    function renderContinue() {
+      if (!continueList.length) {
+        colistEl.innerHTML = ''; coEmptyEl.classList.remove('hidden');
+        coEmptyEl.textContent = 'Nada em andamento.'; return;
+      }
+      coEmptyEl.classList.add('hidden');
+      var html = '';
+      for (var j = 0; j < continueList.length; j++) {
+        var c = continueList[j];
+        var icon = c.kind === 'series' ? '🎞️' : '🎬';
+        var logo = c.cover
+          ? '<img src="' + esc(c.cover) + '" onerror="this.style.display=\\'none\\'" alt="">'
+          : '<div class="ph">' + icon + '</div>';
+        var pct = Math.max(0, Math.min(100, c.pct || 0));
+        html += '<div class="chitem" data-co="' + esc(c.castId) + '" data-kind="' + esc(c.kind) + '">'
+          + logo
+          + '<div style="flex:1;min-width:0">'
+          + '<div class="nm">' + esc(c.name) + '</div>'
+          + '<div class="cobar"><span style="width:' + pct + '%"></span></div></div>'
+          + '<button class="chinfo" data-cocast="' + esc(c.castId) + '" data-kind="' + esc(c.kind) + '" title="Retomar na TV">📡</button></div>';
+      }
+      colistEl.innerHTML = html;
+    }
+
+    colistEl.addEventListener('click', function (ev) {
+      if (!ev.target.closest) return;
+      var btn = ev.target.closest('.chinfo') || ev.target.closest('.chitem');
+      if (!btn) return;
+      var id = btn.getAttribute('data-cocast') || btn.getAttribute('data-co');
+      var kind = btn.getAttribute('data-kind');
+      if (!id) return;
+      if (kind === 'series') sendCmd('castEpisode', null, null, null, null, id);
+      else sendCmd('castMovie', null, null, id);
+    });
+
     chlistEl.addEventListener('click', function (ev) {
       if (!ev.target.closest) return;
       // The ⓘ button toggles the on-demand EPG panel (fetch once, then cached).
@@ -525,7 +614,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         t.classList.toggle('active', t.getAttribute('data-view') === view);
       });
       controlEl.classList.add('hidden'); guideEl.classList.add('hidden'); catalogEl.classList.add('hidden');
-      seriesEl.classList.add('hidden'); episodesEl.classList.add('hidden');
+      seriesEl.classList.add('hidden'); episodesEl.classList.add('hidden'); coEl.classList.add('hidden');
       if (view === 'guide') { guideEl.classList.remove('hidden'); renderGuide(); }
       else if (view === 'catalog') {
         catalogEl.classList.remove('hidden');
@@ -537,6 +626,13 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         seriesEl.classList.remove('hidden'); currentSeriesId = '';
         if (!seriesRequested) { seriesRequested = true; sendCmd('requestSeries'); }
         renderSeries();
+      }
+      else if (view === 'continue') {
+        // Always re-request: progress changes as you watch on the PC.
+        coEl.classList.remove('hidden');
+        coEmptyEl.textContent = 'Carregando…'; coEmptyEl.classList.remove('hidden');
+        sendCmd('requestContinue');
+        renderContinue();
       }
       else { controlEl.classList.remove('hidden'); }
     }
@@ -568,6 +664,16 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         if (sep > 0) { payload.deviceType = selDev.slice(0, sep); payload.deviceId = selDev.slice(sep + 1); }
       }
       ws.send(JSON.stringify(payload));
+    }
+
+    // Full-catalog search: ask the app to filter the WHOLE list server-side
+    // (not just the ≤400 items already loaded here), debounced per keystroke.
+    var searchTimer = null;
+    function debouncedSearch(action, query) {
+      if (searchTimer) clearTimeout(searchTimer);
+      searchTimer = setTimeout(function () {
+        if (ws && ws.readyState === 1) ws.send(JSON.stringify({ action: action, query: query || '' }));
+      }, 300);
     }
 
     document.querySelectorAll('button.ctl[data-cmd]').forEach(function (btn) {

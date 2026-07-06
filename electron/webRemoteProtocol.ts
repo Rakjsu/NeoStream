@@ -123,17 +123,18 @@ export type RemoteCommand =
     | { action: 'seek'; seconds: number }
     | { action: 'playChannel'; channelId: string }
     | { action: 'requestEpg'; channelId: string }
-    | { action: 'requestCatalog' }
+    | { action: 'requestCatalog'; query?: string }
+    | { action: 'requestContinue' }
     | { action: 'requestDevices' }
     | { action: 'castMovie'; movieId: string; target?: CastTarget }
     | { action: 'castMovieQueue'; movieIds: string[]; target?: CastTarget }
-    | { action: 'requestSeries' }
+    | { action: 'requestSeries'; query?: string }
     | { action: 'requestSeriesInfo'; seriesId: string }
     | { action: 'castEpisode'; episodeId: string; target?: CastTarget }
 
 const VALID_ACTIONS = new Set([
     'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'seek', 'playChannel', 'requestEpg',
-    'requestCatalog', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
+    'requestCatalog', 'requestContinue', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
 ])
 
 const CAST_TARGET_TYPES = new Set<CastTargetType>(['chromecast', 'dlna', 'airplay'])
@@ -145,6 +146,14 @@ function parseCastTarget(parsed: unknown): CastTarget | undefined {
     if (typeof deviceId !== 'string' || !deviceId) return undefined
     if (typeof deviceType !== 'string' || !CAST_TARGET_TYPES.has(deviceType as CastTargetType)) return undefined
     return { deviceId, deviceType: deviceType as CastTargetType }
+}
+
+/** Optional search term for catalog/series (trimmed, capped); undefined if absent/empty. */
+function parseQuery(parsed: unknown): string | undefined {
+    const q = (parsed as { query?: unknown }).query
+    if (typeof q !== 'string') return undefined
+    const trimmed = q.trim().slice(0, 100)
+    return trimmed || undefined
 }
 
 /** Validate a command coming off the wire (untrusted phone input). */
@@ -190,8 +199,9 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         if (typeof episodeId !== 'string' || !episodeId) return null
         return { action, episodeId, target: parseCastTarget(parsed) }
     }
-    if (action === 'requestCatalog') return { action: 'requestCatalog' }
-    if (action === 'requestSeries') return { action: 'requestSeries' }
+    if (action === 'requestCatalog') return { action: 'requestCatalog', query: parseQuery(parsed) }
+    if (action === 'requestSeries') return { action: 'requestSeries', query: parseQuery(parsed) }
+    if (action === 'requestContinue') return { action: 'requestContinue' }
     if (action === 'requestDevices') return { action: 'requestDevices' }
     return { action: action as 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' }
 }

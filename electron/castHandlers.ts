@@ -48,6 +48,18 @@ export function isCastSessionActive(): boolean {
     return activeSession?.isActive ?? false
 }
 
+/** Snapshot of the active cast for the phone's progress bar (0s/0s when idle). */
+export function getCastStatus(): { active: boolean; playing: boolean; currentTime: number; duration: number } {
+    const s = activeSession
+    if (!s?.isActive) return { active: false, playing: false, currentTime: 0, duration: 0 }
+    return {
+        active: true,
+        playing: s.status.playing ?? false,
+        currentTime: Math.max(0, s.status.currentTime ?? 0),
+        duration: Math.max(0, s.status.duration ?? 0),
+    }
+}
+
 /**
  * Route a phone-remote transport command to the active cast session, so the
  * same buttons that drive the local player drive the Chromecast when one is
