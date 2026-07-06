@@ -6,6 +6,7 @@ import { profileService } from '../services/profileService';
 import { watchLaterService } from '../services/watchLater';
 import { favoritesService } from '../services/favoritesService';
 import { downloadService } from '../services/downloadService';
+import { castResolvedQueue } from '../services/castQueue';
 import { useLanguage } from '../services/languageService';
 import { extractYouTubeId } from '../utils/youtube';
 import { episodeDisplayTitle, sortedSeasonKeys } from '../utils/seriesEpisodes';
@@ -70,6 +71,8 @@ export function ContentDetailModal({
     const [tmdbData, setTmdbData] = useState<TMDBSeriesDetails | TMDBMovieDetails | null>(null);
     const [selectedSeason, setSelectedSeason] = useState(1);
     const [selectedEpisode, setSelectedEpisode] = useState(1);
+    const [castSeasonMsg, setCastSeasonMsg] = useState<string | null>(null);
+    const [castingSeason, setCastingSeason] = useState(false);
     const [loading, setLoading] = useState(false);
     const [loadError, setLoadError] = useState(false);
     const [retryNonce, setRetryNonce] = useState(0);
@@ -282,6 +285,34 @@ export function ContentDetailModal({
     };
 
     // Download a single episode
+    // Cast the whole selected season to the first Chromecast (QUEUE_LOAD). Each
+    // episode's URL is resolved via IPC (Xtream/M3U/Stalker), in episode order.
+    const castSeason = async () => {
+        const eps = seriesInfo?.episodes?.[selectedSeason] || [];
+        if (eps.length === 0) return;
+        setCastingSeason(true);
+        setCastSeasonMsg(t('contentModal', 'castResolving'));
+        try {
+            const queue: { url: string; title: string }[] = [];
+            for (const ep of eps) {
+                const res = await window.ipcRenderer.invoke('streams:get-series-url', {
+                    streamId: ep.id,
+                    container: ep.container_extension || 'mp4',
+                }).catch(() => null) as { success: boolean; url?: string } | null;
+                if (res?.success && res.url) queue.push({ url: res.url, title: getEpisodeTitle(ep) });
+            }
+            const result = await castResolvedQueue(queue);
+            if (result.status === 'no-device') setCastSeasonMsg(t('contentModal', 'castNoDevice'));
+            else if (result.status === 'empty') setCastSeasonMsg(t('contentModal', 'castNoUrls'));
+            else if (result.status === 'ok') setCastSeasonMsg(
+                t('contentModal', 'castQueued').replace('{n}', String(result.count)).replace('{device}', result.deviceName));
+            else setCastSeasonMsg(t('contentModal', 'castError'));
+        } finally {
+            setCastingSeason(false);
+            setTimeout(() => setCastSeasonMsg(null), 6000);
+        }
+    };
+
     const downloadSingleEpisode = async (seasonNum: number, episodeNum: number) => {
         // Check if episode is already in queue
         if (downloadService.isEpisodeInQueue(contentData.name, seasonNum, episodeNum)) {
@@ -592,6 +623,25 @@ export function ContentDetailModal({
                                             T{season}
                                         </button>
                                     ))}
+                                </div>
+
+                                {/* Cast the whole season to a Chromecast (QUEUE_LOAD) */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                                    <button
+                                        onClick={() => void castSeason()}
+                                        disabled={castingSeason || episodes.length === 0}
+                                        style={{
+                                            padding: '6px 14px', borderRadius: 20, border: '2px solid rgba(var(--ns-accent-rgb), 0.4)',
+                                            background: 'rgba(var(--ns-accent-rgb), 0.12)', color: 'var(--ns-accent-light)',
+                                            fontSize: 12, fontWeight: 700, cursor: castingSeason ? 'default' : 'pointer',
+                                            opacity: castingSeason || episodes.length === 0 ? 0.6 : 1
+                                        }}
+                                    >
+                                        📡 {t('contentModal', 'castSeason').replace('{season}', String(selectedSeason))}
+                                    </button>
+                                    {castSeasonMsg && (
+                                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{castSeasonMsg}</span>
+                                    )}
                                 </div>
 
                                 {/* Episode List (fills the remaining height, scrolls; windowed for long seasons) */}

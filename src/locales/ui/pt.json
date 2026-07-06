@@ -204,6 +204,12 @@
     "seasonComplete": "Temporada {season} completa ({count} eps em download)",
     "downloadRemaining": "Baixar {count} episódios restantes ({downloaded} já na fila)",
     "downloadSeason": "Temporada {season} ({count} episódios)",
+    "castSeason": "Transmitir T{season}",
+    "castResolving": "Preparando a fila…",
+    "castNoDevice": "Nenhum Chromecast encontrado",
+    "castNoUrls": "Nenhum episódio pôde ser transmitido",
+    "castQueued": "{n} episódios na fila do {device}",
+    "castError": "Falha ao transmitir a temporada",
     "episodeAlreadyDownloading": "Episódio {episode} já está em download",
     "onlyEpisode": "Apenas Episódio {episode}",
     "cancel": "Cancelar"
