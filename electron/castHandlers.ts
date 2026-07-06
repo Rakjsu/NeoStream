@@ -49,14 +49,19 @@ export function isCastSessionActive(): boolean {
 }
 
 /** Snapshot of the active cast for the phone's progress bar (0s/0s when idle). */
-export function getCastStatus(): { active: boolean; playing: boolean; currentTime: number; duration: number } {
+export function getCastStatus(): { active: boolean; playing: boolean; currentTime: number; duration: number; title: string; hasQueue: boolean } {
     const s = activeSession
-    if (!s?.isActive) return { active: false, playing: false, currentTime: 0, duration: 0 }
+    if (!s?.isActive) return { active: false, playing: false, currentTime: 0, duration: 0, title: '', hasQueue: false }
+    const status = s.status
+    // What's playing: current queue item (episode) or the single-load meta.
+    const currentItem = status.queue.find(item => item.itemId === status.currentItemId)
     return {
         active: true,
-        playing: s.status.playing ?? false,
-        currentTime: Math.max(0, s.status.currentTime ?? 0),
-        duration: Math.max(0, s.status.duration ?? 0),
+        playing: status.playing ?? false,
+        currentTime: Math.max(0, status.currentTime ?? 0),
+        duration: Math.max(0, status.duration ?? 0),
+        title: currentItem?.title || status.meta?.title || '',
+        hasQueue: status.queue.length > 1,
     }
 }
 
@@ -79,6 +84,15 @@ export function castRemoteControl(action: string, seconds?: number): boolean {
                 s.seek(Math.max(0, (s.status.currentTime ?? 0) + seconds))
             }
             break
+        case 'next':
+        case 'previous':
+            // Queue cast (season/playlist): ⏮/⏭ skip episodes on the TV. With
+            // no queue the action falls through to the renderer (channel zap).
+            if ((s.status.queue?.length ?? 0) > 1) {
+                s.queueSkip(action === 'next' ? 'next' : 'prev')
+                break
+            }
+            return false
         case 'volumeUp': s.setVolume(Math.min(1, vol + 0.1)); break
         case 'volumeDown': s.setVolume(Math.max(0, vol - 0.1)); break
         case 'mute':
