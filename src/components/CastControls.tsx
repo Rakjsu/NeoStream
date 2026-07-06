@@ -265,6 +265,7 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                         max={Math.max(1, Math.floor(duration))}
                         value={Math.floor(position)}
                         onChange={handleSeek}
+                        aria-label="Posição da reprodução"
                         style={{ flex: 1, height: 4, cursor: 'pointer', accentColor: 'var(--ns-accent)' }}
                     />
                     <span style={{ fontSize: 10, color: '#9ca3af', flexShrink: 0 }}>{formatTime(duration)}</span>
@@ -284,6 +285,7 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                         max={100}
                         value={volume}
                         onChange={handleVolume}
+                        aria-label="Volume da TV"
                         style={{ width: 64, height: 4, cursor: 'pointer', accentColor: 'var(--ns-accent)' }}
                     />
                 </div>

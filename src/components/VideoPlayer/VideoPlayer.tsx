@@ -1012,7 +1012,12 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
 
                 <div className="controls-row">
                     <div className="controls-left">
-                        <button className="control-btn" onClick={controls.togglePlay}>
+                        <button
+                            className="control-btn"
+                            onClick={controls.togglePlay}
+                            title={state.playing ? 'Pausar' : 'Reproduzir'}
+                            aria-label={state.playing ? 'Pausar' : 'Reproduzir'}
+                        >
                             {state.playing ? <Pause size="1em" /> : <Play size="1em" />}
                         </button>
 
@@ -1021,7 +1026,12 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             onMouseEnter={() => setShowVolumeSlider(true)}
                             onMouseLeave={() => setShowVolumeSlider(false)}
                         >
-                            <button className="control-btn volume-btn" onClick={controls.toggleMute}>
+                            <button
+                                className="control-btn volume-btn"
+                                onClick={controls.toggleMute}
+                                title={state.muted || state.volume === 0 ? 'Ativar som' : 'Silenciar'}
+                                aria-label={state.muted || state.volume === 0 ? 'Ativar som' : 'Silenciar'}
+                            >
                                 {state.muted || state.volume === 0 ? (
                                     <VolumeX size="1em" />
                                 ) : state.volume < 0.33 ? (
@@ -1041,6 +1051,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                                     step="0.01"
                                     value={state.muted ? 0 : state.volume}
                                     onChange={handleVolumeChange}
+                                    aria-label="Volume"
                                 />
                             )}
                         </div>
@@ -1262,13 +1273,18 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             <Cast size="1em" />
                         </button>
 
-                        <button className="control-btn" onClick={() => {
-                            if (!document.fullscreenElement) {
-                                containerRef.current?.requestFullscreen();
-                            } else {
-                                document.exitFullscreen();
-                            }
-                        }}>
+                        <button
+                            className="control-btn"
+                            onClick={() => {
+                                if (!document.fullscreenElement) {
+                                    containerRef.current?.requestFullscreen();
+                                } else {
+                                    document.exitFullscreen();
+                                }
+                            }}
+                            title={state.fullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
+                            aria-label={state.fullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
+                        >
                             {state.fullscreen ? <Minimize size="1em" /> : <Maximize size="1em" />}
                         </button>
                     </div>

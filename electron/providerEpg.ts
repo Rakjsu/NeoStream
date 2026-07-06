@@ -128,6 +128,8 @@ async function fetchXmltvWithCache(url: string): Promise<string | null> {
         const fetch = (await import('node-fetch')).default
         const response = await fetch(url, {
             agent: getProviderHttpsAgent(url),
+            // Generous: provider xmltv files are big; failure falls back to stale cache.
+            signal: AbortSignal.timeout(60000),
             headers: FETCH_HEADERS
         })
 
@@ -281,6 +283,7 @@ async function fetchSimpleDataTable(streamId: number, channelId: string): Promis
         const fetch = (await import('node-fetch')).default
         const response = await fetch(url, {
             agent: getProviderHttpsAgent(url),
+            signal: AbortSignal.timeout(20000),
             headers: FETCH_HEADERS
         })
 
