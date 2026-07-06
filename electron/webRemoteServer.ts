@@ -501,7 +501,7 @@ function start(): Promise<void> {
         // PWA assets: "Add to home screen" installs the remote as a real app.
         if (req.url === '/manifest.webmanifest') {
             res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'max-age=3600' })
-            res.end(buildManifest())
+            res.end(buildManifest(remoteLang))
             return
         }
         if (req.url === '/icon.svg') {
