@@ -49,11 +49,6 @@ export function encodeTextFrame(text: string): Uint8Array {
     return Buffer.concat([header, payload])
 }
 
-/** A single close frame (server→client, no code). */
-export function encodeCloseFrame(): Uint8Array {
-    return Uint8Array.from([0x88, 0x00])
-}
-
 /** Pong in response to a client ping (echoes the payload). */
 export function encodePongFrame(payload: Uint8Array): Uint8Array {
     const len = payload.length & 0x7f
