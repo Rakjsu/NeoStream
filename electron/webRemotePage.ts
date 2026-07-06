@@ -56,12 +56,17 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
   .hint { font-size: 12px; color: rgba(255,255,255,.4); max-width: 420px; text-align: center; }
   .hidden { display: none !important; }
   /* Guide */
-  #guide, #catalog, #series, #episodes, #continue { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
+  #guide, #catalog, #series, #episodes, #continue, #search { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
+  .gsearch { width: 100%; max-width: 420px; }
   .cobar { height: 4px; border-radius: 2px; background: rgba(255,255,255,.12); margin-top: 6px; overflow: hidden; }
   .cobar > span { display: block; height: 100%; background: var(--accent); }
   .castprog { margin-top: 12px; }
-  .castprog .cobar { height: 5px; }
   .casttime { font-size: 12px; color: rgba(255,255,255,.5); margin-top: 6px; text-align: center; }
+  .castseek { -webkit-appearance: none; appearance: none; width: 100%; height: 5px; border-radius: 3px;
+    background: rgba(255,255,255,.15); outline: none; cursor: pointer; }
+  .castseek::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
+    border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px rgba(99,102,241,.6); }
+  .castseek::-moz-range-thumb { width: 16px; height: 16px; border: none; border-radius: 50%; background: var(--accent); }
   .nowbar {
     background: linear-gradient(135deg, rgba(79,70,229,.25), rgba(99,102,241,.12));
     border: 1px solid rgba(99,102,241,.3); border-radius: 16px; padding: 14px 16px; text-align: left;
@@ -138,12 +143,18 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       <select id="devsel" class="devsel"><option value="">Automático (1ª TV)</option></select>
     </div>
 
+    <input class="chsearch gsearch" id="gsearch" placeholder="🔍 Buscar filmes e séries…" autocomplete="off">
+    <div id="search" class="hidden">
+      <div class="chlist" id="srlist"></div>
+      <div class="empty" id="sr-empty">Digite para buscar no acervo.</div>
+    </div>
+
     <div id="control">
       <div class="card">
         <div class="title" id="title">—</div>
         <div class="status" id="status">Conectando…</div>
         <div class="castprog hidden" id="castprog">
-          <div class="cobar"><span id="castbar" style="width:0%"></span></div>
+          <input type="range" id="castseek" class="castseek" min="0" max="1000" value="0">
           <div class="casttime" id="casttime">0:00 / 0:00</div>
         </div>
         <div class="row seek">
@@ -242,12 +253,19 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     var episodes = [];     // [{ id, label }]
     var currentSeriesId = '';
     var castprogEl = document.getElementById('castprog');
-    var castbarEl = document.getElementById('castbar');
+    var castseekEl = document.getElementById('castseek');
     var casttimeEl = document.getElementById('casttime');
+    var lastCastTime = 0, lastCastDur = 0, seekingCast = false;
     var coEl = document.getElementById('continue');
     var colistEl = document.getElementById('colist');
     var coEmptyEl = document.getElementById('co-empty');
     var continueList = [];  // [{ kind, castId, name, cover, pct }]
+    var gsearchEl = document.getElementById('gsearch');
+    var searchEl = document.getElementById('search');
+    var srlistEl = document.getElementById('srlist');
+    var srEmptyEl = document.getElementById('sr-empty');
+    var gFilter = '', searchMode = false, activeView = 'control', gSearchTimer = null;
+    var srMovies = [], srSeries = [];  // global-search results (kept apart from the tabs' data)
     var devselEl = document.getElementById('devsel');
     var toastEl = document.getElementById('toast');
     var devices = [];      // [{ id, name, type }]
@@ -301,11 +319,12 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
             epgCache[msg.channelId] = { now: msg.now, nowStart: msg.nowStart, nowEnd: msg.nowEnd, next: msg.next };
             if (openEpg[msg.channelId]) renderGuide();
           } else if (msg.type === 'catalog') {
-            movies = msg.items || [];
-            renderCatalog();
+            // Route by mode so global search doesn't clobber the Filmes tab data.
+            if (searchMode) { srMovies = msg.items || []; renderSearch(); }
+            else { movies = msg.items || []; renderCatalog(); }
           } else if (msg.type === 'series') {
-            seriesList = msg.items || [];
-            renderSeries();
+            if (searchMode) { srSeries = msg.items || []; renderSearch(); }
+            else { seriesList = msg.items || []; renderSeries(); }
           } else if (msg.type === 'seriesInfo') {
             if (msg.seriesId === currentSeriesId) { episodes = msg.episodes || []; renderEpisodes(); }
           } else if (msg.type === 'continue') {
@@ -330,17 +349,35 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       return (h > 0 ? h + ':' : '') + mm + ':' + ss;
     }
 
-    // Cast progress bar on the Controle card (only while casting with a duration).
+    // Cast progress + scrubber on the Controle card (only while casting).
     function updateCastProgress(msg) {
       var dur = msg.castDuration || 0, cur = msg.castTime || 0;
+      lastCastTime = cur; lastCastDur = dur;
       if (msg.casting && dur > 0) {
         castprogEl.classList.remove('hidden');
-        castbarEl.style.width = Math.max(0, Math.min(100, (cur / dur) * 100)) + '%';
+        if (!seekingCast) castseekEl.value = String(Math.round((cur / dur) * 1000));
         casttimeEl.textContent = fmtTime(cur) + ' / ' + fmtTime(dur);
       } else {
         castprogEl.classList.add('hidden');
       }
     }
+
+    // Scrubbing: preview the time while dragging, then seek on release. Cast seek
+    // is relative on the wire, so we send the delta from the last known position.
+    castseekEl.addEventListener('input', function () {
+      if (lastCastDur <= 0) return;
+      seekingCast = true;
+      var target = (Number(castseekEl.value) / 1000) * lastCastDur;
+      casttimeEl.textContent = fmtTime(target) + ' / ' + fmtTime(lastCastDur);
+    });
+    castseekEl.addEventListener('change', function () {
+      if (lastCastDur <= 0) { seekingCast = false; return; }
+      var target = (Number(castseekEl.value) / 1000) * lastCastDur;
+      var delta = Math.round(target - lastCastTime);
+      if (delta !== 0) sendCmd('seek', delta);
+      lastCastTime = target;
+      seekingCast = false;
+    });
 
     function showToast(text, kind) {
       toastEl.textContent = text;
@@ -608,8 +645,80 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       if (id) sendCmd('playChannel', null, id);
     });
 
+    // ------------------------------------------------------ Busca unificada --
+    function renderSearch() {
+      if (!gFilter) { srlistEl.innerHTML = ''; srEmptyEl.classList.remove('hidden'); srEmptyEl.textContent = 'Digite para buscar no acervo.'; return; }
+      var html = '';
+      for (var i = 0; i < srMovies.length; i++) {
+        var m = srMovies[i];
+        var logo = m.cover ? '<img src="' + esc(m.cover) + '" onerror="this.style.display=\\'none\\'" alt="">' : '<div class="ph">🎬</div>';
+        html += '<div class="chitem" data-srmv="' + esc(m.id) + '">' + logo
+          + '<div class="nm">' + esc(m.name) + '</div>'
+          + '<button class="chinfo" data-srcast="' + esc(m.id) + '" title="Transmitir na TV">📡</button></div>';
+      }
+      for (var j = 0; j < srSeries.length; j++) {
+        var s = srSeries[j];
+        var slogo = s.cover ? '<img src="' + esc(s.cover) + '" onerror="this.style.display=\\'none\\'" alt="">' : '<div class="ph">🎞️</div>';
+        html += '<div class="chitem" data-srse="' + esc(s.id) + '" data-nm="' + esc(s.name) + '">' + slogo
+          + '<div class="nm">' + esc(s.name) + '</div>'
+          + '<span class="chinfo" title="Ver episódios">›</span></div>';
+      }
+      if (!html) { srlistEl.innerHTML = ''; srEmptyEl.classList.remove('hidden'); srEmptyEl.textContent = 'Nenhum resultado.'; return; }
+      srEmptyEl.classList.add('hidden');
+      srlistEl.innerHTML = html;
+    }
+
+    gsearchEl.addEventListener('input', function () {
+      gFilter = gsearchEl.value.trim();
+      if (gFilter) {
+        searchMode = true;
+        // Hide every tab view; show the combined results.
+        controlEl.classList.add('hidden'); guideEl.classList.add('hidden'); catalogEl.classList.add('hidden');
+        seriesEl.classList.add('hidden'); episodesEl.classList.add('hidden'); coEl.classList.add('hidden');
+        searchEl.classList.remove('hidden');
+        srEmptyEl.textContent = 'Buscando…'; srEmptyEl.classList.remove('hidden');
+        if (gSearchTimer) clearTimeout(gSearchTimer);
+        gSearchTimer = setTimeout(function () {
+          if (ws && ws.readyState === 1) {
+            ws.send(JSON.stringify({ action: 'requestCatalog', query: gFilter }));
+            ws.send(JSON.stringify({ action: 'requestSeries', query: gFilter }));
+          }
+        }, 300);
+      } else {
+        if (gSearchTimer) clearTimeout(gSearchTimer);
+        searchMode = false; srMovies = []; srSeries = [];
+        searchEl.classList.add('hidden');
+        activateTab(activeView || 'control');
+      }
+    });
+
+    srlistEl.addEventListener('click', function (ev) {
+      if (!ev.target.closest) return;
+      var cast = ev.target.closest('.chinfo');
+      if (cast && cast.getAttribute('data-srcast')) { sendCmd('castMovie', null, null, cast.getAttribute('data-srcast')); return; }
+      var se = ev.target.closest('[data-srse]');
+      if (se) {
+        // Drill into the series' episodes (leaves search, like tapping in Séries).
+        var sid = se.getAttribute('data-srse');
+        gsearchEl.value = ''; gFilter = ''; searchMode = false; searchEl.classList.add('hidden');
+        currentSeriesId = sid; episodes = [];
+        document.getElementById('ep-empty').textContent = 'Carregando episódios…';
+        document.getElementById('ep-empty').classList.remove('hidden');
+        eplistEl.innerHTML = '';
+        episodesEl.classList.remove('hidden');
+        sendCmd('requestSeriesInfo', null, null, null, sid);
+        return;
+      }
+      var mv = ev.target.closest('[data-srmv]');
+      if (mv) sendCmd('castMovie', null, null, mv.getAttribute('data-srmv'));
+    });
+
     // Switch to a tab (also used to restore the last tab after reconnecting).
     function activateTab(view) {
+      activeView = view;
+      // Leaving a tab exits any active search.
+      searchMode = false; searchEl.classList.add('hidden');
+      if (gsearchEl.value) gsearchEl.value = '';
       document.querySelectorAll('.tab').forEach(function (t) {
         t.classList.toggle('active', t.getAttribute('data-view') === view);
       });
