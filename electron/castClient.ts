@@ -56,6 +56,10 @@ export interface CastMediaInput {
     live: boolean
     subtitleUrl?: string
     subtitleLanguage?: string
+    /** Queue only: seconds into this item to start at (resume mid-episode). */
+    startTime?: number
+    /** Queue only: identity of this item, echoed in status while it plays. */
+    meta?: CastMediaMeta
 }
 
 /** Content identity echoed in status, so the renderer can record watch history. */
@@ -90,10 +94,22 @@ export class CastSession {
     private reconnectAttempts = 0
     private readonly maxReconnectAttempts = 6
     private mediaMeta: CastMediaMeta | null = null
+    // Queue casts: one meta per item, aligned with the QUEUE_LOAD order, so the
+    // status echoes the identity of whichever episode is CURRENTLY playing.
+    private queueMetas: (CastMediaMeta | null)[] = []
 
     /** Attach the content identity so status echoes it (renderer records history). */
     setMeta(meta: CastMediaMeta | null): void {
         this.mediaMeta = meta
+    }
+
+    /** Meta of the queue item currently playing (falls back to the single-load meta). */
+    private get currentMeta(): CastMediaMeta | null {
+        if (this.queueMetas.length > 0 && this.currentItemId !== null) {
+            const idx = this.queueItems.findIndex(item => item.itemId === this.currentItemId)
+            if (idx >= 0 && idx < this.queueMetas.length) return this.queueMetas[idx] ?? this.mediaMeta
+        }
+        return this.mediaMeta
     }
 
     constructor(
@@ -115,7 +131,7 @@ export class CastSession {
             volume: this.volumeLevel,
             queue: this.queueItems,
             currentItemId: this.currentItemId,
-            meta: this.mediaMeta,
+            meta: this.currentMeta,
         }
     }
 
@@ -202,13 +218,23 @@ export class CastSession {
         const queueItems = items.map(i => ({
             url: i.url, title: i.title, contentType: i.contentType,
             subtitleUrl: i.subtitleUrl, subtitleLanguage: i.subtitleLanguage,
+            startTime: i.startTime,
         }))
+        // Per-item identity, aligned with the QUEUE_LOAD order — the status
+        // echoes the CURRENT item's meta so history tracks the right episode.
+        this.queueMetas = items.map(i => i.meta ?? null)
         this.send(this.transportId!, NS_MEDIA, queueLoadPayload(this.requestId++, queueItems, startIndex))
-        // On a dropped socket, re-queue from the item that was playing.
+        // On a dropped socket, re-queue from the item that was playing — at the
+        // position it was at (its original startTime no longer applies).
         this.reloadMedia = () => {
             this.send(this.transportId!, NS_CONNECTION, connectPayload())
             const idx = Math.max(0, this.currentItemId !== null ? this.currentItemId - 1 : startIndex)
-            this.send(this.transportId!, NS_MEDIA, queueLoadPayload(this.requestId++, queueItems, Math.min(idx, queueItems.length - 1)))
+            const resumeIdx = Math.min(idx, queueItems.length - 1)
+            const resumeItems = queueItems.map((item, i) => ({
+                ...item,
+                startTime: i === resumeIdx ? Math.max(0, this.currentTime ?? 0) : undefined,
+            }))
+            this.send(this.transportId!, NS_MEDIA, queueLoadPayload(this.requestId++, resumeItems, resumeIdx))
         }
         log.info('[Cast] QUEUE_LOAD enviado para', this.deviceName, `(${items.length} itens)`)
     }

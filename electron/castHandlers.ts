@@ -155,7 +155,7 @@ export function setupCastHandlers(): void {
         }
     })
 
-    ipcMain.handle('cast:play-queue', async (_e, payload: { deviceId?: string; items?: { url?: string; title?: string; contentType?: string; subtitleVtt?: string; subtitleLanguage?: string }[] }) => {
+    ipcMain.handle('cast:play-queue', async (_e, payload: { deviceId?: string; items?: { url?: string; title?: string; contentType?: string; subtitleVtt?: string; subtitleLanguage?: string; startTime?: number; meta?: CastMediaMeta }[] }) => {
         try {
             const device = devices.get(String(payload?.deviceId ?? ''))
             if (!device) return { success: false, error: 'Dispositivo não encontrado' }
@@ -179,6 +179,10 @@ export function setupCastHandlers(): void {
                     live: false,
                     subtitleUrl,
                     subtitleLanguage: typeof i.subtitleLanguage === 'string' ? i.subtitleLanguage : undefined,
+                    // Resume mid-episode (the item the cast starts on) + identity
+                    // so the status echoes which episode is playing (history).
+                    startTime: typeof i.startTime === 'number' && i.startTime > 0 ? i.startTime : undefined,
+                    meta: i.meta && i.meta.contentId ? i.meta : undefined,
                 })
             }
             if (items.length === 0) return { success: false, error: 'Fila vazia' }

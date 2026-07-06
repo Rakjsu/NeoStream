@@ -3,7 +3,7 @@ import { useDLNA, type DLNADevice } from '../hooks/useDLNA';
 import { useAirPlay } from '../hooks/useAirPlay';
 import { useChromecast, type ChromecastDevice } from '../hooks/useChromecast';
 import { useLanguage } from '../services/languageService';
-import type { CastQueueItem } from '../services/castQueue';
+import { buildSeasonTailQueue, type CastQueueItem } from '../services/castQueue';
 
 export interface CastDevice {
     id: string;
@@ -60,6 +60,11 @@ export function CastDeviceSelector({
     // overrides whatever the player had, and rides along in the cast.
     const [fetchedVtt, setFetchedVtt] = useState<string | null>(null);
     const effectiveVtt = fetchedVtt ?? subtitleVtt;
+    // Casting a single series episode → resolve the season's remaining episodes
+    // in the background so a Chromecast gets a queue (⏮/⏭ + autoplay of the
+    // next episode). Resolved lazily; if the user picks a device before it's
+    // ready, the cast falls back to the single episode.
+    const [tailQueue, setTailQueue] = useState<CastQueueItem[] | null>(null);
     // When casting a queue, the single-cast hooks (DLNA/AirPlay/single Chromecast)
     // operate on the first item; the whole queue only goes to Chromecast below.
     const isQueue = !!queue && queue.length > 0;
@@ -143,6 +148,23 @@ export function CastDeviceSelector({
             const res = await window.ipcRenderer.invoke('cast:play-queue', { deviceId: device.id, items })
                 .catch(() => null) as { success: boolean } | null;
             success = !!res?.success;
+        } else if (tailQueue && tailQueue.length > 1) {
+            // Single episode → season queue from this episode onward, so ⏮/⏭
+            // work and the next episode autoplays. The first item resumes at
+            // the local player's position and carries the current subtitle.
+            const items = tailQueue.map((it, idx) => idx === 0
+                ? {
+                    ...it,
+                    startTime: typeof startPosition === 'number' && startPosition > 5 ? startPosition : undefined,
+                    subtitleVtt: effectiveVtt && !it.subtitleVtt ? effectiveVtt : it.subtitleVtt,
+                }
+                : it
+            );
+            const res = await window.ipcRenderer.invoke('cast:play-queue', { deviceId: device.id, items })
+                .catch(() => null) as { success: boolean } | null;
+            success = !!res?.success;
+            // Queue refused (older receiver?) — fall back to the single episode.
+            if (!success) success = await castToChromecast(device);
         } else {
             success = await castToChromecast(device);
         }
@@ -159,12 +181,23 @@ export function CastDeviceSelector({
             setCastError(t('cast', 'failedToTransmit'));
         }
         setCasting(false);
-    }, [isQueue, queue, effectiveVtt, castToChromecast, onClose, onDeviceSelected, t]);
+    }, [isQueue, queue, tailQueue, startPosition, effectiveVtt, castToChromecast, onClose, onDeviceSelected, t]);
 
     // Auto-discover on mount
     useEffect(() => {
         discoverDevices();
     }, [discoverDevices]);
+
+    // Series episode (no explicit queue): resolve the rest of the season.
+    useEffect(() => {
+        if (isQueue || contentType !== 'series' || !contentId) return;
+        if (typeof seasonNumber !== 'number' || typeof episodeNumber !== 'number') return;
+        let cancelled = false;
+        void buildSeasonTailQueue(contentId, seasonNumber, episodeNumber).then(items => {
+            if (!cancelled && items.length > 1) setTailQueue(items);
+        });
+        return () => { cancelled = true; };
+    }, [isQueue, contentType, contentId, seasonNumber, episodeNumber]);
 
     const allDevices = useMemo(() => {
         const devices: CastDevice[] = [];
