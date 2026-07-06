@@ -128,22 +128,29 @@ export const chromecastControls = {
             success: boolean; active?: boolean; playing?: boolean; mediaState?: string | null;
             currentTime?: number | null; duration?: number | null; volume?: number | null; deviceName?: string;
             queue?: { itemId: number; title: string }[]; currentItemId?: number | null;
+            meta?: { title?: string } | null;
         };
         if (!result.success || !result.active) {
             return { success: false, error: 'No active cast session' };
         }
+        const queue = Array.isArray(result.queue) ? result.queue : [];
+        // What's playing: the current queue item's title (per-episode), else the
+        // single-load meta title. Empty when neither is known (attach/reconnect).
+        const currentItem = queue.find(item => item.itemId === result.currentItemId);
         return {
             success: true,
             state: result.mediaState ?? (result.playing ? 'PLAYING' : 'PAUSED'),
             position: result.currentTime ?? 0,
             duration: result.duration ?? 0,
             volume: typeof result.volume === 'number' ? Math.round(result.volume * 100) : null,
-            title: result.deviceName ?? '',
+            title: currentItem?.title || result.meta?.title || '',
             deviceId: 'chromecast',
-            queue: Array.isArray(result.queue) ? result.queue : [],
+            queue,
             currentItemId: result.currentItemId ?? null,
         };
     },
     queueJump: (itemId: number) =>
         window.ipcRenderer.invoke('cast:queue-jump', { itemId }) as Promise<{ success: boolean }>,
+    queueSkip: (direction: 'next' | 'prev') =>
+        window.ipcRenderer.invoke('cast:queue-skip', { direction }) as Promise<{ success: boolean }>,
 };

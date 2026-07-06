@@ -4,7 +4,7 @@
  * the TV stops and notifies the parent.
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, Square, Volume2, Tv, ListVideo } from 'lucide-react';
+import { Play, Pause, Square, Volume2, Tv, ListVideo, SkipBack, SkipForward } from 'lucide-react';
 import { castControls, type CastStatus } from '../hooks/useDLNA';
 import { chromecastControls } from '../hooks/useChromecast';
 import { formatTime } from '../utils/videoHelpers';
@@ -139,6 +139,18 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
     };
 
     const queue = status?.queue ?? [];
+    // ⏮/⏭ ride the Chromecast queue (QUEUE_UPDATE jump). Boundary buttons are
+    // disabled when the current index is known; unknown index keeps them live
+    // (the receiver just ignores an impossible skip).
+    const hasQueue = queue.length > 1;
+    const currentIndex = queue.findIndex(item => item.itemId === status?.currentItemId);
+    const canSkipPrev = hasQueue && currentIndex !== 0;
+    const canSkipNext = hasQueue && currentIndex !== queue.length - 1;
+    const handleQueueSkip = async (event: React.MouseEvent<HTMLButtonElement>) => {
+        const direction = event.currentTarget.dataset.direction === 'prev' ? 'prev' : 'next';
+        markCommand();
+        await remote.queueSkip(direction);
+    };
     // Passed directly to onClick (reads the itemId off the button) so the
     // react-hooks purity rule sees markCommand only via an event handler.
     const handleQueueClick = async (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -182,6 +194,28 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                 <div style={{ fontSize: 10, color: '#9ca3af', whiteSpace: 'nowrap' }}>{deviceName}</div>
             </div>
 
+            {hasQueue && (
+                <button
+                    onClick={handleQueueSkip}
+                    data-direction="prev"
+                    disabled={!canSkipPrev}
+                    title="Episódio anterior"
+                    style={{
+                        background: 'rgba(255,255,255,0.08)',
+                        border: 'none',
+                        borderRadius: 8,
+                        padding: 8,
+                        cursor: canSkipPrev ? 'pointer' : 'default',
+                        display: 'flex',
+                        color: 'white',
+                        opacity: canSkipPrev ? 1 : 0.35,
+                        flexShrink: 0
+                    }}
+                >
+                    <SkipBack size={14} />
+                </button>
+            )}
+
             <button
                 onClick={handleTogglePlay}
                 title={isPlaying ? 'Pausar' : 'Reproduzir'}
@@ -198,6 +232,28 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
             >
                 {isPlaying ? <Pause size={14} /> : <Play size={14} />}
             </button>
+
+            {hasQueue && (
+                <button
+                    onClick={handleQueueSkip}
+                    data-direction="next"
+                    disabled={!canSkipNext}
+                    title="Próximo episódio"
+                    style={{
+                        background: 'rgba(255,255,255,0.08)',
+                        border: 'none',
+                        borderRadius: 8,
+                        padding: 8,
+                        cursor: canSkipNext ? 'pointer' : 'default',
+                        display: 'flex',
+                        color: 'white',
+                        opacity: canSkipNext ? 1 : 0.35,
+                        flexShrink: 0
+                    }}
+                >
+                    <SkipForward size={14} />
+                </button>
+            )}
 
             {/* Seek (hidden for live content where duration is 0) */}
             {duration > 0 ? (
