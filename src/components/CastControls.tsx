@@ -4,7 +4,7 @@
  * the TV stops and notifies the parent.
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, Square, Volume2, Tv } from 'lucide-react';
+import { Play, Pause, Square, Volume2, Tv, ListVideo } from 'lucide-react';
 import { castControls, type CastStatus } from '../hooks/useDLNA';
 import { chromecastControls } from '../hooks/useChromecast';
 import { formatTime } from '../utils/videoHelpers';
@@ -29,6 +29,7 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
     const remote = deviceType === 'chromecast' ? chromecastControls : castControls;
     const [status, setStatus] = useState<CastStatus | null>(null);
     const [pendingVolume, setPendingVolume] = useState<number | null>(null);
+    const [showQueue, setShowQueue] = useState(false);
     const stoppedPolls = useRef(0);
     const failedPolls = useRef(0);
     // 0 = "treat mount time as the first command" — set on mount effect below.
@@ -78,6 +79,8 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                     volume: result.volume ?? null,
                     title: result.title || '',
                     deviceId: result.deviceId || deviceId,
+                    queue: result.queue ?? [],
+                    currentItemId: result.currentItemId ?? null,
                 });
 
                 // TV reports STOPPED/NO_MEDIA for several consecutive polls →
@@ -133,6 +136,16 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
     const handleStop = async () => {
         await remote.stop(deviceId);
         endSession();
+    };
+
+    const queue = status?.queue ?? [];
+    // Passed directly to onClick (reads the itemId off the button) so the
+    // react-hooks purity rule sees markCommand only via an event handler.
+    const handleQueueClick = async (event: React.MouseEvent<HTMLButtonElement>) => {
+        const itemId = Number(event.currentTarget.dataset.itemId);
+        markCommand();
+        setShowQueue(false);
+        await remote.queueJump(itemId);
     };
 
     return (
@@ -217,6 +230,52 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                         onChange={handleVolume}
                         style={{ width: 64, height: 4, cursor: 'pointer', accentColor: 'var(--ns-accent)' }}
                     />
+                </div>
+            )}
+
+            {/* Queue toggle — only when a Chromecast queue is active */}
+            {queue.length > 1 && (
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <button
+                        onClick={() => setShowQueue(v => !v)}
+                        title="Fila"
+                        style={{
+                            background: showQueue ? 'rgba(var(--ns-accent-rgb), 0.8)' : 'rgba(255,255,255,0.08)',
+                            border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', display: 'flex', color: 'white',
+                        }}
+                    >
+                        <ListVideo size={14} />
+                    </button>
+                    {showQueue && (
+                        <div style={{
+                            position: 'absolute', bottom: 'calc(100% + 10px)', right: 0, width: 260, maxHeight: 260,
+                            overflowY: 'auto', background: 'rgba(15,15,35,0.98)', border: '1px solid rgba(var(--ns-accent-rgb),0.4)',
+                            borderRadius: 12, padding: 6, boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+                        }}>
+                            {queue.map((item, i) => {
+                                const isCurrent = item.itemId === status?.currentItemId;
+                                return (
+                                    <button
+                                        key={item.itemId}
+                                        data-item-id={item.itemId}
+                                        onClick={handleQueueClick}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
+                                            padding: '8px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', color: 'white',
+                                            fontSize: 12, background: isCurrent ? 'rgba(var(--ns-accent-rgb),0.25)' : 'transparent',
+                                        }}
+                                    >
+                                        <span style={{ width: 18, flexShrink: 0, color: '#9ca3af', fontSize: 11 }}>
+                                            {isCurrent ? '▶' : i + 1}
+                                        </span>
+                                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {item.title || `Item ${i + 1}`}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             )}
 

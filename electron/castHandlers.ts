@@ -183,6 +183,11 @@ export function setupCastHandlers(): void {
         return { success: activeSession !== null }
     })
 
+    ipcMain.handle('cast:queue-jump', (_e, { itemId }: { itemId?: number }) => {
+        if (typeof itemId === 'number' && Number.isFinite(itemId)) activeSession?.queueJump(itemId)
+        return { success: activeSession !== null }
+    })
+
     ipcMain.handle('cast:pause', () => {
         activeSession?.pause()
         return { success: activeSession !== null }

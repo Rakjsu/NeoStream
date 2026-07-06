@@ -58,6 +58,11 @@ function getErrorMessage(error: unknown, fallback: string): string {
     return error instanceof Error ? error.message : fallback;
 }
 
+export interface CastQueueEntry {
+    itemId: number;
+    title: string;
+}
+
 export interface CastStatus {
     state: string;
     position: number;
@@ -65,6 +70,9 @@ export interface CastStatus {
     volume: number | null;
     title: string;
     deviceId: string;
+    /** Present only for a Chromecast queue (QUEUE_LOAD); empty otherwise. */
+    queue?: CastQueueEntry[];
+    currentItemId?: number | null;
 }
 
 interface CastStatusResult extends Partial<CastStatus> {
@@ -222,4 +230,6 @@ export const castControls = {
     setVolume: (volume: number) => window.ipcRenderer.invoke('dlna:set-volume', { volume }) as Promise<DLNACommandResult>,
     stop: (deviceId: string) => window.ipcRenderer.invoke('dlna:stop', { deviceId }) as Promise<DLNACommandResult>,
     getStatus: () => window.ipcRenderer.invoke('dlna:get-status') as Promise<CastStatusResult>,
+    // DLNA has no queue — no-op, kept for signature parity with chromecastControls.
+    queueJump: (): Promise<DLNACommandResult> => Promise.resolve({ success: false }),
 };

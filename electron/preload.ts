@@ -28,6 +28,7 @@ const invokeChannels = new Set([
     'cast:get-status',
     'cast:play-queue',
     'cast:queue-skip',
+    'cast:queue-jump',
     'web-remote:get-config',
     'web-remote:set-enabled',
     'cast:set-volume',

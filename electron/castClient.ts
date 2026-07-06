@@ -28,15 +28,19 @@ import {
     loadMediaPayload,
     queueLoadPayload,
     queueSkipPayload,
+    queueJumpPayload,
     mediaCommandPayload,
     seekPayload,
     getMediaStatusPayload,
     setVolumePayload,
     extractMediaTimes,
+    extractQueueItems,
+    extractCurrentItemId,
     extractTransportId,
     extractSessionId,
     extractMediaSessionId,
     type CastMessage,
+    type QueueItemStatus,
 } from './castProtocol'
 
 const HEARTBEAT_MS = 5000
@@ -63,6 +67,8 @@ export class CastSession {
     private currentTime: number | null = null
     private duration: number | null = null
     private volumeLevel: number | null = null
+    private queueItems: QueueItemStatus[] = []
+    private currentItemId: number | null = null
     private closed = false
 
     constructor(
@@ -82,6 +88,15 @@ export class CastSession {
             currentTime: this.currentTime,
             duration: this.duration,
             volume: this.volumeLevel,
+            queue: this.queueItems,
+            currentItemId: this.currentItemId,
+        }
+    }
+
+    /** Jump the active queue to a specific itemId. */
+    queueJump(itemId: number): void {
+        if (this.transportId && this.mediaSessionId !== null) {
+            this.send(this.transportId, NS_MEDIA, queueJumpPayload(this.requestId++, this.mediaSessionId, itemId))
         }
     }
 
@@ -132,6 +147,12 @@ export class CastSession {
                 if (times.currentTime !== null) this.currentTime = times.currentTime
                 if (times.duration !== null) this.duration = times.duration
             }
+            // Only overwrite the queue when the device actually reports one, so
+            // a periodic status without `items` doesn't blank a live queue.
+            const items = extractQueueItems(payload)
+            if (items.length > 0) this.queueItems = items
+            const currentItemId = extractCurrentItemId(payload)
+            if (currentItemId !== null) this.currentItemId = currentItemId
         }
     }
 
