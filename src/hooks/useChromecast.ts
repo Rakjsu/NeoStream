@@ -130,6 +130,8 @@ export const chromecastControls = {
             queue?: { itemId: number; title: string }[]; currentItemId?: number | null;
             meta?: { title?: string } | null;
             subtitleAvailable?: boolean; subtitleEnabled?: boolean;
+            audioTracks?: { trackId: number; name: string; language: string }[];
+            activeAudioTrackId?: number | null;
         };
         if (!result.success || !result.active) {
             return { success: false, error: 'No active cast session' };
@@ -150,6 +152,8 @@ export const chromecastControls = {
             currentItemId: result.currentItemId ?? null,
             subtitleAvailable: result.subtitleAvailable === true,
             subtitleEnabled: result.subtitleEnabled !== false,
+            audioTracks: Array.isArray(result.audioTracks) ? result.audioTracks : [],
+            activeAudioTrackId: result.activeAudioTrackId ?? null,
         };
     },
     queueJump: (itemId: number) =>
@@ -158,4 +162,6 @@ export const chromecastControls = {
         window.ipcRenderer.invoke('cast:queue-skip', { direction }) as Promise<{ success: boolean }>,
     setSubtitleEnabled: (enabled: boolean) =>
         window.ipcRenderer.invoke('cast:set-subtitle', { enabled }) as Promise<{ success: boolean }>,
+    setAudioTrack: (trackId: number) =>
+        window.ipcRenderer.invoke('cast:set-audio-track', { trackId }) as Promise<{ success: boolean }>,
 };

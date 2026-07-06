@@ -76,6 +76,9 @@ export interface CastStatus {
     /** Chromecast only: the current media carries a WebVTT track (💬 toggle). */
     subtitleAvailable?: boolean;
     subtitleEnabled?: boolean;
+    /** Chromecast only: switchable audio renditions (HLS multi-audio). */
+    audioTracks?: { trackId: number; name: string; language: string }[];
+    activeAudioTrackId?: number | null;
 }
 
 interface CastStatusResult extends Partial<CastStatus> {
@@ -238,4 +241,5 @@ export const castControls = {
     queueJump: (): Promise<DLNACommandResult> => Promise.resolve({ success: false }),
     queueSkip: (): Promise<DLNACommandResult> => Promise.resolve({ success: false }),
     setSubtitleEnabled: (): Promise<DLNACommandResult> => Promise.resolve({ success: false }),
+    setAudioTrack: (): Promise<DLNACommandResult> => Promise.resolve({ success: false }),
 };

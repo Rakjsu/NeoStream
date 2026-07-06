@@ -273,6 +273,12 @@ export function setupCastHandlers(): void {
         return { success: activeSession !== null }
     })
 
+    // Switch the audio rendition (only HLS multi-audio ever offers any).
+    ipcMain.handle('cast:set-audio-track', (_e, { trackId }: { trackId?: number }) => {
+        if (typeof trackId === 'number' && Number.isFinite(trackId)) activeSession?.setAudioTrack(trackId)
+        return { success: activeSession !== null }
+    })
+
     ipcMain.handle('cast:get-status', () => {
         // Prompt fresh times for the NEXT poll; return what we have now.
         activeSession?.requestMediaStatus()

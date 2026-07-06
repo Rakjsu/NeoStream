@@ -38,6 +38,8 @@ import {
     extractMediaTimes,
     extractQueueItems,
     extractCurrentItemId,
+    extractAudioTracks,
+    extractActiveTrackIds,
     extractTransportId,
     extractRunningAppId,
     extractSessionId,
@@ -45,6 +47,7 @@ import {
     CAST_MEDIA_APP_ID,
     type CastMessage,
     type QueueItemStatus,
+    type AudioTrackInfo,
 } from './castProtocol'
 
 const HEARTBEAT_MS = 5000
@@ -109,6 +112,10 @@ export class CastSession {
     // Renderer-side toggle state; items load with their track active, so a
     // queue advance resets this back to true (see handleMessage).
     private subtitleEnabled = true
+    // Receiver-side AUDIO tracks (HLS multi-audio only). Progressive MP4/MKV
+    // never reports these — empty list = "nothing to switch".
+    private audioTracks: AudioTrackInfo[] = []
+    private activeAudioTrackId: number | null = null
 
     /** Attach the content identity so status echoes it (renderer records history). */
     setMeta(meta: CastMediaMeta | null): void {
@@ -133,11 +140,29 @@ export class CastSession {
         return this.mediaHasSubtitle
     }
 
+    /** Active ids to send: chosen audio rendition (if any) + subtitle track 1. */
+    private composeActiveTrackIds(subtitleOn: boolean): number[] {
+        return [
+            ...(this.activeAudioTrackId !== null ? [this.activeAudioTrackId] : []),
+            ...(subtitleOn ? [1] : []),
+        ]
+    }
+
     /** Toggle the WebVTT track mid-playback (EDIT_TRACKS_INFO). */
     setSubtitleEnabled(enabled: boolean): void {
         if (this.transportId && this.mediaSessionId !== null) {
-            this.send(this.transportId, NS_MEDIA, editTracksPayload(this.requestId++, this.mediaSessionId, enabled))
+            this.send(this.transportId, NS_MEDIA, editTracksPayload(this.requestId++, this.mediaSessionId, this.composeActiveTrackIds(enabled)))
             this.subtitleEnabled = enabled
+        }
+    }
+
+    /** Switch the audio rendition (HLS multi-audio), keeping the subtitle state. */
+    setAudioTrack(trackId: number): void {
+        if (!this.audioTracks.some(track => track.trackId === trackId)) return
+        if (this.transportId && this.mediaSessionId !== null) {
+            this.activeAudioTrackId = trackId
+            const subtitleOn = this.subtitleEnabled && this.currentSubtitleAvailable
+            this.send(this.transportId, NS_MEDIA, editTracksPayload(this.requestId++, this.mediaSessionId, this.composeActiveTrackIds(subtitleOn)))
         }
     }
 
@@ -163,6 +188,8 @@ export class CastSession {
             meta: this.currentMeta,
             subtitleAvailable: this.currentSubtitleAvailable,
             subtitleEnabled: this.subtitleEnabled,
+            audioTracks: this.audioTracks,
+            activeAudioTrackId: this.activeAudioTrackId,
         }
     }
 
@@ -236,6 +263,19 @@ export class CastSession {
             if (times) {
                 if (times.currentTime !== null) this.currentTime = times.currentTime
                 if (times.duration !== null) this.duration = times.duration
+            }
+            // AUDIO renditions (HLS multi-audio): refresh whenever the status
+            // carries a `media` description (a partial status without it must
+            // not blank a known list, mirroring the queue handling below).
+            const statusEntry = Array.isArray(statusList) ? statusList[0] as { media?: unknown } : undefined
+            if (statusEntry && statusEntry.media !== undefined) {
+                this.audioTracks = extractAudioTracks(payload)
+            }
+            const activeIds = extractActiveTrackIds(payload)
+            if (activeIds !== null) {
+                // The receiver is the source of truth for what's active.
+                this.activeAudioTrackId = activeIds.find(id => this.audioTracks.some(t => t.trackId === id)) ?? null
+                if (this.currentSubtitleAvailable) this.subtitleEnabled = activeIds.includes(1)
             }
             // Only overwrite the queue when the device actually reports one, so
             // a periodic status without `items` doesn't blank a live queue.
