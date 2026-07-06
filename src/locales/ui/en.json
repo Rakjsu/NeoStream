@@ -204,6 +204,12 @@
     "seasonComplete": "Season {season} complete ({count} eps downloading)",
     "downloadRemaining": "Download {count} remaining episodes ({downloaded} already queued)",
     "downloadSeason": "Season {season} ({count} episodes)",
+    "castSeason": "Cast S{season}",
+    "castResolving": "Preparing the queue…",
+    "castNoDevice": "No Chromecast found",
+    "castNoUrls": "No episode could be cast",
+    "castQueued": "{n} episodes queued on {device}",
+    "castError": "Failed to cast the season",
     "episodeAlreadyDownloading": "Episode {episode} is already downloading",
     "onlyEpisode": "Only Episode {episode}",
     "cancel": "Cancel"

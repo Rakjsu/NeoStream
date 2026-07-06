@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { watchLaterService, type WatchLaterItem } from '../services/watchLater';
+import { castResolvedQueue } from '../services/castQueue';
 import { ContentDetailModal } from '../components/ContentDetailModal';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { ResumeModal } from '../components/ResumeModal';
@@ -94,23 +95,19 @@ export function WatchLater() {
         setCastingQueue(true);
         setCastMessage(t('watchLater', 'castResolving'));
         try {
-            const discover = await window.ipcRenderer.invoke('cast:discover') as { success: boolean; devices?: { id: string; name: string }[] };
-            const device = discover.devices?.[0];
-            if (!device) { setCastMessage(t('watchLater', 'castNoDevice')); return; }
-
             const queue: { url: string; title: string }[] = [];
             for (const movie of movies) {
                 const res = await window.ipcRenderer.invoke('streams:get-vod-url', { streamId: movie.id, container: 'mp4' })
                     .catch(() => null) as { success: boolean; url?: string } | null;
                 if (res?.success && res.url) queue.push({ url: res.url, title: movie.name });
             }
-            if (queue.length === 0) { setCastMessage(t('watchLater', 'castNoUrls')); return; }
 
-            const result = await window.ipcRenderer.invoke('cast:play-queue', { deviceId: device.id, items: queue })
-                .catch(() => null) as { success: boolean; count?: number } | null;
-            setCastMessage(result?.success
-                ? t('watchLater', 'castQueued').replace('{n}', String(result.count ?? queue.length)).replace('{device}', device.name)
-                : t('watchLater', 'castError'));
+            const result = await castResolvedQueue(queue);
+            if (result.status === 'no-device') setCastMessage(t('watchLater', 'castNoDevice'));
+            else if (result.status === 'empty') setCastMessage(t('watchLater', 'castNoUrls'));
+            else if (result.status === 'ok') setCastMessage(
+                t('watchLater', 'castQueued').replace('{n}', String(result.count)).replace('{device}', result.deviceName));
+            else setCastMessage(t('watchLater', 'castError'));
         } finally {
             setCastingQueue(false);
             setTimeout(() => setCastMessage(null), 6000);
