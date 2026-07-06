@@ -117,7 +117,11 @@ export function CastDeviceSelector({
         let success: boolean;
         if (isQueue) {
             // Native Chromecast queue (QUEUE_LOAD) for the whole season/playlist.
-            const items = queue!.filter(i => i.url);
+            // A subtitle fetched here rides along on the first (now-playing) item;
+            // items that already carry their own subtitleVtt keep it.
+            const items = queue!.filter(i => i.url).map((it, idx) =>
+                idx === 0 && effectiveVtt && !it.subtitleVtt ? { ...it, subtitleVtt: effectiveVtt } : it
+            );
             const res = await window.ipcRenderer.invoke('cast:play-queue', { deviceId: device.id, items })
                 .catch(() => null) as { success: boolean } | null;
             success = !!res?.success;
@@ -137,7 +141,7 @@ export function CastDeviceSelector({
             setCastError(t('cast', 'failedToTransmit'));
         }
         setCasting(false);
-    }, [isQueue, queue, castToChromecast, onClose, onDeviceSelected, t]);
+    }, [isQueue, queue, effectiveVtt, castToChromecast, onClose, onDeviceSelected, t]);
 
     // Auto-discover on mount
     useEffect(() => {
