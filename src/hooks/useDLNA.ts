@@ -230,6 +230,7 @@ export const castControls = {
     setVolume: (volume: number) => window.ipcRenderer.invoke('dlna:set-volume', { volume }) as Promise<DLNACommandResult>,
     stop: (deviceId: string) => window.ipcRenderer.invoke('dlna:stop', { deviceId }) as Promise<DLNACommandResult>,
     getStatus: () => window.ipcRenderer.invoke('dlna:get-status') as Promise<CastStatusResult>,
-    // DLNA has no queue — no-op, kept for signature parity with chromecastControls.
+    // DLNA has no queue — no-ops, kept for signature parity with chromecastControls.
     queueJump: (): Promise<DLNACommandResult> => Promise.resolve({ success: false }),
+    queueSkip: (): Promise<DLNACommandResult> => Promise.resolve({ success: false }),
 };
