@@ -14,4 +14,6 @@ import { app } from 'electron'
 const e2eUserData = process.env.NEOSTREAM_E2E_USER_DATA
 if (e2eUserData) {
     app.setPath('userData', e2eUserData)
+    // DVR writes to app.getPath('videos') — keep tests off the real folder.
+    app.setPath('videos', `${e2eUserData}/videos`)
 }
