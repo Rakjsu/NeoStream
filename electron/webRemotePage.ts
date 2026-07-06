@@ -56,7 +56,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
   .hint { font-size: 12px; color: rgba(255,255,255,.4); max-width: 420px; text-align: center; }
   .hidden { display: none !important; }
   /* Guide */
-  #guide { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
+  #guide, #catalog { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
   .nowbar {
     background: linear-gradient(135deg, rgba(79,70,229,.25), rgba(99,102,241,.12));
     border: 1px solid rgba(99,102,241,.3); border-radius: 16px; padding: 14px 16px; text-align: left;
@@ -106,6 +106,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     <div class="tabs">
       <div class="tab active" id="tab-ctl" data-view="control">🎛️ Controle</div>
       <div class="tab" id="tab-guide" data-view="guide">📺 Guia</div>
+      <div class="tab" id="tab-catalog" data-view="catalog">🎬 Filmes</div>
     </div>
 
     <div id="control">
@@ -141,6 +142,12 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       <div class="chlist" id="chlist"></div>
       <div class="empty hidden" id="guide-empty">Abra a <b>TV ao vivo</b> no computador para ver os canais aqui.</div>
     </div>
+
+    <div id="catalog" class="hidden">
+      <input class="chsearch" id="mvsearch" placeholder="Buscar filme…" autocomplete="off">
+      <div class="chlist" id="mvlist"></div>
+      <div class="empty" id="mv-empty">Carregando filmes…</div>
+    </div>
   </div>
 <script>
   (function () {
@@ -155,11 +162,18 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     var chlistEl = document.getElementById('chlist');
     var chsearchEl = document.getElementById('chsearch');
     var emptyEl = document.getElementById('guide-empty');
+    var catalogEl = document.getElementById('catalog');
+    var mvlistEl = document.getElementById('mvlist');
+    var mvsearchEl = document.getElementById('mvsearch');
+    var mvEmptyEl = document.getElementById('mv-empty');
     var ws;
     var guide = { channels: [], playingId: '', epg: null };
     var filter = '';
     var epgCache = {};   // channelId → { now, nowStart, nowEnd, next }
     var openEpg = {};    // channelId → true while its EPG panel is expanded
+    var movies = [];     // catalog: [{ id, name, cover }]
+    var mvFilter = '';
+    var catalogRequested = false;
 
     function showPinPrompt(message) {
       pinCard.style.display = 'block';
@@ -201,6 +215,9 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
           } else if (msg.type === 'channelEpg') {
             epgCache[msg.channelId] = { now: msg.now, nowStart: msg.nowStart, nowEnd: msg.nowEnd, next: msg.next };
             if (openEpg[msg.channelId]) renderGuide();
+          } else if (msg.type === 'catalog') {
+            movies = msg.items || [];
+            renderCatalog();
           }
         } catch (e) {}
       };
@@ -265,6 +282,32 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
 
     chsearchEl.addEventListener('input', function () { filter = chsearchEl.value; renderGuide(); });
 
+    function renderCatalog() {
+      if (!movies.length) { mvlistEl.innerHTML = ''; mvEmptyEl.classList.remove('hidden'); mvEmptyEl.textContent = catalogRequested ? 'Nenhum filme.' : 'Carregando filmes…'; return; }
+      mvEmptyEl.classList.add('hidden');
+      var f = mvFilter.toLowerCase();
+      var html = '';
+      for (var j = 0; j < movies.length; j++) {
+        var m = movies[j];
+        if (f && m.name.toLowerCase().indexOf(f) === -1) continue;
+        var logo = m.cover
+          ? '<img src="' + esc(m.cover) + '" onerror="this.style.display=\\'none\\'" alt="">'
+          : '<div class="ph">🎬</div>';
+        html += '<div class="chitem" data-mv="' + esc(m.id) + '">'
+          + logo + '<div class="nm">' + esc(m.name) + '</div>'
+          + '<button class="chinfo" data-cast="' + esc(m.id) + '" title="Transmitir na TV">📡</button></div>';
+      }
+      mvlistEl.innerHTML = html || '<div class="empty">Nenhum filme encontrado.</div>';
+    }
+
+    mvsearchEl.addEventListener('input', function () { mvFilter = mvsearchEl.value; renderCatalog(); });
+
+    mvlistEl.addEventListener('click', function (ev) {
+      if (!ev.target.closest) return;
+      var castBtn = ev.target.closest('.chinfo');
+      if (castBtn) { var mid = castBtn.getAttribute('data-cast'); if (mid) sendCmd('castMovie', null, null, mid); }
+    });
+
     chlistEl.addEventListener('click', function (ev) {
       if (!ev.target.closest) return;
       // The ⓘ button toggles the on-demand EPG panel (fetch once, then cached).
@@ -289,16 +332,23 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         var view = tab.getAttribute('data-view');
         document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
         tab.classList.add('active');
-        if (view === 'guide') { controlEl.classList.add('hidden'); guideEl.classList.remove('hidden'); renderGuide(); }
-        else { guideEl.classList.add('hidden'); controlEl.classList.remove('hidden'); }
+        controlEl.classList.add('hidden'); guideEl.classList.add('hidden'); catalogEl.classList.add('hidden');
+        if (view === 'guide') { guideEl.classList.remove('hidden'); renderGuide(); }
+        else if (view === 'catalog') {
+          catalogEl.classList.remove('hidden');
+          if (!catalogRequested) { catalogRequested = true; sendCmd('requestCatalog'); }
+          renderCatalog();
+        }
+        else { controlEl.classList.remove('hidden'); }
       });
     });
 
-    function sendCmd(action, sec, channelId) {
+    function sendCmd(action, sec, channelId, movieId) {
       if (!ws || ws.readyState !== 1) return;
       var payload = { action: action };
       if (action === 'seek') payload.seconds = sec;
       if (action === 'playChannel' || action === 'requestEpg') payload.channelId = channelId;
+      if (action === 'castMovie') payload.movieId = movieId;
       ws.send(JSON.stringify(payload));
     }
 

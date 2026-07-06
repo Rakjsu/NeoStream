@@ -10,6 +10,7 @@ import { Dashboard } from './pages/Dashboard';
 import { ProfileSelector } from './pages/ProfileSelector';
 import { UpdateNotification } from './components/UpdateNotification';
 import { PostUpdateChangelog } from './components/PostUpdateChangelog';
+import { WebRemoteBridge } from './components/WebRemoteBridge';
 import { EpisodeToast } from './components/EpisodeToast';
 import { MiniPlayerProvider } from './components/MiniPlayer';
 import { CustomTitleBar } from './components/CustomTitleBar';
@@ -264,6 +265,7 @@ function App() {
       <PostUpdateChangelog />
       <HashRouter>
         <ProgramReminderBridge />
+        <WebRemoteBridge />
         <EpisodeToastWithNavigation />
         <Suspense fallback={<PageLoader />}>
           <Routes>

@@ -154,6 +154,7 @@ const sendChannels = new Set([
     'pip:state',
     'web-remote:guide',
     'web-remote:channel-epg',
+    'web-remote:catalog',
 ])
 
 const receiveChannels = new Set([
