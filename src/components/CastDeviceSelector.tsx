@@ -65,7 +65,7 @@ export function CastDeviceSelector({
     // next episode). The promise is kept so a device pick BEFORE it settles
     // waits for it (bounded) instead of silently casting a queue-less episode.
     const [tailQueue, setTailQueue] = useState<CastQueueItem[] | null>(null);
-    const tailQueuePromise = useRef<Promise<CastQueueItem[]> | null>(null);
+    const [tailQueuePromise, setTailQueuePromise] = useState<Promise<CastQueueItem[]> | null>(null);
     // When casting a queue, the single-cast hooks (DLNA/AirPlay/single Chromecast)
     // operate on the first item; the whole queue only goes to Chromecast below.
     const isQueue = !!queue && queue.length > 0;
@@ -149,14 +149,14 @@ export function CastDeviceSelector({
             const res = await window.ipcRenderer.invoke('cast:play-queue', { deviceId: device.id, items })
                 .catch(() => null) as { success: boolean } | null;
             success = !!res?.success;
-        } else if (contentType === 'series' && tailQueuePromise.current) {
+        } else if (contentType === 'series' && tailQueuePromise) {
             // Single episode of a series → season queue from this episode
             // onward, so ⏮/⏭ work and the next episode autoplays. If the
             // background resolve hasn't settled yet (user picked a device
             // fast), WAIT for it (bounded) instead of silently casting a
             // queue-less episode — that was the "remote has no buttons" bug.
-            const resolved = tailQueue ?? await Promise.race([
-                tailQueuePromise.current,
+            const resolved: CastQueueItem[] = tailQueue ?? await Promise.race([
+                tailQueuePromise,
                 new Promise<CastQueueItem[]>(resolve => setTimeout(() => resolve([]), 10000)),
             ]).catch(() => [] as CastQueueItem[]);
             if (!resolved || resolved.length <= 1) {
@@ -200,7 +200,7 @@ export function CastDeviceSelector({
             setCastError(t('cast', 'failedToTransmit'));
         }
         setCasting(false);
-    }, [isQueue, queue, tailQueue, contentType, startPosition, effectiveVtt, castToChromecast, onClose, onDeviceSelected, t]);
+    }, [isQueue, queue, tailQueue, tailQueuePromise, contentType, startPosition, effectiveVtt, castToChromecast, onClose, onDeviceSelected, t]);
 
     // Auto-discover on mount
     useEffect(() => {
@@ -222,7 +222,9 @@ export function CastDeviceSelector({
         if (typeof seasonNumber !== 'number' || typeof episodeNumber !== 'number') return;
         let cancelled = false;
         const promise = buildSeasonTailQueue(contentId, seasonNumber, episodeNumber);
-        tailQueuePromise.current = promise;
+        // Deferred setState (effect purity rule); function form because a bare
+        // promise would be treated as a state updater.
+        queueMicrotask(() => { if (!cancelled) setTailQueuePromise(() => promise); });
         void promise.then(items => {
             if (!cancelled && items.length > 1) setTailQueue(items);
         });
