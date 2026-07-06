@@ -95,6 +95,7 @@ export const chromecastControls = {
         const result = await window.ipcRenderer.invoke('cast:get-status') as {
             success: boolean; active?: boolean; playing?: boolean; mediaState?: string | null;
             currentTime?: number | null; duration?: number | null; volume?: number | null; deviceName?: string;
+            queue?: { itemId: number; title: string }[]; currentItemId?: number | null;
         };
         if (!result.success || !result.active) {
             return { success: false, error: 'No active cast session' };
@@ -107,6 +108,10 @@ export const chromecastControls = {
             volume: typeof result.volume === 'number' ? Math.round(result.volume * 100) : null,
             title: result.deviceName ?? '',
             deviceId: 'chromecast',
+            queue: Array.isArray(result.queue) ? result.queue : [],
+            currentItemId: result.currentItemId ?? null,
         };
     },
+    queueJump: (itemId: number) =>
+        window.ipcRenderer.invoke('cast:queue-jump', { itemId }) as Promise<{ success: boolean }>,
 };

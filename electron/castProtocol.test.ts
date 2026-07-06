@@ -8,6 +8,9 @@ import {
     loadMediaPayload,
     queueLoadPayload,
     queueSkipPayload,
+    queueJumpPayload,
+    extractQueueItems,
+    extractCurrentItemId,
     getMediaStatusPayload,
     setVolumePayload,
     extractMediaTimes,
@@ -142,5 +145,31 @@ describe('fila de cast (QUEUE_LOAD)', () => {
     it('queueSkipPayload gera QUEUE_NEXT/QUEUE_PREV com a sessão', () => {
         expect(JSON.parse(queueSkipPayload(3, 7, 'next'))).toEqual({ type: 'QUEUE_NEXT', requestId: 3, mediaSessionId: 7 });
         expect(JSON.parse(queueSkipPayload(3, 7, 'prev')).type).toBe('QUEUE_PREV');
+    });
+
+    it('queueJumpPayload pula pro itemId com QUEUE_UPDATE', () => {
+        expect(JSON.parse(queueJumpPayload(4, 7, 12)))
+            .toEqual({ type: 'QUEUE_UPDATE', requestId: 4, mediaSessionId: 7, currentItemId: 12 });
+    });
+
+    it('extractQueueItems e extractCurrentItemId leem a fila do MEDIA_STATUS', () => {
+        const status = {
+            status: [{
+                currentItemId: 2,
+                items: [
+                    { itemId: 1, media: { metadata: { title: 'Ep 1' } } },
+                    { itemId: 2, media: { metadata: { title: 'Ep 2' } } },
+                    { itemId: 3 }, // sem metadata → título vazio
+                ],
+            }],
+        };
+        expect(extractQueueItems(status)).toEqual([
+            { itemId: 1, title: 'Ep 1' },
+            { itemId: 2, title: 'Ep 2' },
+            { itemId: 3, title: '' },
+        ]);
+        expect(extractCurrentItemId(status)).toBe(2);
+        expect(extractQueueItems({ status: [{}] })).toEqual([]);
+        expect(extractCurrentItemId({})).toBeNull();
     });
 });

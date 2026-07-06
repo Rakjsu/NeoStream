@@ -278,6 +278,44 @@ export function mediaCommandPayload(
     return JSON.stringify({ type, requestId, mediaSessionId })
 }
 
+/** Jump the queue straight to a given itemId (QUEUE_UPDATE with currentItemId). */
+export function queueJumpPayload(requestId: number, mediaSessionId: number, itemId: number): string {
+    return JSON.stringify({ type: 'QUEUE_UPDATE', requestId, mediaSessionId, currentItemId: itemId })
+}
+
+export interface QueueItemStatus {
+    itemId: number
+    title: string
+}
+
+/** The queue items (itemId + title) out of a MEDIA_STATUS, or [] when none. */
+export function extractQueueItems(mediaStatusJson: unknown): QueueItemStatus[] {
+    if (mediaStatusJson === null || typeof mediaStatusJson !== 'object') return []
+    const status = (mediaStatusJson as { status?: unknown }).status
+    if (!Array.isArray(status) || status.length === 0) return []
+    const items = (status[0] as { items?: unknown }).items
+    if (!Array.isArray(items)) return []
+    const out: QueueItemStatus[] = []
+    for (const item of items) {
+        if (item === null || typeof item !== 'object') continue
+        const itemId = (item as { itemId?: unknown }).itemId
+        if (typeof itemId !== 'number') continue
+        const media = (item as { media?: { metadata?: { title?: unknown } } }).media
+        const title = typeof media?.metadata?.title === 'string' ? media.metadata.title : ''
+        out.push({ itemId, title })
+    }
+    return out
+}
+
+/** The itemId currently playing in the queue, or null. */
+export function extractCurrentItemId(mediaStatusJson: unknown): number | null {
+    if (mediaStatusJson === null || typeof mediaStatusJson !== 'object') return null
+    const status = (mediaStatusJson as { status?: unknown }).status
+    if (!Array.isArray(status) || status.length === 0) return null
+    const id = (status[0] as { currentItemId?: unknown }).currentItemId
+    return typeof id === 'number' ? id : null
+}
+
 export function seekPayload(requestId: number, mediaSessionId: number, currentTime: number): string {
     return JSON.stringify({ type: 'SEEK', requestId, mediaSessionId, currentTime })
 }
