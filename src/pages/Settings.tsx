@@ -236,7 +236,12 @@ const settingsStyles = `
     background: rgba(255, 255, 255, 0.03);
     border-radius: 20px;
     border: 1px solid rgba(255, 255, 255, 0.05);
-    height: fit-content;
+    /* Scroll the sidebar when the window is short so the bottom items
+       (Backup) aren't cut off with no way to reach them. */
+    max-height: calc(100vh - 180px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--ns-accent-rgb), 0.4) transparent;
     min-width: 220px;
 }
 
