@@ -8,14 +8,17 @@ interface SortSelectProps {
     withRating?: boolean;
     /** Distance from the right edge (sits left of the search bar). */
     right?: number;
+    /** Flow inline in a flex toolbar instead of floating absolutely. */
+    inline?: boolean;
 }
 
 /**
- * Catalog "sort by" dropdown, floating next to the page search bar.
- * "recent" means provider order for live (channel numbers) and added-date
- * for VOD/series — each page maps it accordingly.
+ * Catalog "sort by" dropdown. By default it floats next to the page search bar;
+ * with `inline` it flows in a flex toolbar (the native <select> popup still
+ * opens relative to the control). "recent" means provider order for live
+ * (channel numbers) and added-date for VOD/series — each page maps it accordingly.
  */
-export function SortSelect({ value, onChange, withRating = true, right = 90 }: SortSelectProps) {
+export function SortSelect({ value, onChange, withRating = true, right = 90, inline = false }: SortSelectProps) {
     const { t } = useLanguage();
     return (
         <select
@@ -23,9 +26,8 @@ export function SortSelect({ value, onChange, withRating = true, right = 90 }: S
             onChange={(e) => onChange(e.target.value as CatalogSort)}
             title={t('sort', 'title')}
             style={{
-                position: 'absolute',
-                top: 30,
-                right,
+                position: inline ? 'relative' : 'absolute',
+                ...(inline ? {} : { top: 30, right }),
                 zIndex: 95,
                 padding: '9px 12px',
                 borderRadius: 12,

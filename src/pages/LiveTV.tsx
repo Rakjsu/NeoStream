@@ -989,28 +989,30 @@ export function LiveTV() {
                 onChange={setSearchQuery}
                 placeholder={t('login', 'searchChannels')}
             />
-            <SortSelect value={sortBy} onChange={setSortBy} withRating={false} right={216} />
-            {/* Multi-view entry (2x2 mosaic of live channels) */}
-            <button
-                onClick={() => setShowMultiView(true)}
-                title="Multi-view: assista até 4 canais ao mesmo tempo"
-                style={{
-                    position: 'absolute',
-                    top: 12,
-                    right: 76,
-                    zIndex: 20,
-                    padding: '9px 16px',
-                    borderRadius: 12,
-                    border: '1px solid rgba(var(--ns-accent-rgb), 0.5)',
-                    background: 'rgba(var(--ns-accent-rgb), 0.15)',
-                    color: 'var(--ns-accent-light)',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                }}
-            >
-                🔲 Multi-view
-            </button>
+            {/* Toolbar: Multi-view + sort, grouped and aligned, left of the search. */}
+            <div style={{
+                position: 'absolute', top: 22, right: 84, zIndex: 20,
+                display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+                <button
+                    onClick={() => setShowMultiView(true)}
+                    title="Multi-view: assista até 4 canais ao mesmo tempo"
+                    style={{
+                        padding: '9px 16px',
+                        borderRadius: 12,
+                        border: '1px solid rgba(var(--ns-accent-rgb), 0.5)',
+                        background: 'rgba(var(--ns-accent-rgb), 0.15)',
+                        color: 'var(--ns-accent-light)',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                    }}
+                >
+                    🔲 Multi-view
+                </button>
+                <SortSelect value={sortBy} onChange={setSortBy} withRating={false} inline />
+            </div>
             <CategoryMenu
                 onSelectCategory={setSelectedCategory}
                 selectedCategory={selectedCategory}
