@@ -150,6 +150,7 @@ const invokeChannels = new Set([
 
 const sendChannels = new Set([
     'log:renderer',
+    'app:language',
     'media:state',
     'pip:control',
     'pip:state',
