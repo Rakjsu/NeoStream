@@ -188,6 +188,15 @@ export function CastDeviceSelector({
         discoverDevices();
     }, [discoverDevices]);
 
+    // Esc closes the picker (keyboard parity with the backdrop click / ✕).
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [onClose]);
+
     // Series episode (no explicit queue): resolve the rest of the season.
     useEffect(() => {
         if (isQueue || contentType !== 'series' || !contentId) return;

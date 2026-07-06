@@ -37,7 +37,8 @@ export function SortSelect({ value, onChange, withRating = true, right = 90, inl
                 fontSize: 13,
                 fontWeight: 600,
                 cursor: 'pointer',
-                outline: 'none',
+                // No outline:none — the global :focus-visible ring must show
+                // when tabbing to the control.
                 backdropFilter: 'blur(8px)'
             }}
         >

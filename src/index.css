@@ -76,6 +76,15 @@ body {
     border-radius: 12px;
 }
 
+/* Keyboard navigation: a visible focus ring everywhere (not just TV mode).
+   :focus-visible only fires for keyboard/assistive focus, so mouse clicks
+   stay ring-free. */
+:focus-visible {
+    outline: 2px solid var(--ns-accent);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
 
 /* TV mode (10-foot UI): stronger, always-visible focus ring for remote/gamepad
    navigation. The zoom itself is applied by tvModeService via body.style.zoom. */
