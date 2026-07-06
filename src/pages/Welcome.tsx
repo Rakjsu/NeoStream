@@ -41,7 +41,7 @@ export function Welcome() {
                 url: m3uUrl.trim()
             });
             if (result.success) {
-                playlistService.reloadIntoDashboard();
+                playlistService.reloadIntoDashboard(true);
             } else {
                 setError(result.error || t('welcome', 'm3uError'));
             }
@@ -75,7 +75,7 @@ export function Welcome() {
                     }))
                 }).catch(() => undefined);
             }
-            playlistService.reloadIntoDashboard();
+            playlistService.reloadIntoDashboard(true);
         } catch {
             setError(t('welcome', 'restoreError'));
         } finally {

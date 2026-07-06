@@ -37,8 +37,9 @@ jobs:
       # below uploads. (With GH_TOKEN visible, builder would double-publish.)
       - name: Build application
         run: npm run build -- --publish never
+        # TMDB: sem chave embutida — cada usuário configura a própria
+        # em Configurações → APIs (a env VITE_TMDB_API_KEY é só fallback dev).
         env:
-          VITE_TMDB_API_KEY: ${{ secrets.VITE_TMDB_API_KEY }}
           # macOS: no signing identity in CI — skip signing instead of failing.
           CSC_IDENTITY_AUTO_DISCOVERY: false
 

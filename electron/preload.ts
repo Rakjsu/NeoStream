@@ -121,6 +121,7 @@ const invokeChannels = new Set([
     'playlists:rename',
     'playlists:switch',
     'security:get-certificate-settings',
+    'shell:open-external',
     'security:set-allow-invalid-provider-certificates',
     'storage:clear-cache',
     'storage:open-area',

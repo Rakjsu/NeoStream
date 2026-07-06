@@ -927,5 +927,30 @@
     "openSearch": "Buscar",
     "recent": "Búsquedas recientes",
     "clearRecent": "borrar"
+  },
+  "apiKeys": {
+    "navLabel": "APIs",
+    "title": "APIs de metadatos",
+    "description": "Usa tus propias claves de API — gratuitas — para portadas, sinopsis, notas y tráilers",
+    "whyText": "TMDB proporciona los metadatos del catálogo: portadas en alta calidad, sinopsis, notas, tráilers, clasificación por edad (control parental) y los géneros que potencian las recomendaciones. Cada persona usa su propia clave gratuita — la app ya no incluye una clave compartida.",
+    "statusConfigured": "Configurada",
+    "statusMissing": "Sin configurar",
+    "keyLabel": "Tu clave de la API de TMDB (v3)",
+    "keyPlaceholder": "Pega aquí tu clave de la API…",
+    "save": "Guardar",
+    "saved": "Guardada",
+    "test": "Probar clave",
+    "testing": "Probando…",
+    "testOk": "¡Clave válida — guardada!",
+    "testFail": "TMDB rechazó esta clave. Verifica que copiaste la \"Clave de la API\" (v3) completa.",
+    "howTitle": "Cómo conseguir la tuya (~2 minutos)",
+    "step1": "Crea una cuenta gratuita en themoviedb.org (botón \"Join TMDB\").",
+    "step2": "Entra en Configuración → API (o usa el botón de abajo con la sesión iniciada).",
+    "step3": "Solicita una clave \"Developer\", acepta los términos y completa el formulario corto (uso personal está bien).",
+    "step4": "Copia el campo \"Clave de la API\" (API Key v3) y pégalo arriba.",
+    "openSite": "Abrir themoviedb.org/settings/api",
+    "onboardingTitle": "¡Playlist agregada! Falta un paso…",
+    "onboardingText": "Para la experiencia completa del catálogo — portadas bonitas, sinopsis, notas, tráilers y control parental — agrega abajo tu clave gratuita de TMDB. La app funciona sin ella, solo que sin estos extras.",
+    "privacyNote": "La clave se guarda solo en esta computadora y se usa únicamente en las consultas a TMDB. Nunca se envía a otros servidores."
   }
 }

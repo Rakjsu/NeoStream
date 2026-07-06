@@ -927,5 +927,30 @@
     "openSearch": "Search",
     "recent": "Recent searches",
     "clearRecent": "clear"
+  },
+  "apiKeys": {
+    "navLabel": "APIs",
+    "title": "Metadata APIs",
+    "description": "Use your own free API keys for covers, plots, ratings and trailers",
+    "whyText": "TMDB provides the catalog metadata: high-quality covers, plots, ratings, trailers, age certification (parental control) and the genres that power recommendations. Each person uses their own free key — the app no longer ships a shared one.",
+    "statusConfigured": "Configured",
+    "statusMissing": "Not configured",
+    "keyLabel": "Your TMDB API key (v3)",
+    "keyPlaceholder": "Paste your API key here…",
+    "save": "Save",
+    "saved": "Saved",
+    "test": "Test key",
+    "testing": "Testing…",
+    "testOk": "Valid key — saved!",
+    "testFail": "TMDB rejected this key. Make sure you copied the full \"API Key\" (v3).",
+    "howTitle": "How to get yours (~2 minutes)",
+    "step1": "Create a free account at themoviedb.org (\"Join TMDB\" button).",
+    "step2": "Open Settings → API (or use the button below while signed in).",
+    "step3": "Request a \"Developer\" key, accept the terms and fill in the short form (personal use is fine).",
+    "step4": "Copy the \"API Key\" field (API Key v3) and paste it above.",
+    "openSite": "Open themoviedb.org/settings/api",
+    "onboardingTitle": "Playlist added! One step left…",
+    "onboardingText": "To get the full catalog experience — nice covers, plots, ratings, trailers and parental control — add your free TMDB key below. The app works without it, just without these extras.",
+    "privacyNote": "The key is stored only on this computer and used only for TMDB requests. It is never sent to any other server."
   }
 }

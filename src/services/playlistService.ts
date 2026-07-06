@@ -1,3 +1,5 @@
+import { hasTmdbApiKey, setTmdbOnboardingPending } from './tmdbKey'
+
 // Playlist Service - thin renderer wrapper over the playlists:* IPC surface.
 //
 // Data separation (v1): favorites / watch-later / history / watch progress
@@ -62,8 +64,14 @@ export const playlistService = {
         }
     },
 
-    /** Full restart of the renderer on the dashboard after a provider change. */
-    reloadIntoDashboard(): void {
+    /**
+     * Full restart of the renderer on the dashboard after a provider change.
+     * With `promptTmdbOnboarding` (playlist just ADDED) and no TMDB key yet,
+     * the dashboard redirects once to Configurações → APIs explaining why and
+     * how to create the user's own free key.
+     */
+    reloadIntoDashboard(promptTmdbOnboarding = false): void {
+        if (promptTmdbOnboarding && !hasTmdbApiKey()) setTmdbOnboardingPending()
         this.clearProviderCaches()
         window.location.hash = '#/dashboard'
         window.location.reload()

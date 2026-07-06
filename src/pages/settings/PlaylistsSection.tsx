@@ -103,7 +103,7 @@ export function PlaylistsSection() {
                     url: form.url.trim()
                 });
                 if (m3uResult.success) {
-                    playlistService.reloadIntoDashboard();
+                    playlistService.reloadIntoDashboard(true);
                 } else {
                     setError(m3uResult.error || t('playlists', 'addError'));
                 }
@@ -116,7 +116,7 @@ export function PlaylistsSection() {
                     mac: form.mac.trim()
                 });
                 if (stalkerResult.success) {
-                    playlistService.reloadIntoDashboard();
+                    playlistService.reloadIntoDashboard(true);
                 } else {
                     setError(stalkerResult.error || t('playlists', 'addError'));
                 }
@@ -129,7 +129,7 @@ export function PlaylistsSection() {
                 password: form.password
             });
             if (result.success) {
-                playlistService.reloadIntoDashboard();
+                playlistService.reloadIntoDashboard(true);
             } else {
                 setError(result.error || t('playlists', 'addError'));
             }
