@@ -58,6 +58,15 @@ export interface CastMediaInput {
     subtitleLanguage?: string
 }
 
+/** Content identity echoed in status, so the renderer can record watch history. */
+export interface CastMediaMeta {
+    contentId: string
+    contentType?: 'movie' | 'series' | 'live'
+    season?: number
+    episode?: number
+    title?: string
+}
+
 export class CastSession {
     private socket: tls.TLSSocket | null = null
     private buffer: Uint8Array = new Uint8Array(0)
@@ -80,6 +89,12 @@ export class CastSession {
     private reconnecting = false
     private reconnectAttempts = 0
     private readonly maxReconnectAttempts = 6
+    private mediaMeta: CastMediaMeta | null = null
+
+    /** Attach the content identity so status echoes it (renderer records history). */
+    setMeta(meta: CastMediaMeta | null): void {
+        this.mediaMeta = meta
+    }
 
     constructor(
         readonly host: string,
@@ -100,6 +115,7 @@ export class CastSession {
             volume: this.volumeLevel,
             queue: this.queueItems,
             currentItemId: this.currentItemId,
+            meta: this.mediaMeta,
         }
     }
 

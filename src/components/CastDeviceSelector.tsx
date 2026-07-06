@@ -30,6 +30,13 @@ interface CastDeviceSelectorProps {
      * ignored (the first queue item drives the single-cast hooks).
      */
     queue?: CastQueueItem[];
+    /** Content identity + resume position, so the Chromecast cast resumes and
+     * records watch history (via GlobalCastIndicator). Absent for live/queues. */
+    contentId?: string;
+    contentType?: 'movie' | 'series' | 'live';
+    seasonNumber?: number;
+    episodeNumber?: number;
+    startPosition?: number;
     onClose: () => void;
     onDeviceSelected: (device: CastDevice) => void;
 }
@@ -41,6 +48,11 @@ export function CastDeviceSelector({
     tmdbId,
     imdbId,
     queue,
+    contentId,
+    contentType,
+    seasonNumber,
+    episodeNumber,
+    startPosition,
     onClose,
     onDeviceSelected
 }: CastDeviceSelectorProps) {
@@ -55,7 +67,13 @@ export function CastDeviceSelector({
     const primaryTitle = isQueue ? (queue![0].title || videoTitle) : videoTitle;
     const dlna = useDLNA(primaryUrl, primaryTitle, effectiveVtt);
     const airplay = useAirPlay(primaryUrl, primaryTitle);
-    const chromecast = useChromecast(primaryUrl, primaryTitle, /\.m3u8(\?|$)/.test(primaryUrl), effectiveVtt);
+    // A single video (not a queue) carries its identity + resume position.
+    const castContext = useMemo(() => (
+        !isQueue && contentId
+            ? { startPosition, contentId, contentType, season: seasonNumber, episode: episodeNumber }
+            : undefined
+    ), [isQueue, contentId, contentType, seasonNumber, episodeNumber, startPosition]);
+    const chromecast = useChromecast(primaryUrl, primaryTitle, /\.m3u8(\?|$)/.test(primaryUrl), effectiveVtt, castContext);
     const { devices: dlnaDevices, discoverDevices, castToDevice, addDevice, error: dlnaError, isDiscovering } = dlna;
     const { devices: airplayDevices, castToDevice: castToAirPlayDevice } = airplay;
     const { devices: chromecastDevices, castToDevice: castToChromecast } = chromecast;

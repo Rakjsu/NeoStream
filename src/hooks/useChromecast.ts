@@ -23,7 +23,16 @@ interface CastCommandResult {
     error?: string;
 }
 
-export function useChromecast(videoUrl: string, videoTitle: string, isLive = false, subtitleVtt?: string | null) {
+/** Content identity + start position, so a cast can resume and record history. */
+export interface CastContext {
+    startPosition?: number;
+    contentId?: string;
+    contentType?: 'movie' | 'series' | 'live';
+    season?: number;
+    episode?: number;
+}
+
+export function useChromecast(videoUrl: string, videoTitle: string, isLive = false, subtitleVtt?: string | null, castContext?: CastContext) {
     const [devices, setDevices] = useState<ChromecastDevice[]>([]);
     const [isCasting, setIsCasting] = useState(false);
 
@@ -61,7 +70,18 @@ export function useChromecast(videoUrl: string, videoTitle: string, isLive = fal
                 url: videoUrl,
                 title: videoTitle,
                 live: isLive,
-                subtitleVtt: subtitleVtt || undefined
+                subtitleVtt: subtitleVtt || undefined,
+                // Resume position + content identity (so the cast records progress).
+                startPosition: castContext?.startPosition && castContext.startPosition > 5 ? castContext.startPosition : undefined,
+                meta: castContext?.contentId
+                    ? {
+                        contentId: castContext.contentId,
+                        contentType: castContext.contentType,
+                        season: castContext.season,
+                        episode: castContext.episode,
+                        title: videoTitle,
+                    }
+                    : undefined,
             }) as CastCommandResult;
             setIsCasting(result.success);
             return result.success;
@@ -69,7 +89,7 @@ export function useChromecast(videoUrl: string, videoTitle: string, isLive = fal
             console.error('❌ Chromecast cast error:', error);
             return false;
         }
-    }, [videoUrl, videoTitle, isLive, subtitleVtt]);
+    }, [videoUrl, videoTitle, isLive, subtitleVtt, castContext]);
 
     const stopCasting = useCallback(async () => {
         await window.ipcRenderer.invoke('cast:stop').catch(() => undefined);
