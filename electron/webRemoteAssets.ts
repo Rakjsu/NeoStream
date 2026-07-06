@@ -26,12 +26,21 @@ export const REMOTE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox=
 </svg>
 `
 
+// Localized name/description so the installed PWA matches the app language
+// (same codes the served page uses; anything unknown falls back to pt).
+const MANIFEST_STRINGS: Record<string, { name: string; description: string }> = {
+    pt: { name: 'NeoStream Controle', description: 'Controle remoto do NeoStream IPTV' },
+    en: { name: 'NeoStream Remote', description: 'NeoStream IPTV remote control' },
+    es: { name: 'NeoStream Control', description: 'Control remoto de NeoStream IPTV' },
+}
+
 /** Web app manifest — standalone display turns the page into a real app. */
-export function buildManifest(): string {
+export function buildManifest(lang?: string): string {
+    const t = MANIFEST_STRINGS[lang ?? 'pt'] ?? MANIFEST_STRINGS.pt
     return JSON.stringify({
-        name: 'NeoStream Controle',
+        name: t.name,
         short_name: 'NeoStream',
-        description: 'Controle remoto do NeoStream IPTV',
+        description: t.description,
         start_url: '/',
         scope: '/',
         display: 'standalone',

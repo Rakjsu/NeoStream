@@ -13,6 +13,14 @@ describe('manifest do controle web (PWA)', () => {
         expect(icons.some(i => i.src === '/icon.png' && i.type === 'image/png')).toBe(true)
     })
 
+    it('name/description acompanham o idioma do app (fallback pt)', () => {
+        expect((JSON.parse(buildManifest('en')) as { name: string }).name).toBe('NeoStream Remote')
+        expect((JSON.parse(buildManifest('es')) as { name: string }).name).toBe('NeoStream Control')
+        expect((JSON.parse(buildManifest('fr')) as { name: string }).name).toBe('NeoStream Controle')
+        // short_name é estável — é o rótulo do ícone na tela inicial.
+        expect((JSON.parse(buildManifest('en')) as { short_name: string }).short_name).toBe('NeoStream')
+    })
+
     it('o ícone SVG é um documento SVG válido com viewBox', () => {
         expect(REMOTE_ICON_SVG).toContain('<svg')
         expect(REMOTE_ICON_SVG).toContain('viewBox="0 0 192 192"')
