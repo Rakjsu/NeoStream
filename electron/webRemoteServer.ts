@@ -236,9 +236,9 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     } else if (command.action === 'requestSeriesInfo') {
         win.webContents.send('media:control', 'requestSeriesInfo', command.seriesId)
     } else if (command.action === 'requestCatalog') {
-        win.webContents.send('media:control', 'requestCatalog')
+        win.webContents.send('media:control', 'requestCatalog', command.query)
     } else if (command.action === 'requestSeries') {
-        win.webContents.send('media:control', 'requestSeries')
+        win.webContents.send('media:control', 'requestSeries', command.query)
     } else if (command.action === 'requestDevices') {
         win.webContents.send('media:control', 'requestDevices')
     } else {

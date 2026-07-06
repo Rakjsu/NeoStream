@@ -38,15 +38,21 @@ export function WebRemoteBridge() {
         const sendCastResult = (status: 'ok' | 'no-device' | 'error', deviceName = '') =>
             window.ipcRenderer.send('web-remote:cast-result', { status, deviceName });
 
-        const pushCatalog = async () => {
+        // Push the movie list; with a query, filter the WHOLE catalog server-side
+        // (not just the first 400 the phone happened to load) — streams:get-vod is
+        // main-cached (SWR), so filtering on each keystroke stays cheap.
+        const pushCatalog = async (query = '') => {
             const result = await window.ipcRenderer.invoke('streams:get-vod').catch(() => null) as
                 { success: boolean; data?: VodMovie[] } | null;
             const movies = result?.success ? (result.data ?? []) : [];
             const map = new Map<string, VodMovie>();
             for (const m of movies) map.set(String(m.stream_id), m);
             moviesRef.current = map;
+            const q = query.trim().toLowerCase();
+            const matches = q ? movies.filter(m => (m.name || '').toLowerCase().includes(q)) : movies;
             window.ipcRenderer.send('web-remote:catalog', {
-                items: movies.slice(0, 400).map(m => ({
+                query,
+                items: matches.slice(0, 400).map(m => ({
                     id: String(m.stream_id),
                     name: m.name,
                     cover: m.stream_icon || '',
@@ -158,12 +164,15 @@ export function WebRemoteBridge() {
             await startCast(queue, target);
         };
 
-        const pushSeries = async () => {
+        const pushSeries = async (query = '') => {
             const result = await window.ipcRenderer.invoke('streams:get-series').catch(() => null) as
                 { success: boolean; data?: SeriesItem[] } | null;
             const series = result?.success ? (result.data ?? []) : [];
+            const q = query.trim().toLowerCase();
+            const matches = q ? series.filter(s => (s.name || '').toLowerCase().includes(q)) : series;
             window.ipcRenderer.send('web-remote:series', {
-                items: series.slice(0, 400).map(s => ({
+                query,
+                items: matches.slice(0, 400).map(s => ({
                     id: String(s.series_id), name: s.name, cover: s.cover || '',
                 })),
             });
@@ -203,11 +212,11 @@ export function WebRemoteBridge() {
         };
 
         const handler = (_e: unknown, action: string, arg?: unknown, target?: unknown) => {
-            if (action === 'requestCatalog') void pushCatalog();
+            if (action === 'requestCatalog') void pushCatalog(typeof arg === 'string' ? arg : '');
             else if (action === 'requestDevices') void pushDevices();
             else if (action === 'castMovie') void castMovie(String(arg ?? ''), asTarget(target));
             else if (action === 'castMovieQueue') void castMovieQueue(Array.isArray(arg) ? (arg as string[]) : [], asTarget(target));
-            else if (action === 'requestSeries') void pushSeries();
+            else if (action === 'requestSeries') void pushSeries(typeof arg === 'string' ? arg : '');
             else if (action === 'requestSeriesInfo') void pushSeriesInfo(String(arg ?? ''));
             else if (action === 'castEpisode') void castEpisode(String(arg ?? ''), asTarget(target));
         };

@@ -413,7 +413,11 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       else mvqueueEl.classList.add('hidden');
     }
 
-    mvsearchEl.addEventListener('input', function () { mvFilter = mvsearchEl.value; renderCatalog(); });
+    mvsearchEl.addEventListener('input', function () {
+      mvFilter = mvsearchEl.value;
+      renderCatalog();                                  // instant refine on loaded items
+      debouncedSearch('requestCatalog', mvFilter);      // full-catalog search
+    });
 
     mvlistEl.addEventListener('click', function (ev) {
       if (!ev.target.closest) return;
@@ -454,7 +458,11 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       selistEl.innerHTML = html || '<div class="empty">Nenhuma série encontrada.</div>';
     }
 
-    sesearchEl.addEventListener('input', function () { seFilter = sesearchEl.value; renderSeries(); });
+    sesearchEl.addEventListener('input', function () {
+      seFilter = sesearchEl.value;
+      renderSeries();                                   // instant refine on loaded items
+      debouncedSearch('requestSeries', seFilter);       // full-catalog search
+    });
 
     selistEl.addEventListener('click', function (ev) {
       if (!ev.target.closest) return;
@@ -568,6 +576,16 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         if (sep > 0) { payload.deviceType = selDev.slice(0, sep); payload.deviceId = selDev.slice(sep + 1); }
       }
       ws.send(JSON.stringify(payload));
+    }
+
+    // Full-catalog search: ask the app to filter the WHOLE list server-side
+    // (not just the ≤400 items already loaded here), debounced per keystroke.
+    var searchTimer = null;
+    function debouncedSearch(action, query) {
+      if (searchTimer) clearTimeout(searchTimer);
+      searchTimer = setTimeout(function () {
+        if (ws && ws.readyState === 1) ws.send(JSON.stringify({ action: action, query: query || '' }));
+      }, 300);
     }
 
     document.querySelectorAll('button.ctl[data-cmd]').forEach(function (btn) {
