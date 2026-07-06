@@ -250,6 +250,9 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         connectedEl.style.display = 'flex';
         statusEl.textContent = 'Conectado'; statusEl.className = 'status on';
         if (!devicesRequested) { devicesRequested = true; sendCmd('requestDevices'); }
+        // Land on the last tab the user was using (Guia/Filmes/Séries).
+        var savedTab = localStorage.getItem('neostream_remote_tab');
+        if (savedTab === 'guide' || savedTab === 'catalog' || savedTab === 'series') activateTab(savedTab);
       };
       ws.onclose = function () {
         // 1006 with no prior open + wrong PIN → the server refused (401).
@@ -516,27 +519,35 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       if (id) sendCmd('playChannel', null, id);
     });
 
-    // Tab switching
+    // Switch to a tab (also used to restore the last tab after reconnecting).
+    function activateTab(view) {
+      document.querySelectorAll('.tab').forEach(function (t) {
+        t.classList.toggle('active', t.getAttribute('data-view') === view);
+      });
+      controlEl.classList.add('hidden'); guideEl.classList.add('hidden'); catalogEl.classList.add('hidden');
+      seriesEl.classList.add('hidden'); episodesEl.classList.add('hidden');
+      if (view === 'guide') { guideEl.classList.remove('hidden'); renderGuide(); }
+      else if (view === 'catalog') {
+        catalogEl.classList.remove('hidden');
+        if (!catalogRequested) { catalogRequested = true; sendCmd('requestCatalog'); }
+        renderCatalog();
+      }
+      else if (view === 'series') {
+        // Drill-down always re-enters at the series list, not a stale episodes view.
+        seriesEl.classList.remove('hidden'); currentSeriesId = '';
+        if (!seriesRequested) { seriesRequested = true; sendCmd('requestSeries'); }
+        renderSeries();
+      }
+      else { controlEl.classList.remove('hidden'); }
+    }
+
+    // Tab switching (remembers the choice so a reconnect lands on the same tab).
     document.querySelectorAll('.tab').forEach(function (tab) {
       tab.addEventListener('click', function () {
         var view = tab.getAttribute('data-view');
-        document.querySelectorAll('.tab').forEach(function (t) { t.classList.remove('active'); });
-        tab.classList.add('active');
-        controlEl.classList.add('hidden'); guideEl.classList.add('hidden'); catalogEl.classList.add('hidden');
-        seriesEl.classList.add('hidden'); episodesEl.classList.add('hidden');
-        if (view === 'guide') { guideEl.classList.remove('hidden'); renderGuide(); }
-        else if (view === 'catalog') {
-          catalogEl.classList.remove('hidden');
-          if (!catalogRequested) { catalogRequested = true; sendCmd('requestCatalog'); }
-          renderCatalog();
-        }
-        else if (view === 'series') {
-          // Drill-down always re-enters at the series list, not a stale episodes view.
-          seriesEl.classList.remove('hidden'); currentSeriesId = '';
-          if (!seriesRequested) { seriesRequested = true; sendCmd('requestSeries'); }
-          renderSeries();
-        }
-        else { controlEl.classList.remove('hidden'); }
+        activateTab(view);
+        if (view && view !== 'control') localStorage.setItem('neostream_remote_tab', view);
+        else localStorage.removeItem('neostream_remote_tab');
       });
     });
 
