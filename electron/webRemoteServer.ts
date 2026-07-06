@@ -208,7 +208,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 }
 
 // Actions that always go to the renderer (never routed to the cast session).
-const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'requestCatalog', 'castMovie'])
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'requestCatalog', 'castMovie', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
@@ -232,8 +232,14 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         win.webContents.send('media:control', 'requestEpg', command.channelId)
     } else if (command.action === 'castMovie') {
         win.webContents.send('media:control', 'castMovie', command.movieId)
+    } else if (command.action === 'castEpisode') {
+        win.webContents.send('media:control', 'castEpisode', command.episodeId)
+    } else if (command.action === 'requestSeriesInfo') {
+        win.webContents.send('media:control', 'requestSeriesInfo', command.seriesId)
     } else if (command.action === 'requestCatalog') {
         win.webContents.send('media:control', 'requestCatalog')
+    } else if (command.action === 'requestSeries') {
+        win.webContents.send('media:control', 'requestSeries')
     } else {
         win.webContents.send('media:control', command.action)
     }
@@ -288,6 +294,37 @@ export function setupWebRemote(): void {
             }
         }).filter((c) => c.id && c.name)
         broadcast(JSON.stringify({ type: 'catalog', items }))
+    })
+
+    // Series list (browse) pushed by the renderer bridge.
+    ipcMain.on('web-remote:series', (_e, raw: unknown) => {
+        const obj = (raw ?? {}) as Record<string, unknown>
+        const rawItems = Array.isArray(obj.items) ? obj.items : []
+        const items = rawItems.slice(0, 400).map((c) => {
+            const it = (c ?? {}) as Record<string, unknown>
+            return {
+                id: String(it.id ?? ''),
+                name: typeof it.name === 'string' ? it.name.slice(0, 200) : '',
+                cover: typeof it.cover === 'string' ? it.cover.slice(0, 500) : '',
+            }
+        }).filter((c) => c.id && c.name)
+        broadcast(JSON.stringify({ type: 'series', items }))
+    })
+
+    // Episodes of one series (flattened SxxEyy) pushed by the bridge.
+    ipcMain.on('web-remote:series-info', (_e, raw: unknown) => {
+        const obj = (raw ?? {}) as Record<string, unknown>
+        const seriesId = String(obj.seriesId ?? '')
+        if (!seriesId) return
+        const rawEps = Array.isArray(obj.episodes) ? obj.episodes : []
+        const episodes = rawEps.slice(0, 1000).map((e) => {
+            const ep = (e ?? {}) as Record<string, unknown>
+            return {
+                id: String(ep.id ?? ''),
+                label: typeof ep.label === 'string' ? ep.label.slice(0, 200) : '',
+            }
+        }).filter((e) => e.id && e.label)
+        broadcast(JSON.stringify({ type: 'seriesInfo', seriesId, episodes }))
     })
 
     ipcMain.handle('web-remote:get-config', () => ({
