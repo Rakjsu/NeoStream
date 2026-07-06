@@ -315,8 +315,12 @@ function start(): Promise<void> {
     return new Promise<void>((resolve) => {
         if (serverSecure) {
             // Fresh self-signed cert per start (hand-rolled X.509). The phone
-            // accepts it once; the page connects over wss on the same port.
-            const { key, cert } = generateSelfSignedCert(Date.now())
+            // accepts it once; the page connects over wss on the same port. The
+            // LAN IP goes in the SAN so mobile browsers validate the host.
+            const { key, cert } = generateSelfSignedCert(Date.now(), {
+                commonName: getLanAddress(),
+                altNames: [getLanAddress(), '127.0.0.1', 'localhost'],
+            })
             server = https.createServer({ key, cert }, handler)
         } else {
             server = http.createServer(handler)
