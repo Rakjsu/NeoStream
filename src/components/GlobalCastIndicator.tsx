@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { movieProgressService } from '../services/movieProgressService';
 import { watchProgressService } from '../services/watchProgressService';
+import { CastControls } from './CastControls';
 
 interface CastMeta {
     contentId: string;
@@ -51,34 +52,22 @@ export function GlobalCastIndicator() {
             }
         };
         void poll();
-        const id = setInterval(() => void poll(), 3000);
+        // 2s so the remote appears promptly after a cast starts anywhere.
+        const id = setInterval(() => void poll(), 2000);
         return () => { cancelled = true; clearInterval(id); };
     }, []);
 
     if (!device) return null;
 
-    const stop = () => {
-        void window.ipcRenderer.invoke('cast:stop').catch(() => undefined);
-        setDevice(null);
-    };
-
+    // The FULL mini-remote (play/pause, seek, ⏮/⏭, 💬, 🔊, queue, stop) lives
+    // here at the app root, so it survives closing the player, navigating and
+    // even playing something else locally — the cast never loses its controls.
     return (
-        <div style={{
-            position: 'fixed', bottom: 16, left: 16, zIndex: 9998,
-            display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 12,
-            background: 'rgba(15, 15, 35, 0.95)', border: '1px solid rgba(var(--ns-accent-rgb), 0.5)',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)', color: 'white', fontSize: 13,
-        }}>
-            <span style={{ maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                📡 {device}
-            </span>
-            <button
-                onClick={stop}
-                title="Parar transmissão"
-                style={{ background: 'rgba(239, 68, 68, 0.7)', border: 'none', borderRadius: 8, padding: '4px 9px', cursor: 'pointer', color: 'white' }}
-            >
-                ⏹
-            </button>
-        </div>
+        <CastControls
+            deviceId="chromecast"
+            deviceName={device}
+            deviceType="chromecast"
+            onSessionEnded={() => setDevice(null)}
+        />
     );
 }

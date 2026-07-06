@@ -1318,9 +1318,12 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                 )
             }
 
-            {/* Mini remote while a DLNA/Chromecast cast session is active */}
+            {/* Mini remote while a DLNA cast session is active. Chromecast is
+                NOT mounted here: its remote lives at the app root
+                (GlobalCastIndicator), so it survives closing this player,
+                navigating and playing something else locally. */}
             {
-                castingDevice && (
+                castingDevice && castingDevice.type === 'dlna' && (
                     <CastControls
                         deviceId={castingDevice.id}
                         deviceName={castingDevice.name}
