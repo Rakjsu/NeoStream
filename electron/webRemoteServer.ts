@@ -208,7 +208,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 }
 
 // Actions that always go to the renderer (never routed to the cast session).
-const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'requestCatalog', 'castMovie'])
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'requestCatalog', 'castMovie', 'castMovieQueue'])
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
@@ -232,6 +232,8 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         win.webContents.send('media:control', 'requestEpg', command.channelId)
     } else if (command.action === 'castMovie') {
         win.webContents.send('media:control', 'castMovie', command.movieId)
+    } else if (command.action === 'castMovieQueue') {
+        win.webContents.send('media:control', 'castMovieQueue', command.movieIds)
     } else if (command.action === 'requestCatalog') {
         win.webContents.send('media:control', 'requestCatalog')
     } else {

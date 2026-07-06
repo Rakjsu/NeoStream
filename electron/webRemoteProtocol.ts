@@ -121,10 +121,11 @@ export type RemoteCommand =
     | { action: 'requestEpg'; channelId: string }
     | { action: 'requestCatalog' }
     | { action: 'castMovie'; movieId: string }
+    | { action: 'castMovieQueue'; movieIds: string[] }
 
 const VALID_ACTIONS = new Set([
     'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'seek', 'playChannel', 'requestEpg',
-    'requestCatalog', 'castMovie',
+    'requestCatalog', 'castMovie', 'castMovieQueue',
 ])
 
 /** Validate a command coming off the wire (untrusted phone input). */
@@ -152,6 +153,13 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         const movieId = (parsed as { movieId?: unknown }).movieId
         if (typeof movieId !== 'string' || !movieId) return null
         return { action, movieId }
+    }
+    if (action === 'castMovieQueue') {
+        const raw = (parsed as { movieIds?: unknown }).movieIds
+        if (!Array.isArray(raw)) return null
+        const movieIds = raw.filter((id): id is string => typeof id === 'string' && !!id).slice(0, 200)
+        if (movieIds.length === 0) return null
+        return { action: 'castMovieQueue', movieIds }
     }
     if (action === 'requestCatalog') return { action: 'requestCatalog' }
     return { action: action as 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' }
