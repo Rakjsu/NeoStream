@@ -3,6 +3,7 @@ import { useDLNA, type DLNADevice } from '../hooks/useDLNA';
 import { useAirPlay } from '../hooks/useAirPlay';
 import { useChromecast, type ChromecastDevice } from '../hooks/useChromecast';
 import { useLanguage } from '../services/languageService';
+import type { CastQueueItem } from '../services/castQueue';
 
 export interface CastDevice {
     id: string;
@@ -22,6 +23,13 @@ interface CastDeviceSelectorProps {
     /** Movie/series ids so a subtitle can be fetched here if none is loaded. */
     tmdbId?: string | number;
     imdbId?: string;
+    /**
+     * Optional playlist. When present the picker casts a QUEUE: a Chromecast
+     * gets the whole queue (native QUEUE_LOAD); DLNA/AirPlay have no queue
+     * protocol, so they start the first item. `videoUrl`/`videoTitle` are then
+     * ignored (the first queue item drives the single-cast hooks).
+     */
+    queue?: CastQueueItem[];
     onClose: () => void;
     onDeviceSelected: (device: CastDevice) => void;
 }
@@ -32,6 +40,7 @@ export function CastDeviceSelector({
     subtitleVtt,
     tmdbId,
     imdbId,
+    queue,
     onClose,
     onDeviceSelected
 }: CastDeviceSelectorProps) {
@@ -39,9 +48,14 @@ export function CastDeviceSelector({
     // overrides whatever the player had, and rides along in the cast.
     const [fetchedVtt, setFetchedVtt] = useState<string | null>(null);
     const effectiveVtt = fetchedVtt ?? subtitleVtt;
-    const dlna = useDLNA(videoUrl, videoTitle, effectiveVtt);
-    const airplay = useAirPlay(videoUrl, videoTitle);
-    const chromecast = useChromecast(videoUrl, videoTitle, /\.m3u8(\?|$)/.test(videoUrl), effectiveVtt);
+    // When casting a queue, the single-cast hooks (DLNA/AirPlay/single Chromecast)
+    // operate on the first item; the whole queue only goes to Chromecast below.
+    const isQueue = !!queue && queue.length > 0;
+    const primaryUrl = isQueue ? (queue![0].url || videoUrl) : videoUrl;
+    const primaryTitle = isQueue ? (queue![0].title || videoTitle) : videoTitle;
+    const dlna = useDLNA(primaryUrl, primaryTitle, effectiveVtt);
+    const airplay = useAirPlay(primaryUrl, primaryTitle);
+    const chromecast = useChromecast(primaryUrl, primaryTitle, /\.m3u8(\?|$)/.test(primaryUrl), effectiveVtt);
     const { devices: dlnaDevices, discoverDevices, castToDevice, addDevice, error: dlnaError, isDiscovering } = dlna;
     const { devices: airplayDevices, castToDevice: castToAirPlayDevice } = airplay;
     const { devices: chromecastDevices, castToDevice: castToChromecast } = chromecast;
@@ -100,7 +114,16 @@ export function CastDeviceSelector({
     const handleChromecast = useCallback(async (device: ChromecastDevice) => {
         setCasting(true);
         setCastError(null);
-        const success = await castToChromecast(device);
+        let success: boolean;
+        if (isQueue) {
+            // Native Chromecast queue (QUEUE_LOAD) for the whole season/playlist.
+            const items = queue!.filter(i => i.url);
+            const res = await window.ipcRenderer.invoke('cast:play-queue', { deviceId: device.id, items })
+                .catch(() => null) as { success: boolean } | null;
+            success = !!res?.success;
+        } else {
+            success = await castToChromecast(device);
+        }
         if (success) {
             onDeviceSelected({
                 id: device.id,
@@ -114,7 +137,7 @@ export function CastDeviceSelector({
             setCastError(t('cast', 'failedToTransmit'));
         }
         setCasting(false);
-    }, [castToChromecast, onClose, onDeviceSelected, t]);
+    }, [isQueue, queue, castToChromecast, onClose, onDeviceSelected, t]);
 
     // Auto-discover on mount
     useEffect(() => {
@@ -215,7 +238,7 @@ export function CastDeviceSelector({
                             <div className="cast-icon">📺</div>
                             <div>
                                 <h2 className="cast-title">{t('cast', 'title')}</h2>
-                                <p className="cast-subtitle">{videoTitle || t('cast', 'selectDevice')}</p>
+                                <p className="cast-subtitle">{primaryTitle || t('cast', 'selectDevice')}</p>
                             </div>
                         </div>
                         <button className="cast-close" onClick={onClose}>✕</button>
@@ -246,6 +269,16 @@ export function CastDeviceSelector({
                             </button>
                             {subMsg && !effectiveVtt && (
                                 <div className="cast-error" style={{ background: 'transparent' }}><span>{subMsg}</span></div>
+                            )}
+
+                            {/* Queue note: only Chromecast plays the whole season */}
+                            {isQueue && queue!.length > 1 && (
+                                <div className="cast-help" style={{ marginBottom: 16 }}>
+                                    <div className="help-icon">🎞️</div>
+                                    <div className="help-text">
+                                        {t('cast', 'queueHint').replace('{n}', String(queue!.length))}
+                                    </div>
+                                </div>
                             )}
 
                             {/* Error (cast attempt or device discovery) */}

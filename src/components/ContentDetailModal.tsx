@@ -6,7 +6,8 @@ import { profileService } from '../services/profileService';
 import { watchLaterService } from '../services/watchLater';
 import { favoritesService } from '../services/favoritesService';
 import { downloadService } from '../services/downloadService';
-import { castResolvedQueue } from '../services/castQueue';
+import type { CastQueueItem } from '../services/castQueue';
+import { CastDeviceSelector } from './CastDeviceSelector';
 import { useLanguage } from '../services/languageService';
 import { extractYouTubeId } from '../utils/youtube';
 import { episodeDisplayTitle, sortedSeasonKeys } from '../utils/seriesEpisodes';
@@ -73,6 +74,8 @@ export function ContentDetailModal({
     const [selectedEpisode, setSelectedEpisode] = useState(1);
     const [castSeasonMsg, setCastSeasonMsg] = useState<string | null>(null);
     const [castingSeason, setCastingSeason] = useState(false);
+    // When the resolved season queue is ready, this opens the device picker.
+    const [seasonQueue, setSeasonQueue] = useState<CastQueueItem[] | null>(null);
     const [loading, setLoading] = useState(false);
     const [loadError, setLoadError] = useState(false);
     const [retryNonce, setRetryNonce] = useState(0);
@@ -285,15 +288,16 @@ export function ContentDetailModal({
     };
 
     // Download a single episode
-    // Cast the whole selected season to the first Chromecast (QUEUE_LOAD). Each
-    // episode's URL is resolved via IPC (Xtream/M3U/Stalker), in episode order.
+    // Resolve every episode URL of the selected season (Xtream/M3U/Stalker, in
+    // order) and open the device picker so the user chooses WHERE to cast —
+    // Chromecast (whole queue via QUEUE_LOAD) or DLNA/AirPlay (first episode).
     const castSeason = async () => {
         const eps = seriesInfo?.episodes?.[selectedSeason] || [];
         if (eps.length === 0) return;
         setCastingSeason(true);
         setCastSeasonMsg(t('contentModal', 'castResolving'));
         try {
-            const queue: { url: string; title: string }[] = [];
+            const queue: CastQueueItem[] = [];
             for (const ep of eps) {
                 const res = await window.ipcRenderer.invoke('streams:get-series-url', {
                     streamId: ep.id,
@@ -301,15 +305,15 @@ export function ContentDetailModal({
                 }).catch(() => null) as { success: boolean; url?: string } | null;
                 if (res?.success && res.url) queue.push({ url: res.url, title: getEpisodeTitle(ep) });
             }
-            const result = await castResolvedQueue(queue);
-            if (result.status === 'no-device') setCastSeasonMsg(t('contentModal', 'castNoDevice'));
-            else if (result.status === 'empty') setCastSeasonMsg(t('contentModal', 'castNoUrls'));
-            else if (result.status === 'ok') setCastSeasonMsg(
-                t('contentModal', 'castQueued').replace('{n}', String(result.count)).replace('{device}', result.deviceName));
-            else setCastSeasonMsg(t('contentModal', 'castError'));
+            if (queue.length === 0) {
+                setCastSeasonMsg(t('contentModal', 'castNoUrls'));
+                setTimeout(() => setCastSeasonMsg(null), 6000);
+            } else {
+                setCastSeasonMsg(null);
+                setSeasonQueue(queue); // opens <CastDeviceSelector>
+            }
         } finally {
             setCastingSeason(false);
-            setTimeout(() => setCastSeasonMsg(null), 6000);
         }
     };
 
@@ -1206,6 +1210,24 @@ export function ContentDetailModal({
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Device picker for casting the whole season (Chromecast/DLNA/AirPlay) */}
+            {seasonQueue && (
+                <CastDeviceSelector
+                    videoUrl={seasonQueue[0]?.url || ''}
+                    videoTitle={contentData.name}
+                    queue={seasonQueue}
+                    onClose={() => setSeasonQueue(null)}
+                    onDeviceSelected={(device) => {
+                        setCastSeasonMsg(
+                            t('contentModal', 'castQueued')
+                                .replace('{n}', String(seasonQueue.length))
+                                .replace('{device}', device.name));
+                        setSeasonQueue(null);
+                        setTimeout(() => setCastSeasonMsg(null), 6000);
+                    }}
+                />
             )}
 
         </div>
