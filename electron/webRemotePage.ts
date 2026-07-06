@@ -148,6 +148,7 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       <input class="chsearch" id="mvsearch" placeholder="Buscar filme…" autocomplete="off">
       <div class="chlist" id="mvlist"></div>
       <div class="empty" id="mv-empty">Carregando filmes…</div>
+      <button class="ctl wide hidden" id="mvqueue" style="margin: 4px auto 0; background: linear-gradient(135deg,#4f46e5,var(--accent));">📡 Transmitir fila</button>
     </div>
 
     <div id="series" class="hidden">
@@ -187,6 +188,8 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
     var movies = [];     // catalog: [{ id, name, cover }]
     var mvFilter = '';
     var catalogRequested = false;
+    var selected = {};   // movieId → true (multi-select for the cast queue)
+    var mvqueueEl = document.getElementById('mvqueue');
     var seriesEl = document.getElementById('series');
     var episodesEl = document.getElementById('episodes');
     var selistEl = document.getElementById('selist');
@@ -323,19 +326,38 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
         var logo = m.cover
           ? '<img src="' + esc(m.cover) + '" onerror="this.style.display=\\'none\\'" alt="">'
           : '<div class="ph">🎬</div>';
-        html += '<div class="chitem" data-mv="' + esc(m.id) + '">'
-          + logo + '<div class="nm">' + esc(m.name) + '</div>'
+        var sel = selected[m.id];
+        html += '<div class="chitem' + (sel ? ' playing' : '') + '" data-mv="' + esc(m.id) + '">'
+          + logo + '<div class="nm">' + (sel ? '✓ ' : '') + esc(m.name) + '</div>'
           + '<button class="chinfo" data-cast="' + esc(m.id) + '" title="Transmitir na TV">📡</button></div>';
       }
       mvlistEl.innerHTML = html || '<div class="empty">Nenhum filme encontrado.</div>';
+      updateQueueBar();
+    }
+
+    function updateQueueBar() {
+      var n = Object.keys(selected).length;
+      if (n > 0) { mvqueueEl.classList.remove('hidden'); mvqueueEl.textContent = '📡 Transmitir fila (' + n + ')'; }
+      else mvqueueEl.classList.add('hidden');
     }
 
     mvsearchEl.addEventListener('input', function () { mvFilter = mvsearchEl.value; renderCatalog(); });
 
     mvlistEl.addEventListener('click', function (ev) {
       if (!ev.target.closest) return;
+      // 📡 casts just that movie; tapping the rest of the row toggles selection.
       var castBtn = ev.target.closest('.chinfo');
-      if (castBtn) { var mid = castBtn.getAttribute('data-cast'); if (mid) sendCmd('castMovie', null, null, mid); }
+      if (castBtn) { var mid = castBtn.getAttribute('data-cast'); if (mid) sendCmd('castMovie', null, null, mid); return; }
+      var row = ev.target.closest('.chitem');
+      if (!row) return;
+      var id = row.getAttribute('data-mv');
+      if (selected[id]) delete selected[id]; else selected[id] = true;
+      renderCatalog();
+    });
+
+    mvqueueEl.addEventListener('click', function () {
+      var ids = Object.keys(selected);
+      if (ids.length) { sendCmd('castMovieQueue', null, null, null, ids); selected = {}; renderCatalog(); }
     });
 
     // ------------------------------------------------------------- Séries --
@@ -449,14 +471,17 @@ export const REMOTE_PAGE_HTML = `<!doctype html>
       });
     });
 
-    function sendCmd(action, sec, channelId, movieId, seriesId, episodeId) {
+    // arg5 carries movieIds (castMovieQueue) or seriesId (requestSeriesInfo);
+    // arg6 carries episodeId (castEpisode). Positions are disjoint per action.
+    function sendCmd(action, sec, channelId, movieId, arg5, arg6) {
       if (!ws || ws.readyState !== 1) return;
       var payload = { action: action };
       if (action === 'seek') payload.seconds = sec;
       if (action === 'playChannel' || action === 'requestEpg') payload.channelId = channelId;
       if (action === 'castMovie') payload.movieId = movieId;
-      if (action === 'requestSeriesInfo') payload.seriesId = seriesId;
-      if (action === 'castEpisode') payload.episodeId = episodeId;
+      if (action === 'castMovieQueue') payload.movieIds = arg5;
+      if (action === 'requestSeriesInfo') payload.seriesId = arg5;
+      if (action === 'castEpisode') payload.episodeId = arg6;
       ws.send(JSON.stringify(payload));
     }
 

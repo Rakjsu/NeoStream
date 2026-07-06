@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { castResolvedQueue, type CastQueueItem } from '../services/castQueue';
 
 /**
  * Always-mounted bridge for the phone web remote's catalog second-screen.
@@ -58,6 +59,20 @@ export function WebRemoteBridge() {
             }).catch(() => undefined);
         };
 
+        const castMovieQueue = async (movieIds: string[]) => {
+            const queue: CastQueueItem[] = [];
+            for (const id of movieIds) {
+                const movie = moviesRef.current.get(id);
+                if (!movie) continue;
+                const urlRes = await window.ipcRenderer.invoke('streams:get-vod-url', {
+                    streamId: movie.stream_id,
+                    container: movie.container_extension || 'mp4',
+                }).catch(() => null) as { success: boolean; url?: string } | null;
+                if (urlRes?.success && urlRes.url) queue.push({ url: urlRes.url, title: movie.name });
+            }
+            await castResolvedQueue(queue).catch(() => undefined);
+        };
+
         const pushSeries = async () => {
             const result = await window.ipcRenderer.invoke('streams:get-series').catch(() => null) as
                 { success: boolean; data?: SeriesItem[] } | null;
@@ -107,6 +122,7 @@ export function WebRemoteBridge() {
         const handler = (_e: unknown, action: string, arg?: unknown) => {
             if (action === 'requestCatalog') void pushCatalog();
             else if (action === 'castMovie') void castMovie(String(arg ?? ''));
+            else if (action === 'castMovieQueue') void castMovieQueue(Array.isArray(arg) ? (arg as string[]) : []);
             else if (action === 'requestSeries') void pushSeries();
             else if (action === 'requestSeriesInfo') void pushSeriesInfo(String(arg ?? ''));
             else if (action === 'castEpisode') void castEpisode(String(arg ?? ''));

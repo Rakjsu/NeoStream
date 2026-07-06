@@ -26,7 +26,9 @@ import {
     parseRemoteCommand,
     isPinLockedOut,
     registerPinFailure,
+    pickLanAddress,
     type PinGateEntry,
+    type NetAddress,
 } from './webRemoteProtocol'
 import { REMOTE_PAGE_HTML } from './webRemotePage'
 import { isCastSessionActive, castRemoteControl } from './castHandlers'
@@ -90,14 +92,9 @@ function serverUrl(): string | null {
     return serverPort ? `${serverSecure ? 'https' : 'http'}://${getLanAddress()}:${serverPort}/` : null
 }
 
-/** Best LAN IPv4 (first non-internal), or 127.0.0.1. */
+/** Best LAN IPv4 the phone can reach (skips VPN/virtual adapters), or 127.0.0.1. */
 export function getLanAddress(): string {
-    for (const addresses of Object.values(os.networkInterfaces())) {
-        for (const addr of addresses ?? []) {
-            if (addr.family === 'IPv4' && !addr.internal) return addr.address
-        }
-    }
-    return '127.0.0.1'
+    return pickLanAddress(os.networkInterfaces() as Record<string, NetAddress[] | undefined>)
 }
 
 function stateMessage(): string {
@@ -208,7 +205,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 }
 
 // Actions that always go to the renderer (never routed to the cast session).
-const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'requestCatalog', 'castMovie', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'requestCatalog', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
@@ -232,6 +229,8 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         win.webContents.send('media:control', 'requestEpg', command.channelId)
     } else if (command.action === 'castMovie') {
         win.webContents.send('media:control', 'castMovie', command.movieId)
+    } else if (command.action === 'castMovieQueue') {
+        win.webContents.send('media:control', 'castMovieQueue', command.movieIds)
     } else if (command.action === 'castEpisode') {
         win.webContents.send('media:control', 'castEpisode', command.episodeId)
     } else if (command.action === 'requestSeriesInfo') {
@@ -350,6 +349,18 @@ export function setupWebRemote(): void {
             url: serverUrl(),
             pin: serverPort ? sessionPin : null,
         }
+    })
+
+    // Rotate the pairing PIN on demand: a new code + drop current clients so
+    // old pairings are revoked (the phone re-prompts, its saved PIN now fails).
+    ipcMain.handle('web-remote:regen-pin', () => {
+        if (!serverPort) return { success: false, error: 'Controle desativado' }
+        sessionPin = newPin()
+        pinGate.clear()
+        for (const client of clients) client.socket.destroy()
+        clients.clear()
+        log.info('[WebRemote] PIN regenerado')
+        return { success: true, pin: sessionPin }
     })
 
     if (getConfig().enabled) void start()

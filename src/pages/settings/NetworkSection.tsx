@@ -55,6 +55,13 @@ export function NetworkSection() {
         triggerSaveAnimation('webRemote');
     };
 
+    const handleRegenPin = async () => {
+        const result = await window.ipcRenderer.invoke('web-remote:regen-pin')
+            .catch(() => null) as { success: boolean; pin?: string } | null;
+        if (result?.success && result.pin) setWebRemote(prev => ({ ...prev, pin: result.pin! }));
+        triggerSaveAnimation('webRemote');
+    };
+
     const handleAllowInvalidProviderCertificatesChange = async (value: boolean) => {
         setAllowInvalidProviderCertificates(value);
         try {
@@ -137,9 +144,15 @@ export function NetworkSection() {
                                 {webRemote.url}
                             </a>
                             {webRemote.pin && (
-                                <div style={{ marginTop: 12, fontSize: 14 }}>
+                                <div style={{ marginTop: 12, fontSize: 14, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                                     {t('network', 'webRemotePin')}:{' '}
                                     <strong style={{ fontSize: 22, letterSpacing: 4, color: 'var(--ns-accent-light)' }}>{webRemote.pin}</strong>
+                                    <button
+                                        onClick={() => void handleRegenPin()}
+                                        style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.85)', fontSize: 12, cursor: 'pointer' }}
+                                    >
+                                        🔄 {t('network', 'webRemoteNewPin')}
+                                    </button>
                                 </div>
                             )}
                             <p style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>{t('network', 'webRemoteQrHint')}</p>

@@ -121,13 +121,14 @@ export type RemoteCommand =
     | { action: 'requestEpg'; channelId: string }
     | { action: 'requestCatalog' }
     | { action: 'castMovie'; movieId: string }
+    | { action: 'castMovieQueue'; movieIds: string[] }
     | { action: 'requestSeries' }
     | { action: 'requestSeriesInfo'; seriesId: string }
     | { action: 'castEpisode'; episodeId: string }
 
 const VALID_ACTIONS = new Set([
     'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'seek', 'playChannel', 'requestEpg',
-    'requestCatalog', 'castMovie', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
+    'requestCatalog', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
 ])
 
 /** Validate a command coming off the wire (untrusted phone input). */
@@ -156,6 +157,13 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         if (typeof movieId !== 'string' || !movieId) return null
         return { action, movieId }
     }
+    if (action === 'castMovieQueue') {
+        const raw = (parsed as { movieIds?: unknown }).movieIds
+        if (!Array.isArray(raw)) return null
+        const movieIds = raw.filter((id): id is string => typeof id === 'string' && !!id).slice(0, 200)
+        if (movieIds.length === 0) return null
+        return { action: 'castMovieQueue', movieIds }
+    }
     if (action === 'requestSeriesInfo') {
         const seriesId = (parsed as { seriesId?: unknown }).seriesId
         if (typeof seriesId !== 'string' || !seriesId) return null
@@ -169,6 +177,45 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
     if (action === 'requestCatalog') return { action: 'requestCatalog' }
     if (action === 'requestSeries') return { action: 'requestSeries' }
     return { action: action as 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' }
+}
+
+// ------------------------------------------------------------- LAN address --
+// A machine often has several non-internal IPv4s: the real Wi-Fi/Ethernet plus
+// VPN/virtual adapters (Radmin, ZeroTier, Hyper-V's vEthernet, WSL, VMware…).
+// The phone can only reach the REAL LAN one, so picking the first (as before)
+// broke pairing whenever a VPN adapter sorted first. Score by name + range.
+
+export interface NetAddress {
+    family: string | number
+    address: string
+    internal: boolean
+}
+
+const VIRTUAL_NAME = /vpn|virtual|vethernet|hyper-?v|zerotier|radmin|vmware|virtualbox|tailscale|\bwsl\b|loopback|\btap\b|\btun\b|hamachi|docker|bluetooth|npcap/i
+
+/** Score one candidate: real Wi-Fi/Ethernet on a private range ranks highest. */
+export function scoreLanCandidate(name: string, address: string): number {
+    let score = 0
+    if (VIRTUAL_NAME.test(name)) score -= 100
+    if (/^192\.168\./.test(address)) score += 30
+    else if (/^10\./.test(address)) score += 20
+    else if (/^172\.(1[6-9]|2\d|3[01])\./.test(address)) score += 10
+    if (/^169\.254\./.test(address)) score -= 50 // link-local (unconfigured)
+    return score
+}
+
+/** Best LAN IPv4 the phone can actually reach, or 127.0.0.1. */
+export function pickLanAddress(interfaces: Record<string, NetAddress[] | undefined>): string {
+    let best: string | null = null
+    let bestScore = -Infinity
+    for (const [name, addresses] of Object.entries(interfaces)) {
+        for (const addr of addresses ?? []) {
+            if ((addr.family !== 'IPv4' && addr.family !== 4) || addr.internal) continue
+            const score = scoreLanCandidate(name, addr.address)
+            if (score > bestScore) { bestScore = score; best = addr.address }
+        }
+    }
+    return best ?? '127.0.0.1'
 }
 
 // -------------------------------------------------------------- PIN lockout --

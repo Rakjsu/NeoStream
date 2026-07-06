@@ -32,6 +32,7 @@ const invokeChannels = new Set([
     'cast:reconnect',
     'web-remote:get-config',
     'web-remote:set-enabled',
+    'web-remote:regen-pin',
     'cast:set-volume',
     'categories:get-live',
     'playlists:add-stalker',
