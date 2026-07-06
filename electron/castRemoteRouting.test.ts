@@ -18,6 +18,7 @@ function fakeSession(status: Partial<RoutableCastSession['status']> = {}) {
         setVolume: vi.fn(),
         queueSkip: vi.fn(),
         setSubtitleEnabled: vi.fn(),
+        setAudioTrack: vi.fn(),
     }
     return session
 }
@@ -94,6 +95,27 @@ describe('routeCastCommand', () => {
         const noSub = fakeSession({ subtitleAvailable: false })
         expect(routeCastCommand(noSub, 'subtitle', undefined, 0.3).handled).toBe(false)
         expect(noSub.setSubtitleEnabled).not.toHaveBeenCalled()
+    })
+
+    it('setVolume aplica nível absoluto com clamp em 0..1', () => {
+        const s = fakeSession()
+        expect(routeCastCommand(s, 'setVolume', 0.42, 0.3).handled).toBe(true)
+        expect(s.setVolume).toHaveBeenCalledWith(0.42)
+        routeCastCommand(s, 'setVolume', 7, 0.3)
+        expect(s.setVolume).toHaveBeenCalledWith(1)
+        routeCastCommand(s, 'setVolume', -1, 0.3)
+        expect(s.setVolume).toHaveBeenCalledWith(0)
+        // nível inválido: consumido sem chamada (não cai no renderer).
+        expect(routeCastCommand(s, 'setVolume', undefined, 0.3).handled).toBe(true)
+        expect(s.setVolume).toHaveBeenCalledTimes(3)
+    })
+
+    it('setAudioTrack repassa o id pra sessão', () => {
+        const s = fakeSession()
+        expect(routeCastCommand(s, 'setAudioTrack', 2, 0.3).handled).toBe(true)
+        expect(s.setAudioTrack).toHaveBeenCalledWith(2)
+        expect(routeCastCommand(s, 'setAudioTrack', undefined, 0.3).handled).toBe(true)
+        expect(s.setAudioTrack).toHaveBeenCalledTimes(1)
     })
 
     it('ação desconhecida não é consumida', () => {

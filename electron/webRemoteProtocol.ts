@@ -121,6 +121,8 @@ export interface CastTarget { deviceId: string; deviceType: CastTargetType }
 export type RemoteCommand =
     | { action: 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' | 'subtitle' }
     | { action: 'seek'; seconds: number }
+    | { action: 'setVolume'; level: number }
+    | { action: 'setAudioTrack'; trackId: number }
     | { action: 'playChannel'; channelId: string }
     | { action: 'requestEpg'; channelId: string }
     | { action: 'requestCatalog'; query?: string }
@@ -134,7 +136,7 @@ export type RemoteCommand =
     | { action: 'castEpisode'; episodeId: string; target?: CastTarget }
 
 const VALID_ACTIONS = new Set([
-    'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'playChannel', 'requestEpg',
+    'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'setVolume', 'setAudioTrack', 'playChannel', 'requestEpg',
     'requestCatalog', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
 ])
 
@@ -172,6 +174,16 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         const seconds = (parsed as { seconds?: unknown }).seconds
         if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return null
         return { action: 'seek', seconds }
+    }
+    if (action === 'setVolume') {
+        const level = (parsed as { level?: unknown }).level
+        if (typeof level !== 'number' || !Number.isFinite(level)) return null
+        return { action: 'setVolume', level: Math.min(1, Math.max(0, level)) }
+    }
+    if (action === 'setAudioTrack') {
+        const trackId = (parsed as { trackId?: unknown }).trackId
+        if (typeof trackId !== 'number' || !Number.isFinite(trackId)) return null
+        return { action: 'setAudioTrack', trackId }
     }
     if (action === 'playChannel' || action === 'requestEpg') {
         const channelId = (parsed as { channelId?: unknown }).channelId
