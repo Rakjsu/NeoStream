@@ -35,6 +35,7 @@ import { REMOTE_ICON_SVG, buildManifest, solidPng } from './webRemoteAssets'
 import { isCastSessionActive, castRemoteControl, getCastStatus } from './castHandlers'
 import { dlnaRemoteControl, isDlnaSessionActive, getDlnaStatusSnapshot } from './dlnaHandlers'
 import { dlnaStateFields } from './dlnaRemoteRouting'
+import { airplayRemoteControl } from './airplayHandlers'
 
 interface WebRemoteConfig {
     enabled: boolean
@@ -257,6 +258,7 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
             return
         }
         if (dlnaRemoteControl(command.action, value)) return
+        if (airplayRemoteControl(command.action, value)) return
     }
     // These two only make sense while a cast session is live; with none active
     // there is nothing for the renderer to do with them.

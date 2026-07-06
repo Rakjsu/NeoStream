@@ -13,6 +13,7 @@ import http from 'http';
 import { Bonjour, type Browser, type Service } from 'bonjour-service';
 
 import log from './logger'
+import { planAirplayCommand, parseScrub } from './airplayRemoteRouting';
 import { isLoopbackUrl, createLanProxyUrlFor } from './dlnaHandlers'
 
 interface AirPlayDevice {
@@ -167,6 +168,8 @@ export function setupAirPlayHandlers() {
                 `Content-Location: ${url}\nStart-Position: 0\n`
             );
             log.info('[AirPlay] Playing on device');
+            // Track the session so the phone remote can drive this device.
+            airplaySession = { device, title: String(title ?? ''), playing: true };
 
             return { success: true };
         } catch (error: unknown) {
@@ -187,6 +190,7 @@ export function setupAirPlayHandlers() {
 
             await airplayRequest(device, '/stop');
             log.info('[AirPlay] Stopped successfully');
+            if (airplaySession?.device.id === deviceId) airplaySession = null;
 
             return { success: true };
         } catch (error: unknown) {
@@ -196,4 +200,73 @@ export function setupAirPlayHandlers() {
     });
 
     log.info('[AirPlay] IPC Handlers initialized');
+}
+
+// ===== Phone-remote transport for the active AirPlay session =================
+// Third routing layer after Chromecast and DLNA. The protocol has no volume
+// control (RAOP-only), so those actions fall through untouched.
+
+let airplaySession: { device: AirPlayDevice; title: string; playing: boolean } | null = null;
+
+export function isAirplaySessionActive(): boolean {
+    return airplaySession !== null;
+}
+
+/** GET on the AirPlay control port, returning the response body. */
+function airplayGet(device: AirPlayDevice, path: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const request = http.request({
+            host: device.host,
+            port: device.port || AIRPLAY_DEFAULT_PORT,
+            method: 'GET',
+            path,
+            timeout: 10000,
+            headers: { 'User-Agent': 'MediaControl/1.0' },
+        }, (response) => {
+            let body = '';
+            response.on('data', (chunk) => { body += chunk; });
+            response.on('end', () => {
+                if (response.statusCode && response.statusCode < 300) resolve(body);
+                else reject(new Error(`AirPlay device responded ${response.statusCode} for ${path}`));
+            });
+        });
+        request.on('error', reject);
+        request.on('timeout', () => { request.destroy(); reject(new Error('AirPlay request timeout')); });
+        request.end();
+    });
+}
+
+/**
+ * Route a phone-remote transport command to the active AirPlay session.
+ * Returns true when consumed (HTTP runs in the background); false falls
+ * through to the renderer.
+ */
+export function airplayRemoteControl(action: string, value?: number): boolean {
+    const session = airplaySession;
+    if (!session) return false;
+    const plan = planAirplayCommand(action, value, session.playing);
+    if (!plan) return false;
+
+    const run = async () => {
+        switch (plan.kind) {
+            case 'rate':
+                await airplayRequest(session.device, `/rate?value=${plan.value.toFixed(6)}`);
+                session.playing = plan.value === 1;
+                return;
+            case 'seekRelative': {
+                const scrub = parseScrub(await airplayGet(session.device, '/scrub'));
+                const target = Math.max(0, scrub.position + plan.seconds);
+                await airplayRequest(session.device, `/scrub?position=${target.toFixed(3)}`);
+                return;
+            }
+            case 'stop':
+                await airplayRequest(session.device, '/stop');
+                airplaySession = null;
+                return;
+            case 'noop':
+                return;
+        }
+    };
+    void run().catch((error: unknown) => log.warn('[AirPlay] comando do controle web falhou:', getErrorMessage(error)));
+    return true;
 }
