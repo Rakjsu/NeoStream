@@ -62,9 +62,10 @@ export function CastDeviceSelector({
     const effectiveVtt = fetchedVtt ?? subtitleVtt;
     // Casting a single series episode → resolve the season's remaining episodes
     // in the background so a Chromecast gets a queue (⏮/⏭ + autoplay of the
-    // next episode). Resolved lazily; if the user picks a device before it's
-    // ready, the cast falls back to the single episode.
+    // next episode). The promise is kept so a device pick BEFORE it settles
+    // waits for it (bounded) instead of silently casting a queue-less episode.
     const [tailQueue, setTailQueue] = useState<CastQueueItem[] | null>(null);
+    const tailQueuePromise = useRef<Promise<CastQueueItem[]> | null>(null);
     // When casting a queue, the single-cast hooks (DLNA/AirPlay/single Chromecast)
     // operate on the first item; the whole queue only goes to Chromecast below.
     const isQueue = !!queue && queue.length > 0;
@@ -148,11 +149,29 @@ export function CastDeviceSelector({
             const res = await window.ipcRenderer.invoke('cast:play-queue', { deviceId: device.id, items })
                 .catch(() => null) as { success: boolean } | null;
             success = !!res?.success;
-        } else if (tailQueue && tailQueue.length > 1) {
-            // Single episode → season queue from this episode onward, so ⏮/⏭
-            // work and the next episode autoplays. The first item resumes at
-            // the local player's position and carries the current subtitle.
-            const items = tailQueue.map((it, idx) => idx === 0
+        } else if (contentType === 'series' && tailQueuePromise.current) {
+            // Single episode of a series → season queue from this episode
+            // onward, so ⏮/⏭ work and the next episode autoplays. If the
+            // background resolve hasn't settled yet (user picked a device
+            // fast), WAIT for it (bounded) instead of silently casting a
+            // queue-less episode — that was the "remote has no buttons" bug.
+            const resolved = tailQueue ?? await Promise.race([
+                tailQueuePromise.current,
+                new Promise<CastQueueItem[]>(resolve => setTimeout(() => resolve([]), 10000)),
+            ]).catch(() => [] as CastQueueItem[]);
+            if (!resolved || resolved.length <= 1) {
+                // Season didn't resolve — honest fallback to the single episode.
+                success = await castToChromecast(device);
+                if (success) {
+                    onDeviceSelected({ id: device.id, name: device.name, type: 'chromecast', available: true, cast: () => { } });
+                    setTimeout(() => onClose(), 500);
+                } else {
+                    setCastError(t('cast', 'failedToTransmit'));
+                }
+                setCasting(false);
+                return;
+            }
+            const items = resolved.map((it, idx) => idx === 0
                 ? {
                     ...it,
                     startTime: typeof startPosition === 'number' && startPosition > 5 ? startPosition : undefined,
@@ -181,7 +200,7 @@ export function CastDeviceSelector({
             setCastError(t('cast', 'failedToTransmit'));
         }
         setCasting(false);
-    }, [isQueue, queue, tailQueue, startPosition, effectiveVtt, castToChromecast, onClose, onDeviceSelected, t]);
+    }, [isQueue, queue, tailQueue, contentType, startPosition, effectiveVtt, castToChromecast, onClose, onDeviceSelected, t]);
 
     // Auto-discover on mount
     useEffect(() => {
@@ -202,7 +221,9 @@ export function CastDeviceSelector({
         if (isQueue || contentType !== 'series' || !contentId) return;
         if (typeof seasonNumber !== 'number' || typeof episodeNumber !== 'number') return;
         let cancelled = false;
-        void buildSeasonTailQueue(contentId, seasonNumber, episodeNumber).then(items => {
+        const promise = buildSeasonTailQueue(contentId, seasonNumber, episodeNumber);
+        tailQueuePromise.current = promise;
+        void promise.then(items => {
             if (!cancelled && items.length > 1) setTailQueue(items);
         });
         return () => { cancelled = true; };
