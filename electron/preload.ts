@@ -104,6 +104,8 @@ const invokeChannels = new Set([
     'mpv:stop',
     'notify:show',
     'opensubtitles:request',
+    'opensubtitles:get-config',
+    'opensubtitles:set-config',
     'ping',
     'pip:clickThrough',
     'pip:close',

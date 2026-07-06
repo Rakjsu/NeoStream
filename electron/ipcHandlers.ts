@@ -162,9 +162,19 @@ async function probeTimeshiftM3u8(url: string, baseUrl: string): Promise<boolean
     }
 }
 
-const OPEN_SUBTITLES_API_KEY = process.env.OPEN_SUBTITLES_API_KEY
-const OPEN_SUBTITLES_USERNAME = process.env.OPEN_SUBTITLES_USERNAME
-const OPEN_SUBTITLES_PASSWORD = process.env.OPEN_SUBTITLES_PASSWORD
+// OpenSubtitles credentials are the USER's own (Configurações → APIs, saved in
+// the store). The env vars remain as a dev-only fallback — packaged apps never
+// have them, which is why the old env-only wiring was dead in production.
+interface OpenSubtitlesConfig { apiKey: string; username: string; password: string }
+
+function getOpenSubtitlesConfig(): OpenSubtitlesConfig {
+    const saved = (store.get('openSubtitles') ?? {}) as Partial<OpenSubtitlesConfig>
+    return {
+        apiKey: (saved.apiKey || process.env.OPEN_SUBTITLES_API_KEY || '').trim(),
+        username: (saved.username || process.env.OPEN_SUBTITLES_USERNAME || '').trim(),
+        password: saved.password || process.env.OPEN_SUBTITLES_PASSWORD || '',
+    }
+}
 
 export function setupIpcHandlers() {
     // Legacy single `auth` entry → multi-playlist model (one-time, idempotent).
@@ -935,13 +945,36 @@ export function setupIpcHandlers() {
         }
     })
 
+    // The user's OpenSubtitles credentials (Configurações → APIs). Values come
+    // back as saved so the form can prefill — this is the user's own machine
+    // and their own account.
+    ipcMain.handle('opensubtitles:get-config', () => {
+        const saved = (store.get('openSubtitles') ?? {}) as Partial<OpenSubtitlesConfig>
+        return {
+            success: true,
+            apiKey: saved.apiKey || '',
+            username: saved.username || '',
+            password: saved.password || '',
+        }
+    })
+
+    ipcMain.handle('opensubtitles:set-config', (_e, raw: Partial<OpenSubtitlesConfig> | undefined) => {
+        store.set('openSubtitles', {
+            apiKey: String(raw?.apiKey ?? '').trim().slice(0, 200),
+            username: String(raw?.username ?? '').trim().slice(0, 200),
+            password: String(raw?.password ?? '').slice(0, 200),
+        })
+        return { success: true }
+    })
+
     // OpenSubtitles API proxy (bypass CORS)
     ipcMain.handle('opensubtitles:request', async (_, { endpoint, method, body }: { endpoint: string; method?: string; body?: OpenSubtitlesBody }) => {
         try {
-            if (!OPEN_SUBTITLES_API_KEY) {
+            const creds = getOpenSubtitlesConfig()
+            if (!creds.apiKey) {
                 return { success: false, error: 'OpenSubtitles API key is not configured' }
             }
-            if (endpoint === '/login' && (!OPEN_SUBTITLES_USERNAME || !OPEN_SUBTITLES_PASSWORD)) {
+            if (endpoint === '/login' && (!creds.username || !creds.password)) {
                 return { success: false, error: 'OpenSubtitles credentials are not configured' }
             }
 
@@ -950,13 +983,13 @@ export function setupIpcHandlers() {
             const requestBody = endpoint === '/login'
                 ? {
                     ...body,
-                    username: OPEN_SUBTITLES_USERNAME,
-                    password: OPEN_SUBTITLES_PASSWORD
+                    username: creds.username,
+                    password: creds.password
                 }
                 : { ...body }
 
             const headers: Record<string, string> = {
-                'Api-Key': OPEN_SUBTITLES_API_KEY,
+                'Api-Key': creds.apiKey,
                 'Content-Type': 'application/json',
                 'User-Agent': 'NeoStream IPTV v2.9.0'
             }

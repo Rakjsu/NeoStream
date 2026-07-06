@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLanguage } from '../../services/languageService';
 import { getTmdbApiKey, setTmdbApiKey, validateTmdbApiKey } from '../../services/tmdbKey';
+
+interface OsConfig { apiKey: string; username: string; password: string }
 
 /**
  * Settings > APIs: the user's own TMDB API key.
@@ -40,6 +42,35 @@ export function ApiKeysSection({ onboarding = false }: { onboarding?: boolean })
     const openTmdbSite = () => {
         void window.ipcRenderer.invoke('shell:open-external', { url: 'https://www.themoviedb.org/settings/api' });
     };
+
+    // OpenSubtitles (busca de legendas online) — credenciais guardadas no main
+    // (electron-store); opcional, o player funciona sem.
+    const [os, setOs] = useState<OsConfig>({ apiKey: '', username: '', password: '' });
+    const [osConfigured, setOsConfigured] = useState(false);
+    const [osSaved, setOsSaved] = useState(false);
+
+    useEffect(() => {
+        void (async () => {
+            const cfg = await window.ipcRenderer.invoke('opensubtitles:get-config').catch(() => null) as
+                ({ success: boolean } & OsConfig) | null;
+            if (cfg?.success) {
+                setOs({ apiKey: cfg.apiKey, username: cfg.username, password: cfg.password });
+                setOsConfigured(!!cfg.apiKey);
+            }
+        })();
+    }, []);
+
+    const handleOsSave = async () => {
+        await window.ipcRenderer.invoke('opensubtitles:set-config', os).catch(() => null);
+        setOsConfigured(!!os.apiKey.trim());
+        setOsSaved(true);
+    };
+
+    const openOsSite = () => {
+        void window.ipcRenderer.invoke('shell:open-external', { url: 'https://www.opensubtitles.com/consumers' });
+    };
+
+    const osSteps = [1, 2, 3].map(n => t('apiKeys', `osStep${n}`));
 
     const steps = [1, 2, 3, 4].map(n => t('apiKeys', `step${n}`));
 
@@ -104,6 +135,53 @@ export function ApiKeysSection({ onboarding = false }: { onboarding?: boolean })
                     </ol>
                     <button className="apikeys-btn primary" onClick={openTmdbSite}>
                         🌐 {t('apiKeys', 'openSite')}
+                    </button>
+                </div>
+
+                <div className="setting-item" style={{ marginTop: 18 }}>
+                    <div className="setting-info">
+                        <label>💬 OpenSubtitles</label>
+                        <p>{t('apiKeys', 'osWhyText')}</p>
+                    </div>
+                    <span className={`apikeys-status ${osConfigured ? 'ok' : 'missing'}`}>
+                        {osConfigured ? `✓ ${t('apiKeys', 'statusConfigured')}` : `○ ${t('apiKeys', 'osStatusOptional')}`}
+                    </span>
+                </div>
+
+                <div className="apikeys-form">
+                    <label className="apikeys-label" htmlFor="os-key">{t('apiKeys', 'osKeyLabel')}</label>
+                    <input
+                        id="os-key" className="apikeys-input" type="text" value={os.apiKey}
+                        placeholder={t('apiKeys', 'keyPlaceholder')} autoComplete="off" spellCheck={false}
+                        onChange={(e) => { setOs({ ...os, apiKey: e.target.value }); setOsSaved(false); }}
+                    />
+                    <label className="apikeys-label" htmlFor="os-user" style={{ marginTop: 10 }}>{t('apiKeys', 'osUserLabel')}</label>
+                    <input
+                        id="os-user" className="apikeys-input" type="text" value={os.username}
+                        autoComplete="off" spellCheck={false}
+                        onChange={(e) => { setOs({ ...os, username: e.target.value }); setOsSaved(false); }}
+                    />
+                    <label className="apikeys-label" htmlFor="os-pass" style={{ marginTop: 10 }}>{t('apiKeys', 'osPassLabel')}</label>
+                    <input
+                        id="os-pass" className="apikeys-input" type="password" value={os.password}
+                        autoComplete="off"
+                        onChange={(e) => { setOs({ ...os, password: e.target.value }); setOsSaved(false); }}
+                    />
+                    <div className="apikeys-actions">
+                        <button className="apikeys-btn primary" onClick={() => { void handleOsSave(); }}>
+                            {t('apiKeys', 'save')}
+                        </button>
+                        {osSaved && <span className="apikeys-feedback ok">✓ {t('apiKeys', 'saved')}</span>}
+                    </div>
+                </div>
+
+                <div className="apikeys-how">
+                    <h3>{t('apiKeys', 'osHowTitle')}</h3>
+                    <ol>
+                        {osSteps.map((step, i) => <li key={i}>{step}</li>)}
+                    </ol>
+                    <button className="apikeys-btn primary" onClick={openOsSite}>
+                        🌐 {t('apiKeys', 'osOpenSite')}
                     </button>
                 </div>
 
