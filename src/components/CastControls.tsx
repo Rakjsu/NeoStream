@@ -8,6 +8,7 @@ import { Play, Pause, Square, Volume2, Tv, ListVideo, SkipBack, SkipForward, Sub
 import { castControls, type CastStatus } from '../hooks/useDLNA';
 import { chromecastControls } from '../hooks/useChromecast';
 import { formatTime } from '../utils/videoHelpers';
+import { useLanguage } from '../services/languageService';
 
 interface CastControlsProps {
     deviceId: string;
@@ -27,6 +28,7 @@ const FAILED_POLLS_TO_END = 6;
 
 export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSessionEnded }: CastControlsProps) {
     const remote = deviceType === 'chromecast' ? chromecastControls : castControls;
+    const { t } = useLanguage();
     const [status, setStatus] = useState<CastStatus | null>(null);
     const [pendingVolume, setPendingVolume] = useState<number | null>(null);
     const [showQueue, setShowQueue] = useState(false);
@@ -213,7 +215,7 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                     textOverflow: 'ellipsis',
                     maxWidth: 140
                 }}>
-                    {status?.title || 'Transmitindo'}
+                    {status?.title || t('cast', 'casting')}
                 </div>
                 <div style={{ fontSize: 10, color: '#9ca3af', whiteSpace: 'nowrap' }}>{deviceName}</div>
             </div>
@@ -223,7 +225,7 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                     onClick={handleQueueSkip}
                     data-direction="prev"
                     disabled={!canSkipPrev}
-                    title="Episódio anterior"
+                    title={t('cast', 'prevEpisode')}
                     style={{
                         background: 'rgba(255,255,255,0.08)',
                         border: 'none',
@@ -242,7 +244,7 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
 
             <button
                 onClick={handleTogglePlay}
-                title={isPlaying ? 'Pausar' : 'Reproduzir'}
+                title={isPlaying ? t('cast', 'pause') : t('cast', 'play')}
                 style={{
                     background: 'rgba(var(--ns-accent-rgb), 0.8)',
                     border: 'none',
@@ -262,7 +264,7 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                     onClick={handleQueueSkip}
                     data-direction="next"
                     disabled={!canSkipNext}
-                    title="Próximo episódio"
+                    title={t('cast', 'nextEpisode')}
                     style={{
                         background: 'rgba(255,255,255,0.08)',
                         border: 'none',
@@ -289,14 +291,14 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                         max={Math.max(1, Math.floor(duration))}
                         value={Math.floor(position)}
                         onChange={handleSeek}
-                        aria-label="Posição da reprodução"
+                        aria-label={t('cast', 'seekLabel')}
                         style={{ flex: 1, height: 4, cursor: 'pointer', accentColor: 'var(--ns-accent)' }}
                     />
                     <span style={{ fontSize: 10, color: '#9ca3af', flexShrink: 0 }}>{formatTime(duration)}</span>
                 </div>
             ) : (
                 <div style={{ flex: 1, fontSize: 11, color: '#9ca3af', textAlign: 'center' }}>
-                    {status ? 'AO VIVO' : 'Conectando...'}
+                    {status ? t('cast', 'live') : t('cast', 'connecting')}
                 </div>
             )}
 
@@ -309,7 +311,7 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                         max={100}
                         value={volume}
                         onChange={handleVolume}
-                        aria-label="Volume da TV"
+                        aria-label={t('cast', 'tvVolume')}
                         style={{ width: 64, height: 4, cursor: 'pointer', accentColor: 'var(--ns-accent)' }}
                     />
                 </div>
@@ -319,8 +321,8 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
             {subtitleAvailable && (
                 <button
                     onClick={handleSubtitleToggle}
-                    title={subtitleEnabled ? 'Desativar legenda' : 'Ativar legenda'}
-                    aria-label={subtitleEnabled ? 'Desativar legenda' : 'Ativar legenda'}
+                    title={subtitleEnabled ? t('cast', 'subtitleOff') : t('cast', 'subtitleOn')}
+                    aria-label={subtitleEnabled ? t('cast', 'subtitleOff') : t('cast', 'subtitleOn')}
                     style={{
                         background: subtitleEnabled ? 'rgba(var(--ns-accent-rgb), 0.8)' : 'rgba(255,255,255,0.08)',
                         border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', display: 'flex', color: 'white',
@@ -336,8 +338,8 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                     <button
                         onClick={() => setShowAudio(v => !v)}
-                        title="Faixa de áudio"
-                        aria-label="Faixa de áudio"
+                        title={t('cast', 'audioTrack')}
+                        aria-label={t('cast', 'audioTrack')}
                         style={{
                             background: showAudio ? 'rgba(var(--ns-accent-rgb), 0.8)' : 'rgba(255,255,255,0.08)',
                             border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', display: 'flex', color: 'white',
@@ -353,7 +355,7 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                         }}>
                             {audioTracks.map((track, i) => {
                                 const isCurrent = track.trackId === status?.activeAudioTrackId;
-                                const label = track.name || track.language || `Áudio ${i + 1}`;
+                                const label = track.name || track.language || `${t('cast', 'audioTrack')} ${i + 1}`;
                                 return (
                                     <button
                                         key={track.trackId}
@@ -384,7 +386,7 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                     <button
                         onClick={() => setShowQueue(v => !v)}
-                        title="Fila"
+                        title={t('cast', 'queue')}
                         style={{
                             background: showQueue ? 'rgba(var(--ns-accent-rgb), 0.8)' : 'rgba(255,255,255,0.08)',
                             border: 'none', borderRadius: 8, padding: 8, cursor: 'pointer', display: 'flex', color: 'white',
@@ -427,7 +429,7 @@ export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSess
 
             <button
                 onClick={handleStop}
-                title="Parar transmissão"
+                title={t('cast', 'stopCast')}
                 style={{
                     background: 'rgba(239, 68, 68, 0.7)',
                     border: 'none',
