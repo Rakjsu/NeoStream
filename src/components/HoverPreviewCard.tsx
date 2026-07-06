@@ -24,14 +24,28 @@ interface HoverPreviewCardProps {
 // Grid card. Clicking opens the centered detail modal (trailer hero + info);
 // hover is purely a CSS lift — no preview overlay (that caused flicker on
 // distant items and the owner prefers click-to-open).
+// Keyboard: the card is a Tab stop — Enter/Space opens it like a click.
 function HoverPreviewCardComponent({
     cover,
     title,
     onMoreInfo,
     children
 }: HoverPreviewCardProps) {
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault(); // Space must not scroll the grid
+            onMoreInfo();
+        }
+    };
     return (
-        <div className="hover-preview-card" onClick={onMoreInfo}>
+        <div
+            className="hover-preview-card"
+            role="button"
+            tabIndex={0}
+            aria-label={title}
+            onClick={onMoreInfo}
+            onKeyDown={handleKeyDown}
+        >
             {/* Poster */}
             <div className="preview-poster" style={{ position: 'relative' }}>
                 <LazyImage
