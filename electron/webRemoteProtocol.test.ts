@@ -87,6 +87,15 @@ describe('parseRemoteCommand', () => {
             .toEqual({ action: 'castMovie', movieId: '42' })
         expect(parseRemoteCommand('{"action":"castMovie"}')).toBeNull() // movieId ausente
     })
+    it('aceita castMovieQueue com ids válidos e filtra lixo', () => {
+        expect(parseRemoteCommand('{"action":"castMovieQueue","movieIds":["1","2","3"]}'))
+            .toEqual({ action: 'castMovieQueue', movieIds: ['1', '2', '3'] })
+        // Filtra não-strings/vazios; fica só o válido.
+        expect(parseRemoteCommand('{"action":"castMovieQueue","movieIds":["7", 8, "", null]}'))
+            .toEqual({ action: 'castMovieQueue', movieIds: ['7'] })
+        expect(parseRemoteCommand('{"action":"castMovieQueue","movieIds":[]}')).toBeNull()
+        expect(parseRemoteCommand('{"action":"castMovieQueue"}')).toBeNull()
+    })
     it('rejeita lixo e ações desconhecidas', () => {
         expect(parseRemoteCommand('não-json')).toBeNull()
         expect(parseRemoteCommand('{"action":"rm -rf"}')).toBeNull()
