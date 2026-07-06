@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { User, Lock, Server, LogIn, Tv, ArrowLeft, Play, Film, PlaySquare, Sparkles } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../services/languageService';
+import { hasTmdbApiKey, setTmdbOnboardingPending } from '../services/tmdbKey';
 
 export function Login() {
     const navigate = useNavigate();
@@ -106,6 +107,9 @@ export function Login() {
                 console.error('Failed to rename playlist:', err);
             }
         }
+        // First playlist just added: after the reload, the dashboard walks the
+        // user to Configurações → APIs to set up their own (free) TMDB key.
+        if (!hasTmdbApiKey()) setTmdbOnboardingPending();
         window.location.reload();
     };
 

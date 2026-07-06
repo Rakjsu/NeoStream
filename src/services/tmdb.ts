@@ -1,11 +1,8 @@
 // TMDB API Service
-// Key comes from .env (VITE_TMDB_API_KEY) — required for release builds.
-// The old hardcoded key was rotated out after leaking into git history.
-const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY || '';
-
-if (!TMDB_API_KEY) {
-    console.warn('[TMDB] VITE_TMDB_API_KEY is not set — TMDB metadata (covers, plots, ratings) will be unavailable. Create a .env file from .env.example.');
-}
+// The key is the USER's own, set under Configurações → APIs (tmdbKey.ts).
+// Builds no longer embed a project key; without one, every function here
+// degrades to null and the app works without TMDB metadata.
+import { getTmdbApiKey } from './tmdbKey';
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
 
@@ -212,6 +209,8 @@ export interface TMDBEpisodeDetails {
 }
 
 export async function fetchMovieDetails(tmdbId: string): Promise<TMDBMovieDetails | null> {
+    if (!getTmdbApiKey()) return null; // sem chave configurada — sem metadados TMDB
+
     if (!tmdbId) return null;
 
     // Check cache first
@@ -223,7 +222,7 @@ export async function fetchMovieDetails(tmdbId: string): Promise<TMDBMovieDetail
     try {
         // Fetch movie details with release dates for certification and external_ids for IMDB
         const response = await fetch(
-            `${TMDB_BASE_URL}/movie/${tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=release_dates,external_ids`
+            `${TMDB_BASE_URL}/movie/${tmdbId}?api_key=${getTmdbApiKey()}&language=pt-BR&append_to_response=release_dates,external_ids`
         );
         if (!response.ok) return null;
         const data = await response.json() as TMDBMovieDetailsResponse;
@@ -250,6 +249,8 @@ export async function fetchMovieDetails(tmdbId: string): Promise<TMDBMovieDetail
 }
 
 export async function fetchSeriesDetails(tmdbId: string): Promise<TMDBSeriesDetails | null> {
+    if (!getTmdbApiKey()) return null; // sem chave configurada — sem metadados TMDB
+
     if (!tmdbId) return null;
 
     // Check cache first
@@ -261,7 +262,7 @@ export async function fetchSeriesDetails(tmdbId: string): Promise<TMDBSeriesDeta
     try {
         // Fetch series details with content ratings and external_ids for IMDB
         const response = await fetch(
-            `${TMDB_BASE_URL}/tv/${tmdbId}?api_key=${TMDB_API_KEY}&language=pt-BR&append_to_response=content_ratings,external_ids`
+            `${TMDB_BASE_URL}/tv/${tmdbId}?api_key=${getTmdbApiKey()}&language=pt-BR&append_to_response=content_ratings,external_ids`
         );
         if (!response.ok) return null;
         const data = await response.json() as TMDBSeriesDetailsResponse;
@@ -290,6 +291,8 @@ export async function fetchSeriesDetails(tmdbId: string): Promise<TMDBSeriesDeta
 }
 
 export async function searchMovieByName(movieName: string, year?: string): Promise<TMDBMovieDetails | null> {
+    if (!getTmdbApiKey()) return null; // sem chave configurada — sem metadados TMDB
+
     const searchKey = normalizeSearchKey(movieName, year);
 
     // Check if we have a cached TMDB ID for this search
@@ -305,8 +308,8 @@ export async function searchMovieByName(movieName: string, year?: string): Promi
         cleanName = cleanName.replace(/\s+/g, ' ').trim();
 
         const searchUrl = year
-            ? `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&language=pt-BR&query=${encodeURIComponent(cleanName)}&year=${year}`
-            : `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&language=pt-BR&query=${encodeURIComponent(cleanName)}`;
+            ? `${TMDB_BASE_URL}/search/movie?api_key=${getTmdbApiKey()}&language=pt-BR&query=${encodeURIComponent(cleanName)}&year=${year}`
+            : `${TMDB_BASE_URL}/search/movie?api_key=${getTmdbApiKey()}&language=pt-BR&query=${encodeURIComponent(cleanName)}`;
 
         const response = await fetch(searchUrl);
         if (!response.ok) return null;
@@ -328,6 +331,8 @@ export async function searchMovieByName(movieName: string, year?: string): Promi
 }
 
 export async function searchSeriesByName(seriesName: string, year?: string): Promise<TMDBSeriesDetails | null> {
+    if (!getTmdbApiKey()) return null; // sem chave configurada — sem metadados TMDB
+
     const searchKey = normalizeSearchKey(seriesName, year);
 
     // Check if we have a cached TMDB ID for this search
@@ -343,8 +348,8 @@ export async function searchSeriesByName(seriesName: string, year?: string): Pro
         cleanName = cleanName.replace(/\s+/g, ' ').trim();
 
         const searchUrl = year
-            ? `${TMDB_BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&language=pt-BR&query=${encodeURIComponent(cleanName)}&first_air_date_year=${year}`
-            : `${TMDB_BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&language=pt-BR&query=${encodeURIComponent(cleanName)}`;
+            ? `${TMDB_BASE_URL}/search/tv?api_key=${getTmdbApiKey()}&language=pt-BR&query=${encodeURIComponent(cleanName)}&first_air_date_year=${year}`
+            : `${TMDB_BASE_URL}/search/tv?api_key=${getTmdbApiKey()}&language=pt-BR&query=${encodeURIComponent(cleanName)}`;
 
         const response = await fetch(searchUrl);
         if (!response.ok) return null;
@@ -372,6 +377,8 @@ export async function searchSeriesByName(seriesName: string, year?: string): Pro
  * @returns YouTube trailer URL or null if not found
  */
 export async function fetchMovieTrailer(movieName: string, year?: string): Promise<string | null> {
+    if (!getTmdbApiKey()) return null; // sem chave configurada — sem metadados TMDB
+
     const cacheKey = normalizeSearchKey(movieName, year);
 
     // Check cache first
@@ -387,8 +394,8 @@ export async function fetchMovieTrailer(movieName: string, year?: string): Promi
 
         // First, search for the movie
         const searchUrl = year
-            ? `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanName)}&year=${year}`
-            : `${TMDB_BASE_URL}/search/movie?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanName)}`;
+            ? `${TMDB_BASE_URL}/search/movie?api_key=${getTmdbApiKey()}&query=${encodeURIComponent(cleanName)}&year=${year}`
+            : `${TMDB_BASE_URL}/search/movie?api_key=${getTmdbApiKey()}&query=${encodeURIComponent(cleanName)}`;
 
         const searchResponse = await fetch(searchUrl);
         if (!searchResponse.ok) {
@@ -406,7 +413,7 @@ export async function fetchMovieTrailer(movieName: string, year?: string): Promi
 
         // Fetch videos for the movie
         const videosResponse = await fetch(
-            `${TMDB_BASE_URL}/movie/${movieId}/videos?api_key=${TMDB_API_KEY}&language=pt-BR`
+            `${TMDB_BASE_URL}/movie/${movieId}/videos?api_key=${getTmdbApiKey()}&language=pt-BR`
         );
 
         let videosData = await videosResponse.json() as TMDBVideosResponse;
@@ -414,7 +421,7 @@ export async function fetchMovieTrailer(movieName: string, year?: string): Promi
         // If no videos in Portuguese, try English
         if (!videosData.results || videosData.results.length === 0) {
             const videosResponseEn = await fetch(
-                `${TMDB_BASE_URL}/movie/${movieId}/videos?api_key=${TMDB_API_KEY}&language=en-US`
+                `${TMDB_BASE_URL}/movie/${movieId}/videos?api_key=${getTmdbApiKey()}&language=en-US`
             );
             videosData = await videosResponseEn.json() as TMDBVideosResponse;
         }
@@ -450,6 +457,8 @@ export async function fetchMovieTrailer(movieName: string, year?: string): Promi
  * @returns YouTube trailer URL or null if not found
  */
 export async function fetchSeriesTrailer(seriesName: string, year?: string): Promise<string | null> {
+    if (!getTmdbApiKey()) return null; // sem chave configurada — sem metadados TMDB
+
     const cacheKey = normalizeSearchKey(seriesName, year);
 
     // Check cache first
@@ -465,8 +474,8 @@ export async function fetchSeriesTrailer(seriesName: string, year?: string): Pro
 
         // First, search for the series
         const searchUrl = year
-            ? `${TMDB_BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanName)}&first_air_date_year=${year}`
-            : `${TMDB_BASE_URL}/search/tv?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(cleanName)}`;
+            ? `${TMDB_BASE_URL}/search/tv?api_key=${getTmdbApiKey()}&query=${encodeURIComponent(cleanName)}&first_air_date_year=${year}`
+            : `${TMDB_BASE_URL}/search/tv?api_key=${getTmdbApiKey()}&query=${encodeURIComponent(cleanName)}`;
 
         const searchResponse = await fetch(searchUrl);
         if (!searchResponse.ok) {
@@ -484,7 +493,7 @@ export async function fetchSeriesTrailer(seriesName: string, year?: string): Pro
 
         // Fetch videos for the series
         const videosResponse = await fetch(
-            `${TMDB_BASE_URL}/tv/${seriesId}/videos?api_key=${TMDB_API_KEY}&language=pt-BR`
+            `${TMDB_BASE_URL}/tv/${seriesId}/videos?api_key=${getTmdbApiKey()}&language=pt-BR`
         );
 
         let videosData = await videosResponse.json() as TMDBVideosResponse;
@@ -492,7 +501,7 @@ export async function fetchSeriesTrailer(seriesName: string, year?: string): Pro
         // If no videos in Portuguese, try English
         if (!videosData.results || videosData.results.length === 0) {
             const videosResponseEn = await fetch(
-                `${TMDB_BASE_URL}/tv/${seriesId}/videos?api_key=${TMDB_API_KEY}&language=en-US`
+                `${TMDB_BASE_URL}/tv/${seriesId}/videos?api_key=${getTmdbApiKey()}&language=en-US`
             );
             videosData = await videosResponseEn.json() as TMDBVideosResponse;
         }
@@ -533,6 +542,8 @@ export async function fetchEpisodeDetails(
     seasonNumber: number,
     episodeNumber: number
 ): Promise<TMDBEpisodeDetails | null> {
+    if (!getTmdbApiKey()) return null; // sem chave configurada — sem metadados TMDB
+
     if (!tmdbSeriesId) return null;
 
     const cacheKey = `${tmdbSeriesId}:s${seasonNumber}:e${episodeNumber}`;
@@ -545,7 +556,7 @@ export async function fetchEpisodeDetails(
 
     try {
         const response = await fetch(
-            `${TMDB_BASE_URL}/tv/${tmdbSeriesId}/season/${seasonNumber}/episode/${episodeNumber}?api_key=${TMDB_API_KEY}&language=pt-BR`
+            `${TMDB_BASE_URL}/tv/${tmdbSeriesId}/season/${seasonNumber}/episode/${episodeNumber}?api_key=${getTmdbApiKey()}&language=pt-BR`
         );
         if (!response.ok) return null;
         const data = await response.json() as TMDBEpisodeDetails;

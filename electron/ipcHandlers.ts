@@ -1,4 +1,4 @@
-import { ipcMain, BrowserWindow, dialog, screen } from 'electron'
+import { ipcMain, BrowserWindow, dialog, screen, shell } from 'electron'
 import axios from 'axios'
 import { XtreamClient } from './xtreamClient'
 import store from './store'
@@ -171,6 +171,15 @@ export function setupIpcHandlers() {
     migratePlaylistsOnStartup()
 
     ipcMain.handle('ping', () => 'pong')
+
+    // Open a URL in the OS browser (never inside the app). Restricted to
+    // https so renderer bugs can't shell out to arbitrary protocols.
+    ipcMain.handle('shell:open-external', (_e, { url }: { url?: string }) => {
+        const target = String(url ?? '')
+        if (!/^https:\/\//.test(target)) return { success: false, error: 'URL inválida' }
+        void shell.openExternal(target)
+        return { success: true }
+    })
 
     // Renderer errors land in main.log so packaged-app bug reports include
     // the UI side, not just the main process.

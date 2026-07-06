@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { watchProgressService, type SeriesProgress } from '../services/watchProgressService';
+import { consumeTmdbOnboardingPending, hasTmdbApiKey } from '../services/tmdbKey';
 import { movieProgressService } from '../services/movieProgressService';
 import { ContentDetailModal } from '../components/ContentDetailModal';
 import { NextEpisodes } from '../components/NextEpisodes';
@@ -69,6 +71,16 @@ const dataCache = {
 const isCacheValid = () => Date.now() - dataCache.timestamp < dataCache.TTL;
 
 export function Home() {
+    const navigate = useNavigate();
+
+    // Playlist just added and no TMDB key yet → walk the user (once) through
+    // Configurações → APIs, which explains why and how to create a free key.
+    useEffect(() => {
+        if (consumeTmdbOnboardingPending() && !hasTmdbApiKey()) {
+            navigate('/dashboard/settings?section=apis&onboarding=1');
+        }
+    }, [navigate]);
+
     const [counts, setCounts] = useState<ContentCounts>({ live: 0, vod: 0, series: 0 });
     const [loading, setLoading] = useState(true);
     const [currentTime, setCurrentTime] = useState(new Date());

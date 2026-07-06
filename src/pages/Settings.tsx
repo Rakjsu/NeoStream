@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../services/languageService';
 import epgTestService from '../services/epgTestService';
 import { UpdatesSection } from './settings/UpdatesSection';
@@ -13,10 +14,15 @@ import { BackupSection } from './settings/BackupSection';
 import { AboutSection } from './settings/AboutSection';
 import { PlaylistsSection } from './settings/PlaylistsSection';
 import { DiagnosticsSection } from './settings/DiagnosticsSection';
+import { ApiKeysSection } from './settings/ApiKeysSection';
 
 
 export function Settings() {
-    const [activeSection, setActiveSection] = useState<string>('updates');
+    // Deep-link: /dashboard/settings?section=apis (used by the post-playlist
+    // TMDB onboarding redirect); onboarding=1 highlights the explainer banner.
+    const [searchParams] = useSearchParams();
+    const [activeSection, setActiveSection] = useState<string>(() => searchParams.get('section') || 'updates');
+    const apiOnboarding = searchParams.get('onboarding') === '1';
 
     // Language
     const { t } = useLanguage();
@@ -38,6 +44,7 @@ export function Settings() {
     const sections = [
         { id: 'updates', icon: '🔄', label: t('nav', 'updates'), color: '#10b981' },
         { id: 'playlists', icon: '📺', label: t('playlists', 'title'), color: '#6366f1' },
+        { id: 'apis', icon: '🔑', label: t('apiKeys', 'navLabel'), color: '#eab308' },
         { id: 'playback', icon: '⏯️', label: t('nav', 'playback') || 'Reprodução', color: '#3b82f6' },
         { id: 'appearance', icon: '🎨', label: t('nav', 'appearance') || 'Aparência', color: 'var(--ns-accent)' },
         { id: 'network', icon: '🔐', label: 'Rede', color: '#14b8a6' },
@@ -93,6 +100,9 @@ export function Settings() {
 
                         {/* Playlists Section */}
                         {activeSection === 'playlists' && <PlaylistsSection />}
+
+                        {/* API keys Section (user's own TMDB key) */}
+                        {activeSection === 'apis' && <ApiKeysSection onboarding={apiOnboarding} />}
 
                         {/* Playback Section */}
                         {activeSection === 'playback' && <PlaybackSection />}
