@@ -6,6 +6,7 @@ import {
     isSameMovie,
     findMovieVersions,
     isCurrentVersion,
+    type MovieLike,
 } from './movieVersionService';
 
 describe('getVersionInfo / getVersionLabel', () => {
@@ -91,7 +92,7 @@ describe('findMovieVersions', () => {
     });
 
     it('filme sem nome ou catálogo vazio → []', () => {
-        expect(findMovieVersions({ stream_id: 1 }, catalog)).toEqual([]);
+        expect(findMovieVersions<MovieLike>({ stream_id: 1 }, catalog)).toEqual([]);
         expect(findMovieVersions(catalog[0], [])).toEqual([]);
     });
 });
