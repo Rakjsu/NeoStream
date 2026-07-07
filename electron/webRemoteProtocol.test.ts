@@ -129,6 +129,12 @@ describe('parseRemoteCommand', () => {
         expect(parseRemoteCommand('{"action":"recordChannel","channelId":"77"}'))
             .toEqual({ action: 'recordChannel', channelId: '77', channelName: undefined })
         expect(parseRemoteCommand('{"action":"recordChannel"}')).toBeNull()
+        // Fase 2 do DVR: parar por id e agendar o próximo programa do canal.
+        expect(parseRemoteCommand('{"action":"stopRecord","id":"rec_3"}')).toEqual({ action: 'stopRecord', id: 'rec_3' })
+        expect(parseRemoteCommand('{"action":"stopRecord"}')).toBeNull()
+        expect(parseRemoteCommand('{"action":"scheduleNext","channelId":"77"}')).toEqual({ action: 'scheduleNext', channelId: '77' })
+        expect(parseRemoteCommand('{"action":"scheduleNext"}')).toBeNull()
+        expect(parseRemoteCommand('{"action":"requestRecordings"}')).toEqual({ action: 'requestRecordings' })
         // Volume absoluto: nível numérico com clamp; sem nível é inválido.
         expect(parseRemoteCommand('{"action":"setVolume","level":0.35}')).toEqual({ action: 'setVolume', level: 0.35 })
         expect(parseRemoteCommand('{"action":"setVolume","level":5}')).toEqual({ action: 'setVolume', level: 1 })

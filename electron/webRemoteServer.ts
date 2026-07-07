@@ -246,7 +246,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 }
 
 // Actions that always go to the renderer (never routed to the cast session).
-const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'requestCatalog', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'scheduleNext', 'requestRecordings', 'requestCatalog', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
@@ -279,6 +279,10 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         win.webContents.send('media:control', 'requestEpg', command.channelId)
     } else if (command.action === 'recordChannel') {
         win.webContents.send('media:control', 'recordChannel', command.channelId, command.channelName)
+    } else if (command.action === 'stopRecord') {
+        win.webContents.send('media:control', 'stopRecord', command.id)
+    } else if (command.action === 'scheduleNext') {
+        win.webContents.send('media:control', 'scheduleNext', command.channelId)
     } else if (command.action === 'castMovie') {
         win.webContents.send('media:control', 'castMovie', command.movieId, command.target)
     } else if (command.action === 'castMovieQueue') {
@@ -293,6 +297,8 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         win.webContents.send('media:control', 'requestSeries', command.query)
     } else if (command.action === 'requestContinue') {
         win.webContents.send('media:control', 'requestContinue')
+    } else if (command.action === 'requestRecordings') {
+        win.webContents.send('media:control', 'requestRecordings')
     } else if (command.action === 'requestRecommended') {
         win.webContents.send('media:control', 'requestRecommended')
     } else if (command.action === 'requestDevices') {
@@ -478,9 +484,32 @@ export function setupWebRemote(): void {
     // Result of a recording started from the phone's guide (REC button).
     ipcMain.on('web-remote:record-result', (_e, raw: unknown) => {
         const obj = (raw ?? {}) as Record<string, unknown>
-        const status = obj.status === 'ok' ? 'ok' : 'error'
+        const status = obj.status === 'ok' || obj.status === 'stopped' ? obj.status : 'error'
         const name = typeof obj.name === 'string' ? obj.name.slice(0, 160) : ''
-        broadcast(JSON.stringify({ type: 'recordResult', status, name }))
+        const id = typeof obj.id === 'string' ? obj.id.slice(0, 60) : ''
+        broadcast(JSON.stringify({ type: 'recordResult', status, name, id }))
+    })
+
+    // Active DVR recordings (id + channel) so the guide can mark 🔴 rows.
+    ipcMain.on('web-remote:recordings', (_e, raw: unknown) => {
+        const obj = (raw ?? {}) as Record<string, unknown>
+        const rawItems = Array.isArray(obj.items) ? obj.items : []
+        const items = rawItems.slice(0, 20).map((c) => {
+            const it = (c ?? {}) as Record<string, unknown>
+            return {
+                id: String(it.id ?? '').slice(0, 60),
+                channelName: typeof it.channelName === 'string' ? it.channelName.slice(0, 160) : '',
+            }
+        }).filter((c) => c.id && c.channelName)
+        broadcast(JSON.stringify({ type: 'recordings', items }))
+    })
+
+    // Result of scheduling the channel's NEXT program from the phone.
+    ipcMain.on('web-remote:schedule-result', (_e, raw: unknown) => {
+        const obj = (raw ?? {}) as Record<string, unknown>
+        const status = obj.status === 'ok' ? 'ok' : 'error'
+        const title = typeof obj.title === 'string' ? obj.title.slice(0, 200) : ''
+        broadcast(JSON.stringify({ type: 'scheduleResult', status, title }))
     })
 
     // Cast targets (Chromecast + DLNA + AirPlay) discovered by the bridge.
