@@ -58,3 +58,38 @@ export function muteTarget(current: number, preMute: number): { level: number; p
     if (current > 0) return { level: 0, preMute: current }
     return { level: clampVolume(preMute > 0 ? preMute : 30), preMute }
 }
+
+// ------------------------------------------------ DLNA status → phone state --
+
+export interface DlnaStatusRaw {
+    /** UPnP CurrentTransportState (PLAYING/PAUSED_PLAYBACK/TRANSITIONING/…). */
+    state: string
+    position: number
+    duration: number
+    /** 0..100, or null when the renderer refuses GetVolume. */
+    volume: number | null
+    title: string
+}
+
+/**
+ * Map a DLNA status snapshot onto the SAME field shape the phone already
+ * renders for Chromecast (castTime/castDuration/castVolume 0..1/…), so the
+ * page needs no changes to show DLNA progress.
+ */
+export function dlnaStateFields(status: DlnaStatusRaw): {
+    casting: true
+    castPlaying: boolean
+    castTime: number
+    castDuration: number
+    castTitle: string
+    castVolume: number | null
+} {
+    return {
+        casting: true,
+        castPlaying: status.state === 'PLAYING' || status.state === 'TRANSITIONING',
+        castTime: Math.max(0, status.position || 0),
+        castDuration: Math.max(0, status.duration || 0),
+        castTitle: status.title,
+        castVolume: status.volume === null ? null : clampVolume(status.volume) / 100,
+    }
+}

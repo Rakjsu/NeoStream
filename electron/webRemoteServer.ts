@@ -33,7 +33,8 @@ import {
 import { renderRemotePage } from './webRemotePage'
 import { REMOTE_ICON_SVG, buildManifest, solidPng } from './webRemoteAssets'
 import { isCastSessionActive, castRemoteControl, getCastStatus } from './castHandlers'
-import { dlnaRemoteControl } from './dlnaHandlers'
+import { dlnaRemoteControl, isDlnaSessionActive, getDlnaStatusSnapshot } from './dlnaHandlers'
+import { dlnaStateFields } from './dlnaRemoteRouting'
 
 interface WebRemoteConfig {
     enabled: boolean
@@ -103,10 +104,23 @@ export function getLanAddress(): string {
     return pickLanAddress(os.networkInterfaces() as Record<string, NetAddress[] | undefined>)
 }
 
+// Latest DLNA session snapshot, refreshed by the 2s poll below (SOAP is too
+// slow to fetch inline in stateMessage). Null when no DLNA session.
+let dlnaState: ReturnType<typeof dlnaStateFields> | null = null
+
 function stateMessage(): string {
     // `casting` lets the phone show it's driving the Chromecast, not the app;
     // castTime/castDuration drive the cast progress bar on the Controle tab.
     const cs = getCastStatus()
+    if (!cs.active && dlnaState) {
+        // DLNA session: same field shape as Chromecast so the page just works.
+        // No subtitle toggle / audio picker — DLNA doesn't expose tracks.
+        return JSON.stringify({
+            type: 'state', ...mediaState, ...dlnaState,
+            castSubAvailable: false, castSubEnabled: true,
+            castAudioTracks: [], castAudioActive: null,
+        })
+    }
     return JSON.stringify({
         type: 'state', ...mediaState, casting: cs.active,
         castTime: cs.currentTime, castDuration: cs.duration,
@@ -295,8 +309,26 @@ export function setupWebRemote(): void {
 
     // While casting, push fresh cast position to the phone every 2s so the
     // Controle tab's progress bar advances (cheap: only when clients + casting).
+    // Chromecast state is in-memory; DLNA needs SOAP round-trips, so its
+    // snapshot is fetched async and cached for stateMessage.
     setInterval(() => {
-        if (clients.size > 0 && isCastSessionActive()) broadcastState()
+        if (clients.size === 0) return
+        if (isCastSessionActive()) {
+            dlnaState = null
+            broadcastState()
+            return
+        }
+        if (isDlnaSessionActive()) {
+            void getDlnaStatusSnapshot().then((status) => {
+                dlnaState = status ? dlnaStateFields(status) : null
+                broadcastState()
+            })
+            return
+        }
+        if (dlnaState) {
+            dlnaState = null // DLNA session ended: clear the phone's cast UI
+            broadcastState()
+        }
     }, 2000)
 
     // Mirror the renderer's player state (the tray listens too; multiple

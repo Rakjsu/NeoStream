@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { planDlnaCommand, clampVolume, stepVolume, muteTarget } from './dlnaRemoteRouting'
+import { planDlnaCommand, clampVolume, stepVolume, muteTarget, dlnaStateFields } from './dlnaRemoteRouting'
 
 describe('planDlnaCommand (controle web → sessão DLNA)', () => {
     it('mapeia as ações de transporte', () => {
@@ -27,6 +27,18 @@ describe('planDlnaCommand (controle web → sessão DLNA)', () => {
         for (const action of ['next', 'previous', 'subtitle', 'setAudioTrack', 'fazAlgo']) {
             expect(planDlnaCommand(action, undefined)).toBeNull()
         }
+    })
+})
+
+describe('dlnaStateFields (status DLNA → estado do celular)', () => {
+    it('mapeia pro mesmo formato do Chromecast (volume 0..1)', () => {
+        expect(dlnaStateFields({ state: 'PLAYING', position: 90, duration: 3600, volume: 40, title: 'Filme' })).toEqual({
+            casting: true, castPlaying: true, castTime: 90, castDuration: 3600, castTitle: 'Filme', castVolume: 0.4,
+        })
+        expect(dlnaStateFields({ state: 'PAUSED_PLAYBACK', position: 90, duration: 3600, volume: null, title: 'Filme' }))
+            .toMatchObject({ castPlaying: false, castVolume: null })
+        expect(dlnaStateFields({ state: 'TRANSITIONING', position: 0, duration: 0, volume: 150, title: '' }))
+            .toMatchObject({ castPlaying: true, castVolume: 1 })
     })
 })
 
