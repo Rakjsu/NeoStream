@@ -32,12 +32,12 @@ describe('planDlnaCommand (controle web → sessão DLNA)', () => {
 
 describe('dlnaStateFields (status DLNA → estado do celular)', () => {
     it('mapeia pro mesmo formato do Chromecast (volume 0..1)', () => {
-        expect(dlnaStateFields({ state: 'PLAYING', position: 90, duration: 3600, volume: 40, title: 'Filme' })).toEqual({
-            casting: true, castPlaying: true, castTime: 90, castDuration: 3600, castTitle: 'Filme', castVolume: 0.4,
+        expect(dlnaStateFields({ state: 'PLAYING', position: 90, duration: 3600, volume: 40, title: 'Filme', deviceName: 'Sala Samsung' })).toEqual({
+            casting: true, castPlaying: true, castTime: 90, castDuration: 3600, castTitle: 'Filme', castVolume: 0.4, castDevice: 'Sala Samsung',
         })
-        expect(dlnaStateFields({ state: 'PAUSED_PLAYBACK', position: 90, duration: 3600, volume: null, title: 'Filme' }))
+        expect(dlnaStateFields({ state: 'PAUSED_PLAYBACK', position: 90, duration: 3600, volume: null, title: 'Filme', deviceName: '' }))
             .toMatchObject({ castPlaying: false, castVolume: null })
-        expect(dlnaStateFields({ state: 'TRANSITIONING', position: 0, duration: 0, volume: 150, title: '' }))
+        expect(dlnaStateFields({ state: 'TRANSITIONING', position: 0, duration: 0, volume: 150, title: '', deviceName: '' }))
             .toMatchObject({ castPlaying: true, castVolume: 1 })
     })
 })

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { planAirplayCommand, parseScrub } from './airplayRemoteRouting'
+import { planAirplayCommand, parseScrub, airplayStateFields } from './airplayRemoteRouting'
 
 describe('planAirplayCommand (controle web → sessão AirPlay)', () => {
     it('togglePlay vira rate 0/1 conforme o estado rastreado', () => {
@@ -29,5 +29,16 @@ describe('parseScrub (GET /scrub)', () => {
     it('corpo estranho vira zeros (nunca NaN)', () => {
         expect(parseScrub('')).toEqual({ duration: 0, position: 0 })
         expect(parseScrub('duration: abc')).toEqual({ duration: 0, position: 0 })
+    })
+})
+
+describe('airplayStateFields (status AirPlay → estado do celular)', () => {
+    it('mapeia pro formato comum (sem volume — protocolo não expõe)', () => {
+        expect(airplayStateFields({ position: 12.5, duration: 3600, playing: true, title: 'Filme', deviceName: 'Apple TV Sala' })).toEqual({
+            casting: true, castPlaying: true, castTime: 12.5, castDuration: 3600,
+            castTitle: 'Filme', castVolume: null, castDevice: 'Apple TV Sala',
+        })
+        expect(airplayStateFields({ position: -1, duration: 0, playing: false, title: '', deviceName: '' }))
+            .toMatchObject({ castPlaying: false, castTime: 0, castDuration: 0 })
     })
 })

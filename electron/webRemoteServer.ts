@@ -35,7 +35,8 @@ import { REMOTE_ICON_SVG, buildManifest, solidPng } from './webRemoteAssets'
 import { isCastSessionActive, castRemoteControl, getCastStatus } from './castHandlers'
 import { dlnaRemoteControl, isDlnaSessionActive, getDlnaStatusSnapshot } from './dlnaHandlers'
 import { dlnaStateFields } from './dlnaRemoteRouting'
-import { airplayRemoteControl } from './airplayHandlers'
+import { airplayRemoteControl, isAirplaySessionActive, getAirplayStatusSnapshot } from './airplayHandlers'
+import { airplayStateFields } from './airplayRemoteRouting'
 
 interface WebRemoteConfig {
     enabled: boolean
@@ -108,16 +109,18 @@ export function getLanAddress(): string {
 // Latest DLNA session snapshot, refreshed by the 2s poll below (SOAP is too
 // slow to fetch inline in stateMessage). Null when no DLNA session.
 let dlnaState: ReturnType<typeof dlnaStateFields> | null = null
+// Same idea for AirPlay (GET /scrub round-trip). Null when no session.
+let airplayState: ReturnType<typeof airplayStateFields> | null = null
 
 function stateMessage(): string {
     // `casting` lets the phone show it's driving the Chromecast, not the app;
     // castTime/castDuration drive the cast progress bar on the Controle tab.
     const cs = getCastStatus()
-    if (!cs.active && dlnaState) {
-        // DLNA session: same field shape as Chromecast so the page just works.
-        // No subtitle toggle / audio picker — DLNA doesn't expose tracks.
+    if (!cs.active && (dlnaState || airplayState)) {
+        // DLNA/AirPlay session: same field shape as Chromecast so the page
+        // just works. No subtitle toggle / audio picker — not exposed there.
         return JSON.stringify({
-            type: 'state', ...mediaState, ...dlnaState,
+            type: 'state', ...mediaState, ...(dlnaState ?? airplayState),
             castSubAvailable: false, castSubEnabled: true,
             castAudioTracks: [], castAudioActive: null,
         })
@@ -135,6 +138,8 @@ function stateMessage(): string {
         castVolume: cs.volume,
         castAudioTracks: cs.audioTracks,
         castAudioActive: cs.activeAudioTrackId,
+        // Which TV is receiving the cast ("Transmitindo em <nome>").
+        castDevice: cs.deviceName,
     })
 }
 
@@ -325,12 +330,22 @@ export function setupWebRemote(): void {
         if (isDlnaSessionActive()) {
             void getDlnaStatusSnapshot().then((status) => {
                 dlnaState = status ? dlnaStateFields(status) : null
+                airplayState = null
                 broadcastState()
             })
             return
         }
-        if (dlnaState) {
-            dlnaState = null // DLNA session ended: clear the phone's cast UI
+        if (isAirplaySessionActive()) {
+            void getAirplayStatusSnapshot().then((status) => {
+                airplayState = status ? airplayStateFields(status) : null
+                dlnaState = null
+                broadcastState()
+            })
+            return
+        }
+        if (dlnaState || airplayState) {
+            dlnaState = null // session ended: clear the phone's cast UI
+            airplayState = null
             broadcastState()
         }
     }, 2000)

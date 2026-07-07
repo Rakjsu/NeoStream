@@ -69,6 +69,7 @@ export interface DlnaStatusRaw {
     /** 0..100, or null when the renderer refuses GetVolume. */
     volume: number | null
     title: string
+    deviceName: string
 }
 
 /**
@@ -83,6 +84,7 @@ export function dlnaStateFields(status: DlnaStatusRaw): {
     castDuration: number
     castTitle: string
     castVolume: number | null
+    castDevice: string
 } {
     return {
         casting: true,
@@ -91,5 +93,6 @@ export function dlnaStateFields(status: DlnaStatusRaw): {
         castDuration: Math.max(0, status.duration || 0),
         castTitle: status.title,
         castVolume: status.volume === null ? null : clampVolume(status.volume) / 100,
+        castDevice: status.deviceName,
     }
 }

@@ -13,7 +13,7 @@ import http from 'http';
 import { Bonjour, type Browser, type Service } from 'bonjour-service';
 
 import log from './logger'
-import { planAirplayCommand, parseScrub } from './airplayRemoteRouting';
+import { planAirplayCommand, parseScrub, type AirplayStatusRaw } from './airplayRemoteRouting';
 import { isLoopbackUrl, createLanProxyUrlFor } from './dlnaHandlers'
 
 interface AirPlayDevice {
@@ -210,6 +210,27 @@ let airplaySession: { device: AirPlayDevice; title: string; playing: boolean } |
 
 export function isAirplaySessionActive(): boolean {
     return airplaySession !== null;
+}
+
+/**
+ * Snapshot for the phone remote's state broadcast — position/duration come
+ * from GET /scrub; null when no session or the device stopped answering.
+ */
+export async function getAirplayStatusSnapshot(): Promise<AirplayStatusRaw | null> {
+    const session = airplaySession;
+    if (!session) return null;
+    try {
+        const scrub = parseScrub(await airplayGet(session.device, '/scrub'));
+        return {
+            position: scrub.position,
+            duration: scrub.duration,
+            playing: session.playing,
+            title: session.title,
+            deviceName: session.device.name || '',
+        };
+    } catch {
+        return null;
+    }
 }
 
 /** GET on the AirPlay control port, returning the response body. */
