@@ -38,6 +38,7 @@ const STRINGS: Record<RemoteLang, Record<string, string>> = {
         nextUp: 'A seguir: ', noInfo: 'Sem informa\u00e7\u00e3o', noChannelFound: 'Nenhum canal encontrado.', programming: 'Programa\u00e7\u00e3o',
         recTitle: 'Gravar no computador', recStarted: 'Gravando', recFail: 'Falha ao iniciar a gravação',
         recStop: 'Parar gravação', recStopped: 'Gravação encerrada', schedNext: 'Gravar o próximo', schedOk: 'Agendado: ', schedFail: 'Não deu pra agendar (sem programação?)',
+        recCardTitle: 'Gravações', recReady: 'Prontas no computador',
     },
     en: {
         htmlLang: 'en', brandSuffix: 'Remote',
@@ -63,6 +64,7 @@ const STRINGS: Record<RemoteLang, Record<string, string>> = {
         nextUp: 'Up next: ', noInfo: 'No information', noChannelFound: 'No channel found.', programming: 'Schedule',
         recTitle: 'Record on the computer', recStarted: 'Recording', recFail: 'Failed to start the recording',
         recStop: 'Stop recording', recStopped: 'Recording finished', schedNext: 'Record the next one', schedOk: 'Scheduled: ', schedFail: 'Could not schedule (no guide data?)',
+        recCardTitle: 'Recordings', recReady: 'Ready on the computer',
     },
     es: {
         htmlLang: 'es', brandSuffix: 'Control',
@@ -88,6 +90,7 @@ const STRINGS: Record<RemoteLang, Record<string, string>> = {
         nextUp: 'A continuaci\u00f3n: ', noInfo: 'Sin informaci\u00f3n', noChannelFound: 'No se encontr\u00f3 ning\u00fan canal.', programming: 'Programaci\u00f3n',
         recTitle: 'Grabar en la computadora', recStarted: 'Grabando', recFail: 'Error al iniciar la grabación',
         recStop: 'Detener grabación', recStopped: 'Grabación finalizada', schedNext: 'Grabar el próximo', schedOk: 'Programado: ', schedFail: 'No se pudo programar (¿sin guía?)',
+        recCardTitle: 'Grabaciones', recReady: 'Listas en la computadora',
     },
 }
 
@@ -275,6 +278,12 @@ export function renderRemotePage(lang?: string): string {
         </div>
       </div>
       <div class="hint" style="margin-top:16px">${t.hint}</div>
+      <div class="card hidden" id="reccard" style="margin-top:14px;text-align:left">
+        <div class="title">📼 ${t.recCardTitle}</div>
+        <div class="chlist" id="reclive"></div>
+        <div class="rechead hidden" id="recreadyhead">${t.recReady}</div>
+        <div class="chlist" id="recfiles"></div>
+      </div>
     </div>
 
     <div id="guide" class="hidden">
@@ -340,6 +349,11 @@ export function renderRemotePage(lang?: string): string {
     var filter = '';
     var epgCache = {};   // channelId → { now, nowStart, nowEnd, next }
     var activeRecs = {}; // channelName → recording id (guia marca 🔴)
+    var recsData = { items: [], files: [] }; // card 📼 da aba Controle
+    var reccardEl = document.getElementById('reccard');
+    var recliveEl = document.getElementById('reclive');
+    var recfilesEl = document.getElementById('recfiles');
+    var recreadyheadEl = document.getElementById('recreadyhead');
     var openEpg = {};    // channelId → true while its EPG panel is expanded
     var movies = [];     // catalog: [{ id, name, cover }]
     var mvFilter = '';
@@ -456,15 +470,19 @@ export function renderRemotePage(lang?: string): string {
               if (msg.name && msg.id) activeRecs[msg.name] = msg.id;
               showToast('⏺ ' + L.recStarted + (msg.name ? ': ' + msg.name : ''), 'ok');
               renderGuide();
+              sendCmd('requestRecordings');
             } else if (msg.status === 'stopped') {
               for (var rn in activeRecs) { if (activeRecs[rn] === msg.id) delete activeRecs[rn]; }
               showToast('⏹ ' + L.recStopped, 'ok');
               renderGuide();
+              sendCmd('requestRecordings');
             } else showToast(L.recFail, 'err');
           } else if (msg.type === 'recordings') {
             activeRecs = {};
             for (var ri = 0; ri < (msg.items || []).length; ri++) activeRecs[msg.items[ri].channelName] = msg.items[ri].id;
+            recsData = { items: msg.items || [], files: msg.files || [] };
             renderGuide();
+            renderRecCard();
           } else if (msg.type === 'scheduleResult') {
             if (msg.status === 'ok') showToast('📅 ' + L.schedOk + msg.title, 'ok');
             else showToast(L.schedFail, 'err');
@@ -823,6 +841,35 @@ export function renderRemotePage(lang?: string): string {
     });
 
     // -------------------------------------------- Recomendados ("porque você assistiu") --
+    function renderRecCard() {
+      var hasAny = recsData.items.length || recsData.files.length;
+      if (!hasAny) { reccardEl.classList.add('hidden'); return; }
+      reccardEl.classList.remove('hidden');
+      var html = '';
+      for (var i = 0; i < recsData.items.length; i++) {
+        var r = recsData.items[i];
+        html += '<div class="chitem"><div class="ph">🔴</div>'
+          + '<div class="nm">' + esc(r.channelName) + ' · ' + fmtTime(r.seconds || 0) + '</div>'
+          + '<button class="chinfo" data-recstop="' + esc(r.id) + '" title="' + L.recStop + '">⏹</button></div>';
+      }
+      recliveEl.innerHTML = html;
+      var fhtml = '';
+      for (var fi = 0; fi < recsData.files.length; fi++) {
+        var f = recsData.files[fi];
+        fhtml += '<div class="chitem"><div class="ph">📼</div>'
+          + '<div class="nm">' + esc(f.name) + '</div>'
+          + '<span style="flex:none;font-size:12px;color:rgba(255,255,255,.5)">' + (f.sizeMb || 0) + ' MB</span></div>';
+      }
+      recfilesEl.innerHTML = fhtml;
+      recreadyheadEl.classList.toggle('hidden', !recsData.files.length);
+    }
+
+    recliveEl.addEventListener('click', function (ev) {
+      if (!ev.target.closest) return;
+      var stop = ev.target.closest('[data-recstop]');
+      if (stop) sendCmd('stopRecord', null, stop.getAttribute('data-recstop'));
+    });
+
     function renderRecommended() {
       var html = '';
       for (var g = 0; g < recGroups.length; g++) {
@@ -998,7 +1045,7 @@ export function renderRemotePage(lang?: string): string {
         renderContinue();
         renderRecommended();
       }
-      else { controlEl.classList.remove('hidden'); }
+      else { controlEl.classList.remove('hidden'); sendCmd('requestRecordings'); }
     }
 
     // Tab switching (remembers the choice so a reconnect lands on the same tab).

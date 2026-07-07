@@ -360,12 +360,17 @@ export function WebRemoteBridge() {
             });
         };
 
-        // Active recordings so the guide marks 🔴 rows when the tab opens.
+        // Active recordings (guide 🔴 rows + the Controle tab's Gravações card)
+        // and the latest finished files, so the phone sees the whole DVR.
         const pushRecordings = async () => {
             const res = await window.ipcRenderer.invoke('dvr:active').catch(() => null) as
-                { success: boolean; recordings?: { id: string; channelName: string }[] } | null;
+                { success: boolean; recordings?: { id: string; channelName: string; seconds: number }[] } | null;
+            const filesRes = await window.ipcRenderer.invoke('dvr:list-files').catch(() => null) as
+                { success: boolean; files?: { name: string; sizeBytes: number; recording: boolean }[] } | null;
             window.ipcRenderer.send('web-remote:recordings', {
-                items: (res?.recordings ?? []).map(r => ({ id: r.id, channelName: r.channelName })),
+                items: (res?.recordings ?? []).map(r => ({ id: r.id, channelName: r.channelName, seconds: r.seconds })),
+                files: (filesRes?.files ?? []).filter(f => !f.recording).slice(0, 10)
+                    .map(f => ({ name: f.name, sizeMb: Math.round(f.sizeBytes / 1048576) })),
             });
         };
 

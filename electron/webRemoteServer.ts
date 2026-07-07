@@ -490,7 +490,8 @@ export function setupWebRemote(): void {
         broadcast(JSON.stringify({ type: 'recordResult', status, name, id }))
     })
 
-    // Active DVR recordings (id + channel) so the guide can mark 🔴 rows.
+    // DVR snapshot for the phone: active recordings (guide 🔴 + Controle card,
+    // with elapsed seconds) and the latest finished files.
     ipcMain.on('web-remote:recordings', (_e, raw: unknown) => {
         const obj = (raw ?? {}) as Record<string, unknown>
         const rawItems = Array.isArray(obj.items) ? obj.items : []
@@ -499,9 +500,18 @@ export function setupWebRemote(): void {
             return {
                 id: String(it.id ?? '').slice(0, 60),
                 channelName: typeof it.channelName === 'string' ? it.channelName.slice(0, 160) : '',
+                seconds: typeof it.seconds === 'number' && Number.isFinite(it.seconds) ? Math.max(0, Math.floor(it.seconds)) : 0,
             }
         }).filter((c) => c.id && c.channelName)
-        broadcast(JSON.stringify({ type: 'recordings', items }))
+        const rawFiles = Array.isArray(obj.files) ? obj.files : []
+        const files = rawFiles.slice(0, 10).map((c) => {
+            const it = (c ?? {}) as Record<string, unknown>
+            return {
+                name: typeof it.name === 'string' ? it.name.slice(0, 200) : '',
+                sizeMb: typeof it.sizeMb === 'number' && Number.isFinite(it.sizeMb) ? Math.max(0, Math.round(it.sizeMb)) : 0,
+            }
+        }).filter((c) => c.name)
+        broadcast(JSON.stringify({ type: 'recordings', items, files }))
     })
 
     // Result of scheduling the channel's NEXT program from the phone.
