@@ -344,8 +344,29 @@ export function WebRemoteBridge() {
                 return;
             }
             const rec = await window.ipcRenderer.invoke('dvr:start', { url: urlRes.url, channelName: name })
+                .catch(() => null) as { success: boolean; id?: string } | null;
+            // The id lets the phone toggle this row to ⏹ (stopRecord).
+            window.ipcRenderer.send('web-remote:record-result', {
+                status: rec?.success ? 'ok' : 'error', name, id: rec?.id ?? '',
+            });
+        };
+
+        // Second tap on a 🔴 row: finalize that DVR recording.
+        const stopRecord = async (id: string) => {
+            const res = await window.ipcRenderer.invoke('dvr:stop', { id })
                 .catch(() => null) as { success: boolean } | null;
-            window.ipcRenderer.send('web-remote:record-result', { status: rec?.success ? 'ok' : 'error', name });
+            window.ipcRenderer.send('web-remote:record-result', {
+                status: res?.success ? 'stopped' : 'error', name: '', id,
+            });
+        };
+
+        // Active recordings so the guide marks 🔴 rows when the tab opens.
+        const pushRecordings = async () => {
+            const res = await window.ipcRenderer.invoke('dvr:active').catch(() => null) as
+                { success: boolean; recordings?: { id: string; channelName: string }[] } | null;
+            window.ipcRenderer.send('web-remote:recordings', {
+                items: (res?.recordings ?? []).map(r => ({ id: r.id, channelName: r.channelName })),
+            });
         };
 
         const asTarget = (v: unknown): CastTarget | undefined => {
@@ -359,6 +380,8 @@ export function WebRemoteBridge() {
             else if (action === 'requestRecommended') void pushRecommended();
             else if (action === 'requestDevices') void pushDevices();
             else if (action === 'recordChannel') void recordChannel(String(arg ?? ''), typeof target === 'string' ? target : '');
+            else if (action === 'stopRecord') void stopRecord(String(arg ?? ''));
+            else if (action === 'requestRecordings') void pushRecordings();
             else if (action === 'castMovie') void castMovie(String(arg ?? ''), asTarget(target));
             else if (action === 'castMovieQueue') void castMovieQueue(Array.isArray(arg) ? (arg as string[]) : [], asTarget(target));
             else if (action === 'requestSeries') void pushSeries(typeof arg === 'string' ? arg : '');

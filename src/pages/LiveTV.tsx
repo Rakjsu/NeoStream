@@ -7,6 +7,7 @@ import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { LazyImage } from '../components/LazyImage';
 import { useWindowedGrid } from '../hooks/useWindowedGrid';
 import { epgService } from '../services/epgService';
+import { scheduledRecordingService } from '../services/scheduledRecordingService';
 import { profileService } from '../services/profileService';
 import { favoritesService } from '../services/favoritesService';
 import { parentalService } from '../services/parentalService';
@@ -265,6 +266,36 @@ export function LiveTV() {
                     setSelectedChannel(null);
                     setPlayingChannel(channel);
                 }
+                return;
+            }
+            if (action === 'scheduleNext') {
+                // Phone asked to record this channel's NEXT program: resolve it
+                // from the EPG and hand it to the scheduler (runs on this PC).
+                const id = String(arg ?? '');
+                const channel = zapStreamsRef.current.find(s => String(s.stream_id) === id);
+                if (!channel) return;
+                void (async () => {
+                    try {
+                        const programs = await epgService.fetchChannelEPG(
+                            channel.epg_channel_id || '', channel.name, channel.stream_id);
+                        const current = epgService.getCurrentProgram(programs);
+                        const next = epgService.getUpcomingPrograms(programs, current, 1)[0] || null;
+                        if (!next) {
+                            window.ipcRenderer.send('web-remote:schedule-result', { status: 'error', title: '' });
+                            return;
+                        }
+                        scheduledRecordingService.add({
+                            channelName: channel.name,
+                            streamId: channel.stream_id,
+                            title: next.title,
+                            startIso: next.start,
+                            endIso: next.end,
+                        });
+                        window.ipcRenderer.send('web-remote:schedule-result', { status: 'ok', title: next.title });
+                    } catch {
+                        window.ipcRenderer.send('web-remote:schedule-result', { status: 'error', title: '' });
+                    }
+                })();
                 return;
             }
             if (action === 'requestEpg') {

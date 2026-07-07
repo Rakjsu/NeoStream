@@ -37,6 +37,7 @@ const STRINGS: Record<RemoteLang, Record<string, string>> = {
         castingToast: 'Transmitindo', onDevice: ' em ', noTvFound: 'Nenhuma TV encontrada na rede', castFailed: 'Falha ao transmitir',
         nextUp: 'A seguir: ', noInfo: 'Sem informa\u00e7\u00e3o', noChannelFound: 'Nenhum canal encontrado.', programming: 'Programa\u00e7\u00e3o',
         recTitle: 'Gravar no computador', recStarted: 'Gravando', recFail: 'Falha ao iniciar a gravação',
+        recStop: 'Parar gravação', recStopped: 'Gravação encerrada', schedNext: 'Gravar o próximo', schedOk: 'Agendado: ', schedFail: 'Não deu pra agendar (sem programação?)',
     },
     en: {
         htmlLang: 'en', brandSuffix: 'Remote',
@@ -61,6 +62,7 @@ const STRINGS: Record<RemoteLang, Record<string, string>> = {
         castingToast: 'Casting', onDevice: ' on ', noTvFound: 'No TV found on the network', castFailed: 'Failed to cast',
         nextUp: 'Up next: ', noInfo: 'No information', noChannelFound: 'No channel found.', programming: 'Schedule',
         recTitle: 'Record on the computer', recStarted: 'Recording', recFail: 'Failed to start the recording',
+        recStop: 'Stop recording', recStopped: 'Recording finished', schedNext: 'Record the next one', schedOk: 'Scheduled: ', schedFail: 'Could not schedule (no guide data?)',
     },
     es: {
         htmlLang: 'es', brandSuffix: 'Control',
@@ -85,6 +87,7 @@ const STRINGS: Record<RemoteLang, Record<string, string>> = {
         castingToast: 'Transmitiendo', onDevice: ' en ', noTvFound: 'No se encontr\u00f3 ninguna TV en la red', castFailed: 'Error al transmitir',
         nextUp: 'A continuaci\u00f3n: ', noInfo: 'Sin informaci\u00f3n', noChannelFound: 'No se encontr\u00f3 ning\u00fan canal.', programming: 'Programaci\u00f3n',
         recTitle: 'Grabar en la computadora', recStarted: 'Grabando', recFail: 'Error al iniciar la grabación',
+        recStop: 'Detener grabación', recStopped: 'Grabación finalizada', schedNext: 'Grabar el próximo', schedOk: 'Programado: ', schedFail: 'No se pudo programar (¿sin guía?)',
     },
 }
 
@@ -336,6 +339,7 @@ export function renderRemotePage(lang?: string): string {
     var guide = { channels: [], playingId: '', epg: null };
     var filter = '';
     var epgCache = {};   // channelId → { now, nowStart, nowEnd, next }
+    var activeRecs = {}; // channelName → recording id (guia marca 🔴)
     var openEpg = {};    // channelId → true while its EPG panel is expanded
     var movies = [];     // catalog: [{ id, name, cover }]
     var mvFilter = '';
@@ -448,8 +452,22 @@ export function renderRemotePage(lang?: string): string {
             devices = msg.items || [];
             renderDevices();
           } else if (msg.type === 'recordResult') {
-            if (msg.status === 'ok') showToast('⏺ ' + L.recStarted + (msg.name ? ': ' + msg.name : ''), 'ok');
-            else showToast(L.recFail, 'err');
+            if (msg.status === 'ok') {
+              if (msg.name && msg.id) activeRecs[msg.name] = msg.id;
+              showToast('⏺ ' + L.recStarted + (msg.name ? ': ' + msg.name : ''), 'ok');
+              renderGuide();
+            } else if (msg.status === 'stopped') {
+              for (var rn in activeRecs) { if (activeRecs[rn] === msg.id) delete activeRecs[rn]; }
+              showToast('⏹ ' + L.recStopped, 'ok');
+              renderGuide();
+            } else showToast(L.recFail, 'err');
+          } else if (msg.type === 'recordings') {
+            activeRecs = {};
+            for (var ri = 0; ri < (msg.items || []).length; ri++) activeRecs[msg.items[ri].channelName] = msg.items[ri].id;
+            renderGuide();
+          } else if (msg.type === 'scheduleResult') {
+            if (msg.status === 'ok') showToast('📅 ' + L.schedOk + msg.title, 'ok');
+            else showToast(L.schedFail, 'err');
           } else if (msg.type === 'castResult') {
             if (msg.status === 'ok') showToast('📡 ' + L.castingToast + (msg.deviceName ? L.onDevice + msg.deviceName : ''), 'ok');
             else if (msg.status === 'no-device') showToast(L.noTvFound, 'err');
@@ -626,7 +644,8 @@ export function renderRemotePage(lang?: string): string {
           if (e) {
             epgHtml = '<div class="chepg"><div class="p">' + esc(e.now || L.noInfo) + '</div>'
               + (e.nowStart ? '<div>' + esc(e.nowStart + (e.nowEnd ? ' – ' + e.nowEnd : '')) + '</div>' : '')
-              + (e.next ? '<div>' + L.nextUp + esc(e.next) + '</div>' : '') + '</div>';
+              + (e.next ? '<div>' + L.nextUp + esc(e.next)
+                + ' <button class="chinfo" data-sched="' + esc(c.id) + '" title="' + L.schedNext + '" style="width:26px;height:26px;font-size:12px">⏺</button></div>' : '') + '</div>';
           } else {
             epgHtml = '<div class="chepg">' + L.loading + '</div>';
           }
@@ -634,7 +653,9 @@ export function renderRemotePage(lang?: string): string {
         html += '<div class="chrow">'
           + '<div class="chitem' + (isPlaying ? ' playing' : '') + '" data-id="' + esc(c.id) + '">'
           + logo + '<div class="nm">' + esc(c.name) + '</div>'
-          + '<button class="chinfo" data-rec="' + esc(c.id) + '" data-nm="' + esc(c.name) + '" title="' + L.recTitle + '">⏺</button>'
+          + (activeRecs[c.name]
+            ? '<button class="chinfo" data-recstop="' + esc(activeRecs[c.name]) + '" title="' + L.recStop + '" style="background:rgba(239,68,68,.35)">🔴</button>'
+            : '<button class="chinfo" data-rec="' + esc(c.id) + '" data-nm="' + esc(c.name) + '" title="' + L.recTitle + '">⏺</button>')
           + '<button class="chinfo" data-info="' + esc(c.id) + '" title="' + L.programming + '">ⓘ</button></div>'
           + epgHtml + '</div>';
       }
@@ -852,6 +873,12 @@ export function renderRemotePage(lang?: string): string {
 
     chlistEl.addEventListener('click', function (ev) {
       if (!ev.target.closest) return;
+      // 🔴 second tap: finalize that recording on the computer.
+      var recStop = ev.target.closest('[data-recstop]');
+      if (recStop) { sendCmd('stopRecord', null, recStop.getAttribute('data-recstop')); return; }
+      // ⏺ in the expanded EPG: schedule the channel's NEXT program.
+      var sched = ev.target.closest('[data-sched]');
+      if (sched) { sendCmd('scheduleNext', null, sched.getAttribute('data-sched')); return; }
       // ⏺ starts a DVR recording of that channel on the computer.
       var rec = ev.target.closest('[data-rec]');
       if (rec) { sendCmd('recordChannel', null, rec.getAttribute('data-rec'), null, rec.getAttribute('data-nm')); return; }
@@ -950,7 +977,7 @@ export function renderRemotePage(lang?: string): string {
       });
       controlEl.classList.add('hidden'); guideEl.classList.add('hidden'); catalogEl.classList.add('hidden');
       seriesEl.classList.add('hidden'); episodesEl.classList.add('hidden'); coEl.classList.add('hidden');
-      if (view === 'guide') { guideEl.classList.remove('hidden'); renderGuide(); }
+      if (view === 'guide') { guideEl.classList.remove('hidden'); sendCmd('requestRecordings'); renderGuide(); }
       else if (view === 'catalog') {
         catalogEl.classList.remove('hidden');
         if (!catalogRequested) { catalogRequested = true; sendCmd('requestCatalog'); }
@@ -994,6 +1021,8 @@ export function renderRemotePage(lang?: string): string {
       if (action === 'setAudioTrack') payload.trackId = sec;
       if (action === 'playChannel' || action === 'requestEpg') payload.channelId = channelId;
       if (action === 'recordChannel') { payload.channelId = channelId; payload.channelName = arg5; }
+      if (action === 'stopRecord') payload.id = channelId;
+      if (action === 'scheduleNext') payload.channelId = channelId;
       if (action === 'castMovie') payload.movieId = movieId;
       if (action === 'castMovieQueue') payload.movieIds = arg5;
       if (action === 'requestSeriesInfo') payload.seriesId = arg5;
