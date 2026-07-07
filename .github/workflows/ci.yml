@@ -41,6 +41,9 @@ jobs:
       - name: Renderer + main build
         run: npx vite build
 
+      - name: Bundle guard (ffmpeg-static inline mata DVR/transcode)
+        run: node scripts/check-bundle.mjs
+
   # Separate job so the fast checks above are never blocked by app startup
   # times. Electron E2E needs no Playwright browser download — the suite
   # launches the Electron binary from node_modules directly.
@@ -59,6 +62,9 @@ jobs:
 
       - name: Build app (renderer + main)
         run: npx vite build
+
+      - name: Bundle guard
+        run: node scripts/check-bundle.mjs
 
       - name: E2E tests (Playwright + Electron)
         run: npx playwright test
