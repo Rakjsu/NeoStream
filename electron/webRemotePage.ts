@@ -36,6 +36,7 @@ const STRINGS: Record<RemoteLang, Record<string, string>> = {
         playing: 'Reproduzindo', paused: 'Pausado', nothingPlaying: 'Nada tocando', castingOnTv: 'Transmitindo na TV',
         castingToast: 'Transmitindo', onDevice: ' em ', noTvFound: 'Nenhuma TV encontrada na rede', castFailed: 'Falha ao transmitir',
         nextUp: 'A seguir: ', noInfo: 'Sem informa\u00e7\u00e3o', noChannelFound: 'Nenhum canal encontrado.', programming: 'Programa\u00e7\u00e3o',
+        recTitle: 'Gravar no computador', recStarted: 'Gravando', recFail: 'Falha ao iniciar a gravação',
     },
     en: {
         htmlLang: 'en', brandSuffix: 'Remote',
@@ -59,6 +60,7 @@ const STRINGS: Record<RemoteLang, Record<string, string>> = {
         playing: 'Playing', paused: 'Paused', nothingPlaying: 'Nothing playing', castingOnTv: 'Casting to TV',
         castingToast: 'Casting', onDevice: ' on ', noTvFound: 'No TV found on the network', castFailed: 'Failed to cast',
         nextUp: 'Up next: ', noInfo: 'No information', noChannelFound: 'No channel found.', programming: 'Schedule',
+        recTitle: 'Record on the computer', recStarted: 'Recording', recFail: 'Failed to start the recording',
     },
     es: {
         htmlLang: 'es', brandSuffix: 'Control',
@@ -82,6 +84,7 @@ const STRINGS: Record<RemoteLang, Record<string, string>> = {
         playing: 'Reproduciendo', paused: 'En pausa', nothingPlaying: 'Nada en reproducci\u00f3n', castingOnTv: 'Transmitiendo en la TV',
         castingToast: 'Transmitiendo', onDevice: ' en ', noTvFound: 'No se encontr\u00f3 ninguna TV en la red', castFailed: 'Error al transmitir',
         nextUp: 'A continuaci\u00f3n: ', noInfo: 'Sin informaci\u00f3n', noChannelFound: 'No se encontr\u00f3 ning\u00fan canal.', programming: 'Programaci\u00f3n',
+        recTitle: 'Grabar en la computadora', recStarted: 'Grabando', recFail: 'Error al iniciar la grabación',
     },
 }
 
@@ -444,6 +447,9 @@ export function renderRemotePage(lang?: string): string {
           } else if (msg.type === 'devices') {
             devices = msg.items || [];
             renderDevices();
+          } else if (msg.type === 'recordResult') {
+            if (msg.status === 'ok') showToast('⏺ ' + L.recStarted + (msg.name ? ': ' + msg.name : ''), 'ok');
+            else showToast(L.recFail, 'err');
           } else if (msg.type === 'castResult') {
             if (msg.status === 'ok') showToast('📡 ' + L.castingToast + (msg.deviceName ? L.onDevice + msg.deviceName : ''), 'ok');
             else if (msg.status === 'no-device') showToast(L.noTvFound, 'err');
@@ -628,6 +634,7 @@ export function renderRemotePage(lang?: string): string {
         html += '<div class="chrow">'
           + '<div class="chitem' + (isPlaying ? ' playing' : '') + '" data-id="' + esc(c.id) + '">'
           + logo + '<div class="nm">' + esc(c.name) + '</div>'
+          + '<button class="chinfo" data-rec="' + esc(c.id) + '" data-nm="' + esc(c.name) + '" title="' + L.recTitle + '">⏺</button>'
           + '<button class="chinfo" data-info="' + esc(c.id) + '" title="' + L.programming + '">ⓘ</button></div>'
           + epgHtml + '</div>';
       }
@@ -845,6 +852,9 @@ export function renderRemotePage(lang?: string): string {
 
     chlistEl.addEventListener('click', function (ev) {
       if (!ev.target.closest) return;
+      // ⏺ starts a DVR recording of that channel on the computer.
+      var rec = ev.target.closest('[data-rec]');
+      if (rec) { sendCmd('recordChannel', null, rec.getAttribute('data-rec'), null, rec.getAttribute('data-nm')); return; }
       // The ⓘ button toggles the on-demand EPG panel (fetch once, then cached).
       var info = ev.target.closest('.chinfo');
       if (info) {
@@ -983,6 +993,7 @@ export function renderRemotePage(lang?: string): string {
       if (action === 'setVolume') payload.level = sec;
       if (action === 'setAudioTrack') payload.trackId = sec;
       if (action === 'playChannel' || action === 'requestEpg') payload.channelId = channelId;
+      if (action === 'recordChannel') { payload.channelId = channelId; payload.channelName = arg5; }
       if (action === 'castMovie') payload.movieId = movieId;
       if (action === 'castMovieQueue') payload.movieIds = arg5;
       if (action === 'requestSeriesInfo') payload.seriesId = arg5;

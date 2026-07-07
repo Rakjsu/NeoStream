@@ -123,6 +123,12 @@ describe('parseRemoteCommand', () => {
         expect(parseRemoteCommand('{"action":"requestDevices"}')).toEqual({ action: 'requestDevices' })
         expect(parseRemoteCommand('{"action":"requestContinue"}')).toEqual({ action: 'requestContinue' })
         expect(parseRemoteCommand('{"action":"requestRecommended"}')).toEqual({ action: 'requestRecommended' })
+        // REC do guia: channelId obrigatório; nome opcional aparado em 160.
+        expect(parseRemoteCommand('{"action":"recordChannel","channelId":"77","channelName":"Globo HD"}'))
+            .toEqual({ action: 'recordChannel', channelId: '77', channelName: 'Globo HD' })
+        expect(parseRemoteCommand('{"action":"recordChannel","channelId":"77"}'))
+            .toEqual({ action: 'recordChannel', channelId: '77', channelName: undefined })
+        expect(parseRemoteCommand('{"action":"recordChannel"}')).toBeNull()
         // Volume absoluto: nível numérico com clamp; sem nível é inválido.
         expect(parseRemoteCommand('{"action":"setVolume","level":0.35}')).toEqual({ action: 'setVolume', level: 0.35 })
         expect(parseRemoteCommand('{"action":"setVolume","level":5}')).toEqual({ action: 'setVolume', level: 1 })

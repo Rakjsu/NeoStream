@@ -125,6 +125,7 @@ export type RemoteCommand =
     | { action: 'setAudioTrack'; trackId: number }
     | { action: 'playChannel'; channelId: string }
     | { action: 'requestEpg'; channelId: string }
+    | { action: 'recordChannel'; channelId: string; channelName?: string }
     | { action: 'requestCatalog'; query?: string }
     | { action: 'requestContinue' }
     | { action: 'requestRecommended' }
@@ -136,7 +137,7 @@ export type RemoteCommand =
     | { action: 'castEpisode'; episodeId: string; target?: CastTarget }
 
 const VALID_ACTIONS = new Set([
-    'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'setVolume', 'setAudioTrack', 'playChannel', 'requestEpg',
+    'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'setVolume', 'setAudioTrack', 'playChannel', 'requestEpg', 'recordChannel',
     'requestCatalog', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
 ])
 
@@ -189,6 +190,13 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         const channelId = (parsed as { channelId?: unknown }).channelId
         if (typeof channelId !== 'string' || !channelId) return null
         return { action, channelId }
+    }
+    if (action === 'recordChannel') {
+        const channelId = (parsed as { channelId?: unknown }).channelId
+        if (typeof channelId !== 'string' || !channelId) return null
+        const rawName = (parsed as { channelName?: unknown }).channelName
+        const channelName = typeof rawName === 'string' && rawName.trim() ? rawName.trim().slice(0, 160) : undefined
+        return { action: 'recordChannel', channelId, channelName }
     }
     if (action === 'castMovie') {
         const movieId = (parsed as { movieId?: unknown }).movieId

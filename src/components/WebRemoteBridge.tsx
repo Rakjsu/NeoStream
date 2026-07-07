@@ -332,6 +332,22 @@ export function WebRemoteBridge() {
                 : null;
         };
 
+        // REC from the phone's guide: resolve the live URL and start the DVR
+        // (same ffmpeg pipeline as the player's record button). Works from any
+        // page — the bridge lives at the app root.
+        const recordChannel = async (channelId: string, channelName: string) => {
+            const name = channelName || 'Canal';
+            const urlRes = await window.ipcRenderer.invoke('streams:get-live-url', { streamId: channelId })
+                .catch(() => null) as { success: boolean; url?: string } | null;
+            if (!urlRes?.success || !urlRes.url) {
+                window.ipcRenderer.send('web-remote:record-result', { status: 'error', name });
+                return;
+            }
+            const rec = await window.ipcRenderer.invoke('dvr:start', { url: urlRes.url, channelName: name })
+                .catch(() => null) as { success: boolean } | null;
+            window.ipcRenderer.send('web-remote:record-result', { status: rec?.success ? 'ok' : 'error', name });
+        };
+
         const asTarget = (v: unknown): CastTarget | undefined => {
             const t = v as Partial<CastTarget> | undefined;
             return t && typeof t.deviceId === 'string' && t.deviceId ? t as CastTarget : undefined;
@@ -342,6 +358,7 @@ export function WebRemoteBridge() {
             else if (action === 'requestContinue') void pushContinue();
             else if (action === 'requestRecommended') void pushRecommended();
             else if (action === 'requestDevices') void pushDevices();
+            else if (action === 'recordChannel') void recordChannel(String(arg ?? ''), typeof target === 'string' ? target : '');
             else if (action === 'castMovie') void castMovie(String(arg ?? ''), asTarget(target));
             else if (action === 'castMovieQueue') void castMovieQueue(Array.isArray(arg) ? (arg as string[]) : [], asTarget(target));
             else if (action === 'requestSeries') void pushSeries(typeof arg === 'string' ? arg : '');

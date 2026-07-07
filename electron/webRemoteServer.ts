@@ -241,7 +241,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 }
 
 // Actions that always go to the renderer (never routed to the cast session).
-const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'requestCatalog', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'requestCatalog', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
@@ -272,6 +272,8 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         win.webContents.send('media:control', 'playChannel', command.channelId)
     } else if (command.action === 'requestEpg') {
         win.webContents.send('media:control', 'requestEpg', command.channelId)
+    } else if (command.action === 'recordChannel') {
+        win.webContents.send('media:control', 'recordChannel', command.channelId, command.channelName)
     } else if (command.action === 'castMovie') {
         win.webContents.send('media:control', 'castMovie', command.movieId, command.target)
     } else if (command.action === 'castMovieQueue') {
@@ -456,6 +458,14 @@ export function setupWebRemote(): void {
             }
         }).filter((g) => g.seed && g.items.length > 0)
         broadcast(JSON.stringify({ type: 'recommended', groups }))
+    })
+
+    // Result of a recording started from the phone's guide (REC button).
+    ipcMain.on('web-remote:record-result', (_e, raw: unknown) => {
+        const obj = (raw ?? {}) as Record<string, unknown>
+        const status = obj.status === 'ok' ? 'ok' : 'error'
+        const name = typeof obj.name === 'string' ? obj.name.slice(0, 160) : ''
+        broadcast(JSON.stringify({ type: 'recordResult', status, name }))
     })
 
     // Cast targets (Chromecast + DLNA + AirPlay) discovered by the bridge.
