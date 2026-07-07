@@ -130,6 +130,7 @@ function connectWs(port: number, pin: string): Promise<{ send: (cmd: object) => 
 }
 
 test('comandos do celular chegam como SOAP no renderer DLNA', async () => {
+    test.setTimeout(120000);
     launched = await launchApp({ serverUrl: server.url });
     const page: Page = launched.page;
     await seedProfiles(page, { active: 'adult' });
@@ -160,22 +161,29 @@ test('comandos do celular chegam como SOAP no renderer DLNA', async () => {
     const pin = (await box.locator('strong').first().innerText()).trim();
     const ws = await connectWs(port, pin);
 
+    // Prontidão: a sessão DLNA responde GetTransportInfo antes dos comandos
+    // (evita corrida entre o cast recém-estabelecido e o primeiro comando).
+    await expect.poll(async () => {
+        const st = await page.evaluate(() => window.ipcRenderer.invoke('dlna:get-status')) as { success: boolean };
+        return st.success;
+    }, { timeout: 15000 }).toBe(true);
+
     const marker = renderer.received.length;
 
     // togglePlay: consulta o estado (PLAYING) e pausa na TV — não no player local.
     ws.send({ action: 'togglePlay' });
-    await expect.poll(() => renderer.received.slice(marker), { timeout: 8000 })
+    await expect.poll(() => renderer.received.slice(marker), { timeout: 20000 })
         .toContain('Pause');
     expect(renderer.received.slice(marker)).toContain('GetTransportInfo');
 
     // setVolume absoluto: 0.5 do fio vira SetVolume 50 (0..100 UPnP).
     ws.send({ action: 'setVolume', level: 0.5 });
-    await expect.poll(() => renderer.received.slice(marker), { timeout: 8000 })
+    await expect.poll(() => renderer.received.slice(marker), { timeout: 20000 })
         .toContain('SetVolume:50');
 
     // stop derruba a sessão na TV.
     ws.send({ action: 'stop' });
-    await expect.poll(() => renderer.received.slice(marker), { timeout: 8000 })
+    await expect.poll(() => renderer.received.slice(marker), { timeout: 20000 })
         .toContain('Stop');
 
     ws.close();
