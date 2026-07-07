@@ -135,6 +135,14 @@ describe('parseRemoteCommand', () => {
         expect(parseRemoteCommand('{"action":"scheduleNext","channelId":"77"}')).toEqual({ action: 'scheduleNext', channelId: '77' })
         expect(parseRemoteCommand('{"action":"scheduleNext"}')).toBeNull()
         expect(parseRemoteCommand('{"action":"requestRecordings"}')).toEqual({ action: 'requestRecordings' })
+        // R52: excluir gravação pronta e busca de canais ao vivo.
+        expect(parseRemoteCommand('{"action":"deleteRecording","name":"Globo_2026.ts"}'))
+            .toEqual({ action: 'deleteRecording', name: 'Globo_2026.ts' })
+        expect(parseRemoteCommand('{"action":"deleteRecording","name":"  "}')).toBeNull()
+        expect(parseRemoteCommand('{"action":"requestLiveSearch","query":"globo"}'))
+            .toEqual({ action: 'requestLiveSearch', query: 'globo' })
+        expect(parseRemoteCommand('{"action":"requestLiveSearch"}'))
+            .toEqual({ action: 'requestLiveSearch', query: undefined })
         // Volume absoluto: nível numérico com clamp; sem nível é inválido.
         expect(parseRemoteCommand('{"action":"setVolume","level":0.35}')).toEqual({ action: 'setVolume', level: 0.35 })
         expect(parseRemoteCommand('{"action":"setVolume","level":5}')).toEqual({ action: 'setVolume', level: 1 })

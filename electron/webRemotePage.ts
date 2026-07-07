@@ -9,90 +9,9 @@
  * a channel to switch (the LiveTV page pushes the guide data).
  */
 
-export type RemoteLang = 'pt' | 'en' | 'es'
+import { STRINGS, type RemoteLang } from './webRemoteStrings'
 
-// Every user-facing string of the phone page, in the app's three languages.
-// Static HTML uses ${t.*}; the runtime script gets the whole dict as `L`.
-const STRINGS: Record<RemoteLang, Record<string, string>> = {
-    pt: {
-        htmlLang: 'pt-BR', brandSuffix: 'Controle',
-        pinTitle: 'Digite o PIN', pinHint: 'O c\u00f3digo aparece em Configura\u00e7\u00f5es \u2192 Rede no computador',
-        pinConnect: 'Conectar', pinWrong: 'PIN incorreto. Confira o c\u00f3digo no computador.', pinLen: 'O PIN tem 4 d\u00edgitos.',
-        tabControl: 'Controle', tabGuide: 'Guia', tabMovies: 'Filmes', tabSeries: 'S\u00e9ries', tabContinue: 'Continuar',
-        castTo: 'Transmitir em', devAuto: 'Autom\u00e1tico (1\u00aa TV)',
-        searchAllPh: 'Buscar filmes e s\u00e9ries\u2026', searchPrompt: 'Digite para buscar no acervo.', searching: 'Buscando\u2026', noResults: 'Nenhum resultado.',
-        connecting: 'Conectando\u2026', connected: 'Conectado', reconnecting: 'Reconectando\u2026',
-        prev: 'Anterior', playPause: 'Play/Pause', next: 'Pr\u00f3ximo', volDown: 'Volume -', mute: 'Mudo', volUp: 'Volume +',
-        subtitle: 'Legenda', audio: '\u00c1udio', stop: 'Parar',
-        hint: 'Mantenha o app aberto no computador. Este controle funciona na mesma rede Wi-Fi.',
-        nowOnTv: 'Agora na TV', noChannel: 'Nenhum canal tocando', searchChannel: 'Buscar canal\u2026',
-        guideEmpty: 'Abra a <b>TV ao vivo</b> no computador para ver os canais aqui.',
-        searchMovie: 'Buscar filme\u2026', loadingMovies: 'Carregando filmes\u2026', noMovies: 'Nenhum filme.', noMovieFound: 'Nenhum filme encontrado.',
-        castQueue: 'Transmitir fila',
-        searchSeries: 'Buscar s\u00e9rie\u2026', loadingSeries: 'Carregando s\u00e9ries\u2026', noSeries: 'Nenhuma s\u00e9rie.', noSeriesFound: 'Nenhuma s\u00e9rie encontrada.',
-        seeEpisodes: 'Ver epis\u00f3dios', back: 'Voltar', loadingEpisodes: 'Carregando epis\u00f3dios\u2026', noEpisodes: 'Nenhum epis\u00f3dio.',
-        loading: 'Carregando\u2026', nothingInProgress: 'Nada em andamento.', resumeOnTv: 'Retomar na TV', castToTv: 'Transmitir na TV',
-        becauseWatched: 'Porque voc\u00ea assistiu',
-        playing: 'Reproduzindo', paused: 'Pausado', nothingPlaying: 'Nada tocando', castingOnTv: 'Transmitindo na TV',
-        castingToast: 'Transmitindo', onDevice: ' em ', noTvFound: 'Nenhuma TV encontrada na rede', castFailed: 'Falha ao transmitir',
-        nextUp: 'A seguir: ', noInfo: 'Sem informa\u00e7\u00e3o', noChannelFound: 'Nenhum canal encontrado.', programming: 'Programa\u00e7\u00e3o',
-        recTitle: 'Gravar no computador', recStarted: 'Gravando', recFail: 'Falha ao iniciar a gravação',
-        recStop: 'Parar gravação', recStopped: 'Gravação encerrada', schedNext: 'Gravar o próximo', schedOk: 'Agendado: ', schedFail: 'Não deu pra agendar (sem programação?)',
-        recCardTitle: 'Gravações', recReady: 'Prontas no computador',
-    },
-    en: {
-        htmlLang: 'en', brandSuffix: 'Remote',
-        pinTitle: 'Enter the PIN', pinHint: 'The code is shown under Settings \u2192 Network on the computer',
-        pinConnect: 'Connect', pinWrong: 'Wrong PIN. Check the code on the computer.', pinLen: 'The PIN has 4 digits.',
-        tabControl: 'Remote', tabGuide: 'Guide', tabMovies: 'Movies', tabSeries: 'Series', tabContinue: 'Continue',
-        castTo: 'Cast to', devAuto: 'Automatic (1st TV)',
-        searchAllPh: 'Search movies & series\u2026', searchPrompt: 'Type to search the library.', searching: 'Searching\u2026', noResults: 'No results.',
-        connecting: 'Connecting\u2026', connected: 'Connected', reconnecting: 'Reconnecting\u2026',
-        prev: 'Previous', playPause: 'Play/Pause', next: 'Next', volDown: 'Volume -', mute: 'Mute', volUp: 'Volume +',
-        subtitle: 'Subtitles', audio: 'Audio', stop: 'Stop',
-        hint: 'Keep the app open on the computer. This remote works on the same Wi-Fi network.',
-        nowOnTv: 'Now on TV', noChannel: 'No channel playing', searchChannel: 'Search channel\u2026',
-        guideEmpty: 'Open <b>Live TV</b> on the computer to see the channels here.',
-        searchMovie: 'Search movie\u2026', loadingMovies: 'Loading movies\u2026', noMovies: 'No movies.', noMovieFound: 'No movie found.',
-        castQueue: 'Cast queue',
-        searchSeries: 'Search series\u2026', loadingSeries: 'Loading series\u2026', noSeries: 'No series.', noSeriesFound: 'No series found.',
-        seeEpisodes: 'View episodes', back: 'Back', loadingEpisodes: 'Loading episodes\u2026', noEpisodes: 'No episodes.',
-        loading: 'Loading\u2026', nothingInProgress: 'Nothing in progress.', resumeOnTv: 'Resume on TV', castToTv: 'Cast to TV',
-        becauseWatched: 'Because you watched',
-        playing: 'Playing', paused: 'Paused', nothingPlaying: 'Nothing playing', castingOnTv: 'Casting to TV',
-        castingToast: 'Casting', onDevice: ' on ', noTvFound: 'No TV found on the network', castFailed: 'Failed to cast',
-        nextUp: 'Up next: ', noInfo: 'No information', noChannelFound: 'No channel found.', programming: 'Schedule',
-        recTitle: 'Record on the computer', recStarted: 'Recording', recFail: 'Failed to start the recording',
-        recStop: 'Stop recording', recStopped: 'Recording finished', schedNext: 'Record the next one', schedOk: 'Scheduled: ', schedFail: 'Could not schedule (no guide data?)',
-        recCardTitle: 'Recordings', recReady: 'Ready on the computer',
-    },
-    es: {
-        htmlLang: 'es', brandSuffix: 'Control',
-        pinTitle: 'Ingresa el PIN', pinHint: 'El c\u00f3digo aparece en Configuraci\u00f3n \u2192 Red en la computadora',
-        pinConnect: 'Conectar', pinWrong: 'PIN incorrecto. Verifica el c\u00f3digo en la computadora.', pinLen: 'El PIN tiene 4 d\u00edgitos.',
-        tabControl: 'Control', tabGuide: 'Gu\u00eda', tabMovies: 'Pel\u00edculas', tabSeries: 'Series', tabContinue: 'Continuar',
-        castTo: 'Transmitir a', devAuto: 'Autom\u00e1tico (1\u00aa TV)',
-        searchAllPh: 'Buscar pel\u00edculas y series\u2026', searchPrompt: 'Escribe para buscar en el cat\u00e1logo.', searching: 'Buscando\u2026', noResults: 'Sin resultados.',
-        connecting: 'Conectando\u2026', connected: 'Conectado', reconnecting: 'Reconectando\u2026',
-        prev: 'Anterior', playPause: 'Play/Pausa', next: 'Siguiente', volDown: 'Volumen -', mute: 'Silencio', volUp: 'Volumen +',
-        subtitle: 'Subt\u00edtulos', audio: 'Audio', stop: 'Detener',
-        hint: 'Mant\u00e9n la app abierta en la computadora. Este control funciona en la misma red Wi-Fi.',
-        nowOnTv: 'Ahora en la TV', noChannel: 'Ning\u00fan canal en reproducci\u00f3n', searchChannel: 'Buscar canal\u2026',
-        guideEmpty: 'Abre <b>TV en vivo</b> en la computadora para ver los canales aqu\u00ed.',
-        searchMovie: 'Buscar pel\u00edcula\u2026', loadingMovies: 'Cargando pel\u00edculas\u2026', noMovies: 'No hay pel\u00edculas.', noMovieFound: 'No se encontr\u00f3 ninguna pel\u00edcula.',
-        castQueue: 'Transmitir cola',
-        searchSeries: 'Buscar serie\u2026', loadingSeries: 'Cargando series\u2026', noSeries: 'No hay series.', noSeriesFound: 'No se encontr\u00f3 ninguna serie.',
-        seeEpisodes: 'Ver episodios', back: 'Volver', loadingEpisodes: 'Cargando episodios\u2026', noEpisodes: 'No hay episodios.',
-        loading: 'Cargando\u2026', nothingInProgress: 'Nada en curso.', resumeOnTv: 'Reanudar en la TV', castToTv: 'Transmitir a la TV',
-        becauseWatched: 'Porque viste',
-        playing: 'Reproduciendo', paused: 'En pausa', nothingPlaying: 'Nada en reproducci\u00f3n', castingOnTv: 'Transmitiendo en la TV',
-        castingToast: 'Transmitiendo', onDevice: ' en ', noTvFound: 'No se encontr\u00f3 ninguna TV en la red', castFailed: 'Error al transmitir',
-        nextUp: 'A continuaci\u00f3n: ', noInfo: 'Sin informaci\u00f3n', noChannelFound: 'No se encontr\u00f3 ning\u00fan canal.', programming: 'Programaci\u00f3n',
-        recTitle: 'Grabar en la computadora', recStarted: 'Grabando', recFail: 'Error al iniciar la grabación',
-        recStop: 'Detener grabación', recStopped: 'Grabación finalizada', schedNext: 'Grabar el próximo', schedOk: 'Programado: ', schedFail: 'No se pudo programar (¿sin guía?)',
-        recCardTitle: 'Grabaciones', recReady: 'Listas en la computadora',
-    },
-}
+export type { RemoteLang } from './webRemoteStrings'
 
 /** Render the phone page in the app's language (anything unknown falls back to pt). */
 export function renderRemotePage(lang?: string): string {
@@ -350,6 +269,9 @@ export function renderRemotePage(lang?: string): string {
     var epgCache = {};   // channelId → { now, nowStart, nowEnd, next }
     var activeRecs = {}; // channelName → recording id (guia marca 🔴)
     var recsData = { items: [], files: [] }; // card 📼 da aba Controle
+    var pendingDelete = '';      // nome aguardando o 2º toque do 🗑
+    var pendingDeleteTimer = null;
+    var srChannels = [];         // canais ao vivo na busca global
     var reccardEl = document.getElementById('reccard');
     var recliveEl = document.getElementById('reclive');
     var recfilesEl = document.getElementById('recfiles');
@@ -471,12 +393,18 @@ export function renderRemotePage(lang?: string): string {
               showToast('⏺ ' + L.recStarted + (msg.name ? ': ' + msg.name : ''), 'ok');
               renderGuide();
               sendCmd('requestRecordings');
+            } else if (msg.status === 'deleted') {
+              pendingDelete = '';
+              showToast('🗑 ' + L.recDeleted, 'ok');
+              sendCmd('requestRecordings');
             } else if (msg.status === 'stopped') {
               for (var rn in activeRecs) { if (activeRecs[rn] === msg.id) delete activeRecs[rn]; }
               showToast('⏹ ' + L.recStopped, 'ok');
               renderGuide();
               sendCmd('requestRecordings');
             } else showToast(L.recFail, 'err');
+          } else if (msg.type === 'liveResults') {
+            if (searchMode) { srChannels = msg.items || []; renderSearch(); }
           } else if (msg.type === 'recordings') {
             activeRecs = {};
             for (var ri = 0; ri < (msg.items || []).length; ri++) activeRecs[msg.items[ri].channelName] = msg.items[ri].id;
@@ -856,9 +784,12 @@ export function renderRemotePage(lang?: string): string {
       var fhtml = '';
       for (var fi = 0; fi < recsData.files.length; fi++) {
         var f = recsData.files[fi];
+        var confirming = pendingDelete === f.name;
         fhtml += '<div class="chitem"><div class="ph">📼</div>'
           + '<div class="nm">' + esc(f.name) + '</div>'
-          + '<span style="flex:none;font-size:12px;color:rgba(255,255,255,.5)">' + (f.sizeMb || 0) + ' MB</span></div>';
+          + '<span style="flex:none;font-size:12px;color:rgba(255,255,255,.5)">' + (f.sizeMb || 0) + ' MB</span>'
+          + '<button class="chinfo" data-del="' + esc(f.name) + '" title="' + (confirming ? L.recDeleteConfirm : L.recDelete) + '"'
+          + (confirming ? ' style="background:rgba(239,68,68,.45)"' : '') + '>' + (confirming ? '❗' : '🗑') + '</button></div>';
       }
       recfilesEl.innerHTML = fhtml;
       recreadyheadEl.classList.toggle('hidden', !recsData.files.length);
@@ -868,6 +799,24 @@ export function renderRemotePage(lang?: string): string {
       if (!ev.target.closest) return;
       var stop = ev.target.closest('[data-recstop]');
       if (stop) sendCmd('stopRecord', null, stop.getAttribute('data-recstop'));
+    });
+
+    recfilesEl.addEventListener('click', function (ev) {
+      if (!ev.target.closest) return;
+      var del = ev.target.closest('[data-del]');
+      if (!del) return;
+      var name = del.getAttribute('data-del');
+      if (pendingDelete === name) {
+        pendingDelete = '';
+        if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
+        sendCmd('deleteRecording', null, name);
+      } else {
+        // 1º toque só arma a confirmação (desarma sozinha em 4s).
+        pendingDelete = name;
+        if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
+        pendingDeleteTimer = setTimeout(function () { pendingDelete = ''; renderRecCard(); }, 4000);
+      }
+      renderRecCard();
     });
 
     function renderRecommended() {
@@ -949,6 +898,13 @@ export function renderRemotePage(lang?: string): string {
     function renderSearch() {
       if (!gFilter) { srlistEl.innerHTML = ''; srEmptyEl.classList.remove('hidden'); srEmptyEl.textContent = L.searchPrompt; return; }
       var html = '';
+      for (var ci = 0; ci < srChannels.length; ci++) {
+        var ch = srChannels[ci];
+        var clogo = ch.logo ? '<img src="' + esc(ch.logo) + '" onerror="this.style.display='none'" alt="">' : '<div class="ph">📺</div>';
+        html += '<div class="chitem" data-srch="' + esc(ch.id) + '">' + clogo
+          + '<div class="nm">' + esc(ch.name) + '</div>'
+          + '<span class="chinfo" title="▶">📺</span></div>';
+      }
       for (var i = 0; i < srMovies.length; i++) {
         var m = srMovies[i];
         var logo = m.cover ? '<img src="' + esc(m.cover) + '" onerror="this.style.display=\\'none\\'" alt="">' : '<div class="ph">🎬</div>';
@@ -982,11 +938,12 @@ export function renderRemotePage(lang?: string): string {
           if (ws && ws.readyState === 1) {
             ws.send(JSON.stringify({ action: 'requestCatalog', query: gFilter }));
             ws.send(JSON.stringify({ action: 'requestSeries', query: gFilter }));
+            ws.send(JSON.stringify({ action: 'requestLiveSearch', query: gFilter }));
           }
         }, 300);
       } else {
         if (gSearchTimer) clearTimeout(gSearchTimer);
-        searchMode = false; srMovies = []; srSeries = [];
+        searchMode = false; srMovies = []; srSeries = []; srChannels = [];
         searchEl.classList.add('hidden');
         activateTab(activeView || 'control');
       }
@@ -1009,6 +966,8 @@ export function renderRemotePage(lang?: string): string {
         sendCmd('requestSeriesInfo', null, null, null, sid);
         return;
       }
+      var chn = ev.target.closest('[data-srch]');
+      if (chn) { sendCmd('playChannel', null, chn.getAttribute('data-srch')); return; }
       var mv = ev.target.closest('[data-srmv]');
       if (mv) sendCmd('castMovie', null, null, mv.getAttribute('data-srmv'));
     });
@@ -1069,6 +1028,8 @@ export function renderRemotePage(lang?: string): string {
       if (action === 'playChannel' || action === 'requestEpg') payload.channelId = channelId;
       if (action === 'recordChannel') { payload.channelId = channelId; payload.channelName = arg5; }
       if (action === 'stopRecord') payload.id = channelId;
+      if (action === 'deleteRecording') payload.name = channelId;
+      if (action === 'requestLiveSearch') payload.query = channelId;
       if (action === 'scheduleNext') payload.channelId = channelId;
       if (action === 'castMovie') payload.movieId = movieId;
       if (action === 'castMovieQueue') payload.movieIds = arg5;
