@@ -2,8 +2,14 @@ import { app, ipcMain, shell, BrowserWindow } from 'electron'
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
 import path from 'path'
 import fs from 'fs'
+import { createRequire } from 'module'
 import log from './logger'
 import { recordingFilename, buildRecordingArgs, parseFfmpegTime } from './dvrProtocol'
+
+// Runtime require: resolves the REAL ffmpeg-static from node_modules. A bare
+// top-level require would get inlined by the bundler, whose __dirname shim
+// points at dist-electron and yields a path that doesn't exist (dead DVR).
+const requireRuntime = createRequire(import.meta.url)
 
 interface ActiveRecording {
     id: string
@@ -19,8 +25,7 @@ let nextId = 1
 
 function resolveFfmpegPath(): string | null {
     try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const ffmpegPath = require('ffmpeg-static') as string | null
+        const ffmpegPath = requireRuntime('ffmpeg-static') as string | null
         if (!ffmpegPath) return null
         // Packaged builds keep ffmpeg outside the asar (asarUnpack).
         return ffmpegPath.replace('app.asar', 'app.asar.unpacked')
