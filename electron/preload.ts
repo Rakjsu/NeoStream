@@ -167,6 +167,7 @@ const sendChannels = new Set([
     'web-remote:devices',
     'web-remote:cast-result',
     'web-remote:record-result',
+    'web-remote:live-results',
     'web-remote:recordings',
     'web-remote:schedule-result',
 ])

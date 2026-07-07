@@ -74,6 +74,22 @@ export function WebRemoteBridge() {
             });
         };
 
+        // Live channels matching the phone's global search — straight from the
+        // main-cached list, so it works even with the LiveTV page closed.
+        const pushLiveSearch = async (query = '') => {
+            const res = await window.ipcRenderer.invoke('streams:get-live').catch(() => null) as
+                { success: boolean; data?: { stream_id: number | string; name: string; stream_icon?: string }[] } | null;
+            const q = query.trim().toLowerCase();
+            const matches = q
+                ? (res?.data ?? []).filter(c => (c.name || '').toLowerCase().includes(q))
+                : [];
+            window.ipcRenderer.send('web-remote:live-results', {
+                items: matches.slice(0, 100).map(c => ({
+                    id: String(c.stream_id), name: c.name, logo: c.stream_icon || '',
+                })),
+            });
+        };
+
         // Discover every cast technology and push a flat, typed list to the phone.
         const pushDevices = async () => {
             const [cc, dl, ap] = await Promise.all([
@@ -351,6 +367,21 @@ export function WebRemoteBridge() {
             });
         };
 
+        // 🗑 on a finished file: resolve the name back to its safe absolute path
+        // (dvr:delete-file only accepts paths inside the recordings folder).
+        const deleteRecording = async (name: string) => {
+            const filesRes = await window.ipcRenderer.invoke('dvr:list-files').catch(() => null) as
+                { success: boolean; files?: { name: string; path: string; recording: boolean }[] } | null;
+            const file = (filesRes?.files ?? []).find(f => f.name === name && !f.recording);
+            if (!file) {
+                window.ipcRenderer.send('web-remote:record-result', { status: 'error', name });
+                return;
+            }
+            const res = await window.ipcRenderer.invoke('dvr:delete-file', { path: file.path })
+                .catch(() => null) as { success: boolean } | null;
+            window.ipcRenderer.send('web-remote:record-result', { status: res?.success ? 'deleted' : 'error', name });
+        };
+
         // Second tap on a 🔴 row: finalize that DVR recording.
         const stopRecord = async (id: string) => {
             const res = await window.ipcRenderer.invoke('dvr:stop', { id })
@@ -381,11 +412,13 @@ export function WebRemoteBridge() {
 
         const handler = (_e: unknown, action: string, arg?: unknown, target?: unknown) => {
             if (action === 'requestCatalog') void pushCatalog(typeof arg === 'string' ? arg : '');
+            else if (action === 'requestLiveSearch') void pushLiveSearch(typeof arg === 'string' ? arg : '');
             else if (action === 'requestContinue') void pushContinue();
             else if (action === 'requestRecommended') void pushRecommended();
             else if (action === 'requestDevices') void pushDevices();
             else if (action === 'recordChannel') void recordChannel(String(arg ?? ''), typeof target === 'string' ? target : '');
             else if (action === 'stopRecord') void stopRecord(String(arg ?? ''));
+            else if (action === 'deleteRecording') void deleteRecording(String(arg ?? ''));
             else if (action === 'requestRecordings') void pushRecordings();
             else if (action === 'castMovie') void castMovie(String(arg ?? ''), asTarget(target));
             else if (action === 'castMovieQueue') void castMovieQueue(Array.isArray(arg) ? (arg as string[]) : [], asTarget(target));

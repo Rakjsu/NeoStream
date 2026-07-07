@@ -246,7 +246,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 }
 
 // Actions that always go to the renderer (never routed to the cast session).
-const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'scheduleNext', 'requestRecordings', 'requestCatalog', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'requestRecordings', 'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
@@ -281,6 +281,8 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         win.webContents.send('media:control', 'recordChannel', command.channelId, command.channelName)
     } else if (command.action === 'stopRecord') {
         win.webContents.send('media:control', 'stopRecord', command.id)
+    } else if (command.action === 'deleteRecording') {
+        win.webContents.send('media:control', 'deleteRecording', command.name)
     } else if (command.action === 'scheduleNext') {
         win.webContents.send('media:control', 'scheduleNext', command.channelId)
     } else if (command.action === 'castMovie') {
@@ -293,6 +295,8 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         win.webContents.send('media:control', 'requestSeriesInfo', command.seriesId)
     } else if (command.action === 'requestCatalog') {
         win.webContents.send('media:control', 'requestCatalog', command.query)
+    } else if (command.action === 'requestLiveSearch') {
+        win.webContents.send('media:control', 'requestLiveSearch', command.query)
     } else if (command.action === 'requestSeries') {
         win.webContents.send('media:control', 'requestSeries', command.query)
     } else if (command.action === 'requestContinue') {
@@ -481,10 +485,25 @@ export function setupWebRemote(): void {
         broadcast(JSON.stringify({ type: 'recommended', groups }))
     })
 
+    // Live channels matching the phone's global search (bridge-side filter).
+    ipcMain.on('web-remote:live-results', (_e, raw: unknown) => {
+        const obj = (raw ?? {}) as Record<string, unknown>
+        const rawItems = Array.isArray(obj.items) ? obj.items : []
+        const items = rawItems.slice(0, 100).map((c) => {
+            const it = (c ?? {}) as Record<string, unknown>
+            return {
+                id: String(it.id ?? ''),
+                name: typeof it.name === 'string' ? it.name.slice(0, 160) : '',
+                logo: typeof it.logo === 'string' ? it.logo.slice(0, 500) : '',
+            }
+        }).filter((c) => c.id && c.name)
+        broadcast(JSON.stringify({ type: 'liveResults', items }))
+    })
+
     // Result of a recording started from the phone's guide (REC button).
     ipcMain.on('web-remote:record-result', (_e, raw: unknown) => {
         const obj = (raw ?? {}) as Record<string, unknown>
-        const status = obj.status === 'ok' || obj.status === 'stopped' ? obj.status : 'error'
+        const status = obj.status === 'ok' || obj.status === 'stopped' || obj.status === 'deleted' ? obj.status : 'error'
         const name = typeof obj.name === 'string' ? obj.name.slice(0, 160) : ''
         const id = typeof obj.id === 'string' ? obj.id.slice(0, 60) : ''
         broadcast(JSON.stringify({ type: 'recordResult', status, name, id }))

@@ -127,8 +127,10 @@ export type RemoteCommand =
     | { action: 'requestEpg'; channelId: string }
     | { action: 'recordChannel'; channelId: string; channelName?: string }
     | { action: 'stopRecord'; id: string }
+    | { action: 'deleteRecording'; name: string }
     | { action: 'scheduleNext'; channelId: string }
     | { action: 'requestCatalog'; query?: string }
+    | { action: 'requestLiveSearch'; query?: string }
     | { action: 'requestContinue' }
     | { action: 'requestRecommended' }
     | { action: 'requestRecordings' }
@@ -140,8 +142,8 @@ export type RemoteCommand =
     | { action: 'castEpisode'; episodeId: string; target?: CastTarget }
 
 const VALID_ACTIONS = new Set([
-    'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'setVolume', 'setAudioTrack', 'playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'scheduleNext',
-    'requestCatalog', 'requestContinue', 'requestRecommended', 'requestRecordings', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
+    'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'setVolume', 'setAudioTrack', 'playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext',
+    'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestRecordings', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
 ])
 
 const CAST_TARGET_TYPES = new Set<CastTargetType>(['chromecast', 'dlna', 'airplay'])
@@ -206,6 +208,11 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         if (typeof id !== 'string' || !id) return null
         return { action: 'stopRecord', id: id.slice(0, 60) }
     }
+    if (action === 'deleteRecording') {
+        const name = (parsed as { name?: unknown }).name
+        if (typeof name !== 'string' || !name.trim()) return null
+        return { action: 'deleteRecording', name: name.trim().slice(0, 200) }
+    }
     if (action === 'scheduleNext') {
         const channelId = (parsed as { channelId?: unknown }).channelId
         if (typeof channelId !== 'string' || !channelId) return null
@@ -234,6 +241,7 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         return { action, episodeId, target: parseCastTarget(parsed) }
     }
     if (action === 'requestCatalog') return { action: 'requestCatalog', query: parseQuery(parsed) }
+    if (action === 'requestLiveSearch') return { action: 'requestLiveSearch', query: parseQuery(parsed) }
     if (action === 'requestSeries') return { action: 'requestSeries', query: parseQuery(parsed) }
     if (action === 'requestContinue') return { action: 'requestContinue' }
     if (action === 'requestRecommended') return { action: 'requestRecommended' }
