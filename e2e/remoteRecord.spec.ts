@@ -101,3 +101,100 @@ test('recordChannel do celular inicia a gravação DVR no PC e confirma', async 
         }
     });
 });
+
+/** Cliente WS persistente: envia comandos e espera mensagens por predicado. */
+function openWsClient(port: number, pin: string): Promise<{
+    send: (cmd: object) => void;
+    waitFor: <T>(pred: (msg: Record<string, unknown>) => T | null, timeoutMs?: number) => Promise<T>;
+    close: () => void;
+}> {
+    return new Promise((resolve, reject) => {
+        const waiters: { pred: (msg: Record<string, unknown>) => unknown; resolve: (v: unknown) => void }[] = [];
+        const socket = net.connect(port, '127.0.0.1', () => {
+            socket.write(
+                `GET /?pin=${pin} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\n` +
+                'Upgrade: websocket\r\nConnection: Upgrade\r\n' +
+                'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n',
+            );
+        });
+        let buf = Buffer.alloc(0);
+        let upgraded = false;
+        socket.on('data', (chunk) => {
+            buf = Buffer.concat([buf, chunk]);
+            if (!upgraded) {
+                const end = buf.indexOf('\r\n\r\n');
+                if (end === -1) return;
+                if (!buf.slice(0, end).toString().includes('101')) { socket.destroy(); reject(new Error('sem 101')); return; }
+                upgraded = true;
+                buf = buf.slice(end + 4);
+                resolve({
+                    send: (cmd) => socket.write(maskedTextFrame(JSON.stringify(cmd))),
+                    waitFor: <T,>(pred: (msg: Record<string, unknown>) => T | null, timeoutMs = 20000) =>
+                        new Promise<T>((res, rej) => {
+                            const timer = setTimeout(() => rej(new Error('waitFor timeout')), timeoutMs);
+                            waiters.push({ pred, resolve: (v) => { clearTimeout(timer); res(v as T); } });
+                        }),
+                    close: () => socket.destroy(),
+                });
+            }
+            while (buf.length >= 2) {
+                if (buf[0] !== 0x81) { buf = buf.slice(1); continue; }
+                let len = buf[1] & 0x7f;
+                let offset = 2;
+                if (len === 126) { if (buf.length < 4) break; len = buf.readUInt16BE(2); offset = 4; }
+                if (buf.length < offset + len) break;
+                const text = buf.slice(offset, offset + len).toString('utf-8');
+                buf = buf.slice(offset + len);
+                try {
+                    const msg = JSON.parse(text) as Record<string, unknown>;
+                    for (let i = waiters.length - 1; i >= 0; i--) {
+                        const value = waiters[i].pred(msg);
+                        if (value !== null) { waiters[i].resolve(value); waiters.splice(i, 1); }
+                    }
+                } catch { /* keep reading */ }
+            }
+        });
+        socket.on('error', reject);
+    });
+}
+
+test('stopRecord pelo celular encerra a gravação (toggle 🔴 → ⏹)', async () => {
+    test.setTimeout(120000);
+    launched = await launchApp({ serverUrl: server.url });
+    const page: Page = launched.page;
+    await seedProfiles(page, { active: 'adult' });
+    await expect(page.getByText(GREETING)).toBeVisible();
+
+    await page.locator('button.nav-item[title="Configurações"]').click();
+    await page.locator('.settings-nav .nav-item', { hasText: 'Rede' }).click();
+    await page.locator('.setting-item', { hasText: 'Controle pelo celular' }).locator('.toggle-slider').click();
+    const box = page.locator('.certificate-warning').filter({ hasText: 'PIN de pareamento' });
+    await expect(box).toBeVisible({ timeout: 10000 });
+    const url = await box.locator('a[href^="http://"]').getAttribute('href');
+    const port = Number(new URL(url!).port);
+    const pin = (await box.locator('strong').first().innerText()).trim();
+
+    const ws = await openWsClient(port, pin);
+
+    // Grava: o resultado traz o id que habilita o toggle no guia.
+    ws.send({ action: 'recordChannel', channelId: '102', channelName: 'SBT HD' });
+    const started = await ws.waitFor((m) =>
+        m.type === 'recordResult' && m.status === 'ok' ? m as { id?: string; name?: string } : null);
+    expect(started.name).toBe('SBT HD');
+    expect(typeof started.id).toBe('string');
+    expect((started.id as string).length).toBeGreaterThan(0);
+
+    // requestRecordings devolve a gravação ativa (estado inicial do guia).
+    ws.send({ action: 'requestRecordings' });
+    const listed = await ws.waitFor((m) =>
+        m.type === 'recordings' ? m as { items: { id: string; channelName: string }[] } : null);
+    expect(listed.items.some(i => i.id === started.id && i.channelName === 'SBT HD')).toBe(true);
+
+    // Segundo toque: para a gravação; o status stopped desmarca o 🔴.
+    ws.send({ action: 'stopRecord', id: started.id });
+    const stopped = await ws.waitFor((m) =>
+        m.type === 'recordResult' && m.status === 'stopped' ? m as { id?: string } : null);
+    expect(stopped.id).toBe(started.id);
+
+    ws.close();
+});
