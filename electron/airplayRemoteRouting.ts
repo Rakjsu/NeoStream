@@ -45,3 +45,38 @@ export function parseScrub(body: string): { duration: number; position: number }
     }
     return { duration: num('duration'), position: num('position') }
 }
+
+// ---------------------------------------------- AirPlay status → phone state --
+
+export interface AirplayStatusRaw {
+    position: number
+    duration: number
+    /** Locally-tracked transport state (the protocol has no cheap query). */
+    playing: boolean
+    title: string
+    deviceName: string
+}
+
+/**
+ * Same field shape the phone renders for Chromecast/DLNA. AirPlay video has
+ * no volume control, so castVolume stays null (slider hidden).
+ */
+export function airplayStateFields(status: AirplayStatusRaw): {
+    casting: true
+    castPlaying: boolean
+    castTime: number
+    castDuration: number
+    castTitle: string
+    castVolume: null
+    castDevice: string
+} {
+    return {
+        casting: true,
+        castPlaying: status.playing,
+        castTime: Math.max(0, status.position || 0),
+        castDuration: Math.max(0, status.duration || 0),
+        castTitle: status.title,
+        castVolume: null,
+        castDevice: status.deviceName,
+    }
+}

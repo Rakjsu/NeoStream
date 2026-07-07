@@ -55,13 +55,14 @@ export function getCastStatus(): {
     title: string; hasQueue: boolean; subtitleAvailable: boolean; subtitleEnabled: boolean;
     volume: number | null; audioTracks: { trackId: number; name: string; language: string }[];
     activeAudioTrackId: number | null;
+    deviceName: string;
 } {
     const s = activeSession
     if (!s?.isActive) {
         return {
             active: false, playing: false, currentTime: 0, duration: 0,
             title: '', hasQueue: false, subtitleAvailable: false, subtitleEnabled: true,
-            volume: null, audioTracks: [], activeAudioTrackId: null,
+            volume: null, audioTracks: [], activeAudioTrackId: null, deviceName: '',
         }
     }
     const status = s.status
@@ -79,6 +80,7 @@ export function getCastStatus(): {
         volume: status.volume,
         audioTracks: status.audioTracks,
         activeAudioTrackId: status.activeAudioTrackId,
+        deviceName: status.deviceName,
     }
 }
 

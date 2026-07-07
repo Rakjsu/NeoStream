@@ -417,7 +417,7 @@ export function renderRemotePage(lang?: string): string {
             var cast = msg.casting ? '📡 ' : '';
             titleEl.textContent = msg.hasMedia ? (msg.title || L.playing)
               : (msg.casting && msg.castTitle ? msg.castTitle : L.nothingPlaying);
-            statusEl.textContent = cast + (msg.hasMedia ? (msg.playing ? '▶ ' + L.playing : '⏸ ' + L.paused) : (msg.casting ? L.castingOnTv : L.connected));
+            statusEl.textContent = cast + (msg.hasMedia ? (msg.playing ? '▶ ' + L.playing : '⏸ ' + L.paused) : (msg.casting ? (msg.castDevice ? L.castingToast + L.onDevice + msg.castDevice : L.castingOnTv) : L.connected));
             statusEl.className = 'status on';
             updateCastProgress(msg);
           } else if (msg.type === 'guide') {

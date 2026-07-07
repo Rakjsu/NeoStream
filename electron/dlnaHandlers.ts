@@ -58,6 +58,7 @@ interface NativeSsdpResponse {
 // Active cast session — set on successful dlna:cast, cleared on stop/new cast.
 interface CastSession {
     deviceId: string
+    deviceName: string
     location: string
     avTransportUrl: string
     renderingControlUrl: string | null
@@ -980,6 +981,7 @@ export function setupDLNAHandlers() {
 
             castSession = {
                 deviceId,
+                deviceName: device.name || '',
                 location,
                 avTransportUrl,
                 renderingControlUrl,
@@ -1162,6 +1164,7 @@ async function fetchDlnaSessionStatus(session: CastSession): Promise<DlnaStatusR
     }
     return {
         title: session.title,
+        deviceName: session.deviceName,
         state: getXmlTagValue(transportInfo, 'CurrentTransportState') || 'UNKNOWN',
         position: parseUpnpTime(getXmlTagValue(positionInfo, 'RelTime')),
         duration: parseUpnpTime(getXmlTagValue(positionInfo, 'TrackDuration')),
