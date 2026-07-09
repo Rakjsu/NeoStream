@@ -246,7 +246,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 }
 
 // Actions that always go to the renderer (never routed to the cast session).
-const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'requestRecordings', 'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule', 'requestRecordings', 'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
@@ -285,6 +285,8 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         win.webContents.send('media:control', 'deleteRecording', command.name)
     } else if (command.action === 'scheduleNext') {
         win.webContents.send('media:control', 'scheduleNext', command.channelId)
+    } else if (command.action === 'cancelSchedule') {
+        win.webContents.send('media:control', 'cancelSchedule', command.id)
     } else if (command.action === 'castMovie') {
         win.webContents.send('media:control', 'castMovie', command.movieId, command.target)
     } else if (command.action === 'castMovieQueue') {
@@ -503,7 +505,7 @@ export function setupWebRemote(): void {
     // Result of a recording started from the phone's guide (REC button).
     ipcMain.on('web-remote:record-result', (_e, raw: unknown) => {
         const obj = (raw ?? {}) as Record<string, unknown>
-        const status = obj.status === 'ok' || obj.status === 'stopped' || obj.status === 'deleted' ? obj.status : 'error'
+        const status = obj.status === 'ok' || obj.status === 'stopped' || obj.status === 'deleted' || obj.status === 'cancelled' ? obj.status : 'error'
         const name = typeof obj.name === 'string' ? obj.name.slice(0, 160) : ''
         const id = typeof obj.id === 'string' ? obj.id.slice(0, 60) : ''
         broadcast(JSON.stringify({ type: 'recordResult', status, name, id }))
@@ -530,7 +532,18 @@ export function setupWebRemote(): void {
                 sizeMb: typeof it.sizeMb === 'number' && Number.isFinite(it.sizeMb) ? Math.max(0, Math.round(it.sizeMb)) : 0,
             }
         }).filter((c) => c.name)
-        broadcast(JSON.stringify({ type: 'recordings', items, files }))
+        // Future recordings scheduled from the EPG (this app or the phone's ⏺).
+        const rawScheduled = Array.isArray(obj.scheduled) ? obj.scheduled : []
+        const scheduled = rawScheduled.slice(0, 20).map((c) => {
+            const it = (c ?? {}) as Record<string, unknown>
+            return {
+                id: String(it.id ?? '').slice(0, 80),
+                title: typeof it.title === 'string' ? it.title.slice(0, 160) : '',
+                channelName: typeof it.channelName === 'string' ? it.channelName.slice(0, 160) : '',
+                startIso: typeof it.startIso === 'string' ? it.startIso.slice(0, 40) : '',
+            }
+        }).filter((c) => c.id && c.title)
+        broadcast(JSON.stringify({ type: 'recordings', items, files, scheduled }))
     })
 
     // Result of scheduling the channel's NEXT program from the phone.
