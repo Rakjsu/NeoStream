@@ -274,7 +274,9 @@
     "now": "now",
     "programReminder": "Program Reminder",
     "wrappedAnnual": "Wrapped",
-    "programReminderStarting": "{title} is starting on {channel}"
+    "programReminderStarting": "{title} is starting on {channel}",
+    "dvrFinishedTitle": "Recording finished",
+    "dvrFinishedBody": "{name} — {duration}"
   },
   "changelog": {
     "updateInstalled": "Update Installed!",
