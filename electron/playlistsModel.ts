@@ -201,6 +201,8 @@ export function removePlaylistById(
 
 export function renamePlaylist(playlists: PlaylistEntry[], id: string, name: string): PlaylistEntry[] {
     const trimmed = name.trim()
-    if (!trimmed) return playlists
+    // Same array back = "nothing changed" to callers; an unknown id must not
+    // look like a successful rename (map() alone would return a new array).
+    if (!trimmed || !playlists.some(p => p.id === id)) return playlists
     return playlists.map(p => (p.id === id ? { ...p, name: trimmed } : p))
 }
