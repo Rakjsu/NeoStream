@@ -11,6 +11,7 @@ import { ProfileSelector } from './pages/ProfileSelector';
 import { UpdateNotification } from './components/UpdateNotification';
 import { PostUpdateChangelog } from './components/PostUpdateChangelog';
 import { WebRemoteBridge } from './components/WebRemoteBridge';
+import { DvrNotifyBridge } from './components/DvrNotifyBridge';
 import { GlobalCastIndicator } from './components/GlobalCastIndicator';
 import { EpisodeToast } from './components/EpisodeToast';
 import { MiniPlayerProvider } from './components/MiniPlayer';
@@ -289,6 +290,7 @@ function App() {
       <HashRouter>
         <ProgramReminderBridge />
         <WebRemoteBridge />
+        <DvrNotifyBridge />
         <GlobalCastIndicator />
         <EpisodeToastWithNavigation />
         <Suspense fallback={<PageLoader />}>

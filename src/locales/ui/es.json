@@ -249,7 +249,9 @@
     "now": "ahora",
     "programReminder": "Recordatorio de Programa",
     "wrappedAnnual": "Retrospectiva",
-    "programReminderStarting": "{title} está comenzando en {channel}"
+    "programReminderStarting": "{title} está comenzando en {channel}",
+    "dvrFinishedTitle": "Grabación finalizada",
+    "dvrFinishedBody": "{name} — {duration}"
   },
   "changelog": {
     "updateInstalled": "¡Actualización Instalada!",
