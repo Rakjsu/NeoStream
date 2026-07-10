@@ -51,3 +51,7 @@ release/
 *.zip
 *.tar.gz
 out/
+
+# Claude Code (config local, fora do repo)
+CLAUDE.md
+.claude/
