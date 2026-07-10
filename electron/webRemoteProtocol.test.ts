@@ -134,6 +134,13 @@ describe('parseRemoteCommand', () => {
         expect(parseRemoteCommand('{"action":"stopRecord"}')).toBeNull()
         expect(parseRemoteCommand('{"action":"scheduleNext","channelId":"77"}')).toEqual({ action: 'scheduleNext', channelId: '77' })
         expect(parseRemoteCommand('{"action":"scheduleNext"}')).toBeNull()
+        // R53: cancelar uma gravação agendada pelo id (aparado em 80).
+        expect(parseRemoteCommand('{"action":"cancelSchedule","id":"sched_ab12_1770000000000"}'))
+            .toEqual({ action: 'cancelSchedule', id: 'sched_ab12_1770000000000' })
+        expect(parseRemoteCommand('{"action":"cancelSchedule","id":"  "}')).toBeNull()
+        expect(parseRemoteCommand('{"action":"cancelSchedule"}')).toBeNull()
+        expect(parseRemoteCommand('{"action":"cancelSchedule","id":' + JSON.stringify('x'.repeat(120)) + '}'))
+            .toEqual({ action: 'cancelSchedule', id: 'x'.repeat(80) })
         expect(parseRemoteCommand('{"action":"requestRecordings"}')).toEqual({ action: 'requestRecordings' })
         // R52: excluir gravação pronta e busca de canais ao vivo.
         expect(parseRemoteCommand('{"action":"deleteRecording","name":"Globo_2026.ts"}'))

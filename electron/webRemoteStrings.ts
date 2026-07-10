@@ -37,6 +37,7 @@ export const STRINGS: Record<RemoteLang, Record<string, string>> = {
         recStop: 'Parar gravação', recStopped: 'Gravação encerrada', schedNext: 'Gravar o próximo', schedOk: 'Agendado: ', schedFail: 'Não deu pra agendar (sem programação?)',
         recCardTitle: 'Gravações', recReady: 'Prontas no computador',
         recDelete: 'Excluir gravação', recDeleteConfirm: 'Toque de novo pra confirmar', recDeleted: 'Gravação excluída',
+        recScheduled: 'Agendadas', schedCancel: 'Cancelar agendamento', schedCancelled: 'Agendamento cancelado',
     },
     en: {
         htmlLang: 'en', brandSuffix: 'Remote',
@@ -64,6 +65,7 @@ export const STRINGS: Record<RemoteLang, Record<string, string>> = {
         recStop: 'Stop recording', recStopped: 'Recording finished', schedNext: 'Record the next one', schedOk: 'Scheduled: ', schedFail: 'Could not schedule (no guide data?)',
         recCardTitle: 'Recordings', recReady: 'Ready on the computer',
         recDelete: 'Delete recording', recDeleteConfirm: 'Tap again to confirm', recDeleted: 'Recording deleted',
+        recScheduled: 'Scheduled', schedCancel: 'Cancel schedule', schedCancelled: 'Schedule cancelled',
     },
     es: {
         htmlLang: 'es', brandSuffix: 'Control',
@@ -91,5 +93,6 @@ export const STRINGS: Record<RemoteLang, Record<string, string>> = {
         recStop: 'Detener grabación', recStopped: 'Grabación finalizada', schedNext: 'Grabar el próximo', schedOk: 'Programado: ', schedFail: 'No se pudo programar (¿sin guía?)',
         recCardTitle: 'Grabaciones', recReady: 'Listas en la computadora',
         recDelete: 'Eliminar grabación', recDeleteConfirm: 'Toca de nuevo para confirmar', recDeleted: 'Grabación eliminada',
+        recScheduled: 'Programadas', schedCancel: 'Cancelar programación', schedCancelled: 'Programación cancelada',
     },
 }

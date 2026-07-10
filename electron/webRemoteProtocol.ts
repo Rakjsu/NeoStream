@@ -129,6 +129,7 @@ export type RemoteCommand =
     | { action: 'stopRecord'; id: string }
     | { action: 'deleteRecording'; name: string }
     | { action: 'scheduleNext'; channelId: string }
+    | { action: 'cancelSchedule'; id: string }
     | { action: 'requestCatalog'; query?: string }
     | { action: 'requestLiveSearch'; query?: string }
     | { action: 'requestContinue' }
@@ -142,7 +143,7 @@ export type RemoteCommand =
     | { action: 'castEpisode'; episodeId: string; target?: CastTarget }
 
 const VALID_ACTIONS = new Set([
-    'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'setVolume', 'setAudioTrack', 'playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext',
+    'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'setVolume', 'setAudioTrack', 'playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule',
     'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestRecordings', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
 ])
 
@@ -217,6 +218,11 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         const channelId = (parsed as { channelId?: unknown }).channelId
         if (typeof channelId !== 'string' || !channelId) return null
         return { action: 'scheduleNext', channelId }
+    }
+    if (action === 'cancelSchedule') {
+        const id = (parsed as { id?: unknown }).id
+        if (typeof id !== 'string' || !id.trim()) return null
+        return { action: 'cancelSchedule', id: id.trim().slice(0, 80) }
     }
     if (action === 'castMovie') {
         const movieId = (parsed as { movieId?: unknown }).movieId

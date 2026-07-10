@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { CastQueueItem } from '../services/castQueue';
 import { watchProgressService } from '../services/watchProgressService';
+import { scheduledRecordingService } from '../services/scheduledRecordingService';
 import { movieProgressService } from '../services/movieProgressService';
 import { getHomeRecommendations, type RecMovie, type RecSeries } from '../services/recommendationService';
 
@@ -391,18 +392,32 @@ export function WebRemoteBridge() {
             });
         };
 
-        // Active recordings (guide 🔴 rows + the Controle tab's Gravações card)
-        // and the latest finished files, so the phone sees the whole DVR.
+        // Active recordings (guide 🔴 rows + the Controle tab's Gravações card),
+        // the latest finished files and the pending EPG schedules, so the phone
+        // sees the whole DVR (active → ready → scheduled).
         const pushRecordings = async () => {
             const res = await window.ipcRenderer.invoke('dvr:active').catch(() => null) as
                 { success: boolean; recordings?: { id: string; channelName: string; seconds: number }[] } | null;
             const filesRes = await window.ipcRenderer.invoke('dvr:list-files').catch(() => null) as
                 { success: boolean; files?: { name: string; sizeBytes: number; recording: boolean }[] } | null;
+            const scheduled = scheduledRecordingService.list()
+                .slice()
+                .sort((a, b) => (Date.parse(a.startIso) || 0) - (Date.parse(b.startIso) || 0))
+                .slice(0, 10)
+                .map(s => ({ id: s.id, title: s.title, channelName: s.channelName, startIso: s.startIso }));
             window.ipcRenderer.send('web-remote:recordings', {
                 items: (res?.recordings ?? []).map(r => ({ id: r.id, channelName: r.channelName, seconds: r.seconds })),
                 files: (filesRes?.files ?? []).filter(f => !f.recording).slice(0, 10)
                     .map(f => ({ name: f.name, sizeMb: Math.round(f.sizeBytes / 1048576) })),
+                scheduled,
             });
+        };
+
+        // ✖ on a scheduled row: unarm the timer (and stop it if already recording).
+        const cancelSchedule = (id: string) => {
+            const exists = scheduledRecordingService.list().some(s => s.id === id);
+            if (exists) scheduledRecordingService.remove(id);
+            window.ipcRenderer.send('web-remote:record-result', { status: exists ? 'cancelled' : 'error', name: '', id });
         };
 
         const asTarget = (v: unknown): CastTarget | undefined => {
@@ -420,6 +435,7 @@ export function WebRemoteBridge() {
             else if (action === 'stopRecord') void stopRecord(String(arg ?? ''));
             else if (action === 'deleteRecording') void deleteRecording(String(arg ?? ''));
             else if (action === 'requestRecordings') void pushRecordings();
+            else if (action === 'cancelSchedule') cancelSchedule(String(arg ?? ''));
             else if (action === 'castMovie') void castMovie(String(arg ?? ''), asTarget(target));
             else if (action === 'castMovieQueue') void castMovieQueue(Array.isArray(arg) ? (arg as string[]) : [], asTarget(target));
             else if (action === 'requestSeries') void pushSeries(typeof arg === 'string' ? arg : '');

@@ -202,6 +202,8 @@ export function renderRemotePage(lang?: string): string {
         <div class="chlist" id="reclive"></div>
         <div class="rechead hidden" id="recreadyhead">${t.recReady}</div>
         <div class="chlist" id="recfiles"></div>
+        <div class="rechead hidden" id="recschedhead">📅 ${t.recScheduled}</div>
+        <div class="chlist" id="recsched"></div>
       </div>
     </div>
 
@@ -268,14 +270,18 @@ export function renderRemotePage(lang?: string): string {
     var filter = '';
     var epgCache = {};   // channelId → { now, nowStart, nowEnd, next }
     var activeRecs = {}; // channelName → recording id (guia marca 🔴)
-    var recsData = { items: [], files: [] }; // card 📼 da aba Controle
+    var recsData = { items: [], files: [], scheduled: [] }; // card 📼 da aba Controle
     var pendingDelete = '';      // nome aguardando o 2º toque do 🗑
     var pendingDeleteTimer = null;
+    var pendingCancel = '';      // id de agendada aguardando o 2º toque do ✖
+    var pendingCancelTimer = null;
     var srChannels = [];         // canais ao vivo na busca global
     var reccardEl = document.getElementById('reccard');
     var recliveEl = document.getElementById('reclive');
     var recfilesEl = document.getElementById('recfiles');
     var recreadyheadEl = document.getElementById('recreadyhead');
+    var recschedEl = document.getElementById('recsched');
+    var recschedheadEl = document.getElementById('recschedhead');
     var openEpg = {};    // channelId → true while its EPG panel is expanded
     var movies = [];     // catalog: [{ id, name, cover }]
     var mvFilter = '';
@@ -402,17 +408,22 @@ export function renderRemotePage(lang?: string): string {
               showToast('⏹ ' + L.recStopped, 'ok');
               renderGuide();
               sendCmd('requestRecordings');
+            } else if (msg.status === 'cancelled') {
+              pendingCancel = '';
+              showToast('✖ ' + L.schedCancelled, 'ok');
+              sendCmd('requestRecordings');
             } else showToast(L.recFail, 'err');
           } else if (msg.type === 'liveResults') {
             if (searchMode) { srChannels = msg.items || []; renderSearch(); }
           } else if (msg.type === 'recordings') {
             activeRecs = {};
             for (var ri = 0; ri < (msg.items || []).length; ri++) activeRecs[msg.items[ri].channelName] = msg.items[ri].id;
-            recsData = { items: msg.items || [], files: msg.files || [] };
+            recsData = { items: msg.items || [], files: msg.files || [], scheduled: msg.scheduled || [] };
             renderGuide();
             renderRecCard();
           } else if (msg.type === 'scheduleResult') {
-            if (msg.status === 'ok') showToast('📅 ' + L.schedOk + msg.title, 'ok');
+            // Refresh the card so the fresh schedule shows up under 📅.
+            if (msg.status === 'ok') { showToast('📅 ' + L.schedOk + msg.title, 'ok'); sendCmd('requestRecordings'); }
             else showToast(L.schedFail, 'err');
           } else if (msg.type === 'castResult') {
             if (msg.status === 'ok') showToast('📡 ' + L.castingToast + (msg.deviceName ? L.onDevice + msg.deviceName : ''), 'ok');
@@ -769,8 +780,19 @@ export function renderRemotePage(lang?: string): string {
     });
 
     // -------------------------------------------- Recomendados ("porque você assistiu") --
+    // "24/12 21:30" (só "21:30" quando é hoje) pra linha de agendada.
+    function fmtSched(iso) {
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      var now = new Date();
+      var hm = (d.getHours() < 10 ? '0' : '') + d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+      var sameDay = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+      if (sameDay) return hm;
+      return ((d.getDate() < 10 ? '0' : '') + d.getDate()) + '/' + ((d.getMonth() + 1 < 10 ? '0' : '') + (d.getMonth() + 1)) + ' ' + hm;
+    }
+
     function renderRecCard() {
-      var hasAny = recsData.items.length || recsData.files.length;
+      var hasAny = recsData.items.length || recsData.files.length || recsData.scheduled.length;
       if (!hasAny) { reccardEl.classList.add('hidden'); return; }
       reccardEl.classList.remove('hidden');
       var html = '';
@@ -793,6 +815,19 @@ export function renderRemotePage(lang?: string): string {
       }
       recfilesEl.innerHTML = fhtml;
       recreadyheadEl.classList.toggle('hidden', !recsData.files.length);
+      var shtml = '';
+      for (var si = 0; si < recsData.scheduled.length; si++) {
+        var s = recsData.scheduled[si];
+        var canceling = pendingCancel === s.id;
+        var when = fmtSched(s.startIso);
+        shtml += '<div class="chitem"><div class="ph">📅</div>'
+          + '<div class="nm">' + esc(s.title) + (s.channelName ? ' · ' + esc(s.channelName) : '') + '</div>'
+          + (when ? '<span style="flex:none;font-size:12px;color:rgba(255,255,255,.5)">' + when + '</span>' : '')
+          + '<button class="chinfo" data-cancel="' + esc(s.id) + '" title="' + (canceling ? L.recDeleteConfirm : L.schedCancel) + '"'
+          + (canceling ? ' style="background:rgba(239,68,68,.45)"' : '') + '>' + (canceling ? '❗' : '✖') + '</button></div>';
+      }
+      recschedEl.innerHTML = shtml;
+      recschedheadEl.classList.toggle('hidden', !recsData.scheduled.length);
     }
 
     recliveEl.addEventListener('click', function (ev) {
@@ -815,6 +850,24 @@ export function renderRemotePage(lang?: string): string {
         pendingDelete = name;
         if (pendingDeleteTimer) clearTimeout(pendingDeleteTimer);
         pendingDeleteTimer = setTimeout(function () { pendingDelete = ''; renderRecCard(); }, 4000);
+      }
+      renderRecCard();
+    });
+
+    recschedEl.addEventListener('click', function (ev) {
+      if (!ev.target.closest) return;
+      var btn = ev.target.closest('[data-cancel]');
+      if (!btn) return;
+      var sid = btn.getAttribute('data-cancel');
+      if (pendingCancel === sid) {
+        pendingCancel = '';
+        if (pendingCancelTimer) clearTimeout(pendingCancelTimer);
+        sendCmd('cancelSchedule', null, sid);
+      } else {
+        // 1º toque só arma a confirmação (desarma sozinha em 4s).
+        pendingCancel = sid;
+        if (pendingCancelTimer) clearTimeout(pendingCancelTimer);
+        pendingCancelTimer = setTimeout(function () { pendingCancel = ''; renderRecCard(); }, 4000);
       }
       renderRecCard();
     });
@@ -1031,6 +1084,7 @@ export function renderRemotePage(lang?: string): string {
       if (action === 'deleteRecording') payload.name = channelId;
       if (action === 'requestLiveSearch') payload.query = channelId;
       if (action === 'scheduleNext') payload.channelId = channelId;
+      if (action === 'cancelSchedule') payload.id = channelId;
       if (action === 'castMovie') payload.movieId = movieId;
       if (action === 'castMovieQueue') payload.movieIds = arg5;
       if (action === 'requestSeriesInfo') payload.seriesId = arg5;
