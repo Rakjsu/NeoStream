@@ -1,5 +1,6 @@
 import { profileService } from './profileService';
 import { playlistScopedKey, hasKnownPlaylistId } from './activePlaylistService';
+import { syncTraktMovieWatched } from './traktService';
 
 export interface MovieProgress {
     movieId: string;
@@ -71,6 +72,11 @@ class MovieProgressService {
         const progress = this.getProgress();
         const progressPercent = (currentTime / duration) * 100;
         const completed = progressPercent >= 95;
+
+        // 🎬 Trakt: a PRIMEIRA vez que o filme cruza os 95% vira "visto" lá
+        // (fire-and-forget; sem credenciais/conexão a chamada é um no-op).
+        const previousEntry = progress.find(p => p.movieId === movieId && p.profileId === activeProfile.id);
+        if (completed && !previousEntry?.completed) void syncTraktMovieWatched(movieName);
 
         const existing = progress.findIndex((p) => p.movieId === movieId);
 

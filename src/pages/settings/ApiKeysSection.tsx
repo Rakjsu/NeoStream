@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '../../services/languageService';
 import { getTmdbApiKey, setTmdbApiKey, validateTmdbApiKey } from '../../services/tmdbKey';
+import { disconnectTrakt, fetchTraktProfile, getTraktCreds, isTraktConnected, pollDeviceToken, setTraktCreds, startDeviceAuth, type TraktCreds } from '../../services/traktService';
 
 interface OsConfig { apiKey: string; username: string; password: string }
 
@@ -82,6 +83,41 @@ export function ApiKeysSection({ onboarding = false }: { onboarding?: boolean })
 
     const openOsSite = () => {
         void window.ipcRenderer.invoke('shell:open-external', { url: 'https://www.opensubtitles.com/consumers' });
+    };
+
+    // Trakt.tv (device code) — credenciais próprias no localStorage; conectar
+    // abre trakt.tv/activate e fica perguntando até o usuário autorizar lá.
+    const [trakt, setTrakt] = useState<TraktCreds>(() => getTraktCreds());
+    const [traktOn, setTraktOn] = useState(() => isTraktConnected());
+    const [traktUser, setTraktUser] = useState('');
+    const [traktCode, setTraktCode] = useState('');
+    const [traktMsg, setTraktMsg] = useState<'idle' | 'saved' | 'fail'>('idle');
+
+    useEffect(() => {
+        if (traktOn) void fetchTraktProfile().then(setTraktUser);
+    }, [traktOn]);
+
+    const handleTraktSave = () => {
+        setTraktCreds(trakt);
+        setTraktMsg('saved');
+    };
+
+    const handleTraktConnect = async () => {
+        setTraktCreds(trakt);
+        setTraktMsg('idle');
+        const auth = await startDeviceAuth();
+        if (!auth) { setTraktMsg('fail'); return; }
+        setTraktCode(auth.userCode);
+        void window.ipcRenderer.invoke('shell:open-external', { url: auth.verificationUrl });
+        const deadline = Date.now() + auth.expiresIn * 1000;
+        const tick = async () => {
+            if (Date.now() > deadline) { setTraktCode(''); return; }
+            const result = await pollDeviceToken(auth.deviceCode);
+            if (result === 'ok') { setTraktCode(''); setTraktOn(true); return; }
+            if (result === 'error') { setTraktCode(''); setTraktMsg('fail'); return; }
+            setTimeout(() => { void tick(); }, auth.intervalSec * 1000);
+        };
+        setTimeout(() => { void tick(); }, auth.intervalSec * 1000);
     };
 
     const osSteps = [1, 2, 3].map(n => t('apiKeys', `osStep${n}`));
@@ -202,6 +238,52 @@ export function ApiKeysSection({ onboarding = false }: { onboarding?: boolean })
                     <button className="apikeys-btn primary" onClick={openOsSite}>
                         🌐 {t('apiKeys', 'osOpenSite')}
                     </button>
+                </div>
+
+                <div className="setting-item" style={{ marginTop: 18 }}>
+                    <div className="setting-info">
+                        <label>🎬 Trakt.tv</label>
+                        <p>{t('apiKeys', 'traktWhyText')}</p>
+                    </div>
+                    <span className={`apikeys-status ${traktOn ? 'ok' : 'missing'}`}>
+                        {traktOn
+                            ? `✓ ${t('apiKeys', 'traktConnected')}${traktUser ? ` @${traktUser}` : ''}`
+                            : `○ ${t('apiKeys', 'osStatusOptional')}`}
+                    </span>
+                </div>
+
+                <div className="apikeys-form">
+                    <label className="apikeys-label" htmlFor="trakt-id">Client ID</label>
+                    <input
+                        id="trakt-id" className="apikeys-input" type="text" value={trakt.clientId}
+                        autoComplete="off" spellCheck={false}
+                        onChange={(e) => { setTrakt({ ...trakt, clientId: e.target.value }); setTraktMsg('idle'); }}
+                    />
+                    <label className="apikeys-label" htmlFor="trakt-secret" style={{ marginTop: 10 }}>Client Secret</label>
+                    <input
+                        id="trakt-secret" className="apikeys-input" type="password" value={trakt.clientSecret}
+                        autoComplete="off"
+                        onChange={(e) => { setTrakt({ ...trakt, clientSecret: e.target.value }); setTraktMsg('idle'); }}
+                    />
+                    <div className="apikeys-actions">
+                        <button className="apikeys-btn primary" onClick={handleTraktSave}>{t('apiKeys', 'save')}</button>
+                        {traktOn ? (
+                            <button className="apikeys-btn" onClick={() => { disconnectTrakt(); setTraktOn(false); setTraktUser(''); }}>
+                                {t('apiKeys', 'traktDisconnect')}
+                            </button>
+                        ) : (
+                            <button
+                                className="apikeys-btn"
+                                onClick={() => { void handleTraktConnect(); }}
+                                disabled={!!traktCode || !trakt.clientId.trim() || !trakt.clientSecret.trim()}
+                            >
+                                {traktCode ? `${t('apiKeys', 'traktWaiting')} ${traktCode}` : t('apiKeys', 'traktConnect')}
+                            </button>
+                        )}
+                        {traktMsg === 'saved' && <span className="apikeys-feedback ok">✓ {t('apiKeys', 'saved')}</span>}
+                        {traktMsg === 'fail' && <span className="apikeys-feedback err">✗ {t('apiKeys', 'traktFail')}</span>}
+                    </div>
+                    <p className="apikeys-label" style={{ marginTop: 10 }}>{t('apiKeys', 'traktHint')}</p>
                 </div>
 
                 <div className="certificate-warning">

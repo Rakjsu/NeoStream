@@ -6,6 +6,7 @@ import { watchLaterService } from '../services/watchLater';
 import { favoritesService } from '../services/favoritesService';
 import { newEpisodesService } from '../services/newEpisodesService';
 import { watchProgressService } from '../services/watchProgressService';
+import { syncTraktEpisodeWatched } from '../services/traktService';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import { CategoryMenu } from '../components/CategoryMenu';
@@ -628,6 +629,8 @@ export function Series() {
                             selectedSeason,
                             selectedEpisode
                         );
+                        // 🎬 Trakt: episódio concluído com temporada/número reais.
+                        void syncTraktEpisodeWatched(playingSeries.name, selectedSeason, selectedEpisode);
 
                         const episodes = seriesInfo?.episodes?.[selectedSeason];
                         if (episodes && selectedEpisode < episodes.length) {
