@@ -100,8 +100,74 @@ function stripQualityTags(name: string): string {
 
 export const epgService = {
 
+    // -------------------------------------------------------------------
+    // XMLTV do PRÓPRIO usuário (Configurações → EPG): quando configurado e
+    // com o canal presente, vence o EPG do provedor e as fontes públicas.
+    getUserEpgUrl(): string {
+        try {
+            return (localStorage.getItem('neostream_external_epg_url') || '').trim();
+        } catch {
+            return '';
+        }
+    },
+
+    setUserEpgUrl(url: string): void {
+        try {
+            const trimmed = url.trim();
+            if (trimmed) localStorage.setItem('neostream_external_epg_url', trimmed);
+            else localStorage.removeItem('neostream_external_epg_url');
+        } catch { /* storage indisponível */ }
+    },
+
+    /** Acha o id do canal no XMLTV pelo display-name (tags de qualidade fora). */
+    findXmltvChannelId(xml: string, channelName: string): string | null {
+        const wanted = stripQualityTags(channelName).toLowerCase();
+        if (!wanted) return null;
+        const channels = xml.match(/<channel[^>]+id="[^"]+"[\s\S]*?<\/channel>/gi) || [];
+        for (const entry of channels) {
+            const id = entry.match(/id="([^"]+)"/i)?.[1];
+            if (!id) continue;
+            const names = entry.match(/<display-name[^>]*>([^<]*)<\/display-name>/gi) || [];
+            for (const nameTag of names) {
+                const name = nameTag.replace(/<[^>]+>/g, '').trim();
+                if (name && stripQualityTags(name).toLowerCase() === wanted) return id;
+            }
+        }
+        return null;
+    },
+
+    async fetchFromUserXmltv(channelName: string): Promise<EPGProgram[]> {
+        const url = this.getUserEpgUrl();
+        if (!url) return [];
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ipcRenderer = (window as any).ipcRenderer;
+            if (!ipcRenderer?.invoke) return [];
+            const result = await ipcRenderer.invoke('epg:get-cached', {
+                url: url,
+                cacheKey: 'user-external',
+                forceRefresh: false
+            });
+            if (!result?.success || !result.data) return [];
+            const channelId = this.findXmltvChannelId(result.data, channelName);
+            if (!channelId) return [];
+            return this.parseXMLTV(result.data, channelId, channelName);
+        } catch {
+            return [];
+        }
+    },
+
     // Main function to fetch EPG for a channel
     async fetchChannelEPG(epgChannelId: string, channelName?: string, streamId?: number): Promise<EPGProgram[]> {
+        // MÁXIMA prioridade: o XMLTV que o PRÓPRIO usuário configurou —
+        // só vence quando tem programação atual/futura pro canal.
+        if (channelName) {
+            const userPrograms = await this.fetchFromUserXmltv(channelName);
+            if (userPrograms.some(p => new Date(p.end).getTime() > Date.now())) {
+                return userPrograms;
+            }
+        }
+
         // PRIMARY: the Xtream provider's own EPG (xmltv.php parsed once in the
         // main process; get_simple_data_table as secondary). Falls back to the
         // existing chain when the provider has nothing for this channel.

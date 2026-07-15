@@ -132,3 +132,17 @@ describe('programa atual / próximo / a seguir', () => {
         expect(half).toBeLessThanOrEqual(51);
     });
 });
+
+describe('findXmltvChannelId (XMLTV do usuário)', () => {
+    it('casa display-name ignorando tags de qualidade', async () => {
+        const { epgService } = await import('./epgService');
+        const xml = `
+            <tv>
+              <channel id="espn.br"><display-name>ESPN</display-name></channel>
+              <channel id="globo.br"><display-name>Globo HD</display-name></channel>
+            </tv>`;
+        expect(epgService.findXmltvChannelId(xml, 'ESPN FHD')).toBe('espn.br');
+        expect(epgService.findXmltvChannelId(xml, 'Globo')).toBe('globo.br');
+        expect(epgService.findXmltvChannelId(xml, 'Inexistente')).toBeNull();
+    });
+});
