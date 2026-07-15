@@ -966,6 +966,13 @@
     "osOpenSite": "Abrir opensubtitles.com/consumers",
     "osTest": "Probar credenciales",
     "osTestOk": "¡Credenciales válidas — login OK!",
-    "osTestFail": "OpenSubtitles las rechazó. Verifica la clave de API, el usuario y la contraseña."
+    "osTestFail": "OpenSubtitles las rechazó. Verifica la clave de API, el usuario y la contraseña.",
+    "traktWhyText": "Marca automáticamente como vistos en Trakt las películas y episodios que terminas aquí. Crea una app personal en trakt.tv/oauth/applications y pega el Client ID/Secret.",
+    "traktConnected": "Conectado",
+    "traktDisconnect": "Desconectar",
+    "traktConnect": "Conectar (código en el sitio)",
+    "traktWaiting": "Escribe en el sitio el código",
+    "traktFail": "Falló — verifica el Client ID y el Secret.",
+    "traktHint": "El botón Conectar abre trakt.tv/activate — escribe allí el código mostrado aquí y autoriza."
   }
 }
