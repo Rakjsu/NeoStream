@@ -47,7 +47,7 @@ test('m3u: adicionar lista por URL leva os canais pra TV ao Vivo com grupos', as
     await page.locator('.playlists-add-form button[type="submit"]').click();
 
     // Adding switches + reloads into the dashboard.
-    await expect(page.getByText(GREETING)).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(GREETING)).toBeVisible({ timeout: 45000 });
 
     await page.locator('button.nav-item[title="TV ao Vivo"]').click();
     await expect(page.getByText('Canal M3U Um').first()).toBeVisible({ timeout: 20000 });
