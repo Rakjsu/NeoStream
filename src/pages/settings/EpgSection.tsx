@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useLanguage } from '../../services/languageService';
+import { epgService } from '../../services/epgService';
 import epgTestService, { type EpgTestResult, type EpgTestProgress } from '../../services/epgTestService';
 
 export type EpgResultsFilter = 'all' | 'working' | 'notWorking';
@@ -29,6 +30,8 @@ export function EpgSection({
     const { t } = useLanguage();
 
     // EPG Test states - synced with global background service
+    const [externalEpgUrl, setExternalEpgUrl] = useState(() => epgService.getUserEpgUrl());
+    const [externalEpgSaved, setExternalEpgSaved] = useState(false);
     const [testingEpg, setTestingEpg] = useState(epgTestService.isRunning);
     const [epgTestProgress, setEpgTestProgress] = useState<EpgTestProgress>(epgTestService.progress);
     const [epgTestResults, setEpgTestResults] = useState<EpgTestResult | null>(epgTestService.results);
@@ -190,6 +193,42 @@ export function EpgSection({
             </div>
 
             <div className="settings-group">
+                {/* XMLTV externo do usuário — prioridade máxima na cadeia de EPG */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>🌐 {t('epg', 'externalEpgTitle')}</label>
+                        <p>{t('epg', 'externalEpgHint')}</p>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', padding: '0 4px 18px' }}>
+                    <input
+                        type="text"
+                        value={externalEpgUrl}
+                        placeholder="https://exemplo.com/guia.xml"
+                        spellCheck={false}
+                        onChange={(e) => { setExternalEpgUrl(e.target.value); setExternalEpgSaved(false); }}
+                        style={{
+                            flex: '1 1 320px', maxWidth: 520, padding: '12px 14px', borderRadius: 10,
+                            border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.06)',
+                            color: '#fff', fontSize: 14, fontFamily: 'monospace',
+                        }}
+                    />
+                    <button
+                        onClick={() => { epgService.setUserEpgUrl(externalEpgUrl); setExternalEpgSaved(true); }}
+                        style={{
+                            padding: '10px 18px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                            background: 'linear-gradient(135deg, #06b6d4, #0891b2)', color: '#06222a', fontWeight: 700,
+                        }}
+                    >
+                        {t('epg', 'externalEpgSave')}
+                    </button>
+                    {externalEpgSaved && (
+                        <span style={{ alignSelf: 'center', color: '#34d399', fontSize: 13, fontWeight: 600 }}>
+                            ✓ {t('epg', 'externalEpgSaved')}
+                        </span>
+                    )}
+                </div>
+
                 {/* Playlist Channel Counts Grid - Redesigned */}
                 {playlistChannelCounts.total > 0 && (
                     <div style={{ marginBottom: '24px' }}>

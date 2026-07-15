@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SortSelect } from '../components/SortSelect';
+import { groupChannelVariants, qualityLabel } from '../services/channelVariantsService';
 import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
@@ -405,7 +406,17 @@ export function LiveTV() {
         [streams, sortBy]
     );
 
-    const filteredStreams = useMemo(() => sortedStreams.filter(stream => {
+    // 🧬 Variantes FHD/HD/SD do mesmo canal viram UM card (a melhor qualidade
+    // representa o grupo; as demais viram botões de qualidade na ficha).
+    const [groupVariants, setGroupVariantsState] = useState(() => localStorage.getItem('neostream_group_variants') !== 'off');
+    const variantsResult = useMemo(
+        () => (groupVariants
+            ? groupChannelVariants(sortedStreams)
+            : { groups: sortedStreams, variantsOf: new Map<string, typeof sortedStreams>() }),
+        [sortedStreams, groupVariants]
+    );
+
+    const filteredStreams = useMemo(() => variantsResult.groups.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
         if (selectedCategory === 'FAVORITES') {
             return matchesSearch && favoriteChannelIds.has(String(stream.stream_id));
@@ -426,7 +437,7 @@ export function LiveTV() {
         }
 
         return matchesSearch && matchesCategory;
-    }), [sortedStreams, searchQuery, selectedCategory, favoriteChannelIds, blockedCategoryIds, isKidsProfile, allowedCategoryIds]);
+    }), [variantsResult, searchQuery, selectedCategory, favoriteChannelIds, blockedCategoryIds, isKidsProfile, allowedCategoryIds]);
 
     // Keep the zap ref current for the media:control handler (written in an
     // effect — refs must not be mutated during render).
@@ -1048,6 +1059,28 @@ export function LiveTV() {
                 >
                     🔲 Multi-view
                 </button>
+                <button
+                    onClick={() => {
+                        const next = !groupVariants;
+                        setGroupVariantsState(next);
+                        if (next) localStorage.removeItem('neostream_group_variants');
+                        else localStorage.setItem('neostream_group_variants', 'off');
+                    }}
+                    title="Agrupar variantes FHD/HD/SD do mesmo canal num card só"
+                    style={{
+                        padding: '8px 14px',
+                        borderRadius: 10,
+                        border: groupVariants ? '1px solid rgba(var(--ns-accent-rgb), 0.5)' : '1px solid rgba(255,255,255,0.15)',
+                        background: groupVariants ? 'rgba(var(--ns-accent-rgb), 0.15)' : 'rgba(255,255,255,0.06)',
+                        color: groupVariants ? 'var(--ns-accent-light)' : 'rgba(255,255,255,0.7)',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                    }}
+                >
+                    🧬 FHD/HD/SD
+                </button>
                 <SortSelect value={sortBy} onChange={setSortBy} withRating={false} inline />
             </div>
             <CategoryMenu
@@ -1217,6 +1250,28 @@ export function LiveTV() {
 
                                 {/* Buttons */}
                                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                                    {(variantsResult.variantsOf.get(String(selectedChannel.stream_id)) ?? []).map(variant => (
+                                        <button
+                                            key={variant.stream_id}
+                                            title={variant.name}
+                                            onClick={() => {
+                                                setPlayingChannel(variant);
+                                                setSelectedChannel(null);
+                                            }}
+                                            style={{
+                                                padding: '14px 18px',
+                                                background: 'rgba(255, 255, 255, 0.08)',
+                                                color: 'white',
+                                                fontWeight: '700',
+                                                fontSize: '13px',
+                                                borderRadius: '12px',
+                                                border: '1px solid rgba(255, 255, 255, 0.15)',
+                                                cursor: 'pointer',
+                                            }}
+                                        >
+                                            {qualityLabel(variant.name)}
+                                        </button>
+                                    ))}
                                     <button
                                         onClick={() => {
                                             setPlayingChannel(selectedChannel);
