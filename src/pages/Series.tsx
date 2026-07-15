@@ -489,7 +489,7 @@ export function Series() {
                                     const yearMatch = s.release_date?.match(/(\d{4})/);
                                     const year = yearMatch ? yearMatch[1] : undefined;
                                     const genres = s.genre?.split(',').map(g => g.trim()).filter(Boolean);
-                                    const isNew = isRecentlyAdded(s.last_modified || s.added, nowMs);
+                                    const isNew = isRecentlyAdded(s.last_modified, nowMs);
 
                                     return (
                                         <div
