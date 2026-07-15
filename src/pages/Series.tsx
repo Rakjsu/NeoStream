@@ -20,6 +20,7 @@ import { useWindowedGrid } from '../hooks/useWindowedGrid';
 import { HoverPreviewCard } from '../components/HoverPreviewCard';
 import { closeAllPreviews } from '../components/hoverPreviewActions';
 import { useLanguage } from '../services/languageService';
+import { isRecentlyAdded } from '../services/catalogNew';
 import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
 
 interface Series {
@@ -76,6 +77,8 @@ export function Series() {
     const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false);
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const { t } = useLanguage();
+    // Congelado por sessão da página (regra de pureza) — base do selo NOVO.
+    const [nowMs] = useState(() => Date.now());
 
     // TMDB metadata + episode title resolution for the selected series
     const { tmdbData, loadingTmdb, getEpisodeTitle } = useSeriesMetadata(selectedSeries, selectedSeason);
@@ -486,6 +489,7 @@ export function Series() {
                                     const yearMatch = s.release_date?.match(/(\d{4})/);
                                     const year = yearMatch ? yearMatch[1] : undefined;
                                     const genres = s.genre?.split(',').map(g => g.trim()).filter(Boolean);
+                                    const isNew = isRecentlyAdded(s.last_modified || s.added, nowMs);
 
                                     return (
                                         <div
@@ -505,6 +509,7 @@ export function Series() {
                                                 plot={s.plot}
                                                 youtubeTrailer={s.youtube_trailer}
                                                 isFavorite={isFavorite}
+                                                isNew={isNew}
                                                 onPlay={() => {
                                                     handleSeriesClick(s);
                                                 }}

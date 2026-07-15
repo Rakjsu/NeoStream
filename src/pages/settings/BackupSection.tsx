@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '../../services/languageService';
-import { collectBackup, applyBackup, encodePlaylistPassword, decodePlaylistPassword, type BackupPlaylist } from '../../services/backupService';
+import { collectBackup, applyBackup, decryptBackup, encodePlaylistPassword, encryptBackup, decodePlaylistPassword, isEncryptedBackup, type BackupPlaylist } from '../../services/backupService';
 import { useSaveAnimation } from './useSaveAnimation';
 
 interface BackupFileResult {
@@ -18,6 +18,8 @@ export function BackupSection() {
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [pendingImportJson, setPendingImportJson] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    // Senha opcional: cifra o export e destranca imports NEOENC2.
+    const [backupPassword, setBackupPassword] = useState('');
     // Auto-backup config (lives in the main process store)
     const [autoBackup, setAutoBackup] = useState<{ enabled: boolean; dirPath: string; lastBackupAt: number } | null>(null);
     // Machine sync config (lives in the main process store)
@@ -103,9 +105,11 @@ export function BackupSection() {
             } catch { /* export without OpenSubtitles */ }
 
             const payload = collectBackup(playlists, openSubtitles);
+            let json = JSON.stringify(payload, null, 2);
+            if (backupPassword.trim()) json = await encryptBackup(json, backupPassword.trim());
             const result = await window.ipcRenderer.invoke(
                 'backup:save-file',
-                { json: JSON.stringify(payload, null, 2) }
+                { json }
             ) as BackupFileResult;
 
             if (result.success) {
@@ -145,7 +149,17 @@ export function BackupSection() {
         if (!pendingImportJson) return;
 
         try {
-            const parsed: unknown = JSON.parse(pendingImportJson);
+            let jsonText = pendingImportJson;
+            if (isEncryptedBackup(jsonText)) {
+                const decrypted = await decryptBackup(jsonText, backupPassword.trim());
+                if (decrypted === null) {
+                    setErrorMessage(t('backup', 'wrongPassword'));
+                    setPendingImportJson(null);
+                    return;
+                }
+                jsonText = decrypted;
+            }
+            const parsed: unknown = JSON.parse(jsonText);
             const report = applyBackup(parsed);
 
             // v2 backups also carry saved playlists — restored in the main store.
@@ -225,6 +239,26 @@ export function BackupSection() {
                         <span>📥</span>
                         <span>{t('backup', 'importButton')}</span>
                     </button>
+                </div>
+
+                {/* Senha opcional do arquivo de backup */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>🔒 {t('backup', 'passwordTitle')}</label>
+                        <p>{t('backup', 'passwordDesc')}</p>
+                    </div>
+                    <input
+                        type="password"
+                        value={backupPassword}
+                        onChange={(e) => setBackupPassword(e.target.value)}
+                        placeholder={t('backup', 'passwordPlaceholder')}
+                        autoComplete="new-password"
+                        style={{
+                            width: 200, padding: '12px 14px', borderRadius: 10,
+                            border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.06)',
+                            color: '#fff', fontSize: 14,
+                        }}
+                    />
                 </div>
 
                 {/* Scheduled automatic backup */}

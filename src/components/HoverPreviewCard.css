@@ -117,3 +117,18 @@
     background: linear-gradient(135deg, var(--ns-bg-panel) 0%, var(--ns-bg-deep) 100%);
     font-size: 48px;
 }
+/* Selo "NOVO" (item adicionado nos últimos dias) */
+.preview-new-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 2;
+    padding: 3px 8px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: #04150a;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .5px;
+    pointer-events: none;
+}
