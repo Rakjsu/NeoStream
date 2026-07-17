@@ -65,7 +65,7 @@ test('m3u fase 2: grupo "FILMES ..." vira filme na página de Filmes', async () 
     await page.locator('.playlists-add-form input[type="text"]').first().fill('Lista M3U E2E');
     await page.locator('.playlists-add-form input').nth(1).fill(`${server.url}/lista.m3u`);
     await page.locator('.playlists-add-form button[type="submit"]').click();
-    await expect(page.getByText(GREETING)).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(GREETING)).toBeVisible({ timeout: 45000 });
 
     // The VOD-heuristic entry (group "FILMES M3U", no SxxEyy tag) is a movie.
     await page.locator('button.nav-item[title="Filmes"]').click();

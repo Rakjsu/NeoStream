@@ -197,6 +197,25 @@ export function replayDurationMinutes(startIso: string, endIso: string, slackMin
     return Math.ceil((end - start) / 60000) + slackMin;
 }
 
+/**
+ * True when the program currently ON AIR can be restarted from its beginning
+ * via timeshift: archive flag on, program airing right now, and its start
+ * still inside the provider's retention window.
+ */
+export function isRestartable(
+    program: { start: string; end: string },
+    channel: ReplayChannelLike,
+    nowMs: number = Date.now()
+): boolean {
+    if (channel.tv_archive !== 1) return false;
+    const start = Date.parse(program.start);
+    const end = Date.parse(program.end);
+    if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return false;
+    if (start > nowMs || end < nowMs) return false;
+    const retentionDays = channel.tv_archive_duration > 0 ? channel.tv_archive_duration : 1;
+    return start >= nowMs - retentionDays * DAY_MS;
+}
+
 /** HH:MM label for a tick / program time (local time, 24h). */
 export function formatGuideTime(ms: number): string {
     return new Date(ms).toLocaleTimeString('pt-BR', {

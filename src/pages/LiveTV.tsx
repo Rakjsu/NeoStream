@@ -15,7 +15,7 @@ import { parentalService } from '../services/parentalService';
 import { useLanguage } from '../services/languageService';
 import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
 import { MultiView } from '../components/MultiView';
-import { isReplayable, replayDurationMinutes } from '../utils/epgGuide';
+import { isReplayable, isRestartable, replayDurationMinutes } from '../utils/epgGuide';
 import { getTimeshiftUrl } from '../services/timeshiftService';
 
 interface LiveStream {
@@ -114,6 +114,8 @@ export function LiveTV() {
     const [replayPlayback, setReplayPlayback] = useState<{ channel: LiveStream; program: EPGProgram } | null>(null);
     // Multi-view mosaic (2x2 simultaneous live channels)
     const [showMultiView, setShowMultiView] = useState(false);
+    // 📱 Feedback do "enviar pro celular" (app mobile conectado no controle web)
+    const [sendMobileMsg, setSendMobileMsg] = useState('');
     // Favorite channel ids (⭐): re-read whenever the star toggles.
     const [favoriteChannelIds, setFavoriteChannelIds] = useState<Set<string>>(() =>
         new Set(favoritesService.getAll().filter(f => f.type === 'channel').map(f => f.id)));
@@ -416,6 +418,12 @@ export function LiveTV() {
         [sortedStreams, groupVariants]
     );
 
+    // 🩺 Verificador de favoritos: sonda os canais da categoria ⭐ e marca
+    // quem está fora do ar (a sonda roda no main — sem CORS).
+    const [favCheckBusy, setFavCheckBusy] = useState(false);
+    const [favCheckMsg, setFavCheckMsg] = useState('');
+    const [deadIds, setDeadIds] = useState<Set<string>>(new Set());
+
     const filteredStreams = useMemo(() => variantsResult.groups.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
         if (selectedCategory === 'FAVORITES') {
@@ -703,6 +711,34 @@ export function LiveTV() {
         });
         return result.url;
     }, [replayPlayback]);
+
+    const checkFavorites = async () => {
+        setFavCheckBusy(true);
+        setFavCheckMsg('');
+        try {
+            const targets: { id: string; url: string }[] = [];
+            for (const stream of filteredStreams.slice(0, 30)) {
+                try {
+                    const url = await buildLiveStreamUrl(stream);
+                    if (url?.startsWith('http')) targets.push({ id: String(stream.stream_id), url });
+                } catch { /* canal sem URL fica de fora da sonda */ }
+            }
+            const result = await window.ipcRenderer.invoke('diagnostics:probe-urls', { targets }) as {
+                success: boolean; results?: { id: string; alive: boolean }[];
+            };
+            if (result.success && result.results) {
+                const dead = new Set(result.results.filter(r => !r.alive).map(r => r.id));
+                setDeadIds(dead);
+                setFavCheckMsg(dead.size === 0
+                    ? `✓ ${result.results.length} no ar`
+                    : `⚠ ${dead.size} de ${result.results.length} fora do ar`);
+            } else {
+                setFavCheckMsg('✖ sonda falhou');
+            }
+        } finally {
+            setFavCheckBusy(false);
+        }
+    };
 
     // Recent already-aired programs of the selected archive channel
     // (newest first, capped at 4) — each gets a ▶ Replay button.
@@ -1059,6 +1095,26 @@ export function LiveTV() {
                 >
                     🔲 Multi-view
                 </button>
+                {selectedCategory === 'FAVORITES' && (
+                    <button
+                        onClick={() => { void checkFavorites(); }}
+                        disabled={favCheckBusy}
+                        title="Sonda os favoritos (até 30) e marca os fora do ar"
+                        style={{
+                            padding: '8px 14px',
+                            borderRadius: 10,
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            background: 'rgba(255,255,255,0.06)',
+                            color: 'rgba(255,255,255,0.7)',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        {favCheckBusy ? '⏳ Verificando…' : favCheckMsg || '🩺 Verificar favoritos'}
+                    </button>
+                )}
                 <button
                     onClick={() => {
                         const next = !groupVariants;
@@ -1307,6 +1363,25 @@ export function LiveTV() {
                                         <span style={{ fontSize: '18px' }}>▶</span> {t('liveTV', 'watchNow')}
                                     </button>
 
+                                    {currentProgram && isRestartable(currentProgram, selectedChannel) && (
+                                        <button
+                                            onClick={() => setReplayPlayback({ channel: selectedChannel, program: currentProgram })}
+                                            title={currentProgram.title}
+                                            style={{
+                                                padding: '14px 18px',
+                                                background: 'rgba(var(--ns-accent-rgb), 0.18)',
+                                                color: 'var(--ns-accent-light)',
+                                                fontWeight: '700',
+                                                fontSize: '13px',
+                                                borderRadius: '12px',
+                                                border: '1px solid rgba(var(--ns-accent-rgb), 0.4)',
+                                                cursor: 'pointer',
+                                            }}
+                                        >
+                                            ⏮ {t('liveTV', 'restartProgram')}
+                                        </button>
+                                    )}
+
                                     <button
                                         onClick={() => {
                                             const id = String(selectedChannel.stream_id);
@@ -1345,6 +1420,39 @@ export function LiveTV() {
                                     >
                                         {favoriteChannelIds.has(String(selectedChannel.stream_id)) ? '⭐' : '☆'}
                                     </button>
+
+                                    <button
+                                        onClick={() => {
+                                            void window.ipcRenderer.invoke('web-remote:play-on-mobile', {
+                                                streamId: selectedChannel.stream_id,
+                                                name: selectedChannel.name
+                                            }).then((result: { success?: boolean; delivered?: number }) => {
+                                                setSendMobileMsg((result?.delivered ?? 0) > 0
+                                                    ? t('liveTV', 'sentToPhone')
+                                                    : t('liveTV', 'noPhoneConnected'));
+                                                setTimeout(() => setSendMobileMsg(''), 4000);
+                                            }).catch(() => undefined);
+                                        }}
+                                        title={t('liveTV', 'sendToPhone')}
+                                        style={{
+                                            padding: '14px 20px',
+                                            background: 'rgba(255, 255, 255, 0.05)',
+                                            color: 'rgba(255, 255, 255, 0.9)',
+                                            fontWeight: '600',
+                                            fontSize: '17px',
+                                            borderRadius: '12px',
+                                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        📱
+                                    </button>
+
+                                    {sendMobileMsg && (
+                                        <span style={{ alignSelf: 'center', color: 'rgba(255,255,255,0.75)', fontSize: '12px' }}>
+                                            {sendMobileMsg}
+                                        </span>
+                                    )}
 
                                     <button
                                         onClick={() => setSelectedChannel(null)}
@@ -1697,6 +1805,9 @@ export function LiveTV() {
                                         }}>
                                             {stream.name}
                                         </p>
+                                        {deadIds.has(String(stream.stream_id)) && (
+                                            <span style={{ color: '#f87171', fontSize: 11, fontWeight: 800 }}>⚠ FORA DO AR</span>
+                                        )}
                                     </div>
                                     {selectedChannel?.stream_id === stream.stream_id && (
                                         <div style={{

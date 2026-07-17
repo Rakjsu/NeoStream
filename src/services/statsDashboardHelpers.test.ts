@@ -101,3 +101,23 @@ describe('busiestWeekday', () => {
         expect(busiestWeekday([day('2026-07-01', 0)])).toBeNull();
     });
 });
+
+describe('habitHeatmap (dia × faixa de hora)', () => {
+    it('acumula por célula e acha o máximo; sessão sem bucket fica de fora', async () => {
+        const { habitHeatmap } = await import('./statsDashboardHelpers');
+        const { cells, max } = habitHeatmap([
+            { date: '2023-01-01', watchedSeconds: 600, hourBucket: 'evening' }, // domingo
+            { date: '2023-01-01', watchedSeconds: 300, hourBucket: 'evening' },
+            { date: '2023-01-02', watchedSeconds: 120, hourBucket: 'morning' }, // segunda
+            { date: '2023-01-02', watchedSeconds: 999 }, // sem bucket
+        ]);
+        expect(cells[0][2]).toBe(900);
+        expect(cells[1][0]).toBe(120);
+        expect(max).toBe(900);
+    });
+
+    it('vazio não explode', async () => {
+        const { habitHeatmap } = await import('./statsDashboardHelpers');
+        expect(habitHeatmap([]).max).toBe(0);
+    });
+});

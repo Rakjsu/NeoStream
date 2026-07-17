@@ -5,6 +5,7 @@ import { consumeTmdbOnboardingPending, hasTmdbApiKey } from '../services/tmdbKey
 import { movieProgressService } from '../services/movieProgressService';
 import { ContentDetailModal } from '../components/ContentDetailModal';
 import { NextEpisodes } from '../components/NextEpisodes';
+import { loadHomeRailPrefs, orderedHomeRails } from '../services/homeRailsService';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { ResumeModal } from '../components/ResumeModal';
 import { profileService } from '../services/profileService';
@@ -85,6 +86,8 @@ export function Home() {
     const [loading, setLoading] = useState(true);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [continueWatching, setContinueWatching] = useState<ContinueWatchingItem[]>([]);
+    // Ordem/visibilidade das fileiras (Configurações → Aparência) — lida no mount.
+    const [railPrefs] = useState(() => loadHomeRailPrefs());
     const [recentSeries, setRecentSeries] = useState<SeriesData[]>([]);
     const [updatedSeries, setUpdatedSeries] = useState<SeriesData[]>([]);
     const [recentMovies, setRecentMovies] = useState<MovieData[]>([]);
@@ -1443,52 +1446,67 @@ export function Home() {
                     </a >
                 </div >
 
-                {/* Continue Watching Section */}
-                {renderContentSection({
-                    title: `⏯️ ${t('home', 'continueWatching')}`,
-                    items: continueWatching,
-                    type: 'continue',
-                    showProgress: true,
-                    sectionIndex: 0
-                })}
-
-                {/* New episodes on followed series */}
-                {updatedSeries.length > 0 && renderContentSection({
-                    title: `📣 ${t('home', 'newEpisodes')}`,
-                    items: updatedSeries,
-                    type: 'series',
-                    sectionIndex: 1
-                })}
-
-                {/* Next Episodes Section */}
-                <NextEpisodes allSeries={allSeries} />
-
-                {/* Personalized Recommendations ("Porque você assistiu X") */}
-                {recommendationGroups.map((group, index) => (
-                    <div key={`rec-${group.seedName}`}>
-                        {renderContentSection({
-                            title: `💡 ${becauseYouWatchedTitle(group.seedName)}`,
-                            items: group.items.map(rec => rec.item),
-                            type: 'recommendations',
-                            sectionIndex: 1 + index
-                        })}
-                    </div>
-                ))}
-
-                {/* Recently Added Series */}
-                {renderContentSection({
-                    title: `🆕 ${t('home', 'recentSeries')}`,
-                    items: recentSeries,
-                    type: 'series',
-                    sectionIndex: 2
-                })}
-
-                {/* Recently Added Movies */}
-                {renderContentSection({
-                    title: `🎬 ${t('home', 'recentMovies')}`,
-                    items: recentMovies,
-                    type: 'movie',
-                    sectionIndex: 3
+                {/* Fileiras na ordem/visibilidade de Configurações → Aparência */}
+                {orderedHomeRails(railPrefs).map(railKey => {
+                    switch (railKey) {
+                        case 'continue': return (
+                            <div key={railKey}>
+                                {renderContentSection({
+                                    title: `⏯️ ${t('home', 'continueWatching')}`,
+                                    items: continueWatching,
+                                    type: 'continue',
+                                    showProgress: true,
+                                    sectionIndex: 0
+                                })}
+                            </div>
+                        );
+                        case 'newEpisodes': return updatedSeries.length > 0 ? (
+                            <div key={railKey}>
+                                {renderContentSection({
+                                    title: `📣 ${t('home', 'newEpisodes')}`,
+                                    items: updatedSeries,
+                                    type: 'series',
+                                    sectionIndex: 1
+                                })}
+                            </div>
+                        ) : null;
+                        case 'nextEpisodes': return <NextEpisodes key={railKey} allSeries={allSeries} />;
+                        case 'recommendations': return (
+                            <div key={railKey}>
+                                {recommendationGroups.map((group, index) => (
+                                    <div key={`rec-${group.seedName}`}>
+                                        {renderContentSection({
+                                            title: `💡 ${becauseYouWatchedTitle(group.seedName)}`,
+                                            items: group.items.map(rec => rec.item),
+                                            type: 'recommendations',
+                                            sectionIndex: 1 + index
+                                        })}
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                        case 'recentSeries': return (
+                            <div key={railKey}>
+                                {renderContentSection({
+                                    title: `🆕 ${t('home', 'recentSeries')}`,
+                                    items: recentSeries,
+                                    type: 'series',
+                                    sectionIndex: 2
+                                })}
+                            </div>
+                        );
+                        case 'recentMovies': return (
+                            <div key={railKey}>
+                                {renderContentSection({
+                                    title: `🎬 ${t('home', 'recentMovies')}`,
+                                    items: recentMovies,
+                                    type: 'movie',
+                                    sectionIndex: 3
+                                })}
+                            </div>
+                        );
+                        default: return null;
+                    }
                 })}
 
                 {/* Quick Access */}

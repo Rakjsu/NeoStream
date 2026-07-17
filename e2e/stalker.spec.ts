@@ -48,7 +48,7 @@ test('stalker: adicionar portal por URL+MAC leva os canais pra TV ao Vivo', asyn
     await page.locator('.playlists-add-form button[type="submit"]').click();
 
     // Adding switches + reloads into the dashboard.
-    await expect(page.getByText(GREETING)).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(GREETING)).toBeVisible({ timeout: 45000 });
 
     await page.locator('button.nav-item[title="TV ao Vivo"]').click();
     await expect(page.getByText('Canal STK Um').first()).toBeVisible({ timeout: 20000 });

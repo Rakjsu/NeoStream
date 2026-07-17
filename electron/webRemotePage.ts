@@ -13,10 +13,20 @@ import { STRINGS, type RemoteLang } from './webRemoteStrings'
 
 export type { RemoteLang } from './webRemoteStrings'
 
+/** Accent colors mirrored from the desktop theme (falls back to indigo). */
+export interface RemoteAccent {
+    main: string
+    dark: string
+    rgb: string
+}
+
+const DEFAULT_ACCENT: RemoteAccent = { main: '#6366f1', dark: '#4f46e5', rgb: '99, 102, 241' }
+
 /** Render the phone page in the app's language (anything unknown falls back to pt). */
-export function renderRemotePage(lang?: string): string {
+export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
     const code: RemoteLang = lang === 'en' || lang === 'es' ? lang : 'pt'
     const t = STRINGS[code]
+    const a = accent && accent.main && accent.dark && accent.rgb ? accent : DEFAULT_ACCENT
     return `<!doctype html>
 <html lang="${t.htmlLang}">
 <head>
@@ -31,7 +41,7 @@ export function renderRemotePage(lang?: string): string {
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <style>
-  :root { --accent: #6366f1; }
+  :root { --accent: ${a.main}; --accent-dark: ${a.dark}; --accent-rgb: ${a.rgb}; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body {
     margin: 0; min-height: 100vh; font-family: -apple-system, system-ui, sans-serif;
@@ -48,7 +58,7 @@ export function renderRemotePage(lang?: string): string {
     background: rgba(255,255,255,.04); color: rgba(255,255,255,.6); font-size: 14px;
     font-weight: 600; cursor: pointer; text-align: center; transition: all .15s ease;
   }
-  .tab.active { background: linear-gradient(135deg, #4f46e5, var(--accent)); color: #fff; border-color: transparent; }
+  .tab.active { background: linear-gradient(135deg, var(--accent-dark), var(--accent)); color: #fff; border-color: transparent; }
   .card {
     width: 100%; max-width: 420px; background: rgba(255,255,255,.05);
     border: 1px solid rgba(255,255,255,.1); border-radius: 20px; padding: 22px;
@@ -65,7 +75,7 @@ export function renderRemotePage(lang?: string): string {
     transition: transform .08s ease, background .15s ease;
   }
   button.ctl:active { transform: scale(.92); background: rgba(255,255,255,.16); }
-  button.ctl.primary { background: linear-gradient(135deg, #4f46e5, var(--accent)); width: 80px; height: 80px; font-size: 30px; }
+  button.ctl.primary { background: linear-gradient(135deg, var(--accent-dark), var(--accent)); width: 80px; height: 80px; font-size: 30px; }
   button.ctl.wide { width: auto; padding: 0 22px; font-size: 15px; font-weight: 600; height: 52px; }
   .seek button.ctl { font-size: 15px; font-weight: 600; }
   .hint { font-size: 12px; color: rgba(255,255,255,.4); max-width: 420px; text-align: center; }
@@ -84,11 +94,11 @@ export function renderRemotePage(lang?: string): string {
   .castseek { -webkit-appearance: none; appearance: none; width: 100%; height: 5px; border-radius: 3px;
     background: rgba(255,255,255,.15); outline: none; cursor: pointer; }
   .castseek::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px;
-    border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px rgba(99,102,241,.6); }
+    border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px rgba(var(--accent-rgb),.6); }
   .castseek::-moz-range-thumb { width: 16px; height: 16px; border: none; border-radius: 50%; background: var(--accent); }
   .nowbar {
-    background: linear-gradient(135deg, rgba(79,70,229,.25), rgba(99,102,241,.12));
-    border: 1px solid rgba(99,102,241,.3); border-radius: 16px; padding: 14px 16px; text-align: left;
+    background: linear-gradient(135deg, rgba(var(--accent-rgb),.25), rgba(var(--accent-rgb),.12));
+    border: 1px solid rgba(var(--accent-rgb),.3); border-radius: 16px; padding: 14px 16px; text-align: left;
   }
   .nowbar .lbl { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #a5b4fc; font-weight: 700; }
   .nowbar .ch { font-size: 15px; font-weight: 700; margin-top: 4px; }
@@ -107,7 +117,7 @@ export function renderRemotePage(lang?: string): string {
     transition: background .12s ease, transform .08s ease; text-align: left;
   }
   .chitem:active { transform: scale(.98); background: rgba(255,255,255,.1); }
-  .chitem.playing { border-color: var(--accent); background: rgba(99,102,241,.16); }
+  .chitem.playing { border-color: var(--accent); background: rgba(var(--accent-rgb),.16); }
   .chitem img { width: 40px; height: 40px; border-radius: 8px; object-fit: contain; background: rgba(0,0,0,.3); flex: none; }
   .chitem .ph { width: 40px; height: 40px; border-radius: 8px; background: rgba(255,255,255,.08); display: flex; align-items: center; justify-content: center; font-size: 18px; flex: none; }
   .chitem .nm { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -224,7 +234,7 @@ export function renderRemotePage(lang?: string): string {
       <input class="chsearch" id="mvsearch" placeholder="${t.searchMovie}" autocomplete="off">
       <div class="chlist" id="mvlist"></div>
       <div class="empty" id="mv-empty">${t.loadingMovies}</div>
-      <button class="ctl wide hidden" id="mvqueue" style="margin: 4px auto 0; background: linear-gradient(135deg,#4f46e5,var(--accent));">📡 ${t.castQueue}</button>
+      <button class="ctl wide hidden" id="mvqueue" style="margin: 4px auto 0; background: linear-gradient(135deg,var(--accent-dark),var(--accent));">📡 ${t.castQueue}</button>
     </div>
 
     <div id="series" class="hidden">
@@ -456,7 +466,7 @@ export function renderRemotePage(lang?: string): string {
       if (msg.casting && msg.castSubAvailable) {
         castsubEl.classList.remove('hidden');
         castsubEl.style.background = msg.castSubEnabled !== false
-          ? 'linear-gradient(135deg, #4f46e5, var(--accent))' : '';
+          ? 'linear-gradient(135deg, var(--accent-dark), var(--accent))' : '';
       } else {
         castsubEl.classList.add('hidden');
       }

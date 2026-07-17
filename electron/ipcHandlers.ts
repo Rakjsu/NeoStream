@@ -1111,6 +1111,34 @@ export function setupIpcHandlers() {
         }
     })
 
+    // 🩺 Verificador de favoritos: sonda uma lista de URLs de stream (GET com
+    // o corpo destruído na hora — o 1º byte basta) e devolve vivo/morto por
+    // id. Roda aqui no main pra não esbarrar em CORS no renderer.
+    ipcMain.handle('diagnostics:probe-urls', async (_e, data: { targets?: { id: string; url: string }[] }) => {
+        const targets = (data?.targets ?? []).filter(t => t?.id && t?.url).slice(0, 40)
+        const probeOne = async (target: { id: string; url: string }) => {
+            try {
+                const response = await axios.get(target.url, {
+                    timeout: 8000,
+                    validateStatus: () => true,
+                    responseType: 'stream',
+                    httpsAgent: getProviderHttpsAgent(target.url, target.url)
+                })
+                const body = response.data as { destroy?: () => void } | undefined
+                body?.destroy?.()
+                return { id: target.id, alive: response.status >= 200 && response.status < 400 }
+            } catch {
+                return { id: target.id, alive: false }
+            }
+        }
+        // 4 por vez pra não afogar o provedor.
+        const results: { id: string; alive: boolean }[] = []
+        for (let i = 0; i < targets.length; i += 4) {
+            results.push(...await Promise.all(targets.slice(i, i + 4).map(probeOne)))
+        }
+        return { success: true, results }
+    })
+
     // Provider health: probe the active provider's endpoints with timings.
     ipcMain.handle('diagnostics:provider-health', async () => {
         const auth = store.get('auth')

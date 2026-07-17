@@ -30,7 +30,7 @@ import {
     type PinGateEntry,
     type NetAddress,
 } from './webRemoteProtocol'
-import { renderRemotePage } from './webRemotePage'
+import { renderRemotePage, type RemoteAccent } from './webRemotePage'
 import { buildSetupDeepLink, renderSetupHandoffPage } from './setupPayload'
 import { exportPlaylistsForSetup, getActivePlaylistIdPublic } from './playlistManager'
 import { REMOTE_ICON_SVG, buildManifest, solidPng } from './webRemoteAssets'
@@ -51,6 +51,9 @@ const store = new Store<{ webRemote: WebRemoteConfig }>({ name: 'web-remote' })
 interface ClientSocket {
     socket: Socket
     buffer: Uint8Array
+    /** 'mobile' quando o cliente é o app NeoStream Mobile (não a página do navegador). */
+    role?: 'mobile'
+    name?: string
 }
 
 interface GuideChannel {
@@ -162,6 +165,20 @@ function broadcastState(): void {
     broadcast(stateMessage())
 }
 
+/** Envia um comando só pros clientes que são o APP mobile (não a página). */
+function sendToMobileClients(text: string): number {
+    const frame = encodeTextFrame(text)
+    let delivered = 0
+    for (const client of clients) {
+        if (client.role !== 'mobile') continue
+        try {
+            client.socket.write(frame)
+            delivered++
+        } catch { /* dropped on next read */ }
+    }
+    return delivered
+}
+
 /** Sanitize the untrusted guide payload coming from the renderer. */
 function sanitizeGuide(raw: unknown): GuideState {
     const obj = (raw ?? {}) as Record<string, unknown>
@@ -233,6 +250,19 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
                 } else if (frame.type === 'ping') {
                     socket.write(encodePongFrame(frame.payload))
                 } else if (frame.type === 'text') {
+                    // Hello do app mobile: marca o cliente como app — vira o
+                    // alvo do "enviar pro celular" (a página do navegador não).
+                    if (frame.text.includes('helloMobile')) {
+                        try {
+                            const hello = JSON.parse(frame.text) as { action?: unknown; name?: unknown } | null
+                            if (hello?.action === 'helloMobile') {
+                                client.role = 'mobile'
+                                client.name = typeof hello.name === 'string' ? hello.name.slice(0, 40) : 'celular'
+                                log.info('[WebRemote] app mobile conectado:', client.name)
+                                continue
+                            }
+                        } catch { /* não era o hello — segue o parse normal */ }
+                    }
                     const command = parseRemoteCommand(frame.text)
                     if (command) forwardCommand(command)
                 }
@@ -321,12 +351,26 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
 // page load after a restart already comes localized.
 let remoteLang = (store.get('webRemoteLang') as string | undefined) || 'pt'
 
+// Accent colors of the served page — mirrors the desktop theme (same flow as
+// the language above); persisted so the first load after a restart matches.
+let remoteAccent = (store.get('webRemoteAccent') as RemoteAccent | undefined) || null
+
 export function setupWebRemote(): void {
     ipcMain.on('app:language', (_e, raw: unknown) => {
         const code = String(raw ?? '').slice(0, 2)
         if (code === 'pt' || code === 'en' || code === 'es') {
             remoteLang = code
             store.set('webRemoteLang', code)
+        }
+    })
+
+    ipcMain.on('app:accent', (_e, raw: unknown) => {
+        const a = raw as Partial<RemoteAccent> | null
+        const isCssColorish = (s: unknown): s is string =>
+            typeof s === 'string' && s.length <= 40 && /^[#a-zA-Z0-9(),.% -]+$/.test(s)
+        if (a && isCssColorish(a.main) && isCssColorish(a.dark) && isCssColorish(a.rgb)) {
+            remoteAccent = { main: a.main, dark: a.dark, rgb: a.rgb }
+            store.set('webRemoteAccent', remoteAccent)
         }
     })
 
@@ -377,6 +421,19 @@ export function setupWebRemote(): void {
 
     // The LiveTV page pushes its channel list + now/next EPG here while it's
     // mounted, so the phone can show a second-screen guide and tap to switch.
+    // 📱 "Enviar pro celular": empurra um canal pro app NeoStream Mobile
+    // conectado neste servidor (o app dá play com a conta dele).
+    ipcMain.handle('web-remote:play-on-mobile', (_e, raw: unknown) => {
+        const data = raw as { streamId?: unknown; name?: unknown } | null
+        if (!data || data.streamId === undefined) return { success: false, delivered: 0 }
+        const delivered = sendToMobileClients(JSON.stringify({
+            type: 'playOnMobile',
+            streamId: String(data.streamId),
+            name: typeof data.name === 'string' ? data.name.slice(0, 120) : '',
+        }))
+        return { success: true, delivered }
+    })
+
     ipcMain.on('web-remote:guide', (_e, raw: unknown) => {
         guideState = sanitizeGuide(raw)
         broadcast(guideMessage())
@@ -630,7 +687,7 @@ function start(): Promise<void> {
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
             // PIN is NOT injected — the phone must enter the code shown on
             // the desktop settings screen (the page prompts + stores it).
-            res.end(renderRemotePage(remoteLang))
+            res.end(renderRemotePage(remoteLang, remoteAccent ?? undefined))
             return
         }
         // PWA assets: "Add to home screen" installs the remote as a real app.

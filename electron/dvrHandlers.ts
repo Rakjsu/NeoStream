@@ -21,6 +21,11 @@ interface ActiveRecording {
 }
 
 const active = new Map<string, ActiveRecording>()
+
+/** How many recordings are running right now (drives the tray hold-on-close). */
+export function activeRecordingCount(): number {
+    return active.size
+}
 let nextId = 1
 
 function resolveFfmpegPath(): string | null {

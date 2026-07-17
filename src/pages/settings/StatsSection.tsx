@@ -6,10 +6,12 @@ import {
     fillLastNDays,
     typeShare,
     dailyAverageSeconds,
-    busiestWeekday
+    busiestWeekday,
+    habitHeatmap
 } from '../../services/statsDashboardHelpers';
 import { useLanguage } from '../../services/languageService';
 import { WrappedOverlay } from '../../components/WrappedOverlay';
+import { getDailyGoalMinutes, goalProgressPct, setDailyGoalMinutes } from '../../services/watchLimitsService';
 
 const TYPE_COLORS = { movies: '#3b82f6', series: '#10b981', live: '#f59e0b' } as const;
 const LOCALE_BY_LANGUAGE: Record<string, string> = { pt: 'pt-BR', en: 'en-US', es: 'es-ES' };
@@ -19,6 +21,7 @@ export function StatsSection() {
     const [usageStats] = useState<UsageStats | null>(() => usageStatsService.getStats());
     const [weeklyStats] = useState<DailyStats[]>(() => usageStatsService.getWeeklyStats());
     const [showWrapped, setShowWrapped] = useState(false);
+    const [dailyGoal, setDailyGoal] = useState(() => getDailyGoalMinutes());
     const { t, language } = useLanguage();
 
     // The annual Wrapped notification opens the overlay via this event.
@@ -29,12 +32,25 @@ export function StatsSection() {
     }, []);
 
     const today = new Date().toISOString().split('T')[0];
+    const todaySeconds = usageStats?.dailyStats.find(d => d.date === today)?.totalSeconds || 0;
+    const goalPct = goalProgressPct(todaySeconds, dailyGoal);
     const monthlyStats = fillLastNDays(usageStats?.dailyStats || [], 30, today);
     const share = typeShare(usageStats?.contentBreakdown || { movies: 0, series: 0, live: 0 });
     const topContent = aggregateTopContent(usageStats?.sessionsThisMonth || []);
     const topGenres = aggregateTopGenres(usageStats?.sessionsThisMonth || []);
     const dailyAverage = dailyAverageSeconds(usageStats?.dailyStats || [], 30, today);
     const busiestDay = busiestWeekday(usageStats?.dailyStats || []);
+
+    // 🗓️ Heatmap de hábitos (dia × faixa de hora) do mês corrente.
+    const habitmap = habitHeatmap(usageStats?.sessionsThisMonth || []);
+    const heatmapLocale = LOCALE_BY_LANGUAGE[language] || 'pt-BR';
+    // 1º de janeiro de 2023 foi DOMINGO — vira as iniciais no idioma da UI.
+    const dayInitials = Array.from({ length: 7 }, (_, index) =>
+        new Date(2023, 0, 1 + index).toLocaleDateString(heatmapLocale, { weekday: 'narrow' }));
+    const bucketLabels = [
+        t('stats', 'habitMorning'), t('stats', 'habitAfternoon'),
+        t('stats', 'habitEvening'), t('stats', 'habitNight'),
+    ];
 
     // Helper functions for stats display
     const formatWatchTime = (seconds: number) => {
@@ -163,6 +179,58 @@ export function StatsSection() {
                             {t('stats', 'currentStreak')}
                         </div>
                     </div>
+                </div>
+
+                {/* 🎯 Daily watch goal */}
+                <div style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    borderRadius: '16px',
+                    padding: '20px',
+                    border: '1px solid rgba(255,255,255,0.05)',
+                    marginBottom: '20px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: dailyGoal > 0 ? '12px' : 0 }}>
+                        <h3 style={{ color: 'white', fontSize: '15px', margin: 0 }}>🎯 {t('stats', 'dailyGoal')}</h3>
+                        <select
+                            className="setting-select"
+                            value={dailyGoal}
+                            onChange={(e) => {
+                                const minutes = Number(e.target.value);
+                                setDailyGoal(minutes);
+                                setDailyGoalMinutes(minutes);
+                            }}
+                        >
+                            <option value={0}>{t('stats', 'goalOff')}</option>
+                            <option value={30}>30 min</option>
+                            <option value={60}>1h</option>
+                            <option value={120}>2h</option>
+                            <option value={180}>3h</option>
+                            <option value={240}>4h</option>
+                        </select>
+                    </div>
+                    {dailyGoal > 0 && (
+                        <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>
+                                    {formatWatchTime(todaySeconds)} / {formatWatchTime(dailyGoal * 60)}
+                                </span>
+                                {goalPct >= 100 && (
+                                    <span style={{ color: '#10b981', fontSize: '13px', fontWeight: 700 }}>{t('stats', 'goalReached')}</span>
+                                )}
+                            </div>
+                            <div style={{ height: '10px', background: 'rgba(255,255,255,0.06)', borderRadius: '5px' }}>
+                                <div style={{
+                                    height: '100%',
+                                    width: `${goalPct}%`,
+                                    background: goalPct >= 100
+                                        ? 'linear-gradient(90deg, #10b981, #059669)'
+                                        : 'linear-gradient(90deg, var(--ns-accent), var(--ns-accent-dark))',
+                                    borderRadius: '5px',
+                                    transition: 'width 0.3s ease'
+                                }} />
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 {/* Content Breakdown */}
@@ -408,6 +476,50 @@ export function StatsSection() {
                             🎭 {t('stats', 'topGenres')}
                         </h3>
                         {renderRankedBars(topGenres, '#a855f7')}
+                    </div>
+                )}
+
+                {/* Heatmap de hábitos: quando você costuma assistir */}
+                {habitmap.max > 0 && (
+                    <div style={{
+                        background: 'rgba(255,255,255,0.03)',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        marginTop: '20px'
+                    }}>
+                        <h3 style={{ color: 'white', fontSize: '14px', fontWeight: 600, marginBottom: '16px' }}>
+                            🗓️ {t('stats', 'habitHeatmap')}
+                        </h3>
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                            <span style={{ width: 110 }} />
+                            {dayInitials.map((initial, index) => (
+                                <span key={index} style={{ flex: 1, textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 700 }}>
+                                    {initial.toUpperCase()}
+                                </span>
+                            ))}
+                        </div>
+                        {bucketLabels.map((label, bucketIndex) => (
+                            <div key={label} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                                <span style={{ width: 110, color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{label}</span>
+                                {habitmap.cells.map((dayCells, dayIndex) => {
+                                    const seconds = dayCells[bucketIndex];
+                                    const alpha = seconds > 0 ? (0.10 + 0.70 * seconds / habitmap.max).toFixed(2) : null;
+                                    return (
+                                        <div
+                                            key={dayIndex}
+                                            title={`${Math.round(seconds / 60)} min`}
+                                            style={{
+                                                flex: 1,
+                                                height: 22,
+                                                borderRadius: 5,
+                                                background: alpha ? `rgba(var(--ns-accent-rgb), ${alpha})` : 'rgba(255,255,255,0.04)',
+                                            }}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        ))}
                     </div>
                 )}
 

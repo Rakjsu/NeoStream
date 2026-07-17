@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useLanguage } from '../../services/languageService';
 import { tvModeService } from '../../services/tvModeService';
 import {
+    loadHomeRailPrefs, moveHomeRail, saveHomeRailPrefs, toggleHomeRail, type HomeRailPrefs,
+} from '../../services/homeRailsService';
+import {
     ACCENT_PRESETS,
     BACKGROUND_PRESETS,
     useTheme
@@ -11,6 +14,16 @@ export function AppearanceSection() {
     const { t } = useLanguage();
     const { theme, setTheme } = useTheme();
     const [tvMode, setTvMode] = useState<boolean>(() => tvModeService.isEnabled());
+    // Fileiras do Início: ordem + ligar/desligar (vale ao voltar pro Início).
+    const [railPrefs, setRailPrefs] = useState(() => loadHomeRailPrefs());
+    const updateRails = (next: HomeRailPrefs) => {
+        setRailPrefs(next);
+        saveHomeRailPrefs(next);
+    };
+    const railButtonStyle: React.CSSProperties = {
+        width: 30, height: 30, borderRadius: 8, cursor: 'pointer',
+        border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.06)', color: '#fff',
+    };
 
     return (
         <div className="section-card">
@@ -23,6 +36,44 @@ export function AppearanceSection() {
             </div>
 
             <div className="settings-group">
+                {/* Fileiras do Início: ordem + visibilidade */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>🧱 {t('appearance', 'homeRailsTitle')}</label>
+                        <p>{t('appearance', 'homeRailsDesc')}</p>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 4px 16px' }}>
+                    {railPrefs.order.map((railKey, index) => (
+                        <div key={railKey} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <button
+                                style={{ ...railButtonStyle, opacity: index === 0 ? 0.4 : 1 }}
+                                disabled={index === 0}
+                                onClick={() => updateRails(moveHomeRail(railPrefs, railKey, -1))}
+                            >↑</button>
+                            <button
+                                style={{ ...railButtonStyle, opacity: index === railPrefs.order.length - 1 ? 0.4 : 1 }}
+                                disabled={index === railPrefs.order.length - 1}
+                                onClick={() => updateRails(moveHomeRail(railPrefs, railKey, 1))}
+                            >↓</button>
+                            <span style={{
+                                flex: 1, fontSize: 14,
+                                color: railPrefs.hidden.includes(railKey) ? 'rgba(255,255,255,.35)' : 'rgba(255,255,255,.85)',
+                            }}>
+                                {t('appearance', `rail_${railKey}`)}
+                            </span>
+                            <label className="toggle-switch">
+                                <input
+                                    type="checkbox"
+                                    checked={!railPrefs.hidden.includes(railKey)}
+                                    onChange={() => updateRails(toggleHomeRail(railPrefs, railKey))}
+                                />
+                                <span className="toggle-slider"></span>
+                            </label>
+                        </div>
+                    ))}
+                </div>
+
                 {/* TV mode (10-foot UI) */}
                 <div className="setting-item">
                     <div className="setting-info">
