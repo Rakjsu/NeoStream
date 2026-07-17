@@ -114,6 +114,8 @@ export function LiveTV() {
     const [replayPlayback, setReplayPlayback] = useState<{ channel: LiveStream; program: EPGProgram } | null>(null);
     // Multi-view mosaic (2x2 simultaneous live channels)
     const [showMultiView, setShowMultiView] = useState(false);
+    // 📱 Feedback do "enviar pro celular" (app mobile conectado no controle web)
+    const [sendMobileMsg, setSendMobileMsg] = useState('');
     // Favorite channel ids (⭐): re-read whenever the star toggles.
     const [favoriteChannelIds, setFavoriteChannelIds] = useState<Set<string>>(() =>
         new Set(favoritesService.getAll().filter(f => f.type === 'channel').map(f => f.id)));
@@ -1345,6 +1347,39 @@ export function LiveTV() {
                                     >
                                         {favoriteChannelIds.has(String(selectedChannel.stream_id)) ? '⭐' : '☆'}
                                     </button>
+
+                                    <button
+                                        onClick={() => {
+                                            void window.ipcRenderer.invoke('web-remote:play-on-mobile', {
+                                                streamId: selectedChannel.stream_id,
+                                                name: selectedChannel.name
+                                            }).then((result: { success?: boolean; delivered?: number }) => {
+                                                setSendMobileMsg((result?.delivered ?? 0) > 0
+                                                    ? t('liveTV', 'sentToPhone')
+                                                    : t('liveTV', 'noPhoneConnected'));
+                                                setTimeout(() => setSendMobileMsg(''), 4000);
+                                            }).catch(() => undefined);
+                                        }}
+                                        title={t('liveTV', 'sendToPhone')}
+                                        style={{
+                                            padding: '14px 20px',
+                                            background: 'rgba(255, 255, 255, 0.05)',
+                                            color: 'rgba(255, 255, 255, 0.9)',
+                                            fontWeight: '600',
+                                            fontSize: '17px',
+                                            borderRadius: '12px',
+                                            border: '1px solid rgba(255, 255, 255, 0.15)',
+                                            cursor: 'pointer',
+                                        }}
+                                    >
+                                        📱
+                                    </button>
+
+                                    {sendMobileMsg && (
+                                        <span style={{ alignSelf: 'center', color: 'rgba(255,255,255,0.75)', fontSize: '12px' }}>
+                                            {sendMobileMsg}
+                                        </span>
+                                    )}
 
                                     <button
                                         onClick={() => setSelectedChannel(null)}

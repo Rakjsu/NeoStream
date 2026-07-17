@@ -62,12 +62,28 @@ jobs:
 
       - name: Build app (renderer + main)
         run: npx vite build
+        env:
+          # Chave TMDB fake SO pro build de E2E: sem chave, todo teste que
+          # adiciona playlist cai no redirect de onboarding (Configuracoes ->
+          # APIs) e a saudacao do dashboard so aparece por um frame - flaky
+          # que depende da velocidade do runner. O spec do onboarding continua
+          # cobrindo o fluxo sem chave via neostream_tmdb_ignore_env.
+          VITE_TMDB_API_KEY: e2e-dummy-key
 
       - name: Bundle guard
         run: node scripts/check-bundle.mjs
 
       - name: E2E tests (Playwright + Electron)
         run: npx playwright test
+
+      - name: Upload app screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-screenshots
+          path: screenshots/
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Upload Playwright report on failure
         if: failure()

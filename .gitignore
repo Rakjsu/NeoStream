@@ -42,6 +42,7 @@ dist-electron
 # Playwright
 playwright-report/
 test-results/
+screenshots/
 
 # Electron build artifacts
 release/
