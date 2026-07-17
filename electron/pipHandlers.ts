@@ -7,6 +7,7 @@ import { BrowserWindow, ipcMain, screen, globalShortcut } from 'electron';
 import type { IpcMainEvent } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import Store from 'electron-store';
 
 import log from './logger'
 // ES module equivalent of __dirname
@@ -29,8 +30,44 @@ interface PipContent {
     episodeNumber?: number;
 }
 
+// Multi-monitor: which display hosts the PiP window (absent = primary).
+const pipStore = new Store<{ pipDisplayId?: number }>({ name: 'pip-config' });
+
+function pickPipDisplay() {
+    const preferredId = pipStore.get('pipDisplayId');
+    if (typeof preferredId === 'number') {
+        const match = screen.getAllDisplays().find(d => d.id === preferredId);
+        if (match) return match;
+    }
+    return screen.getPrimaryDisplay();
+}
+
 export function setupPipHandlers(mainWin: BrowserWindow) {
     mainWindow = mainWin;
+
+    // Multi-monitor: list displays + persist which one hosts the PiP window.
+    ipcMain.handle('pip:get-display-config', () => ({
+        success: true,
+        displays: screen.getAllDisplays().map((d, index) => ({
+            id: d.id,
+            label: d.label || `Monitor ${index + 1}`,
+            width: d.size.width,
+            height: d.size.height,
+            primary: d.id === screen.getPrimaryDisplay().id,
+        })),
+        selectedId: typeof pipStore.get('pipDisplayId') === 'number' ? pipStore.get('pipDisplayId') : null,
+    }));
+
+    ipcMain.handle('pip:set-display', (_event, data: { displayId: number | null }) => {
+        if (typeof data?.displayId === 'number') pipStore.set('pipDisplayId', data.displayId);
+        else pipStore.delete('pipDisplayId');
+        // A live PiP window hops to the new display right away.
+        if (pipWindow && !pipWindow.isDestroyed()) {
+            const area = pickPipDisplay().workArea;
+            pipWindow.setPosition(area.x + area.width - 420, area.y + area.height - 280);
+        }
+        return { success: true };
+    });
 
     // Open PiP window
     ipcMain.handle('pip:open', async (_event, content: PipContent) => {
@@ -69,10 +106,10 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
             },
         });
 
-        // Position in bottom-right corner of screen
-        const primaryDisplay = screen.getPrimaryDisplay();
-        const { width: screenWidth, height: screenHeight } = primaryDisplay.workAreaSize;
-        pipWindow.setPosition(screenWidth - 420, screenHeight - 280);
+        // Position in bottom-right corner of the configured display (falls
+        // back to the primary when the saved monitor is gone).
+        const area = pickPipDisplay().workArea;
+        pipWindow.setPosition(area.x + area.width - 420, area.y + area.height - 280);
 
         // Load PiP page with content data encoded in URL
         const encodedContent = encodeURIComponent(JSON.stringify(content));

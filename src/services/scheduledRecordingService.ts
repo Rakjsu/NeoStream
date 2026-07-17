@@ -71,6 +71,14 @@ class ScheduledRecordingService {
             localStorage.setItem(this.getStorageKey(), JSON.stringify(schedules));
         } catch { /* best-effort */ }
         this.listeners.forEach(cb => cb(schedules));
+        this.pushCountToMain(schedules.length);
+    }
+
+    /** Mirror the pending count into main so closing the window can hold the app. */
+    private pushCountToMain(count: number): void {
+        try {
+            window.ipcRenderer?.send('dvr:schedules-changed', count);
+        } catch { /* jsdom/tests sem preload */ }
     }
 
     subscribe(cb: ScheduleCallback): () => void {
@@ -108,6 +116,7 @@ class ScheduledRecordingService {
         const alive = all.filter(s => !isScheduleExpired(s.endIso, now));
         if (alive.length !== all.length) this.save(alive);
         alive.forEach(s => this.arm(s));
+        this.pushCountToMain(alive.length);
     }
 
     private arm(rec: ScheduledRecording): void {

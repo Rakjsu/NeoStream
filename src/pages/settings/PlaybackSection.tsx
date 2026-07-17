@@ -20,8 +20,23 @@ export function PlaybackSection() {
     const [notifyNewEpisodes, setNotifyNewEpisodes] = useState<boolean>(() => newEpisodeNotifier.isEnabled());
     const [transcodeRescue, setTranscodeRescue] = useState<boolean>(() => localStorage.getItem('neostream_transcode_rescue') !== '0');
     const [playbackConfig, setPlaybackConfig] = useState<PlaybackConfig>(playbackService.getConfig());
+    // Multi-monitor: where the PiP window opens (list comes from the main process).
+    const [pipDisplays, setPipDisplays] = useState<{ id: number; label: string; width: number; height: number; primary: boolean }[]>([]);
+    const [pipDisplayId, setPipDisplayId] = useState<number | null>(null);
     const { t } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
+
+    useEffect(() => {
+        let cancelled = false;
+        window.ipcRenderer.invoke('pip:get-display-config')
+            .then((result: { success: boolean; displays?: { id: number; label: string; width: number; height: number; primary: boolean }[]; selectedId?: number | null }) => {
+                if (cancelled || !result?.success) return;
+                setPipDisplays(result.displays || []);
+                setPipDisplayId(result.selectedId ?? null);
+            })
+            .catch(() => undefined);
+        return () => { cancelled = true; };
+    }, []);
 
     // EXPERIMENTAL — MPV PoC state
     const [mpvPathInput, setMpvPathInput] = useState('');
@@ -171,6 +186,33 @@ export function PlaybackSection() {
                     </select>
                     {saveAnimation === 'bufferSize' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                 </div>
+
+                {pipDisplays.length > 1 && (
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <label>🖥️ {t('playback', 'pipDisplay')}</label>
+                            <p>{t('playback', 'pipDisplayDesc')}</p>
+                        </div>
+                        <select
+                            className="setting-select"
+                            value={pipDisplayId === null ? 'auto' : String(pipDisplayId)}
+                            onChange={(e) => {
+                                const displayId = e.target.value === 'auto' ? null : Number(e.target.value);
+                                setPipDisplayId(displayId);
+                                window.ipcRenderer.invoke('pip:set-display', { displayId }).catch(() => undefined);
+                                triggerSaveAnimation('pipDisplay');
+                            }}
+                        >
+                            <option value="auto">{t('playback', 'pipDisplayAuto')}</option>
+                            {pipDisplays.map(display => (
+                                <option key={display.id} value={String(display.id)}>
+                                    {display.label} ({display.width}×{display.height}){display.primary ? ' ★' : ''}
+                                </option>
+                            ))}
+                        </select>
+                        {saveAnimation === 'pipDisplay' && <span className="save-indicator">{t('settings', 'saved')}</span>}
+                    </div>
+                )}
 
                 <div className="setting-item">
                     <div className="setting-info">
