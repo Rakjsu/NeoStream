@@ -1,4 +1,4 @@
-import { app, ipcMain, Tray, Menu, Notification, nativeImage, type BrowserWindow } from 'electron'
+import { app, ipcMain, Tray, Menu, Notification, nativeImage, powerSaveBlocker, type BrowserWindow } from 'electron'
 import path from 'path'
 import Store from 'electron-store'
 import log from './logger'
@@ -39,6 +39,9 @@ let pendingSchedules = 0
 
 // Last playback state reported by the renderer (drives the tray media items).
 let mediaState = { hasMedia: false, playing: false, title: '' }
+
+// 🖥️ Blocker que impede a tela de apagar durante a reprodução.
+let displayBlockerId: number | null = null
 
 function applyLoginItem(config: SystemConfig) {
     // Packaged only — in dev this would register the bare electron.exe.
@@ -131,6 +134,15 @@ export function setupTrayMode(getWin: () => BrowserWindow | null) {
             hasMedia: state?.hasMedia === true,
             playing: state?.playing === true,
             title: typeof state?.title === 'string' ? state.title : '',
+        }
+        // Tela acesa enquanto toca; libera o blocker ao pausar/parar.
+        if (mediaState.hasMedia && mediaState.playing) {
+            if (displayBlockerId === null || !powerSaveBlocker.isStarted(displayBlockerId)) {
+                displayBlockerId = powerSaveBlocker.start('prevent-display-sleep')
+            }
+        } else if (displayBlockerId !== null && powerSaveBlocker.isStarted(displayBlockerId)) {
+            powerSaveBlocker.stop(displayBlockerId)
+            displayBlockerId = null
         }
         buildTrayMenu(getWin)
     })

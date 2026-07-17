@@ -710,12 +710,24 @@ function start(): Promise<void> {
         // 🔗 Hand-off: page that bounces into the neostream://setup deep link
         // so the phone imports the desktop accounts by scanning the QR.
         if (req.url && req.url.startsWith('/setup')) {
+            // Mesmo anti brute-force do WebSocket: cooldown por IP no PIN.
+            const ip = req.socket.remoteAddress || 'unknown'
+            const now = Date.now()
+            if (isPinLockedOut(pinGate.get(ip), now)) {
+                res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8' })
+                res.end('Aguarde e tente de novo')
+                return
+            }
             const pin = new URL(req.url, 'http://local').searchParams.get('pin') || ''
             if (pin !== sessionPin) {
+                const entry = registerPinFailure(pinGate.get(ip), now)
+                pinGate.set(ip, entry)
+                if (entry.lockedUntil > now) log.warn(`[WebRemote] PIN do /setup bloqueado por tentativas: ${ip}`)
                 res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
                 res.end('PIN')
                 return
             }
+            pinGate.delete(ip)
             const link = buildSetupDeepLink(exportPlaylistsForSetup(), getActivePlaylistIdPublic())
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
             res.end(renderSetupHandoffPage(link, remoteLang))

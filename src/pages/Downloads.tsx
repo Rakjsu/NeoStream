@@ -4,7 +4,7 @@ import { Download, Trash2, Play, FolderOpen, HardDrive, Film, Tv, AlertTriangle,
 import { downloadService } from '../services/downloadService';
 import type { DownloadItem, StorageInfo } from '../services/downloadService';
 import { useLanguage } from '../services/languageService';
-import { getDvrMaxAgeDays, pickExpiredRecordings, setDvrMaxAgeDays } from '../services/dvrSweep';
+import { getDvrMaxAgeDays, getProtectedRecordings, pickExpiredRecordings, setDvrMaxAgeDays, toggleProtectedRecording } from '../services/dvrSweep';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 
 // Type for grouped series
@@ -65,6 +65,9 @@ export function Downloads() {
     const [recordings, setRecordings] = useState<RecordingFile[]>([]);
     const [playingRecording, setPlayingRecording] = useState<RecordingFile | null>(null);
     const [dvrMaxAge, setDvrMaxAge] = useState(() => getDvrMaxAgeDays());
+    const [protectedRecs, setProtectedRecs] = useState<Set<string>>(() => getProtectedRecordings());
+    const [renamingPath, setRenamingPath] = useState<string | null>(null);
+    const [renameValue, setRenameValue] = useState('');
 
     const loadRecordings = useCallback(async () => {
         try {
@@ -73,7 +76,7 @@ export function Downloads() {
             // Auto-sweep: delete recordings older than the configured limit (once per session)
             if (!sweptThisSession) {
                 sweptThisSession = true;
-                const expired = pickExpiredRecordings(files, getDvrMaxAgeDays(), Date.now());
+                const expired = pickExpiredRecordings(files, getDvrMaxAgeDays(), Date.now(), getProtectedRecordings());
                 if (expired.length > 0) {
                     for (const file of expired) {
                         try { await window.ipcRenderer.invoke('dvr:delete-file', { path: file.path }); } catch { /* keep going */ }
@@ -93,6 +96,13 @@ export function Downloads() {
             void loadRecordings();
         });
     }, [loadRecordings, showRecordings]);
+
+    const confirmRename = async () => {
+        if (!renamingPath) return;
+        const result = await window.ipcRenderer.invoke('dvr:rename-file', { path: renamingPath, name: renameValue }) as { success: boolean; error?: string };
+        setRenamingPath(null);
+        if (result?.success) void loadRecordings();
+    };
 
     const loadData = useCallback(async () => {
         setDownloads(downloadService.getDownloads());
@@ -379,9 +389,24 @@ export function Downloads() {
                                     <div key={rec.path} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, background: 'rgba(0,0,0,0.25)' }}>
                                         <span style={{ fontSize: 16, flexShrink: 0 }}>{rec.recording ? '🔴' : '📼'}</span>
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ color: 'white', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                                {rec.name.replace(/\.ts$/i, '')}
-                                            </div>
+                                            {renamingPath === rec.path ? (
+                                                <input
+                                                    autoFocus
+                                                    value={renameValue}
+                                                    onChange={e => setRenameValue(e.target.value)}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter') void confirmRename();
+                                                        if (e.key === 'Escape') setRenamingPath(null);
+                                                    }}
+                                                    onBlur={() => void confirmRename()}
+                                                    style={{ width: '100%', padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(var(--ns-accent-rgb), 0.6)', background: 'rgba(0,0,0,0.4)', color: 'white', fontSize: 13 }}
+                                                />
+                                            ) : (
+                                                <div title={rec.path} style={{ color: 'white', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {protectedRecs.has(rec.path) && <span title={t('downloads', 'recProtect')}>🔐 </span>}
+                                                    {rec.name.replace(/\.ts$/i, '')}
+                                                </div>
+                                            )}
                                             <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>
                                                 {downloadService.formatBytes(rec.sizeBytes)} · {new Date(rec.mtimeMs).toLocaleString('pt-BR')}
                                                 {rec.recording && <span style={{ color: '#ef4444', fontWeight: 700 }}> · GRAVANDO</span>}
@@ -394,6 +419,31 @@ export function Downloads() {
                                         >
                                             <Play size={12} style={{ verticalAlign: -2, marginRight: 4 }} fill="white" />
                                             {t('liveTV', 'watchNow')}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setRenamingPath(rec.path);
+                                                setRenameValue(rec.name.replace(/\.ts$/i, ''));
+                                            }}
+                                            disabled={rec.recording}
+                                            title={t('downloads', 'renameRec')}
+                                            style={{ padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.7)', cursor: rec.recording ? 'not-allowed' : 'pointer', opacity: rec.recording ? 0.4 : 1, flexShrink: 0 }}
+                                        >
+                                            ✏️
+                                        </button>
+                                        <button
+                                            onClick={() => setProtectedRecs(new Set(toggleProtectedRecording(rec.path)))}
+                                            title={protectedRecs.has(rec.path) ? t('downloads', 'recUnprotect') : t('downloads', 'recProtect')}
+                                            style={{ padding: 8, borderRadius: 8, border: protectedRecs.has(rec.path) ? '1px solid rgba(251, 191, 36, 0.5)' : '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: protectedRecs.has(rec.path) ? '#fbbf24' : 'rgba(255,255,255,0.7)', cursor: 'pointer', flexShrink: 0 }}
+                                        >
+                                            {protectedRecs.has(rec.path) ? '🔐' : '🔓'}
+                                        </button>
+                                        <button
+                                            onClick={() => void window.ipcRenderer.invoke('dvr:show-in-folder', { path: rec.path })}
+                                            title={t('downloads', 'showInFolder')}
+                                            style={{ padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', flexShrink: 0 }}
+                                        >
+                                            📂
                                         </button>
                                         <button
                                             onClick={async () => {

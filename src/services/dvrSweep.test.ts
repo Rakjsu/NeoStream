@@ -18,4 +18,8 @@ describe('pickExpiredRecordings (auto-faxina do DVR)', () => {
     it('limite 0 = faxina desligada', () => {
         expect(pickExpiredRecordings(files, 0, nowMs)).toEqual([]);
     });
+
+    it('gravação protegida nunca entra na varredura', () => {
+        expect(pickExpiredRecordings(files, 30, nowMs, new Set(['velha.ts']))).toEqual([]);
+    });
 });

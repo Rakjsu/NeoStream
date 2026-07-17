@@ -99,6 +99,31 @@ export function setupDvrHandlers() {
         }
     })
 
+    // Renomeia uma gravação pronta (sempre dentro da pasta de gravações).
+    ipcMain.handle('dvr:rename-file', async (_e, data: { path?: string; name?: string }) => {
+        try {
+            const dir = path.resolve(recordingsDir())
+            const current = path.resolve(String(data?.path || ''))
+            if (!current.startsWith(dir)) return { success: false, error: 'arquivo fora da pasta de gravações' }
+            const safe = String(data?.name || '').replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120)
+            if (!safe) return { success: false, error: 'nome vazio' }
+            const target = path.join(dir, safe.toLowerCase().endsWith('.ts') ? safe : `${safe}.ts`)
+            if (fs.existsSync(target)) return { success: false, error: 'já existe uma gravação com esse nome' }
+            await fs.promises.rename(current, target)
+            return { success: true, path: target }
+        } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : String(error) }
+        }
+    })
+
+    // Revela a gravação no Explorer (ficha: caminho está no tooltip do nome).
+    ipcMain.handle('dvr:show-in-folder', (_e, data: { path?: string }) => {
+        const file = path.resolve(String(data?.path || ''))
+        if (!file.startsWith(path.resolve(recordingsDir()))) return { success: false }
+        shell.showItemInFolder(file)
+        return { success: true }
+    })
+
     ipcMain.handle('dvr:stop', async (_e, data: { id: string }) => {
         const rec = active.get(data?.id)
         if (!rec) return { success: false, error: 'Gravação não encontrada' }
