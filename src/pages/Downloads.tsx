@@ -4,6 +4,7 @@ import { Download, Trash2, Play, FolderOpen, HardDrive, Film, Tv, AlertTriangle,
 import { downloadService } from '../services/downloadService';
 import type { DownloadItem, StorageInfo } from '../services/downloadService';
 import { useLanguage } from '../services/languageService';
+import { getDvrMaxAgeDays, pickExpiredRecordings, setDvrMaxAgeDays } from '../services/dvrSweep';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 
 // Type for grouped series
@@ -21,6 +22,9 @@ type SeriesGroup = {
         episodes: DownloadItem[]
     }[]
 };
+
+// DVR auto-sweep runs at most once per app session
+let sweptThisSession = false;
 
 export function Downloads() {
     const [downloads, setDownloads] = useState<DownloadItem[]>([]);
@@ -60,15 +64,34 @@ export function Downloads() {
     const [showAgenda, setShowAgenda] = useState(false);
     const [recordings, setRecordings] = useState<RecordingFile[]>([]);
     const [playingRecording, setPlayingRecording] = useState<RecordingFile | null>(null);
+    const [dvrMaxAge, setDvrMaxAge] = useState(() => getDvrMaxAgeDays());
 
-    const loadRecordings = useCallback(() => {
-        window.ipcRenderer.invoke('dvr:list-files')
-            .then(result => setRecordings(result?.success ? result.files : []))
-            .catch(() => setRecordings([]));
+    const loadRecordings = useCallback(async () => {
+        try {
+            const result = await window.ipcRenderer.invoke('dvr:list-files');
+            let files: RecordingFile[] = result?.success ? result.files : [];
+            // Auto-sweep: delete recordings older than the configured limit (once per session)
+            if (!sweptThisSession) {
+                sweptThisSession = true;
+                const expired = pickExpiredRecordings(files, getDvrMaxAgeDays(), Date.now());
+                if (expired.length > 0) {
+                    for (const file of expired) {
+                        try { await window.ipcRenderer.invoke('dvr:delete-file', { path: file.path }); } catch { /* keep going */ }
+                    }
+                    const refreshed = await window.ipcRenderer.invoke('dvr:list-files');
+                    files = refreshed?.success ? refreshed.files : files;
+                }
+            }
+            setRecordings(files);
+        } catch {
+            setRecordings([]);
+        }
     }, []);
 
     useEffect(() => {
-        loadRecordings();
+        queueMicrotask(() => {
+            void loadRecordings();
+        });
     }, [loadRecordings, showRecordings]);
 
     const loadData = useCallback(async () => {
@@ -296,6 +319,32 @@ export function Downloads() {
                     >
                         ⏺ {t('downloads', 'recordings')} {recordings.length > 0 ? `(${recordings.length})` : ''}
                     </button>
+                    {showRecordings && (
+                        <button
+                            onClick={() => {
+                                const next = dvrMaxAge === 0 ? 15 : dvrMaxAge === 15 ? 30 : dvrMaxAge === 30 ? 60 : 0;
+                                setDvrMaxAgeDays(next);
+                                setDvrMaxAge(next);
+                            }}
+                            title={t('downloads', 'sweepTooltip')}
+                            style={{
+                                marginLeft: 12,
+                                padding: '10px 18px',
+                                borderRadius: 12,
+                                border: '1px solid rgba(148, 163, 184, 0.4)',
+                                background: 'rgba(148, 163, 184, 0.1)',
+                                color: '#cbd5e1',
+                                fontSize: 14,
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8
+                            }}
+                        >
+                            {dvrMaxAge > 0 ? t('downloads', 'sweepDays').replace('{n}', String(dvrMaxAge)) : t('downloads', 'sweepOff')}
+                        </button>
+                    )}
                 </header>
 
                 {/* Unified agenda (reminders + scheduled recordings) */}

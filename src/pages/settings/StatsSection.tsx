@@ -6,7 +6,8 @@ import {
     fillLastNDays,
     typeShare,
     dailyAverageSeconds,
-    busiestWeekday
+    busiestWeekday,
+    habitHeatmap
 } from '../../services/statsDashboardHelpers';
 import { useLanguage } from '../../services/languageService';
 import { WrappedOverlay } from '../../components/WrappedOverlay';
@@ -35,6 +36,17 @@ export function StatsSection() {
     const topGenres = aggregateTopGenres(usageStats?.sessionsThisMonth || []);
     const dailyAverage = dailyAverageSeconds(usageStats?.dailyStats || [], 30, today);
     const busiestDay = busiestWeekday(usageStats?.dailyStats || []);
+
+    // 🗓️ Heatmap de hábitos (dia × faixa de hora) do mês corrente.
+    const habitmap = habitHeatmap(usageStats?.sessionsThisMonth || []);
+    const heatmapLocale = LOCALE_BY_LANGUAGE[language] || 'pt-BR';
+    // 1º de janeiro de 2023 foi DOMINGO — vira as iniciais no idioma da UI.
+    const dayInitials = Array.from({ length: 7 }, (_, index) =>
+        new Date(2023, 0, 1 + index).toLocaleDateString(heatmapLocale, { weekday: 'narrow' }));
+    const bucketLabels = [
+        t('stats', 'habitMorning'), t('stats', 'habitAfternoon'),
+        t('stats', 'habitEvening'), t('stats', 'habitNight'),
+    ];
 
     // Helper functions for stats display
     const formatWatchTime = (seconds: number) => {
@@ -408,6 +420,50 @@ export function StatsSection() {
                             🎭 {t('stats', 'topGenres')}
                         </h3>
                         {renderRankedBars(topGenres, '#a855f7')}
+                    </div>
+                )}
+
+                {/* Heatmap de hábitos: quando você costuma assistir */}
+                {habitmap.max > 0 && (
+                    <div style={{
+                        background: 'rgba(255,255,255,0.03)',
+                        borderRadius: '16px',
+                        padding: '20px',
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        marginTop: '20px'
+                    }}>
+                        <h3 style={{ color: 'white', fontSize: '14px', fontWeight: 600, marginBottom: '16px' }}>
+                            🗓️ {t('stats', 'habitHeatmap')}
+                        </h3>
+                        <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                            <span style={{ width: 110 }} />
+                            {dayInitials.map((initial, index) => (
+                                <span key={index} style={{ flex: 1, textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 700 }}>
+                                    {initial.toUpperCase()}
+                                </span>
+                            ))}
+                        </div>
+                        {bucketLabels.map((label, bucketIndex) => (
+                            <div key={label} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                                <span style={{ width: 110, color: 'rgba(255,255,255,0.6)', fontSize: 12 }}>{label}</span>
+                                {habitmap.cells.map((dayCells, dayIndex) => {
+                                    const seconds = dayCells[bucketIndex];
+                                    const alpha = seconds > 0 ? (0.10 + 0.70 * seconds / habitmap.max).toFixed(2) : null;
+                                    return (
+                                        <div
+                                            key={dayIndex}
+                                            title={`${Math.round(seconds / 60)} min`}
+                                            style={{
+                                                flex: 1,
+                                                height: 22,
+                                                borderRadius: 5,
+                                                background: alpha ? `rgba(var(--ns-accent-rgb), ${alpha})` : 'rgba(255,255,255,0.04)',
+                                            }}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        ))}
                     </div>
                 )}
 

@@ -90,3 +90,24 @@ export function busiestWeekday(dailyStats: DailyStats[]): number | null {
     if (max <= 0) return null;
     return totals.indexOf(max);
 }
+
+/**
+ * Heatmap de hábitos: segundos assistidos por dia-da-semana × faixa de hora
+ * (manhã/tarde/noite/madrugada). Tipo estrutural pra não acoplar no
+ * usageStatsService — qualquer sessão com date + hourBucket serve (PURO).
+ */
+export function habitHeatmap(sessions: { date: string; watchedSeconds: number; hourBucket?: string }[]): { cells: number[][]; max: number } {
+    const bucketIndex: Record<string, number> = { morning: 0, afternoon: 1, evening: 2, night: 3 };
+    const cells = Array.from({ length: 7 }, () => [0, 0, 0, 0]);
+    let max = 0;
+    for (const session of sessions) {
+        const bucket = session.hourBucket ? bucketIndex[session.hourBucket] : undefined;
+        if (bucket === undefined) continue;
+        const [year, month, day] = session.date.split('-').map(Number);
+        if (!year || !month || !day) continue;
+        const weekday = new Date(year, month - 1, day).getDay();
+        cells[weekday][bucket] += session.watchedSeconds;
+        max = Math.max(max, cells[weekday][bucket]);
+    }
+    return { cells, max };
+}

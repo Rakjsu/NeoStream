@@ -49,6 +49,7 @@ const invokeChannels = new Set([
     'content:get-counts',
     'diagnostics:export-report',
     'diagnostics:provider-health',
+    'diagnostics:probe-urls',
     'diagnostics:open-logs',
     'dlna:add-device',
     'dlna:cast',
