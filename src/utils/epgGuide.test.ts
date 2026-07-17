@@ -15,6 +15,7 @@ import {
     shiftWindow,
     searchPrograms,
     isReplayable,
+    isRestartable,
     replayDurationMinutes
 } from './epgGuide';
 
@@ -245,5 +246,26 @@ describe('replayDurationMinutes', () => {
     it('falls back to the slack on malformed timestamps', () => {
         expect(replayDurationMinutes('bogus', isoAt(NOW))).toBe(2);
         expect(replayDurationMinutes(isoAt(NOW), isoAt(NOW))).toBe(2);
+    });
+});
+
+describe('isRestartable', () => {
+    const HOUR = 60 * 60 * 1000;
+    const isoAt = (ms: number) => new Date(ms).toISOString();
+    const archive = { tv_archive: 1, tv_archive_duration: 3 };
+    const airing = { start: isoAt(NOW - HOUR), end: isoAt(NOW + HOUR) };
+
+    it('allows restarting the program on air on an archived channel', () => {
+        expect(isRestartable(airing, archive, NOW)).toBe(true);
+    });
+
+    it('rejects channels without archive, finished and future programs', () => {
+        expect(isRestartable(airing, { tv_archive: 0, tv_archive_duration: 3 }, NOW)).toBe(false);
+        expect(isRestartable({ start: isoAt(NOW - 2 * HOUR), end: isoAt(NOW - HOUR) }, archive, NOW)).toBe(false);
+        expect(isRestartable({ start: isoAt(NOW + HOUR), end: isoAt(NOW + 2 * HOUR) }, archive, NOW)).toBe(false);
+    });
+
+    it('rejects malformed timestamps', () => {
+        expect(isRestartable({ start: 'bogus', end: isoAt(NOW + HOUR) }, archive, NOW)).toBe(false);
     });
 });

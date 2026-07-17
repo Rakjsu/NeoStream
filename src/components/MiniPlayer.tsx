@@ -6,6 +6,7 @@
 import { useEffect, useState, useRef, useCallback, type ReactNode } from 'react';
 import { usageStatsService } from '../services/usageStatsService';
 import { MiniPlayerContext, type MiniPlayerContent, type MiniPlayerContextType } from './miniPlayerContext';
+import { FloatingMiniPlayer } from './FloatingMiniPlayer';
 
 interface ProviderCredentials {
     url: string;
@@ -54,6 +55,7 @@ function limitChannelWindow(
 export function MiniPlayerProvider({ children }: { children: ReactNode }) {
     const [isActive, setIsActive] = useState(false);
     const [content, setContent] = useState<MiniPlayerContent | null>(null);
+    const [inAppContent, setInAppContent] = useState<MiniPlayerContent | null>(null);
     const videoTimeRef = useRef<number>(0);
 
     const startMiniPlayer = useCallback((newContent: MiniPlayerContent) => {
@@ -90,10 +92,25 @@ export function MiniPlayerProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
+    /** In-app floating mini-player: same content, rendered as an overlay card. */
+    const startInAppMiniPlayer = useCallback((newContent: MiniPlayerContent) => {
+        setInAppContent(newContent);
+        setIsActive(true);
+        videoTimeRef.current = newContent.currentTime || 0;
+        if (newContent.contentId && newContent.title) {
+            usageStatsService.startSession(
+                newContent.contentId,
+                newContent.contentType || 'movie',
+                newContent.title
+            );
+        }
+    }, []);
+
     const stopMiniPlayer = useCallback(() => {
         usageStatsService.endSession();
         setIsActive(false);
         setContent(null);
+        setInAppContent(null);
         videoTimeRef.current = 0;
 
         // Close external PiP window
@@ -238,6 +255,7 @@ export function MiniPlayerProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         window.__miniPlayerContext = {
             startMiniPlayer,
+            startInAppMiniPlayer,
             stopMiniPlayer,
             getCurrentTime,
             isActive
@@ -245,12 +263,47 @@ export function MiniPlayerProvider({ children }: { children: ReactNode }) {
         return () => {
             delete window.__miniPlayerContext;
         };
-    }, [startMiniPlayer, stopMiniPlayer, getCurrentTime, isActive]);
+    }, [startMiniPlayer, startInAppMiniPlayer, stopMiniPlayer, getCurrentTime, isActive]);
+
+    const handleInAppTime = useCallback((time: number) => {
+        videoTimeRef.current = time;
+    }, []);
+
+    const closeInAppMiniPlayer = useCallback(() => {
+        usageStatsService.endSession();
+        setIsActive(false);
+        setInAppContent(null);
+        videoTimeRef.current = 0;
+    }, []);
 
     return (
-        <MiniPlayerContext.Provider value={{ isActive, content, startMiniPlayer, stopMiniPlayer, getCurrentTime }}>
+        <MiniPlayerContext.Provider value={{ isActive, content, startMiniPlayer, startInAppMiniPlayer, stopMiniPlayer, getCurrentTime }}>
             {children}
-            {/* External PiP window is now used instead of internal MiniPlayerUI */}
+            {/* External PiP window handles "real" PiP; below is the in-app floating card. */}
+            {inAppContent && (
+                <FloatingMiniPlayer
+                    content={inAppContent}
+                    onTime={handleInAppTime}
+                    onClose={closeInAppMiniPlayer}
+                    onExpand={(time) => {
+                        window.dispatchEvent(new CustomEvent('miniPlayerExpand', {
+                            detail: {
+                                src: inAppContent.src,
+                                title: inAppContent.title,
+                                poster: inAppContent.poster,
+                                contentId: inAppContent.contentId,
+                                contentType: inAppContent.contentType,
+                                currentTime: time,
+                                seasonNumber: inAppContent.seasonNumber,
+                                episodeNumber: inAppContent.episodeNumber
+                            }
+                        }));
+                        inAppContent.onExpand?.(time);
+                        setIsActive(false);
+                        setInAppContent(null);
+                    }}
+                />
+            )}
         </MiniPlayerContext.Provider>
     );
 }
