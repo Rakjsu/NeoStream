@@ -170,6 +170,58 @@ export function exportPlaylistsForBackup(): PlaylistBackupEntry[] {
  * provider (the machine may be offline during a restore). Existing entries
  * (same url+username) keep their password unless the backup differs.
  */
+/** Entries with passwords + type for the phone hand-off deep link (main-only). */
+export interface SetupExportEntry {
+    id: string
+    name: string
+    url: string
+    username: string
+    password: string
+    type?: 'xtream' | 'm3u' | 'stalker'
+}
+
+export function exportPlaylistsForSetup(): SetupExportEntry[] {
+    return getPlaylists().map(p => ({
+        id: p.id,
+        name: p.name,
+        url: p.url,
+        username: p.username,
+        password: p.password,
+        type: p.type
+    }))
+}
+
+/** Accounts from a NeoStream Mobile backup → saved playlists (no provider validation). */
+export interface MobileAccountEntry {
+    name?: string
+    url: string
+    username: string
+    password: string
+    type?: 'xtream' | 'm3u' | 'stalker'
+}
+
+export function importMobileAccounts(entries: MobileAccountEntry[]): number {
+    let playlists = getPlaylists()
+    let imported = 0
+    for (const entry of entries) {
+        if (!entry?.url?.trim() || typeof entry.username !== 'string' || typeof entry.password !== 'string') continue
+        const result = upsertPlaylist(playlists, {
+            name: entry.name,
+            url: entry.url,
+            username: entry.username,
+            password: entry.password,
+            type: entry.type === 'm3u' || entry.type === 'stalker' ? entry.type : 'xtream'
+        })
+        playlists = result.playlists
+        imported++
+    }
+    if (imported > 0) {
+        store.set('playlists', playlists)
+        log.info('[Playlists] Imported', imported, 'account(s) from a mobile backup')
+    }
+    return imported
+}
+
 export function importPlaylistsFromBackup(entries: PlaylistBackupEntry[]): number {
     let playlists = getPlaylists()
     let imported = 0

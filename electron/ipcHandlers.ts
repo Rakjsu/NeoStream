@@ -18,8 +18,9 @@ import {
     removePlaylist,
     renameStoredPlaylist,
     saveAndActivatePlaylist,
+    importMobileAccounts,
 } from './playlistManager'
-import type { PlaylistBackupEntry } from './playlistManager'
+import type { PlaylistBackupEntry, MobileAccountEntry } from './playlistManager'
 
 import { cachedCatalogFetch, invalidatePlaylistCache, type CatalogKind } from './catalogCache'
 import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uToVodStreams, m3uCategories, classifyM3uChannels, m3uToSeries, m3uSeriesInfo, findM3uEpisodeUrl } from './m3uProtocol'
@@ -277,6 +278,16 @@ export function setupIpcHandlers() {
     // from different providers don't bleed across playlists.
     ipcMain.handle('playlists:get-active-id', () => {
         return { id: getActivePlaylistIdPublic() }
+    })
+
+    // 🔗 Ecosystem: accounts from a NeoStream Mobile backup → saved playlists.
+    ipcMain.handle('playlists:import-mobile', (_, { accounts }: { accounts: MobileAccountEntry[] }) => {
+        try {
+            const imported = importMobileAccounts(Array.isArray(accounts) ? accounts : [])
+            return { success: true, imported }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
+        }
     })
 
     ipcMain.handle('playlists:add', async (_, { name, url, username, password }) => {

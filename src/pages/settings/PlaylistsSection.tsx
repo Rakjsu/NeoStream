@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '../../services/languageService';
 import { playlistService, type PlaylistSummary } from '../../services/playlistService';
+import { parseMobileBackupAccounts } from '../../services/crossBackup';
+import { qrToSvg } from '../../utils/qrEncoder';
 
 /**
  * Settings > Playlists: list saved Xtream playlists, add a new one,
@@ -22,6 +24,12 @@ export function PlaylistsSection() {
     const [form, setForm] = useState({ name: '', url: '', username: '', password: '', mac: '' });
     const [addType, setAddType] = useState<'xtream' | 'm3u' | 'stalker'>('xtream');
 
+    // 🔗 Ecossistema: QR pro celular + importação do backup do mobile
+    const [showQr, setShowQr] = useState(false);
+    const [remoteConfig, setRemoteConfig] = useState<{ enabled: boolean; url?: string; pin?: string } | null>(null);
+    const [importingMobile, setImportingMobile] = useState(false);
+    const [importMsg, setImportMsg] = useState('');
+
     const refresh = async () => {
         setLoading(true);
         try {
@@ -37,6 +45,20 @@ export function PlaylistsSection() {
         // Deferred: refresh flips loading state synchronously on entry.
         queueMicrotask(() => { void refresh(); });
     }, []);
+
+    useEffect(() => {
+        if (!showQr) return;
+        let cancelled = false;
+        window.ipcRenderer.invoke('web-remote:get-config')
+            .then((config: { enabled?: boolean; url?: string; pin?: string }) => {
+                if (cancelled) return;
+                setRemoteConfig({ enabled: config?.enabled === true, url: config?.url, pin: config?.pin });
+            })
+            .catch(() => {
+                if (!cancelled) setRemoteConfig({ enabled: false });
+            });
+        return () => { cancelled = true; };
+    }, [showQr]);
 
     const hostOf = (url: string) => {
         try {
@@ -89,6 +111,36 @@ export function PlaylistsSection() {
             setError(t('playlists', 'removeError'));
         } finally {
             setBusyId(null);
+        }
+    };
+
+    const handleImportMobile = async () => {
+        setError('');
+        setImportMsg('');
+        setImportingMobile(true);
+        try {
+            const file = await window.ipcRenderer.invoke('backup:load-file') as { success: boolean; canceled?: boolean; json?: string };
+            if (!file.success || !file.json) return;
+            const parsed = parseMobileBackupAccounts(file.json);
+            if (parsed.error === 'encrypted') {
+                setError(t('playlists', 'importMobileEncrypted'));
+                return;
+            }
+            if (parsed.error || parsed.accounts.length === 0) {
+                setError(t('playlists', 'importMobileInvalid'));
+                return;
+            }
+            const result = await window.ipcRenderer.invoke('playlists:import-mobile', { accounts: parsed.accounts }) as { success: boolean; imported?: number };
+            if (result.success) {
+                setImportMsg(t('playlists', 'importMobileDone').replace('{n}', String(result.imported ?? 0)));
+                await refresh();
+            } else {
+                setError(t('playlists', 'importMobileInvalid'));
+            }
+        } catch {
+            setError(t('playlists', 'importMobileInvalid'));
+        } finally {
+            setImportingMobile(false);
         }
     };
 
@@ -302,6 +354,56 @@ export function PlaylistsSection() {
                         </div>
                     </form>
                 )}
+
+                {/* 🔗 Ecossistema: levar contas pro celular + importar backup do mobile */}
+                <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+                    <button className="playlists-btn" onClick={() => setShowQr(v => !v)}>
+                        📱 {t('playlists', 'toPhone')}
+                    </button>
+                    <button className="playlists-btn" onClick={handleImportMobile} disabled={importingMobile}>
+                        📥 {importingMobile ? t('common', 'loading') : t('playlists', 'importMobile')}
+                    </button>
+                </div>
+                {importMsg && (
+                    <p style={{ color: '#34d399', fontSize: 13, margin: '10px 2px 0' }}>{importMsg}</p>
+                )}
+                {showQr && (() => {
+                    const setupUrl = remoteConfig?.enabled && remoteConfig.url && remoteConfig.pin
+                        ? `${remoteConfig.url}/setup?pin=${remoteConfig.pin}`
+                        : null;
+                    let setupQr: string | null = null;
+                    if (setupUrl) {
+                        try { setupQr = qrToSvg(setupUrl, 4); } catch { setupQr = null; }
+                    }
+                    return (
+                        <div style={{
+                            marginTop: 12,
+                            padding: 16,
+                            borderRadius: 14,
+                            background: 'rgba(255,255,255,0.04)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            display: 'flex',
+                            gap: 16,
+                            alignItems: 'center'
+                        }}>
+                            {setupQr ? (
+                                <>
+                                    <div
+                                        style={{ width: 132, height: 132, flexShrink: 0, borderRadius: 8, overflow: 'hidden' }}
+                                        dangerouslySetInnerHTML={{ __html: setupQr }}
+                                    />
+                                    <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: 0 }}>
+                                        {t('playlists', 'toPhoneHint')}
+                                    </p>
+                                </>
+                            ) : (
+                                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: 0 }}>
+                                    {t('playlists', 'toPhoneNeedRemote')}
+                                </p>
+                            )}
+                        </div>
+                    );
+                })()}
             </div>
         </div>
     );
