@@ -31,6 +31,8 @@ import {
     type NetAddress,
 } from './webRemoteProtocol'
 import { renderRemotePage } from './webRemotePage'
+import { buildSetupDeepLink, renderSetupHandoffPage } from './setupPayload'
+import { exportPlaylistsForSetup, getActivePlaylistIdPublic } from './playlistManager'
 import { REMOTE_ICON_SVG, buildManifest, solidPng } from './webRemoteAssets'
 import { isCastSessionActive, castRemoteControl, getCastStatus } from './castHandlers'
 import { dlnaRemoteControl, isDlnaSessionActive, getDlnaStatusSnapshot } from './dlnaHandlers'
@@ -646,6 +648,20 @@ function start(): Promise<void> {
             // iOS apple-touch-icon (can't take the SVG) — solid indigo square.
             res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' })
             res.end(solidPng(180, 0x4f, 0x46, 0xe5))
+            return
+        }
+        // 🔗 Hand-off: page that bounces into the neostream://setup deep link
+        // so the phone imports the desktop accounts by scanning the QR.
+        if (req.url && req.url.startsWith('/setup')) {
+            const pin = new URL(req.url, 'http://local').searchParams.get('pin') || ''
+            if (pin !== sessionPin) {
+                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
+                res.end('PIN')
+                return
+            }
+            const link = buildSetupDeepLink(exportPlaylistsForSetup(), getActivePlaylistIdPublic())
+            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
+            res.end(renderSetupHandoffPage(link, remoteLang))
             return
         }
         res.writeHead(404)

@@ -118,6 +118,7 @@ const invokeChannels = new Set([
     'playlists:add',
     'playlists:add-m3u',
     'playlists:get-active-id',
+    'playlists:import-mobile',
     'playlists:list',
     'playlists:remove',
     'playlists:rename',
