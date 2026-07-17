@@ -53,7 +53,8 @@ test('agenda: lembrete e gravação futuros aparecem em Hoje e cancelam no lugar
     await page.locator('button.nav-item[title="Baixados"]').click();
     await page.getByRole('button', { name: /🗓️ Agenda/ }).click();
 
-    await expect(page.getByText('Hoje')).toBeVisible();
+    // Perto da meia-noite (fuso do runner) os itens de +2h/+3h caem em "Amanhã".
+    await expect(page.getByText(/Hoje|Amanhã/).first()).toBeVisible();
     await expect(page.getByText('Lembrete E2E')).toBeVisible();
     await expect(page.getByText('Gravação E2E')).toBeVisible();
 
