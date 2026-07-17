@@ -26,6 +26,8 @@ export interface MiniPlayerContextType {
     isActive: boolean;
     content: MiniPlayerContent | null;
     startMiniPlayer: (content: MiniPlayerContent) => void;
+    /** Mini-player flutuante dentro do app (cartão fixo no canto). */
+    startInAppMiniPlayer: (content: MiniPlayerContent) => void;
     stopMiniPlayer: () => void;
     getCurrentTime: () => number;
 }

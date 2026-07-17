@@ -10,6 +10,7 @@ import {
 } from '../../services/statsDashboardHelpers';
 import { useLanguage } from '../../services/languageService';
 import { WrappedOverlay } from '../../components/WrappedOverlay';
+import { getDailyGoalMinutes, goalProgressPct, setDailyGoalMinutes } from '../../services/watchLimitsService';
 
 const TYPE_COLORS = { movies: '#3b82f6', series: '#10b981', live: '#f59e0b' } as const;
 const LOCALE_BY_LANGUAGE: Record<string, string> = { pt: 'pt-BR', en: 'en-US', es: 'es-ES' };
@@ -19,6 +20,7 @@ export function StatsSection() {
     const [usageStats] = useState<UsageStats | null>(() => usageStatsService.getStats());
     const [weeklyStats] = useState<DailyStats[]>(() => usageStatsService.getWeeklyStats());
     const [showWrapped, setShowWrapped] = useState(false);
+    const [dailyGoal, setDailyGoal] = useState(() => getDailyGoalMinutes());
     const { t, language } = useLanguage();
 
     // The annual Wrapped notification opens the overlay via this event.
@@ -29,6 +31,8 @@ export function StatsSection() {
     }, []);
 
     const today = new Date().toISOString().split('T')[0];
+    const todaySeconds = usageStats?.dailyStats.find(d => d.date === today)?.totalSeconds || 0;
+    const goalPct = goalProgressPct(todaySeconds, dailyGoal);
     const monthlyStats = fillLastNDays(usageStats?.dailyStats || [], 30, today);
     const share = typeShare(usageStats?.contentBreakdown || { movies: 0, series: 0, live: 0 });
     const topContent = aggregateTopContent(usageStats?.sessionsThisMonth || []);
@@ -163,6 +167,58 @@ export function StatsSection() {
                             {t('stats', 'currentStreak')}
                         </div>
                     </div>
+                </div>
+
+                {/* 🎯 Daily watch goal */}
+                <div style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    borderRadius: '16px',
+                    padding: '20px',
+                    border: '1px solid rgba(255,255,255,0.05)',
+                    marginBottom: '20px'
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: dailyGoal > 0 ? '12px' : 0 }}>
+                        <h3 style={{ color: 'white', fontSize: '15px', margin: 0 }}>🎯 {t('stats', 'dailyGoal')}</h3>
+                        <select
+                            className="setting-select"
+                            value={dailyGoal}
+                            onChange={(e) => {
+                                const minutes = Number(e.target.value);
+                                setDailyGoal(minutes);
+                                setDailyGoalMinutes(minutes);
+                            }}
+                        >
+                            <option value={0}>{t('stats', 'goalOff')}</option>
+                            <option value={30}>30 min</option>
+                            <option value={60}>1h</option>
+                            <option value={120}>2h</option>
+                            <option value={180}>3h</option>
+                            <option value={240}>4h</option>
+                        </select>
+                    </div>
+                    {dailyGoal > 0 && (
+                        <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                                <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px' }}>
+                                    {formatWatchTime(todaySeconds)} / {formatWatchTime(dailyGoal * 60)}
+                                </span>
+                                {goalPct >= 100 && (
+                                    <span style={{ color: '#10b981', fontSize: '13px', fontWeight: 700 }}>{t('stats', 'goalReached')}</span>
+                                )}
+                            </div>
+                            <div style={{ height: '10px', background: 'rgba(255,255,255,0.06)', borderRadius: '5px' }}>
+                                <div style={{
+                                    height: '100%',
+                                    width: `${goalPct}%`,
+                                    background: goalPct >= 100
+                                        ? 'linear-gradient(90deg, #10b981, #059669)'
+                                        : 'linear-gradient(90deg, var(--ns-accent), var(--ns-accent-dark))',
+                                    borderRadius: '5px',
+                                    transition: 'width 0.3s ease'
+                                }} />
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 {/* Content Breakdown */}

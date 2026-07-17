@@ -1,5 +1,5 @@
 import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Pause, Volume2, Volume1, Volume, VolumeX, Maximize, Minimize, Cast, Captions, PictureInPicture2 } from 'lucide-react';
+import { Play, Pause, Volume2, Volume1, Volume, VolumeX, Maximize, Minimize, Minimize2, Cast, Captions, PictureInPicture2 } from 'lucide-react';
 import { useVideoPlayer } from '../../hooks/useVideoPlayer';
 import { useHls } from '../../hooks/useHls';
 import { useMediaSession } from '../../hooks/useMediaSession';
@@ -7,6 +7,8 @@ import { CastDeviceSelector } from '../CastDeviceSelector';
 import { CastControls } from '../CastControls';
 import { formatTime, percentage } from '../../utils/videoHelpers';
 import { usageStatsService } from '../../services/usageStatsService';
+import { profileService } from '../../services/profileService';
+import { getKidsDailyLimitMinutes, isLimitExceeded } from '../../services/watchLimitsService';
 import { SubtitleOverlay } from './SubtitleOverlay';
 import { useSubtitleManager } from './useSubtitleManager';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
@@ -479,6 +481,33 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         };
     }, [contentId, contentType, title, genre, videoRef]);
 
+    // ⏰ Kids daily screen-time limit: block playback once today's total hits it
+    const [kidsLimitReached, setKidsLimitReached] = useState(false);
+
+    useEffect(() => {
+        const checkKidsLimit = () => {
+            if (!profileService.getActiveProfile()?.isKids) return;
+            const limitMinutes = getKidsDailyLimitMinutes();
+            if (limitMinutes <= 0) return;
+            const today = new Date().toISOString().split('T')[0];
+            const todaySeconds = usageStatsService.getStats().dailyStats.find(d => d.date === today)?.totalSeconds || 0;
+            if (isLimitExceeded(todaySeconds, limitMinutes)) setKidsLimitReached(true);
+        };
+        queueMicrotask(checkKidsLimit);
+        const intervalId = setInterval(checkKidsLimit, 30_000);
+        return () => clearInterval(intervalId);
+    }, []);
+
+    useEffect(() => {
+        if (!kidsLimitReached) return;
+        const video = videoRef.current;
+        if (!video) return;
+        video.pause();
+        const blockPlay = () => video.pause();
+        video.addEventListener('play', blockPlay);
+        return () => video.removeEventListener('play', blockPlay);
+    }, [kidsLimitReached, videoRef]);
+
 
     // Live TV recording (DVR) — ffmpeg in the main process copies the stream.
     const [recording, setRecording] = useState<{ id: string; seconds: number } | null>(null);
@@ -760,6 +789,44 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     enabled={subtitlesEnabled}
                     offsetSeconds={subtitleOffset}
                 />
+
+                {/* ⏰ Kids limit reached: blocking overlay */}
+                {kidsLimitReached && (
+                    <div style={{
+                        position: 'absolute',
+                        inset: 0,
+                        zIndex: 1200,
+                        background: 'rgba(2, 6, 23, 0.95)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '14px',
+                        textAlign: 'center',
+                        padding: '24px'
+                    }}>
+                        <span style={{ fontSize: '56px' }}>⏰</span>
+                        <h2 style={{ color: 'white', margin: 0, fontSize: '24px' }}>{t('player', 'kidsLimitTitle')}</h2>
+                        <p style={{ color: 'rgba(255,255,255,0.7)', margin: 0, fontSize: '15px' }}>{t('player', 'kidsLimitText')}</p>
+                        {onClose && (
+                            <button
+                                onClick={onClose}
+                                style={{
+                                    marginTop: '10px',
+                                    padding: '12px 32px',
+                                    borderRadius: '12px',
+                                    border: 'none',
+                                    background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                                    color: 'white',
+                                    fontWeight: 700,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                OK
+                            </button>
+                        )}
+                    </div>
+                )}
 
                 {/* Subtitle Warning Toast */}
                 {subtitleWarning && (
@@ -1259,6 +1326,36 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             title="Picture-in-Picture"
                         >
                             <PictureInPicture2 size={18} />
+                        </button>
+
+                        {/* In-app floating mini-player */}
+                        <button
+                            className="control-btn"
+                            onClick={() => {
+                                if (!src || !title) return;
+                                const miniPlayer = window.__miniPlayerContext;
+                                if (!miniPlayer?.startInAppMiniPlayer) return;
+                                miniPlayer.startInAppMiniPlayer({
+                                    src,
+                                    title: title || 'Video',
+                                    poster,
+                                    contentId,
+                                    contentType,
+                                    currentTime: state.currentTime,
+                                    seasonNumber,
+                                    episodeNumber,
+                                    onExpand: (time: number) => {
+                                        if (videoRef.current) {
+                                            videoRef.current.currentTime = time;
+                                            videoRef.current.play();
+                                        }
+                                    }
+                                });
+                                if (onClose) onClose();
+                            }}
+                            title={t('player', 'miniPlayer')}
+                        >
+                            <Minimize2 size={18} />
                         </button>
 
                         <button

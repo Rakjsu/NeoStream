@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { parentalService } from '../../services/parentalService';
 import type { ParentalConfig } from '../../services/parentalService';
+import { getKidsDailyLimitMinutes, setKidsDailyLimitMinutes } from '../../services/watchLimitsService';
 import { useLanguage } from '../../services/languageService';
 import { useSaveAnimation } from './useSaveAnimation';
 
@@ -8,6 +9,7 @@ export function ParentalSection() {
     const [parentalConfig, setParentalConfig] = useState<ParentalConfig>(parentalService.getConfig());
     const { t } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
+    const [kidsLimit, setKidsLimit] = useState(() => getKidsDailyLimitMinutes());
 
     // PIN Modal states
     const [showPinModal, setShowPinModal] = useState(false);
@@ -207,6 +209,31 @@ export function ParentalSection() {
                             <span className="toggle-slider"></span>
                         </label>
                         {saveAnimation === 'parental_filterByTMDB' && <span className="save-indicator">{t('settings', 'saved')}</span>}
+                    </div>
+
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <label>⏰ {t('parental', 'kidsLimit')}</label>
+                            <p>{t('parental', 'kidsLimitDesc')}</p>
+                        </div>
+                        <select
+                            className="setting-select"
+                            value={kidsLimit}
+                            onChange={(e) => {
+                                const minutes = Number(e.target.value);
+                                setKidsLimit(minutes);
+                                setKidsDailyLimitMinutes(minutes);
+                                triggerSaveAnimation('parental_kidsLimit');
+                            }}
+                        >
+                            <option value={0}>{t('parental', 'limitOff')}</option>
+                            <option value={30}>30 min</option>
+                            <option value={60}>1h</option>
+                            <option value={90}>1h30</option>
+                            <option value={120}>2h</option>
+                            <option value={180}>3h</option>
+                        </select>
+                        {saveAnimation === 'parental_kidsLimit' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                     </div>
                 </div>
             </div>

@@ -15,7 +15,7 @@ import { parentalService } from '../services/parentalService';
 import { useLanguage } from '../services/languageService';
 import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
 import { MultiView } from '../components/MultiView';
-import { isReplayable, replayDurationMinutes } from '../utils/epgGuide';
+import { isReplayable, isRestartable, replayDurationMinutes } from '../utils/epgGuide';
 import { getTimeshiftUrl } from '../services/timeshiftService';
 
 interface LiveStream {
@@ -1306,6 +1306,25 @@ export function LiveTV() {
                                     >
                                         <span style={{ fontSize: '18px' }}>▶</span> {t('liveTV', 'watchNow')}
                                     </button>
+
+                                    {currentProgram && isRestartable(currentProgram, selectedChannel) && (
+                                        <button
+                                            onClick={() => setReplayPlayback({ channel: selectedChannel, program: currentProgram })}
+                                            title={currentProgram.title}
+                                            style={{
+                                                padding: '14px 18px',
+                                                background: 'rgba(var(--ns-accent-rgb), 0.18)',
+                                                color: 'var(--ns-accent-light)',
+                                                fontWeight: '700',
+                                                fontSize: '13px',
+                                                borderRadius: '12px',
+                                                border: '1px solid rgba(var(--ns-accent-rgb), 0.4)',
+                                                cursor: 'pointer',
+                                            }}
+                                        >
+                                            ⏮ {t('liveTV', 'restartProgram')}
+                                        </button>
+                                    )}
 
                                     <button
                                         onClick={() => {
