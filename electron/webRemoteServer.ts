@@ -49,6 +49,9 @@ const store = new Store<{ webRemote: WebRemoteConfig }>({ name: 'web-remote' })
 interface ClientSocket {
     socket: Socket
     buffer: Uint8Array
+    /** 'mobile' quando o cliente é o app NeoStream Mobile (não a página do navegador). */
+    role?: 'mobile'
+    name?: string
 }
 
 interface GuideChannel {
@@ -160,6 +163,20 @@ function broadcastState(): void {
     broadcast(stateMessage())
 }
 
+/** Envia um comando só pros clientes que são o APP mobile (não a página). */
+function sendToMobileClients(text: string): number {
+    const frame = encodeTextFrame(text)
+    let delivered = 0
+    for (const client of clients) {
+        if (client.role !== 'mobile') continue
+        try {
+            client.socket.write(frame)
+            delivered++
+        } catch { /* dropped on next read */ }
+    }
+    return delivered
+}
+
 /** Sanitize the untrusted guide payload coming from the renderer. */
 function sanitizeGuide(raw: unknown): GuideState {
     const obj = (raw ?? {}) as Record<string, unknown>
@@ -231,6 +248,19 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
                 } else if (frame.type === 'ping') {
                     socket.write(encodePongFrame(frame.payload))
                 } else if (frame.type === 'text') {
+                    // Hello do app mobile: marca o cliente como app — vira o
+                    // alvo do "enviar pro celular" (a página do navegador não).
+                    if (frame.text.includes('helloMobile')) {
+                        try {
+                            const hello = JSON.parse(frame.text) as { action?: unknown; name?: unknown } | null
+                            if (hello?.action === 'helloMobile') {
+                                client.role = 'mobile'
+                                client.name = typeof hello.name === 'string' ? hello.name.slice(0, 40) : 'celular'
+                                log.info('[WebRemote] app mobile conectado:', client.name)
+                                continue
+                            }
+                        } catch { /* não era o hello — segue o parse normal */ }
+                    }
                     const command = parseRemoteCommand(frame.text)
                     if (command) forwardCommand(command)
                 }
@@ -389,6 +419,19 @@ export function setupWebRemote(): void {
 
     // The LiveTV page pushes its channel list + now/next EPG here while it's
     // mounted, so the phone can show a second-screen guide and tap to switch.
+    // 📱 "Enviar pro celular": empurra um canal pro app NeoStream Mobile
+    // conectado neste servidor (o app dá play com a conta dele).
+    ipcMain.handle('web-remote:play-on-mobile', (_e, raw: unknown) => {
+        const data = raw as { streamId?: unknown; name?: unknown } | null
+        if (!data || data.streamId === undefined) return { success: false, delivered: 0 }
+        const delivered = sendToMobileClients(JSON.stringify({
+            type: 'playOnMobile',
+            streamId: String(data.streamId),
+            name: typeof data.name === 'string' ? data.name.slice(0, 120) : '',
+        }))
+        return { success: true, delivered }
+    })
+
     ipcMain.on('web-remote:guide', (_e, raw: unknown) => {
         guideState = sanitizeGuide(raw)
         broadcast(guideMessage())

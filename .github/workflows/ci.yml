@@ -76,6 +76,15 @@ jobs:
       - name: E2E tests (Playwright + Electron)
         run: npx playwright test
 
+      - name: Upload app screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-screenshots
+          path: screenshots/
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
