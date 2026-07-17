@@ -30,7 +30,7 @@ import {
     type PinGateEntry,
     type NetAddress,
 } from './webRemoteProtocol'
-import { renderRemotePage } from './webRemotePage'
+import { renderRemotePage, type RemoteAccent } from './webRemotePage'
 import { REMOTE_ICON_SVG, buildManifest, solidPng } from './webRemoteAssets'
 import { isCastSessionActive, castRemoteControl, getCastStatus } from './castHandlers'
 import { dlnaRemoteControl, isDlnaSessionActive, getDlnaStatusSnapshot } from './dlnaHandlers'
@@ -319,12 +319,26 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
 // page load after a restart already comes localized.
 let remoteLang = (store.get('webRemoteLang') as string | undefined) || 'pt'
 
+// Accent colors of the served page — mirrors the desktop theme (same flow as
+// the language above); persisted so the first load after a restart matches.
+let remoteAccent = (store.get('webRemoteAccent') as RemoteAccent | undefined) || null
+
 export function setupWebRemote(): void {
     ipcMain.on('app:language', (_e, raw: unknown) => {
         const code = String(raw ?? '').slice(0, 2)
         if (code === 'pt' || code === 'en' || code === 'es') {
             remoteLang = code
             store.set('webRemoteLang', code)
+        }
+    })
+
+    ipcMain.on('app:accent', (_e, raw: unknown) => {
+        const a = raw as Partial<RemoteAccent> | null
+        const isCssColorish = (s: unknown): s is string =>
+            typeof s === 'string' && s.length <= 40 && /^[#a-zA-Z0-9(),.% -]+$/.test(s)
+        if (a && isCssColorish(a.main) && isCssColorish(a.dark) && isCssColorish(a.rgb)) {
+            remoteAccent = { main: a.main, dark: a.dark, rgb: a.rgb }
+            store.set('webRemoteAccent', remoteAccent)
         }
     })
 
@@ -628,7 +642,7 @@ function start(): Promise<void> {
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
             // PIN is NOT injected — the phone must enter the code shown on
             // the desktop settings screen (the page prompts + stores it).
-            res.end(renderRemotePage(remoteLang))
+            res.end(renderRemotePage(remoteLang, remoteAccent ?? undefined))
             return
         }
         // PWA assets: "Add to home screen" installs the remote as a real app.

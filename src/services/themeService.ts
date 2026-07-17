@@ -146,6 +146,15 @@ class ThemeService {
             root.style.setProperty(name, value);
         }
         root.setAttribute('data-theme', `${this.theme.background}-${this.theme.accent}`);
+        // Mirror the accent into the main process so the phone web-remote
+        // page is served with the same color (no-op outside Electron).
+        try {
+            window.ipcRenderer?.send('app:accent', {
+                main: vars['--ns-accent'],
+                dark: vars['--ns-accent-dark'],
+                rgb: vars['--ns-accent-rgb'],
+            });
+        } catch { /* jsdom/tests sem preload */ }
     }
 
     subscribe(listener: () => void): () => void {

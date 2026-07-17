@@ -2,6 +2,8 @@ import { app, ipcMain, Tray, Menu, Notification, nativeImage, type BrowserWindow
 import path from 'path'
 import Store from 'electron-store'
 import log from './logger'
+import { activeRecordingCount } from './dvrHandlers'
+import { closeAction } from './trayClosePolicy'
 
 /**
  * Tray mode: closing the window hides the app to the system tray instead of
@@ -31,6 +33,9 @@ function setConfig(partial: Partial<SystemConfig>): SystemConfig {
 let tray: Tray | null = null
 let quitting = false
 let balloonShown = false
+
+// Pending DVR schedules, mirrored from the renderer (protects quit-on-close).
+let pendingSchedules = 0
 
 // Last playback state reported by the renderer (drives the tray media items).
 let mediaState = { hasMedia: false, playing: false, title: '' }
@@ -130,6 +135,12 @@ export function setupTrayMode(getWin: () => BrowserWindow | null) {
         buildTrayMenu(getWin)
     })
 
+    // Renderer mirrors how many DVR schedules are pending.
+    ipcMain.on('dvr:schedules-changed', (_e, raw: unknown) => {
+        const count = Number(raw)
+        pendingSchedules = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0
+    })
+
     ipcMain.handle('system:get-config', () => ({ success: true, config: getConfig() }))
     ipcMain.handle('system:set-config', (_e, partial: Partial<SystemConfig>) => {
         const next = setConfig(partial ?? {})
@@ -147,9 +158,23 @@ export function setupTrayMode(getWin: () => BrowserWindow | null) {
  */
 export function attachCloseToTray(win: BrowserWindow) {
     win.on('close', (e) => {
-        if (quitting || !getConfig().closeToTray) return
+        const action = closeAction({
+            quitting,
+            closeToTray: getConfig().closeToTray,
+            activeRecordings: activeRecordingCount(),
+            pendingSchedules,
+        })
+        if (action === 'quit') return
         e.preventDefault()
         win.hide()
+        if (action === 'hold') {
+            // Close-to-tray is OFF, but the DVR still has work — tell why we stayed.
+            new Notification({
+                title: 'Gravação protegida',
+                body: 'Há gravação em andamento ou agendada — o NeoStream segue na bandeja até terminar. Use a bandeja para sair de vez.',
+            }).show()
+            return
+        }
         if (!balloonShown) {
             balloonShown = true
             new Notification({
