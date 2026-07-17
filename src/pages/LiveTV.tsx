@@ -416,6 +416,12 @@ export function LiveTV() {
         [sortedStreams, groupVariants]
     );
 
+    // 🩺 Verificador de favoritos: sonda os canais da categoria ⭐ e marca
+    // quem está fora do ar (a sonda roda no main — sem CORS).
+    const [favCheckBusy, setFavCheckBusy] = useState(false);
+    const [favCheckMsg, setFavCheckMsg] = useState('');
+    const [deadIds, setDeadIds] = useState<Set<string>>(new Set());
+
     const filteredStreams = useMemo(() => variantsResult.groups.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
         if (selectedCategory === 'FAVORITES') {
@@ -703,6 +709,34 @@ export function LiveTV() {
         });
         return result.url;
     }, [replayPlayback]);
+
+    const checkFavorites = async () => {
+        setFavCheckBusy(true);
+        setFavCheckMsg('');
+        try {
+            const targets: { id: string; url: string }[] = [];
+            for (const stream of filteredStreams.slice(0, 30)) {
+                try {
+                    const url = await buildLiveStreamUrl(stream);
+                    if (url?.startsWith('http')) targets.push({ id: String(stream.stream_id), url });
+                } catch { /* canal sem URL fica de fora da sonda */ }
+            }
+            const result = await window.ipcRenderer.invoke('diagnostics:probe-urls', { targets }) as {
+                success: boolean; results?: { id: string; alive: boolean }[];
+            };
+            if (result.success && result.results) {
+                const dead = new Set(result.results.filter(r => !r.alive).map(r => r.id));
+                setDeadIds(dead);
+                setFavCheckMsg(dead.size === 0
+                    ? `✓ ${result.results.length} no ar`
+                    : `⚠ ${dead.size} de ${result.results.length} fora do ar`);
+            } else {
+                setFavCheckMsg('✖ sonda falhou');
+            }
+        } finally {
+            setFavCheckBusy(false);
+        }
+    };
 
     // Recent already-aired programs of the selected archive channel
     // (newest first, capped at 4) — each gets a ▶ Replay button.
@@ -1059,6 +1093,26 @@ export function LiveTV() {
                 >
                     🔲 Multi-view
                 </button>
+                {selectedCategory === 'FAVORITES' && (
+                    <button
+                        onClick={() => { void checkFavorites(); }}
+                        disabled={favCheckBusy}
+                        title="Sonda os favoritos (até 30) e marca os fora do ar"
+                        style={{
+                            padding: '8px 14px',
+                            borderRadius: 10,
+                            border: '1px solid rgba(255,255,255,0.15)',
+                            background: 'rgba(255,255,255,0.06)',
+                            color: 'rgba(255,255,255,0.7)',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        {favCheckBusy ? '⏳ Verificando…' : favCheckMsg || '🩺 Verificar favoritos'}
+                    </button>
+                )}
                 <button
                     onClick={() => {
                         const next = !groupVariants;
@@ -1697,6 +1751,9 @@ export function LiveTV() {
                                         }}>
                                             {stream.name}
                                         </p>
+                                        {deadIds.has(String(stream.stream_id)) && (
+                                            <span style={{ color: '#f87171', fontSize: 11, fontWeight: 800 }}>⚠ FORA DO AR</span>
+                                        )}
                                     </div>
                                     {selectedChannel?.stream_id === stream.stream_id && (
                                         <div style={{
