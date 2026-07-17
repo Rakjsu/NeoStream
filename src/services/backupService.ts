@@ -207,3 +207,67 @@ export function applyBackup(parsed: unknown): ApplyReport & { playlists: BackupP
 
     return { applied, skipped, playlistsImported: 0, playlists, openSubtitles };
 }
+
+// ----------------- backup com senha (AES-GCM + PBKDF2, Web Crypto) -----------------
+// Opcional: com senha o arquivo sai criptografado inteiro, com o prefixo
+// abaixo marcando o formato (salt 16 + iv 12 + cifra, tudo em base64).
+
+export const ENCRYPTED_PREFIX = 'NEOENC2:';
+
+export function isEncryptedBackup(text: string): boolean {
+    return text.startsWith(ENCRYPTED_PREFIX);
+}
+
+function bytesToB64(bytes: Uint8Array): string {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    }
+    return btoa(binary);
+}
+
+function b64ToBytes(b64: string): Uint8Array {
+    const binary = atob(b64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+}
+
+async function deriveBackupKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
+    const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt: salt as BufferSource, iterations: 100_000, hash: 'SHA-256' },
+        material,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+    );
+}
+
+export async function encryptBackup(json: string, password: string): Promise<string> {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveBackupKey(password, salt);
+    const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv as BufferSource }, key, new TextEncoder().encode(json)));
+    const packed = new Uint8Array(salt.length + iv.length + cipher.length);
+    packed.set(salt, 0);
+    packed.set(iv, salt.length);
+    packed.set(cipher, salt.length + iv.length);
+    return ENCRYPTED_PREFIX + bytesToB64(packed);
+}
+
+/** null = senha errada ou arquivo corrompido (o GCM autentica a cifra). */
+export async function decryptBackup(text: string, password: string): Promise<string | null> {
+    if (!isEncryptedBackup(text)) return text;
+    try {
+        const packed = b64ToBytes(text.slice(ENCRYPTED_PREFIX.length).trim());
+        const salt = packed.subarray(0, 16);
+        const iv = packed.subarray(16, 28);
+        const cipher = packed.subarray(28);
+        const key = await deriveBackupKey(password, salt);
+        const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv as BufferSource }, key, cipher as BufferSource);
+        return new TextDecoder().decode(plain);
+    } catch {
+        return null;
+    }
+}

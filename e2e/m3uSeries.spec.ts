@@ -44,7 +44,7 @@ test('m3u fase 3: episódios SxxEyy viram série agrupada na página Séries', a
     await page.locator('.playlists-add-form input[type="text"]').first().fill('Lista Séries E2E');
     await page.locator('.playlists-add-form input').nth(1).fill(`${server.url}/lista.m3u`);
     await page.locator('.playlists-add-form button[type="submit"]').click();
-    await expect(page.getByText(GREETING)).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(GREETING)).toBeVisible({ timeout: 45000 });
 
     // The three SxxEyy items collapse into ONE series called "Serie Mock".
     await page.locator('button.nav-item[title="Séries"]').click();

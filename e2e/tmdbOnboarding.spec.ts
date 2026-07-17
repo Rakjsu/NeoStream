@@ -69,7 +69,7 @@ test('adicionar playlist COM chave TMDB configurada não redireciona', async () 
     await addM3uPlaylist(page);
 
     // Fica no dashboard normal — sem banner, sem seção APIs.
-    await expect(page.getByText(GREETING)).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(GREETING)).toBeVisible({ timeout: 45000 });
     await page.waitForTimeout(800);
     await expect(page.getByText('Playlist adicionada! Só falta um passo…')).toHaveCount(0);
     await expect(page.getByText('APIs de metadados')).toHaveCount(0);

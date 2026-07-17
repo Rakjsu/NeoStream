@@ -201,3 +201,20 @@ describe('backupService', () => {
         });
     });
 });
+
+describe('backup com senha (AES-GCM)', () => {
+    it('roundtrip com a senha certa; senha errada dá null', async () => {
+        const { encryptBackup, decryptBackup, isEncryptedBackup } = await import('./backupService');
+        const json = JSON.stringify({ app: 'neostream', dados: 'çãé 🎬' });
+        const packed = await encryptBackup(json, 'segredo123');
+        expect(isEncryptedBackup(packed)).toBe(true);
+        expect(packed).not.toContain('neostream');
+        expect(await decryptBackup(packed, 'segredo123')).toBe(json);
+        expect(await decryptBackup(packed, 'errada')).toBeNull();
+    });
+
+    it('texto sem prefixo passa direto (backup antigo sem senha)', async () => {
+        const { decryptBackup } = await import('./backupService');
+        expect(await decryptBackup('{"a":1}', 'qualquer')).toBe('{"a":1}');
+    });
+});

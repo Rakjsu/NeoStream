@@ -16,6 +16,7 @@ import { useWindowedGrid } from '../hooks/useWindowedGrid';
 import { HoverPreviewCard } from '../components/HoverPreviewCard';
 import { closeAllPreviews } from '../components/hoverPreviewActions';
 import { useLanguage } from '../services/languageService';
+import { isRecentlyAdded } from '../services/catalogNew';
 import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
 
 interface VODStream {
@@ -66,6 +67,8 @@ export function VOD() {
     const gridRef = useRef<HTMLDivElement>(null);
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const { t } = useLanguage();
+    // Congelado por sessão da página (regra de pureza) — base do selo NOVO.
+    const [nowMs] = useState(() => Date.now());
 
     // Kids profile + Parental Control filtering and click-gating
     // (same generic hook Series.tsx uses)
@@ -444,6 +447,7 @@ export function VOD() {
                                     const yearMatch = stream.release_date?.match(/(\d{4})/);
                                     const year = yearMatch ? yearMatch[1] : undefined;
                                     const genres = stream.genre?.split(',').map(g => g.trim()).filter(Boolean);
+                                    const isNew = isRecentlyAdded(stream.added, nowMs);
 
                                     return (
                                         <div
@@ -463,6 +467,7 @@ export function VOD() {
                                                 plot={stream.plot}
                                                 youtubeTrailer={stream.youtube_trailer}
                                                 isFavorite={isFavorite}
+                                                isNew={isNew}
                                                 onPlay={async () => {
                                                     const url = await buildStreamUrl(stream);
                                                     if (url) {

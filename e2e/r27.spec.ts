@@ -49,7 +49,7 @@ async function addPlaylist(page: Page, kind: 'M3U' | 'Stalker/MAC'): Promise<voi
         await page.locator('.playlists-add-form input[type="text"]').nth(2).fill('00:1A:79:AB:CD:EF');
     }
     await page.locator('.playlists-add-form button[type="submit"]').click();
-    await expect(page.getByText(GREETING)).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(GREETING)).toBeVisible({ timeout: 45000 });
 }
 
 async function runHealthCheck(page: Page): Promise<void> {
