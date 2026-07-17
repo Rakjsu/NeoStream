@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { FRAME_STEP_SEC } from './playerExtras';
 
 interface PlayerKeyboardControls {
     togglePlay: () => void;
@@ -17,6 +18,11 @@ export interface UseKeyboardShortcutsParams {
     vttContent: string | null;
     setSubtitlesEnabled: React.Dispatch<React.SetStateAction<boolean>>;
     onClose?: () => void;
+    /** Frame step (,/.) — the player mutates the <video> element itself. */
+    onFrameStep?: (deltaSec: number) => void;
+    onToggleStats?: () => void;
+    onCycleAbLoop?: () => void;
+    onScreenshot?: () => void;
 }
 
 // Keyboard shortcuts — the latest handler lives in a ref so a single
@@ -30,7 +36,11 @@ export function useKeyboardShortcuts({
     containerRef,
     vttContent,
     setSubtitlesEnabled,
-    onClose
+    onClose,
+    onFrameStep,
+    onToggleStats,
+    onCycleAbLoop,
+    onScreenshot
 }: UseKeyboardShortcutsParams) {
     const handleKeyDownRef = useRef<(e: KeyboardEvent) => void>(() => { });
     // Intentional render-time ref update (same as the original inline code in
@@ -57,12 +67,39 @@ export function useKeyboardShortcuts({
                 controls.togglePlay();
                 break;
             case 'arrowleft':
+            case 'j':
                 e.preventDefault();
                 controls.seek(Math.max(0, currentTime - 10));
                 break;
             case 'arrowright':
+            case 'l':
                 e.preventDefault();
                 controls.seek(Math.min(duration, currentTime + 10));
+                break;
+            case ',':
+            case '.':
+                if (onFrameStep) {
+                    e.preventDefault();
+                    onFrameStep(e.key === ',' ? -FRAME_STEP_SEC : FRAME_STEP_SEC);
+                }
+                break;
+            case 'i':
+                if (onToggleStats) {
+                    e.preventDefault();
+                    onToggleStats();
+                }
+                break;
+            case 'b':
+                if (onCycleAbLoop) {
+                    e.preventDefault();
+                    onCycleAbLoop();
+                }
+                break;
+            case 's':
+                if (onScreenshot) {
+                    e.preventDefault();
+                    onScreenshot();
+                }
                 break;
             case 'arrowup':
                 e.preventDefault();

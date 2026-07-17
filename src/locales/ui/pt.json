@@ -596,6 +596,14 @@
     "expand": "Expandir"
   },
   "player": {
+    "volumeBoost": "Reforço de volume",
+    "frameSaved": "📸 Quadro salvo",
+    "frameError": "Não deu pra capturar o quadro deste stream",
+    "statsResolution": "Resolução",
+    "statsBitrate": "Bitrate",
+    "statsBuffer": "Buffer",
+    "statsDropped": "Frames perdidos",
+    "statsSpeed": "Velocidade",
     "quality": "Qualidade",
     "speed": "Velocidade",
     "version": "Versão",
@@ -922,6 +930,10 @@
     "note": "Os filtros de perfil infantil e controle parental continuam valendo por cima destas opções."
   },
   "shortcuts": {
+    "frameStep": "Quadro a quadro (pausado)",
+    "abLoop": "Repetição A-B",
+    "nerdStats": "Estatísticas do stream",
+    "screenshot": "Salvar quadro como PNG",
     "title": "Atalhos de teclado",
     "groupGeneral": "Geral",
     "groupPlayer": "Player",

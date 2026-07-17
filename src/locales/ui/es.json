@@ -689,6 +689,14 @@
     "expand": "Expandir"
   },
   "player": {
+    "volumeBoost": "Refuerzo de volumen",
+    "frameSaved": "📸 Fotograma guardado",
+    "frameError": "No se pudo capturar el fotograma de este stream",
+    "statsResolution": "Resolución",
+    "statsBitrate": "Bitrate",
+    "statsBuffer": "Búfer",
+    "statsDropped": "Fotogramas perdidos",
+    "statsSpeed": "Velocidad",
     "quality": "Calidad",
     "speed": "Velocidad",
     "version": "Versión",
@@ -922,6 +930,10 @@
     "note": "Los filtros de perfil infantil y control parental siguen aplicándose sobre estas opciones."
   },
   "shortcuts": {
+    "frameStep": "Fotograma a fotograma (en pausa)",
+    "abLoop": "Repetición A-B",
+    "nerdStats": "Estadísticas del stream",
+    "screenshot": "Guardar fotograma como PNG",
     "title": "Atajos de teclado",
     "groupGeneral": "General",
     "groupPlayer": "Reproductor",
