@@ -1025,6 +1025,8 @@
   "shortcuts": {
     "frameStep": "Fotograma a fotograma (en pausa)",
     "abLoop": "Repetición A-B",
+    "bookmark": "Marcar posición",
+    "bookmarkList": "Panel de marcadores",
     "nerdStats": "Estadísticas del stream",
     "screenshot": "Guardar fotograma como PNG",
     "title": "Atajos de teclado",

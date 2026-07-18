@@ -22,6 +22,9 @@ export interface UseKeyboardShortcutsParams {
     onFrameStep?: (deltaSec: number) => void;
     onToggleStats?: () => void;
     onCycleAbLoop?: () => void;
+    /** 🔖 X marca a posição atual; Shift+X abre o painel de marcadores. */
+    onAddBookmark?: () => void;
+    onToggleBookmarks?: () => void;
     onScreenshot?: () => void;
     onCycleVideoFilter?: () => void;
     onToggleNormalize?: () => void;
@@ -42,6 +45,8 @@ export function useKeyboardShortcuts({
     onFrameStep,
     onToggleStats,
     onCycleAbLoop,
+    onAddBookmark,
+    onToggleBookmarks,
     onScreenshot,
     onCycleVideoFilter,
     onToggleNormalize
@@ -92,6 +97,17 @@ export function useKeyboardShortcuts({
                 if (onToggleStats) {
                     e.preventDefault();
                     onToggleStats();
+                }
+                break;
+            case 'x':
+                if (e.shiftKey) {
+                    if (onToggleBookmarks) {
+                        e.preventDefault();
+                        onToggleBookmarks();
+                    }
+                } else if (onAddBookmark) {
+                    e.preventDefault();
+                    onAddBookmark();
                 }
                 break;
             case 'b':

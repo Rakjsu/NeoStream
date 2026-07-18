@@ -10,6 +10,8 @@ import type { MiniPlayerContent } from './miniPlayerContext';
 
 interface FloatingMiniPlayerProps {
     content: MiniPlayerContent;
+    /** 📺 Zap ao vivo: o provider troca o conteúdo pro canal vizinho. */
+    onZap?: (patch: { src: string; title: string; contentId: string }) => void;
     onClose: () => void;
     onExpand: (currentTime: number) => void;
     onTime: (currentTime: number) => void;
@@ -30,7 +32,21 @@ const headerButtonStyle: React.CSSProperties = {
     cursor: 'pointer'
 };
 
-export function FloatingMiniPlayer({ content, onClose, onExpand, onTime }: FloatingMiniPlayerProps) {
+export function FloatingMiniPlayer({ content, onZap, onClose, onExpand, onTime }: FloatingMiniPlayerProps) {
+    const zap = async (direction: 1 | -1) => {
+        const list = content.channelList;
+        if (!list || list.length < 2) return;
+        const index = Math.max(0, list.findIndex(c => String(c.id) === String(content.contentId)));
+        const next = list[(index + direction + list.length) % list.length];
+        let url = next.directUrl || null;
+        if (!url) {
+            const result = await window.ipcRenderer.invoke('streams:get-live-url', { streamId: next.id })
+                .catch(() => null) as { success?: boolean; url?: string } | null;
+            url = result?.success && result.url ? result.url : null;
+        }
+        if (url) onZap?.({ src: url, title: next.name, contentId: String(next.id) });
+    };
+
     const videoRef = useRef<HTMLVideoElement>(null);
     const [paused, setPaused] = useState(false);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -132,6 +148,12 @@ export function FloatingMiniPlayer({ content, onClose, onExpand, onTime }: Float
                 }}>
                     {content.title}
                 </span>
+                {content.contentType === 'live' && (content.channelList?.length ?? 0) > 1 && (
+                    <>
+                        <button onClick={() => void zap(-1)} style={headerButtonStyle} title="Canal anterior">⏮</button>
+                        <button onClick={() => void zap(1)} style={headerButtonStyle} title="Próximo canal">⏭</button>
+                    </>
+                )}
                 <button onClick={togglePlay} style={headerButtonStyle} title={paused ? '▶' : '⏸'}>
                     {paused ? '▶' : '⏸'}
                 </button>

@@ -13,6 +13,7 @@ import { SubtitleOverlay } from './SubtitleOverlay';
 import { useSubtitleManager } from './useSubtitleManager';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { clampBoost, cycleAbState, abLoopTarget, type AbLoopState, filterCssOf, nextVideoFilter } from './playerExtras';
+import { bookmarkService, type VideoBookmark } from '../../services/bookmarkService';
 import { loadSubtitleStyle, type SubtitleStyle } from '../../utils/subtitleStyle';
 import { PlayerSettingsMenu } from './PlayerSettingsMenu';
 import { useSleepTimer, formatSleepCountdown } from './useSleepTimer';
@@ -379,6 +380,29 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
 
     // 🔁 Repetição A-B (tecla B cicla A → A-B → limpo); volta pro A ao passar do B.
     const [abLoop, setAbLoop] = useState<AbLoopState>({ a: null, b: null });
+    // ✂️ Exporta o intervalo A–B como clipe (ffmpeg -c copy no main).
+    const [clipStatus, setClipStatus] = useState<'idle' | 'busy' | 'ok' | 'fail'>('idle');
+    const exportClip = useCallback(async () => {
+        if (abLoop.a == null || abLoop.b == null || clipStatus === 'busy') return;
+        setClipStatus('busy');
+        const result = await window.ipcRenderer.invoke('clip:export', { url: src, start: abLoop.a, end: abLoop.b, title })
+            .catch(() => null) as { success?: boolean } | null;
+        setClipStatus(result?.success ? 'ok' : 'fail');
+    }, [abLoop, clipStatus, src, title]);
+    // 🔖 Marcadores de posição (X marca; Shift+X abre o painel; null = fechado).
+    const [bookmarkPanel, setBookmarkPanel] = useState<VideoBookmark[] | null>(null);
+    const [bookmarkFlash, setBookmarkFlash] = useState(false);
+    const addBookmark = useCallback(() => {
+        if (!contentId || contentType === 'live') return;
+        const updated = bookmarkService.add(contentId, state.currentTime);
+        setBookmarkPanel(prev => (prev !== null ? updated : prev));
+        setBookmarkFlash(true);
+        setTimeout(() => setBookmarkFlash(false), 1200);
+    }, [contentId, contentType, state.currentTime]);
+    const toggleBookmarkPanel = useCallback(() => {
+        if (!contentId || contentType === 'live') return;
+        setBookmarkPanel(prev => (prev === null ? bookmarkService.list(contentId) : null));
+    }, [contentId, contentType]);
     useEffect(() => {
         const target = abLoopTarget(state.currentTime, abLoop);
         if (target != null) controls.seek(target);
@@ -870,6 +894,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         onClose,
         onFrameStep: stepFrame,
         onToggleStats: () => setShowStats(v => !v),
+        onAddBookmark: addBookmark,
+        onToggleBookmarks: toggleBookmarkPanel,
         onCycleAbLoop: contentType !== 'live'
             ? () => setAbLoop(prev => cycleAbState(prev, videoRef.current?.currentTime ?? 0))
             : undefined,
@@ -930,12 +956,72 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
             {abLoop.a != null && (
                 <div style={{
                     position: 'absolute', top: 18, right: 70, zIndex: 1100,
+                    display: 'flex', alignItems: 'center', gap: 8,
                     background: 'rgba(var(--ns-accent-rgb), 0.25)',
                     border: '1px solid rgba(var(--ns-accent-rgb), 0.5)',
                     borderRadius: 8, padding: '4px 10px',
                     fontSize: 12, fontWeight: 700, color: 'var(--ns-accent-light)'
                 }}>
                     🔁 A{abLoop.b != null ? '–B' : '…'}
+                    {abLoop.b != null && contentType !== 'live' && (
+                        <button
+                            onClick={exportClip}
+                            disabled={clipStatus === 'busy'}
+                            title="Exportar clipe A–B (vai pra pasta de gravações)"
+                            style={{ border: 'none', background: 'transparent', cursor: clipStatus === 'busy' ? 'wait' : 'pointer', fontSize: 13, padding: 0 }}
+                        >
+                            {clipStatus === 'busy' ? '⏳' : clipStatus === 'ok' ? '✅' : clipStatus === 'fail' ? '⚠️' : '✂️'}
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {/* 🔖 Flash de marcador adicionado (X). */}
+            {bookmarkFlash && (
+                <div style={{
+                    position: 'absolute', top: 56, right: 70, zIndex: 1100,
+                    background: 'rgba(0,0,0,0.7)', borderRadius: 8, padding: '4px 10px',
+                    fontSize: 12, fontWeight: 700, color: 'white'
+                }}>
+                    🔖 Posição marcada
+                </div>
+            )}
+
+            {/* 🔖 Painel de marcadores (Shift+X). */}
+            {bookmarkPanel !== null && (
+                <div style={{
+                    position: 'absolute', top: 56, right: 18, zIndex: 1100, width: 240,
+                    maxHeight: '55vh', overflowY: 'auto',
+                    background: 'rgba(10, 10, 25, 0.94)',
+                    border: '1px solid rgba(var(--ns-accent-rgb), 0.4)',
+                    borderRadius: 10, padding: 10
+                }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'white', marginBottom: 8 }}>
+                        🔖 Marcadores <span style={{ opacity: 0.5, fontWeight: 400 }}>(X marca)</span>
+                    </div>
+                    {bookmarkPanel.length === 0 && (
+                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Nenhum marcador ainda</div>
+                    )}
+                    {bookmarkPanel.map(bookmark => (
+                        <div key={bookmark.time} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                            <button
+                                onClick={() => controls.seek(bookmark.time)}
+                                style={{ flex: 1, textAlign: 'left', border: 'none', background: 'rgba(255,255,255,0.07)', color: 'white', fontSize: 12, padding: '6px 8px', borderRadius: 6, cursor: 'pointer' }}
+                            >
+                                ⏱ {formatTime(bookmark.time)}
+                            </button>
+                            <button
+                                onClick={() => {
+                                    if (!contentId) return;
+                                    setBookmarkPanel(bookmarkService.remove(contentId, bookmark.time));
+                                }}
+                                title="Remover marcador"
+                                style={{ border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: 12 }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    ))}
                 </div>
             )}
 

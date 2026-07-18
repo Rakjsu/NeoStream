@@ -60,6 +60,8 @@ export function ShortcutsOverlay() {
                 { keys: ['Shift', '←/→'], label: t('shortcuts', 'seek30') },
                 { keys: [',', '.'], label: t('shortcuts', 'frameStep') },
                 { keys: ['B'], label: t('shortcuts', 'abLoop') },
+                { keys: ['X'], label: t('shortcuts', 'bookmark') },
+                { keys: ['Shift', 'X'], label: t('shortcuts', 'bookmarkList') },
                 { keys: ['I'], label: t('shortcuts', 'nerdStats') },
                 { keys: ['S'], label: t('shortcuts', 'screenshot') },
                 { keys: ['↑', '↓'], label: t('shortcuts', 'volume') },

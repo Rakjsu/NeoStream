@@ -1025,6 +1025,8 @@
   "shortcuts": {
     "frameStep": "Quadro a quadro (pausado)",
     "abLoop": "Repetição A-B",
+    "bookmark": "Marcar posição (marcador)",
+    "bookmarkList": "Painel de marcadores",
     "nerdStats": "Estatísticas do stream",
     "screenshot": "Salvar quadro como PNG",
     "title": "Atalhos de teclado",

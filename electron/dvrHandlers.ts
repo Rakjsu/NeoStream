@@ -50,6 +50,39 @@ function broadcast(channel: string, payload: unknown) {
 }
 
 export function setupDvrHandlers() {
+    // ✂️ Exporta um clipe A–B de um VOD por cópia de stream (sem re-encode).
+    ipcMain.handle('clip:export', async (_e, data: { url: string; start: number; end: number; title?: string }) => {
+        try {
+            const ffmpeg = resolveFfmpegPath()
+            if (!ffmpeg) return { success: false, error: 'ffmpeg indisponível' }
+            if (!data?.url || typeof data.start !== 'number' || typeof data.end !== 'number' || data.end <= data.start) {
+                return { success: false, error: 'intervalo inválido' }
+            }
+            const dir = recordingsDir()
+            fs.mkdirSync(dir, { recursive: true })
+            const base = (data.title || 'clipe').replace(/[^\p{L}\p{N} _-]/gu, '').trim().slice(0, 40) || 'clipe'
+            const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19)
+            const file = path.join(dir, `${base}-clip-${stamp}.mp4`)
+            const args = ['-ss', String(data.start), '-to', String(data.end), '-i', data.url, '-c', 'copy', '-movflags', '+faststart', '-y', file]
+            await new Promise<void>((resolve, reject) => {
+                const proc = spawn(ffmpeg, args, { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] })
+                let errTail = ''
+                proc.stderr.on('data', (chunk: Buffer) => { errTail = (errTail + chunk.toString()).slice(-400) })
+                const timer = setTimeout(() => { proc.kill(); reject(new Error('timeout no corte do clipe')) }, 5 * 60_000)
+                proc.on('close', code => {
+                    clearTimeout(timer)
+                    if (code === 0) resolve()
+                    else reject(new Error(errTail.slice(-200) || `ffmpeg exit ${code}`))
+                })
+                proc.on('error', reject)
+            })
+            log.info(`[DVR] Clip exported: ${file}`)
+            return { success: true, file }
+        } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : String(error) }
+        }
+    })
+
     ipcMain.handle('dvr:start', async (_e, data: { url: string; channelName: string }) => {
         try {
             const ffmpeg = resolveFfmpegPath()

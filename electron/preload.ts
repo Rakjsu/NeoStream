@@ -66,6 +66,7 @@ const invokeChannels = new Set([
     'dlna:seek',
     'dlna:set-volume',
     'dlna:stop',
+    'clip:export',
     'dvr:active',
     'dvr:convert-mp4',
     'dvr:delete-file',
