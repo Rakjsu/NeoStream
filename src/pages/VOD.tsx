@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SortSelect } from '../components/SortSelect';
+import { CatalogFilters } from '../components/CatalogFilters';
+import { matchesFilters } from '../utils/catalogFilter';
 import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { fetchMovieDetails, searchMovieByName, type TMDBMovieDetails, getBackdropUrl } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
@@ -56,6 +58,9 @@ export function VOD() {
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [sortBy, setSortBy] = useState<CatalogSort>('recent');
+    // 🔎 Filtros de década e gênero — aplicados antes da ordenação.
+    const [decade, setDecade] = useState<number | null>(null);
+    const [genreFilter, setGenreFilter] = useState<string | null>(null);
     const [selectedMovie, setSelectedMovie] = useState<VODStream | null>(null);
     const [tmdbData, setTmdbData] = useState<TMDBMovieDetails | null>(null);
     const [playingMovie, setPlayingMovie] = useState<VODStream | null>(null);
@@ -191,8 +196,13 @@ export function VOD() {
     // Memoized so a big catalog isn't re-sorted/re-filtered on every render —
     // notably on every scroll frame (the windowed grid updates scrollTop state).
     const sortedStreams = useMemo(
-        () => sortBy === 'recent' ? streams : [...streams].sort((a, b) => compareCatalogItems(sortBy, a, b)),
-        [streams, sortBy]
+        () => {
+            const base = (decade !== null || genreFilter)
+                ? streams.filter(item => matchesFilters(item, decade, genreFilter))
+                : streams;
+            return sortBy === 'recent' ? base : [...base].sort((a, b) => compareCatalogItems(sortBy, a, b));
+        },
+        [streams, sortBy, decade, genreFilter]
     );
 
     // 🙈 Esconder assistidos: filmes com progresso >= 95% saem da grade.
@@ -424,6 +434,7 @@ export function VOD() {
                     placeholder={t('login', 'searchMovies')}
                 />
                 <SortSelect value={sortBy} onChange={setSortBy} />
+                <CatalogFilters items={streams} decade={decade} genre={genreFilter} onDecade={setDecade} onGenre={setGenreFilter} />
                 <button
                     onClick={() => {
                         const next = !hideWatched;

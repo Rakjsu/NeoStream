@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { searchSeriesByName, searchMovieByName, fetchMovieTrailer, fetchSeriesTrailer, fetchCollection, fetchSimilarByTmdbId, type TMDBSeriesDetails, type TMDBMovieDetails, type TMDBCollection, type TMDBSimilarItem } from '../services/tmdb';
+import { searchSeriesByName, searchMovieByName, fetchMovieTrailer, fetchSeriesTrailer, fetchCollection, fetchSimilarByTmdbId, fetchCastByTmdbId, fetchPersonFilmography, type TMDBSeriesDetails, type TMDBMovieDetails, type TMDBCollection, type TMDBSimilarItem, type TMDBCastMember } from '../services/tmdb';
+import { allTags, getMark, setRating, toggleTag } from '../services/personalMarksService';
 import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
 import { profileService } from '../services/profileService';
@@ -73,6 +74,9 @@ export function ContentDetailModal({
     // 🎬 Coleção (franquia) do filme e títulos parecidos, ambos via TMDB.
     const [collection, setCollection] = useState<TMDBCollection | null>(null);
     const [similar, setSimilar] = useState<TMDBSimilarItem[]>([]);
+    const [castList, setCastList] = useState<TMDBCastMember[]>([]);
+    const [filmography, setFilmography] = useState<{ name: string; items: TMDBSimilarItem[] } | null>(null);
+    const [tagInput, setTagInput] = useState('');
     const [selectedSeason, setSelectedSeason] = useState(1);
     const [selectedEpisode, setSelectedEpisode] = useState(1);
     const [castSeasonMsg, setCastSeasonMsg] = useState<string | null>(null);
@@ -211,12 +215,12 @@ export function ContentDetailModal({
     // 🎬 Coleção + similares: dependem do id TMDB resolvido pela busca acima.
     useEffect(() => {
         if (!isOpen) {
-            queueMicrotask(() => { setCollection(null); setSimilar([]); });
+            queueMicrotask(() => { setCollection(null); setSimilar([]); setCastList([]); setFilmography(null); });
             return;
         }
         const tmdbId = tmdbData?.id;
         if (!tmdbId) {
-            queueMicrotask(() => { setCollection(null); setSimilar([]); });
+            queueMicrotask(() => { setCollection(null); setSimilar([]); setCastList([]); setFilmography(null); });
             return;
         }
         let cancelled = false;
@@ -232,6 +236,11 @@ export function ContentDetailModal({
         }
         void fetchSimilarByTmdbId(String(tmdbId), contentType).then(result => {
             if (!cancelled) setSimilar(result);
+        });
+        // 🎭 Elenco clicável (filmografia): mesma vida do rail de similares.
+        queueMicrotask(() => setFilmography(null));
+        void fetchCastByTmdbId(String(tmdbId), contentType).then(result => {
+            if (!cancelled) setCastList(result);
         });
         return () => { cancelled = true; };
     }, [isOpen, tmdbData, contentType]);
@@ -1226,6 +1235,55 @@ export function ContentDetailModal({
                         <p style={{ color: 'var(--ns-accent-light)', fontSize: 12, marginTop: 10 }}>{mobileMsg}</p>
                     )}
 
+                    {/* ⭐ Minha nota + 🏷️ tags pessoais (locais à máquina) */}
+                    <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
+                        <div title={t('contentModal', 'myRating')} style={{ whiteSpace: 'nowrap' }}>
+                            {[1, 2, 3, 4, 5].map(star => (
+                                <button
+                                    key={star}
+                                    onClick={() => {
+                                        const current = getMark(contentType, contentId).rating ?? 0;
+                                        setRating(contentType, contentId, current === star ? 0 : star);
+                                        setRefresh(r => r + 1);
+                                    }}
+                                    aria-label={`${t('contentModal', 'myRating')}: ${star}`}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: 2, opacity: (getMark(contentType, contentId).rating ?? 0) >= star ? 1 : 0.25 }}
+                                >
+                                    ⭐
+                                </button>
+                            ))}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            {(getMark(contentType, contentId).tags ?? []).map(tag => (
+                                <button
+                                    key={tag}
+                                    onClick={() => { toggleTag(contentType, contentId, tag); setRefresh(r => r + 1); }}
+                                    title={tag}
+                                    style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.85)', borderRadius: 999, padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}
+                                >
+                                    🏷️ {tag} ✕
+                                </button>
+                            ))}
+                            <input
+                                value={tagInput}
+                                onChange={(e) => setTagInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && tagInput.trim()) {
+                                        toggleTag(contentType, contentId, tagInput);
+                                        setTagInput('');
+                                        setRefresh(r => r + 1);
+                                    }
+                                }}
+                                placeholder={t('contentModal', 'tagPlaceholder')}
+                                list="ns-known-tags"
+                                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: 'white', borderRadius: 999, padding: '5px 10px', fontSize: 12, width: 90 }}
+                            />
+                            <datalist id="ns-known-tags">
+                                {allTags().map(tag => <option key={tag} value={tag} />)}
+                            </datalist>
+                        </div>
+                    </div>
+
                     {/* 🎬 Coleção TMDB (franquia) */}
                     {contentType === 'movie' && collection && collection.parts.length > 1 && (
                         <div style={{ marginTop: 24 }}>
@@ -1267,6 +1325,62 @@ export function ContentDetailModal({
                             </h3>
                             <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6 }}>
                                 {similar.map(item => (
+                                    <div key={item.id} style={{ width: 92, flexShrink: 0 }} title={item.title}>
+                                        <img
+                                            src={`https://image.tmdb.org/t/p/w185${item.poster_path}`}
+                                            alt={item.title}
+                                            loading="lazy"
+                                            style={{ width: 92, height: 138, objectFit: 'cover', borderRadius: 8 }}
+                                        />
+                                        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {item.title}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {/* 🎭 Elenco (clicável → filmografia da pessoa) */}
+                    {castList.length > 0 && (
+                        <div style={{ marginTop: 24 }}>
+                            <h3 style={{ color: 'white', fontSize: 15, fontWeight: 700, marginBottom: 10 }}>
+                                🎭 {t('contentModal', 'castTitle')}
+                            </h3>
+                            <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6 }}>
+                                {castList.map(member => (
+                                    <button
+                                        key={member.id}
+                                        onClick={() => { void fetchPersonFilmography(member.id).then(items => setFilmography({ name: member.name, items })); }}
+                                        title={member.character ? `${member.name} (${member.character})` : member.name}
+                                        style={{ width: 84, flexShrink: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'center' }}
+                                    >
+                                        {member.profile_path ? (
+                                            <img
+                                                src={`https://image.tmdb.org/t/p/w185${member.profile_path}`}
+                                                alt={member.name}
+                                                loading="lazy"
+                                                style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: '50%' }}
+                                            />
+                                        ) : (
+                                            <div style={{ width: 72, height: 72, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontSize: 24 }}>🎭</div>
+                                        )}
+                                        <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 11, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {member.name}
+                                        </p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 🎬 Filmografia da pessoa clicada */}
+                    {filmography && filmography.items.length > 0 && (
+                        <div style={{ marginTop: 16 }}>
+                            <h3 style={{ color: 'white', fontSize: 15, fontWeight: 700, marginBottom: 10 }}>
+                                🎬 {t('contentModal', 'filmographyOf').replace('{name}', filmography.name)}
+                            </h3>
+                            <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6 }}>
+                                {filmography.items.map(item => (
                                     <div key={item.id} style={{ width: 92, flexShrink: 0 }} title={item.title}>
                                         <img
                                             src={`https://image.tmdb.org/t/p/w185${item.poster_path}`}
