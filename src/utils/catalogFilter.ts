@@ -58,3 +58,35 @@ export function matchesFilters(item: FilterableItem, decade: number | null, genr
     }
     return true;
 }
+
+/**
+ * 🔎 Busca fuzzy: minúsculas, sem acentos e sem pontuação; os tokens da
+ * query podem vir em qualquer ordem e também casam com o nome "achatado"
+ * (query "spiderman" acha "Spider-Man").
+ */
+export function normalizeSearchText(text: string): string {
+    return text
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
+export function fuzzyIncludes(name: string, query: string): boolean {
+    const normalizedQuery = normalizeSearchText(query);
+    if (!normalizedQuery) return true;
+    const normalizedName = normalizeSearchText(name);
+    const flatName = normalizedName.replace(/ /g, '');
+    return normalizedQuery
+        .split(' ')
+        .every(token => normalizedName.includes(token) || flatName.includes(token));
+}
+
+/** 🏷️ Selo de qualidade extraído do nome que o provedor usa. */
+export function qualityBadgeOf(name: string): string | null {
+    if (/\b(4k|uhd|2160p?)\b/i.test(name)) return '4K';
+    if (/\b(fhd|1080p?|full ?hd)\b/i.test(name)) return 'FHD';
+    if (/\b(hd|720p?)\b/i.test(name)) return 'HD';
+    return null;
+}

@@ -17,6 +17,8 @@ interface HoverPreviewCardProps {
     isFavorite?: boolean;
     /** Selo "NOVO": item que entrou no catálogo há poucos dias. */
     isNew?: boolean;
+    /** Selo de qualidade (4K/FHD/HD) extraído do nome do provedor. */
+    qualityBadge?: string | null;
     onPlay: () => void;
     onMoreInfo: () => void;
     onToggleFavorite?: () => void;
@@ -32,6 +34,7 @@ function HoverPreviewCardComponent({
     title,
     onMoreInfo,
     isNew,
+    qualityBadge,
     children
 }: HoverPreviewCardProps) {
     const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -52,6 +55,9 @@ function HoverPreviewCardComponent({
             {/* Poster */}
             <div className="preview-poster" style={{ position: 'relative' }}>
                 {isNew && <span className="preview-new-badge">NOVO</span>}
+                {qualityBadge && !isNew && (
+                    <span className="preview-new-badge" style={{ background: 'rgba(59, 130, 246, 0.9)' }}>{qualityBadge}</span>
+                )}
                 <LazyImage
                     src={cover}
                     alt={title}
