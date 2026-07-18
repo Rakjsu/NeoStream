@@ -59,6 +59,13 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
     font-weight: 600; cursor: pointer; text-align: center; transition: all .15s ease;
   }
   .tab.active { background: linear-gradient(135deg, var(--accent-dark), var(--accent)); color: #fff; border-color: transparent; }
+  /* 🌓 Tema claro: overrides por cima do dark (inline styles caem no !important) */
+  body.light { background: #eef1f7 !important; color: #15151f; }
+  body.light .ctl { background: rgba(0,0,0,.06) !important; color: #1c1c28 !important; border-color: rgba(0,0,0,.14) !important; }
+  body.light .tab { background: rgba(0,0,0,.05); color: rgba(0,0,0,.6); }
+  body.light .hint { color: rgba(0,0,0,.55) !important; }
+  body.light input { background: rgba(0,0,0,.05) !important; color: #15151f !important; border-color: rgba(0,0,0,.15) !important; }
+  body.light .card, body.light [class*="card"] { background: rgba(0,0,0,.04) !important; }
   .card {
     width: 100%; max-width: 420px; background: rgba(255,255,255,.05);
     border: 1px solid rgba(255,255,255,.1); border-radius: 20px; padding: 22px;
@@ -211,12 +218,16 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
           <button class="ctl" data-sleep="90" title="${t.sleepBtn}">😴 90</button>
           <button class="ctl" data-sleep="0" title="${t.sleepOff}">😴 ✕</button>
           <button class="ctl" id="focusapp" title="${t.openApp}">🖥️</button>
+          <button class="ctl" id="mvbtn" title="${t.openMultiview}">🎛️</button>
+          <button class="ctl" id="themetoggle" title="${t.themeToggle}">🌓</button>
         </div>
         <div class="row">
           <input id="zapnum" type="number" inputmode="numeric" placeholder="${t.zapNumPh}" style="flex:1;min-width:0;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:16px" />
           <button class="ctl" id="zapgo">📺 ${t.zapGo}</button>
         </div>
         <div class="hint hidden" id="statsline" style="margin-top:10px"></div>
+        <div class="hint hidden" id="remtitle" style="margin-top:10px"></div>
+        <div id="remlist"></div>
       </div>
       <div class="hint" style="margin-top:16px">${t.hint}</div>
       <div class="card hidden" id="reccard" style="margin-top:14px;text-align:left">
@@ -369,6 +380,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
         statusEl.textContent = L.connected; statusEl.className = 'status on';
         if (!devicesRequested) { devicesRequested = true; sendCmd('requestDevices'); }
         sendCmd('requestStats');
+        sendCmd('requestReminders');
         // Land on the last tab the user was using (Guia/Filmes/Séries).
         var savedTab = localStorage.getItem('neostream_remote_tab');
         if (savedTab === 'guide' || savedTab === 'catalog' || savedTab === 'series' || savedTab === 'continue') activateTab(savedTab);
@@ -401,6 +413,8 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
               sl.textContent = '📊 ' + L.statsToday + ' ' + fmtHours(msg.todaySeconds) + ' · ' + L.statsWeek + ' ' + fmtHours(msg.weekSeconds) + (msg.streak > 0 ? ' · 🔥 ' + msg.streak : '');
               sl.classList.remove('hidden');
             }
+          } else if (msg.type === 'reminders') {
+            renderReminders(msg.items || []);
           } else if (msg.type === 'channelEpg') {
             epgCache[msg.channelId] = { now: msg.now, nowStart: msg.nowStart, nowEnd: msg.nowEnd, next: msg.next };
             if (openEpg[msg.channelId]) renderGuide();
@@ -1118,6 +1132,42 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
     });
     var focusBtn = document.getElementById('focusapp');
     if (focusBtn) focusBtn.addEventListener('click', function () { sendCmd('focusApp'); showToast('🖥️ ' + L.openApp, 'ok'); });
+    var mvBtn = document.getElementById('mvbtn');
+    if (mvBtn) mvBtn.addEventListener('click', function () { sendCmd('openMultiview'); showToast('🎛️ ' + L.openMultiview, 'ok'); });
+    // 🌓 Tema claro/escuro persistido no aparelho
+    function applyTheme(mode) { document.body.classList.toggle('light', mode === 'light'); }
+    try { applyTheme(localStorage.getItem('nsTheme') || 'dark'); } catch (e) { /* storage bloqueado */ }
+    var themeBtn = document.getElementById('themetoggle');
+    if (themeBtn) themeBtn.addEventListener('click', function () {
+      var next = document.body.classList.contains('light') ? 'dark' : 'light';
+      try { localStorage.setItem('nsTheme', next); } catch (e) { /* idem */ }
+      applyTheme(next);
+    });
+    // ⏰ Lembretes do guia (lista com cancelar)
+    function renderReminders(items) {
+      var box = document.getElementById('remlist');
+      var title = document.getElementById('remtitle');
+      if (!box || !title) return;
+      box.innerHTML = '';
+      if (!items.length) { title.classList.add('hidden'); return; }
+      title.textContent = '⏰ ' + L.remindersTitle;
+      title.classList.remove('hidden');
+      items.forEach(function (r) {
+        var row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px';
+        var when = new Date(r.startIso);
+        var label = document.createElement('span');
+        label.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+        label.textContent = ('0' + when.getHours()).slice(-2) + ':' + ('0' + when.getMinutes()).slice(-2) + ' · ' + r.title + ' (' + r.channelName + ')';
+        var btn = document.createElement('button');
+        btn.className = 'ctl';
+        btn.textContent = '✕';
+        btn.title = L.reminderCancel;
+        btn.addEventListener('click', function () { sendCmd('cancelReminder', 0, r.id); });
+        row.appendChild(label); row.appendChild(btn);
+        box.appendChild(row);
+      });
+    }
     var zapNumEl = document.getElementById('zapnum');
     var zapGoEl = document.getElementById('zapgo');
     function zapByNumber() {
@@ -1148,6 +1198,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
       if (action === 'requestLiveSearch') payload.query = channelId;
       if (action === 'scheduleNext') payload.channelId = channelId;
       if (action === 'cancelSchedule') payload.id = channelId;
+      if (action === 'cancelReminder') payload.id = channelId;
       if (action === 'castMovie') payload.movieId = movieId;
       if (action === 'castMovieQueue') payload.movieIds = arg5;
       if (action === 'requestSeriesInfo') payload.seriesId = arg5;
