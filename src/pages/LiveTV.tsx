@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SortSelect } from '../components/SortSelect';
+import { usageStatsService } from '../services/usageStatsService';
 import { groupChannelVariants, qualityLabel } from '../services/channelVariantsService';
 import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { CategoryMenu } from '../components/CategoryMenu';
@@ -411,7 +412,19 @@ export function LiveTV() {
     // Memoized so the channel list isn't re-sorted/re-filtered on every render
     // (notably every scroll frame — the windowed grid updates scrollTop state).
     const sortedStreams = useMemo(
-        () => sortBy === 'recent' ? streams : [...streams].sort((a, b) => compareCatalogItems(sortBy, a, b)),
+        () => {
+            // 🏆 'mywatch': ordena pelos meus segundos assistidos por canal
+            // (contentTotals do usageStats, keyed por nome do canal).
+            if (sortBy === 'mywatch') {
+                const totals: Record<string, { name: string; type: string; seconds: number }> = usageStatsService.getStats().contentTotals ?? {};
+                const secondsOf = new Map<string, number>();
+                for (const total of Object.values(totals)) {
+                    if (total.type === 'live') secondsOf.set(total.name, (secondsOf.get(total.name) ?? 0) + total.seconds);
+                }
+                return [...streams].sort((a, b) => (secondsOf.get(b.name) ?? 0) - (secondsOf.get(a.name) ?? 0));
+            }
+            return sortBy === 'recent' ? streams : [...streams].sort((a, b) => compareCatalogItems(sortBy, a, b));
+        },
         [streams, sortBy]
     );
 
@@ -1213,7 +1226,7 @@ export function LiveTV() {
                         🙈 {hiddenIds.size}
                     </button>
                 )}
-                <SortSelect value={sortBy} onChange={setSortBy} withRating={false} inline />
+                <SortSelect value={sortBy} onChange={setSortBy} withRating={false} withMyWatch inline />
             </div>
             <CategoryMenu
                 onSelectCategory={setSelectedCategory}
@@ -1833,6 +1846,7 @@ export function LiveTV() {
                                     <div
                                         className="channel-logo"
                                         style={{
+                                            position: 'relative',
                                             width: '56px',
                                             height: '56px',
                                             background: 'linear-gradient(145deg, rgba(55, 65, 81, 1) 0%, rgba(31, 41, 55, 1) 100%)',
@@ -1845,6 +1859,20 @@ export function LiveTV() {
                                             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)'
                                         }}
                                     >
+                                        {stream.tv_archive === 1 && (
+                                            <span
+                                                title={t('liveTV', 'catchupBadge')}
+                                                style={{
+                                                    position: 'absolute', top: 2, right: 2, zIndex: 1,
+                                                    fontSize: 10, lineHeight: 1, padding: '2px 4px',
+                                                    borderRadius: 6,
+                                                    background: 'rgba(var(--ns-accent-rgb), 0.85)',
+                                                    color: 'white'
+                                                }}
+                                            >
+                                                ⏪
+                                            </span>
+                                        )}
                                         {stream.stream_icon ? (
                                             <LazyImage
                                                 src={stream.stream_icon}
