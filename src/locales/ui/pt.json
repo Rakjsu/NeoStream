@@ -350,6 +350,8 @@
     "exportCanceled": "Exportação cancelada",
     "exportError": "Erro ao exportar o relatório",
     "openLogs": "Abrir pasta de logs",
+    "exportLog": "Exportar log",
+    "exportLogFail": "Não deu pra exportar o log.",
     "healthTitle": "Saúde do provedor",
     "healthDesc": "Mede a latência dos endpoints do provedor ativo (API, canais, EPG)",
     "healthTest": "Testar agora",

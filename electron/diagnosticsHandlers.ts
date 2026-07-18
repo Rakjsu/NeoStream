@@ -109,6 +109,21 @@ export function setupDiagnosticsHandlers() {
         }
     })
 
+    // 💾 Exporta o arquivo de log principal pra onde o usuário escolher.
+    ipcMain.handle('diagnostics:export-log', async () => {
+        try {
+            const source = path.join(app.getPath('logs'), 'main.log')
+            const stamp = new Date().toISOString().slice(0, 10)
+            const result = await dialog.showSaveDialog({ defaultPath: `neostream-log-${stamp}.log` })
+            if (result.canceled || !result.filePath) return { success: false, canceled: true }
+            await fs.copyFile(source, result.filePath)
+            return { success: true, path: result.filePath }
+        } catch (error: unknown) {
+            log.error('[Diagnostics] Export log error:', getErrorMessage(error))
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
     // Open the logs folder in the OS file manager.
     ipcMain.handle('diagnostics:open-logs', async () => {
         try {

@@ -555,7 +555,7 @@ export function Series() {
                                 <p>Tente buscar por outro termo</p>
                             </div>
                         ) : (
-                            <div ref={gridRef} className="series-grid">
+                            <div ref={gridRef} className="series-grid" role="list" aria-label={t('nav', 'series')}>
                                 {gridWindow.topSpacer > 0 && (
                                     <div data-spacer="true" style={{ gridColumn: '1 / -1', height: gridWindow.topSpacer }} />
                                 )}

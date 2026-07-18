@@ -145,6 +145,11 @@ export function DiagnosticsSection() {
         epgCache: { label: t('storage', 'epgCache'), clearable: true }
     };
 
+    const handleExportLog = async () => {
+        const result = await window.ipcRenderer.invoke('diagnostics:export-log') as { success: boolean; canceled?: boolean };
+        if (!result.success && !result.canceled) alert(t('diagnostics', 'exportLogFail'));
+    };
+
     const handleOpenLogs = async () => {
         setErrorMessage(null);
         setSuccessMessage(null);
@@ -213,13 +218,23 @@ export function DiagnosticsSection() {
                         <label>{t('diagnostics', 'openLogs')}</label>
                         <p>{t('diagnostics', 'openLogsDesc')}</p>
                     </div>
-                    <button
-                        className="about-link"
-                        style={{ whiteSpace: 'nowrap' }}
-                        onClick={handleOpenLogs}
-                    >
-                        📂 {t('diagnostics', 'openLogs')}
-                    </button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                            className="about-link"
+                            style={{ whiteSpace: 'nowrap' }}
+                            onClick={handleOpenLogs}
+                        >
+                            📂 {t('diagnostics', 'openLogs')}
+                        </button>
+                        <button
+                            className="about-link"
+                            style={{ whiteSpace: 'nowrap' }}
+                            onClick={handleExportLog}
+                            title={t('diagnostics', 'exportLog')}
+                        >
+                            💾 {t('diagnostics', 'exportLog')}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Provider health */}

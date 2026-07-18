@@ -501,7 +501,7 @@ export function VOD() {
                                 <p>Tente buscar por outro termo</p>
                             </div>
                         ) : (
-                            <div ref={gridRef} className="movies-grid">
+                            <div ref={gridRef} className="movies-grid" role="list" aria-label={t('nav', 'movies')}>
                                 {gridWindow.topSpacer > 0 && (
                                     <div data-spacer="true" style={{ gridColumn: '1 / -1', height: gridWindow.topSpacer }} />
                                 )}
