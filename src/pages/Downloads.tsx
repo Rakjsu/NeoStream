@@ -68,6 +68,9 @@ export function Downloads() {
     const [protectedRecs, setProtectedRecs] = useState<Set<string>>(() => getProtectedRecordings());
     const [renamingPath, setRenamingPath] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState('');
+    // ⚙️ Config da fila de downloads (D66).
+    const [maxConc, setMaxConc] = useState(() => downloadService.getMaxConcurrent());
+    const [nightOnly, setNightOnlyState] = useState(() => downloadService.isNightOnly());
     // 🎞️/📤 conversão e exportação + 🖼️ thumbnails cacheadas por path.
     const [convertingPath, setConvertingPath] = useState<string | null>(null);
     const [dvrMsg, setDvrMsg] = useState('');
@@ -533,6 +536,40 @@ export function Downloads() {
                     </div>
                 )}
 
+                {/* ⚙️ Fila de downloads: limite simultâneo + modo madrugada */}
+                <div className="storage-card" style={{ marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
+                        <label style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            ⬇ {t('downloads', 'maxConcurrent')}
+                            <select
+                                className="setting-select"
+                                value={maxConc}
+                                onChange={(e) => {
+                                    const n = Number(e.target.value);
+                                    setMaxConc(n);
+                                    downloadService.setMaxConcurrent(n);
+                                }}
+                            >
+                                <option value={1}>1</option>
+                                <option value={2}>2</option>
+                                <option value={3}>3</option>
+                                <option value={4}>4</option>
+                            </select>
+                        </label>
+                        <label style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} title={t('downloads', 'nightOnlyDesc')}>
+                            <input
+                                type="checkbox"
+                                checked={nightOnly}
+                                onChange={(e) => {
+                                    setNightOnlyState(e.target.checked);
+                                    downloadService.setNightOnly(e.target.checked);
+                                }}
+                            />
+                            🌙 {t('downloads', 'nightOnly')}
+                        </label>
+                    </div>
+                </div>
+
                 {/* Storage Info */}
                 <div className="storage-card">
                     <div className="storage-icon">
@@ -639,7 +676,9 @@ export function Downloads() {
                                             <div className="status-badge completed">✓ {t('downloads', 'downloaded')}</div>
                                         )}
                                         {item.status === 'downloading' && (
-                                            <div className="status-badge downloading">{item.progress}%</div>
+                                            <div className="status-badge downloading">
+                                                {item.progress}%{item.speedBps ? ` · ${(item.speedBps / (1024 * 1024)).toFixed(1)} MB/s` : ''}
+                                            </div>
                                         )}
                                         {(item.status === 'paused' || item.status === 'failed') && (
                                             <div className="status-badge paused">⏸ {t('downloads', 'paused')}</div>
@@ -655,6 +694,18 @@ export function Downloads() {
                                                     }}
                                                 >
                                                     <Play size={28} fill="white" />
+                                                </button>
+                                            ) : item.status === 'downloading' ? (
+                                                <button
+                                                    className="resume-btn"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        void downloadService.pauseDownload(item.id);
+                                                    }}
+                                                    title={t('downloads', 'pauseDownload')}
+                                                >
+                                                    ⏸
+                                                    <span>{t('downloads', 'pauseDownload')}</span>
                                                 </button>
                                             ) : (item.status === 'paused' || item.status === 'failed') && (
                                                 <button
