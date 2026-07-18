@@ -945,6 +945,7 @@
     "today": "Hoy / Ahora",
     "earlier": "Más temprano",
     "later": "Más tarde",
+    "jumpToDay": "Saltar al día",
     "replay": "Replay",
     "replayBadge": "Replay disponible ({days} días)",
     "replayOf": "Ver replay de {title}",
@@ -1004,6 +1005,8 @@
     "recordingNow": "GRABANDO",
     "cancel": "Cancelar",
     "cancelReminder": "Cancelar recordatorio",
+    "exportIcs": "Exportar .ics",
+    "exportIcsHint": "Descarga un calendario (.ics) con recordatorios y grabaciones programadas.",
     "cancelRecording": "Cancelar grabación"
   },
   "sort": {

@@ -224,3 +224,34 @@ export function formatGuideTime(ms: number): string {
         hour12: false
     });
 }
+
+/** Matiz determinística (0–359) pra tingir a grade por categoria do canal. */
+export function categoryHue(key: string): number {
+    let hash = 0;
+    for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+    return hash % 360;
+}
+
+const DAY_OPTION_HOUR = 8;
+
+/**
+ * Dias alcançáveis pela faixa de EPG do provedor (ms às 08:00 locais de
+ * ontem..depois de amanhã que ainda caibam numa janela clampada).
+ */
+export function listGuideDays(now: number = Date.now()): number[] {
+    const days: number[] = [];
+    for (let offset = -1; offset <= 2; offset++) {
+        const date = new Date(now + offset * DAY_MS);
+        date.setHours(DAY_OPTION_HOUR, 0, 0, 0);
+        const ms = date.getTime();
+        const latestStart = now + WINDOW_MAX_OFFSET_MS - WINDOW_HALF_HOURS * HALF_HOUR_MS;
+        if (ms >= now + WINDOW_MIN_OFFSET_MS && ms <= latestStart) days.push(ms);
+    }
+    return days;
+}
+
+/** Janela do guia ancorada no instante escolhido (lattice de 30min + clamp). */
+export function windowForDay(dayMs: number, now: number = Date.now()): GuideWindow {
+    const start = Math.floor(dayMs / HALF_HOUR_MS) * HALF_HOUR_MS;
+    return clampWindow({ start, end: start + WINDOW_HALF_HOURS * HALF_HOUR_MS }, now);
+}
