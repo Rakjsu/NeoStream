@@ -206,6 +206,10 @@
     "markWatched": "Marcar como visto",
     "unmarkWatched": "Desmarcar visto",
     "similarTitle": "Parecidos com este",
+    "castTitle": "Elenco",
+    "filmographyOf": "Filmes de {name}",
+    "myRating": "Minha nota",
+    "tagPlaceholder": "+ tag",
     "hideWatched": "🙈 Vistos",
     "hideWatchedHint": "Esconder já assistidos (filmes vistos e séries sem episódios pendentes)",
     "watchOffline": "Assistir Offline",
@@ -1024,7 +1028,11 @@
     "title": "Ordenar por",
     "recent": "Mais recentes",
     "name": "Nome (A–Z)",
-    "rating": "Melhor avaliados"
+    "rating": "Melhor avaliados",
+    "decade": "Década",
+    "allDecades": "Todas as décadas",
+    "genre": "Gênero",
+    "allGenres": "Todos os gêneros"
   },
   "storage": {
     "title": "Armazenamento",

@@ -687,3 +687,60 @@ export async function fetchSimilarByTmdbId(tmdbId: string, type: 'movie' | 'seri
         return [];
     }
 }
+
+export interface TMDBCastMember {
+    id: number;
+    name: string;
+    character?: string;
+    profile_path: string | null;
+}
+
+const castCache = new Map<string, TMDBCastMember[]>();
+
+/** Elenco principal (até 12) do título — alimenta a filmografia clicável. */
+export async function fetchCastByTmdbId(tmdbId: string, type: 'movie' | 'series'): Promise<TMDBCastMember[]> {
+    if (!getTmdbApiKey() || !tmdbId) return [];
+    const cacheKey = `${type}:${tmdbId}`;
+    const cached = castCache.get(cacheKey);
+    if (cached) return cached;
+    try {
+        const path = type === 'series' ? 'tv' : 'movie';
+        const response = await fetch(
+            `${TMDB_BASE_URL}/${path}/${tmdbId}/credits?api_key=${getTmdbApiKey()}&language=pt-BR`
+        );
+        if (!response.ok) return [];
+        const data = await response.json() as { cast?: TMDBCastMember[] };
+        const result = (data.cast ?? []).filter(member => member && member.id).slice(0, 12);
+        castCache.set(cacheKey, result);
+        return result;
+    } catch {
+        return [];
+    }
+}
+
+const personCache = new Map<number, TMDBSimilarItem[]>();
+
+/** Filmografia da pessoa (mais populares primeiro) — reusa o card dos similares. */
+export async function fetchPersonFilmography(personId: number): Promise<TMDBSimilarItem[]> {
+    if (!getTmdbApiKey() || !personId) return [];
+    const cached = personCache.get(personId);
+    if (cached) return cached;
+    try {
+        const response = await fetch(
+            `${TMDB_BASE_URL}/person/${personId}/movie_credits?api_key=${getTmdbApiKey()}&language=pt-BR`
+        );
+        if (!response.ok) return [];
+        const data = await response.json() as {
+            cast?: { id: number; title?: string; poster_path: string | null; vote_average?: number; popularity?: number }[];
+        };
+        const result = (data.cast ?? [])
+            .filter(item => item && item.id && item.poster_path)
+            .sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0))
+            .slice(0, 20)
+            .map(item => ({ id: item.id, title: item.title ?? '', poster_path: item.poster_path, vote_average: item.vote_average }));
+        personCache.set(personId, result);
+        return result;
+    } catch {
+        return [];
+    }
+}

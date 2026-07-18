@@ -206,6 +206,10 @@
     "markWatched": "Mark as watched",
     "unmarkWatched": "Unmark watched",
     "similarTitle": "Similar to this",
+    "castTitle": "Cast",
+    "filmographyOf": "Movies with {name}",
+    "myRating": "My rating",
+    "tagPlaceholder": "+ tag",
     "hideWatched": "🙈 Watched",
     "hideWatchedHint": "Hide already watched (finished movies and series with nothing pending)",
     "watchOffline": "Watch Offline",
@@ -1024,7 +1028,11 @@
     "title": "Sort by",
     "recent": "Most recent",
     "name": "Name (A–Z)",
-    "rating": "Top rated"
+    "rating": "Top rated",
+    "decade": "Decade",
+    "allDecades": "All decades",
+    "genre": "Genre",
+    "allGenres": "All genres"
   },
   "storage": {
     "title": "Storage",

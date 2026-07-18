@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { SortSelect } from '../components/SortSelect';
+import { CatalogFilters } from '../components/CatalogFilters';
+import { matchesFilters } from '../utils/catalogFilter';
 import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { getBackdropUrl } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
@@ -53,6 +55,9 @@ export function Series() {
     const [error, setError] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [sortBy, setSortBy] = useState<CatalogSort>('recent');
+    // 🔎 Filtros de década e gênero — aplicados antes da ordenação.
+    const [decade, setDecade] = useState<number | null>(null);
+    const [genreFilter, setGenreFilter] = useState<string | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [selectedSeries, setSelectedSeries] = useState<Series | null>(null);
     const [playingSeries, setPlayingSeries] = useState<Series | null>(null);
@@ -205,8 +210,13 @@ export function Series() {
     // Memoized so a big library isn't re-sorted/re-filtered on every render
     // (notably on every scroll frame — the windowed grid updates scrollTop state).
     const sortedSeries = useMemo(
-        () => sortBy === 'recent' ? series : [...series].sort((a, b) => compareCatalogItems(sortBy, a, b)),
-        [series, sortBy]
+        () => {
+            const base = (decade !== null || genreFilter)
+                ? series.filter(item => matchesFilters(item, decade, genreFilter))
+                : series;
+            return sortBy === 'recent' ? base : [...base].sort((a, b) => compareCatalogItems(sortBy, a, b));
+        },
+        [series, sortBy, decade, genreFilter]
     );
 
     // 🙈 Esconder assistidos: séries onde TODO episódio registrado está
@@ -456,6 +466,7 @@ export function Series() {
                     placeholder={t('login', 'searchSeries')}
                 />
                 <SortSelect value={sortBy} onChange={setSortBy} />
+                <CatalogFilters items={series} decade={decade} genre={genreFilter} onDecade={setDecade} onGenre={setGenreFilter} />
                 <button
                     onClick={() => {
                         const next = !hideWatched;

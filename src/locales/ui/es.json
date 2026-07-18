@@ -206,6 +206,10 @@
     "markWatched": "Marcar como visto",
     "unmarkWatched": "Desmarcar visto",
     "similarTitle": "Parecidos a este",
+    "castTitle": "Reparto",
+    "filmographyOf": "Películas de {name}",
+    "myRating": "Mi nota",
+    "tagPlaceholder": "+ etiqueta",
     "hideWatched": "🙈 Vistos",
     "hideWatchedHint": "Ocultar ya vistos (películas terminadas y series sin episodios pendientes)",
     "watchOffline": "Ver Sin Conexión",
@@ -1024,7 +1028,11 @@
     "title": "Ordenar por",
     "recent": "Más recientes",
     "name": "Nombre (A–Z)",
-    "rating": "Mejor valorados"
+    "rating": "Mejor valorados",
+    "decade": "Década",
+    "allDecades": "Todas las décadas",
+    "genre": "Género",
+    "allGenres": "Todos los géneros"
   },
   "storage": {
     "title": "Almacenamiento",
