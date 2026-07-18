@@ -1088,6 +1088,31 @@ export function setupIpcHandlers() {
         }
     })
 
+    // 📸 Player frame capture: the renderer draws the current <video> frame
+    // on a canvas; main shows the save dialog and writes the PNG bytes.
+    ipcMain.handle('player:save-frame', async (_, { dataUrl, name }: { dataUrl?: string; name?: string }) => {
+        try {
+            const base64 = String(dataUrl ?? '').replace(/^data:image\/png;base64,/, '')
+            if (!base64 || /[^A-Za-z0-9+/=]/.test(base64)) {
+                return { success: false, error: 'PNG inválido' }
+            }
+            const safe = String(name ?? 'frame').replace(/[<>:"/\\|?*]/g, '').trim().slice(0, 60) || 'frame'
+            const result = await dialog.showSaveDialog({
+                title: 'Salvar quadro',
+                defaultPath: `${safe}.png`,
+                filters: [{ name: 'PNG', extensions: ['png'] }]
+            })
+            if (result.canceled || !result.filePath) {
+                return { success: false, canceled: true }
+            }
+            const fs = await import('fs/promises')
+            await fs.writeFile(result.filePath, Buffer.from(base64, 'base64'))
+            return { success: true, path: result.filePath }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
     // Load a user-data backup JSON from a file chosen by the user
     ipcMain.handle('backup:load-file', async () => {
         try {

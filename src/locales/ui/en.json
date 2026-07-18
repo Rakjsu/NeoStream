@@ -694,6 +694,14 @@
     "expand": "Expand"
   },
   "player": {
+    "volumeBoost": "Volume boost",
+    "frameSaved": "📸 Frame saved",
+    "frameError": "Could not capture a frame from this stream",
+    "statsResolution": "Resolution",
+    "statsBitrate": "Bitrate",
+    "statsBuffer": "Buffer",
+    "statsDropped": "Dropped frames",
+    "statsSpeed": "Speed",
     "quality": "Quality",
     "speed": "Speed",
     "version": "Version",
@@ -933,6 +941,10 @@
     "note": "Kids profile and parental control filters still apply on top of these options."
   },
   "shortcuts": {
+    "frameStep": "Frame step (paused)",
+    "abLoop": "A-B loop",
+    "nerdStats": "Stream stats",
+    "screenshot": "Save frame as PNG",
     "title": "Keyboard shortcuts",
     "groupGeneral": "General",
     "groupPlayer": "Player",

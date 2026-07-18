@@ -45,6 +45,7 @@ const invokeChannels = new Set([
     'sync:save',
     'series:get-info',
     'wrapped:save-png',
+    'player:save-frame',
     'categories:get-series',
     'categories:get-vod',
     'content:get-counts',

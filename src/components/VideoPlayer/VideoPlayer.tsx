@@ -12,6 +12,7 @@ import { getKidsDailyLimitMinutes, isLimitExceeded } from '../../services/watchL
 import { SubtitleOverlay } from './SubtitleOverlay';
 import { useSubtitleManager } from './useSubtitleManager';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
+import { clampBoost, cycleAbState, abLoopTarget, type AbLoopState } from './playerExtras';
 import { PlayerSettingsMenu } from './PlayerSettingsMenu';
 import { useSleepTimer, formatSleepCountdown } from './useSleepTimer';
 import { aspectPrefs, aspectPrefKey } from '../../utils/aspectPrefs';
@@ -283,6 +284,107 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         : aspectMode === 'zoom' ? { objectFit: 'contain', transform: 'scale(1.33)' }
         : { objectFit: 'contain' };
     const [hoverPosition, setHoverPosition] = useState(0);
+
+    // 🔊 Volume boost (>100%) via WebAudio GainNode — o grafo é criado só no
+    // primeiro boost (createMediaElementSource captura o áudio do elemento;
+    // streams sem CORS ficariam mudos à toa se fosse criado sempre).
+    const [volumeBoost, setVolumeBoost] = useState(1);
+    const audioGraphRef = useRef<{ ctx: AudioContext; gain: GainNode } | null>(null);
+    const applyVolumeBoost = useCallback((mult: number) => {
+        const clamped = clampBoost(mult);
+        setVolumeBoost(clamped);
+        const video = videoRef.current;
+        if (!video) return;
+        try {
+            if (!audioGraphRef.current) {
+                if (clamped <= 1) return;
+                const ctx = new AudioContext();
+                const source = ctx.createMediaElementSource(video);
+                const gain = ctx.createGain();
+                source.connect(gain);
+                gain.connect(ctx.destination);
+                audioGraphRef.current = { ctx, gain };
+            }
+            audioGraphRef.current.gain.gain.value = clamped;
+            void audioGraphRef.current.ctx.resume();
+        } catch (err) {
+            console.warn('[Player] volume boost indisponível:', err);
+        }
+    }, [videoRef]);
+    useEffect(() => () => {
+        try { void audioGraphRef.current?.ctx.close(); } catch { /* ignore */ }
+    }, []);
+
+    // 🔁 Repetição A-B (tecla B cicla A → A-B → limpo); volta pro A ao passar do B.
+    const [abLoop, setAbLoop] = useState<AbLoopState>({ a: null, b: null });
+    useEffect(() => {
+        const target = abLoopTarget(state.currentTime, abLoop);
+        if (target != null) controls.seek(target);
+    }, [state.currentTime, abLoop, controls]);
+
+    // 📊 Nerd stats (tecla I): coleta 1x/s enquanto o overlay está aberto.
+    interface PlayerStats { width: number; height: number; dropped: number; total: number; bufferAheadSec: number; bitrateKbps: number | null }
+    const [showStats, setShowStats] = useState(false);
+    const [stats, setStats] = useState<PlayerStats | null>(null);
+    useEffect(() => {
+        if (!showStats) { queueMicrotask(() => setStats(null)); return; }
+        const collect = () => {
+            const video = videoRef.current;
+            if (!video) return;
+            const q = video.getVideoPlaybackQuality?.();
+            const hls = hlsRef.current;
+            const level = hls && hls.currentLevel >= 0 ? hls.levels?.[hls.currentLevel] : undefined;
+            let bufferAheadSec = 0;
+            for (let i = 0; i < video.buffered.length; i++) {
+                if (video.buffered.start(i) <= video.currentTime && video.currentTime <= video.buffered.end(i)) {
+                    bufferAheadSec = video.buffered.end(i) - video.currentTime;
+                    break;
+                }
+            }
+            setStats({
+                width: video.videoWidth,
+                height: video.videoHeight,
+                dropped: q?.droppedVideoFrames ?? 0,
+                total: q?.totalVideoFrames ?? 0,
+                bufferAheadSec,
+                bitrateKbps: level?.bitrate ? Math.round(level.bitrate / 1000) : null
+            });
+        };
+        queueMicrotask(collect);
+        const timer = setInterval(collect, 1000);
+        return () => clearInterval(timer);
+    }, [showStats, videoRef, hlsRef]);
+
+    // ,/. — quadro a quadro (~30fps) com o vídeo pausado.
+    const stepFrame = useCallback((deltaSec: number) => {
+        const video = videoRef.current;
+        if (!video || !video.paused) return;
+        const max = Number.isFinite(video.duration) ? video.duration : Number.MAX_SAFE_INTEGER;
+        video.currentTime = Math.max(0, Math.min(max, video.currentTime + deltaSec));
+    }, [videoRef]);
+
+    // 📸 Screenshot do quadro atual (tecla S): canvas → PNG → dialog no main.
+    const captureFrame = useCallback(async () => {
+        const video = videoRef.current;
+        if (!video || !video.videoWidth || !window.ipcRenderer) return;
+        try {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d')?.drawImage(video, 0, 0);
+            const dataUrl = canvas.toDataURL('image/png');
+            const result = await window.ipcRenderer.invoke('player:save-frame', { dataUrl, name: title || 'frame' });
+            if (result?.success) {
+                setStreamErrorToast(t('player', 'frameSaved'));
+                setTimeout(() => setStreamErrorToast(null), 4000);
+            }
+        } catch (err) {
+            // Canvas taint (stream sem CORS) ou dialog cancelado.
+            console.warn('[Player] screenshot falhou:', err);
+            setStreamErrorToast(t('player', 'frameError'));
+            setTimeout(() => setStreamErrorToast(null), 4000);
+        }
+    }, [videoRef, title, t]);
     const {
         subtitlesEnabled,
         setSubtitlesEnabled,
@@ -689,7 +791,13 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         containerRef,
         vttContent,
         setSubtitlesEnabled,
-        onClose
+        onClose,
+        onFrameStep: stepFrame,
+        onToggleStats: () => setShowStats(v => !v),
+        onCycleAbLoop: contentType !== 'live'
+            ? () => setAbLoop(prev => cycleAbState(prev, videoRef.current?.currentTime ?? 0))
+            : undefined,
+        onScreenshot: () => { void captureFrame(); }
     });
 
     // Progress bar hover preview
@@ -738,6 +846,39 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
 
             {title && showControls && (
                 <div className="video-player-title">{title}</div>
+            )}
+
+            {/* 🔁 A-B loop badge (B key). */}
+            {abLoop.a != null && (
+                <div style={{
+                    position: 'absolute', top: 18, right: 70, zIndex: 1100,
+                    background: 'rgba(var(--ns-accent-rgb), 0.25)',
+                    border: '1px solid rgba(var(--ns-accent-rgb), 0.5)',
+                    borderRadius: 8, padding: '4px 10px',
+                    fontSize: 12, fontWeight: 700, color: 'var(--ns-accent-light)'
+                }}>
+                    🔁 A{abLoop.b != null ? '–B' : '…'}
+                </div>
+            )}
+
+            {/* 📊 Nerd stats overlay (I key). */}
+            {showStats && stats && (
+                <div className="nerd-stats" style={{
+                    position: 'absolute', top: 18, left: 18, zIndex: 1100,
+                    background: 'rgba(2, 6, 23, 0.85)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 8, padding: '10px 14px',
+                    fontFamily: 'monospace', fontSize: 12, color: '#a5f3fc',
+                    lineHeight: 1.7, pointerEvents: 'none'
+                }}>
+                    <div>{t('player', 'statsResolution')}: {stats.width}×{stats.height}</div>
+                    {stats.bitrateKbps != null && (
+                        <div>{t('player', 'statsBitrate')}: {stats.bitrateKbps} kbps</div>
+                    )}
+                    <div>{t('player', 'statsBuffer')}: {stats.bufferAheadSec.toFixed(1)}s</div>
+                    <div>{t('player', 'statsDropped')}: {stats.dropped}/{stats.total}</div>
+                    <div>{t('player', 'statsSpeed')}: {state.playbackRate}x · vol {Math.round(volumeBoost * 100)}%</div>
+                </div>
             )}
 
             {/* Live mini-EPG: what's on now / next, right under the title */}
@@ -1205,6 +1346,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             onAdjustSubtitleOffset={(delta) => setSubtitleOffset(prev => Math.round((prev + delta) * 2) / 2)}
                             sleepTimerMinutes={sleepTimer.selectedMinutes}
                             onSetSleepTimer={(minutes) => minutes ? sleepTimer.start(minutes) : sleepTimer.cancel()}
+                            volumeBoost={volumeBoost}
+                            onSetVolumeBoost={applyVolumeBoost}
                         />
 
                         {/* Channel list toggle (live TV zapping) */}

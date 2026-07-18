@@ -56,7 +56,11 @@ export function ShortcutsOverlay() {
             title: t('shortcuts', 'groupPlayer'),
             rows: [
                 { keys: ['Espaço', 'K'], label: t('shortcuts', 'playPause') },
-                { keys: ['←', '→'], label: t('shortcuts', 'seek') },
+                { keys: ['←', '→', 'J', 'L'], label: t('shortcuts', 'seek') },
+                { keys: [',', '.'], label: t('shortcuts', 'frameStep') },
+                { keys: ['B'], label: t('shortcuts', 'abLoop') },
+                { keys: ['I'], label: t('shortcuts', 'nerdStats') },
+                { keys: ['S'], label: t('shortcuts', 'screenshot') },
                 { keys: ['↑', '↓'], label: t('shortcuts', 'volume') },
                 { keys: ['M'], label: t('shortcuts', 'mute') },
                 { keys: ['F'], label: t('shortcuts', 'fullscreen') },

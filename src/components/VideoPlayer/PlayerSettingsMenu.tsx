@@ -2,6 +2,7 @@ import { Settings } from 'lucide-react';
 import { useLanguage } from '../../services/languageService';
 import { SUBTITLE_LANGUAGE_OPTIONS } from '../../services/subtitleService';
 import { SLEEP_TIMER_OPTIONS } from './useSleepTimer';
+import { BOOST_OPTIONS } from './playerExtras';
 
 import type { MovieVersion } from '../../services/movieVersionService';
 
@@ -44,6 +45,9 @@ export interface PlayerSettingsMenuProps<TSwitchContent extends SwitchableConten
     /** Aspect ratio mode. */
     aspectMode?: 'original' | 'stretch' | 'fill' | 'zoom';
     onSetAspectMode?: (mode: 'original' | 'stretch' | 'fill' | 'zoom') => void;
+    /** Volume boost via WebAudio gain (1 = 100%, up to 3 = 300%). */
+    volumeBoost?: number;
+    onSetVolumeBoost?: (mult: number) => void;
 }
 
 // Gear settings menu: movie version / live quality switcher, or playback speed.
@@ -68,7 +72,9 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
     subtitleOffset,
     onAdjustSubtitleOffset,
     aspectMode,
-    onSetAspectMode
+    onSetAspectMode,
+    volumeBoost,
+    onSetVolumeBoost
 }: PlayerSettingsMenuProps<TSwitchContent>) {
     const { t } = useLanguage();
 
@@ -300,6 +306,24 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
                                         onClick={() => onSetAspectMode(mode)}
                                     >
                                         {label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Volume boost: WebAudio gain above the HTML5 100% ceiling */}
+                    {volumeBoost !== undefined && onSetVolumeBoost && (
+                        <div className="settings-section">
+                            <span className="settings-label">{t('player', 'volumeBoost')}</span>
+                            <div className="settings-options">
+                                {BOOST_OPTIONS.map(mult => (
+                                    <button
+                                        key={mult}
+                                        className={`settings-option ${volumeBoost === mult ? 'active' : ''}`}
+                                        onClick={() => onSetVolumeBoost(mult)}
+                                    >
+                                        {Math.round(mult * 100)}%
                                     </button>
                                 ))}
                             </div>
