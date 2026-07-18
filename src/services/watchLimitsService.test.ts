@@ -39,3 +39,43 @@ describe('watchLimitsService (limite infantil + meta diária)', () => {
         expect(goalProgressPct(1000, 0)).toBe(0);
     });
 });
+
+describe('limite por perfil (D65)', () => {
+    it('o específico do perfil vence; kids sem específico herda o global', async () => {
+        const { setProfileDailyLimitMinutes, setKidsDailyLimitMinutes, effectiveDailyLimitMinutes } =
+            await import('./watchLimitsService')
+        localStorage.clear()
+        setKidsDailyLimitMinutes(60)
+        expect(effectiveDailyLimitMinutes('p1', true)).toBe(60)
+        expect(effectiveDailyLimitMinutes('p1', false)).toBe(0)
+        setProfileDailyLimitMinutes('p1', 120)
+        expect(effectiveDailyLimitMinutes('p1', true)).toBe(120)
+        expect(effectiveDailyLimitMinutes('p1', false)).toBe(120)
+        setProfileDailyLimitMinutes('p1', 0)
+        expect(effectiveDailyLimitMinutes('p1', false)).toBe(0)
+    })
+})
+
+describe('janelas de horário (D65)', () => {
+    it('isHourWithinWindow cobre janela normal e a que vira a meia-noite', async () => {
+        const { isHourWithinWindow } = await import('./watchLimitsService')
+        expect(isHourWithinWindow(10, { start: 6, end: 20 })).toBe(true)
+        expect(isHourWithinWindow(6, { start: 6, end: 20 })).toBe(true)
+        expect(isHourWithinWindow(20, { start: 6, end: 20 })).toBe(false)
+        expect(isHourWithinWindow(23, { start: 20, end: 6 })).toBe(true)
+        expect(isHourWithinWindow(3, { start: 20, end: 6 })).toBe(true)
+        expect(isHourWithinWindow(12, { start: 20, end: 6 })).toBe(false)
+    })
+
+    it('persistência valida o formato e rejeita lixo', async () => {
+        const { setKidsAllowedHours, getKidsAllowedHours } = await import('./watchLimitsService')
+        localStorage.clear()
+        expect(getKidsAllowedHours()).toBeNull()
+        setKidsAllowedHours({ start: 6, end: 20 })
+        expect(getKidsAllowedHours()).toEqual({ start: 6, end: 20 })
+        localStorage.setItem('neostream_kids_allowed_hours', '99-5')
+        expect(getKidsAllowedHours()).toBeNull()
+        setKidsAllowedHours(null)
+        expect(localStorage.getItem('neostream_kids_allowed_hours')).toBeNull()
+    })
+})

@@ -1,4 +1,5 @@
 import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { getAutoKidsHours, isHourWithinWindow } from './services/watchLimitsService';
 import { catalogRefreshService } from './services/catalogRefreshService';
 import { tvModeService } from './services/tvModeService';
 import { collectBackup, encodePlaylistPassword, sanitizeBackupPlaylists, sanitizeBackupOpenSubtitles, decodePlaylistPassword, type BackupPlaylist, type OpenSubtitlesCreds } from './services/backupService';
@@ -263,6 +264,14 @@ function App() {
       // One-time: split the legacy global movie-progress key into per-profile
       // keys (no-op once migrated). Runs after profiles exist.
       movieProgressService.migrateLegacyGlobalProgress();
+
+      // 👶 Auto-kids por horário: dentro da janela, o boot cai direto no
+      // primeiro perfil infantil (configurado no Controle Parental).
+      const autoKids = getAutoKidsHours();
+      if (autoKids && isHourWithinWindow(new Date().getHours(), autoKids)) {
+          const kidsProfile = profileService.getAllProfiles().find(p => p.isKids);
+          if (kidsProfile) profileService.setActiveProfile(kidsProfile.id);
+      }
 
       // Check if there's an active profile
       const activeProfile = profileService.getActiveProfile();
