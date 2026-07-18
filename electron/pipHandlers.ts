@@ -266,6 +266,17 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
             pipWindow.webContents.send('pip:clickThroughChanged', clickThroughMode);
         }
     });
+
+    // 📌 F10 (global): alterna o "sempre no topo" do PiP — dá pra deixar o
+    // vídeo cair atrás das janelas e trazê-lo de volta sem tocar no mouse,
+    // mesmo com o app principal minimizado. Religar traz a janela pra frente.
+    globalShortcut.register('F10', () => {
+        if (pipWindow && !pipWindow.isDestroyed()) {
+            const next = !pipWindow.isAlwaysOnTop();
+            pipWindow.setAlwaysOnTop(next, 'screen-saver');
+            if (next) pipWindow.moveTop();
+        }
+    });
 }
 
 export function closePipWindow() {

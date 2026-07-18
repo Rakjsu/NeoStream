@@ -1,0 +1,42 @@
+# 🌙 Nightly beta: builda o instalador Windows todo dia e guarda como
+# ARTIFACT do run (7 dias) — nada é publicado como release; o fluxo oficial
+# de release (tag → draft do electron-builder) continua manual.
+name: Nightly
+
+on:
+  schedule:
+    - cron: '0 6 * * *' # 03:00 no Brasil
+  workflow_dispatch:
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  nightly:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies (com retry)
+        run: npm ci || (sleep 15 && npm ci) || (sleep 60 && npm ci)
+        shell: bash
+
+      - name: Build (sem publicar)
+        run: npm run build -- --publish never
+
+      - name: Upload nightly artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: neostream-nightly-${{ github.run_number }}
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            release/*.exe
+            release/latest.yml
