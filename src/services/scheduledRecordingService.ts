@@ -24,6 +24,25 @@ const STORAGE_KEY_PREFIX = 'scheduled_recordings';
 /** Extra time recorded after the announced program end (credits, delays). */
 export const END_PADDING_MS = 2 * 60 * 1000;
 
+/** Margem inicial: liga 2min ANTES do início anunciado (relógio do provedor). */
+export const START_MARGIN_MS = 2 * 60 * 1000;
+
+/** Delay até ligar a gravação — início anunciado menos a margem (clamp 0). */
+export function startDelayMs(startIso: string, nowMs: number): number {
+    return Math.max(0, computeDelay(startIso, nowMs) - START_MARGIN_MS);
+}
+
+/** Limite de gravações simultâneas (1–4; padrão 2) — excedente entra em fila. */
+export function getDvrMaxConcurrent(): number {
+    try {
+        const parsed = Number(localStorage.getItem('neostream_dvr_max_concurrent'));
+        if (!Number.isFinite(parsed) || parsed <= 0) return 2;
+        return Math.max(1, Math.min(4, Math.round(parsed)));
+    } catch {
+        return 2;
+    }
+}
+
 /** Deterministic id for a (channel, program start) pair — djb2 hash, hex. */
 export function scheduleId(channelKey: string, startIso: string): string {
     const input = `${channelKey}|${startIso}`;
@@ -122,7 +141,7 @@ class ScheduledRecordingService {
     private arm(rec: ScheduledRecording): void {
         const existing = this.startTimers.get(rec.id);
         if (existing) clearTimeout(existing);
-        const delay = computeDelay(rec.startIso, Date.now());
+        const delay = startDelayMs(rec.startIso, Date.now());
         this.startTimers.set(rec.id, setTimeout(() => {
             this.startTimers.delete(rec.id);
             void this.fire(rec);
@@ -133,6 +152,15 @@ class ScheduledRecordingService {
         // Program already over (slept laptop, long downtime) → drop silently.
         if (isScheduleExpired(rec.endIso, Date.now())) {
             this.save(this.list().filter(s => s.id !== rec.id));
+            return;
+        }
+        // 🚦 Fila: com o limite de gravações simultâneas atingido, re-tenta a
+        // cada 30s até abrir vaga (ou o programa acabar e cair no guard acima).
+        if (this.activeRecIds.size >= getDvrMaxConcurrent()) {
+            this.startTimers.set(rec.id, setTimeout(() => {
+                this.startTimers.delete(rec.id);
+                void this.fire(rec);
+            }, 30_000));
             return;
         }
         try {
