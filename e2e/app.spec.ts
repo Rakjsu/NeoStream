@@ -151,7 +151,8 @@ test('guia de TV: seletor de categoria e linhas de canais', async () => {
 
     await page.locator('button.nav-item[title="Guia de TV"]').click();
 
-    const select = page.locator('select');
+    // O guia tem DOIS selects (categoria + salto por dia 📅) — mirar o certo.
+    const select = page.getByLabel('Categoria');
     await expect(select).toBeVisible();
     await expect(select.locator('option', { hasText: 'CANAIS | ABERTOS' })).toHaveCount(1);
 
