@@ -71,6 +71,7 @@ export function Downloads() {
     // ⚙️ Config da fila de downloads (D66).
     const [maxConc, setMaxConc] = useState(() => downloadService.getMaxConcurrent());
     const [nightOnly, setNightOnlyState] = useState(() => downloadService.isNightOnly());
+    const [smartDl, setSmartDlState] = useState(() => downloadService.isSmartDownloads());
     // 🎞️/📤 conversão e exportação + 🖼️ thumbnails cacheadas por path.
     const [convertingPath, setConvertingPath] = useState<string | null>(null);
     const [dvrMsg, setDvrMsg] = useState('');
@@ -566,6 +567,17 @@ export function Downloads() {
                                 }}
                             />
                             🌙 {t('downloads', 'nightOnly')}
+                        </label>
+                        <label style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} title={t('downloads', 'smartDlDesc')}>
+                            <input
+                                type="checkbox"
+                                checked={smartDl}
+                                onChange={(e) => {
+                                    setSmartDlState(e.target.checked);
+                                    downloadService.setSmartDownloads(e.target.checked);
+                                }}
+                            />
+                            🧠 {t('downloads', 'smartDl')}
                         </label>
                     </div>
                 </div>
