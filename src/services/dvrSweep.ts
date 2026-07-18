@@ -28,9 +28,31 @@ export function setDvrMaxAgeDays(days: number): void {
     } catch { /* storage indisponível */ }
 }
 
-/** Gravações vencidas (mais velhas que o limite), fora as ativas (PURO). */
-export function pickExpiredRecordings<T extends RecordingFileInfo>(files: T[], maxAgeDays: number, nowMs: number): T[] {
+const PROTECTED_KEY = 'neostream_dvr_protected';
+
+/** Gravações marcadas como 🔐 protegidas — a auto-faxina nunca as apaga. */
+export function getProtectedRecordings(): Set<string> {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(PROTECTED_KEY) || '[]');
+        return new Set(Array.isArray(parsed) ? parsed.filter(p => typeof p === 'string') : []);
+    } catch {
+        return new Set();
+    }
+}
+
+export function toggleProtectedRecording(filePath: string): Set<string> {
+    const current = getProtectedRecordings();
+    if (current.has(filePath)) current.delete(filePath);
+    else current.add(filePath);
+    try {
+        localStorage.setItem(PROTECTED_KEY, JSON.stringify([...current]));
+    } catch { /* storage indisponível */ }
+    return current;
+}
+
+/** Gravações vencidas (mais velhas que o limite), fora ativas e protegidas (PURO). */
+export function pickExpiredRecordings<T extends RecordingFileInfo>(files: T[], maxAgeDays: number, nowMs: number, protectedPaths?: Set<string>): T[] {
     if (maxAgeDays <= 0) return [];
     const cutoff = nowMs - maxAgeDays * 86_400_000;
-    return files.filter(file => !file.recording && file.mtimeMs > 0 && file.mtimeMs < cutoff);
+    return files.filter(file => !file.recording && !protectedPaths?.has(file.path) && file.mtimeMs > 0 && file.mtimeMs < cutoff);
 }

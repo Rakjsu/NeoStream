@@ -67,6 +67,8 @@ const invokeChannels = new Set([
     'dvr:delete-file',
     'dvr:list-files',
     'dvr:open-folder',
+    'dvr:rename-file',
+    'dvr:show-in-folder',
     'dvr:start',
     'dvr:stop',
     'download:cache-image',
