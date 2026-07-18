@@ -589,7 +589,7 @@ export function StatsSection() {
                                 )}
                             </div>
                         ) : (
-                            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>{t('stats', 'noData')}</div>
+                            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>{t('stats', 'recordsEmpty')}</div>
                         )}
                     </div>
                 </div>

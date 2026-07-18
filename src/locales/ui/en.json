@@ -600,6 +600,7 @@
     "weekCompareTitle": "This week",
     "weekCompareLast": "Previous week",
     "recordsTitle": "Records",
+    "recordsEmpty": "No records yet",
     "recordBiggestDay": "Biggest one-day binge",
     "recordTopSeries": "Most binged series",
     "recordTopContent": "Most watched title",

@@ -132,8 +132,9 @@ test('wrapped: retrospectiva abre com horas, persona e top de conteúdos', async
 
     // Slide 3: all-time top content from contentTotals.
     await page.locator('.wrapped-nav-btn').last().click();
-    await expect(page.getByText('Filme Campeão')).toBeVisible();
-    await expect(page.getByText('Série Vice')).toBeVisible();
+    // O card 🏆 de recordes (atrás do overlay) também lista os campeões.
+    await expect(page.getByText('Filme Campeão').first()).toBeVisible();
+    await expect(page.getByText('Série Vice').first()).toBeVisible();
 
     // Slide 4: habits (longest streak) + closing the overlay.
     await page.locator('.wrapped-nav-btn').last().click();
