@@ -200,6 +200,9 @@
     "noScheduleInfo": "No schedule information available"
   },
   "contentModal": {
+    "sendToPhone": "Play on phone (paired app)",
+    "sentToPhone": "📱 Sent to your phone",
+    "noPhoneConnected": "No phone connected to the remote",
     "markWatched": "Mark as watched",
     "unmarkWatched": "Unmark watched",
     "similarTitle": "Similar to this",

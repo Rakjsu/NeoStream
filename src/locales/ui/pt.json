@@ -200,6 +200,9 @@
     "noScheduleInfo": "Sem informações de programação"
   },
   "contentModal": {
+    "sendToPhone": "Tocar no celular (app pareado)",
+    "sentToPhone": "📱 Enviado pro celular",
+    "noPhoneConnected": "Nenhum celular conectado ao controle",
     "markWatched": "Marcar como visto",
     "unmarkWatched": "Desmarcar visto",
     "similarTitle": "Parecidos com este",
