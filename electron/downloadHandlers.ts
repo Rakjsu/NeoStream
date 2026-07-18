@@ -12,6 +12,8 @@ interface ActiveDownload {
     stream: fs.WriteStream | null;
     paused: boolean;
     cancelled: boolean;
+    /** Conexões dos chunks paralelos — sem isto, pause/cancel eram no-op nesse caminho. */
+    requests?: http.ClientRequest[];
 }
 
 const activeDownloads: Map<string, ActiveDownload> = new Map();
@@ -82,7 +84,7 @@ function showDownloadNotification(name: string, filePath: string): void {
 }
 
 // Download a single chunk with Range header
-function downloadChunk(url: string, start: number, end: number, tempPath: string): Promise<number> {
+function downloadChunk(url: string, start: number, end: number, tempPath: string, register?: (req: http.ClientRequest) => void): Promise<number> {
     return new Promise((resolve, reject) => {
         const parsedUrl = new URL(url);
         const protocol = url.startsWith('https') ? https : http;
@@ -106,7 +108,7 @@ function downloadChunk(url: string, start: number, end: number, tempPath: string
             if (response.statusCode === 301 || response.statusCode === 302) {
                 const redirectUrl = response.headers.location;
                 if (redirectUrl) {
-                    downloadChunk(redirectUrl, start, end, tempPath).then(resolve).catch(reject);
+                    downloadChunk(redirectUrl, start, end, tempPath, register).then(resolve).catch(reject);
                     return;
                 }
             }
@@ -130,6 +132,7 @@ function downloadChunk(url: string, start: number, end: number, tempPath: string
         };
 
         const request = protocol.request(options, handleResponse);
+        register?.(request);
         request.on('error', reject);
         request.on('timeout', () => {
             request.destroy();
@@ -318,9 +321,11 @@ export function setupDownloadHandlers() {
                 setTaskbarProgress(progress);
             }, 500);
 
-            // Download all chunks in parallel
+            // Download all chunks in parallel (registrados pra pause/cancel).
+            const entry: ActiveDownload = { id, request: null, stream: null, paused: false, cancelled: false, requests: [] };
+            activeDownloads.set(id, entry);
             const downloadPromises = chunks.map(chunk =>
-                downloadChunk(url, chunk.start, chunk.end, `${filePath}.part${chunk.index}`)
+                downloadChunk(url, chunk.start, chunk.end, `${filePath}.part${chunk.index}`, req => entry.requests?.push(req))
                     .then(bytes => { totalDownloaded += bytes; return bytes; })
             );
 
@@ -345,7 +350,17 @@ export function setupDownloadHandlers() {
                     });
                 }
             }
-            writeStream.end();
+            await new Promise<void>((resolve) => writeStream.end(resolve));
+            activeDownloads.delete(id);
+
+            // 🔎 Integridade: o arquivo final precisa bater com o content-length.
+            const finalSize = fs.statSync(filePath).size;
+            if (totalBytes > 0 && finalSize !== totalBytes) {
+                try { fs.unlinkSync(filePath); } catch { /* best-effort */ }
+                setTaskbarProgress(null);
+                log.warn(`[Download] Integridade falhou: esperado ${totalBytes}, veio ${finalSize}`);
+                return { success: false, error: `Arquivo incompleto (${finalSize}/${totalBytes} bytes) — tente de novo` };
+            }
 
             // Send 100%
             BrowserWindow.getAllWindows().forEach(win => {
@@ -373,6 +388,9 @@ export function setupDownloadHandlers() {
         if (download) {
             download.paused = true;
             if (download.request) download.request.destroy();
+            for (const req of download.requests ?? []) {
+                try { req.destroy(); } catch { /* já caiu */ }
+            }
             return { success: true };
         }
         return { success: false, error: 'Download not found' };
@@ -384,6 +402,9 @@ export function setupDownloadHandlers() {
         if (download) {
             download.cancelled = true;
             if (download.request) download.request.destroy();
+            for (const req of download.requests ?? []) {
+                try { req.destroy(); } catch { /* já caiu */ }
+            }
             if (download.stream) download.stream.close();
             activeDownloads.delete(id);
             setTaskbarProgress(null);

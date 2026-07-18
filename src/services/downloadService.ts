@@ -15,6 +15,8 @@ export interface DownloadItem {
     size: number;
     downloadedBytes: number;
     status: 'pending' | 'downloading' | 'paused' | 'completed' | 'failed';
+    /** Velocidade instantânea (bytes/s) — só durante o download. */
+    speedBps?: number;
     progress: number;
     filePath?: string;
     error?: string;
@@ -71,6 +73,8 @@ class DownloadService {
     private queue: string[] = [];
     private isProcessing: boolean = false;
     private maxConcurrent: number = 2;
+    private nightOnly: boolean = false;
+    private speedMarks: Map<string, { bytes: number; ts: number }> = new Map();
     private activeDownloads: number = 0;
     private listeners: Map<string, DownloadEventCallback[]> = new Map();
     private dbName = 'neostream_downloads';
@@ -78,6 +82,14 @@ class DownloadService {
     private db: IDBDatabase | null = null;
 
     constructor() {
+        // ⚙️ Config da fila persistida (limite simultâneo + modo madrugada).
+        try {
+            const saved = Number(localStorage.getItem('neostream_dl_max_concurrent'));
+            if (saved >= 1 && saved <= 4) this.maxConcurrent = saved;
+            this.nightOnly = localStorage.getItem('neostream_dl_night_only') === 'on';
+        } catch { /* storage indisponível */ }
+        // 🌙 Reavalia a fila periodicamente (a janela da madrugada abre sozinha).
+        setInterval(() => { void this.processQueue(); }, 5 * 60_000);
         this.initDB();
     }
 
@@ -268,6 +280,11 @@ class DownloadService {
             return;
         }
 
+        // 🌙 Modo madrugada: a fila só anda entre 0h e 6h.
+        if (this.nightOnly && new Date().getHours() >= 6) {
+            return;
+        }
+
         const pendingId = this.queue.find(id => {
             const item = this.downloads.get(id);
             return item && item.status === 'pending';
@@ -284,6 +301,16 @@ class DownloadService {
         try {
             await this.downloadFile(item);
         } catch (error: unknown) {
+            // Reler via map alarga o tipo — o TS narrowed pra 'downloading'
+            // no set acima e não vê a mutação feita pelo pauseDownload.
+            if (this.downloads.get(pendingId)?.status === 'paused') {
+                // Pausa manual: as conexões foram destruídas de propósito e o
+                // download:start rejeita — o status de pausa é o correto.
+                await this.saveDownload(item);
+                this.activeDownloads--;
+                this.processQueue();
+                return;
+            }
             item.status = 'failed';
             item.error = getErrorMessage(error, 'Download failed');
             this.emit('error', item);
@@ -351,12 +378,43 @@ class DownloadService {
                     item.progress = data.progress;
                     item.downloadedBytes = data.downloadedBytes;
                     item.size = data.totalBytes;
+                    // 📶 MB/s: delta de bytes / delta de tempo entre eventos.
+                    const mark = this.speedMarks.get(item.id);
+                    const now = Date.now();
+                    if (mark && now > mark.ts && data.downloadedBytes >= mark.bytes) {
+                        item.speedBps = ((data.downloadedBytes - mark.bytes) * 1000) / (now - mark.ts);
+                    }
+                    this.speedMarks.set(item.id, { bytes: data.downloadedBytes, ts: now });
                     this.emit('progress', item);
                 }
             };
 
             window.ipcRenderer.on('download:progress', progressHandler);
         });
+    }
+
+    // ⚙️ Config da fila (Downloads → cabeçalho).
+    getMaxConcurrent(): number {
+        return this.maxConcurrent;
+    }
+
+    setMaxConcurrent(n: number): void {
+        this.maxConcurrent = Math.min(4, Math.max(1, Math.floor(n) || 2));
+        try { localStorage.setItem('neostream_dl_max_concurrent', String(this.maxConcurrent)); } catch { /* ignore */ }
+        this.processQueue();
+    }
+
+    isNightOnly(): boolean {
+        return this.nightOnly;
+    }
+
+    setNightOnly(on: boolean): void {
+        this.nightOnly = on;
+        try {
+            if (on) localStorage.setItem('neostream_dl_night_only', 'on');
+            else localStorage.removeItem('neostream_dl_night_only');
+        } catch { /* ignore */ }
+        this.processQueue();
     }
 
     // Pause download
