@@ -111,6 +111,19 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
         const area = pickPipDisplay().workArea;
         pipWindow.setPosition(area.x + area.width - 420, area.y + area.height - 280);
 
+        // 📐 Reabre onde o usuário deixou: bounds salvos ao mover/redimensionar,
+        // desde que o ponto ainda caia num monitor conectado.
+        const savedBounds = pipStore.get('pipBounds') as { x: number; y: number; width: number; height: number } | undefined;
+        const boundsVisible = savedBounds && screen.getAllDisplays().some(d =>
+            savedBounds.x >= d.bounds.x - 8 && savedBounds.x < d.bounds.x + d.bounds.width &&
+            savedBounds.y >= d.bounds.y - 8 && savedBounds.y < d.bounds.y + d.bounds.height);
+        if (savedBounds && boundsVisible) pipWindow.setBounds(savedBounds);
+        const persistBounds = () => {
+            if (pipWindow && !pipWindow.isDestroyed()) pipStore.set('pipBounds', pipWindow.getBounds());
+        };
+        pipWindow.on('moved', persistBounds);
+        pipWindow.on('resized', persistBounds);
+
         // Load PiP page with content data encoded in URL
         const encodedContent = encodeURIComponent(JSON.stringify(content));
         if (VITE_DEV_SERVER_URL) {
