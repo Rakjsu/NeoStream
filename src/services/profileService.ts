@@ -1,4 +1,5 @@
 import type { Profile, ProfilesData, CreateProfileData, UpdateProfileData } from '../types/profile';
+import { logParentalEvent } from './parentalLogService';
 
 const STORAGE_KEY = 'neostream_profiles';
 const MAX_PROFILES = 5;
@@ -265,7 +266,9 @@ export const profileService = {
         if (!profile.pin) return true;
 
         const hashedPin = await hashPin(pin);
-        return hashedPin === profile.pin;
+        const ok = hashedPin === profile.pin;
+        logParentalEvent(ok ? 'pin_ok' : 'pin_fail', `PIN do perfil ${profile.name}`);
+        return ok;
     },
 
     // Check if profile has PIN

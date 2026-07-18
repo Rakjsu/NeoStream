@@ -3,6 +3,8 @@
  * Manages PIN access and content restrictions
  */
 
+import { logParentalEvent } from './parentalLogService';
+
 export interface ParentalConfig {
     enabled: boolean;
     /** @deprecated legacy plaintext PIN — migrated to pinHash/pinSalt on load */
@@ -91,7 +93,9 @@ class ParentalService {
 
     async verifyPin(inputPin: string): Promise<boolean> {
         if (!this.config.pinHash || !this.config.pinSalt) return false;
-        return (await hashPin(inputPin, this.config.pinSalt)) === this.config.pinHash;
+        const ok = (await hashPin(inputPin, this.config.pinSalt)) === this.config.pinHash;
+        logParentalEvent(ok ? 'pin_ok' : 'pin_fail', 'PIN parental');
+        return ok;
     }
 
     hasPin(): boolean {

@@ -1,7 +1,15 @@
 import { useState } from 'react';
 import { parentalService } from '../../services/parentalService';
 import type { ParentalConfig } from '../../services/parentalService';
-import { getKidsDailyLimitMinutes, setKidsDailyLimitMinutes } from '../../services/watchLimitsService';
+import {
+    getKidsDailyLimitMinutes, setKidsDailyLimitMinutes,
+    getProfileDailyLimitMinutes, setProfileDailyLimitMinutes,
+    getKidsAllowedHours, setKidsAllowedHours,
+    getAutoKidsHours, setAutoKidsHours,
+    type HoursWindow,
+} from '../../services/watchLimitsService';
+import { profileService } from '../../services/profileService';
+import { listParentalLog, clearParentalLog, type ParentalLogEntry } from '../../services/parentalLogService';
 import { useLanguage } from '../../services/languageService';
 import { useSaveAnimation } from './useSaveAnimation';
 
@@ -10,6 +18,18 @@ export function ParentalSection() {
     const { t } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
     const [kidsLimit, setKidsLimit] = useState(() => getKidsDailyLimitMinutes());
+    // D65: janelas de horário, limites por perfil e log parental.
+    const windowToValue = (window: HoursWindow | null) => (window ? `${window.start}-${window.end}` : '');
+    const valueToWindow = (value: string): HoursWindow | null => {
+        const match = value.match(/^(\d{1,2})-(\d{1,2})$/);
+        return match ? { start: Number(match[1]), end: Number(match[2]) } : null;
+    };
+    const [kidsHours, setKidsHours] = useState(() => windowToValue(getKidsAllowedHours()));
+    const [autoKids, setAutoKids] = useState(() => windowToValue(getAutoKidsHours()));
+    const [profiles] = useState(() => profileService.getAllProfiles().filter(p => !p.isGuest));
+    const [profileLimits, setProfileLimits] = useState<Record<string, number>>(() =>
+        Object.fromEntries(profileService.getAllProfiles().map(p => [p.id, getProfileDailyLimitMinutes(p.id)])));
+    const [logEntries, setLogEntries] = useState<ParentalLogEntry[]>(() => listParentalLog().slice(0, 30));
 
     // PIN Modal states
     const [showPinModal, setShowPinModal] = useState(false);
@@ -234,6 +254,114 @@ export function ParentalSection() {
                             <option value={180}>3h</option>
                         </select>
                         {saveAnimation === 'parental_kidsLimit' && <span className="save-indicator">{t('settings', 'saved')}</span>}
+                    </div>
+
+                    {/* 🕗 Janela de horário do perfil kids */}
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <label>🕗 {t('parental', 'kidsHours')}</label>
+                            <p>{t('parental', 'kidsHoursDesc')}</p>
+                        </div>
+                        <select
+                            className="setting-select"
+                            value={kidsHours}
+                            onChange={(e) => {
+                                setKidsHours(e.target.value);
+                                setKidsAllowedHours(valueToWindow(e.target.value));
+                                triggerSaveAnimation('parental_kidsHours');
+                            }}
+                        >
+                            <option value="">{t('parental', 'limitOff')}</option>
+                            <option value="6-20">06h–20h</option>
+                            <option value="7-21">07h–21h</option>
+                            <option value="8-22">08h–22h</option>
+                        </select>
+                        {saveAnimation === 'parental_kidsHours' && <span className="save-indicator">{t('settings', 'saved')}</span>}
+                    </div>
+
+                    {/* 👶 Auto-trocar pra kids por horário */}
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <label>👶 {t('parental', 'autoKids')}</label>
+                            <p>{t('parental', 'autoKidsDesc')}</p>
+                        </div>
+                        <select
+                            className="setting-select"
+                            value={autoKids}
+                            onChange={(e) => {
+                                setAutoKids(e.target.value);
+                                setAutoKidsHours(valueToWindow(e.target.value));
+                                triggerSaveAnimation('parental_autoKids');
+                            }}
+                        >
+                            <option value="">{t('parental', 'limitOff')}</option>
+                            <option value="6-20">06h–20h</option>
+                            <option value="7-21">07h–21h</option>
+                            <option value="8-22">08h–22h</option>
+                        </select>
+                        {saveAnimation === 'parental_autoKids' && <span className="save-indicator">{t('settings', 'saved')}</span>}
+                    </div>
+
+                    {/* ⏳ Limite diário por perfil (adultos também) */}
+                    <div className="setting-item" style={{ alignItems: 'flex-start' }}>
+                        <div className="setting-info">
+                            <label>⏳ {t('parental', 'profileLimits')}</label>
+                            <p>{t('parental', 'profileLimitsDesc')}</p>
+                            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {profiles.map(profile => (
+                                    <div key={profile.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <span style={{ minWidth: 140, color: 'rgba(255,255,255,0.8)', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {profile.isKids ? '👶 ' : ''}{profile.name}
+                                        </span>
+                                        <select
+                                            className="setting-select"
+                                            value={profileLimits[profile.id] ?? 0}
+                                            onChange={(e) => {
+                                                const minutes = Number(e.target.value);
+                                                setProfileDailyLimitMinutes(profile.id, minutes);
+                                                setProfileLimits(prev => ({ ...prev, [profile.id]: minutes }));
+                                                triggerSaveAnimation('parental_profileLimit');
+                                            }}
+                                        >
+                                            <option value={0}>{t('parental', 'limitOff')}</option>
+                                            <option value={30}>30 min</option>
+                                            <option value={60}>1h</option>
+                                            <option value={90}>1h30</option>
+                                            <option value={120}>2h</option>
+                                            <option value={180}>3h</option>
+                                        </select>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        {saveAnimation === 'parental_profileLimit' && <span className="save-indicator">{t('settings', 'saved')}</span>}
+                    </div>
+
+                    {/* 📜 Log parental (verificações de PIN) */}
+                    <div className="setting-item" style={{ alignItems: 'flex-start' }}>
+                        <div className="setting-info">
+                            <label>📜 {t('parental', 'logTitle')}</label>
+                            <p>{t('parental', 'logDesc')}</p>
+                            {logEntries.length > 0 ? (
+                                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
+                                    {logEntries.map((entry, index) => (
+                                        <div key={`${entry.ts}-${index}`} style={{ fontSize: 12, color: entry.kind === 'pin_fail' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
+                                            {new Date(entry.ts).toLocaleString('pt-BR')} · {entry.kind === 'pin_fail' ? '❌' : '✅'} {entry.detail}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginTop: 8 }}>{t('parental', 'logEmpty')}</p>
+                            )}
+                        </div>
+                        <button
+                            className="check-btn"
+                            style={{ width: 'auto', padding: '10px 16px' }}
+                            title={t('parental', 'logClear')}
+                            onClick={() => { clearParentalLog(); setLogEntries([]); }}
+                        >
+                            🗑
+                        </button>
                     </div>
                 </div>
             </div>

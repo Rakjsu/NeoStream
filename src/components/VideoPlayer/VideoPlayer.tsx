@@ -8,7 +8,7 @@ import { CastControls } from '../CastControls';
 import { formatTime, percentage } from '../../utils/videoHelpers';
 import { usageStatsService } from '../../services/usageStatsService';
 import { profileService } from '../../services/profileService';
-import { getKidsDailyLimitMinutes, isLimitExceeded } from '../../services/watchLimitsService';
+import { effectiveDailyLimitMinutes, isLimitExceeded, getKidsAllowedHours, isHourWithinWindow } from '../../services/watchLimitsService';
 import { SubtitleOverlay } from './SubtitleOverlay';
 import { useSubtitleManager } from './useSubtitleManager';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
@@ -588,12 +588,26 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
 
     useEffect(() => {
         const checkKidsLimit = () => {
-            if (!profileService.getActiveProfile()?.isKids) return;
-            const limitMinutes = getKidsDailyLimitMinutes();
-            if (limitMinutes <= 0) return;
-            const today = new Date().toISOString().split('T')[0];
-            const todaySeconds = usageStatsService.getStats().dailyStats.find(d => d.date === today)?.totalSeconds || 0;
-            if (isLimitExceeded(todaySeconds, limitMinutes)) setKidsLimitReached(true);
+            const profile = profileService.getActiveProfile();
+            if (!profile) return;
+            // ⏳ Limite diário efetivo: por perfil (adulto ou kids); kids sem
+            // limite próprio herda o global do parental.
+            const limitMinutes = effectiveDailyLimitMinutes(profile.id, !!profile.isKids);
+            if (limitMinutes > 0) {
+                const today = new Date().toISOString().split('T')[0];
+                const todaySeconds = usageStatsService.getStats().dailyStats.find(d => d.date === today)?.totalSeconds || 0;
+                if (isLimitExceeded(todaySeconds, limitMinutes)) {
+                    setKidsLimitReached(true);
+                    return;
+                }
+            }
+            // 🕗 Janela de horário do perfil kids (fora dela, mesmo bloqueio).
+            if (profile.isKids) {
+                const window = getKidsAllowedHours();
+                if (window && !isHourWithinWindow(new Date().getHours(), window)) {
+                    setKidsLimitReached(true);
+                }
+            }
         };
         queueMicrotask(checkKidsLimit);
         const intervalId = setInterval(checkKidsLimit, 30_000);
