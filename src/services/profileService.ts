@@ -272,6 +272,36 @@ export const profileService = {
     },
 
     // Check if profile has PIN
+    /** 👶 União das whitelists de canais de todos os perfis kids. */
+    getKidsAllowedChannelIds(): Set<string> {
+        const data = getStorageData();
+        const ids = new Set<string>();
+        for (const profile of data.profiles) {
+            if (!profile.isKids) continue;
+            for (const id of profile.allowedChannelIds ?? []) ids.add(id);
+        }
+        return ids;
+    },
+
+    /**
+     * Alterna um canal na whitelist dos perfis kids: presente em algum →
+     * remove de todos; ausente → adiciona a todos (gestão em conjunto).
+     */
+    toggleKidsChannel(streamId: string): { allowed: boolean; kidsCount: number } {
+        const data = getStorageData();
+        const kids = data.profiles.filter(p => p.isKids);
+        if (kids.length === 0) return { allowed: false, kidsCount: 0 };
+        const present = kids.some(p => (p.allowedChannelIds ?? []).includes(streamId));
+        for (const profile of kids) {
+            const current = new Set(profile.allowedChannelIds ?? []);
+            if (present) current.delete(streamId);
+            else current.add(streamId);
+            profile.allowedChannelIds = [...current];
+        }
+        saveStorageData(data);
+        return { allowed: !present, kidsCount: kids.length };
+    },
+
     hasPin(profileId: string): boolean {
         const data = getStorageData();
         const profile = data.profiles.find(p => p.id === profileId);

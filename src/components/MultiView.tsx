@@ -59,6 +59,22 @@ export function MultiView({ channels, initialChannelId, onClose }: MultiViewProp
         return [...base.filter(c => c.favorite), ...base.filter(c => !c.favorite)];
     }, [channels, pickerQuery]);
 
+    // ⧉ Destaca a célula pra janela PiP nativa (independente) e libera o slot,
+    // pra não tocar o mesmo canal duas vezes.
+    const detachToWindow = async (channel: MultiViewChannel, slotIndex: number) => {
+        const result = await window.ipcRenderer.invoke('streams:get-live-url', { streamId: channel.id })
+            .catch(() => null);
+        if (!result?.success || !result.url) return;
+        await window.ipcRenderer.invoke('pip:open', {
+            src: result.url,
+            title: channel.name,
+            poster: channel.logo,
+            contentId: String(channel.id),
+            contentType: 'live'
+        }).catch(console.error);
+        setSlots(prev => prev.map((s, idx) => (idx === slotIndex ? null : s)));
+    };
+
     return (
         // top: 36 = CustomTitleBar height — it sits at z-index 99999 and would
         // cover this overlay's own top bar (✕ Fechar) if we used inset: 0.
@@ -130,6 +146,16 @@ export function MultiView({ channels, initialChannelId, onClose }: MultiViewProp
                                     {audioSlot === i && <span style={{ fontSize: 13 }}>🔊</span>}
                                 </div>
                                 <div style={{ position: 'absolute', top: 8, right: 10, zIndex: 2, display: 'flex', gap: 6 }}>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            void detachToWindow(channel, i);
+                                        }}
+                                        title="Abrir em janela própria"
+                                        style={{ width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.6)', color: 'white', cursor: 'pointer', fontSize: 13 }}
+                                    >
+                                        ⧉
+                                    </button>
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
