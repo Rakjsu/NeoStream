@@ -808,6 +808,9 @@
   },
   "home": {
     "goodMorning": "Bom dia",
+    "expiryWarn": "Sua lista expira em {days} dia(s) — fale com o seu provedor pra renovar.",
+    "expiryExpired": "Sua lista expirou — fale com o seu provedor pra renovar.",
+    "expiryDismiss": "Dispensar por 24h",
     "goodAfternoon": "Boa tarde",
     "goodEvening": "Boa noite",
     "continueWatching": "Continue Assistindo",

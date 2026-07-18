@@ -808,6 +808,9 @@
   },
   "home": {
     "goodMorning": "Good morning",
+    "expiryWarn": "Your playlist expires in {days} day(s) — contact your provider to renew.",
+    "expiryExpired": "Your playlist has expired — contact your provider to renew.",
+    "expiryDismiss": "Dismiss for 24h",
     "goodAfternoon": "Good afternoon",
     "goodEvening": "Good evening",
     "continueWatching": "Continue Watching",

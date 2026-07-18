@@ -9,6 +9,7 @@ import { loadHomeRailPrefs, orderedHomeRails } from '../services/homeRailsServic
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { ResumeModal } from '../components/ResumeModal';
 import { profileService } from '../services/profileService';
+import { daysToExpiry, EXPIRY_SNOOZE_KEY, isExpirySnoozed, shouldWarnExpiry } from '../utils/expiryWarning';
 import { indexedDBCache } from '../services/indexedDBCache';
 import { searchMovieByName, searchSeriesByName, isKidsFriendly } from '../services/tmdb';
 import { getHomeRecommendations, type RecommendationGroup } from '../services/recommendationService';
@@ -116,6 +117,28 @@ export function Home() {
     const { t } = useLanguage();
     const [hiddenItems, setHiddenItems] = useState<Set<string>>(new Set());
     const [blockMessage, setBlockMessage] = useState<string | null>(null);
+
+    // ⚠️ Lista perto de expirar (exp_date do provedor): banner com 7 dias
+    // de antecedência, dispensável por 24h.
+    const [expiryBanner, setExpiryBanner] = useState<number | null>(null);
+    useEffect(() => {
+        void (async () => {
+            try {
+                const status = await window.ipcRenderer.invoke('auth:status') as {
+                    authenticated?: boolean;
+                    user?: { exp_date?: string | number | null };
+                };
+                const days = daysToExpiry(status?.user?.exp_date, Date.now());
+                if (shouldWarnExpiry(days) && !isExpirySnoozed(localStorage.getItem(EXPIRY_SNOOZE_KEY), Date.now())) {
+                    setExpiryBanner(days);
+                }
+            } catch { /* provedor fora do ar ou handler ausente: sem banner */ }
+        })();
+    }, []);
+    const snoozeExpiry = () => {
+        localStorage.setItem(EXPIRY_SNOOZE_KEY, String(Date.now() + 24 * 60 * 60 * 1000));
+        setExpiryBanner(null);
+    };
 
     // Filtered counts for Kids profile
     // For Kids: subtract hidden items from totals
@@ -1290,6 +1313,30 @@ export function Home() {
                 scrollbarWidth: 'thin',
                 scrollbarColor: 'rgba(var(--ns-accent-rgb), 0.4) transparent'
             }}>
+                {/* ⚠️ Aviso de expiração da lista */}
+                {expiryBanner !== null && (
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        background: 'rgba(245, 158, 11, 0.12)',
+                        border: '1px solid rgba(245, 158, 11, 0.4)',
+                        borderRadius: 12, padding: '10px 16px', marginBottom: 18,
+                        color: '#fcd34d', fontSize: 13, position: 'relative', zIndex: 1
+                    }}>
+                        <span>⚠️</span>
+                        <span style={{ flex: 1 }}>
+                            {expiryBanner <= 0
+                                ? t('home', 'expiryExpired')
+                                : t('home', 'expiryWarn').replace('{days}', String(expiryBanner))}
+                        </span>
+                        <button
+                            onClick={snoozeExpiry}
+                            title={t('home', 'expiryDismiss')}
+                            style={{ background: 'none', border: 'none', color: '#fcd34d', cursor: 'pointer', fontSize: 14 }}
+                        >
+                            ✕
+                        </button>
+                    </div>
+                )}
                 {/* Background decorations */}
                 <div style={{
                     position: 'fixed',
