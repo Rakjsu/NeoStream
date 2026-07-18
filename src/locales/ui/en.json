@@ -969,6 +969,7 @@
     "today": "Today / Now",
     "earlier": "Earlier",
     "later": "Later",
+    "jumpToDay": "Jump to day",
     "replay": "Replay",
     "replayBadge": "Replay available ({days} days)",
     "replayOf": "Watch replay of {title}",
@@ -1028,6 +1029,8 @@
     "recordingNow": "RECORDING",
     "cancel": "Cancel",
     "cancelReminder": "Cancel reminder",
+    "exportIcs": "Export .ics",
+    "exportIcsHint": "Downloads a calendar (.ics) with reminders and scheduled recordings.",
     "cancelRecording": "Cancel recording"
   },
   "sort": {

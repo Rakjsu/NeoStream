@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { reminderService } from '../services/reminderService';
 import { scheduledRecordingService } from '../services/scheduledRecordingService';
 import { buildAgenda, groupAgendaByDay, isRecordingInFlight, type AgendaEntry } from '../utils/agenda';
+import { buildIcs } from '../utils/icsExport';
 import { useLanguage } from '../services/languageService';
 
 /**
@@ -32,6 +33,27 @@ export function AgendaPanel() {
         setNow(Date.now());
     }, []);
 
+    // 📆 Exporta a agenda como .ics (abre no Google Agenda/Outlook/etc).
+    const exportIcs = useCallback(() => {
+        const nowMs = Date.now();
+        const events = buildAgenda(reminderService.list(), scheduledRecordingService.list(), nowMs).map(entry => {
+            const endMs = entry.kind === 'recording' && entry.endIso ? Date.parse(entry.endIso) : NaN;
+            return {
+                title: `${entry.kind === 'reminder' ? '⏰' : '⏺'} ${entry.title}`,
+                startMs: entry.startMs,
+                endMs: Number.isFinite(endMs) ? endMs : undefined,
+                description: entry.channelName,
+            };
+        });
+        const blob = new Blob([buildIcs(events, nowMs)], { type: 'text/calendar' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'neostream-agenda.ics';
+        link.click();
+        URL.revokeObjectURL(url);
+    }, []);
+
     const fmtTime = (iso: string) =>
         new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -49,9 +71,20 @@ export function AgendaPanel() {
             background: 'rgba(59, 130, 246, 0.06)',
             border: '1px solid rgba(59, 130, 246, 0.25)'
         }}>
-            <h3 style={{ color: 'white', fontSize: 16, margin: '0 0 12px' }}>
-                🗓️ {t('agenda', 'title')}
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <h3 style={{ color: 'white', fontSize: 16, margin: 0 }}>
+                    🗓️ {t('agenda', 'title')}
+                </h3>
+                {entries.length > 0 && (
+                    <button
+                        onClick={exportIcs}
+                        title={t('agenda', 'exportIcsHint')}
+                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.85)', borderRadius: 10, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}
+                    >
+                        📆 {t('agenda', 'exportIcs')}
+                    </button>
+                )}
+            </div>
 
             {entries.length === 0 ? (
                 <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, margin: 0 }}>

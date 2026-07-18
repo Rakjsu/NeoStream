@@ -969,6 +969,7 @@
     "today": "Hoje / Agora",
     "earlier": "Mais cedo",
     "later": "Mais tarde",
+    "jumpToDay": "Pular pro dia",
     "replay": "Replay",
     "replayBadge": "Replay disponível ({days} dias)",
     "replayOf": "Assistir replay de {title}",
@@ -1028,6 +1029,8 @@
     "recordingNow": "GRAVANDO",
     "cancel": "Cancelar",
     "cancelReminder": "Cancelar lembrete",
+    "exportIcs": "Exportar .ics",
+    "exportIcsHint": "Baixa um calendário (.ics) com os lembretes e gravações agendadas.",
     "cancelRecording": "Cancelar gravação"
   },
   "sort": {

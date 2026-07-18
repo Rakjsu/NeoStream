@@ -6,7 +6,10 @@ import { profileService } from '../services/profileService';
 import { parentalService } from '../services/parentalService';
 import { useLanguage } from '../services/languageService';
 import {
+    categoryHue,
     getGuideWindow,
+    listGuideDays,
+    windowForDay,
     buildTimeTicks,
     programToBlock,
     nowOffsetPx,
@@ -143,6 +146,8 @@ export function EpgGuide() {
     // Pageable window (◀/▶ shift it by 2h; "Hoje/Agora" resets to default).
     const [guideWindow, setGuideWindow] = useState(() => getGuideWindow());
     const ticks = useMemo(() => buildTimeTicks(guideWindow), [guideWindow]);
+    // 📅 Salto por dia: dias alcançáveis pela faixa de EPG do provedor.
+    const guideDays = useMemo(() => listGuideDays(now), [now]);
 
     // Program search over the already-loaded EPG data
     const [searchQuery, setSearchQuery] = useState('');
@@ -493,6 +498,21 @@ export function EpgGuide() {
                     >
                         ▶
                     </button>
+                    {/* 📅 Menu de salto: escolhe o dia e a janela pula pras 08:00 dele */}
+                    <select
+                        value=""
+                        onChange={(e) => { if (e.target.value) setGuideWindow(windowForDay(Number(e.target.value), now)); }}
+                        aria-label={t('guide', 'jumpToDay')}
+                        title={t('guide', 'jumpToDay')}
+                        style={{ ...pagerButtonStyle, width: 'auto', padding: '0 10px', fontSize: '13px', cursor: 'pointer' }}
+                    >
+                        <option value="" disabled>📅</option>
+                        {guideDays.map(dayMs => (
+                            <option key={dayMs} value={dayMs} style={{ color: '#000' }}>
+                                {new Date(dayMs).toLocaleDateString([], { weekday: 'short', day: '2-digit', month: '2-digit' })}
+                            </option>
+                        ))}
+                    </select>
                 </div>
 
                 {/* Program search across the loaded EPG data */}
@@ -733,6 +753,8 @@ export function EpgGuide() {
                                                 return blocks.map(({ program, block }) => {
                                                     const airing = isAiringNow(program.start, program.end, now);
                                                     const replayable = !airing && isReplayable(program, channel, now);
+                                                    // 🎨 Tinta da categoria do canal (cores por gênero na grade).
+                                                    const hue = categoryHue(channel.category_id || channel.name);
                                                     const future = !airing && Date.parse(program.start) > now;
                                                     const hasReminder = future && reminderIds.has(reminderId(channel.name, program.start));
                                                     const hasSchedule = future && scheduleIds.has(scheduleId(channel.name, program.start));
@@ -770,7 +792,7 @@ export function EpgGuide() {
                                                                 cursor: handleClick ? 'pointer' : 'default',
                                                                 background: airing
                                                                     ? 'linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.35) 0%, rgba(var(--ns-accent-grad-to-rgb), 0.25) 100%)'
-                                                                    : (replayable ? 'rgba(var(--ns-accent-rgb), 0.08)' : 'rgba(255, 255, 255, 0.05)'),
+                                                                    : (replayable ? 'rgba(var(--ns-accent-rgb), 0.08)' : `hsla(${hue}, 45%, 55%, 0.09)`),
                                                                 border: airing
                                                                     ? '1px solid rgba(var(--ns-accent-rgb), 0.6)'
                                                                     : '1px solid rgba(255, 255, 255, 0.08)',
@@ -778,7 +800,7 @@ export function EpgGuide() {
                                                                     ? '1px solid rgba(var(--ns-accent-rgb), 0.6)'
                                                                     : (replayable
                                                                         ? '3px solid rgba(var(--ns-accent-rgb), 0.55)'
-                                                                        : '1px solid rgba(255, 255, 255, 0.08)'),
+                                                                        : `3px solid hsla(${hue}, 55%, 55%, 0.45)`),
                                                                 transition: 'filter 0.2s ease'
                                                             }}
                                                         >
