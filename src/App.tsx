@@ -200,6 +200,26 @@ if (typeof window !== 'undefined') {
     });
 }
 
+// Weekly usage summary: first boot of each week → native + in-app notification.
+if (typeof window !== 'undefined') {
+    void import('./services/weeklySummary').then(({ weeklySummaryService }) => {
+        const payload = weeklySummaryService.maybeNotify();
+        if (payload) {
+            try {
+                void window.ipcRenderer?.invoke('notify:show', { title: payload.title, body: payload.body })
+                    .catch(() => undefined);
+            } catch { /* preload antigo sem o canal */ }
+            void import('./services/episodeNotificationService').then(({ appNotificationService }) => {
+                appNotificationService.addNotification({
+                    type: 'weekly_summary',
+                    title: payload.title,
+                    message: payload.body,
+                });
+            });
+        }
+    });
+}
+
 // TV mode scale/focus (Settings -> Aparencia).
 tvModeService.apply();
 

@@ -15,7 +15,8 @@ export type NotificationType =
     | 'download_started'
     | 'program_reminder'
     | 'dvr_recording'
-    | 'wrapped_annual';
+    | 'wrapped_annual'
+    | 'weekly_summary';
 
 export interface AppNotification {
     id: string;
