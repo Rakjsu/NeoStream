@@ -10,6 +10,7 @@ import {
 } from '../../services/watchLimitsService';
 import { profileService } from '../../services/profileService';
 import { listParentalLog, clearParentalLog, type ParentalLogEntry } from '../../services/parentalLogService';
+import { kidsWeeklyUsage } from '../../services/statsDashboardHelpers';
 import { useLanguage } from '../../services/languageService';
 import { useSaveAnimation } from './useSaveAnimation';
 
@@ -335,6 +336,21 @@ export function ParentalSection() {
                             </div>
                         </div>
                         {saveAnimation === 'parental_profileLimit' && <span className="save-indicator">{t('settings', 'saved')}</span>}
+                    </div>
+
+                    {/* 👶 Relatório semanal dos perfis kids (últimos 7 dias) */}
+                    <div className="setting-item" style={{ alignItems: 'flex-start' }}>
+                        <div className="setting-info">
+                            <label>👶 {t('parental', 'kidsReportTitle')}</label>
+                            <p>{t('parental', 'kidsReportDesc')}</p>
+                            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {kidsWeeklyUsage(profileService.getAllProfiles(), key => localStorage.getItem(key), new Date().toISOString().split('T')[0]).map(row => (
+                                    <div key={row.id} style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>
+                                        {row.name}: <b>{Math.floor(row.weekSeconds / 3600)}h {Math.floor((row.weekSeconds % 3600) / 60)}min</b>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
                     {/* 📜 Log parental (verificações de PIN) */}

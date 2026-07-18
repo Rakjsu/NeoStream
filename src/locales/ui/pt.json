@@ -512,6 +512,8 @@
     "autoKidsDesc": "Dentro da janela, o app abre direto no primeiro perfil infantil",
     "profileLimits": "Limite diário por perfil",
     "profileLimitsDesc": "Tempo de tela individual — vale também pra perfis adultos",
+    "kidsReportTitle": "Relatório semanal kids",
+    "kidsReportDesc": "Quanto cada perfil infantil assistiu nos últimos 7 dias.",
     "logTitle": "Registro de PINs",
     "logDesc": "Últimas verificações de PIN (parental e de perfis)",
     "logEmpty": "Nenhuma verificação registrada ainda",

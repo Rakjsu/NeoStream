@@ -276,6 +276,8 @@ function App() {
       // Check if there's an active profile
       const activeProfile = profileService.getActiveProfile();
       setProfileSelected(!!activeProfile);
+      // 👶 UI kids: perfil infantil ativa o visual lúdico (data-kids + CSS).
+      document.documentElement.setAttribute('data-kids', activeProfile?.isKids ? '1' : '0');
 
       // Then check auth
       try {
@@ -294,6 +296,7 @@ function App() {
 
   const handleProfileSelected = () => {
     setProfileSelected(true);
+    document.documentElement.setAttribute('data-kids', profileService.getActiveProfile()?.isKids ? '1' : '0');
     // Force navigation to dashboard after profile selection
     window.location.hash = '#/dashboard';
   };
