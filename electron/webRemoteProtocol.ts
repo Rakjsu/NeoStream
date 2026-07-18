@@ -147,11 +147,12 @@ export type RemoteCommand =
     | { action: 'requestReminders' }
     | { action: 'cancelReminder'; id: string }
     | { action: 'openMultiview' }
+    | { action: 'screenshot' }
 
 const VALID_ACTIONS = new Set([
     'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'setVolume', 'setAudioTrack', 'playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule',
     'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestRecordings', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
-    'sleep', 'requestStats', 'focusApp', 'requestReminders', 'cancelReminder', 'openMultiview',
+    'sleep', 'requestStats', 'focusApp', 'requestReminders', 'cancelReminder', 'openMultiview', 'screenshot',
 ])
 
 const CAST_TARGET_TYPES = new Set<CastTargetType>(['chromecast', 'dlna', 'airplay'])

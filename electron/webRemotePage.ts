@@ -219,6 +219,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
           <button class="ctl" data-sleep="0" title="${t.sleepOff}">😴 ✕</button>
           <button class="ctl" id="focusapp" title="${t.openApp}">🖥️</button>
           <button class="ctl" id="mvbtn" title="${t.openMultiview}">🎛️</button>
+          <button class="ctl" id="ssbtn" title="${t.screenshotPc}">📷</button>
           <button class="ctl" id="themetoggle" title="${t.themeToggle}">🌓</button>
         </div>
         <div class="row">
@@ -433,6 +434,8 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
           } else if (msg.type === 'recommended') {
             recGroups = msg.groups || [];
             renderRecommended();
+          } else if (msg.type === 'screenshot') {
+            showScreenshot(msg.dataUrl);
           } else if (msg.type === 'devices') {
             devices = msg.items || [];
             renderDevices();
@@ -1134,6 +1137,19 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
     if (focusBtn) focusBtn.addEventListener('click', function () { sendCmd('focusApp'); showToast('🖥️ ' + L.openApp, 'ok'); });
     var mvBtn = document.getElementById('mvbtn');
     if (mvBtn) mvBtn.addEventListener('click', function () { sendCmd('openMultiview'); showToast('🎛️ ' + L.openMultiview, 'ok'); });
+    var ssBtn = document.getElementById('ssbtn');
+    if (ssBtn) ssBtn.addEventListener('click', function () { sendCmd('screenshot'); showToast('📷 ' + L.screenshotPc + '…', 'ok'); });
+    function showScreenshot(dataUrl) {
+      if (!dataUrl) { showToast('📷 ✗', 'err'); return; }
+      var overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:12px';
+      var shot = document.createElement('img');
+      shot.src = dataUrl;
+      shot.style.cssText = 'max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 8px 32px rgba(0,0,0,.6)';
+      overlay.appendChild(shot);
+      overlay.addEventListener('click', function () { overlay.remove(); });
+      document.body.appendChild(overlay);
+    }
     // 🌓 Tema claro/escuro persistido no aparelho
     function applyTheme(mode) { document.body.classList.toggle('light', mode === 'light'); }
     try { applyTheme(localStorage.getItem('nsTheme') || 'dark'); } catch (e) { /* storage bloqueado */ }

@@ -310,6 +310,22 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         }
         return
     }
+    if (command.action === 'screenshot') {
+        // 📷 Captura a janela do app e devolve pra página (reduzida pra LAN).
+        const appWin = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
+        if (!appWin) {
+            broadcast(JSON.stringify({ type: 'screenshot', dataUrl: null }))
+            return
+        }
+        appWin.webContents.capturePage()
+            .then(image => {
+                const size = image.getSize()
+                const resized = size.width > 900 ? image.resize({ width: 900 }) : image
+                broadcast(JSON.stringify({ type: 'screenshot', dataUrl: resized.toDataURL() }))
+            })
+            .catch(() => broadcast(JSON.stringify({ type: 'screenshot', dataUrl: null })))
+        return
+    }
     // While a cast session is live, transport commands drive the TV instead of
     // the local player: Chromecast first, then an active DLNA session. Channel
     // and catalog actions always go to the renderer.
@@ -759,6 +775,12 @@ function start(): Promise<void> {
     sessionPin = newPin()
     serverSecure = getConfig().https
     const handler = (req: http.IncomingMessage, res: http.ServerResponse) => {
+        if (req.url === '/health') {
+            // 🩺 Health-check leve (sem dados sensíveis): monitoração/diagnóstico na LAN.
+            res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+            res.end(JSON.stringify({ ok: true, app: 'neostream-remote', uptimeSeconds: Math.round(process.uptime()) }))
+            return
+        }
         if (req.url === '/' || req.url === '/index.html') {
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
             // PIN is NOT injected — the phone must enter the code shown on
