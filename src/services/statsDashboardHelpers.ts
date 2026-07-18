@@ -275,6 +275,8 @@ export function kidsWeeklyUsage(
             } catch { /* storage corrompido conta como zero */ }
             return { id: profile.id, name: profile.name, weekSeconds };
         });
+}
+
 /** 📡 Segundos do mês por CANAL (sessões live), do mais visto pro menos. */
 export function aggregateChannelTime(sessions: WatchSession[], limit = 8): { name: string; seconds: number }[] {
     const totals = new Map<string, number>();
