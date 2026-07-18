@@ -36,3 +36,26 @@ export function abLoopTarget(currentTime: number, state: AbLoopState): number | 
 
 /** Seconds one frame step moves — assumes ~30fps (no fps metadata exposed). */
 export const FRAME_STEP_SEC = 1 / 30;
+
+// 🎨 Filtros de vídeo (tecla V): presets de CSS filter aplicados no <video>.
+export interface VideoFilterPreset {
+    id: string;
+    css: string;
+}
+
+export const VIDEO_FILTERS: VideoFilterPreset[] = [
+    { id: 'normal', css: 'none' },
+    { id: 'vivid', css: 'saturate(1.3) contrast(1.08)' },
+    { id: 'cinema', css: 'saturate(0.92) contrast(1.06) brightness(0.97)' },
+    { id: 'night', css: 'brightness(0.8) contrast(1.02)' },
+];
+
+export function filterCssOf(id: string): string {
+    return VIDEO_FILTERS.find(preset => preset.id === id)?.css ?? 'none';
+}
+
+/** Próximo preset no ciclo (id desconhecido volta pro início). */
+export function nextVideoFilter(id: string): VideoFilterPreset {
+    const index = VIDEO_FILTERS.findIndex(preset => preset.id === id);
+    return VIDEO_FILTERS[(index + 1) % VIDEO_FILTERS.length];
+}

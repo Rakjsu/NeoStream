@@ -12,7 +12,7 @@ import { effectiveDailyLimitMinutes, isLimitExceeded, getKidsAllowedHours, isHou
 import { SubtitleOverlay } from './SubtitleOverlay';
 import { useSubtitleManager } from './useSubtitleManager';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
-import { clampBoost, cycleAbState, abLoopTarget, type AbLoopState } from './playerExtras';
+import { clampBoost, cycleAbState, abLoopTarget, type AbLoopState, filterCssOf, nextVideoFilter } from './playerExtras';
 import { PlayerSettingsMenu } from './PlayerSettingsMenu';
 import { useSleepTimer, formatSleepCountdown } from './useSleepTimer';
 import { aspectPrefs, aspectPrefKey } from '../../utils/aspectPrefs';
@@ -294,28 +294,74 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     // primeiro boost (createMediaElementSource captura o áudio do elemento;
     // streams sem CORS ficariam mudos à toa se fosse criado sempre).
     const [volumeBoost, setVolumeBoost] = useState(1);
-    const audioGraphRef = useRef<{ ctx: AudioContext; gain: GainNode } | null>(null);
+    // 🎚️ Normalização (tecla N): compressor aplaina os picos (comerciais,
+    // trocas de canal) — mesmo grafo lazy do boost.
+    const [audioNormalize, setAudioNormalize] = useState(() => localStorage.getItem('neostream_audio_normalize') === '1');
+    const audioGraphRef = useRef<{ ctx: AudioContext; source: MediaElementAudioSourceNode; gain: GainNode; comp: DynamicsCompressorNode | null } | null>(null);
+    const ensureAudioGraph = useCallback((): boolean => {
+        const video = videoRef.current;
+        if (!video) return false;
+        if (audioGraphRef.current) return true;
+        try {
+            const ctx = new AudioContext();
+            const source = ctx.createMediaElementSource(video);
+            const gain = ctx.createGain();
+            source.connect(gain);
+            gain.connect(ctx.destination);
+            audioGraphRef.current = { ctx, source, gain, comp: null };
+            return true;
+        } catch (err) {
+            console.warn('[Player] grafo de áudio indisponível:', err);
+            return false;
+        }
+    }, [videoRef]);
+    /** Reconecta source→(compressor?)→gain conforme a normalização. */
+    const wireAudioGraph = useCallback((normalize: boolean) => {
+        const graph = audioGraphRef.current;
+        if (!graph) return;
+        graph.source.disconnect();
+        graph.comp?.disconnect();
+        if (normalize) {
+            if (!graph.comp) {
+                const comp = graph.ctx.createDynamicsCompressor();
+                comp.threshold.value = -24;
+                comp.knee.value = 30;
+                comp.ratio.value = 6;
+                comp.attack.value = 0.003;
+                comp.release.value = 0.25;
+                graph.comp = comp;
+            }
+            graph.source.connect(graph.comp);
+            graph.comp.connect(graph.gain);
+        } else {
+            graph.source.connect(graph.gain);
+        }
+    }, []);
     const applyVolumeBoost = useCallback((mult: number) => {
         const clamped = clampBoost(mult);
         setVolumeBoost(clamped);
-        const video = videoRef.current;
-        if (!video) return;
-        try {
-            if (!audioGraphRef.current) {
-                if (clamped <= 1) return;
-                const ctx = new AudioContext();
-                const source = ctx.createMediaElementSource(video);
-                const gain = ctx.createGain();
-                source.connect(gain);
-                gain.connect(ctx.destination);
-                audioGraphRef.current = { ctx, gain };
-            }
-            audioGraphRef.current.gain.gain.value = clamped;
-            void audioGraphRef.current.ctx.resume();
-        } catch (err) {
-            console.warn('[Player] volume boost indisponível:', err);
-        }
-    }, [videoRef]);
+        if (clamped <= 1 && !audioGraphRef.current) return; // lazy: cria só quando precisa
+        if (!ensureAudioGraph()) return;
+        const graph = audioGraphRef.current;
+        if (!graph) return;
+        graph.gain.gain.value = clamped;
+        void graph.ctx.resume();
+    }, [ensureAudioGraph]);
+    const toggleNormalize = useCallback(() => setAudioNormalize(v => !v), []);
+    useEffect(() => {
+        localStorage.setItem('neostream_audio_normalize', audioNormalize ? '1' : '0');
+        if (audioNormalize && !ensureAudioGraph()) return;
+        wireAudioGraph(audioNormalize);
+        if (audioNormalize && audioGraphRef.current) void audioGraphRef.current.ctx.resume();
+    }, [audioNormalize, ensureAudioGraph, wireAudioGraph]);
+
+    // 🎨 Filtros de vídeo (tecla V cicla os presets; escolha persistida).
+    const [videoFilter, setVideoFilter] = useState(() => localStorage.getItem('neostream_video_filter') || 'normal');
+    const cycleVideoFilter = useCallback(() => {
+        const next = nextVideoFilter(videoFilter).id;
+        localStorage.setItem('neostream_video_filter', next);
+        setVideoFilter(next);
+    }, [videoFilter]);
     useEffect(() => () => {
         try { void audioGraphRef.current?.ctx.close(); } catch { /* ignore */ }
     }, []);
@@ -816,7 +862,9 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         onCycleAbLoop: contentType !== 'live'
             ? () => setAbLoop(prev => cycleAbState(prev, videoRef.current?.currentTime ?? 0))
             : undefined,
-        onScreenshot: () => { void captureFrame(); }
+        onScreenshot: () => { void captureFrame(); },
+        onCycleVideoFilter: cycleVideoFilter,
+        onToggleNormalize: toggleNormalize
     });
 
     // Progress bar hover preview
@@ -896,7 +944,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     )}
                     <div>{t('player', 'statsBuffer')}: {stats.bufferAheadSec.toFixed(1)}s</div>
                     <div>{t('player', 'statsDropped')}: {stats.dropped}/{stats.total}</div>
-                    <div>{t('player', 'statsSpeed')}: {state.playbackRate}x · vol {Math.round(volumeBoost * 100)}%</div>
+                    <div>{t('player', 'statsSpeed')}: {state.playbackRate}x · vol {Math.round(volumeBoost * 100)}%{audioNormalize ? ' · 🎚️ norm' : ''}{videoFilter !== 'normal' ? ` · 🎨 ${videoFilter}` : ''}</div>
                 </div>
             )}
 
@@ -936,7 +984,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                 <video
                     ref={videoRef}
                     className="video-fullwidth"
-                    style={aspectStyle}
+                    style={{ ...aspectStyle, filter: filterCssOf(videoFilter) }}
                     poster={poster}
                     onClick={controls.togglePlay}
                     crossOrigin="anonymous"

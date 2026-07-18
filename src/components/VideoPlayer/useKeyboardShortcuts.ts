@@ -23,6 +23,8 @@ export interface UseKeyboardShortcutsParams {
     onToggleStats?: () => void;
     onCycleAbLoop?: () => void;
     onScreenshot?: () => void;
+    onCycleVideoFilter?: () => void;
+    onToggleNormalize?: () => void;
 }
 
 // Keyboard shortcuts — the latest handler lives in a ref so a single
@@ -40,7 +42,9 @@ export function useKeyboardShortcuts({
     onFrameStep,
     onToggleStats,
     onCycleAbLoop,
-    onScreenshot
+    onScreenshot,
+    onCycleVideoFilter,
+    onToggleNormalize
 }: UseKeyboardShortcutsParams) {
     const handleKeyDownRef = useRef<(e: KeyboardEvent) => void>(() => { });
     // Intentional render-time ref update (same as the original inline code in
@@ -100,6 +104,18 @@ export function useKeyboardShortcuts({
                 if (onScreenshot) {
                     e.preventDefault();
                     onScreenshot();
+                }
+                break;
+            case 'v':
+                if (onCycleVideoFilter) {
+                    e.preventDefault();
+                    onCycleVideoFilter();
+                }
+                break;
+            case 'n':
+                if (onToggleNormalize) {
+                    e.preventDefault();
+                    onToggleNormalize();
                 }
                 break;
             case 'arrowup':
