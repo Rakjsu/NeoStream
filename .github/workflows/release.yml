@@ -1,7 +1,8 @@
 # Multi-OS release pipeline: push a v*.*.* tag and this builds Windows
 # (NSIS + portable), Linux (AppImage + deb) and macOS (dmg + zip), then
 # attaches everything — including the latest*.yml auto-update feeds — to
-# the GitHub release for that tag. Release notes are edited afterwards.
+# the GitHub release for that tag. Release notes come auto-generated
+# from the merged PRs (and can still be rewritten afterwards).
 name: Build and Release
 
 on:
@@ -59,6 +60,9 @@ jobs:
       - name: Attach artifacts to the release
         uses: softprops/action-gh-release@v3
         with:
+          # 📝 Release notes automáticas dos PRs mergeados desde a última tag
+          # (dá pra reescrever por cima depois, como sempre).
+          generate_release_notes: true
           files: |
             release/*.exe
             release/*.exe.blockmap
