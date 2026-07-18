@@ -30,6 +30,7 @@ import type { ProgramSearchResult } from '../utils/epgGuide';
 import { getTimeshiftUrl } from '../services/timeshiftService';
 import { reminderService, reminderId } from '../services/reminderService';
 import { scheduledRecordingService, scheduleId } from '../services/scheduledRecordingService';
+import { recordingRuleService, ruleMatches } from '../services/recordingRuleService';
 
 interface LiveStream {
     num: number;
@@ -154,6 +155,11 @@ export function EpgGuide() {
     const [searchQuery, setSearchQuery] = useState('');
     const [pendingScrollChannel, setPendingScrollChannel] = useState<string | null>(null);
     const [highlightedChannel, setHighlightedChannel] = useState<string | null>(null);
+    // 🔁 Regras de gravação automática (painel + versão pra reaplicar o matching).
+    const [showRules, setShowRules] = useState(false);
+    const [rulesVersion, setRulesVersion] = useState(0);
+    const [rulePattern, setRulePattern] = useState('');
+    const [ruleChannel, setRuleChannel] = useState('');
     const rowRefs = useRef(new Map<string, HTMLDivElement>());
 
     // "Now" line updates every minute
@@ -184,6 +190,33 @@ export function EpgGuide() {
     // Scheduled recordings: same pattern (⏺ indicator + popover label)
     const [scheduleVersion, setScheduleVersion] = useState(0);
     useEffect(() => scheduledRecordingService.subscribe(() => setScheduleVersion(v => v + 1)), []);
+
+    // 🔁 Agenda automaticamente os programas futuros da grade que casam com
+    // alguma regra de gravação (dedupe pelo scheduleId).
+    useEffect(() => {
+        const rules = recordingRuleService.list();
+        if (rules.length === 0) return;
+        const nowMs = Date.now();
+        const scheduled = new Set(scheduledRecordingService.list().map(s => s.id));
+        for (const stream of streams) {
+            const programs = epgByChannel[stream.name];
+            if (!programs) continue;
+            for (const program of programs) {
+                if (Date.parse(program.start) <= nowMs) continue;
+                const id = scheduleId(stream.name, program.start);
+                if (scheduled.has(id)) continue;
+                if (!ruleMatches(rules, program.title, stream.name)) continue;
+                scheduledRecordingService.add({
+                    channelName: stream.name,
+                    streamId: stream.stream_id,
+                    title: program.title,
+                    startIso: program.start,
+                    endIso: program.end
+                });
+                scheduled.add(id);
+            }
+        }
+    }, [streams, epgByChannel, rulesVersion]);
     const scheduleIds = useMemo(() => {
         void scheduleVersion;
         return new Set(scheduledRecordingService.list().map(s => s.id));
@@ -510,6 +543,71 @@ export function EpgGuide() {
                     >
                         ▶
                     </button>
+                    <button
+                        onClick={() => setShowRules(true)}
+                        title={t('guide', 'rulesButton')}
+                        style={{ padding: '8px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'white', fontSize: 14, cursor: 'pointer' }}
+                    >
+                        🔁
+                    </button>
+                    {showRules && (
+                        <div
+                            onClick={() => setShowRules(false)}
+                            style={{ position: 'fixed', inset: 0, zIndex: 9100, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        >
+                            <div
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ width: 460, maxHeight: '70vh', overflowY: 'auto', background: 'var(--ns-bg-panel, #181829)', border: '1px solid rgba(var(--ns-accent-rgb), 0.35)', borderRadius: 14, padding: 18 }}
+                            >
+                                <div style={{ color: 'white', fontWeight: 700, fontSize: 15, marginBottom: 12 }}>
+                                    {t('guide', 'rulesTitle')}
+                                </div>
+                                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                                    <input
+                                        value={rulePattern}
+                                        onChange={(e) => setRulePattern(e.target.value)}
+                                        placeholder={t('guide', 'rulesPattern')}
+                                        style={{ flex: 2, padding: '9px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.07)', color: 'white', fontSize: 13, outline: 'none' }}
+                                    />
+                                    <input
+                                        value={ruleChannel}
+                                        onChange={(e) => setRuleChannel(e.target.value)}
+                                        placeholder={t('guide', 'rulesChannel')}
+                                        style={{ flex: 1, padding: '9px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.07)', color: 'white', fontSize: 13, outline: 'none' }}
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            if (recordingRuleService.add(rulePattern, ruleChannel || undefined)) {
+                                                setRulePattern('');
+                                                setRuleChannel('');
+                                                setRulesVersion(v => v + 1);
+                                            }
+                                        }}
+                                        style={{ padding: '9px 14px', borderRadius: 8, border: '1px solid rgba(var(--ns-accent-rgb), 0.5)', background: 'rgba(var(--ns-accent-rgb), 0.2)', color: 'white', fontSize: 14, cursor: 'pointer' }}
+                                    >
+                                        ＋
+                                    </button>
+                                </div>
+                                {recordingRuleService.list().length === 0 && (
+                                    <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>{t('guide', 'rulesEmpty')}</div>
+                                )}
+                                {recordingRuleService.list().map(rule => (
+                                    <div key={rule.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 4px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                                        <span style={{ flex: 1, color: 'white', fontSize: 13, fontFamily: 'monospace' }}>/{rule.pattern}/i</span>
+                                        {rule.channelName && (
+                                            <span style={{ color: 'rgba(148,163,184,0.9)', fontSize: 12 }}>📡 {rule.channelName}</span>
+                                        )}
+                                        <button
+                                            onClick={() => { recordingRuleService.remove(rule.id); setRulesVersion(v => v + 1); }}
+                                            style={{ border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: 13 }}
+                                        >
+                                            ✕
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     {/* 📅 Menu de salto: escolhe o dia e a janela pula pras 08:00 dele */}
                     <select
                         value=""

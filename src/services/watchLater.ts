@@ -56,6 +56,20 @@ export const watchLaterService = {
         }
     },
 
+    /** 🖐️ Reordena a lista (drag-n-drop): move fromIndex pra toIndex. */
+    reorder(fromIndex: number, toIndex: number): WatchLaterItem[] {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return this.getAll();
+        const items = this.getAll();
+        if (fromIndex < 0 || fromIndex >= items.length || toIndex < 0 || toIndex >= items.length || fromIndex === toIndex) {
+            return items;
+        }
+        const [moved] = items.splice(fromIndex, 1);
+        items.splice(toIndex, 0, moved);
+        this.save(activeProfile, items);
+        return items;
+    },
+
     // Remove item from watch later
     remove(id: string, type: 'series' | 'movie'): boolean {
         const activeProfile = profileService.getActiveProfile();

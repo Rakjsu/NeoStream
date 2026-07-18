@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { watchLaterService, type WatchLaterItem } from '../services/watchLater';
 import { castResolvedQueue, type CastQueueItem } from '../services/castQueue';
@@ -11,6 +11,8 @@ import { useLanguage } from '../services/languageService';
 
 export function WatchLater() {
     const [items, setItems] = useState<WatchLaterItem[]>(() => watchLaterService.getAll());
+    // 🖐️ Índice sendo arrastado (só na aba 'all', onde índice = posição real).
+    const dragIndexRef = useRef<number | null>(null);
     const [removingId, setRemovingId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'all' | 'movies' | 'series'>('all');
     const navigate = useNavigate();
@@ -249,6 +251,14 @@ export function WatchLater() {
                                     <div
                                         key={`${item.type}-${item.id}`}
                                         className={`item-card ${isRemoving ? 'removing' : ''}`}
+                                        draggable={activeTab === 'all'}
+                                        onDragStart={() => { dragIndexRef.current = index; }}
+                                        onDragOver={(e) => { if (activeTab === 'all') e.preventDefault(); }}
+                                        onDrop={() => {
+                                            if (activeTab !== 'all' || dragIndexRef.current === null) return;
+                                            setItems(watchLaterService.reorder(dragIndexRef.current, index));
+                                            dragIndexRef.current = null;
+                                        }}
                                         style={{ animationDelay: `${index * 0.05}s` }}
                                     >
                                         {/* Remove Button */}
