@@ -29,6 +29,11 @@ export function DvrNotifyBridge() {
                 body: t('dvrFinishedBody').replace('{name}', name).replace('{duration}', duration),
                 route: '/dashboard/downloads',
             }).catch((err: unknown) => console.warn('[DVR] notify:show failed:', err));
+            // 🔔 Espelha no app do celular pareado (no-op sem app conectado).
+            void window.ipcRenderer.invoke('web-remote:notify-mobile', {
+                title: `📼 ${t('dvrFinishedTitle')}`,
+                body: t('dvrFinishedBody').replace('{name}', name).replace('{duration}', duration),
+            }).catch(() => undefined);
         };
         window.ipcRenderer.on('dvr:stopped', handler);
         return () => window.ipcRenderer.off('dvr:stopped', handler);

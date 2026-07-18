@@ -83,6 +83,8 @@ export function ContentDetailModal({
     const [loadError, setLoadError] = useState(false);
     const [retryNonce, setRetryNonce] = useState(0);
     const [refresh, setRefresh] = useState(0); // Force re-render for button states
+    // 📱 Feedback do "tocar no celular" (app pareado no controle web).
+    const [mobileMsg, setMobileMsg] = useState('');
     const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'completed'>('idle');
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [showDownloadModal, setShowDownloadModal] = useState(false);
@@ -1104,6 +1106,50 @@ export function ContentDetailModal({
                             }
                         </button>
 
+                        {/* 📱 Tocar no celular pareado (app conectado no controle web) */}
+                        <button
+                            onClick={async () => {
+                                const payload = contentType === 'series'
+                                    ? (() => {
+                                        const ep = episodes.find(e => Number(e.episode_num) === selectedEpisode);
+                                        if (!ep) return null;
+                                        return {
+                                            kind: 'series',
+                                            sid: String(ep.id),
+                                            container: ep.container_extension || 'mp4',
+                                            name: `${contentData.name} · S${selectedSeason}E${selectedEpisode}`
+                                        };
+                                    })()
+                                    : {
+                                        kind: 'movie',
+                                        sid: contentId,
+                                        container: contentData.container_extension || 'mp4',
+                                        name: contentData.name
+                                    };
+                                if (!payload) return;
+                                const result = await window.ipcRenderer.invoke('web-remote:play-vod-on-mobile', payload) as { success: boolean };
+                                setMobileMsg(t('contentModal', result?.success ? 'sentToPhone' : 'noPhoneConnected'));
+                                setTimeout(() => setMobileMsg(''), 4000);
+                            }}
+                            style={{
+                                width: 50,
+                                height: 50,
+                                borderRadius: '50%',
+                                border: '2px solid rgba(255, 255, 255, 0.2)',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                color: 'white',
+                                fontSize: 20,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s'
+                            }}
+                            title={t('contentModal', 'sendToPhone')}
+                        >
+                            📱
+                        </button>
+
                         {/* ✓ Marcar visto manual (filmes; episódios têm o ✓ por linha) */}
                         {contentType === 'movie' && (
                             <button
@@ -1175,6 +1221,10 @@ export function ContentDetailModal({
                             {favoritesService.has(contentId, contentType) ? '❤️' : '🤍'}
                         </button>
                     </div>
+
+                    {mobileMsg && (
+                        <p style={{ color: 'var(--ns-accent-light)', fontSize: 12, marginTop: 10 }}>{mobileMsg}</p>
+                    )}
 
                     {/* 🎬 Coleção TMDB (franquia) */}
                     {contentType === 'movie' && collection && collection.parts.length > 1 && (

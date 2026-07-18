@@ -423,6 +423,30 @@ export function setupWebRemote(): void {
     // mounted, so the phone can show a second-screen guide and tap to switch.
     // 📱 "Enviar pro celular": empurra um canal pro app NeoStream Mobile
     // conectado neste servidor (o app dá play com a conta dele).
+    // 📱 Manda um VOD/episódio pro app do celular pareado tocar.
+    ipcMain.handle('web-remote:play-vod-on-mobile', (_e, data: { kind?: string; sid?: string; container?: string; name?: string }) => {
+        const kind = data?.kind === 'series' ? 'series' : 'movie'
+        const sid = String(data?.sid ?? '').trim()
+        if (!sid) return { success: false, error: 'sid ausente' }
+        const count = sendToMobileClients(JSON.stringify({
+            type: 'playVodOnMobile',
+            kind,
+            sid,
+            container: String(data?.container ?? 'mp4'),
+            name: String(data?.name ?? ''),
+        }))
+        return { success: count > 0, count }
+    })
+
+    // 🔔 Notificação cruzada: espelha um aviso do desktop nos celulares.
+    ipcMain.handle('web-remote:notify-mobile', (_e, data: { title?: string; body?: string }) => {
+        const title = String(data?.title ?? '').slice(0, 80)
+        const body = String(data?.body ?? '').slice(0, 200)
+        if (!title) return { success: false }
+        const count = sendToMobileClients(JSON.stringify({ type: 'notifyMobile', title, body }))
+        return { success: count > 0, count }
+    })
+
     ipcMain.handle('web-remote:play-on-mobile', (_e, raw: unknown) => {
         const data = raw as { streamId?: unknown; name?: unknown } | null
         if (!data || data.streamId === undefined) return { success: false, delivered: 0 }

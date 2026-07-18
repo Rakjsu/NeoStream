@@ -200,6 +200,9 @@
     "noScheduleInfo": "Sin información de programación"
   },
   "contentModal": {
+    "sendToPhone": "Reproducir en el móvil (app emparejada)",
+    "sentToPhone": "📱 Enviado al móvil",
+    "noPhoneConnected": "Ningún móvil conectado al control",
     "markWatched": "Marcar como visto",
     "unmarkWatched": "Desmarcar visto",
     "similarTitle": "Parecidos a este",
