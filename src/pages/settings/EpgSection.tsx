@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { useLanguage } from '../../services/languageService';
 import { epgService } from '../../services/epgService';
+import { addKeyword, listKeywords, removeKeyword } from '../../services/epgKeywordAlertService';
 import epgTestService, { type EpgTestResult, type EpgTestProgress } from '../../services/epgTestService';
 
 export type EpgResultsFilter = 'all' | 'working' | 'notWorking';
@@ -28,6 +29,9 @@ export function EpgSection({
     setEpgCurrentPage
 }: EpgSectionProps) {
     const { t } = useLanguage();
+    // 🔎 Alertas por keyword/regex na programação
+    const [keywords, setKeywords] = useState<string[]>(() => listKeywords());
+    const [keywordInput, setKeywordInput] = useState('');
 
     // EPG Test states - synced with global background service
     const [externalEpgUrl, setExternalEpgUrl] = useState(() => epgService.getUserEpgUrl());
@@ -193,6 +197,40 @@ export function EpgSection({
             </div>
 
             <div className="settings-group">
+                {/* 🔎 Alertas por palavra-chave/regex na programação */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>🔎 {t('epg', 'keywordTitle')}</label>
+                        <p>{t('epg', 'keywordHint')}</p>
+                    </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '0 4px 18px' }}>
+                    {keywords.map(keyword => (
+                        <button
+                            key={keyword}
+                            onClick={() => setKeywords(removeKeyword(keyword))}
+                            title={t('epg', 'keywordRemove')}
+                            style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.18)', color: 'rgba(255,255,255,0.85)', borderRadius: 999, padding: '5px 12px', fontSize: 12, cursor: 'pointer' }}
+                        >
+                            {keyword} ✕
+                        </button>
+                    ))}
+                    <input
+                        type="text"
+                        value={keywordInput}
+                        placeholder={t('epg', 'keywordPh')}
+                        spellCheck={false}
+                        onChange={(e) => setKeywordInput(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && keywordInput.trim()) {
+                                setKeywords(addKeyword(keywordInput));
+                                setKeywordInput('');
+                            }
+                        }}
+                        style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.06)', color: '#fff', fontSize: 13, width: 220 }}
+                    />
+                </div>
+
                 {/* XMLTV externo do usuário — prioridade máxima na cadeia de EPG */}
                 <div className="setting-item">
                     <div className="setting-info">
