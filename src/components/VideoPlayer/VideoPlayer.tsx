@@ -13,6 +13,7 @@ import { SubtitleOverlay } from './SubtitleOverlay';
 import { useSubtitleManager } from './useSubtitleManager';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { clampBoost, cycleAbState, abLoopTarget, type AbLoopState, filterCssOf, nextVideoFilter } from './playerExtras';
+import { loadSubtitleStyle, type SubtitleStyle } from '../../utils/subtitleStyle';
 import { PlayerSettingsMenu } from './PlayerSettingsMenu';
 import { useSleepTimer, formatSleepCountdown } from './useSleepTimer';
 import { aspectPrefs, aspectPrefKey } from '../../utils/aspectPrefs';
@@ -362,6 +363,16 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         localStorage.setItem('neostream_video_filter', next);
         setVideoFilter(next);
     }, [videoFilter]);
+
+    // 💬 Estilo da legenda (tamanho/fundo/cor) persistido.
+    const [subtitleStyle, setSubtitleStyle] = useState<SubtitleStyle>(() => loadSubtitleStyle(localStorage.getItem('neostream_subtitle_style')));
+    const applySubtitleStyle = useCallback((next: SubtitleStyle) => {
+        setSubtitleStyle(next);
+        localStorage.setItem('neostream_subtitle_style', JSON.stringify(next));
+    }, []);
+
+    // 📻 Modo rádio: tela preta com o áudio seguindo (clique volta).
+    const [radioMode, setRadioMode] = useState(false);
     useEffect(() => () => {
         try { void audioGraphRef.current?.ctx.close(); } catch { /* ignore */ }
     }, []);
@@ -996,7 +1007,18 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     videoRef={videoRef}
                     enabled={subtitlesEnabled}
                     offsetSeconds={subtitleOffset}
+                    styleConfig={subtitleStyle}
                 />
+
+                {/* 📻 Modo rádio: overlay preto por cima de tudo (clique volta) */}
+                {radioMode && (
+                    <div
+                        onClick={() => setRadioMode(false)}
+                        style={{ position: 'absolute', inset: 0, background: '#000', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+                    >
+                        <span style={{ color: 'rgba(255,255,255,0.25)', fontSize: 14 }}>📻 {t('player', 'radioModeHint')}</span>
+                    </div>
+                )}
 
                 {/* ⏰ Kids limit reached: blocking overlay */}
                 {kidsLimitReached && (
@@ -1415,6 +1437,9 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             onSetSleepTimer={(minutes) => minutes ? sleepTimer.start(minutes) : sleepTimer.cancel()}
                             volumeBoost={volumeBoost}
                             onSetVolumeBoost={applyVolumeBoost}
+                            subtitleStyle={subtitleStyle}
+                            onSetSubtitleStyle={applySubtitleStyle}
+                            onEnterRadioMode={() => setRadioMode(true)}
                         />
 
                         {/* Channel list toggle (live TV zapping) */}
