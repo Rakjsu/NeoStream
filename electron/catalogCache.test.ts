@@ -17,10 +17,19 @@ import { cachedCatalogFetch, invalidatePlaylistCache, isFresh, CATALOG_CACHE_TTL
 
 const cacheDir = path.join(USER_DATA, 'catalog-cache')
 
-/** O write-behind não é aguardado pelo fetch — espera o arquivo aparecer. */
+/**
+ * O write-behind não é aguardado pelo fetch — espera o arquivo aparecer E
+ * conter JSON válido (o writeFile cria o arquivo vazio antes de escrever;
+ * em runner lento o existsSync sozinho vencia a corrida e o teste lia '').
+ */
 async function waitForFile(file: string): Promise<void> {
     for (let i = 0; i < 100; i++) {
-        if (fs.existsSync(file)) return
+        if (fs.existsSync(file)) {
+            try {
+                JSON.parse(fs.readFileSync(file, 'utf-8'))
+                return
+            } catch { /* escrita ainda no meio — tenta de novo */ }
+        }
         await new Promise(resolve => setTimeout(resolve, 10))
     }
     throw new Error(`arquivo de cache não apareceu: ${file}`)
