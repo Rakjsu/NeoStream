@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { DEFAULT_SUBTITLE_STYLE, subtitleCss, type SubtitleStyle } from '../../utils/subtitleStyle';
 
 interface SubtitleCue {
     startTime: number;  // in seconds
@@ -18,6 +19,8 @@ interface SubtitleOverlayProps {
     enabled: boolean;
     /** Sync adjustment in seconds: positive shows subtitles LATER. */
     offsetSeconds?: number;
+    /** Estilo (tamanho/fundo/cor) escolhido no menu ⚙️ do player. */
+    styleConfig?: SubtitleStyle;
 }
 
 /**
@@ -94,7 +97,8 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
     vttContent,
     videoRef,
     enabled,
-    offsetSeconds = 0
+    offsetSeconds = 0,
+    styleConfig
 }) => {
     const [currentText, setCurrentText] = useState<string>('');
 
@@ -151,6 +155,8 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
         return null;
     }
 
+    const css = subtitleCss(styleConfig ?? DEFAULT_SUBTITLE_STYLE);
+
     return (
         <div
             style={{
@@ -160,10 +166,10 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
                 transform: 'translateX(-50%)',
                 maxWidth: '80%',
                 padding: '6px 14px',
-                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                backgroundColor: css.backgroundColor,
                 borderRadius: '4px',
-                color: 'white',
-                fontSize: '1.4rem',
+                color: css.color,
+                fontSize: css.fontSize,
                 fontWeight: 600,
                 textAlign: 'center',
                 textShadow: '1px 1px 2px #000, -1px -1px 2px #000, 1px -1px 2px #000, -1px 1px 2px #000, 0 0 8px rgba(0,0,0,0.9)',
