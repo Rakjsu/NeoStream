@@ -63,7 +63,8 @@ describe('remux e thumbnail (D60)', () => {
         const args = buildThumbnailArgs('a.ts', 'a.jpg', 45)
         expect(args[args.indexOf('-ss') + 1]).toBe('45')
         expect(args[args.indexOf('-vframes') + 1]).toBe('1')
-        expect(buildThumbnailArgs('a.ts', 'a.jpg', -5)[2 + 1]).toBe('0')
+        const clamped = buildThumbnailArgs('a.ts', 'a.jpg', -5)
+        expect(clamped[clamped.indexOf('-ss') + 1]).toBe('0')
     })
 
     it('mp4PathFor troca só a extensão final .ts', () => {
