@@ -283,6 +283,7 @@ export function MiniPlayerProvider({ children }: { children: ReactNode }) {
             {inAppContent && (
                 <FloatingMiniPlayer
                     content={inAppContent}
+                    onZap={(zapPatch) => setInAppContent(prev => (prev ? { ...prev, ...zapPatch, currentTime: 0 } : prev))}
                     onTime={handleInAppTime}
                     onClose={closeInAppMiniPlayer}
                     onExpand={(time) => {
