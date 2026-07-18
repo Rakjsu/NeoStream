@@ -270,6 +270,11 @@ export function LiveTV() {
     // the current channel list lives in a ref to keep this handler stable.
     useEffect(() => {
         const handler = (_e: unknown, action: string, arg?: unknown) => {
+            if (action === 'openMultiview') {
+                // 🎛️ Pedido do celular: abre o mosaico por cima da TV ao vivo.
+                setShowMultiView(true);
+                return;
+            }
             if (action === 'playChannel') {
                 const id = String(arg ?? '');
                 const channel = zapStreamsRef.current.find(s => String(s.stream_id) === id);

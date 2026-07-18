@@ -281,7 +281,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 }
 
 // Actions that always go to the renderer (never routed to the cast session).
-const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule', 'requestRecordings', 'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode', 'sleep', 'requestStats'])
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule', 'requestRecordings', 'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode', 'sleep', 'requestStats', 'requestReminders', 'cancelReminder'])
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
@@ -292,6 +292,21 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
             if (appWin.isMinimized()) appWin.restore()
             appWin.show()
             appWin.focus()
+        }
+        return
+    }
+    if (command.action === 'openMultiview') {
+        // 🎛️ Traz o app, navega pra TV ao vivo (canal da bandeja) e pede o
+        // multi-view com um pequeno atraso pra página já estar montada.
+        const appWin = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
+        if (appWin) {
+            if (appWin.isMinimized()) appWin.restore()
+            appWin.show()
+            appWin.focus()
+            appWin.webContents.send('tray:navigate', '/dashboard/live')
+            setTimeout(() => {
+                if (!appWin.isDestroyed()) appWin.webContents.send('media:control', 'openMultiview')
+            }, 700)
         }
         return
     }
@@ -332,6 +347,8 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         win.webContents.send('media:control', 'stopRecord', command.id)
     } else if (command.action === 'deleteRecording') {
         win.webContents.send('media:control', 'deleteRecording', command.name)
+    } else if (command.action === 'cancelReminder') {
+        win.webContents.send('media:control', 'cancelReminder', command.id)
     } else if (command.action === 'scheduleNext') {
         win.webContents.send('media:control', 'scheduleNext', command.channelId)
     } else if (command.action === 'cancelSchedule') {
@@ -483,6 +500,13 @@ export function setupWebRemote(): void {
     // On-demand EPG for a single channel: the renderer answers a requestEpg by
     // fetching that channel's now/next and pushing it here, relayed to phones.
     // 📊 Stats rápidas do renderer → página (hoje / 7 dias / streak).
+    // ⏰ Lembretes do renderer pro celular (lista com cancelar remoto).
+    ipcMain.on('web-remote:reminders', (_e, raw: unknown) => {
+        const payload = (raw ?? {}) as { items?: unknown }
+        const items = Array.isArray(payload.items) ? payload.items.slice(0, 40) : []
+        broadcast(JSON.stringify({ type: 'reminders', items }))
+    })
+
     ipcMain.on('web-remote:stats', (_e, raw: unknown) => {
         const payload = (raw ?? {}) as { todaySeconds?: unknown; weekSeconds?: unknown; streak?: unknown }
         broadcast(JSON.stringify({
