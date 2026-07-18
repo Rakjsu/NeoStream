@@ -209,8 +209,30 @@ export function Series() {
         [series, sortBy]
     );
 
+    // 🙈 Esconder assistidos: séries onde TODO episódio registrado está
+    // completo (nada pendente pra continuar) saem da grade.
+    const [hideWatched, setHideWatchedState] = useState(() => localStorage.getItem('neostream_hide_watched') === 'on');
+    const watchedSeriesIds = useMemo(() => {
+        if (!hideWatched) return new Set<string>();
+        const bySeries = new Map<string, { total: number; completed: number }>();
+        for (const ep of watchProgressService.getEpisodeHistory()) {
+            const entry = bySeries.get(ep.seriesId) || { total: 0, completed: 0 };
+            entry.total += 1;
+            if (ep.completed) entry.completed += 1;
+            bySeries.set(ep.seriesId, entry);
+        }
+        const ids = new Set<string>();
+        for (const [id, entry] of bySeries) {
+            if (entry.total > 0 && entry.completed === entry.total) ids.add(id);
+        }
+        return ids;
+    }, [hideWatched]);
+
     const filteredSeries = useMemo(() => sortedSeries.filter(s => {
         const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
+        if (hideWatched && watchedSeriesIds.has(String(s.series_id))) {
+            return false;
+        }
 
         // Kids profile + Parental Control filtering
         if (!isItemVisible(s)) {
@@ -232,7 +254,7 @@ export function Series() {
     // isItemVisible reads parental/kids state that only changes via a profile/
     // settings switch (which reloads the library), so it's intentionally omitted.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }), [sortedSeries, searchQuery, selectedCategory]);
+    }), [sortedSeries, searchQuery, selectedCategory, hideWatched, watchedSeriesIds]);
 
     // Windowed rendering (same mechanism as VOD): spacer rows keep the
     // scrollbar honest while only ~3 screens of cards stay mounted.
@@ -434,6 +456,26 @@ export function Series() {
                     placeholder={t('login', 'searchSeries')}
                 />
                 <SortSelect value={sortBy} onChange={setSortBy} />
+                <button
+                    onClick={() => {
+                        const next = !hideWatched;
+                        setHideWatchedState(next);
+                        if (next) localStorage.setItem('neostream_hide_watched', 'on');
+                        else localStorage.removeItem('neostream_hide_watched');
+                    }}
+                    title={t('contentModal', 'hideWatchedHint')}
+                    style={{
+                        position: 'absolute', top: 30, right: 235, zIndex: 95,
+                        padding: '9px 12px', borderRadius: 12,
+                        border: hideWatched ? '1px solid rgba(var(--ns-accent-rgb), 0.5)' : '1px solid rgba(255, 255, 255, 0.18)',
+                        background: hideWatched ? 'rgba(var(--ns-accent-rgb), 0.2)' : 'rgba(15, 15, 35, 0.85)',
+                        color: hideWatched ? 'var(--ns-accent-light)' : 'rgba(255, 255, 255, 0.85)',
+                        fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                        backdropFilter: 'blur(8px)', whiteSpace: 'nowrap'
+                    }}
+                >
+                    {t('contentModal', 'hideWatched')}
+                </button>
 
                 <CategoryMenu
                     onSelectCategory={setSelectedCategory}

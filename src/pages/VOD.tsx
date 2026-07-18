@@ -195,8 +195,18 @@ export function VOD() {
         [streams, sortBy]
     );
 
+    // 🙈 Esconder assistidos: filmes com progresso >= 95% saem da grade.
+    const [hideWatched, setHideWatchedState] = useState(() => localStorage.getItem('neostream_hide_watched') === 'on');
+    const watchedIds = useMemo(
+        () => (hideWatched ? new Set(movieProgressService.getWatchedMovies()) : new Set<string>()),
+        [hideWatched]
+    );
+
     const filteredStreams = useMemo(() => sortedStreams.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
+        if (hideWatched && selectedCategory !== 'WATCHED' && watchedIds.has(stream.stream_id.toString())) {
+            return false;
+        }
 
         // Kids profile + Parental Control gating (categories, cached ratings, hidden items)
         if (!isItemVisible(stream)) {
@@ -219,7 +229,7 @@ export function VOD() {
     // settings switch (which reloads streams / remounts this page), so it doesn't
     // need to be a dep — keeping it out is what makes scrolling cheap.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }), [sortedStreams, searchQuery, selectedCategory]);
+    }), [sortedStreams, searchQuery, selectedCategory, hideWatched, watchedIds]);
 
     // Windowed rendering: only ~3 screens of cards stay mounted while the
     // scrollbar reflects the full list (spacer rows keep the geometry).
@@ -414,6 +424,26 @@ export function VOD() {
                     placeholder={t('login', 'searchMovies')}
                 />
                 <SortSelect value={sortBy} onChange={setSortBy} />
+                <button
+                    onClick={() => {
+                        const next = !hideWatched;
+                        setHideWatchedState(next);
+                        if (next) localStorage.setItem('neostream_hide_watched', 'on');
+                        else localStorage.removeItem('neostream_hide_watched');
+                    }}
+                    title={t('contentModal', 'hideWatchedHint')}
+                    style={{
+                        position: 'absolute', top: 30, right: 235, zIndex: 95,
+                        padding: '9px 12px', borderRadius: 12,
+                        border: hideWatched ? '1px solid rgba(var(--ns-accent-rgb), 0.5)' : '1px solid rgba(255, 255, 255, 0.18)',
+                        background: hideWatched ? 'rgba(var(--ns-accent-rgb), 0.2)' : 'rgba(15, 15, 35, 0.85)',
+                        color: hideWatched ? 'var(--ns-accent-light)' : 'rgba(255, 255, 255, 0.85)',
+                        fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                        backdropFilter: 'blur(8px)', whiteSpace: 'nowrap'
+                    }}
+                >
+                    {t('contentModal', 'hideWatched')}
+                </button>
 
                 <CategoryMenu
                     onSelectCategory={setSelectedCategory}
