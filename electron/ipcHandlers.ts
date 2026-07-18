@@ -1165,7 +1165,9 @@ export function setupIpcHandlers() {
     })
 
     // Provider health: probe the active provider's endpoints with timings.
-    ipcMain.handle('diagnostics:provider-health', async () => {
+    // Com { speedTest: true } também baixa até 8 MB (ou 5 s) de um endpoint
+    // grande do provedor e devolve o throughput real em `speed`.
+    ipcMain.handle('diagnostics:provider-health', async (_evt, opts?: { speedTest?: boolean }) => {
         const auth = store.get('auth')
         if (!auth.url || !auth.username || !auth.password) {
             return { success: false, error: 'Not authenticated' }
@@ -1190,6 +1192,36 @@ export function setupIpcHandlers() {
             }
         }
 
+        // 🚀 Velocímetro: consome o body (em vez de destruí-lo como o probe)
+        // por até 8 MB ou 5 s e mede o throughput. Amostra < 64 KB → null.
+        const measureSpeed = async (url: string) => {
+            const startedAt = Date.now()
+            try {
+                const response = await axios.get(url, {
+                    timeout: 15000,
+                    validateStatus: () => true,
+                    responseType: 'stream',
+                    httpsAgent: getProviderHttpsAgent(url, base)
+                })
+                const stream = response.data as NodeJS.ReadableStream & { destroy?: () => void }
+                let bytes = 0
+                await new Promise<void>((resolve) => {
+                    const timer = setTimeout(() => { stream.destroy?.(); resolve() }, 5000)
+                    stream.on('data', (chunk: Buffer) => {
+                        bytes += chunk.length
+                        if (bytes >= 8 * 1024 * 1024) { clearTimeout(timer); stream.destroy?.(); resolve() }
+                    })
+                    stream.on('end', () => { clearTimeout(timer); resolve() })
+                    stream.on('error', () => { clearTimeout(timer); resolve() })
+                })
+                const seconds = Math.max(0.2, (Date.now() - startedAt) / 1000)
+                if (bytes < 64 * 1024) return null
+                return { bytes, seconds, mbps: (bytes * 8) / seconds / 1_000_000 }
+            } catch {
+                return null
+            }
+        }
+
         // Non-Xtream playlists get type-appropriate checks: the M3U document
         // itself, or the portal handshake + channel list.
         const activeId = getActivePlaylistIdPublic()
@@ -1201,7 +1233,8 @@ export function setupIpcHandlers() {
             const parseResult = await fetchM3uChannels(activeEntry.url)
                 .then(channels => ({ name: 'm3u_parse', ok: channels.length > 0, status: null, ms: Date.now() - startedAt, error: undefined as string | undefined }))
                 .catch((error: unknown) => ({ name: 'm3u_parse', ok: false, status: null, ms: Date.now() - startedAt, error: getErrorMessage(error) as string | undefined }))
-            return { success: true, results: [download, parseResult] }
+            const speed = opts?.speedTest ? await measureSpeed(activeEntry.url) : null
+            return { success: true, results: [download, parseResult], speed }
         }
 
         if (activeEntry?.type === 'stalker') {
@@ -1219,7 +1252,7 @@ export function setupIpcHandlers() {
             const channels = handshake.ok
                 ? await timed('stalker_channels', () => stalker.getAllChannels())
                 : { name: 'stalker_channels', ok: false, status: null, ms: 0, error: 'handshake falhou' }
-            return { success: true, results: [handshake, channels] }
+            return { success: true, results: [handshake, channels], speed: null }
         }
 
         const results = await Promise.all([
@@ -1227,7 +1260,10 @@ export function setupIpcHandlers() {
             probe('live_streams', `${base}/player_api.php?${creds}&action=get_live_streams`),
             probe('xmltv', `${base}/xmltv.php?${creds}`)
         ])
-        return { success: true, results }
+        const speed = opts?.speedTest
+            ? await measureSpeed(`${base}/get.php?${creds}&type=m3u_plus&output=ts`)
+            : null
+        return { success: true, results, speed }
     })
 
     // Full playlist entries for the backup file (passwords included — the

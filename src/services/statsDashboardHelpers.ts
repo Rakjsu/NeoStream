@@ -111,3 +111,76 @@ export function habitHeatmap(sessions: { date: string; watchedSeconds: number; h
     }
     return { cells, max };
 }
+
+/** Semana atual (últimos 7 dias) vs anterior (8–14 dias atrás), com delta %. */
+export interface WeekComparison {
+    currentSeconds: number;
+    previousSeconds: number;
+    /** null quando não há base de comparação (semana anterior zerada). */
+    deltaPct: number | null;
+}
+
+export function weekOverWeek(dailyStats: DailyStats[], today: string): WeekComparison {
+    const last14 = fillLastNDays(dailyStats, 14, today);
+    const previousSeconds = last14.slice(0, 7).reduce((sum, d) => sum + d.totalSeconds, 0);
+    const currentSeconds = last14.slice(7).reduce((sum, d) => sum + d.totalSeconds, 0);
+    const deltaPct = previousSeconds > 0
+        ? Math.round(((currentSeconds - previousSeconds) / previousSeconds) * 100)
+        : null;
+    return { currentSeconds, previousSeconds, deltaPct };
+}
+
+/** Recordes deriváveis dos dados existentes (dia 90d + contentTotals all-time). */
+export interface StatsRecords {
+    biggestDay: { date: string; seconds: number } | null;
+    topSeries: { name: string; seconds: number } | null;
+    topContent: { name: string; seconds: number } | null;
+}
+
+export function computeRecords(
+    dailyStats: DailyStats[],
+    contentTotals?: Record<string, { name: string; type: string; seconds: number }>
+): StatsRecords {
+    let biggestDay: StatsRecords['biggestDay'] = null;
+    for (const day of dailyStats) {
+        if (day.totalSeconds > 0 && (!biggestDay || day.totalSeconds > biggestDay.seconds)) {
+            biggestDay = { date: day.date, seconds: day.totalSeconds };
+        }
+    }
+    let topSeries: StatsRecords['topSeries'] = null;
+    let topContent: StatsRecords['topContent'] = null;
+    for (const entry of Object.values(contentTotals ?? {})) {
+        if (entry.seconds <= 0) continue;
+        if (!topContent || entry.seconds > topContent.seconds) {
+            topContent = { name: entry.name, seconds: entry.seconds };
+        }
+        if (entry.type === 'series' && (!topSeries || entry.seconds > topSeries.seconds)) {
+            topSeries = { name: entry.name, seconds: entry.seconds };
+        }
+    }
+    return { biggestDay, topSeries, topContent };
+}
+
+/** Uso agregado por perfil, lendo as chaves usage_stats_<id> (leitura injetada — PURO). */
+export interface ProfileUsage {
+    id: string;
+    name: string;
+    seconds: number;
+}
+
+export function perProfileUsage(
+    profiles: { id: string; name: string }[],
+    readRaw: (key: string) => string | null
+): ProfileUsage[] {
+    return profiles
+        .map(profile => {
+            let seconds = 0;
+            try {
+                const parsed: unknown = JSON.parse(readRaw(`usage_stats_${profile.id}`) || 'null');
+                const total = (parsed as { totalWatchTimeSeconds?: unknown } | null)?.totalWatchTimeSeconds;
+                if (typeof total === 'number' && Number.isFinite(total)) seconds = Math.max(0, total);
+            } catch { /* registro corrompido conta como 0 */ }
+            return { id: profile.id, name: profile.name, seconds };
+        })
+        .sort((a, b) => b.seconds - a.seconds);
+}

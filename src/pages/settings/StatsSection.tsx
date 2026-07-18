@@ -7,9 +7,13 @@ import {
     typeShare,
     dailyAverageSeconds,
     busiestWeekday,
-    habitHeatmap
+    habitHeatmap,
+    weekOverWeek,
+    computeRecords,
+    perProfileUsage
 } from '../../services/statsDashboardHelpers';
 import { useLanguage } from '../../services/languageService';
+import { profileService } from '../../services/profileService';
 import { WrappedOverlay } from '../../components/WrappedOverlay';
 import { getDailyGoalMinutes, goalProgressPct, setDailyGoalMinutes } from '../../services/watchLimitsService';
 
@@ -40,6 +44,14 @@ export function StatsSection() {
     const topGenres = aggregateTopGenres(usageStats?.sessionsThisMonth || []);
     const dailyAverage = dailyAverageSeconds(usageStats?.dailyStats || [], 30, today);
     const busiestDay = busiestWeekday(usageStats?.dailyStats || []);
+
+    // 📈 Comparação semanal, 🏆 recordes e 👥 uso por perfil (D63).
+    const weekCompare = weekOverWeek(usageStats?.dailyStats || [], today);
+    const records = computeRecords(usageStats?.dailyStats || [], usageStats?.contentTotals);
+    const [profileUsage] = useState(() => perProfileUsage(
+        profileService.getAllProfiles().map(p => ({ id: p.id, name: p.name })),
+        key => localStorage.getItem(key)
+    ));
 
     // 🗓️ Heatmap de hábitos (dia × faixa de hora) do mês corrente.
     const habitmap = habitHeatmap(usageStats?.sessionsThisMonth || []);
@@ -527,6 +539,68 @@ export function StatsSection() {
                 {!hasShare && (
                     <div style={{ marginTop: '16px', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>
                         {t('stats', 'noData')}
+                    </div>
+                )}
+
+                {/* 📈 Comparação semanal + 🏆 Recordes */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginTop: '16px' }}>
+                    <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px' }}>
+                        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginBottom: '8px' }}>
+                            📈 {t('stats', 'weekCompareTitle')}
+                        </div>
+                        <div style={{ color: 'white', fontSize: '20px', fontWeight: 700 }}>
+                            {formatWatchTime(weekCompare.currentSeconds)}
+                            {weekCompare.deltaPct !== null && (
+                                <span style={{
+                                    marginLeft: '10px', fontSize: '14px', fontWeight: 700,
+                                    color: weekCompare.deltaPct >= 0 ? '#10b981' : '#ef4444'
+                                }}>
+                                    {weekCompare.deltaPct >= 0 ? '▲' : '▼'} {Math.abs(weekCompare.deltaPct)}%
+                                </span>
+                            )}
+                        </div>
+                        <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: '12px', marginTop: '4px' }}>
+                            {t('stats', 'weekCompareLast')}: {formatWatchTime(weekCompare.previousSeconds)}
+                        </div>
+                    </div>
+                    <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px' }}>
+                        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginBottom: '8px' }}>
+                            🏆 {t('stats', 'recordsTitle')}
+                        </div>
+                        {(records.biggestDay || records.topSeries || records.topContent) ? (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
+                                {records.biggestDay && (
+                                    <div style={{ color: 'rgba(255,255,255,0.85)' }}>
+                                        🔥 {t('stats', 'recordBiggestDay')}: <b>{formatWatchTime(records.biggestDay.seconds)}</b>
+                                        <span style={{ color: 'rgba(255,255,255,0.45)' }}>
+                                            {' '}({new Date(records.biggestDay.date + 'T12:00:00').toLocaleDateString(heatmapLocale)})
+                                        </span>
+                                    </div>
+                                )}
+                                {records.topSeries && (
+                                    <div style={{ color: 'rgba(255,255,255,0.85)' }}>
+                                        📺 {t('stats', 'recordTopSeries')}: <b>{records.topSeries.name}</b>
+                                    </div>
+                                )}
+                                {records.topContent && (
+                                    <div style={{ color: 'rgba(255,255,255,0.85)' }}>
+                                        🎬 {t('stats', 'recordTopContent')}: <b>{records.topContent.name}</b>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>{t('stats', 'recordsEmpty')}</div>
+                        )}
+                    </div>
+                </div>
+
+                {/* 👥 Uso por perfil (só com 2+ perfis) */}
+                {profileUsage.length > 1 && (
+                    <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', marginTop: '16px' }}>
+                        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginBottom: '10px' }}>
+                            👥 {t('stats', 'profileUsageTitle')}
+                        </div>
+                        {renderRankedBars(profileUsage.map(p => ({ name: p.name, seconds: p.seconds })), '#8b5cf6')}
                     </div>
                 )}
 

@@ -77,6 +77,32 @@ export function DiagnosticsSection() {
         }
     };
 
+    // 🚀 Velocímetro: mesmo canal do health check, com { speedTest: true }.
+    const [speedBusy, setSpeedBusy] = useState(false);
+    const [speedResult, setSpeedResult] = useState<{ mbps: number; bytes: number; seconds: number } | null>(null);
+    const [speedError, setSpeedError] = useState<string | null>(null);
+
+    const handleSpeedTest = async () => {
+        setSpeedBusy(true);
+        setSpeedError(null);
+        try {
+            const result = await window.ipcRenderer.invoke('diagnostics:provider-health', { speedTest: true }) as {
+                success: boolean; speed?: { mbps: number; bytes: number; seconds: number } | null;
+            };
+            if (result.success && result.speed) {
+                setSpeedResult(result.speed);
+            } else {
+                setSpeedResult(null);
+                setSpeedError(t('diagnostics', 'speedError'));
+            }
+        } catch (error) {
+            console.error('[Diagnostics] Speed test failed:', error);
+            setSpeedError(t('diagnostics', 'speedError'));
+        } finally {
+            setSpeedBusy(false);
+        }
+    };
+
     const ENDPOINT_LABELS: Record<string, string> = {
         player_api: 'API (player_api.php)',
         live_streams: t('diagnostics', 'healthChannels'),
@@ -231,6 +257,37 @@ export function DiagnosticsSection() {
                     >
                         <span>{healthBusy ? '⏳' : '📡'}</span>
                         <span>{healthBusy ? t('diagnostics', 'healthTesting') : t('diagnostics', 'healthTest')}</span>
+                    </button>
+                </div>
+
+                {/* 🚀 Velocímetro do provedor */}
+                <div className="setting-item" style={{ alignItems: 'flex-start' }}>
+                    <div className="setting-info">
+                        <label>🚀 {t('diagnostics', 'speedTitle')}</label>
+                        <p>{t('diagnostics', 'speedDesc')}</p>
+                        {speedResult && (
+                            <p style={{
+                                marginTop: 8, fontWeight: 700, fontSize: 15,
+                                color: speedResult.mbps >= 25 ? '#10b981' : speedResult.mbps >= 8 ? '#f59e0b' : '#ef4444'
+                            }}>
+                                {speedResult.mbps.toFixed(1)} Mbps
+                                <span style={{ color: 'rgba(255,255,255,0.5)', fontWeight: 400, fontSize: 13 }}>
+                                    {' '}· {(speedResult.bytes / (1024 * 1024)).toFixed(1)} MB / {speedResult.seconds.toFixed(1)}s
+                                </span>
+                            </p>
+                        )}
+                        {speedError && (
+                            <p style={{ color: '#ef4444', marginTop: 8 }}>⚠️ {speedError}</p>
+                        )}
+                    </div>
+                    <button
+                        className="check-btn"
+                        style={{ width: 'auto', padding: '14px 24px' }}
+                        onClick={handleSpeedTest}
+                        disabled={speedBusy}
+                    >
+                        <span>{speedBusy ? '⏳' : '🚀'}</span>
+                        <span>{speedBusy ? t('diagnostics', 'speedTesting') : t('diagnostics', 'speedTest')}</span>
                     </button>
                 </div>
 

@@ -5,7 +5,10 @@ import {
     fillLastNDays,
     typeShare,
     dailyAverageSeconds,
-    busiestWeekday
+    busiestWeekday,
+    weekOverWeek,
+    computeRecords,
+    perProfileUsage,
 } from './statsDashboardHelpers';
 import type { WatchSession, DailyStats } from './usageStatsService';
 
@@ -119,5 +122,68 @@ describe('habitHeatmap (dia × faixa de hora)', () => {
     it('vazio não explode', async () => {
         const { habitHeatmap } = await import('./statsDashboardHelpers');
         expect(habitHeatmap([]).max).toBe(0);
+    });
+});
+
+describe('weekOverWeek (comparação semanal)', () => {
+    const day = (date: string, totalSeconds: number) =>
+        ({ date, totalSeconds, movies: totalSeconds, series: 0, live: 0 });
+
+    it('separa últimos 7 dias da semana anterior e calcula o delta', () => {
+        const daily = [
+            day('2026-07-05', 3600), // semana anterior
+            day('2026-07-08', 3600), // semana anterior
+            day('2026-07-12', 1800), // janela atual (últimos 7 dias de 2026-07-17)
+            day('2026-07-16', 1800),
+        ];
+        const result = weekOverWeek(daily, '2026-07-17');
+        expect(result.previousSeconds).toBe(7200);
+        expect(result.currentSeconds).toBe(3600);
+        expect(result.deltaPct).toBe(-50);
+    });
+
+    it('sem base de comparação o delta é null', () => {
+        const result = weekOverWeek([day('2026-07-16', 600)], '2026-07-17');
+        expect(result.previousSeconds).toBe(0);
+        expect(result.deltaPct).toBeNull();
+    });
+});
+
+describe('computeRecords', () => {
+    it('acha o maior dia e os campeões de série/conteúdo', () => {
+        const daily = [
+            { date: '2026-07-01', totalSeconds: 1200, movies: 0, series: 0, live: 0 },
+            { date: '2026-07-02', totalSeconds: 9000, movies: 0, series: 0, live: 0 },
+        ];
+        const totals = {
+            'movie:1': { name: 'Filmão', type: 'movie', seconds: 5000 },
+            'series:2': { name: 'Seriado', type: 'series', seconds: 4000 },
+            'series:3': { name: 'Novela', type: 'series', seconds: 200 },
+        };
+        const records = computeRecords(daily, totals);
+        expect(records.biggestDay).toEqual({ date: '2026-07-02', seconds: 9000 });
+        expect(records.topContent).toEqual({ name: 'Filmão', seconds: 5000 });
+        expect(records.topSeries).toEqual({ name: 'Seriado', seconds: 4000 });
+    });
+
+    it('sem dados retorna tudo null', () => {
+        expect(computeRecords([], undefined)).toEqual({ biggestDay: null, topSeries: null, topContent: null });
+    });
+});
+
+describe('perProfileUsage', () => {
+    it('lê cada perfil, ordena por tempo e tolera registro corrompido', () => {
+        const storage: Record<string, string> = {
+            usage_stats_p1: JSON.stringify({ totalWatchTimeSeconds: 100 }),
+            usage_stats_p2: JSON.stringify({ totalWatchTimeSeconds: 900 }),
+            usage_stats_p3: '{corrompido',
+        };
+        const result = perProfileUsage(
+            [{ id: 'p1', name: 'Ana' }, { id: 'p2', name: 'Bia' }, { id: 'p3', name: 'Caio' }],
+            key => storage[key] ?? null
+        );
+        expect(result.map(r => r.name)).toEqual(['Bia', 'Ana', 'Caio']);
+        expect(result[0].seconds).toBe(900);
+        expect(result[2].seconds).toBe(0);
     });
 });
