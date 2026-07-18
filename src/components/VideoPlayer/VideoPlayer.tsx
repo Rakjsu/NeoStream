@@ -233,11 +233,16 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
             else if (action === 'seek' && typeof arg === 'number') {
                 controls.seek(Math.max(0, Math.min(state.duration || 0, state.currentTime + arg)));
             }
+            else if (action === 'sleep' && typeof arg === 'number') {
+                // 😴 Sleep remoto (controle web): 0 cancela o timer.
+                if (arg > 0) sleepTimer.start(arg);
+                else sleepTimer.cancel();
+            }
             // 'next'/'previous' are list-level (zap) — ignored by the modal player.
         };
         window.ipcRenderer.on('media:control', handler);
         return () => { window.ipcRenderer?.off('media:control', handler); };
-    }, [controls, onClose, state.volume, state.duration, state.currentTime]);
+    }, [controls, onClose, state.volume, state.duration, state.currentTime, sleepTimer]);
 
     // OS media integration: hardware media keys + Windows media overlay (SMTC)
     useMediaSession({

@@ -3,6 +3,7 @@ import type { CastQueueItem } from '../services/castQueue';
 import { watchProgressService } from '../services/watchProgressService';
 import { scheduledRecordingService } from '../services/scheduledRecordingService';
 import { movieProgressService } from '../services/movieProgressService';
+import { usageStatsService } from '../services/usageStatsService';
 import { getHomeRecommendations, type RecMovie, type RecSeries } from '../services/recommendationService';
 
 /**
@@ -425,11 +426,24 @@ export function WebRemoteBridge() {
             return t && typeof t.deviceId === 'string' && t.deviceId ? t as CastTarget : undefined;
         };
 
+        // 📊 Stats rápidas pro controle web (hoje / últimos 7 dias / streak).
+        const pushStats = () => {
+            const stats = usageStatsService.getStats();
+            const today = new Date().toISOString().split('T')[0];
+            const todaySeconds = stats.dailyStats.find(d => d.date === today)?.totalSeconds || 0;
+            const cutoff = Date.now() - 7 * 86400_000;
+            const weekSeconds = stats.dailyStats
+                .filter(d => Date.parse(d.date + 'T12:00:00') >= cutoff)
+                .reduce((sum, d) => sum + d.totalSeconds, 0);
+            window.ipcRenderer.send('web-remote:stats', { todaySeconds, weekSeconds, streak: stats.watchStreak || 0 });
+        };
+
         const handler = (_e: unknown, action: string, arg?: unknown, target?: unknown) => {
             if (action === 'requestCatalog') void pushCatalog(typeof arg === 'string' ? arg : '');
             else if (action === 'requestLiveSearch') void pushLiveSearch(typeof arg === 'string' ? arg : '');
             else if (action === 'requestContinue') void pushContinue();
             else if (action === 'requestRecommended') void pushRecommended();
+            else if (action === 'requestStats') pushStats();
             else if (action === 'requestDevices') void pushDevices();
             else if (action === 'recordChannel') void recordChannel(String(arg ?? ''), typeof target === 'string' ? target : '');
             else if (action === 'stopRecord') void stopRecord(String(arg ?? ''));

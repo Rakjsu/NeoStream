@@ -205,6 +205,18 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
           <button class="ctl hidden" data-cmd="subtitle" id="castsub" title="${t.subtitle}">💬</button>
           <button class="ctl wide" data-cmd="stop" title="${t.stop}">⏹ ${t.stop}</button>
         </div>
+        <div class="row">
+          <button class="ctl" data-sleep="30" title="${t.sleepBtn}">😴 30</button>
+          <button class="ctl" data-sleep="60" title="${t.sleepBtn}">😴 60</button>
+          <button class="ctl" data-sleep="90" title="${t.sleepBtn}">😴 90</button>
+          <button class="ctl" data-sleep="0" title="${t.sleepOff}">😴 ✕</button>
+          <button class="ctl" id="focusapp" title="${t.openApp}">🖥️</button>
+        </div>
+        <div class="row">
+          <input id="zapnum" type="number" inputmode="numeric" placeholder="${t.zapNumPh}" style="flex:1;min-width:0;padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:16px" />
+          <button class="ctl" id="zapgo">📺 ${t.zapGo}</button>
+        </div>
+        <div class="hint hidden" id="statsline" style="margin-top:10px"></div>
       </div>
       <div class="hint" style="margin-top:16px">${t.hint}</div>
       <div class="card hidden" id="reccard" style="margin-top:14px;text-align:left">
@@ -356,6 +368,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
         connectedEl.style.display = 'flex';
         statusEl.textContent = L.connected; statusEl.className = 'status on';
         if (!devicesRequested) { devicesRequested = true; sendCmd('requestDevices'); }
+        sendCmd('requestStats');
         // Land on the last tab the user was using (Guia/Filmes/Séries).
         var savedTab = localStorage.getItem('neostream_remote_tab');
         if (savedTab === 'guide' || savedTab === 'catalog' || savedTab === 'series' || savedTab === 'continue') activateTab(savedTab);
@@ -382,6 +395,12 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
           } else if (msg.type === 'guide') {
             guide = { channels: msg.channels || [], playingId: msg.playingId || '', epg: msg.epg || null };
             renderGuide();
+          } else if (msg.type === 'stats') {
+            var sl = document.getElementById('statsline');
+            if (sl) {
+              sl.textContent = '📊 ' + L.statsToday + ' ' + fmtHours(msg.todaySeconds) + ' · ' + L.statsWeek + ' ' + fmtHours(msg.weekSeconds) + (msg.streak > 0 ? ' · 🔥 ' + msg.streak : '');
+              sl.classList.remove('hidden');
+            }
           } else if (msg.type === 'channelEpg') {
             epgCache[msg.channelId] = { now: msg.now, nowStart: msg.nowStart, nowEnd: msg.nowEnd, next: msg.next };
             if (openEpg[msg.channelId]) renderGuide();
@@ -1082,10 +1101,44 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
 
     // arg5 carries movieIds (castMovieQueue) or seriesId (requestSeriesInfo);
     // arg6 carries episodeId (castEpisode). Positions are disjoint per action.
+    function fmtHours(totalSeconds) {
+      var s = Number(totalSeconds) || 0;
+      var h = Math.floor(s / 3600);
+      var m = Math.floor((s % 3600) / 60);
+      return h > 0 ? h + 'h' + (m < 10 ? '0' : '') + m : m + 'min';
+    }
+
+    // 😴 sleep remoto + 🖥️ trazer o app + 📺 zap por número (W2)
+    document.querySelectorAll('button[data-sleep]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var m = Number(b.getAttribute('data-sleep')) || 0;
+        sendCmd('sleep', m);
+        showToast(m > 0 ? '😴 ' + m + ' min' : L.sleepOff, 'ok');
+      });
+    });
+    var focusBtn = document.getElementById('focusapp');
+    if (focusBtn) focusBtn.addEventListener('click', function () { sendCmd('focusApp'); showToast('🖥️ ' + L.openApp, 'ok'); });
+    var zapNumEl = document.getElementById('zapnum');
+    var zapGoEl = document.getElementById('zapgo');
+    function zapByNumber() {
+      var n = Number(zapNumEl && zapNumEl.value);
+      if (!n) return;
+      var ch = null;
+      for (var zi = 0; zi < guide.channels.length; zi++) {
+        if (Number(guide.channels[zi].num) === n) { ch = guide.channels[zi]; break; }
+      }
+      if (ch) { sendCmd('playChannel', null, ch.id); showToast('📺 ' + ch.name, 'ok'); zapNumEl.value = ''; }
+      else showToast(L.zapNumMiss, 'err');
+    }
+    if (zapGoEl) zapGoEl.addEventListener('click', zapByNumber);
+    if (zapNumEl) zapNumEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') zapByNumber(); });
+
     function sendCmd(action, sec, channelId, movieId, arg5, arg6) {
       if (!ws || ws.readyState !== 1) return;
+      try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) { /* sem vibra */ }
       var payload = { action: action };
       if (action === 'seek') payload.seconds = sec;
+      if (action === 'sleep') payload.minutes = sec;
       if (action === 'setVolume') payload.level = sec;
       if (action === 'setAudioTrack') payload.trackId = sec;
       if (action === 'playChannel' || action === 'requestEpg') payload.channelId = channelId;

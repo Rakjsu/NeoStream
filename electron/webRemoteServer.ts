@@ -60,6 +60,8 @@ interface GuideChannel {
     id: string
     name: string
     logo: string
+    /** Número do canal (zap por número na página). */
+    num?: number
 }
 interface GuideEpg {
     now: string
@@ -189,6 +191,7 @@ function sanitizeGuide(raw: unknown): GuideState {
             id: String(ch.id ?? ''),
             name: typeof ch.name === 'string' ? ch.name.slice(0, 160) : '',
             logo: typeof ch.logo === 'string' ? ch.logo.slice(0, 500) : '',
+            num: Number(ch.num) > 0 ? Number(ch.num) : undefined,
         }
     }).filter((c) => c.id && c.name)
     const rawEpg = obj.epg as Record<string, unknown> | null | undefined
@@ -278,10 +281,20 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 }
 
 // Actions that always go to the renderer (never routed to the cast session).
-const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule', 'requestRecordings', 'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode'])
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule', 'requestRecordings', 'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode', 'sleep', 'requestStats'])
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
+    // 🖥️ Trazer o app pra frente — não depende do renderer nem do cast.
+    if (command.action === 'focusApp') {
+        const appWin = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
+        if (appWin) {
+            if (appWin.isMinimized()) appWin.restore()
+            appWin.show()
+            appWin.focus()
+        }
+        return
+    }
     // While a cast session is live, transport commands drive the TV instead of
     // the local player: Chromecast first, then an active DLNA session. Channel
     // and catalog actions always go to the renderer.
@@ -305,6 +318,10 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     // The renderer's media:control handler maps these to player actions.
     if (command.action === 'seek') {
         win.webContents.send('media:control', 'seek', command.seconds)
+    } else if (command.action === 'sleep') {
+        win.webContents.send('media:control', 'sleep', command.minutes)
+    } else if (command.action === 'requestStats') {
+        win.webContents.send('media:control', 'requestStats')
     } else if (command.action === 'playChannel') {
         win.webContents.send('media:control', 'playChannel', command.channelId)
     } else if (command.action === 'requestEpg') {
@@ -465,6 +482,17 @@ export function setupWebRemote(): void {
 
     // On-demand EPG for a single channel: the renderer answers a requestEpg by
     // fetching that channel's now/next and pushing it here, relayed to phones.
+    // 📊 Stats rápidas do renderer → página (hoje / 7 dias / streak).
+    ipcMain.on('web-remote:stats', (_e, raw: unknown) => {
+        const payload = (raw ?? {}) as { todaySeconds?: unknown; weekSeconds?: unknown; streak?: unknown }
+        broadcast(JSON.stringify({
+            type: 'stats',
+            todaySeconds: Number(payload.todaySeconds) || 0,
+            weekSeconds: Number(payload.weekSeconds) || 0,
+            streak: Number(payload.streak) || 0,
+        }))
+    })
+
     ipcMain.on('web-remote:channel-epg', (_e, raw: unknown) => {
         const obj = (raw ?? {}) as Record<string, unknown>
         const channelId = String(obj.channelId ?? '')
