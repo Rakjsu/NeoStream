@@ -136,4 +136,22 @@ describe('profileService', () => {
             expect(profileService.getAllProfiles()).toHaveLength(1);
         });
     });
+
+    describe('whitelist de canais kids (item 85)', () => {
+        it('toggle adiciona e remove o canal de todos os perfis kids', async () => {
+            await profileService.createProfile({ name: 'Adulto', avatar: 'x' });
+            await profileService.createProfile({ name: 'Kid1', avatar: 'x', isKids: true });
+            await profileService.createProfile({ name: 'Kid2', avatar: 'x', isKids: true });
+            expect(profileService.toggleKidsChannel('101')).toEqual({ allowed: true, kidsCount: 2 });
+            expect(profileService.getKidsAllowedChannelIds()).toEqual(new Set(['101']));
+            expect(profileService.toggleKidsChannel('101')).toEqual({ allowed: false, kidsCount: 2 });
+            expect(profileService.getKidsAllowedChannelIds().size).toBe(0);
+        });
+
+        it('sem perfil kids o toggle é no-op', async () => {
+            await profileService.createProfile({ name: 'Solo', avatar: 'x' });
+            expect(profileService.toggleKidsChannel('7')).toEqual({ allowed: false, kidsCount: 0 });
+            expect(profileService.getKidsAllowedChannelIds().size).toBe(0);
+        });
+    });
 });

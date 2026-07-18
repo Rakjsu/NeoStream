@@ -17,6 +17,7 @@ import { parentalService } from '../services/parentalService';
 import { useLanguage } from '../services/languageService';
 import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
 import { MultiView } from '../components/MultiView';
+import { ChannelHoverMiniGuide } from '../components/ChannelHoverMiniGuide';
 import { isReplayable, isRestartable, replayDurationMinutes } from '../utils/epgGuide';
 import { getTimeshiftUrl } from '../services/timeshiftService';
 
@@ -110,6 +111,12 @@ export function LiveTV() {
     const lastGuideSigRef = useRef<string>('');
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const [allowedCategoryIds, setAllowedCategoryIds] = useState<Set<string>>(new Set());
+    // 👶 Whitelist de canais dos perfis kids (união) + se existe algum perfil kids.
+    const [kidsAllowedChannelIds, setKidsAllowedChannelIds] = useState<Set<string>>(() => profileService.getKidsAllowedChannelIds());
+    const [hasKidsProfiles] = useState(() => profileService.getAllProfiles().some(p => p.isKids));
+    // 📋 Mini-guia flutuante no hover do canal (atraso anti-ruído no enter).
+    const [hoverGuide, setHoverGuide] = useState<{ streamId: string | number; epgChannelId: string; name: string; x: number; y: number } | null>(null);
+    const hoverGuideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [blockedCategoryIds, setBlockedCategoryIds] = useState<Set<string>>(new Set());
     const [pipResumeTime, setPipResumeTime] = useState<number | null>(null);
     // Catch-up/replay playback (timeshift) of an already-aired program
@@ -472,8 +479,14 @@ export function LiveTV() {
             }
         }
 
+        // 👶 Whitelist por canal dos perfis kids: quando existir, só os canais
+        // marcados (👶 pelo perfil adulto) aparecem no perfil infantil.
+        if (isKidsProfile && kidsAllowedChannelIds.size > 0 && !kidsAllowedChannelIds.has(String(stream.stream_id))) {
+            return false;
+        }
+
         return matchesSearch && matchesCategory;
-    }), [variantsResult, searchQuery, selectedCategory, favoriteChannelIds, blockedCategoryIds, isKidsProfile, allowedCategoryIds, onlyWithEpg, hiddenIds, showHidden]);
+    }), [variantsResult, searchQuery, selectedCategory, favoriteChannelIds, blockedCategoryIds, isKidsProfile, allowedCategoryIds, kidsAllowedChannelIds, onlyWithEpg, hiddenIds, showHidden]);
 
     // Keep the zap ref current for the media:control handler (written in an
     // effect — refs must not be mutated during render).
@@ -1763,6 +1776,17 @@ export function LiveTV() {
                     </div>
                 )}
 
+                {hoverGuide && (
+                    <ChannelHoverMiniGuide
+                        key={String(hoverGuide.streamId)}
+                        streamId={hoverGuide.streamId}
+                        epgChannelId={hoverGuide.epgChannelId}
+                        channelName={hoverGuide.name}
+                        x={hoverGuide.x}
+                        y={hoverGuide.y}
+                    />
+                )}
+
                 <div ref={scrollContainerRef} className="livetv-scroll-container p-8" style={{ paddingLeft: '60px', position: 'relative', zIndex: 1, height: 'calc(100vh - 120px)', overflowY: 'auto', paddingRight: '8px', scrollbarWidth: 'thin', scrollbarColor: 'rgba(var(--ns-accent-rgb), 0.4) transparent' }}>
                     <style>{`
                         .channel-card {
@@ -1832,6 +1856,18 @@ export function LiveTV() {
                                         setHiddenIds(hiddenChannelsService.toggle(String(stream.stream_id)));
                                     }}
                                     title={t('liveTV', showHidden ? 'unhideHint' : 'hideHint')}
+                                    onMouseEnter={(e) => {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        if (hoverGuideTimer.current) clearTimeout(hoverGuideTimer.current);
+                                        hoverGuideTimer.current = setTimeout(() => {
+                                            setHoverGuide({ streamId: stream.stream_id, epgChannelId: stream.epg_channel_id || '', name: stream.name, x: rect.right + 10, y: rect.top });
+                                        }, 450);
+                                    }}
+                                    onMouseLeave={() => {
+                                        if (hoverGuideTimer.current) clearTimeout(hoverGuideTimer.current);
+                                        hoverGuideTimer.current = null;
+                                        setHoverGuide(null);
+                                    }}
                                     className="channel-card"
                                     style={{
                                         background: selectedChannel?.stream_id === stream.stream_id
@@ -1923,6 +1959,30 @@ export function LiveTV() {
                                             <span style={{ color: '#f87171', fontSize: 11, fontWeight: 800 }}>⚠ FORA DO AR</span>
                                         )}
                                     </div>
+                                    {!isKidsProfile && hasKidsProfiles && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                profileService.toggleKidsChannel(String(stream.stream_id));
+                                                setKidsAllowedChannelIds(profileService.getKidsAllowedChannelIds());
+                                            }}
+                                            title="Permitir/remover este canal nos perfis infantis"
+                                            style={{
+                                                flexShrink: 0,
+                                                width: 26,
+                                                height: 26,
+                                                borderRadius: 8,
+                                                border: 'none',
+                                                cursor: 'pointer',
+                                                fontSize: 13,
+                                                background: kidsAllowedChannelIds.has(String(stream.stream_id))
+                                                    ? 'rgba(34, 197, 94, 0.35)'
+                                                    : 'rgba(255, 255, 255, 0.08)'
+                                            }}
+                                        >
+                                            👶
+                                        </button>
+                                    )}
                                     {selectedChannel?.stream_id === stream.stream_id && (
                                         <div style={{
                                             width: '8px',
