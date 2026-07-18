@@ -13,6 +13,8 @@ import {
     clearRecentSearches
 } from '../utils/searchRank';
 import { searchConfigService, type SearchConfig } from '../services/searchConfigService';
+import { searchPersonCredits } from '../services/tmdb';
+import { matchCatalogByTitles } from '../services/personSearchHelpers';
 
 /**
  * sessionStorage bridge: the section pages (LiveTV/VOD/Series) don't support
@@ -361,6 +363,9 @@ export function GlobalSearch() {
 
     // EPG program hits (mouse-only extra section below the ranked groups).
     const [epgHits, setEpgHits] = useState<EpgHit[]>([]);
+    // 🎭 Busca por pessoa: "@nome" procura elenco/diretor no TMDB e cruza a
+    // filmografia com o catálogo (seção extra mouse-only, como a de EPG).
+    const [personHits, setPersonHits] = useState<{ person: string; items: SearchItem[] } | null>(null);
     const liveByEpgId = useMemo(() => {
         const map = new Map<string, SearchItem>();
         for (const channel of data?.live ?? []) {
@@ -405,6 +410,28 @@ export function GlobalSearch() {
         return () => { cancelled = true; };
     }, [query, data, liveByEpgId, gate, searchConfig.epg]);
 
+    useEffect(() => {
+        const trimmed = query.trim();
+        if (!trimmed.startsWith('@') || trimmed.length < 4 || !data) {
+            queueMicrotask(() => setPersonHits(null));
+            return;
+        }
+        let cancelled = false;
+        searchPersonCredits(trimmed.slice(1))
+            .then(credits => {
+                if (cancelled) return;
+                if (!credits) {
+                    setPersonHits(null);
+                    return;
+                }
+                const pool = [...data.vod, ...data.series].filter(item => !gate.blockAdult || isItemAllowed(item, gate));
+                const items = matchCatalogByTitles(pool, credits.titles, 12);
+                setPersonHits(items.length > 0 ? { person: credits.personName, items } : null);
+            })
+            .catch(() => { if (!cancelled) setPersonHits(null); });
+        return () => { cancelled = true; };
+    }, [query, data, gate]);
+
     // Keep the selected row in view while navigating with the keyboard
     useEffect(() => {
         const el = listRef.current?.querySelector('[data-selected="true"]');
@@ -441,6 +468,21 @@ export function GlobalSearch() {
         const typed = query.trim();
         if (typed) addRecentSearch(typed);
         navigate(SECTION_ROUTES.live);
+        window.dispatchEvent(new Event(GLOBAL_SEARCH_EVENT));
+        setOpen(false);
+        setInputValue('');
+        setQuery('');
+    }, [navigate, query]);
+
+    // 🎭 Person hit: navega pra página do item filtrada pelo NOME do item
+    // (o termo digitado "@pessoa" não casaria com nada lá).
+    const activatePerson = useCallback((item: SearchItem) => {
+        try {
+            sessionStorage.setItem(GLOBAL_SEARCH_TERM_KEY, item.name);
+        } catch { /* navigation still works, just unfiltered */ }
+        const typed = query.trim();
+        if (typed) addRecentSearch(typed);
+        navigate(SECTION_ROUTES[item.kind]);
         window.dispatchEvent(new Event(GLOBAL_SEARCH_EVENT));
         setOpen(false);
         setInputValue('');
@@ -492,7 +534,7 @@ export function GlobalSearch() {
     if (!open) return null;
 
     const trimmedQuery = query.trim();
-    const showNoResults = !!data && !!trimmedQuery && flatResults.length === 0 && epgHits.length === 0;
+    const showNoResults = !!data && !!trimmedQuery && flatResults.length === 0 && epgHits.length === 0 && !personHits;
     // Recents show only when the input is empty (keyed off the live value so it
     // hides the instant the user types) and we're not loading/erroring.
     const showRecents = !loading && !loadError && inputValue.trim() === '' && recent.length > 0;
@@ -619,6 +661,39 @@ export function GlobalSearch() {
                             </div>
                         ))}
 
+                        {personHits && !!trimmedQuery && (
+                            <div className="gsearch-group">
+                                <div className="gsearch-group-header">
+                                    <span>🎭</span>
+                                    <span>{t('search', 'personGroup').replace('{person}', personHits.person)}</span>
+                                </div>
+                                {personHits.items.map(item => (
+                                    <button
+                                        key={`person-${item.kind}-${item.id}`}
+                                        type="button"
+                                        className="gsearch-item"
+                                        onClick={() => activatePerson(item)}
+                                    >
+                                        <div className="gsearch-thumb">
+                                            {item.icon ? (
+                                                <LazyImage
+                                                    src={item.icon}
+                                                    alt={item.name}
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                    fallback={<div className="gsearch-thumb-fallback">🎭</div>}
+                                                />
+                                            ) : (
+                                                <div className="gsearch-thumb-fallback">🎭</div>
+                                            )}
+                                        </div>
+                                        <div className="gsearch-item-info">
+                                            <div className="gsearch-item-name">{item.name}</div>
+                                            <div className="gsearch-item-meta">{item.kind === 'vod' ? '🎬' : '📺'}</div>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         {epgHits.length > 0 && !!trimmedQuery && (
                             <div className="gsearch-group">
                                 <div className="gsearch-group-header">

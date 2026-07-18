@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { watchProgressService, type SeriesProgress } from '../services/watchProgressService';
 import { consumeTmdbOnboardingPending, hasTmdbApiKey } from '../services/tmdbKey';
@@ -16,6 +16,9 @@ import { getHomeRecommendations, type RecommendationGroup } from '../services/re
 import { newEpisodesService } from '../services/newEpisodesService';
 import { newEpisodeNotifier } from '../services/newEpisodeNotifier';
 import { favoritesService } from '../services/favoritesService';
+import { watchLaterService } from '../services/watchLater';
+import { findDepartures, dismissDepartures } from '../services/catalogDeparturesService';
+import { favoredCategoryIds, spinRoulette } from '../services/rouletteService';
 import { useLanguage } from '../services/languageService';
 
 interface ContentCounts {
@@ -94,6 +97,32 @@ export function Home() {
     const [recentMovies, setRecentMovies] = useState<MovieData[]>([]);
     const [allSeries, setAllSeries] = useState<SeriesData[]>([]);
     const [allMovies, setAllMovies] = useState<MovieData[]>([]);
+    // 📉 Títulos do "Ver depois" que saíram do catálogo + 🎰 sorteio da roleta.
+    const [departures, setDepartures] = useState<{ id: string; name: string }[]>([]);
+    const [rouletteItem, setRouletteItem] = useState<MovieData | null>(null);
+
+    // 📉 Com o catálogo carregado, aponta itens do "Ver depois" que sumiram.
+    useEffect(() => {
+        if (allMovies.length === 0 && allSeries.length === 0) return;
+        const catalogIds = new Set<string>([
+            ...allMovies.map(m => `movie:${m.stream_id}`),
+            ...allSeries.map(s => `series:${s.series_id}`),
+        ]);
+        const tracked = watchLaterService.getAll().map(w => ({ id: `${w.type}:${w.id}`, name: w.name }));
+        const found = findDepartures(catalogIds, tracked);
+        queueMicrotask(() => setDepartures(found));
+    }, [allMovies, allSeries]);
+
+    // 🎰 Sorteia um filme não visto, com peso pras categorias já assistidas.
+    const spinTheRoulette = useCallback(() => {
+        if (allMovies.length === 0) return;
+        const watchedIds = new Set(movieProgressService.getWatchedMovies());
+        const byId = new Map(allMovies.map(m => [String(m.stream_id), m] as const));
+        const watchedCategories = [...watchedIds].map(id => byId.get(id)?.category_id);
+        const favored = favoredCategoryIds(watchedCategories);
+        const pool = allMovies.filter(m => !watchedIds.has(String(m.stream_id)));
+        setRouletteItem(spinRoulette(pool.length > 0 ? pool : allMovies, favored, Math.random));
+    }, [allMovies]);
     const [recommendationGroups, setRecommendationGroups] = useState<RecommendationGroup[]>([]);
     const [isVisible, setIsVisible] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -1337,6 +1366,30 @@ export function Home() {
                         </button>
                     </div>
                 )}
+                {/* 📉 Aviso: títulos do Ver depois que saíram do catálogo */}
+                {departures.length > 0 && (
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        background: 'rgba(239, 68, 68, 0.12)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        borderRadius: 12, padding: '10px 16px', marginBottom: 18,
+                        color: '#fca5a5', fontSize: 13, position: 'relative', zIndex: 1
+                    }}>
+                        <span>📉</span>
+                        <span style={{ flex: 1 }}>
+                            {t('home', 'departuresWarn')
+                                .replace('{count}', String(departures.length))
+                                .replace('{names}', departures.slice(0, 3).map(d => d.name).join(', '))}
+                        </span>
+                        <button
+                            onClick={() => { dismissDepartures(departures.map(d => d.id)); setDepartures([]); }}
+                            title={t('home', 'expiryDismiss')}
+                            style={{ background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: 14 }}
+                        >
+                            ✕
+                        </button>
+                    </div>
+                )}
                 {/* Background decorations */}
                 <div style={{
                     position: 'fixed',
@@ -1557,6 +1610,45 @@ export function Home() {
                 })}
 
                 {/* Quick Access */}
+                {/* 🎰 Roleta por gosto */}
+                <div style={{ marginTop: 40, position: 'relative', zIndex: 1 }}>
+                    <h2 style={{ fontSize: '16px', fontWeight: '600', color: 'white', marginBottom: '16px' }}>
+                        🎰 {t('home', 'rouletteTitle')}
+                    </h2>
+                    {rouletteItem ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                            <div
+                                onClick={() => setSelectedContent({ id: String(rouletteItem.stream_id), type: 'movie', name: rouletteItem.name, cover: rouletteItem.stream_icon || '', rating: rouletteItem.rating })}
+                                style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(var(--ns-accent-rgb), 0.35)', borderRadius: 12, padding: '12px 18px', maxWidth: 480 }}
+                            >
+                                {rouletteItem.stream_icon && (
+                                    <img
+                                        src={rouletteItem.stream_icon}
+                                        alt=""
+                                        style={{ width: 52, height: 74, objectFit: 'cover', borderRadius: 8 }}
+                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                    />
+                                )}
+                                <div style={{ color: 'white', fontSize: 15, fontWeight: 600 }}>{rouletteItem.name}</div>
+                            </div>
+                            <button
+                                onClick={spinTheRoulette}
+                                style={{ padding: '10px 18px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                            >
+                                🎲 {t('home', 'rouletteSpin')}
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={spinTheRoulette}
+                            disabled={allMovies.length === 0}
+                            style={{ padding: '12px 22px', borderRadius: 10, border: '1px solid rgba(var(--ns-accent-rgb), 0.45)', background: 'rgba(var(--ns-accent-rgb), 0.15)', color: 'white', fontSize: 14, fontWeight: 600, cursor: allMovies.length === 0 ? 'default' : 'pointer' }}
+                        >
+                            🎲 {t('home', 'rouletteSpin')}
+                        </button>
+                    )}
+                </div>
+
                 < div style={{ marginTop: 40 }}>
                     <h2 style={{
                         fontSize: '16px',
