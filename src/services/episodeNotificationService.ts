@@ -10,6 +10,7 @@ import { languageService } from './languageService';
 export type NotificationType =
     | 'new_season'
     | 'new_episodes'
+    | 'epg_keyword'
     | 'download_complete'
     | 'download_failed'
     | 'download_started'
