@@ -21,6 +21,7 @@ import { setupNotifyHandlers } from './notifyHandlers'
 import { setupDiagnosticsHandlers } from './diagnosticsHandlers'
 import { setupDvrHandlers } from './dvrHandlers'
 import { setupTrayMode, attachCloseToTray } from './trayMode'
+import { setupWinIntegration, routeFromArgv } from './winIntegration'
 import { setupStorageManager } from './storageManager'
 import { setupAutoBackup } from './autoBackup'
 import { setupTranscoder } from './transcoder'
@@ -54,6 +55,20 @@ process.env.DIST = path.join(__dirname, '../dist')
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public')
 
 let win: BrowserWindow | null
+
+// 🪟 Uma instância só: relançamentos (jump list / atalhos) chegam via
+// second-instance e roteiam na instância viva em vez de abrir outra janela.
+if (!app.requestSingleInstanceLock()) {
+    app.quit()
+}
+app.on('second-instance', (_event, argv) => {
+    if (!win) return
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+    const route = routeFromArgv(argv)
+    if (route) win.webContents.send('tray:navigate', route)
+})
 
 // Native notifications (program reminders) — needs the window for click-focus.
 setupNotifyHandlers(() => win)
@@ -120,6 +135,17 @@ app.whenReady().then(() => {
 
     // Tray icon + "start with Windows" + close-to-tray IPC.
     setupTrayMode(() => win)
+
+    // 🪟 Jump list + progresso na taskbar + thumbar play/pause (Windows).
+    setupWinIntegration(() => win)
+
+    // Boot direto por um atalho da jump list: navega quando o renderer subir.
+    const initialRoute = routeFromArgv(process.argv)
+    if (initialRoute && win) {
+        win.webContents.once('did-finish-load', () => {
+            win?.webContents.send('tray:navigate', initialRoute)
+        })
+    }
     setupStorageManager()
     setupAutoBackup(() => win)
     setupTranscoder()

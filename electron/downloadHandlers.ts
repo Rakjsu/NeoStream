@@ -4,6 +4,7 @@ import fs from 'fs'
 import https from 'https'
 import http from 'http'
 import log from './logger'
+import { setTaskbarProgress } from './winIntegration'
 
 interface ActiveDownload {
     id: string;
@@ -230,6 +231,7 @@ function singleDownload(id: string, url: string, filePath: string): Promise<{ su
                 BrowserWindow.getAllWindows().forEach(win => {
                     win.webContents.send('download:progress', { id, progress, downloadedBytes, totalBytes: totalBytes || downloadedBytes });
                 });
+                setTaskbarProgress(progress);
             });
 
             response.pipe(writeStream);
@@ -313,6 +315,7 @@ export function setupDownloadHandlers() {
                 BrowserWindow.getAllWindows().forEach(win => {
                     win.webContents.send('download:progress', { id, progress, downloadedBytes: totalDownloaded, totalBytes });
                 });
+                setTaskbarProgress(progress);
             }, 500);
 
             // Download all chunks in parallel
@@ -348,6 +351,7 @@ export function setupDownloadHandlers() {
             BrowserWindow.getAllWindows().forEach(win => {
                 win.webContents.send('download:progress', { id, progress: 100, downloadedBytes: totalBytes, totalBytes });
             });
+            setTaskbarProgress(null);
 
             log.info('[Download] Complete:', filePath);
 
@@ -358,6 +362,7 @@ export function setupDownloadHandlers() {
 
         } catch (error: unknown) {
             log.error('[Download] Error:', error);
+            setTaskbarProgress(null);
             return { success: false, error: getErrorMessage(error) };
         }
     });
@@ -381,6 +386,7 @@ export function setupDownloadHandlers() {
             if (download.request) download.request.destroy();
             if (download.stream) download.stream.close();
             activeDownloads.delete(id);
+            setTaskbarProgress(null);
             return { success: true };
         }
         return { success: false, error: 'Download not found' };
