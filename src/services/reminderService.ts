@@ -16,6 +16,8 @@ export interface ProgramReminder {
     title: string;
     /** Program start in ISO-8601. */
     startIso: string;
+    /** Optional recurrence: the reminder re-arms for the next day/week after firing. */
+    recurrence?: 'daily' | 'weekly';
 }
 
 const STORAGE_KEY_PREFIX = 'program_reminders';
@@ -52,6 +54,15 @@ export function isExpired(startIso: string, nowMs: number): boolean {
     const startMs = Date.parse(startIso);
     if (Number.isNaN(startMs)) return true;
     return startMs < nowMs - EXPIRY_GRACE_MS;
+}
+
+/** Next daily/weekly occurrence of startIso strictly after nowMs. */
+export function nextOccurrenceIso(startIso: string, recurrence: 'daily' | 'weekly', nowMs: number): string {
+    const stepMs = recurrence === 'daily' ? 24 * 3600_000 : 7 * 24 * 3600_000;
+    let startMs = Date.parse(startIso);
+    if (Number.isNaN(startMs)) return startIso;
+    while (startMs <= nowMs) startMs += stepMs;
+    return new Date(startMs).toISOString();
 }
 
 // ---------------------------------------------------------------------------
@@ -118,8 +129,15 @@ class ReminderService {
 
         const now = Date.now();
         const all = this.list();
-        const valid = all.filter(r => !isExpired(r.startIso, now));
-        if (valid.length !== all.length) {
+        // Recurring reminders never expire: one that is out of date (the app
+        // was closed when it fired) rolls forward to its next occurrence.
+        const rolled = all.map(r => {
+            if (!r.recurrence || !isExpired(r.startIso, now)) return r;
+            const nextIso = nextOccurrenceIso(r.startIso, r.recurrence, now);
+            return { ...r, startIso: nextIso, id: reminderId(r.channelName, nextIso) };
+        });
+        const valid = rolled.filter(r => !isExpired(r.startIso, now));
+        if (valid.length !== all.length || rolled.some((r, i) => r !== all[i])) {
             this.save(valid);
         }
 
@@ -162,8 +180,15 @@ class ReminderService {
             message
         });
 
-        // (c) Remove the fired reminder (save() already notifies subscribers).
-        this.save(this.list().filter(r => r.id !== reminder.id));
+        // (c) One-shot reminders are removed; recurring ones re-arm for the
+        // next occurrence (new id — the id derives from the start time).
+        const rest = this.list().filter(r => r.id !== reminder.id);
+        if (reminder.recurrence) {
+            const nextIso = nextOccurrenceIso(reminder.startIso, reminder.recurrence, Date.now());
+            rest.push({ ...reminder, startIso: nextIso, id: reminderId(reminder.channelName, nextIso) });
+        }
+        this.save(rest);
+        if (reminder.recurrence) this.scheduleAll();
     }
 
     subscribe(callback: ReminderCallback): () => void {

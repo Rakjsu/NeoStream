@@ -11,6 +11,7 @@ import { epgService } from '../services/epgService';
 import { scheduledRecordingService } from '../services/scheduledRecordingService';
 import { profileService } from '../services/profileService';
 import { favoritesService } from '../services/favoritesService';
+import { hiddenChannelsService } from '../services/hiddenChannelsService';
 import { parentalService } from '../services/parentalService';
 import { useLanguage } from '../services/languageService';
 import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
@@ -119,6 +120,12 @@ export function LiveTV() {
     // Favorite channel ids (⭐): re-read whenever the star toggles.
     const [favoriteChannelIds, setFavoriteChannelIds] = useState<Set<string>>(() =>
         new Set(favoritesService.getAll().filter(f => f.type === 'channel').map(f => f.id)));
+    // 📅 Filtro "só canais com EPG mapeado" (epg_channel_id) — persistido.
+    const [onlyWithEpg, setOnlyWithEpgState] = useState(() => localStorage.getItem('neostream_live_only_epg') === 'on');
+    // 🙈 Canais ocultos (clique direito no card oculta/mostra); o modo
+    // showHidden inverte a lista pra revelar SÓ os ocultos e poder desfazer.
+    const [hiddenIds, setHiddenIds] = useState<Set<string>>(() => hiddenChannelsService.getAll());
+    const [showHidden, setShowHidden] = useState(false);
     const { t } = useLanguage();
 
     // Calculate items per page based on window dimensions
@@ -426,6 +433,9 @@ export function LiveTV() {
 
     const filteredStreams = useMemo(() => variantsResult.groups.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
+        // 🙈 normal esconde os ocultos; "ver ocultos" mostra somente eles
+        if (showHidden !== hiddenIds.has(String(stream.stream_id))) return false;
+        if (onlyWithEpg && !stream.epg_channel_id) return false;
         if (selectedCategory === 'FAVORITES') {
             return matchesSearch && favoriteChannelIds.has(String(stream.stream_id));
         }
@@ -445,7 +455,7 @@ export function LiveTV() {
         }
 
         return matchesSearch && matchesCategory;
-    }), [variantsResult, searchQuery, selectedCategory, favoriteChannelIds, blockedCategoryIds, isKidsProfile, allowedCategoryIds]);
+    }), [variantsResult, searchQuery, selectedCategory, favoriteChannelIds, blockedCategoryIds, isKidsProfile, allowedCategoryIds, onlyWithEpg, hiddenIds, showHidden]);
 
     // Keep the zap ref current for the media:control handler (written in an
     // effect — refs must not be mutated during render).
@@ -1137,6 +1147,71 @@ export function LiveTV() {
                 >
                     🧬 FHD/HD/SD
                 </button>
+                <button
+                    onClick={() => {
+                        const pool = filteredStreams.filter(s => s.stream_id !== playingChannel?.stream_id);
+                        const list = pool.length > 0 ? pool : filteredStreams;
+                        if (list.length === 0) return;
+                        const target = list[Math.floor(Math.random() * list.length)];
+                        setSelectedChannel(target);
+                        setPlayingChannel(target);
+                    }}
+                    title={t('liveTV', 'randomZapHint')}
+                    style={{
+                        padding: '8px 14px',
+                        borderRadius: 10,
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        background: 'rgba(255,255,255,0.06)',
+                        color: 'rgba(255,255,255,0.7)',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                    }}
+                >
+                    🎲
+                </button>
+                <button
+                    onClick={() => {
+                        const next = !onlyWithEpg;
+                        setOnlyWithEpgState(next);
+                        if (next) localStorage.setItem('neostream_live_only_epg', 'on');
+                        else localStorage.removeItem('neostream_live_only_epg');
+                    }}
+                    title={t('liveTV', 'onlyEpgHint')}
+                    style={{
+                        padding: '8px 14px',
+                        borderRadius: 10,
+                        border: onlyWithEpg ? '1px solid rgba(var(--ns-accent-rgb), 0.5)' : '1px solid rgba(255,255,255,0.15)',
+                        background: onlyWithEpg ? 'rgba(var(--ns-accent-rgb), 0.15)' : 'rgba(255,255,255,0.06)',
+                        color: onlyWithEpg ? 'var(--ns-accent-light)' : 'rgba(255,255,255,0.7)',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        whiteSpace: 'nowrap',
+                    }}
+                >
+                    📅 EPG
+                </button>
+                {(hiddenIds.size > 0 || showHidden) && (
+                    <button
+                        onClick={() => setShowHidden(v => !v)}
+                        title={t('liveTV', 'hiddenHint')}
+                        style={{
+                            padding: '8px 14px',
+                            borderRadius: 10,
+                            border: showHidden ? '1px solid rgba(var(--ns-accent-rgb), 0.5)' : '1px solid rgba(255,255,255,0.15)',
+                            background: showHidden ? 'rgba(var(--ns-accent-rgb), 0.15)' : 'rgba(255,255,255,0.06)',
+                            color: showHidden ? 'var(--ns-accent-light)' : 'rgba(255,255,255,0.7)',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        🙈 {hiddenIds.size}
+                    </button>
+                )}
                 <SortSelect value={sortBy} onChange={setSortBy} withRating={false} inline />
             </div>
             <CategoryMenu
@@ -1733,6 +1808,11 @@ export function LiveTV() {
                                 <div
                                     key={stream.stream_id}
                                     onClick={() => setSelectedChannel(stream)}
+                                    onContextMenu={(e) => {
+                                        e.preventDefault();
+                                        setHiddenIds(hiddenChannelsService.toggle(String(stream.stream_id)));
+                                    }}
+                                    title={t('liveTV', showHidden ? 'unhideHint' : 'hideHint')}
                                     className="channel-card"
                                     style={{
                                         background: selectedChannel?.stream_id === stream.stream_id

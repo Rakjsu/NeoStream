@@ -180,6 +180,11 @@
     "watchedMovies": "Watched Movies"
   },
   "liveTV": {
+    "randomZapHint": "Random zap: pick a random channel from the current list",
+    "onlyEpgHint": "Show only channels with mapped EPG",
+    "hiddenHint": "Hidden channels: view/manage channels hidden from the list",
+    "hideHint": "Right-click hides this channel from the list",
+    "unhideHint": "Right-click puts this channel back in the list",
     "scheduleTitle": "TV Schedule",
     "live": "LIVE",
     "watchNow": "Watch Now",
@@ -910,6 +915,8 @@
     "remind": "Remind me about this program",
     "removeReminder": "Remove reminder",
     "scheduleRecording": "Record this program",
+    "remindDaily": "Remind me daily at this time",
+    "remindWeekly": "Remind me weekly at this time",
     "cancelRecording": "Cancel recording"
   },
   "searchConfig": {

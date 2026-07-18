@@ -4,6 +4,7 @@ import {
     reminderId,
     computeDelay,
     isExpired,
+    nextOccurrenceIso,
     MAX_TIMEOUT_MS,
     EXPIRY_GRACE_MS
 } from './reminderService'
@@ -48,6 +49,16 @@ describe('reminder pure helpers', () => {
         expect(computeDelay('2026-08-12T12:00:00.000Z', now)).toBe(MAX_TIMEOUT_MS)
         // Garbage input → 0
         expect(computeDelay('not-a-date', now)).toBe(0)
+    })
+
+    it('nextOccurrenceIso advances daily/weekly until strictly after now', () => {
+        const now = Date.parse('2026-06-12T12:00:00.000Z')
+        expect(nextOccurrenceIso('2026-06-10T20:00:00.000Z', 'daily', now)).toBe('2026-06-12T20:00:00.000Z')
+        // 12/06 08:00 ainda é antes do now (12:00) → pula pra semana seguinte
+        expect(nextOccurrenceIso('2026-06-05T08:00:00.000Z', 'weekly', now)).toBe('2026-06-19T08:00:00.000Z')
+        // Already in the future: untouched
+        expect(nextOccurrenceIso('2026-06-13T09:00:00.000Z', 'daily', now)).toBe('2026-06-13T09:00:00.000Z')
+        expect(nextOccurrenceIso('not-a-date', 'daily', now)).toBe('not-a-date')
     })
 
     it('isExpired uses a 5-minute grace window after start', () => {
@@ -140,6 +151,42 @@ describe('reminderService.scheduleAll', () => {
         expect(notifications[0].message).toContain('Jornal Nacional')
         expect(notifications[0].message).toContain('BR: Globo HD')
         expect(notifications[0].read).toBe(false)
+    })
+
+    it('firing a recurring reminder re-arms it for the next occurrence', () => {
+        vi.useFakeTimers()
+        const input = makeReminder({
+            startIso: new Date(Date.now() + 60 * 1000).toISOString(),
+            recurrence: 'daily'
+        })
+        reminderService.addReminder(input)
+
+        vi.advanceTimersByTime(61 * 1000)
+
+        const list = reminderService.list()
+        expect(list).toHaveLength(1)
+        expect(list[0].recurrence).toBe('daily')
+        expect(Date.parse(list[0].startIso)).toBeGreaterThan(Date.now())
+        // Fired once: the panel entry exists even though the reminder re-armed
+        const notifications = JSON.parse(localStorage.getItem('app_notifications_default') || '[]')
+        expect(notifications).toHaveLength(1)
+    })
+
+    it('scheduleAll rolls an out-of-date recurring reminder forward instead of pruning', () => {
+        const stale = makeReminder({
+            startIso: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+            recurrence: 'weekly'
+        })
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([
+            { ...stale, id: reminderId(stale.channelName, stale.startIso) }
+        ]))
+
+        reminderService.scheduleAll()
+
+        const list = reminderService.list()
+        expect(list).toHaveLength(1)
+        expect(Date.parse(list[0].startIso)).toBeGreaterThan(Date.now())
+        expect(list[0].recurrence).toBe('weekly')
     })
 
     it('does not fire after the reminder is removed', () => {

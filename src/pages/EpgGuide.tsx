@@ -833,8 +833,8 @@ export function EpgGuide() {
                 const popoverScheduleId = scheduleId(channel.name, program.start);
                 const actions: ProgramPopoverAction[] = isFutureProgram
                     ? [
-                        reminderIds.has(popoverReminderId)
-                            ? {
+                        ...(reminderIds.has(popoverReminderId)
+                            ? [{
                                 key: 'remove-reminder',
                                 icon: '🔕',
                                 label: t('guide', 'removeReminder'),
@@ -842,22 +842,24 @@ export function EpgGuide() {
                                     reminderService.removeReminder(popoverReminderId);
                                     setProgramPopover(null);
                                 }
-                            }
-                            : {
-                                key: 'add-reminder',
-                                icon: '🔔',
-                                label: t('guide', 'remind'),
+                            }]
+                            : ([undefined, 'daily', 'weekly'] as const).map(recurrence => ({
+                                key: `add-reminder-${recurrence ?? 'once'}`,
+                                icon: recurrence ? '🔁' : '🔔',
+                                label: t('guide', recurrence === 'daily' ? 'remindDaily'
+                                    : recurrence === 'weekly' ? 'remindWeekly' : 'remind'),
                                 onClick: () => {
                                     reminderService.addReminder({
                                         channelName: channel.name,
                                         streamId: channel.stream_id,
                                         categoryId: channel.category_id,
                                         title: program.title,
-                                        startIso: program.start
+                                        startIso: program.start,
+                                        recurrence
                                     });
                                     setProgramPopover(null);
                                 }
-                            },
+                            }))),
                         scheduleIds.has(popoverScheduleId)
                             ? {
                                 key: 'remove-recording',
