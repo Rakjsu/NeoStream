@@ -248,6 +248,35 @@ export function aggregatePlaylistTime(sessions: WatchSession[]): { playlistId: s
         .sort((a, b) => b.seconds - a.seconds);
 }
 
+/** 👶 Segundos dos últimos 7 dias por perfil KIDS (lendo o storage de cada um). */
+export function kidsWeeklyUsage(
+    profiles: { id: string; name: string; isKids?: boolean }[],
+    readRaw: (key: string) => string | null,
+    todayIso: string
+): { id: string; name: string; weekSeconds: number }[] {
+    const cutoffDate = new Date(todayIso + 'T12:00:00');
+    cutoffDate.setDate(cutoffDate.getDate() - 6);
+    const month = String(cutoffDate.getMonth() + 1).padStart(2, '0');
+    const day = String(cutoffDate.getDate()).padStart(2, '0');
+    const cutoffIso = `${cutoffDate.getFullYear()}-${month}-${day}`;
+    return profiles
+        .filter(profile => profile.isKids)
+        .map(profile => {
+            let weekSeconds = 0;
+            try {
+                const parsed = JSON.parse(readRaw(`usage_stats_${profile.id}`) || 'null') as {
+                    dailyStats?: { date?: string; totalSeconds?: number }[];
+                } | null;
+                for (const entry of parsed?.dailyStats ?? []) {
+                    if (typeof entry?.date === 'string' && entry.date >= cutoffIso && typeof entry.totalSeconds === 'number') {
+                        weekSeconds += Math.max(0, entry.totalSeconds);
+                    }
+                }
+            } catch { /* storage corrompido conta como zero */ }
+            return { id: profile.id, name: profile.name, weekSeconds };
+        });
+}
+
 /** 📡 Segundos do mês por CANAL (sessões live), do mais visto pro menos. */
 export function aggregateChannelTime(sessions: WatchSession[], limit = 8): { name: string; seconds: number }[] {
     const totals = new Map<string, number>();

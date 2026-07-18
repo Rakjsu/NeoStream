@@ -125,3 +125,22 @@ html[data-motion='reduced'] *::after {
 body {
     zoom: var(--ns-ui-scale, 1);
 }
+
+/* 👶 UI kids: accent verde-vivo com gradiente quente e cantos mais redondos
+   quando o perfil infantil está ativo (data-kids no <html>). O !important é
+   necessário porque o themeService grava as vars inline no root. */
+html[data-kids='1'] {
+    --ns-accent: #22c55e !important;
+    --ns-accent-dark: #15803d !important;
+    --ns-accent-light: #86efac !important;
+    --ns-accent-grad-to: #f59e0b !important;
+    --ns-accent-rgb: 34, 197, 94 !important;
+    --ns-accent-grad-to-rgb: 245, 158, 11 !important;
+    --ns-accent-soft: rgba(34, 197, 94, 0.15) !important;
+    --ns-accent-glow: rgba(34, 197, 94, 0.4) !important;
+}
+html[data-kids='1'] .section-card,
+html[data-kids='1'] .channel-card,
+html[data-kids='1'] .preview-poster {
+    border-radius: 22px !important;
+}

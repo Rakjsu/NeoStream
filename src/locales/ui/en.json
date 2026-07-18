@@ -697,6 +697,8 @@
     "autoKidsDesc": "Within the window, the app boots straight into the first kids profile",
     "profileLimits": "Daily limit per profile",
     "profileLimitsDesc": "Individual screen time — also applies to adult profiles",
+    "kidsReportTitle": "Kids weekly report",
+    "kidsReportDesc": "How much each kids profile watched in the last 7 days.",
     "logTitle": "PIN log",
     "logDesc": "Latest PIN checks (parental and profile PINs)",
     "logEmpty": "No checks recorded yet",
