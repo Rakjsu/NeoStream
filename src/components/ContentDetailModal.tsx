@@ -616,6 +616,34 @@ export function ContentDetailModal({
                         background: 'linear-gradient(to bottom, transparent 55%, var(--ns-bg-panel) 100%)'
                     }} />
 
+                    {/* ⛶ Trailer em tela cheia com 1 clique (ESC volta) */}
+                    {extractYouTubeId(trailerUrl) && (
+                        <button
+                            onClick={() => { void trailerFrameRef.current?.requestFullscreen().catch(() => undefined); }}
+                            title={t('contentModal', 'trailerFullscreen')}
+                            aria-label={t('contentModal', 'trailerFullscreen')}
+                            style={{
+                                position: 'absolute',
+                                bottom: 14,
+                                right: 62,
+                                width: 40,
+                                height: 40,
+                                borderRadius: '50%',
+                                background: 'rgba(0, 0, 0, 0.55)',
+                                border: '1px solid rgba(255, 255, 255, 0.35)',
+                                color: 'white',
+                                fontSize: 16,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                zIndex: 5
+                            }}
+                        >
+                            ⛶
+                        </button>
+                    )}
+
                     {/* Mute / unmute toggle (only when a trailer is playing) */}
                     {extractYouTubeId(trailerUrl) && (
                         <button

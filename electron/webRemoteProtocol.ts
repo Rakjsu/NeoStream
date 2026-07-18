@@ -144,11 +144,14 @@ export type RemoteCommand =
     | { action: 'sleep'; minutes: number }
     | { action: 'requestStats' }
     | { action: 'focusApp' }
+    | { action: 'requestReminders' }
+    | { action: 'cancelReminder'; id: string }
+    | { action: 'openMultiview' }
 
 const VALID_ACTIONS = new Set([
     'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'setVolume', 'setAudioTrack', 'playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule',
     'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestRecordings', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
-    'sleep', 'requestStats', 'focusApp',
+    'sleep', 'requestStats', 'focusApp', 'requestReminders', 'cancelReminder', 'openMultiview',
 ])
 
 const CAST_TARGET_TYPES = new Set<CastTargetType>(['chromecast', 'dlna', 'airplay'])
@@ -232,6 +235,11 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         const id = (parsed as { id?: unknown }).id
         if (typeof id !== 'string' || !id.trim()) return null
         return { action: 'cancelSchedule', id: id.trim().slice(0, 80) }
+    }
+    if (action === 'cancelReminder') {
+        const id = (parsed as { id?: unknown }).id
+        if (typeof id !== 'string' || !id.trim()) return null
+        return { action: 'cancelReminder', id: id.trim().slice(0, 80) }
     }
     if (action === 'castMovie') {
         const movieId = (parsed as { movieId?: unknown }).movieId

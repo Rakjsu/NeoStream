@@ -1,4 +1,5 @@
 import { Settings } from 'lucide-react';
+import type { SubtitleStyle } from '../../utils/subtitleStyle';
 import { useLanguage } from '../../services/languageService';
 import { SUBTITLE_LANGUAGE_OPTIONS } from '../../services/subtitleService';
 import { SLEEP_TIMER_OPTIONS } from './useSleepTimer';
@@ -48,6 +49,11 @@ export interface PlayerSettingsMenuProps<TSwitchContent extends SwitchableConten
     /** Volume boost via WebAudio gain (1 = 100%, up to 3 = 300%). */
     volumeBoost?: number;
     onSetVolumeBoost?: (mult: number) => void;
+    /** Estilo da legenda externa (tamanho/fundo/cor). */
+    subtitleStyle?: SubtitleStyle;
+    onSetSubtitleStyle?: (style: SubtitleStyle) => void;
+    /** 📻 Modo rádio: tela preta com o áudio seguindo. */
+    onEnterRadioMode?: () => void;
 }
 
 // Gear settings menu: movie version / live quality switcher, or playback speed.
@@ -74,7 +80,10 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
     aspectMode,
     onSetAspectMode,
     volumeBoost,
-    onSetVolumeBoost
+    onSetVolumeBoost,
+    subtitleStyle,
+    onSetSubtitleStyle,
+    onEnterRadioMode
 }: PlayerSettingsMenuProps<TSwitchContent>) {
     const { t } = useLanguage();
 
@@ -356,6 +365,60 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
                                         {minutes} min
                                     </button>
                                 ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 💬 Estilo da legenda: tamanho, fundo e cor */}
+                    {subtitleStyle && onSetSubtitleStyle && (
+                        <div className="settings-section">
+                            <span className="settings-label">{t('player', 'subStyle')}</span>
+                            <div className="settings-options">
+                                {(['small', 'medium', 'large'] as const).map(size => (
+                                    <button
+                                        key={size}
+                                        className={`settings-option ${subtitleStyle.size === size ? 'active' : ''}`}
+                                        onClick={() => onSetSubtitleStyle({ ...subtitleStyle, size })}
+                                    >
+                                        {size === 'small' ? 'Aa⁻' : size === 'large' ? 'Aa⁺' : 'Aa'}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="settings-options">
+                                {(['dark', 'none', 'solid'] as const).map(background => (
+                                    <button
+                                        key={background}
+                                        className={`settings-option ${subtitleStyle.background === background ? 'active' : ''}`}
+                                        onClick={() => onSetSubtitleStyle({ ...subtitleStyle, background })}
+                                    >
+                                        {t('player', background === 'dark' ? 'subBgDark' : background === 'none' ? 'subBgNone' : 'subBgSolid')}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="settings-options">
+                                {(['white', 'yellow'] as const).map(color => (
+                                    <button
+                                        key={color}
+                                        className={`settings-option ${subtitleStyle.color === color ? 'active' : ''}`}
+                                        onClick={() => onSetSubtitleStyle({ ...subtitleStyle, color })}
+                                    >
+                                        {color === 'white' ? '⚪' : '🟡'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 📻 Modo rádio: tela preta, áudio segue (clique volta) */}
+                    {onEnterRadioMode && (
+                        <div className="settings-section">
+                            <div className="settings-options">
+                                <button
+                                    className="settings-option"
+                                    onClick={() => { onEnterRadioMode(); setShowSettings(false); }}
+                                >
+                                    📻 {t('player', 'radioMode')}
+                                </button>
                             </div>
                         </div>
                     )}

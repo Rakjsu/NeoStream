@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { SortSelect } from '../components/SortSelect';
 import { CatalogFilters } from '../components/CatalogFilters';
-import { matchesFilters } from '../utils/catalogFilter';
+import { fuzzyIncludes, matchesFilters, qualityBadgeOf } from '../utils/catalogFilter';
+import { buildCatalogCsv } from '../utils/catalogExport';
 import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { getBackdropUrl } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
@@ -239,7 +240,7 @@ export function Series() {
     }, [hideWatched]);
 
     const filteredSeries = useMemo(() => sortedSeries.filter(s => {
-        const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesSearch = fuzzyIncludes(s.name, searchQuery);
         if (hideWatched && watchedSeriesIds.has(String(s.series_id))) {
             return false;
         }
@@ -467,6 +468,30 @@ export function Series() {
                 />
                 <SortSelect value={sortBy} onChange={setSortBy} />
                 <CatalogFilters items={series} decade={decade} genre={genreFilter} onDecade={setDecade} onGenre={setGenreFilter} />
+                {/* 📤 Exporta a lista FILTRADA como CSV */}
+                <button
+                    onClick={() => {
+                        const csv = buildCatalogCsv(filteredSeries.map(item => ({ name: item.name, release_date: item.release_date, genre: item.genre })));
+                        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = 'neostream-series.csv';
+                        link.click();
+                        URL.revokeObjectURL(url);
+                    }}
+                    title="Exportar lista (CSV)"
+                    style={{
+                        position: 'absolute', top: 30, right: 471, zIndex: 95,
+                        padding: '9px 12px', borderRadius: 12,
+                        border: '1px solid rgba(255, 255, 255, 0.18)',
+                        background: 'rgba(15, 15, 35, 0.85)',
+                        color: 'rgba(255, 255, 255, 0.85)',
+                        fontSize: 13, cursor: 'pointer', backdropFilter: 'blur(8px)'
+                    }}
+                >
+                    📤
+                </button>
                 <button
                     onClick={() => {
                         const next = !hideWatched;
@@ -563,6 +588,7 @@ export function Series() {
                                                 youtubeTrailer={s.youtube_trailer}
                                                 isFavorite={isFavorite}
                                                 isNew={isNew}
+                                                qualityBadge={qualityBadgeOf(s.name)}
                                                 onPlay={() => {
                                                     handleSeriesClick(s);
                                                 }}

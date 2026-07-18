@@ -4,6 +4,7 @@ import { watchProgressService } from '../services/watchProgressService';
 import { scheduledRecordingService } from '../services/scheduledRecordingService';
 import { movieProgressService } from '../services/movieProgressService';
 import { usageStatsService } from '../services/usageStatsService';
+import { reminderService } from '../services/reminderService';
 import { getHomeRecommendations, type RecMovie, type RecSeries } from '../services/recommendationService';
 
 /**
@@ -438,12 +439,28 @@ export function WebRemoteBridge() {
             window.ipcRenderer.send('web-remote:stats', { todaySeconds, weekSeconds, streak: stats.watchStreak || 0 });
         };
 
+        // ⏰ Lembretes do guia pro celular (id + título + horário).
+        const pushReminders = () => {
+            const items = reminderService.list().map(reminder => ({
+                id: reminder.id,
+                title: reminder.title,
+                channelName: reminder.channelName,
+                startIso: reminder.startIso,
+            }));
+            window.ipcRenderer.send('web-remote:reminders', { items });
+        };
+
         const handler = (_e: unknown, action: string, arg?: unknown, target?: unknown) => {
             if (action === 'requestCatalog') void pushCatalog(typeof arg === 'string' ? arg : '');
             else if (action === 'requestLiveSearch') void pushLiveSearch(typeof arg === 'string' ? arg : '');
             else if (action === 'requestContinue') void pushContinue();
             else if (action === 'requestRecommended') void pushRecommended();
             else if (action === 'requestStats') pushStats();
+            else if (action === 'requestReminders') pushReminders();
+            else if (action === 'cancelReminder') {
+                if (typeof arg === 'string' && arg) reminderService.removeReminder(arg);
+                pushReminders();
+            }
             else if (action === 'requestDevices') void pushDevices();
             else if (action === 'recordChannel') void recordChannel(String(arg ?? ''), typeof target === 'string' ? target : '');
             else if (action === 'stopRecord') void stopRecord(String(arg ?? ''));

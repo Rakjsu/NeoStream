@@ -86,6 +86,15 @@ function showDownloadNotification(name: string, filePath: string): void {
 // Download a single chunk with Range header
 function downloadChunk(url: string, start: number, end: number, tempPath: string, register?: (req: http.ClientRequest) => void): Promise<number> {
     return new Promise((resolve, reject) => {
+        // ⏯ Resume real: aproveita o que o .partN já tem — o Range recomeça
+        // do offset e o stream faz append; chunk completo nem vai pra rede.
+        let already = 0;
+        try {
+            const stat = fs.statSync(tempPath);
+            if (stat.size > 0 && stat.size <= end - start + 1) already = stat.size;
+        } catch { /* sem parcial anterior */ }
+        if (already >= end - start + 1) { resolve(already); return; }
+        const effectiveStart = start + already;
         const parsedUrl = new URL(url);
         const protocol = url.startsWith('https') ? https : http;
 
@@ -100,7 +109,7 @@ function downloadChunk(url: string, start: number, end: number, tempPath: string
                 'Accept': '*/*',
                 'Accept-Encoding': 'identity',
                 'Connection': 'keep-alive',
-                'Range': `bytes=${start}-${end}`
+                'Range': `bytes=${effectiveStart}-${end}`
             }
         };
 
@@ -117,8 +126,14 @@ function downloadChunk(url: string, start: number, end: number, tempPath: string
                 reject(new Error(`HTTP Error: ${response.statusCode}`));
                 return;
             }
+            // 200 no meio de um resume = servidor ignorou o Range e mandaria
+            // o arquivo inteiro — append corromperia o chunk.
+            if (response.statusCode === 200 && effectiveStart > start) {
+                reject(new Error('servidor ignorou o Range no resume'));
+                return;
+            }
 
-            const writeStream = fs.createWriteStream(tempPath, { highWaterMark: 128 * 1024 });
+            const writeStream = fs.createWriteStream(tempPath, { flags: already > 0 ? 'a' : 'w', highWaterMark: 128 * 1024 });
             let downloaded = 0;
 
             response.on('data', (chunk) => {
@@ -127,7 +142,7 @@ function downloadChunk(url: string, start: number, end: number, tempPath: string
 
             response.pipe(writeStream);
 
-            writeStream.on('finish', () => resolve(downloaded));
+            writeStream.on('finish', () => resolve(already + downloaded));
             writeStream.on('error', reject);
         };
 

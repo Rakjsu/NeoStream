@@ -275,4 +275,15 @@ export function kidsWeeklyUsage(
             } catch { /* storage corrompido conta como zero */ }
             return { id: profile.id, name: profile.name, weekSeconds };
         });
+/** 📡 Segundos do mês por CANAL (sessões live), do mais visto pro menos. */
+export function aggregateChannelTime(sessions: WatchSession[], limit = 8): { name: string; seconds: number }[] {
+    const totals = new Map<string, number>();
+    for (const session of sessions) {
+        if (session.contentType !== 'live') continue;
+        totals.set(session.contentName, (totals.get(session.contentName) ?? 0) + session.watchedSeconds);
+    }
+    return [...totals.entries()]
+        .map(([name, seconds]) => ({ name, seconds }))
+        .sort((a, b) => b.seconds - a.seconds)
+        .slice(0, limit);
 }

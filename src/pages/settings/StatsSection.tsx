@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { usageStatsService, type UsageStats, type DailyStats } from '../../services/usageStatsService';
 import {
+    aggregateChannelTime,
     aggregatePlaylistTime,
     aggregateTopContent,
     aggregateTopGenres,
@@ -61,6 +62,7 @@ export function StatsSection() {
     // 🗓️ Mapa do ano + 📚 tempo por playlist
     const yearMap = yearHeatmap(usageStats?.dailyStats || [], today);
     const playlistTime = aggregatePlaylistTime(usageStats?.sessionsThisMonth || []);
+    const channelTime = aggregateChannelTime(usageStats?.sessionsThisMonth || []);
     const [playlistNames, setPlaylistNames] = useState<Record<string, string>>({});
     useEffect(() => {
         queueMicrotask(() => {
@@ -704,6 +706,16 @@ export function StatsSection() {
                             name: playlistNames[entry.playlistId] || entry.playlistId,
                             seconds: entry.seconds
                         })), '#38bdf8')}
+                    </div>
+                )}
+
+                {/* 📡 Tempo por canal neste mês */}
+                {channelTime.length > 0 && (
+                    <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', marginTop: '16px' }}>
+                        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginBottom: '10px' }}>
+                            📡 {t('stats', 'channelTimeTitle')}
+                        </div>
+                        {renderRankedBars(channelTime.map(entry => ({ name: entry.name, seconds: entry.seconds })), '#f59e0b')}
                     </div>
                 )}
 

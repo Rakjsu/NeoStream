@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { LazyImage } from '../components/LazyImage';
 import { epgService } from '../services/epgService';
+import { scanEpgForKeywords } from '../services/epgKeywordAlertService';
 import { profileService } from '../services/profileService';
 import { parentalService } from '../services/parentalService';
 import { useLanguage } from '../services/languageService';
@@ -160,6 +161,17 @@ export function EpgGuide() {
         const id = setInterval(() => setNow(Date.now()), 60000);
         return () => clearInterval(id);
     }, []);
+
+    // 🔎 Alertas por keyword: varre a programação carregada (só futuros) e
+    // notifica matches inéditos — debounce de 2s por leva de EPG.
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            const entries = Object.entries(epgByChannel)
+                .filter((entry): entry is [string, EPGProgram[]] => Array.isArray(entry[1]));
+            scanEpgForKeywords(entries);
+        }, 2000);
+        return () => clearTimeout(timer);
+    }, [epgByChannel]);
 
     // Program reminders: re-render on changes (🔔 indicators + popover label)
     const [reminderVersion, setReminderVersion] = useState(0);
