@@ -141,10 +141,14 @@ export type RemoteCommand =
     | { action: 'requestSeries'; query?: string }
     | { action: 'requestSeriesInfo'; seriesId: string }
     | { action: 'castEpisode'; episodeId: string; target?: CastTarget }
+    | { action: 'sleep'; minutes: number }
+    | { action: 'requestStats' }
+    | { action: 'focusApp' }
 
 const VALID_ACTIONS = new Set([
     'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'setVolume', 'setAudioTrack', 'playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule',
     'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestRecordings', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
+    'sleep', 'requestStats', 'focusApp',
 ])
 
 const CAST_TARGET_TYPES = new Set<CastTargetType>(['chromecast', 'dlna', 'airplay'])
@@ -191,6 +195,11 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         const trackId = (parsed as { trackId?: unknown }).trackId
         if (typeof trackId !== 'number' || !Number.isFinite(trackId)) return null
         return { action: 'setAudioTrack', trackId }
+    }
+    if (action === 'sleep') {
+        const minutes = (parsed as { minutes?: unknown }).minutes
+        if (typeof minutes !== 'number' || !Number.isFinite(minutes) || minutes < 0) return null
+        return { action: 'sleep', minutes: Math.min(480, Math.floor(minutes)) }
     }
     if (action === 'playChannel' || action === 'requestEpg') {
         const channelId = (parsed as { channelId?: unknown }).channelId
@@ -253,6 +262,8 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
     if (action === 'requestRecommended') return { action: 'requestRecommended' }
     if (action === 'requestRecordings') return { action: 'requestRecordings' }
     if (action === 'requestDevices') return { action: 'requestDevices' }
+    if (action === 'requestStats') return { action: 'requestStats' }
+    if (action === 'focusApp') return { action: 'focusApp' }
     return { action: action as 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' | 'subtitle' }
 }
 

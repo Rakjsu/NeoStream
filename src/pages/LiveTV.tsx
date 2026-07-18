@@ -515,6 +515,7 @@ export function LiveTV() {
             id: String(s.stream_id),
             name: s.name,
             logo: s.stream_icon || '',
+            num: s.num,
         }));
         const playingId = playingChannel ? String(playingChannel.stream_id) : '';
         const epg = currentProgram
