@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { usageStatsService, type UsageStats, type DailyStats } from '../../services/usageStatsService';
 import {
+    aggregatePlaylistTime,
     aggregateTopContent,
     aggregateTopGenres,
     fillLastNDays,
@@ -10,10 +11,12 @@ import {
     habitHeatmap,
     weekOverWeek,
     computeRecords,
-    perProfileUsage
+    perProfileUsage,
+    yearHeatmap
 } from '../../services/statsDashboardHelpers';
 import { useLanguage } from '../../services/languageService';
 import { profileService } from '../../services/profileService';
+import { playlistService } from '../../services/playlistService';
 import { WrappedOverlay } from '../../components/WrappedOverlay';
 import { getDailyGoalMinutes, goalProgressPct, setDailyGoalMinutes } from '../../services/watchLimitsService';
 
@@ -55,6 +58,17 @@ export function StatsSection() {
 
     // 🗓️ Heatmap de hábitos (dia × faixa de hora) do mês corrente.
     const habitmap = habitHeatmap(usageStats?.sessionsThisMonth || []);
+    // 🗓️ Mapa do ano + 📚 tempo por playlist
+    const yearMap = yearHeatmap(usageStats?.dailyStats || [], today);
+    const playlistTime = aggregatePlaylistTime(usageStats?.sessionsThisMonth || []);
+    const [playlistNames, setPlaylistNames] = useState<Record<string, string>>({});
+    useEffect(() => {
+        queueMicrotask(() => {
+            void playlistService.list()
+                .then(list => setPlaylistNames(Object.fromEntries(list.map(p => [p.id, p.name]))))
+                .catch(() => undefined);
+        });
+    }, []);
     const heatmapLocale = LOCALE_BY_LANGUAGE[language] || 'pt-BR';
     // 1º de janeiro de 2023 foi DOMINGO — vira as iniciais no idioma da UI.
     const dayInitials = Array.from({ length: 7 }, (_, index) =>
@@ -122,6 +136,58 @@ export function StatsSection() {
         );
     };
 
+    // 📸 Resumo do mês como imagem (canvas próprio → PNG baixado).
+    const exportImage = () => {
+        if (!usageStats) return;
+        const canvas = document.createElement('canvas');
+        const width = 900;
+        const height = 620;
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const gradient = ctx.createLinearGradient(0, 0, width, height);
+        gradient.addColorStop(0, '#1a1a2e');
+        gradient.addColorStop(1, '#0f0f1a');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+        ctx.fillStyle = 'white';
+        ctx.font = '800 40px "Segoe UI", sans-serif';
+        ctx.fillText('📊 NeoStream', 40, 70);
+        ctx.font = '400 22px "Segoe UI", sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.fillText(new Date().toLocaleDateString(heatmapLocale, { month: 'long', year: 'numeric' }), 40, 104);
+        ctx.fillStyle = 'white';
+        ctx.font = '800 56px "Segoe UI", sans-serif';
+        ctx.fillText(formatWatchTime(usageStats.totalWatchTimeThisMonth), 40, 190);
+        ctx.font = '400 22px "Segoe UI", sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        ctx.fillText(t('stats', 'exportMonthLabel'), 40, 222);
+        ctx.fillText(`🔥 ${usageStats.watchStreak} ${t('stats', 'exportStreakLabel')}`, 40, 262);
+        topContent.slice(0, 5).forEach((item, index) => {
+            const y = 330 + index * 52;
+            ctx.fillStyle = 'rgba(255,255,255,0.06)';
+            ctx.beginPath();
+            ctx.roundRect(40, y - 32, width - 80, 42, 10);
+            ctx.fill();
+            ctx.fillStyle = 'var(--ns-accent-light)'.startsWith('var') ? '#a5b4fc' : '#a5b4fc';
+            ctx.font = '800 24px "Segoe UI", sans-serif';
+            ctx.fillText(String(index + 1), 58, y);
+            ctx.fillStyle = 'white';
+            ctx.font = '400 22px "Segoe UI", sans-serif';
+            const name = item.name.length > 52 ? `${item.name.slice(0, 51)}…` : item.name;
+            ctx.fillText(name, 96, y);
+            ctx.fillStyle = 'rgba(255,255,255,0.55)';
+            ctx.textAlign = 'right';
+            ctx.fillText(formatWatchTime(item.seconds), width - 58, y);
+            ctx.textAlign = 'left';
+        });
+        const link = document.createElement('a');
+        link.download = 'neostream-stats.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    };
+
     return (
         <div className="section-card">
             <div className="section-header">
@@ -137,6 +203,15 @@ export function StatsSection() {
                 >
                     <span>🎁</span>
                     <span>{t('wrapped', 'open')}</span>
+                </button>
+                <button
+                    className="check-btn"
+                    style={{ width: 'auto', padding: '10px 20px', marginLeft: '10px' }}
+                    onClick={exportImage}
+                    title={t('stats', 'exportImageHint')}
+                >
+                    <span>📸</span>
+                    <span>{t('stats', 'exportImage')}</span>
                 </button>
             </div>
 
@@ -593,6 +668,44 @@ export function StatsSection() {
                         )}
                     </div>
                 </div>
+
+                {/* 🗓️ Mapa do ano (365 dias) */}
+                <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', marginTop: '16px' }}>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginBottom: '10px' }}>
+                        🗓️ {t('stats', 'yearHeatmapTitle')}
+                    </div>
+                    <div style={{ display: 'flex', gap: '3px', overflowX: 'auto', paddingBottom: '4px' }}>
+                        {yearMap.map((week, weekIndex) => (
+                            <div key={weekIndex} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                {week.map(cell => (
+                                    <div
+                                        key={cell.date}
+                                        title={cell.level >= 0 ? `${new Date(cell.date + 'T12:00:00').toLocaleDateString(heatmapLocale)} · ${formatWatchTime(cell.seconds)}` : undefined}
+                                        style={{
+                                            width: '9px', height: '9px', borderRadius: '2px',
+                                            background: cell.level < 0 ? 'transparent'
+                                                : cell.level === 0 ? 'rgba(255,255,255,0.05)'
+                                                : `rgba(var(--ns-accent-rgb), ${0.2 + cell.level * 0.2})`
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* 📚 Tempo por playlist neste mês (só com 2+ playlists) */}
+                {playlistTime.length > 1 && (
+                    <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: '16px', marginTop: '16px' }}>
+                        <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '13px', marginBottom: '10px' }}>
+                            📚 {t('stats', 'playlistTimeTitle')}
+                        </div>
+                        {renderRankedBars(playlistTime.map(entry => ({
+                            name: playlistNames[entry.playlistId] || entry.playlistId,
+                            seconds: entry.seconds
+                        })), '#38bdf8')}
+                    </div>
+                )}
 
                 {/* 👥 Uso por perfil (só com 2+ perfis) */}
                 {profileUsage.length > 1 && (

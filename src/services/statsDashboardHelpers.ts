@@ -184,3 +184,66 @@ export function perProfileUsage(
         })
         .sort((a, b) => b.seconds - a.seconds);
 }
+
+export interface YearHeatCell {
+    date: string;
+    seconds: number;
+    /** 0 (nada) a 4 (2h+); -1 = dia futuro (célula invisível). */
+    level: number;
+}
+
+/** Nível visual do heatmap pelo tempo assistido no dia. */
+export function heatLevel(seconds: number): number {
+    if (seconds <= 0) return 0;
+    if (seconds < 30 * 60) return 1;
+    if (seconds < 60 * 60) return 2;
+    if (seconds < 2 * 60 * 60) return 3;
+    return 4;
+}
+
+function localIso(date: Date): string {
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * Heatmap anual estilo GitHub: colunas = semanas (dom→sáb), a última
+ * terminando na semana de hoje. Dias sem registro entram com 0 — a grade
+ * tem sempre o mesmo formato; dias futuros saem com level -1.
+ */
+export function yearHeatmap(dailyStats: DailyStats[], todayIso: string, weeks = 53): YearHeatCell[][] {
+    const byDate = new Map(dailyStats.map(d => [d.date, d.totalSeconds]));
+    const today = new Date(todayIso + 'T12:00:00');
+    const end = new Date(today);
+    end.setDate(end.getDate() + (6 - end.getDay())); // completa a semana corrente
+    const columns: YearHeatCell[][] = [];
+    for (let week = weeks - 1; week >= 0; week--) {
+        const column: YearHeatCell[] = [];
+        for (let day = 0; day < 7; day++) {
+            const date = new Date(end);
+            date.setDate(end.getDate() - week * 7 - (6 - day));
+            const iso = localIso(date);
+            if (iso > todayIso) {
+                column.push({ date: iso, seconds: 0, level: -1 });
+                continue;
+            }
+            const seconds = byDate.get(iso) ?? 0;
+            column.push({ date: iso, seconds, level: heatLevel(seconds) });
+        }
+        columns.push(column);
+    }
+    return columns;
+}
+
+/** Segundos do mês agrupados pela playlist ativa na hora de assistir. */
+export function aggregatePlaylistTime(sessions: WatchSession[]): { playlistId: string; seconds: number }[] {
+    const totals = new Map<string, number>();
+    for (const session of sessions) {
+        const key = session.playlistId || 'default';
+        totals.set(key, (totals.get(key) ?? 0) + session.watchedSeconds);
+    }
+    return [...totals.entries()]
+        .map(([playlistId, seconds]) => ({ playlistId, seconds }))
+        .sort((a, b) => b.seconds - a.seconds);
+}
