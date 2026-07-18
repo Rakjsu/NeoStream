@@ -1,10 +1,10 @@
-import { app, ipcMain, shell, BrowserWindow } from 'electron'
+import { app, ipcMain, shell, dialog, BrowserWindow } from 'electron'
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
 import path from 'path'
 import fs from 'fs'
 import { createRequire } from 'module'
 import log from './logger'
-import { recordingFilename, buildRecordingArgs, parseFfmpegTime } from './dvrProtocol'
+import { recordingFilename, buildRecordingArgs, parseFfmpegTime, buildMp4RemuxArgs, buildThumbnailArgs, mp4PathFor } from './dvrProtocol'
 
 // Runtime require: resolves the REAL ffmpeg-static from node_modules. A bare
 // top-level require would get inlined by the bundler, whose __dirname shim
@@ -107,7 +107,8 @@ export function setupDvrHandlers() {
             if (!current.startsWith(dir)) return { success: false, error: 'arquivo fora da pasta de gravações' }
             const safe = String(data?.name || '').replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120)
             if (!safe) return { success: false, error: 'nome vazio' }
-            const target = path.join(dir, safe.toLowerCase().endsWith('.ts') ? safe : `${safe}.ts`)
+            const ext = current.toLowerCase().endsWith('.mp4') ? '.mp4' : '.ts'
+            const target = path.join(dir, safe.toLowerCase().endsWith(ext) ? safe : `${safe}${ext}`)
             if (fs.existsSync(target)) return { success: false, error: 'já existe uma gravação com esse nome' }
             await fs.promises.rename(current, target)
             return { success: true, path: target }
@@ -122,6 +123,80 @@ export function setupDvrHandlers() {
         if (!file.startsWith(path.resolve(recordingsDir()))) return { success: false }
         shell.showItemInFolder(file)
         return { success: true }
+    })
+
+    // 🎞️ Converte uma gravação .ts pronta em .mp4 (remux com codec copy —
+    // rápido e sem perda; o .ts original fica até o usuário apagar).
+    ipcMain.handle('dvr:convert-mp4', async (_e, data: { path?: string }) => {
+        try {
+            const ffmpeg = resolveFfmpegPath()
+            if (!ffmpeg) return { success: false, error: 'ffmpeg indisponível' }
+            const dir = path.resolve(recordingsDir())
+            const source = path.resolve(String(data?.path || ''))
+            if (!source.startsWith(dir) || !source.toLowerCase().endsWith('.ts')) {
+                return { success: false, error: 'gravação inválida' }
+            }
+            if (Array.from(active.values()).some(r => r.file === source)) {
+                return { success: false, error: 'Gravação em andamento' }
+            }
+            const target = mp4PathFor(source)
+            if (fs.existsSync(target)) return { success: false, error: 'já existe um .mp4 desta gravação' }
+            await new Promise<void>((resolve, reject) => {
+                const proc = spawn(ffmpeg, buildMp4RemuxArgs(source, target), { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] })
+                let stderr = ''
+                proc.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString() })
+                proc.on('close', code => code === 0 ? resolve() : reject(new Error(stderr.slice(0, 300) || `ffmpeg saiu com código ${code}`)))
+                proc.on('error', reject)
+            })
+            log.info(`[DVR] Remux concluído: ${target}`)
+            return { success: true, path: target }
+        } catch (err) {
+            return { success: false, error: err instanceof Error ? err.message : String(err) }
+        }
+    })
+
+    // 🖼️ Thumbnail da gravação (frame ~30s), cacheada em .thumbs/ ao lado.
+    ipcMain.handle('dvr:thumbnail', async (_e, data: { path?: string }) => {
+        try {
+            const ffmpeg = resolveFfmpegPath()
+            if (!ffmpeg) return { success: false }
+            const dir = path.resolve(recordingsDir())
+            const source = path.resolve(String(data?.path || ''))
+            if (!source.startsWith(dir)) return { success: false }
+            const thumbsDir = path.join(dir, '.thumbs')
+            fs.mkdirSync(thumbsDir, { recursive: true })
+            const thumb = path.join(thumbsDir, path.basename(source).replace(/\.(ts|mp4)$/i, '') + '.jpg')
+            if (!fs.existsSync(thumb)) {
+                await new Promise<void>((resolve) => {
+                    const proc = spawn(ffmpeg, buildThumbnailArgs(source, thumb), { windowsHide: true, stdio: 'ignore' })
+                    proc.on('close', () => resolve())
+                    proc.on('error', () => resolve())
+                })
+            }
+            return fs.existsSync(thumb) ? { success: true, path: thumb } : { success: false }
+        } catch {
+            return { success: false }
+        }
+    })
+
+    // 📤 Exporta (copia) a gravação pra um destino escolhido pelo usuário.
+    ipcMain.handle('dvr:export-file', async (_e, data: { path?: string }) => {
+        try {
+            const dir = path.resolve(recordingsDir())
+            const source = path.resolve(String(data?.path || ''))
+            if (!source.startsWith(dir)) return { success: false, error: 'fora da pasta de gravações' }
+            const ext = path.extname(source).replace('.', '') || 'ts'
+            const result = await dialog.showSaveDialog({
+                title: 'Exportar gravação',
+                defaultPath: path.basename(source),
+                filters: [{ name: ext.toUpperCase(), extensions: [ext] }]
+            })
+            if (result.canceled || !result.filePath) return { success: false, canceled: true }
+            await fs.promises.copyFile(source, result.filePath)
+            return { success: true, path: result.filePath }
+        } catch (err) {
+            return { success: false, error: String(err) }
+        }
     })
 
     ipcMain.handle('dvr:stop', async (_e, data: { id: string }) => {
@@ -164,7 +239,7 @@ export function setupDvrHandlers() {
             fs.mkdirSync(dir, { recursive: true })
             const activeFiles = new Set(Array.from(active.values()).map(r => r.file))
             const files = fs.readdirSync(dir)
-                .filter(name => name.toLowerCase().endsWith('.ts'))
+                .filter(name => /\.(ts|mp4)$/i.test(name))
                 .map(name => {
                     const full = path.join(dir, name)
                     const stat = fs.statSync(full)
@@ -196,6 +271,8 @@ export function setupDvrHandlers() {
                 return { success: false, error: 'Gravação em andamento' }
             }
             fs.unlinkSync(target)
+            const thumb = path.join(dir, '.thumbs', path.basename(target).replace(/\.(ts|mp4)$/i, '') + '.jpg')
+            try { if (fs.existsSync(thumb)) fs.unlinkSync(thumb) } catch { /* best-effort */ }
             return { success: true }
         } catch (err) {
             return { success: false, error: String(err) }

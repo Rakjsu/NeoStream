@@ -57,6 +57,7 @@ export function ShortcutsOverlay() {
             rows: [
                 { keys: ['Espaço', 'K'], label: t('shortcuts', 'playPause') },
                 { keys: ['←', '→', 'J', 'L'], label: t('shortcuts', 'seek') },
+                { keys: ['Shift', '←/→'], label: t('shortcuts', 'seek30') },
                 { keys: [',', '.'], label: t('shortcuts', 'frameStep') },
                 { keys: ['B'], label: t('shortcuts', 'abLoop') },
                 { keys: ['I'], label: t('shortcuts', 'nerdStats') },

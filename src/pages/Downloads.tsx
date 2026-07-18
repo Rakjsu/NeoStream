@@ -68,6 +68,10 @@ export function Downloads() {
     const [protectedRecs, setProtectedRecs] = useState<Set<string>>(() => getProtectedRecordings());
     const [renamingPath, setRenamingPath] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState('');
+    // 🎞️/📤 conversão e exportação + 🖼️ thumbnails cacheadas por path.
+    const [convertingPath, setConvertingPath] = useState<string | null>(null);
+    const [dvrMsg, setDvrMsg] = useState('');
+    const [thumbs, setThumbs] = useState<Record<string, string>>({});
 
     const loadRecordings = useCallback(async () => {
         try {
@@ -96,6 +100,23 @@ export function Downloads() {
             void loadRecordings();
         });
     }, [loadRecordings, showRecordings]);
+
+    // 🖼️ Thumbnails das gravações (frame ~30s, gerado e cacheado no main).
+    useEffect(() => {
+        let cancelled = false;
+        void (async () => {
+            for (const rec of recordings) {
+                if (cancelled || rec.recording) continue;
+                try {
+                    const result = await window.ipcRenderer.invoke('dvr:thumbnail', { path: rec.path }) as { success: boolean; path?: string };
+                    if (!cancelled && result?.success && result.path) {
+                        setThumbs(prev => (prev[rec.path] === result.path ? prev : { ...prev, [rec.path]: result.path! }));
+                    }
+                } catch { /* fica no emoji */ }
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [recordings]);
 
     const confirmRename = async () => {
         if (!renamingPath) return;
@@ -379,6 +400,9 @@ export function Downloads() {
                                 {t('downloads', 'openFolder')}
                             </button>
                         </div>
+                        {dvrMsg && (
+                            <p style={{ color: 'var(--ns-accent-light)', fontSize: 12, margin: '0 0 8px' }}>{dvrMsg}</p>
+                        )}
                         {recordings.length === 0 ? (
                             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, margin: 0 }}>
                                 {t('downloads', 'noRecordings')}
@@ -387,7 +411,15 @@ export function Downloads() {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                 {recordings.map(rec => (
                                     <div key={rec.path} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, background: 'rgba(0,0,0,0.25)' }}>
-                                        <span style={{ fontSize: 16, flexShrink: 0 }}>{rec.recording ? '🔴' : '📼'}</span>
+                                        {thumbs[rec.path] && !rec.recording ? (
+                                            <img
+                                                src={`file:///${thumbs[rec.path].replace(/\\/g, '/')}`}
+                                                alt=""
+                                                style={{ width: 56, height: 32, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}
+                                            />
+                                        ) : (
+                                            <span style={{ fontSize: 16, flexShrink: 0 }}>{rec.recording ? '🔴' : '📼'}</span>
+                                        )}
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             {renamingPath === rec.path ? (
                                                 <input
@@ -404,7 +436,7 @@ export function Downloads() {
                                             ) : (
                                                 <div title={rec.path} style={{ color: 'white', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                     {protectedRecs.has(rec.path) && <span title={t('downloads', 'recProtect')}>🔐 </span>}
-                                                    {rec.name.replace(/\.ts$/i, '')}
+                                                    {rec.name.replace(/\.(ts|mp4)$/i, '')}
                                                 </div>
                                             )}
                                             <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>
@@ -423,7 +455,7 @@ export function Downloads() {
                                         <button
                                             onClick={() => {
                                                 setRenamingPath(rec.path);
-                                                setRenameValue(rec.name.replace(/\.ts$/i, ''));
+                                                setRenameValue(rec.name.replace(/\.(ts|mp4)$/i, ''));
                                             }}
                                             disabled={rec.recording}
                                             title={t('downloads', 'renameRec')}
@@ -444,6 +476,43 @@ export function Downloads() {
                                             style={{ padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', flexShrink: 0 }}
                                         >
                                             📂
+                                        </button>
+                                        {rec.name.toLowerCase().endsWith('.ts') && (
+                                            <button
+                                                onClick={async () => {
+                                                    if (rec.recording || convertingPath) return;
+                                                    setConvertingPath(rec.path);
+                                                    setDvrMsg(t('downloads', 'converting'));
+                                                    const result = await window.ipcRenderer.invoke('dvr:convert-mp4', { path: rec.path }) as { success: boolean; error?: string };
+                                                    setConvertingPath(null);
+                                                    if (result?.success) {
+                                                        setDvrMsg(t('downloads', 'convertDone'));
+                                                        void loadRecordings();
+                                                    } else {
+                                                        setDvrMsg(result?.error || t('downloads', 'convertFail'));
+                                                    }
+                                                    setTimeout(() => setDvrMsg(''), 6000);
+                                                }}
+                                                disabled={rec.recording || convertingPath !== null}
+                                                title={t('downloads', 'convertMp4')}
+                                                style={{ padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.7)', cursor: rec.recording || convertingPath ? 'not-allowed' : 'pointer', opacity: rec.recording ? 0.4 : 1, flexShrink: 0 }}
+                                            >
+                                                {convertingPath === rec.path ? '⏳' : '🎞️'}
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={async () => {
+                                                const result = await window.ipcRenderer.invoke('dvr:export-file', { path: rec.path }) as { success: boolean; canceled?: boolean };
+                                                if (result?.success) {
+                                                    setDvrMsg(t('downloads', 'exportDone'));
+                                                    setTimeout(() => setDvrMsg(''), 6000);
+                                                }
+                                            }}
+                                            disabled={rec.recording}
+                                            title={t('downloads', 'exportRec')}
+                                            style={{ padding: 8, borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'transparent', color: 'rgba(255,255,255,0.7)', cursor: rec.recording ? 'not-allowed' : 'pointer', opacity: rec.recording ? 0.4 : 1, flexShrink: 0 }}
+                                        >
+                                            📤
                                         </button>
                                         <button
                                             onClick={async () => {

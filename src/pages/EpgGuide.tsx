@@ -339,6 +339,25 @@ export function EpgGuide() {
         setTimeshiftPlayback({ channel, program });
     }, []);
 
+    // ⬇ Baixa o replay como gravação: resolve a URL de timeshift e entrega
+    // pro pipeline do DVR (ffmpeg copy grava até o stream do programa acabar).
+    const downloadReplay = useCallback(async (channel: LiveStream, program: EPGProgram) => {
+        setProgramPopover(null);
+        try {
+            const result = await getTimeshiftUrl({
+                streamId: channel.stream_id,
+                startIso: program.start,
+                durationMin: replayDurationMinutes(program.start, program.end)
+            });
+            if (result?.url) {
+                await window.ipcRenderer.invoke('dvr:start', {
+                    url: result.url,
+                    channelName: `${channel.name} - ${program.title}`
+                });
+            }
+        } catch { /* provedor sem timeshift utilizável */ }
+    }, []);
+
     // Timeshift URL builder for the AsyncVideoPlayer — the main process picks
     // the URL form (probe) and converts the start to provider-local time.
     const buildTimeshiftStreamUrl = useCallback(async (channel: LiveStream): Promise<string> => {
@@ -901,6 +920,12 @@ export function EpgGuide() {
                             icon: '▶',
                             label: t('guide', 'watchFromStart'),
                             onClick: () => startReplay(channel, program)
+                        },
+                        {
+                            key: 'download-replay',
+                            icon: '⬇',
+                            label: t('guide', 'downloadReplay'),
+                            onClick: () => { void downloadReplay(channel, program); }
                         }
                     ];
                 return (
