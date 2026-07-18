@@ -12,9 +12,18 @@ const STORAGE_KEY = 'neostream_theme';
 export type BackgroundVariant = 'default' | 'amoled';
 export type AccentId = 'roxo' | 'azul' | 'verde' | 'vermelho' | 'laranja' | 'rosa';
 
+export type UiScale = 90 | 100 | 110 | 125;
+export const UI_SCALES: readonly UiScale[] = [90, 100, 110, 125];
+
 export interface Theme {
     background: BackgroundVariant;
     accent: AccentId;
+    /** Alto contraste (a11y): fundos pretos + textos reforçados via CSS. */
+    contrast: boolean;
+    /** Reduzir animações (a11y): corta transitions/animations no CSS global. */
+    reducedMotion: boolean;
+    /** Escala da interface em % — vira zoom do body (pega até px na unha). */
+    scale: UiScale;
 }
 
 export interface AccentPreset {
@@ -62,7 +71,7 @@ export const BACKGROUND_PRESETS: readonly BackgroundPreset[] = [
     { id: 'amoled', nameKey: 'backgroundAmoled', deep: '#000000', panel: '#0a0a0f', tint: '#05050a' }
 ];
 
-export const DEFAULT_THEME: Theme = { background: 'default', accent: 'roxo' };
+export const DEFAULT_THEME: Theme = { background: 'default', accent: 'roxo', contrast: false, reducedMotion: false, scale: 100 };
 
 export function getAccentPreset(id: AccentId): AccentPreset {
     return ACCENT_PRESETS.find(p => p.id === id) ?? ACCENT_PRESETS[0];
@@ -85,9 +94,10 @@ export function cssVariablesFor(theme: Theme): Record<string, string> {
         '--ns-accent-grad-to-rgb': accent.gradToRgb,
         '--ns-accent-soft': `rgba(${accent.rgb}, 0.15)`,
         '--ns-accent-glow': `rgba(${accent.rgb}, 0.4)`,
-        '--ns-bg-deep': bg.deep,
-        '--ns-bg-panel': bg.panel,
-        '--ns-bg-tint': bg.tint
+        '--ns-bg-deep': theme.contrast ? '#000000' : bg.deep,
+        '--ns-bg-panel': theme.contrast ? '#0b0b12' : bg.panel,
+        '--ns-bg-tint': theme.contrast ? '#000000' : bg.tint,
+        '--ns-ui-scale': String(theme.scale / 100)
     };
 }
 
@@ -102,7 +112,16 @@ export function parseStoredTheme(raw: string | null): Theme {
         const accent = ACCENT_PRESETS.some(a => a.id === parsed.accent)
             ? parsed.accent as AccentId
             : DEFAULT_THEME.accent;
-        return { background, accent };
+        const scale = UI_SCALES.includes(parsed.scale as UiScale)
+            ? parsed.scale as UiScale
+            : DEFAULT_THEME.scale;
+        return {
+            background,
+            accent,
+            contrast: parsed.contrast === true,
+            reducedMotion: parsed.reducedMotion === true,
+            scale
+        };
     } catch {
         return { ...DEFAULT_THEME };
     }
@@ -146,6 +165,8 @@ class ThemeService {
             root.style.setProperty(name, value);
         }
         root.setAttribute('data-theme', `${this.theme.background}-${this.theme.accent}`);
+        root.setAttribute('data-contrast', this.theme.contrast ? '1' : '0');
+        root.setAttribute('data-motion', this.theme.reducedMotion ? 'reduced' : 'normal');
         // Mirror the accent into the main process so the phone web-remote
         // page is served with the same color (no-op outside Electron).
         try {

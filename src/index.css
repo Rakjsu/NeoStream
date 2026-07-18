@@ -99,3 +99,29 @@ body {
     transform: scale(1.04);
     transition: transform 0.15s ease;
 }
+
+/* ♿ Alto contraste (data-contrast no <html>): reforça textos secundários
+   por cima do tema — os fundos viram preto via --ns-bg-* no themeService. */
+html[data-contrast='1'] body {
+    color: #ffffff;
+}
+html[data-contrast='1'] .setting-info p,
+html[data-contrast='1'] .last-check,
+html[data-contrast='1'] ::placeholder {
+    color: rgba(255, 255, 255, 0.85) !important;
+}
+
+/* ♿ Reduzir animações: mata transitions/animations do app inteiro. */
+html[data-motion='reduced'] *,
+html[data-motion='reduced'] *::before,
+html[data-motion='reduced'] *::after {
+    animation-duration: 0.001s !important;
+    animation-delay: 0s !important;
+    transition-duration: 0.001s !important;
+    scroll-behavior: auto !important;
+}
+
+/* 🔠 Escala da interface: zoom pega inclusive os px hardcoded inline. */
+body {
+    zoom: var(--ns-ui-scale, 1);
+}

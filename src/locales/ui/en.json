@@ -473,6 +473,12 @@
     "colorRed": "Red",
     "colorOrange": "Orange",
     "colorPink": "Pink",
+    "contrast": "High contrast",
+    "contrastDesc": "Black background and stronger text for maximum readability.",
+    "reducedMotion": "Reduce motion",
+    "reducedMotionDesc": "Cuts UI transitions and animations.",
+    "uiScale": "Interface scale",
+    "uiScaleDesc": "Makes everything bigger or smaller (90%–125%).",
     "note": "Some screens still keep the classic palette for now."
   },
   "backup": {
