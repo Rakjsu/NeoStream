@@ -144,6 +144,12 @@ export function setupTrayMode(getWin: () => BrowserWindow | null) {
             powerSaveBlocker.stop(displayBlockerId)
             displayBlockerId = null
         }
+        // 📺 Tooltip da bandeja mostra o que está tocando agora.
+        try {
+            tray?.setToolTip(mediaState.hasMedia && mediaState.title
+                ? `NeoStream — ${mediaState.title}`
+                : 'NeoStream IPTV')
+        } catch { /* tray pode não existir */ }
         buildTrayMenu(getWin)
     })
 

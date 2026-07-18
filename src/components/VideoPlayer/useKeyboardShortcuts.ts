@@ -69,12 +69,13 @@ export function useKeyboardShortcuts({
             case 'arrowleft':
             case 'j':
                 e.preventDefault();
-                controls.seek(Math.max(0, currentTime - 10));
+                // Shift pula 30s — feito pra varrer gravações e VOD longos.
+                controls.seek(Math.max(0, currentTime - (e.shiftKey ? 30 : 10)));
                 break;
             case 'arrowright':
             case 'l':
                 e.preventDefault();
-                controls.seek(Math.min(duration, currentTime + 10));
+                controls.seek(Math.min(duration, currentTime + (e.shiftKey ? 30 : 10)));
                 break;
             case ',':
             case '.':
