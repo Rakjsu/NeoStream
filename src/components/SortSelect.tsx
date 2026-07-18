@@ -6,6 +6,8 @@ interface SortSelectProps {
     onChange: (value: CatalogSort) => void;
     /** Hide the rating option (live channels have no rating). */
     withRating?: boolean;
+    /** Show "mais assistidos por mim" (pages that wire usage data). */
+    withMyWatch?: boolean;
     /** Distance from the right edge (sits left of the search bar). */
     right?: number;
     /** Flow inline in a flex toolbar instead of floating absolutely. */
@@ -18,7 +20,7 @@ interface SortSelectProps {
  * opens relative to the control). "recent" means provider order for live
  * (channel numbers) and added-date for VOD/series — each page maps it accordingly.
  */
-export function SortSelect({ value, onChange, withRating = true, right = 90, inline = false }: SortSelectProps) {
+export function SortSelect({ value, onChange, withRating = true, withMyWatch = false, right = 90, inline = false }: SortSelectProps) {
     const { t } = useLanguage();
     return (
         <select
@@ -45,6 +47,7 @@ export function SortSelect({ value, onChange, withRating = true, right = 90, inl
             <option value="recent">{t('sort', 'recent')}</option>
             <option value="name">{t('sort', 'name')}</option>
             {withRating && <option value="rating">{t('sort', 'rating')}</option>}
+            {withMyWatch && <option value="mywatch">{t('sort', 'myWatch')}</option>}
         </select>
     );
 }

@@ -180,6 +180,7 @@
     "watchedMovies": "Películas Vistas"
   },
   "liveTV": {
+    "catchupBadge": "Canal con replay (catch-up)",
     "randomZapHint": "Zapping aleatorio: elegir un canal al azar de la lista actual",
     "onlyEpgHint": "Mostrar solo canales con EPG mapeado",
     "hiddenHint": "Canales ocultos: ver/gestionar los canales escondidos de la lista",
@@ -631,6 +632,7 @@
     "exportStreakLabel": "días seguidos",
     "yearHeatmapTitle": "Mapa del año (365 días)",
     "playlistTimeTitle": "Tiempo por playlist este mes",
+    "channelTimeTitle": "Tiempo por canal este mes",
     "recordBiggestDay": "Mayor maratón en un día",
     "recordTopSeries": "Serie más maratoneada",
     "recordTopContent": "Título más visto",
@@ -1048,6 +1050,7 @@
     "recent": "Más recientes",
     "name": "Nombre (A–Z)",
     "rating": "Mejor valorados",
+    "myWatch": "Más vistos por mí",
     "decade": "Década",
     "allDecades": "Todas las décadas",
     "genre": "Género",
