@@ -195,6 +195,11 @@
     "noScheduleInfo": "Sem informações de programação"
   },
   "contentModal": {
+    "markWatched": "Marcar como visto",
+    "unmarkWatched": "Desmarcar visto",
+    "similarTitle": "Parecidos com este",
+    "hideWatched": "🙈 Vistos",
+    "hideWatchedHint": "Esconder já assistidos (filmes vistos e séries sem episódios pendentes)",
     "watchOffline": "Assistir Offline",
     "continueWatching": "Continuar Assistindo",
     "watchMovie": "Assistir Filme",

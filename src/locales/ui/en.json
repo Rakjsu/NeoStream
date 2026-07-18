@@ -195,6 +195,11 @@
     "noScheduleInfo": "No schedule information available"
   },
   "contentModal": {
+    "markWatched": "Mark as watched",
+    "unmarkWatched": "Unmark watched",
+    "similarTitle": "Similar to this",
+    "hideWatched": "🙈 Watched",
+    "hideWatchedHint": "Hide already watched (finished movies and series with nothing pending)",
     "watchOffline": "Watch Offline",
     "continueWatching": "Continue Watching",
     "watchMovie": "Watch Movie",

@@ -185,6 +185,8 @@ export interface TMDBMovieDetails {
     backdrop_path: string | null;
     certification?: string; // Content rating (G, PG, PG-13, R, etc.)
     imdb_id?: string; // IMDB ID for subtitle matching
+    /** Franquia/coleção do filme — já vem no GET /movie/{id} padrão. */
+    belongs_to_collection?: { id: number; name: string; poster_path: string | null } | null;
 }
 
 export interface TMDBSeriesDetails {
@@ -601,3 +603,87 @@ export function isKidsFriendly(certification: string | undefined | null): boolea
     return isKidsFriendlyContent;
 }
 
+
+// ---------------------------------------------------------------------------
+// 🎬 Coleções (franquias) e similares — cache simples em memória por sessão.
+// ---------------------------------------------------------------------------
+
+export interface TMDBCollectionPart {
+    id: number;
+    title: string;
+    poster_path: string | null;
+    release_date?: string;
+}
+
+export interface TMDBCollection {
+    id: number;
+    name: string;
+    parts: TMDBCollectionPart[];
+}
+
+const collectionCache = new Map<string, TMDBCollection | null>();
+
+export async function fetchCollection(collectionId: string): Promise<TMDBCollection | null> {
+    if (!getTmdbApiKey() || !collectionId) return null;
+    if (collectionCache.has(collectionId)) return collectionCache.get(collectionId) ?? null;
+    try {
+        const response = await fetch(
+            `${TMDB_BASE_URL}/collection/${collectionId}?api_key=${getTmdbApiKey()}&language=pt-BR`
+        );
+        if (!response.ok) {
+            collectionCache.set(collectionId, null);
+            return null;
+        }
+        const data = await response.json() as { id: number; name: string; parts?: TMDBCollectionPart[] };
+        const result: TMDBCollection = {
+            id: data.id,
+            name: data.name,
+            parts: (data.parts ?? [])
+                .filter(part => part && part.id)
+                .sort((a, b) => (a.release_date || '9999').localeCompare(b.release_date || '9999'))
+        };
+        collectionCache.set(collectionId, result);
+        return result;
+    } catch {
+        return null;
+    }
+}
+
+export interface TMDBSimilarItem {
+    id: number;
+    title: string;
+    poster_path: string | null;
+    vote_average?: number;
+}
+
+const similarCache = new Map<string, TMDBSimilarItem[]>();
+
+export async function fetchSimilarByTmdbId(tmdbId: string, type: 'movie' | 'series'): Promise<TMDBSimilarItem[]> {
+    if (!getTmdbApiKey() || !tmdbId) return [];
+    const cacheKey = `${type}:${tmdbId}`;
+    const cached = similarCache.get(cacheKey);
+    if (cached) return cached;
+    try {
+        const path = type === 'series' ? 'tv' : 'movie';
+        const response = await fetch(
+            `${TMDB_BASE_URL}/${path}/${tmdbId}/similar?api_key=${getTmdbApiKey()}&language=pt-BR`
+        );
+        if (!response.ok) return [];
+        const data = await response.json() as {
+            results?: { id: number; title?: string; name?: string; poster_path: string | null; vote_average?: number }[];
+        };
+        const result = (data.results ?? [])
+            .filter(item => item.poster_path)
+            .slice(0, 8)
+            .map(item => ({
+                id: item.id,
+                title: item.title || item.name || '',
+                poster_path: item.poster_path,
+                vote_average: item.vote_average
+            }));
+        similarCache.set(cacheKey, result);
+        return result;
+    } catch {
+        return [];
+    }
+}

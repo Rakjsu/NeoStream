@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { searchSeriesByName, searchMovieByName, fetchMovieTrailer, fetchSeriesTrailer, type TMDBSeriesDetails, type TMDBMovieDetails } from '../services/tmdb';
+import { searchSeriesByName, searchMovieByName, fetchMovieTrailer, fetchSeriesTrailer, fetchCollection, fetchSimilarByTmdbId, type TMDBSeriesDetails, type TMDBMovieDetails, type TMDBCollection, type TMDBSimilarItem } from '../services/tmdb';
 import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
 import { profileService } from '../services/profileService';
@@ -70,6 +70,9 @@ export function ContentDetailModal({
 }: ContentDetailModalProps) {
     const [seriesInfo, setSeriesInfo] = useState<SeriesInfo | null>(null);
     const [tmdbData, setTmdbData] = useState<TMDBSeriesDetails | TMDBMovieDetails | null>(null);
+    // 🎬 Coleção (franquia) do filme e títulos parecidos, ambos via TMDB.
+    const [collection, setCollection] = useState<TMDBCollection | null>(null);
+    const [similar, setSimilar] = useState<TMDBSimilarItem[]>([]);
     const [selectedSeason, setSelectedSeason] = useState(1);
     const [selectedEpisode, setSelectedEpisode] = useState(1);
     const [castSeasonMsg, setCastSeasonMsg] = useState<string | null>(null);
@@ -79,7 +82,7 @@ export function ContentDetailModal({
     const [loading, setLoading] = useState(false);
     const [loadError, setLoadError] = useState(false);
     const [retryNonce, setRetryNonce] = useState(0);
-    const [, setRefresh] = useState(0); // Force re-render for button states
+    const [refresh, setRefresh] = useState(0); // Force re-render for button states
     const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'completed'>('idle');
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [showDownloadModal, setShowDownloadModal] = useState(false);
@@ -202,6 +205,34 @@ export function ContentDetailModal({
                 .catch(() => setTmdbData(null));
         }
     }, [isOpen, contentData.name, contentType]);
+
+    // 🎬 Coleção + similares: dependem do id TMDB resolvido pela busca acima.
+    useEffect(() => {
+        if (!isOpen) {
+            queueMicrotask(() => { setCollection(null); setSimilar([]); });
+            return;
+        }
+        const tmdbId = tmdbData?.id;
+        if (!tmdbId) {
+            queueMicrotask(() => { setCollection(null); setSimilar([]); });
+            return;
+        }
+        let cancelled = false;
+        const collectionRef = contentType === 'movie'
+            ? (tmdbData as TMDBMovieDetails).belongs_to_collection
+            : null;
+        if (collectionRef?.id) {
+            void fetchCollection(String(collectionRef.id)).then(result => {
+                if (!cancelled) setCollection(result);
+            });
+        } else {
+            queueMicrotask(() => setCollection(null));
+        }
+        void fetchSimilarByTmdbId(String(tmdbId), contentType).then(result => {
+            if (!cancelled) setSimilar(result);
+        });
+        return () => { cancelled = true; };
+    }, [isOpen, tmdbData, contentType]);
 
     // Check if content is already downloaded or in queue
     useEffect(() => {
@@ -412,7 +443,7 @@ export function ContentDetailModal({
         }
         return map;
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [contentType, seriesInfo, selectedSeason, contentId, isOpen]);
+    }, [contentType, seriesInfo, selectedSeason, contentId, isOpen, refresh]);
 
     if (!isOpen) return null;
 
@@ -699,6 +730,18 @@ export function ContentDetailModal({
                                                 <span style={{ fontSize: 13, color: 'white', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                     {getEpisodeTitle(ep)}
                                                 </span>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (isWatched) watchProgressService.clearEpisodeProgress(contentId, selectedSeason, epNum);
+                                                        else watchProgressService.markEpisodeWatched(contentId, selectedSeason, epNum);
+                                                        setRefresh(r => r + 1);
+                                                    }}
+                                                    title={isWatched ? t('contentModal', 'unmarkWatched') : t('contentModal', 'markWatched')}
+                                                    style={{ width: 24, height: 24, borderRadius: 6, flexShrink: 0, border: '1px solid rgba(255,255,255,0.2)', background: isWatched ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.05)', color: isWatched ? '#10b981' : 'rgba(255,255,255,0.5)', fontSize: 11, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                >
+                                                    ✓
+                                                </button>
                                                 {isSelected && (
                                                     <span style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: 'white' }}>▶</span>
                                                 )}
@@ -1061,6 +1104,42 @@ export function ContentDetailModal({
                             }
                         </button>
 
+                        {/* ✓ Marcar visto manual (filmes; episódios têm o ✓ por linha) */}
+                        {contentType === 'movie' && (
+                            <button
+                                onClick={() => {
+                                    if (movieProgress?.completed) {
+                                        movieProgressService.clearMovieProgress(contentId);
+                                    } else {
+                                        // 100% assistido sem reprodução: completed = progress >= 95.
+                                        movieProgressService.saveMovieTime(contentId, contentData.name, 5400, 5400);
+                                    }
+                                    setRefresh(r => r + 1);
+                                }}
+                                style={{
+                                    width: 50,
+                                    height: 50,
+                                    borderRadius: '50%',
+                                    border: movieProgress?.completed
+                                        ? '2px solid #10b981'
+                                        : '2px solid rgba(255, 255, 255, 0.2)',
+                                    background: movieProgress?.completed
+                                        ? 'rgba(16, 185, 129, 0.2)'
+                                        : 'rgba(255, 255, 255, 0.05)',
+                                    color: 'white',
+                                    fontSize: 20,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'all 0.2s'
+                                }}
+                                title={movieProgress?.completed ? t('contentModal', 'unmarkWatched') : t('contentModal', 'markWatched')}
+                            >
+                                {movieProgress?.completed ? '✅' : '☑️'}
+                            </button>
+                        )}
+
                         {/* Favorite Button */}
                         <button
                             onClick={() => {
@@ -1096,6 +1175,63 @@ export function ContentDetailModal({
                             {favoritesService.has(contentId, contentType) ? '❤️' : '🤍'}
                         </button>
                     </div>
+
+                    {/* 🎬 Coleção TMDB (franquia) */}
+                    {contentType === 'movie' && collection && collection.parts.length > 1 && (
+                        <div style={{ marginTop: 24 }}>
+                            <h3 style={{ color: 'white', fontSize: 15, fontWeight: 700, marginBottom: 10 }}>
+                                🎬 {collection.name}
+                            </h3>
+                            <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6 }}>
+                                {collection.parts.map(part => (
+                                    <div key={part.id} style={{ width: 92, flexShrink: 0 }} title={part.title}>
+                                        {part.poster_path ? (
+                                            <img
+                                                src={`https://image.tmdb.org/t/p/w185${part.poster_path}`}
+                                                alt={part.title}
+                                                loading="lazy"
+                                                style={{
+                                                    width: 92, height: 138, objectFit: 'cover', borderRadius: 8,
+                                                    border: part.id === tmdbDetails?.id
+                                                        ? '2px solid var(--ns-accent)'
+                                                        : '2px solid transparent'
+                                                }}
+                                            />
+                                        ) : (
+                                            <div style={{ width: 92, height: 138, borderRadius: 8, background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>🎬</div>
+                                        )}
+                                        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {part.title}{part.release_date ? ` (${part.release_date.slice(0, 4)})` : ''}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 🍿 Parecidos com este (TMDB /similar) */}
+                    {similar.length > 0 && (
+                        <div style={{ marginTop: 24 }}>
+                            <h3 style={{ color: 'white', fontSize: 15, fontWeight: 700, marginBottom: 10 }}>
+                                🍿 {t('contentModal', 'similarTitle')}
+                            </h3>
+                            <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6 }}>
+                                {similar.map(item => (
+                                    <div key={item.id} style={{ width: 92, flexShrink: 0 }} title={item.title}>
+                                        <img
+                                            src={`https://image.tmdb.org/t/p/w185${item.poster_path}`}
+                                            alt={item.title}
+                                            loading="lazy"
+                                            style={{ width: 92, height: 138, objectFit: 'cover', borderRadius: 8 }}
+                                        />
+                                        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {item.title}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
 
