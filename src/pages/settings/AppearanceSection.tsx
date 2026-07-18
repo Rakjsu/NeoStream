@@ -7,7 +7,9 @@ import {
 import {
     ACCENT_PRESETS,
     BACKGROUND_PRESETS,
-    useTheme
+    UI_SCALES,
+    useTheme,
+    type UiScale
 } from '../../services/themeService';
 
 export function AppearanceSection() {
@@ -194,6 +196,55 @@ export function AppearanceSection() {
                             );
                         })}
                     </div>
+                </div>
+
+                {/* ♿ Alto contraste */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>♿ {t('appearance', 'contrast')}</label>
+                        <p>{t('appearance', 'contrastDesc')}</p>
+                    </div>
+                    <label className="toggle-switch">
+                        <input
+                            type="checkbox"
+                            checked={theme.contrast}
+                            onChange={(e) => setTheme({ contrast: e.target.checked })}
+                        />
+                        <span className="toggle-slider"></span>
+                    </label>
+                </div>
+
+                {/* 🪶 Reduzir animações */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>🪶 {t('appearance', 'reducedMotion')}</label>
+                        <p>{t('appearance', 'reducedMotionDesc')}</p>
+                    </div>
+                    <label className="toggle-switch">
+                        <input
+                            type="checkbox"
+                            checked={theme.reducedMotion}
+                            onChange={(e) => setTheme({ reducedMotion: e.target.checked })}
+                        />
+                        <span className="toggle-slider"></span>
+                    </label>
+                </div>
+
+                {/* 🔠 Escala da interface */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>🔠 {t('appearance', 'uiScale')}</label>
+                        <p>{t('appearance', 'uiScaleDesc')}</p>
+                    </div>
+                    <select
+                        value={theme.scale}
+                        onChange={(e) => setTheme({ scale: Number(e.target.value) as UiScale })}
+                        style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.06)', color: 'white', border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer' }}
+                    >
+                        {UI_SCALES.map(scale => (
+                            <option key={scale} value={scale} style={{ color: '#000' }}>{scale}%</option>
+                        ))}
+                    </select>
                 </div>
 
                 {/* Partial theming note */}

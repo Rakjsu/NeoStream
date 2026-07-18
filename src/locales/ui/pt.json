@@ -593,6 +593,12 @@
     "colorRed": "Vermelho",
     "colorOrange": "Laranja",
     "colorPink": "Rosa",
+    "contrast": "Alto contraste",
+    "contrastDesc": "Fundo preto e textos reforçados pra máxima legibilidade.",
+    "reducedMotion": "Reduzir animações",
+    "reducedMotionDesc": "Corta transições e animações da interface.",
+    "uiScale": "Escala da interface",
+    "uiScaleDesc": "Aumenta ou diminui o tamanho de tudo (90%–125%).",
     "note": "Algumas telas ainda mantêm a paleta clássica por enquanto."
   },
   "dashboard": {

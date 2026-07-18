@@ -469,6 +469,12 @@
     "colorRed": "Rojo",
     "colorOrange": "Naranja",
     "colorPink": "Rosa",
+    "contrast": "Alto contraste",
+    "contrastDesc": "Fondo negro y textos reforzados para máxima legibilidad.",
+    "reducedMotion": "Reducir animaciones",
+    "reducedMotionDesc": "Corta transiciones y animaciones de la interfaz.",
+    "uiScale": "Escala de la interfaz",
+    "uiScaleDesc": "Agranda o reduce todo (90%–125%).",
     "note": "Algunas pantallas aún mantienen la paleta clásica por ahora."
   },
   "backup": {

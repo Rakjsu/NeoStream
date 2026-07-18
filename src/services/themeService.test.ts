@@ -79,7 +79,7 @@ describe('cssVariablesFor', () => {
     })
 
     it('amoled + azul switches background and accent variables', () => {
-        const vars = cssVariablesFor({ background: 'amoled', accent: 'azul' })
+        const vars = cssVariablesFor({ ...DEFAULT_THEME, background: 'amoled', accent: 'azul' })
         expect(vars['--ns-bg-deep']).toBe('#000000')
         expect(vars['--ns-bg-panel']).toBe('#0a0a0f')
         expect(vars['--ns-accent']).toBe('#3b82f6')
@@ -95,9 +95,9 @@ describe('parseStoredTheme', () => {
 
     it('falls back per-field on unknown values', () => {
         expect(parseStoredTheme(JSON.stringify({ background: 'neon', accent: 'verde' })))
-            .toEqual({ background: 'default', accent: 'verde' })
+            .toEqual({ ...DEFAULT_THEME, accent: 'verde' })
         expect(parseStoredTheme(JSON.stringify({ background: 'amoled', accent: 'cyan' })))
-            .toEqual({ background: 'amoled', accent: 'roxo' })
+            .toEqual({ ...DEFAULT_THEME, background: 'amoled' })
     })
 })
 
@@ -105,15 +105,41 @@ describe('persistence round-trip', () => {
     it('setTheme persists to localStorage under neostream_theme', () => {
         themeService.setTheme({ background: 'amoled', accent: 'rosa' })
         const stored = JSON.parse(localStorage.getItem('neostream_theme')!) as Theme
-        expect(stored).toEqual({ background: 'amoled', accent: 'rosa' })
+        expect(stored).toEqual({ ...DEFAULT_THEME, background: 'amoled', accent: 'rosa' })
         expect(parseStoredTheme(localStorage.getItem('neostream_theme'))).toEqual(stored)
     })
 
     it('partial setTheme keeps the other field', () => {
         themeService.setTheme({ accent: 'laranja' })
-        expect(themeService.getTheme()).toEqual({ background: 'default', accent: 'laranja' })
+        expect(themeService.getTheme()).toEqual({ ...DEFAULT_THEME, accent: 'laranja' })
         themeService.setTheme({ background: 'amoled' })
-        expect(themeService.getTheme()).toEqual({ background: 'amoled', accent: 'laranja' })
+        expect(themeService.getTheme()).toEqual({ ...DEFAULT_THEME, background: 'amoled', accent: 'laranja' })
+    })
+})
+
+describe('a11y do tema (contraste, animações, escala)', () => {
+    it('parseStoredTheme valida os campos novos e ignora lixo', () => {
+        expect(parseStoredTheme(JSON.stringify({ contrast: true, reducedMotion: true, scale: 125 })))
+            .toEqual({ ...DEFAULT_THEME, contrast: true, reducedMotion: true, scale: 125 })
+        expect(parseStoredTheme(JSON.stringify({ scale: 300 })).scale).toBe(100)
+        expect(parseStoredTheme(JSON.stringify({ contrast: 'yes' })).contrast).toBe(false)
+    })
+
+    it('contraste força fundo preto e a escala vira --ns-ui-scale', () => {
+        const vars = cssVariablesFor({ ...DEFAULT_THEME, contrast: true, scale: 110 })
+        expect(vars['--ns-bg-deep']).toBe('#000000')
+        expect(vars['--ns-ui-scale']).toBe('1.1')
+        expect(cssVariablesFor(DEFAULT_THEME)['--ns-ui-scale']).toBe('1')
+    })
+
+    it('apply() estampa data-contrast e data-motion no <html>', () => {
+        themeService.setTheme({ contrast: true, reducedMotion: true })
+        const root = document.documentElement
+        expect(root.getAttribute('data-contrast')).toBe('1')
+        expect(root.getAttribute('data-motion')).toBe('reduced')
+        themeService.setTheme({ contrast: false, reducedMotion: false })
+        expect(root.getAttribute('data-contrast')).toBe('0')
+        expect(root.getAttribute('data-motion')).toBe('normal')
     })
 })
 
