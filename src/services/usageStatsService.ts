@@ -5,6 +5,7 @@
 
 import { profileService } from './profileService';
 import { hourBucketOf, type HourBucket } from './habitProfile';
+import { getActivePlaylistId } from './activePlaylistService';
 
 export interface WatchSession {
     contentId: string;
@@ -15,6 +16,8 @@ export interface WatchSession {
     genre?: string;
     /** Time of day the session started (fuels habit-aware recommendations). */
     hourBucket?: HourBucket;
+    /** Playlist ativa na hora de assistir (alimenta o tempo por playlist). */
+    playlistId?: string;
 }
 
 export interface DailyStats {
@@ -235,7 +238,8 @@ class UsageStatsService {
                     watchedSeconds: seconds,
                     date: today,
                     genre,
-                    hourBucket: hourBucketOf(new Date().getHours())
+                    hourBucket: hourBucketOf(new Date().getHours()),
+                    playlistId: getActivePlaylistId()
                 });
             }
         }
@@ -260,9 +264,9 @@ class UsageStatsService {
         // Update watch streak
         this.updateStreak(stats, today);
 
-        // Keep only last 90 days of daily stats
+        // Keep a full year of daily stats (fuels the 365-day heatmap)
         const ninetyDaysAgo = new Date();
-        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+        ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 365);
         const cutoffDate = ninetyDaysAgo.toISOString().split('T')[0];
         stats.dailyStats = stats.dailyStats.filter(d => d.date >= cutoffDate);
 
