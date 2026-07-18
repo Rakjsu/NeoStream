@@ -528,6 +528,8 @@
     "exportCanceled": "Export canceled",
     "exportError": "Error exporting the report",
     "openLogs": "Open logs folder",
+    "exportLog": "Export log",
+    "exportLogFail": "Could not export the log.",
     "healthTitle": "Provider health",
     "healthDesc": "Measures latency of the active provider endpoints (API, channels, EPG)",
     "healthTest": "Test now",
