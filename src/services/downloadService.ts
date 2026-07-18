@@ -354,6 +354,8 @@ class DownloadService {
                     item.completedAt = Date.now();
                     this.emit('completed', item);
                     this.saveDownload(item);
+                    // 🧠 Smart downloads: engatilha o próximo episódio da série.
+                    void this.maybeQueueNextEpisode(item);
                     // Send completed notification
                     appNotificationService.addDownloadNotification(
                         'complete',
@@ -429,6 +431,58 @@ class DownloadService {
     }
 
     // Resume download
+    /** Smart downloads: baixar o próximo episódio quando um termina. */
+    isSmartDownloads(): boolean {
+        return localStorage.getItem('neostream_dl_smart') === '1';
+    }
+
+    setSmartDownloads(enabled: boolean): void {
+        localStorage.setItem('neostream_dl_smart', enabled ? '1' : '0');
+    }
+
+    /**
+     * 🧠 Ao concluir um EPISÓDIO, enfileira o seguinte da mesma série
+     * (S+1E1 quando a temporada acaba). Oportunista: qualquer falha de
+     * IPC/provedor simplesmente não enfileira nada.
+     */
+    private async maybeQueueNextEpisode(item: DownloadItem): Promise<void> {
+        if (!this.isSmartDownloads()) return;
+        if (item.type !== 'episode' || !item.seriesId || !item.season || !item.episode) return;
+        try {
+            const result = await window.ipcRenderer.invoke('series:get-info', { seriesId: item.seriesId }) as {
+                success?: boolean;
+                info?: { episodes?: Record<string, { id: number | string; episode_num: number | string; container_extension?: string }[]> };
+            };
+            const seasons = result?.info?.episodes ?? {};
+            let nextSeason = item.season;
+            let nextEpisode = item.episode + 1;
+            let next = (seasons[String(nextSeason)] ?? []).find(ep => Number(ep.episode_num) === nextEpisode);
+            if (!next) {
+                nextSeason = item.season + 1;
+                nextEpisode = 1;
+                next = (seasons[String(nextSeason)] ?? []).find(ep => Number(ep.episode_num) === 1);
+            }
+            if (!next) return;
+            const duplicate = Array.from(this.downloads.values()).some(existing =>
+                existing.seriesId === item.seriesId
+                && existing.season === nextSeason
+                && existing.episode === nextEpisode
+                && existing.status !== 'failed');
+            if (duplicate) return;
+            const urlResult = await window.ipcRenderer.invoke('streams:get-series-url', {
+                streamId: next.id,
+                container: next.container_extension
+            }) as { success?: boolean; url?: string };
+            if (!urlResult?.url) return;
+            await this.addDownload(item.seriesName || item.name, 'episode', urlResult.url, item.cover, {
+                seriesName: item.seriesName || item.name,
+                seriesId: item.seriesId,
+                season: nextSeason,
+                episode: nextEpisode
+            });
+        } catch { /* oportunista — sem próximo episódio, sem drama */ }
+    }
+
     async resumeDownload(id: string): Promise<void> {
         const item = this.downloads.get(id);
         if (item && (item.status === 'paused' || item.status === 'failed')) {

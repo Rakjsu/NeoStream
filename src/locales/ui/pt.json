@@ -917,6 +917,8 @@
     "maxConcurrent": "Downloads simultâneos",
     "nightOnly": "Baixar só de madrugada (00h–06h)",
     "nightOnlyDesc": "A fila espera e roda sozinha entre meia-noite e 6h",
+    "smartDl": "Smart downloads",
+    "smartDlDesc": "Ao terminar um episódio, o próximo da série entra na fila sozinho.",
     "pauseDownload": "Pausar download",
     "convertMp4": "Converter pra MP4 (sem perda)",
     "converting": "🎞️ Convertendo pra MP4...",
