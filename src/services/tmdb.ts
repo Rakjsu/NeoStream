@@ -744,3 +744,37 @@ export async function fetchPersonFilmography(personId: number): Promise<TMDBSimi
         return [];
     }
 }
+
+/** 🎭 Resultado da busca de pessoa: nome + títulos da filmografia (elenco + direção). */
+export interface PersonCreditsResult {
+    personName: string;
+    titles: string[];
+}
+
+/** Busca uma pessoa (ator/diretor) no TMDB e devolve os títulos da filmografia. */
+export async function searchPersonCredits(query: string): Promise<PersonCreditsResult | null> {
+    const apiKey = getTmdbApiKey();
+    if (!apiKey || query.trim().length < 3) return null;
+    try {
+        const searchRes = await fetch(`${TMDB_BASE_URL}/search/person?api_key=${apiKey}&language=pt-BR&query=${encodeURIComponent(query.trim())}`);
+        if (!searchRes.ok) return null;
+        const searchJson = await searchRes.json() as { results?: { id: number; name: string }[] };
+        const person = searchJson.results?.[0];
+        if (!person) return null;
+        const creditsRes = await fetch(`${TMDB_BASE_URL}/person/${person.id}/combined_credits?api_key=${apiKey}&language=pt-BR`);
+        if (!creditsRes.ok) return null;
+        type Credit = { title?: string; name?: string; original_title?: string; original_name?: string; job?: string };
+        const creditsJson = await creditsRes.json() as { cast?: Credit[]; crew?: Credit[] };
+        const titles = new Set<string>();
+        const collect = (credit: Credit) => {
+            for (const t of [credit.title, credit.name, credit.original_title, credit.original_name]) {
+                if (t) titles.add(t);
+            }
+        };
+        (creditsJson.cast ?? []).forEach(collect);
+        (creditsJson.crew ?? []).filter(c => c.job === 'Director').forEach(collect);
+        return titles.size > 0 ? { personName: person.name, titles: [...titles] } : null;
+    } catch {
+        return null;
+    }
+}

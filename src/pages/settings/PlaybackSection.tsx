@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { SCREENSAVER_MINUTES_KEY } from '../../components/ShowcaseScreensaver';
 import { catalogRefreshService, REFRESH_INTERVAL_OPTIONS, type RefreshIntervalHours } from '../../services/catalogRefreshService';
 import { newEpisodeNotifier } from '../../services/newEpisodeNotifier';
 import { playbackService } from '../../services/playbackService';
@@ -19,6 +20,7 @@ export function PlaybackSection() {
     const [refreshInterval, setRefreshInterval] = useState<RefreshIntervalHours>(() => catalogRefreshService.getIntervalHours());
     const [notifyNewEpisodes, setNotifyNewEpisodes] = useState<boolean>(() => newEpisodeNotifier.isEnabled());
     const [transcodeRescue, setTranscodeRescue] = useState<boolean>(() => localStorage.getItem('neostream_transcode_rescue') !== '0');
+    const [screensaverMin, setScreensaverMin] = useState<number>(() => parseInt(localStorage.getItem(SCREENSAVER_MINUTES_KEY) || '0', 10) || 0);
     const [playbackConfig, setPlaybackConfig] = useState<PlaybackConfig>(playbackService.getConfig());
     // Multi-monitor: where the PiP window opens (list comes from the main process).
     const [pipDisplays, setPipDisplays] = useState<{ id: number; label: string; width: number; height: number; primary: boolean }[]>([]);
@@ -148,6 +150,26 @@ export function PlaybackSection() {
                         />
                         <span className="toggle-slider"></span>
                     </label>
+                </div>
+
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>{t('playback', 'screensaver')}</label>
+                        <p>{t('playback', 'screensaverDesc')}</p>
+                    </div>
+                    <select
+                        value={screensaverMin}
+                        onChange={(e) => {
+                            const minutes = parseInt(e.target.value, 10) || 0;
+                            localStorage.setItem(SCREENSAVER_MINUTES_KEY, String(minutes));
+                            setScreensaverMin(minutes);
+                        }}
+                    >
+                        <option value="0">{t('playback', 'screensaverOff')}</option>
+                        {[3, 5, 10, 20].map(minutes => (
+                            <option key={minutes} value={minutes}>{minutes} min</option>
+                        ))}
+                    </select>
                 </div>
 
                 <div className="setting-item">

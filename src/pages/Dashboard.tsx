@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Sidebar } from '../components/Sidebar';
 import { GlobalSearch } from '../components/GlobalSearch';
+import { ShowcaseScreensaver } from '../components/ShowcaseScreensaver';
 import { ShortcutsOverlay } from '../components/ShortcutsOverlay';
 import { useSpatialNavigation } from '../hooks/useSpatialNavigation';
 
@@ -31,6 +32,7 @@ export function Dashboard() {
             </main>
             {/* Ctrl+K / Cmd+K global search overlay — available on all dashboard pages */}
             <GlobalSearch />
+            <ShowcaseScreensaver />
             {/* "?" keyboard shortcuts cheatsheet */}
             <ShortcutsOverlay />
         </div>
