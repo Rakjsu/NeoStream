@@ -337,6 +337,8 @@
     "done": "Done"
   },
   "network": {
+    "devicesDisconnect": "Disconnect",
+    "historyTitle": "Connection history",
     "webRemoteTitle": "Phone remote",
     "webRemoteDesc": "Opens a remote in your phone's browser (same Wi-Fi) with play/pause, volume and skip",
     "webRemoteOpen": "Open on your phone",

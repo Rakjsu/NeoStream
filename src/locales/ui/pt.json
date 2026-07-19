@@ -789,6 +789,8 @@
     "done": "Concluir"
   },
   "network": {
+    "devicesDisconnect": "Desconectar",
+    "historyTitle": "Histórico de conexões",
     "webRemoteTitle": "Controle pelo celular",
     "webRemoteDesc": "Abre um controle remoto no navegador do celular (mesma rede Wi-Fi) com play/pause, volume e avançar/voltar",
     "webRemoteOpen": "Abra no celular",
