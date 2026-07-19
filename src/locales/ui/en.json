@@ -325,8 +325,6 @@
     "persona_zapper": "Live TV zapper",
     "persona_explorer": "A-bit-of-everything explorer",
     "share": "Save image",
-    "shareSaved": "Image saved! Share it anywhere",
-    "shareError": "Could not generate the image",
     "topKicker": "Your screen champions",
     "habitsKicker": "Your habits",
     "streakLine": "days in a row on your longest streak",
@@ -405,8 +403,6 @@
     "pipDisplayDesc": "Which monitor the floating window opens on",
     "pipDisplayAuto": "Automatic (primary)",
     "catalogRefresh": "Auto-refresh catalog",
-    "transcodeRescue": "Rescue transcoding (ffmpeg)",
-    "transcodeRescueDesc": "When a channel/movie fails due to codecs (H.265, AC3), converts it on the fly to a compatible format",
     "screensaver": "Showcase mode (screensaver)",
     "screensaverDesc": "After a while idle, shows catalog covers full screen",
     "screensaverOff": "Off",
@@ -824,8 +820,6 @@
     "disableSubtitles": "Disable Subtitles",
     "errorLoadingSubtitles": "Error loading forced subtitles",
     "streamFallback": "Switching to",
-    "transcodeTrying": "Incompatible stream — converting with ffmpeg...",
-    "transcodeActive": "Converted: playing via ffmpeg",
     "streamUnavailable": "Stream unavailable. No alternative found."
   },
   "home": {

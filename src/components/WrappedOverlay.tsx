@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { X, ChevronRight, ChevronLeft, Download } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft } from 'lucide-react';
 import { buildWrapped, type WrappedData, type WrappedPersona } from '../services/wrappedHelpers';
 import { usageStatsService } from '../services/usageStatsService';
 import { useLanguage } from '../services/languageService';
@@ -17,130 +17,10 @@ const PERSONA_EMOJI: Record<WrappedPersona, string> = {
 
 const TYPE_EMOJI: Record<string, string> = { movie: '🎬', series: '📺', live: '📡' };
 
-/**
- * Draw the shareable 1080×1350 card on an offscreen canvas. Everything is
- * local (no network); the caller ships the data-URL to the main process for
- * the save dialog.
- */
-function drawWrappedCard(
-    wrapped: WrappedData,
-    labels: {
-        kicker: string; hoursLine: string; persona: string; personaEmoji: string;
-        topKicker: string; streakLine: string; footer: string;
-    },
-): string {
-    const width = 1080;
-    const height = 1350;
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return '';
-
-    // Background: dark base + two radial glows (same look as the overlay).
-    ctx.fillStyle = '#12121c';
-    ctx.fillRect(0, 0, width, height);
-    const glow1 = ctx.createRadialGradient(120, 0, 0, 120, 0, 900);
-    glow1.addColorStop(0, 'rgba(99, 102, 241, 0.4)');
-    glow1.addColorStop(1, 'rgba(99, 102, 241, 0)');
-    ctx.fillStyle = glow1;
-    ctx.fillRect(0, 0, width, height);
-    const glow2 = ctx.createRadialGradient(width - 100, height, 0, width - 100, height, 900);
-    glow2.addColorStop(0, 'rgba(236, 72, 153, 0.35)');
-    glow2.addColorStop(1, 'rgba(236, 72, 153, 0)');
-    ctx.fillStyle = glow2;
-    ctx.fillRect(0, 0, width, height);
-
-    ctx.textAlign = 'center';
-
-    // Header
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.font = '600 34px "Segoe UI", sans-serif';
-    ctx.fillText(labels.kicker.toUpperCase(), width / 2, 120);
-
-    // Hours hero
-    ctx.fillStyle = '#c7b7fc';
-    ctx.font = '800 180px "Segoe UI", sans-serif';
-    ctx.fillText(`${wrapped.totalHours}h`, width / 2, 320);
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.font = '400 40px "Segoe UI", sans-serif';
-    ctx.fillText(labels.hoursLine, width / 2, 390);
-
-    // Persona
-    ctx.font = '110px "Segoe UI Emoji", sans-serif';
-    ctx.fillText(labels.personaEmoji, width / 2, 560);
-    ctx.fillStyle = 'white';
-    ctx.font = '700 52px "Segoe UI", sans-serif';
-    ctx.fillText(labels.persona, width / 2, 640);
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.font = '400 36px "Segoe UI", sans-serif';
-    ctx.fillText(`🎬 ${wrapped.share.movies}%   📺 ${wrapped.share.series}%   📡 ${wrapped.share.live}%`, width / 2, 700);
-
-    // Top content
-    if (wrapped.topContent.length > 0) {
-        ctx.fillStyle = 'rgba(255,255,255,0.6)';
-        ctx.font = '600 32px "Segoe UI", sans-serif';
-        ctx.fillText(labels.topKicker.toUpperCase(), width / 2, 800);
-        ctx.textAlign = 'left';
-        wrapped.topContent.slice(0, 5).forEach((item, index) => {
-            const y = 870 + index * 74;
-            ctx.fillStyle = 'rgba(255,255,255,0.06)';
-            const boxY = y - 46;
-            ctx.beginPath();
-            ctx.roundRect(90, boxY, width - 180, 62, 14);
-            ctx.fill();
-            ctx.fillStyle = '#a5b4fc';
-            ctx.font = '800 38px "Segoe UI", sans-serif';
-            ctx.fillText(String(index + 1), 120, y);
-            ctx.fillStyle = 'white';
-            ctx.font = '400 34px "Segoe UI", sans-serif';
-            const name = item.name.length > 38 ? `${item.name.slice(0, 37)}…` : item.name;
-            ctx.fillText(name, 180, y);
-            ctx.fillStyle = 'rgba(255,255,255,0.55)';
-            ctx.textAlign = 'right';
-            ctx.fillText(`${Math.max(1, Math.round(item.seconds / 3600))}h`, width - 120, y);
-            ctx.textAlign = 'left';
-        });
-        ctx.textAlign = 'center';
-    }
-
-    // Streak + footer
-    ctx.fillStyle = 'rgba(255,255,255,0.8)';
-    ctx.font = '400 38px "Segoe UI", sans-serif';
-    ctx.fillText(`🔥 ${wrapped.longestStreakDays} ${labels.streakLine}`, width / 2, 1265);
-    ctx.fillStyle = 'rgba(255,255,255,0.45)';
-    ctx.font = '600 30px "Segoe UI", sans-serif';
-    ctx.fillText(labels.footer, width / 2, 1320);
-
-    return canvas.toDataURL('image/png');
-}
-
 export function WrappedOverlay({ onClose }: { onClose: () => void }) {
     const { t, language } = useLanguage();
     const wrapped: WrappedData = useMemo(() => buildWrapped(usageStatsService.getStats()), []);
     const [slide, setSlide] = useState(0);
-    const [shareMsg, setShareMsg] = useState<string | null>(null);
-
-    const handleShare = async () => {
-        setShareMsg(null);
-        const dataUrl = drawWrappedCard(wrapped, {
-            kicker: t('wrapped', 'kicker'),
-            hoursLine: t('wrapped', 'hoursLine'),
-            persona: t('wrapped', `persona_${wrapped.persona}`),
-            personaEmoji: PERSONA_EMOJI[wrapped.persona],
-            topKicker: t('wrapped', 'topKicker'),
-            streakLine: t('wrapped', 'streakLine'),
-            footer: 'NeoStream',
-        });
-        if (!dataUrl) {
-            setShareMsg(t('wrapped', 'shareError'));
-            return;
-        }
-        const result = await window.ipcRenderer.invoke('wrapped:save-png', { dataUrl })
-            .catch(() => null) as { success: boolean; canceled?: boolean } | null;
-        if (result?.success) setShareMsg(t('wrapped', 'shareSaved'));
-        else if (!result?.canceled) setShareMsg(t('wrapped', 'shareError'));
-    };
 
     const weekdayName = (day: number) => {
         const locale = { pt: 'pt-BR', en: 'en-US', es: 'es-ES' }[language] ?? 'pt-BR';
@@ -226,10 +106,6 @@ export function WrappedOverlay({ onClose }: { onClose: () => void }) {
                 ) : (
                     <>
                         {slides[slide]}
-                        <button className="wrapped-share" onClick={() => void handleShare()}>
-                            <Download size={14} /> {t('wrapped', 'share')}
-                        </button>
-                        {shareMsg && <p className="wrapped-share-msg">{shareMsg}</p>}
                         <div className="wrapped-nav">
                             <button
                                 className="wrapped-nav-btn"
