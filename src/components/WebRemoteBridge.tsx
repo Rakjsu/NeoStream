@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { CastQueueItem } from '../services/castQueue';
 import { watchProgressService } from '../services/watchProgressService';
+import { getProtectedRecordings, toggleProtectedRecording } from '../services/dvrSweep';
 import { scheduledRecordingService } from '../services/scheduledRecordingService';
 import { movieProgressService } from '../services/movieProgressService';
 import { usageStatsService } from '../services/usageStatsService';
@@ -380,6 +381,10 @@ export function WebRemoteBridge() {
                 window.ipcRenderer.send('web-remote:record-result', { status: 'error', name });
                 return;
             }
+            if (getProtectedRecordings().has(file.path)) {
+                window.ipcRenderer.send('web-remote:record-result', { status: 'protected', name })
+                return
+            }
             const res = await window.ipcRenderer.invoke('dvr:delete-file', { path: file.path })
                 .catch(() => null) as { success: boolean } | null;
             window.ipcRenderer.send('web-remote:record-result', { status: res?.success ? 'deleted' : 'error', name });
@@ -401,7 +406,7 @@ export function WebRemoteBridge() {
             const res = await window.ipcRenderer.invoke('dvr:active').catch(() => null) as
                 { success: boolean; recordings?: { id: string; channelName: string; seconds: number }[] } | null;
             const filesRes = await window.ipcRenderer.invoke('dvr:list-files').catch(() => null) as
-                { success: boolean; files?: { name: string; sizeBytes: number; recording: boolean }[] } | null;
+                { success: boolean; files?: { name: string; path: string; sizeBytes: number; recording: boolean }[] } | null;
             const scheduled = scheduledRecordingService.list()
                 .slice()
                 .sort((a, b) => (Date.parse(a.startIso) || 0) - (Date.parse(b.startIso) || 0))
@@ -410,9 +415,45 @@ export function WebRemoteBridge() {
             window.ipcRenderer.send('web-remote:recordings', {
                 items: (res?.recordings ?? []).map(r => ({ id: r.id, channelName: r.channelName, seconds: r.seconds })),
                 files: (filesRes?.files ?? []).filter(f => !f.recording).slice(0, 10)
-                    .map(f => ({ name: f.name, sizeMb: Math.round(f.sizeBytes / 1048576) })),
+                    .map(f => ({ name: f.name, sizeMb: Math.round(f.sizeBytes / 1048576), locked: getProtectedRecordings().has(f.path) })),
                 scheduled,
             });
+        };
+
+        // ✏️ Renomeia uma gravação pronta a pedido do celular (resolve name→path).
+        const renameRecording = async (name: string, newName: string) => {
+            const filesRes = await window.ipcRenderer.invoke('dvr:list-files').catch(() => null) as
+                { success: boolean; files?: { name: string; path: string; recording: boolean }[] } | null;
+            const file = (filesRes?.files ?? []).find(f => f.name === name && !f.recording);
+            const res = file && newName.trim()
+                ? await window.ipcRenderer.invoke('dvr:rename-file', { path: file.path, name: newName.trim() })
+                    .catch(() => null) as { success: boolean } | null
+                : null;
+            window.ipcRenderer.send('web-remote:record-result', { status: res?.success ? 'renamed' : 'error', name });
+            void pushRecordings();
+        };
+
+        // 🔐 Alterna a proteção contra exclusão (mesma flag do sweep do desktop).
+        const toggleProtect = async (name: string) => {
+            const filesRes = await window.ipcRenderer.invoke('dvr:list-files').catch(() => null) as
+                { success: boolean; files?: { name: string; path: string; recording: boolean }[] } | null;
+            const file = (filesRes?.files ?? []).find(f => f.name === name && !f.recording);
+            if (!file) {
+                window.ipcRenderer.send('web-remote:record-result', { status: 'error', name });
+                return;
+            }
+            toggleProtectedRecording(file.path);
+            const lockedNow = getProtectedRecordings().has(file.path);
+            window.ipcRenderer.send('web-remote:record-result', { status: lockedNow ? 'protected' : 'unprotected', name });
+            void pushRecordings();
+        };
+
+        // 🖐️ Trackpad do celular: swipes viram teclas de navegação no app.
+        const dispatchNavKey = (key: string) => {
+            const keyMap: Record<string, string> = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', ok: 'Enter', back: 'Escape' };
+            const mapped = keyMap[key];
+            if (!mapped) return;
+            document.dispatchEvent(new KeyboardEvent('keydown', { key: mapped, bubbles: true, cancelable: true }));
         };
 
         // ✖ on a scheduled row: unarm the timer (and stop it if already recording).
@@ -465,6 +506,9 @@ export function WebRemoteBridge() {
             else if (action === 'recordChannel') void recordChannel(String(arg ?? ''), typeof target === 'string' ? target : '');
             else if (action === 'stopRecord') void stopRecord(String(arg ?? ''));
             else if (action === 'deleteRecording') void deleteRecording(String(arg ?? ''));
+            else if (action === 'renameRecording') void renameRecording(String(arg ?? ''), String(target ?? ''));
+            else if (action === 'toggleProtectRecording') void toggleProtect(String(arg ?? ''));
+            else if (action === 'navKey') dispatchNavKey(String(arg ?? ''));
             else if (action === 'requestRecordings') void pushRecordings();
             else if (action === 'cancelSchedule') cancelSchedule(String(arg ?? ''));
             else if (action === 'castMovie') void castMovie(String(arg ?? ''), asTarget(target));

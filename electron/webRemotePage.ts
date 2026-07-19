@@ -230,6 +230,11 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
         <div class="hint hidden" id="remtitle" style="margin-top:10px"></div>
         <div id="remlist"></div>
       </div>
+      <div id="trackpad" style="margin-top:14px;height:130px;border:1px dashed rgba(255,255,255,.25);border-radius:12px;display:flex;align-items:center;justify-content:center;gap:10px;color:rgba(255,255,255,.4);font-size:12px;user-select:none;touch-action:none">
+        <span>${t.trackpadHint}</span>
+        <button class="ctl" id="navback" title="${t.navBack}" style="flex:none">↩</button>
+      </div>
+      <div id="hostsRow" style="margin-top:10px;font-size:12px;color:rgba(255,255,255,.5)"></div>
       <div class="hint" style="margin-top:16px">${t.hint}</div>
       <div class="card hidden" id="reccard" style="margin-top:14px;text-align:left">
         <div class="title">📼 ${t.recCardTitle}</div>
@@ -453,6 +458,16 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
               for (var rn in activeRecs) { if (activeRecs[rn] === msg.id) delete activeRecs[rn]; }
               showToast('⏹ ' + L.recStopped, 'ok');
               renderGuide();
+              sendCmd('requestRecordings');
+            } else if (msg.status === 'renamed') {
+              showToast('\u270f\ufe0f ' + L.recRenamed, 'ok');
+              sendCmd('requestRecordings');
+            } else if (msg.status === 'protected') {
+              pendingDelete = '';
+              showToast('\ud83d\udd10 ' + L.recProtected, 'ok');
+              sendCmd('requestRecordings');
+            } else if (msg.status === 'unprotected') {
+              showToast('\ud83d\udd13 ' + L.recUnprotected, 'ok');
               sendCmd('requestRecordings');
             } else if (msg.status === 'cancelled') {
               pendingCancel = '';
@@ -854,8 +869,10 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
         var f = recsData.files[fi];
         var confirming = pendingDelete === f.name;
         fhtml += '<div class="chitem"><div class="ph">📼</div>'
-          + '<div class="nm">' + esc(f.name) + '</div>'
+          + '<div class="nm">' + (f.locked ? '\ud83d\udd10 ' : '') + esc(f.name) + '</div>'
           + '<span style="flex:none;font-size:12px;color:rgba(255,255,255,.5)">' + (f.sizeMb || 0) + ' MB</span>'
+          + '<button class="chinfo" data-ren="' + esc(f.name) + '" title="' + L.recRename + '">\u270f\ufe0f</button>'
+          + '<button class="chinfo" data-lock="' + esc(f.name) + '" title="' + L.recProtect + '">' + (f.locked ? '\ud83d\udd10' : '\ud83d\udd13') + '</button>'
           + '<button class="chinfo" data-del="' + esc(f.name) + '" title="' + (confirming ? L.recDeleteConfirm : L.recDelete) + '"'
           + (confirming ? ' style="background:rgba(239,68,68,.45)"' : '') + '>' + (confirming ? '❗' : '🗑') + '</button></div>';
       }
@@ -884,6 +901,19 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
 
     recfilesEl.addEventListener('click', function (ev) {
       if (!ev.target.closest) return;
+      var ren = ev.target.closest('[data-ren]');
+      if (ren) {
+        var rname = ren.getAttribute('data-ren');
+        var newName = prompt(L.recRenamePrompt, rname || '');
+        if (newName && newName.trim() && rname) sendCmd('renameRecording', null, rname, null, newName.trim());
+        return;
+      }
+      var lockBtn = ev.target.closest('[data-lock]');
+      if (lockBtn) {
+        var lname = lockBtn.getAttribute('data-lock');
+        if (lname) sendCmd('toggleProtectRecording', null, lname);
+        return;
+      }
       var del = ev.target.closest('[data-del]');
       if (!del) return;
       var name = del.getAttribute('data-del');
@@ -1137,6 +1167,49 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
     if (focusBtn) focusBtn.addEventListener('click', function () { sendCmd('focusApp'); showToast('🖥️ ' + L.openApp, 'ok'); });
     var mvBtn = document.getElementById('mvbtn');
     if (mvBtn) mvBtn.addEventListener('click', function () { sendCmd('openMultiview'); showToast('🎛️ ' + L.openMultiview, 'ok'); });
+    var trackpadEl = document.getElementById('trackpad');
+    if (trackpadEl) {
+      var tpStart = null;
+      trackpadEl.addEventListener('touchstart', function (ev) {
+        var t0 = ev.touches[0];
+        tpStart = { x: t0.clientX, y: t0.clientY };
+      }, { passive: true });
+      trackpadEl.addEventListener('touchend', function (ev) {
+        if (!tpStart) return;
+        if (ev.target && ev.target.id === 'navback') { tpStart = null; return; }
+        var t1 = ev.changedTouches[0];
+        var dx = t1.clientX - tpStart.x;
+        var dy = t1.clientY - tpStart.y;
+        tpStart = null;
+        var key;
+        if (Math.abs(dx) < 24 && Math.abs(dy) < 24) key = 'ok';
+        else if (Math.abs(dx) > Math.abs(dy)) key = dx > 0 ? 'right' : 'left';
+        else key = dy > 0 ? 'down' : 'up';
+        sendCmd('navKey', null, key);
+      }, { passive: true });
+    }
+    var navBackBtn = document.getElementById('navback');
+    if (navBackBtn) navBackBtn.addEventListener('click', function () { sendCmd('navKey', null, 'back'); });
+    try {
+      var hostsKey = 'ns_remote_hosts';
+      var savedHosts = JSON.parse(localStorage.getItem(hostsKey) || '[]');
+      if (savedHosts.indexOf(location.origin) === -1) {
+        savedHosts.push(location.origin);
+        localStorage.setItem(hostsKey, JSON.stringify(savedHosts.slice(-5)));
+      }
+      var hostsEl = document.getElementById('hostsRow');
+      if (hostsEl && savedHosts.length > 1) {
+        var hostsHtml = '\ud83d\udda5\ufe0f ';
+        for (var hi = 0; hi < savedHosts.length; hi++) {
+          var host = savedHosts[hi];
+          var shortHost = host.replace('https://', '').replace('http://', '');
+          hostsHtml += host === location.origin
+            ? '<b style="color:#fff">' + shortHost + '</b> '
+            : '<a href="' + host + '" style="color:rgba(129,140,248,.9)">' + shortHost + '</a> ';
+        }
+        hostsEl.innerHTML = hostsHtml;
+      }
+    } catch (e) { /* sem localStorage o switcher s\u00f3 n\u00e3o aparece */ }
     var ssBtn = document.getElementById('ssbtn');
     if (ssBtn) ssBtn.addEventListener('click', function () { sendCmd('screenshot'); showToast('📷 ' + L.screenshotPc + '…', 'ok'); });
     function showScreenshot(dataUrl) {
@@ -1211,6 +1284,9 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
       if (action === 'recordChannel') { payload.channelId = channelId; payload.channelName = arg5; }
       if (action === 'stopRecord') payload.id = channelId;
       if (action === 'deleteRecording') payload.name = channelId;
+      if (action === 'renameRecording') { payload.name = channelId; payload.newName = arg5; }
+      if (action === 'toggleProtectRecording') payload.name = channelId;
+      if (action === 'navKey') payload.key = channelId;
       if (action === 'requestLiveSearch') payload.query = channelId;
       if (action === 'scheduleNext') payload.channelId = channelId;
       if (action === 'cancelSchedule') payload.id = channelId;

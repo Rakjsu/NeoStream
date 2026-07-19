@@ -281,7 +281,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 }
 
 // Actions that always go to the renderer (never routed to the cast session).
-const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule', 'requestRecordings', 'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode', 'sleep', 'requestStats', 'requestReminders', 'cancelReminder'])
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule', 'requestRecordings', 'renameRecording', 'toggleProtectRecording', 'navKey', 'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode', 'sleep', 'requestStats', 'requestReminders', 'cancelReminder'])
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
@@ -363,6 +363,12 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         win.webContents.send('media:control', 'stopRecord', command.id)
     } else if (command.action === 'deleteRecording') {
         win.webContents.send('media:control', 'deleteRecording', command.name)
+    } else if (command.action === 'renameRecording') {
+        win.webContents.send('media:control', 'renameRecording', command.name, command.newName)
+    } else if (command.action === 'toggleProtectRecording') {
+        win.webContents.send('media:control', 'toggleProtectRecording', command.name)
+    } else if (command.action === 'navKey') {
+        win.webContents.send('media:control', 'navKey', command.key)
     } else if (command.action === 'cancelReminder') {
         win.webContents.send('media:control', 'cancelReminder', command.id)
     } else if (command.action === 'scheduleNext') {
