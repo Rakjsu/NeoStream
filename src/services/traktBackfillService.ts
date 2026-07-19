@@ -7,7 +7,7 @@ import { movieProgressService } from './movieProgressService';
 import { watchProgressService } from './watchProgressService';
 import {
     fetchTraktWatchedMovies, fetchTraktWatchedShows, isTraktConnected,
-    syncTraktEpisodeWatched, syncTraktMovieWatched,
+    syncTraktEpisodeWatched, syncTraktMovieWatched, traktScrobble,
 } from './traktService';
 
 const PUSH_CAP = 30;
@@ -25,6 +25,10 @@ export function episodeKey(show: string, season: number, episode: number): strin
 export interface TraktBackfillReport {
     pushedMovies: number;
     pushedEpisodes: number;
+    /** Fase 2: tempos parciais enviados + vistos puxados do Trakt. */
+    pushedTimes: number;
+    pulledMovies: number;
+    pulledEpisodes: number;
     /** true quando tudo coube no lote — a flag "concluído" foi gravada. */
     complete: boolean;
 }
@@ -45,7 +49,7 @@ export async function runTraktBackfill(force = false): Promise<TraktBackfillRepo
     const movieSet = new Set(traktMovies.map(cleanTitle));
     const episodeSet = new Set(traktEpisodes.map(e => episodeKey(e.show, e.season, e.episode)));
 
-    const report: TraktBackfillReport = { pushedMovies: 0, pushedEpisodes: 0, complete: false };
+    const report: TraktBackfillReport = { pushedMovies: 0, pushedEpisodes: 0, pushedTimes: 0, pulledMovies: 0, pulledEpisodes: 0, complete: false };
     let budget = PUSH_CAP;
 
     // ---- Filmes ≥85% que nunca sincronizaram ----
@@ -81,6 +85,60 @@ export async function runTraktBackfill(force = false): Promise<TraktBackfillRepo
             report.pushedEpisodes++;
             budget--;
         }
+    }
+
+    // ---- Fase 2: tempos parciais (filme na metade) viram playback no Trakt ----
+    let pauseBudget = 10;
+    for (const entry of movieProgressService.getAllEntries()) {
+        if (pauseBudget <= 0) break;
+        if (entry.traktSynced || entry.progress < 5 || entry.progress >= 85) continue;
+        if (await traktScrobble({ kind: 'movie', title: entry.movieName }, 'pause', Math.round(entry.progress))) {
+            report.pushedTimes++;
+            pauseBudget--;
+        }
+    }
+
+    // ---- Fase 2 PULL: filmes vistos no Trakt viram vistos locais ----
+    try {
+        const vodResult = await window.ipcRenderer.invoke('streams:get-vod', {}) as {
+            success?: boolean; data?: { stream_id: number | string; name: string }[];
+        };
+        for (const movie of vodResult?.data ?? []) {
+            if (!movieSet.has(cleanTitle(movie.name))) continue;
+            movieProgressService.markWatchedFromTrakt(String(movie.stream_id), movie.name);
+            report.pulledMovies++;
+        }
+    } catch { /* catálogo indisponível — fica pra próxima rodada */ }
+
+    // ---- Fase 2 PULL: episódios vistos no Trakt viram vistos locais ----
+    if (traktEpisodes.length > 0) {
+        try {
+            const seriesResult = await window.ipcRenderer.invoke('streams:get-series', {}) as {
+                success?: boolean; data?: { series_id: number | string; name: string }[];
+            };
+            const seriesList = seriesResult?.data ?? [];
+            const byShow = new Map<string, { season: number; episode: number }[]>();
+            for (const ep of traktEpisodes) {
+                const key = cleanTitle(ep.show);
+                const list = byShow.get(key) ?? [];
+                list.push({ season: ep.season, episode: ep.episode });
+                byShow.set(key, list);
+            }
+            let showBudget = 15;
+            for (const [showName, eps] of byShow) {
+                if (showBudget <= 0) break;
+                const show = seriesList.find(candidate =>
+                    cleanTitle(candidate.name) === showName || candidate.name.toLowerCase().includes(showName));
+                if (!show) continue;
+                showBudget--;
+                for (const ep of eps) {
+                    const id = String(show.series_id);
+                    if (watchProgressService.isEpisodeWatched(id, ep.season, ep.episode)) continue;
+                    watchProgressService.markEpisodeWatched(id, ep.season, ep.episode);
+                    report.pulledEpisodes++;
+                }
+            }
+        } catch { /* catálogo indisponível — fica pra próxima rodada */ }
     }
 
     // Só marca "concluído" quando o lote NÃO estourou — senão a próxima

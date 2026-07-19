@@ -66,6 +66,26 @@ class MovieProgressService {
         return this.getProgress();
     }
 
+    /** Pull do Trakt: marca visto SEM disparar novo sync (traktSynced=true). */
+    markWatchedFromTrakt(movieId: string, movieName: string): void {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return;
+        const progress = this.getProgress();
+        if (progress.some(p => p.movieId === movieId)) return;
+        progress.push({
+            movieId,
+            movieName,
+            profileId: activeProfile.id,
+            currentTime: 0,
+            duration: 0,
+            progress: 96,
+            watchedAt: Date.now(),
+            traktSynced: true,
+            completed: true
+        });
+        this.saveProgress(progress);
+    }
+
     /** Marca traktSynced sem mexer no progresso (backfill do histórico). */
     markTraktSynced(movieId: string): void {
         const progress = this.getProgress();
