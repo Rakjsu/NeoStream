@@ -12,6 +12,7 @@ import {
     PIN_LOCK_MS,
     pickLanAddress,
     scoreLanCandidate,
+    parseProgressReport,
 } from './webRemoteProtocol'
 
 /** Mask a text payload as a browser client would (client→server frames). */
@@ -231,5 +232,31 @@ describe('pickLanAddress (escolhe a LAN real, não VPN/virtual)', () => {
     })
     it('scoreLanCandidate penaliza nomes virtuais', () => {
         expect(scoreLanCandidate('Ethernet', '10.0.0.5')).toBeGreaterThan(scoreLanCandidate('ZeroTier One', '10.0.0.5'))
+    })
+})
+
+describe('parseProgressReport (item 11 — sync de posições)', () => {
+    it('aceita amostra de filme válida', () => {
+        expect(parseProgressReport({ kind: 'movie', movieId: '42', title: 'Filme', positionSec: 300, durationSec: 6000, updatedAt: 1700000000000 }))
+            .toEqual({ kind: 'movie', movieId: '42', title: 'Filme', positionSec: 300, durationSec: 6000, updatedAt: 1700000000000 })
+    })
+
+    it('aceita episódio com série + SxxEyy', () => {
+        const report = parseProgressReport({ kind: 'episode', title: 'Minha Série', season: 2, episode: 5, positionSec: 10, durationSec: 1200, updatedAt: 1 })
+        expect(report?.season).toBe(2)
+        expect(report?.episode).toBe(5)
+    })
+
+    it('rejeita lixo: sem duração, sem movieId, número não finito', () => {
+        expect(parseProgressReport({ kind: 'movie', movieId: '42', title: 'x', positionSec: 1, durationSec: 0, updatedAt: 1 })).toBeNull()
+        expect(parseProgressReport({ kind: 'movie', title: 'x', positionSec: 1, durationSec: 10, updatedAt: 1 })).toBeNull()
+        expect(parseProgressReport({ kind: 'episode', title: 'x', season: NaN, episode: 1, positionSec: 1, durationSec: 10, updatedAt: 1 })).toBeNull()
+        expect(parseProgressReport(null)).toBeNull()
+    })
+
+    it('parseRemoteCommand roteia reportProgress com o report validado', () => {
+        const text = JSON.stringify({ action: 'reportProgress', report: { kind: 'movie', movieId: '7', title: 'F', positionSec: 60, durationSec: 600, updatedAt: 5 } })
+        const command = parseRemoteCommand(text)
+        expect(command).toEqual({ action: 'reportProgress', report: { kind: 'movie', movieId: '7', title: 'F', positionSec: 60, durationSec: 600, updatedAt: 5 } })
     })
 })

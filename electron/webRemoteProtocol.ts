@@ -152,12 +152,57 @@ export type RemoteCommand =
     | { action: 'toggleProtectRecording'; name: string }
     | { action: 'navKey'; key: 'up' | 'down' | 'left' | 'right' | 'ok' | 'back' }
     | { action: 'requestFavorites' }
+    | { action: 'reportProgress'; report: ProgressReport }
 
 const VALID_ACTIONS = new Set([
     'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'setVolume', 'setAudioTrack', 'playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule',
     'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestRecordings', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
-    'sleep', 'requestStats', 'focusApp', 'requestReminders', 'cancelReminder', 'openMultiview', 'screenshot', 'renameRecording', 'toggleProtectRecording', 'navKey', 'requestFavorites',
+    'sleep', 'requestStats', 'focusApp', 'requestReminders', 'cancelReminder', 'openMultiview', 'screenshot', 'renameRecording', 'toggleProtectRecording', 'navKey', 'requestFavorites', 'reportProgress',
 ])
+
+/**
+ * 🔄 Item 11: amostra de progresso trocada entre PC e celular.
+ * Filme casa por stream_id (mesma conta nos 2 lados); episódio casa por
+ * nome da série + SxxEyy (o celular não conhece o seriesId do desktop).
+ */
+export interface ProgressReport {
+    kind: 'movie' | 'episode'
+    /** stream_id do filme (só kind movie). */
+    movieId?: string
+    /** Filme: título; episódio: nome da série. */
+    title: string
+    season?: number
+    episode?: number
+    positionSec: number
+    durationSec: number
+    updatedAt: number
+}
+
+/** Valida uma amostra vinda do fio (entrada do celular, não confiável). PURO. */
+export function parseProgressReport(raw: unknown): ProgressReport | null {
+    if (raw === null || typeof raw !== 'object') return null
+    const r = raw as Record<string, unknown>
+    const kind = r.kind
+    if (kind !== 'movie' && kind !== 'episode') return null
+    const title = typeof r.title === 'string' ? r.title.trim().slice(0, 200) : ''
+    if (!title) return null
+    const positionSec = r.positionSec
+    const durationSec = r.durationSec
+    const updatedAt = r.updatedAt
+    if (typeof positionSec !== 'number' || !Number.isFinite(positionSec) || positionSec < 0) return null
+    if (typeof durationSec !== 'number' || !Number.isFinite(durationSec) || durationSec <= 0) return null
+    if (typeof updatedAt !== 'number' || !Number.isFinite(updatedAt) || updatedAt <= 0) return null
+    if (kind === 'movie') {
+        const movieId = typeof r.movieId === 'string' ? r.movieId.trim().slice(0, 60) : ''
+        if (!movieId) return null
+        return { kind, movieId, title, positionSec, durationSec, updatedAt }
+    }
+    const season = r.season
+    const episode = r.episode
+    if (typeof season !== 'number' || !Number.isInteger(season) || season < 0) return null
+    if (typeof episode !== 'number' || !Number.isInteger(episode) || episode < 0) return null
+    return { kind, title, season, episode, positionSec, durationSec, updatedAt }
+}
 
 const CAST_TARGET_TYPES = new Set<CastTargetType>(['chromecast', 'dlna', 'airplay'])
 
@@ -189,6 +234,10 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
     if (parsed === null || typeof parsed !== 'object') return null
     const action = (parsed as { action?: unknown }).action
     if (typeof action !== 'string' || !VALID_ACTIONS.has(action)) return null
+    if (action === 'reportProgress') {
+        const report = parseProgressReport((parsed as { report?: unknown }).report)
+        return report ? { action: 'reportProgress', report } : null
+    }
     if (action === 'seek') {
         const seconds = (parsed as { seconds?: unknown }).seconds
         if (typeof seconds !== 'number' || !Number.isFinite(seconds)) return null
