@@ -13,6 +13,7 @@ import { scheduledRecordingService } from '../services/scheduledRecordingService
 import { profileService } from '../services/profileService';
 import { favoritesService } from '../services/favoritesService';
 import { hiddenChannelsService } from '../services/hiddenChannelsService';
+import { zapHistoryService } from '../services/zapHistoryService';
 import { parentalService } from '../services/parentalService';
 import { useLanguage } from '../services/languageService';
 import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
@@ -93,9 +94,17 @@ export function LiveTV() {
     const [sortBy, setSortBy] = useState<CatalogSort>('recent');
     const [selectedChannel, setSelectedChannel] = useState<LiveStream | null>(null);
     const [playingChannel, setPlayingChannel] = useState<LiveStream | null>(null);
+    // ⏱️ Últimos canais zapeados (MRU) — alimenta os chips "Recentes" do overlay.
+    const [zapRecent, setZapRecent] = useState<string[]>(() => zapHistoryService.getRecent());
     // Latest playlist + playing channel for the media:control zap handler,
     // kept in a ref so the handler stays stable (no re-subscribe per render).
     const zapRef = useRef<{ list: LiveStream[]; current: LiveStream | null }>({ list: [], current: null });
+
+    useEffect(() => {
+        if (!playingChannel) return;
+        const next = zapHistoryService.push(String(playingChannel.stream_id));
+        queueMicrotask(() => setZapRecent(next));
+    }, [playingChannel]);
     const [epgData, setEpgData] = useState<EPGProgram[]>([]);
     const [currentProgram, setCurrentProgram] = useState<EPGProgram | null>(null);
     const [upcomingPrograms, setUpcomingPrograms] = useState<EPGProgram[]>([]);
@@ -2022,7 +2031,7 @@ export function LiveTV() {
                             progressPct: epgService.getProgramProgress(currentProgram),
                             nextTitle: upcomingPrograms[0]?.title
                         } : undefined}
-                        channelList={filteredStreams.map(s => ({ id: s.stream_id, name: s.name, logo: s.stream_icon, num: s.num, favorite: favoriteChannelIds.has(String(s.stream_id)), directUrl: s.direct_source || undefined }))}
+                        channelList={filteredStreams.map(s => { const rank = zapRecent.indexOf(String(s.stream_id)); return { id: s.stream_id, name: s.name, logo: s.stream_icon, num: s.num, favorite: favoriteChannelIds.has(String(s.stream_id)), directUrl: s.direct_source || undefined, recentRank: rank >= 0 ? rank : undefined }; })}
                         onSwitchChannel={(id) => {
                             const next = filteredStreams.find(s => String(s.stream_id) === String(id));
                             if (next) {

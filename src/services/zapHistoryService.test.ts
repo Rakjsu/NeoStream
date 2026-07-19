@@ -6,8 +6,8 @@ describe('zapHistoryService', () => {
     beforeEach(() => {
         localStorage.clear();
         vi.spyOn(profileService, 'getActiveProfile').mockReturnValue({
-            id: 'p1', name: 'Teste', avatar: '👤', createdAt: 0
-        } as ReturnType<typeof profileService.getActiveProfile>);
+            id: 'p1', name: 'Teste', avatar: '👤', createdAt: 0, watchLater: [], continueWatching: [], lastUsed: 0
+        } as unknown as ReturnType<typeof profileService.getActiveProfile>);
     });
 
     it('começa vazio', () => {
