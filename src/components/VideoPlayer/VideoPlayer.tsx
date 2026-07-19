@@ -738,6 +738,18 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
             await window.ipcRenderer.invoke('dvr:stop', { id: recording.id });
             return;
         }
+        // 💾 Estimativa pré-REC: espaço livre e horas aproximadas (~2 GB/h de TS).
+        const free = await window.ipcRenderer.invoke('dvr:disk-free').catch(() => null) as { success?: boolean; freeBytes?: number } | null;
+        if (free?.success && typeof free.freeBytes === 'number') {
+            const gigabytes = free.freeBytes / 1e9;
+            if (gigabytes < 1) {
+                setRecToast(`💾 ${t('player', 'recNoSpace')}`);
+                setTimeout(() => setRecToast(null), 5000);
+                return;
+            }
+            setRecToast(`💾 ${gigabytes.toFixed(1)} GB · ~${Math.max(1, Math.floor(gigabytes / 2))}h`);
+            setTimeout(() => setRecToast(null), 4000);
+        }
         const result = await window.ipcRenderer.invoke('dvr:start', { url: src, channelName: title || 'canal' });
         if (result?.success) {
             setRecording({ id: result.id, seconds: 0 });

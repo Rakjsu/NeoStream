@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { watchProgressService, type SeriesProgress } from '../services/watchProgressService';
 import { consumeTmdbOnboardingPending, hasTmdbApiKey } from '../services/tmdbKey';
@@ -16,6 +16,7 @@ import { getHomeRecommendations, type RecommendationGroup } from '../services/re
 import { newEpisodesService } from '../services/newEpisodesService';
 import { newEpisodeNotifier } from '../services/newEpisodeNotifier';
 import { favoritesService } from '../services/favoritesService';
+import { ContinueFramePreview } from '../components/ContinueFramePreview';
 import { watchLaterService } from '../services/watchLater';
 import { findDepartures, dismissDepartures } from '../services/catalogDeparturesService';
 import { favoredCategoryIds, spinRoulette } from '../services/rouletteService';
@@ -100,6 +101,9 @@ export function Home() {
     // 📉 Títulos do "Ver depois" que saíram do catálogo + 🎰 sorteio da roleta.
     const [departures, setDepartures] = useState<{ id: string; name: string }[]>([]);
     const [rouletteItem, setRouletteItem] = useState<MovieData | null>(null);
+    // 🖼️ Preview do frame no ponto salvo (hover num filme do continuar).
+    const [framePreview, setFramePreview] = useState<{ url: string; time: number; x: number; y: number } | null>(null);
+    const framePreviewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // 📉 Com o catálogo carregado, aponta itens do "Ver depois" que sumiram.
     useEffect(() => {
@@ -730,6 +734,25 @@ export function Home() {
             <div
                 key={key}
                 className="content-card"
+                onMouseEnter={(e) => {
+                    if (!isContinue || continueItem.type !== 'movie' || !continueItem.movieProgress) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const savedTime = continueItem.movieProgress.currentTime;
+                    const movieId = continueItem.id;
+                    if (framePreviewTimer.current) clearTimeout(framePreviewTimer.current);
+                    framePreviewTimer.current = setTimeout(async () => {
+                        const urlResult = await window.ipcRenderer.invoke('streams:get-vod-url', { streamId: movieId, container: 'mp4' })
+                            .catch(() => null) as { success?: boolean; url?: string } | null;
+                        if (urlResult?.success && urlResult.url) {
+                            setFramePreview({ url: urlResult.url, time: savedTime, x: rect.right + 10, y: rect.top });
+                        }
+                    }, 600);
+                }}
+                onMouseLeave={() => {
+                    if (framePreviewTimer.current) clearTimeout(framePreviewTimer.current);
+                    framePreviewTimer.current = null;
+                    setFramePreview(null);
+                }}
                 style={{
                     position: 'relative',
                     minWidth: 160,
@@ -1389,6 +1412,15 @@ export function Home() {
                             ✕
                         </button>
                     </div>
+                )}
+                {framePreview && (
+                    <ContinueFramePreview
+                        key={framePreview.url}
+                        url={framePreview.url}
+                        time={framePreview.time}
+                        x={framePreview.x}
+                        y={framePreview.y}
+                    />
                 )}
                 {/* Background decorations */}
                 <div style={{

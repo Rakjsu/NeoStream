@@ -50,6 +50,18 @@ function broadcast(channel: string, payload: unknown) {
 }
 
 export function setupDvrHandlers() {
+    // 💾 Espaço livre no volume das gravações (estimativa pré-REC).
+    ipcMain.handle('dvr:disk-free', async () => {
+        try {
+            const dir = recordingsDir()
+            fs.mkdirSync(dir, { recursive: true })
+            const stats = await fs.promises.statfs(dir)
+            return { success: true, freeBytes: stats.bavail * stats.bsize }
+        } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : String(error) }
+        }
+    })
+
     // ✂️ Exporta um clipe A–B de um VOD por cópia de stream (sem re-encode).
     ipcMain.handle('clip:export', async (_e, data: { url: string; start: number; end: number; title?: string }) => {
         try {

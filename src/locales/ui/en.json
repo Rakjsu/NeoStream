@@ -808,6 +808,7 @@
     "stopRecording": "Stop recording",
     "recordingSaved": "Recording saved",
     "recordingFailed": "Recording failed",
+    "recNoSpace": "Not enough disk space to record (less than 1 GB free)",
     "fullscreen": "Fullscreen",
     "exitFullscreen": "Exit fullscreen",
     "nextEpisode": "Next episode",
