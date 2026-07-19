@@ -12,6 +12,7 @@
  */
 
 import { movieProgressService } from './movieProgressService';
+import { ratingSignals } from './personalMarksService';
 import { watchProgressService } from './watchProgressService';
 import { indexedDBCache } from './indexedDBCache';
 import { searchMovieByName, searchSeriesByName } from './tmdb';
@@ -350,6 +351,32 @@ function collectRawSeeds(movies: RecMovie[], series: RecSeries[]): {
         watchedTitles.add(normalizeTitle(item.name));
         raw.push({ kind: 'series', name: item.name, watchedAt, categoryId: item.category_id });
     });
+
+    // ⭐ Item 36: notas pessoais alimentam os seeds — 4–5⭐ contam como os
+    // títulos mais recentes (com teto pra não afogar o histórico real) e
+    // 1–2⭐ saem das sugestões, como se já tivessem sido assistidos.
+    const MAX_RATED_SEEDS = 4;
+    const { loved, disliked } = ratingSignals();
+    const now = Date.now();
+    let ratedCount = 0;
+    for (const mark of loved) {
+        if (ratedCount >= MAX_RATED_SEEDS) break;
+        const item = mark.type === 'movie' ? movieById.get(mark.id) : seriesById.get(mark.id);
+        if (!item) continue;
+        raw.push({
+            kind: mark.type === 'movie' ? 'vod' : 'series',
+            name: item.name,
+            watchedAt: now + mark.rating,
+            categoryId: item.category_id,
+        });
+        ratedCount++;
+    }
+    for (const mark of disliked) {
+        if (mark.type === 'movie') watchedMovieIds.add(mark.id);
+        else watchedSeriesIds.add(mark.id);
+        const item = mark.type === 'movie' ? movieById.get(mark.id) : seriesById.get(mark.id);
+        if (item) watchedTitles.add(normalizeTitle(item.name));
+    }
 
     // Most recent first, dedupe by normalized title, cap.
     raw.sort((a, b) => b.watchedAt - a.watchedAt);

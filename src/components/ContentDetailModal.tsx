@@ -6,6 +6,7 @@ import { movieProgressService } from '../services/movieProgressService';
 import { profileService } from '../services/profileService';
 import { watchLaterService } from '../services/watchLater';
 import { favoritesService } from '../services/favoritesService';
+import { isTraktConnected, traktRate } from '../services/traktService';
 import { downloadService } from '../services/downloadService';
 import type { CastQueueItem } from '../services/castQueue';
 import { CastDeviceSelector } from './CastDeviceSelector';
@@ -1301,7 +1302,10 @@ export function ContentDetailModal({
                                     key={star}
                                     onClick={() => {
                                         const current = getMark(contentType, contentId).rating ?? 0;
-                                        setRating(contentType, contentId, current === star ? 0 : star);
+                                        const next = current === star ? 0 : star;
+                                        setRating(contentType, contentId, next);
+                                        // ⭐ Item 36: espelha no Trakt (2–10; 0 remove) — fire-and-forget.
+                                        if (isTraktConnected()) void traktRate(contentType, contentData.name, next);
                                         setRefresh(r => r + 1);
                                     }}
                                     aria-label={`${t('contentModal', 'myRating')}: ${star}`}

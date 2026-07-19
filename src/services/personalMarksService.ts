@@ -46,6 +46,27 @@ export function setRating(type: 'movie' | 'series', id: string, rating: number):
     saveAll(map);
 }
 
+/** ⭐ Item 36: sinais das notas pras recomendações — amados (4–5⭐, melhores primeiro) e rejeitados (1–2⭐). */
+export function ratingSignals(): {
+    loved: { type: 'movie' | 'series'; id: string; rating: number }[];
+    disliked: { type: 'movie' | 'series'; id: string }[];
+} {
+    const loved: { type: 'movie' | 'series'; id: string; rating: number }[] = [];
+    const disliked: { type: 'movie' | 'series'; id: string }[] = [];
+    for (const [key, mark] of Object.entries(loadAll())) {
+        const rating = mark.rating;
+        if (rating === undefined) continue;
+        const sep = key.indexOf(':');
+        const type = key.slice(0, sep);
+        if (type !== 'movie' && type !== 'series') continue;
+        const id = key.slice(sep + 1);
+        if (rating >= 4) loved.push({ type, id, rating });
+        else if (rating <= 2) disliked.push({ type, id });
+    }
+    loved.sort((a, b) => b.rating - a.rating);
+    return { loved, disliked };
+}
+
 /** Liga/desliga a tag (case-insensitive) e devolve a lista atual. */
 export function toggleTag(type: 'movie' | 'series', id: string, tag: string): string[] {
     const clean = tag.trim().slice(0, 30);
