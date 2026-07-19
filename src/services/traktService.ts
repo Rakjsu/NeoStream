@@ -6,6 +6,8 @@
  * melhor esforço, casando por busca de título; nunca trava o fluxo local.
  */
 
+import { searchMovieByName, searchSeriesByName } from './tmdb';
+
 const API = 'https://api.trakt.tv';
 const CREDS_KEY = 'neostream_trakt_creds';
 const TOKEN_KEY = 'neostream_trakt_token';
@@ -172,6 +174,35 @@ async function traktPost(path: string, body: unknown, clientId: string, access: 
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 }
 
+/** 🎯 Extrai os ids do Trakt de um resultado /search/tmdb/{id}. PURO. */
+export function pickTmdbHitIds(results: unknown, type: 'movie' | 'show'): Record<string, unknown> | null {
+    if (!Array.isArray(results)) return null;
+    for (const hit of results) {
+        const item = (hit as Record<string, { ids?: Record<string, unknown> } | undefined>)[type];
+        if (item?.ids) return item.ids;
+    }
+    return null;
+}
+
+/**
+ * 🎯 Resolução EXATA pelo TMDB id: quando a chave TMDB do usuário está
+ * configurada, o título vira id no TMDB (cache próprio de lá) e o Trakt é
+ * consultado por /search/tmdb/{id} — títulos ambíguos ("Obsessão") deixam
+ * de depender da busca por texto, que fica só de fallback.
+ */
+async function resolveIdsViaTmdb(kind: 'movie' | 'show', title: string, year: number | undefined, clientId: string, access: string): Promise<Record<string, unknown> | null> {
+    try {
+        const details = kind === 'movie'
+            ? await searchMovieByName(title, year ? String(year) : undefined)
+            : await searchSeriesByName(title, year ? String(year) : undefined);
+        if (!details?.id) return null;
+        const results = await traktGet(`/search/tmdb/${details.id}?type=${kind}`, clientId, access);
+        return pickTmdbHitIds(results, kind);
+    } catch {
+        return null; // sem chave TMDB / offline — a busca textual cobre
+    }
+}
+
 // ids resolvidos por título nesta sessão — sync repetido não re-busca.
 const idsCache = new Map<string, Record<string, unknown> | null>();
 
@@ -181,8 +212,11 @@ async function resolveMovieIds(title: string, clientId: string, access: string):
     let ids: Record<string, unknown> | null = null;
     const { clean, year } = splitTitleYear(title);
     if (clean) {
-        const results = await traktGet(`/search/movie?query=${encodeURIComponent(clean)}`, clientId, access) as { movie?: TraktHit }[];
-        ids = pickSearchHit(results, clean, year)?.ids ?? null;
+        ids = await resolveIdsViaTmdb('movie', clean, year, clientId, access);
+        if (!ids) {
+            const results = await traktGet(`/search/movie?query=${encodeURIComponent(clean)}`, clientId, access) as { movie?: TraktHit }[];
+            ids = pickSearchHit(results, clean, year)?.ids ?? null;
+        }
     }
     idsCache.set(cacheKey, ids);
     return ids;
@@ -194,8 +228,11 @@ async function resolveShowIds(title: string, clientId: string, access: string): 
     let ids: Record<string, unknown> | null = null;
     const { clean } = splitTitleYear(title);
     if (clean) {
-        const results = await traktGet(`/search/show?query=${encodeURIComponent(clean)}`, clientId, access) as { show?: TraktHit }[];
-        ids = pickSearchHit(results, clean)?.ids ?? null;
+        ids = await resolveIdsViaTmdb('show', clean, undefined, clientId, access);
+        if (!ids) {
+            const results = await traktGet(`/search/show?query=${encodeURIComponent(clean)}`, clientId, access) as { show?: TraktHit }[];
+            ids = pickSearchHit(results, clean)?.ids ?? null;
+        }
     }
     idsCache.set(cacheKey, ids);
     return ids;

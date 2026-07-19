@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pickSearchHit, splitTitleYear, starsToTraktRating } from './traktService';
+import { pickSearchHit, pickTmdbHitIds, splitTitleYear, starsToTraktRating } from './traktService';
 
 describe('splitTitleYear', () => {
     it('separa o ano entre parênteses do nome', () => {
@@ -40,5 +40,19 @@ describe('starsToTraktRating (item 36)', () => {
     it('valores estranhos ficam presos em 1–10', () => {
         expect(starsToTraktRating(0.4)).toBe(1);
         expect(starsToTraktRating(7)).toBe(10);
+    });
+});
+
+describe('pickTmdbHitIds (resolução exata pelo TMDB id)', () => {
+    it('extrai os ids do tipo pedido', () => {
+        const results = [{ type: 'movie', movie: { ids: { trakt: 1, tmdb: 550 } } }];
+        expect(pickTmdbHitIds(results, 'movie')).toEqual({ trakt: 1, tmdb: 550 });
+    });
+
+    it('ignora hits de outro tipo e lixo', () => {
+        const results = [{ type: 'show', show: { ids: { trakt: 9 } } }];
+        expect(pickTmdbHitIds(results, 'movie')).toBeNull();
+        expect(pickTmdbHitIds(null, 'movie')).toBeNull();
+        expect(pickTmdbHitIds([{}], 'show')).toBeNull();
     });
 });
