@@ -56,6 +56,7 @@ export function getMovieBaseName(name: string): string {
     return name
         .replace(/\s*\[L\]\s*/gi, '') // Remove [L]
         .replace(/\s*4k\s*/gi, ' ')    // Remove 4K
+        .replace(/\b(fhd|uhd|hd|hevc|h\.?26[45]|1080p|2160p|720p|60fps|leg(?:endado)?|dub(?:lado)?)\b/gi, ' ') // Item 45: FHD/HD/codec/leg/dub também agrupam
         .replace(/\s*\(\d{4}\)\s*/g, '') // Remove year (2009)
         .replace(/\s*\[.*?\]\s*/g, '') // Remove any other brackets
         .toLowerCase()
@@ -63,6 +64,32 @@ export function getMovieBaseName(name: string): string {
         .replace(/[^a-z0-9\s]/gi, '') // Remove special chars
         .replace(/\s+/g, ' ') // Normalize spaces
         .trim();
+}
+
+
+/**
+ * 🎞️ Item 45: rótulo curto da versão pros chips da ficha, direto dos
+ * marcadores crus do nome do provedor (mais amplo que o par 1080p/4k tipado).
+ */
+export function getVersionTag(name: string): string {
+    const quality = /4k|uhd|2160p/i.test(name) ? '4K'
+        : /fhd|1080p/i.test(name) ? 'FHD'
+            : /\bhd\b|720p/i.test(name) ? 'HD'
+                : '';
+    const audio = /\[L\]|legendado/i.test(name) ? 'Legendado' : 'Dublado';
+    return quality ? `${quality} ${audio}` : audio;
+}
+
+/** 🎞️ Item 45: agrupa o catálogo por nome-base num passe só (grade unificada). */
+export function groupByBaseName<TMovie extends MovieLike>(movies: TMovie[]): Map<string, TMovie[]> {
+    const map = new Map<string, TMovie[]>();
+    for (const movie of movies) {
+        const base = getMovieBaseName(movie.name ?? '');
+        const list = map.get(base);
+        if (list) list.push(movie);
+        else map.set(base, [movie]);
+    }
+    return map;
 }
 
 /**

@@ -31,6 +31,10 @@ interface ContentDetailModalProps {
         youtube_trailer?: string;
     };
     onPlay: (season?: number, episode?: number, offlineUrl?: string) => void;
+    /** 🎞️ Item 45: versões do mesmo filme (4K/FHD/HD/legendado) pros chips. */
+    versions?: { id: string; label: string }[];
+    activeVersionId?: string;
+    onSelectVersion?: (id: string) => void;
 }
 
 interface SeriesEpisode {
@@ -67,8 +71,7 @@ export function ContentDetailModal({
     contentId,
     contentType,
     contentData,
-    onPlay
-}: ContentDetailModalProps) {
+    onPlay, versions, activeVersionId, onSelectVersion }: ContentDetailModalProps) {
     const [seriesInfo, setSeriesInfo] = useState<SeriesInfo | null>(null);
     const [tmdbData, setTmdbData] = useState<TMDBSeriesDetails | TMDBMovieDetails | null>(null);
     // 🎬 Coleção (franquia) do filme e títulos parecidos, ambos via TMDB.
@@ -920,6 +923,33 @@ export function ContentDetailModal({
                     }}>
                         {overview}
                     </p>
+
+                    {/* 🎞️ Item 45: seletor de versão (4K/FHD/HD/legendado) */}
+                    {versions && versions.length > 1 && (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+                            {versions.map(version => {
+                                const isActive = version.id === activeVersionId;
+                                return (
+                                    <button
+                                        key={version.id}
+                                        onClick={() => { if (!isActive) onSelectVersion?.(version.id); }}
+                                        style={{
+                                            padding: '6px 14px',
+                                            borderRadius: 16,
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            cursor: isActive ? 'default' : 'pointer',
+                                            border: isActive ? '1px solid var(--ns-accent)' : '1px solid rgba(255,255,255,0.25)',
+                                            background: isActive ? 'rgba(var(--ns-accent-rgb), 0.3)' : 'rgba(255,255,255,0.08)',
+                                            color: 'white'
+                                        }}
+                                    >
+                                        {version.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
 
                     {/* Action Buttons */}
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>

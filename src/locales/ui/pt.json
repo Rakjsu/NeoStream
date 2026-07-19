@@ -550,6 +550,8 @@
     "version": "Versão"
   },
   "playback": {
+    "groupVersions": "Agrupar versões de filme",
+    "groupVersionsDesc": "Um card por filme (4K/FHD/HD/legendado juntos) com seletor de versão na ficha",
     "resumeOnOpen": "Retomar ao abrir",
     "resumeOnOpenDesc": "Ao abrir o app, oferece continuar o último conteúdo que você estava assistindo",
     "title": "Reprodução",

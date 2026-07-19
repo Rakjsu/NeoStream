@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SortSelect } from '../components/SortSelect';
 import { CatalogFilters } from '../components/CatalogFilters';
 import { fuzzyIncludes, matchesFilters, qualityBadgeOf } from '../utils/catalogFilter';
+import { getMovieBaseName, getVersionTag, groupByBaseName } from '../services/movieVersionService';
 import { fetchTraktWatchedMovies } from '../services/traktService';
 import { normalizeTitle } from '../services/personSearchHelpers';
 import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
@@ -228,6 +229,14 @@ export function VOD() {
         [hideWatched]
     );
 
+    // 🎞️ Item 45: card único de versões — agrupa 4K/FHD/HD/legendado por
+    // nome-base (toggle em Configurações → Reprodução, ligado por padrão).
+    const [groupVersions] = useState(() => localStorage.getItem('neostream_group_versions') !== '0');
+    const versionsByBase = useMemo(() => {
+        if (!groupVersions) return null;
+        return groupByBaseName(sortedStreams);
+    }, [groupVersions, sortedStreams]);
+
     const filteredStreams = useMemo(() => sortedStreams.filter(stream => {
         const matchesSearch = fuzzyIncludes(stream.name, searchQuery);
         if (hideWatched && selectedCategory !== 'WATCHED' && traktWatchedTitles.size > 0 && traktWatchedTitles.has(normalizeTitle(stream.name))) {
@@ -263,10 +272,32 @@ export function VOD() {
     // Windowed rendering: only ~3 screens of cards stay mounted while the
     // scrollbar reflects the full list (spacer rows keep the geometry).
     // Until geometry is measured, the plain first-page slice renders.
+    // 🎞️ Item 45: com o agrupamento ligado, cada nome-base vira UM card; com
+    // "ocultar assistidos", QUALQUER versão vista esconde o grupo inteiro.
+    const displayStreams = useMemo(() => {
+        if (!versionsByBase) return filteredStreams;
+        const seen = new Set<string>();
+        const out: typeof filteredStreams = [];
+        for (const stream of filteredStreams) {
+            const base = getMovieBaseName(stream.name);
+            if (seen.has(base)) continue;
+            seen.add(base);
+            if (hideWatched && selectedCategory !== 'WATCHED') {
+                const versions = versionsByBase.get(base) ?? [];
+                const anyWatched = versions.some(v =>
+                    watchedIds.has(v.stream_id.toString()) ||
+                    (traktWatchedTitles.size > 0 && traktWatchedTitles.has(normalizeTitle(v.name))));
+                if (anyWatched) continue;
+            }
+            out.push(stream);
+        }
+        return out;
+    }, [versionsByBase, filteredStreams, hideWatched, selectedCategory, watchedIds, traktWatchedTitles]);
+
     const gridWindow = useWindowedGrid({
         scrollRef: scrollContainerRef,
         gridRef,
-        itemCount: filteredStreams.length
+        itemCount: displayStreams.length
     });
     const windowStart = gridWindow.ready ? gridWindow.start : 0;
     const windowEnd = gridWindow.ready ? gridWindow.end : Math.min(visibleCount, filteredStreams.length);
@@ -499,8 +530,13 @@ export function VOD() {
                                 {gridWindow.topSpacer > 0 && (
                                     <div data-spacer="true" style={{ gridColumn: '1 / -1', height: gridWindow.topSpacer }} />
                                 )}
-                                {filteredStreams.slice(windowStart, windowEnd).map((stream, index) => {
-                                    const progress = getProgress(stream.stream_id);
+                                {displayStreams.slice(windowStart, windowEnd).map((stream, index) => {
+                                    const groupList = versionsByBase?.get(getMovieBaseName(stream.name));
+                                    const versionCount = groupList?.length ?? 1;
+                                    // Progresso do grupo: a versão mais avançada representa o card.
+                                    const progress = groupList && groupList.length > 1
+                                        ? Math.max(...groupList.map(v => getProgress(v.stream_id)))
+                                        : getProgress(stream.stream_id);
                                     const movieProgress = getMovieProgress(stream.stream_id);
                                     const isSaved = watchLaterService.has(String(stream.stream_id), 'movie');
                                     const isFavorite = favoritesService.has(String(stream.stream_id), 'movie');
@@ -610,6 +646,20 @@ export function VOD() {
                                                         {formatRemainingTime(movieProgress.currentTime, movieProgress.duration)}
                                                     </div>
                                                 )}
+
+                                                {/* 🎞️ Item 45: quantas versões esse card agrupa */}
+                                                {versionCount > 1 && (
+                                                    <span style={{
+                                                        position: 'absolute',
+                                                        bottom: 8,
+                                                        right: 8,
+                                                        background: 'rgba(0,0,0,0.8)',
+                                                        borderRadius: 6,
+                                                        padding: '3px 7px',
+                                                        fontSize: 11,
+                                                        color: 'white'
+                                                    }}>🎞️ {versionCount}</span>
+                                                )}
                                             </HoverPreviewCard>
                                         </div>
                                     );
@@ -687,6 +737,15 @@ export function VOD() {
                         rating: selectedMovie.rating,
                         container_extension: selectedMovie.container_extension,
                         youtube_trailer: selectedMovie.youtube_trailer
+                    }}
+                    versions={versionsByBase
+                        ? (versionsByBase.get(getMovieBaseName(selectedMovie.name)) ?? [])
+                            .map(v => ({ id: String(v.stream_id), label: getVersionTag(v.name) }))
+                        : undefined}
+                    activeVersionId={String(selectedMovie.stream_id)}
+                    onSelectVersion={(id) => {
+                        const version = sortedStreams.find(v => String(v.stream_id) === id);
+                        if (version) setSelectedMovie(version);
                     }}
                     onPlay={(_season, _episode, offlineUrl) => {
                         // Set offline URL if available
