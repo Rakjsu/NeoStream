@@ -2,11 +2,15 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import { themeService } from './services/themeService'
+import { bootProfiler } from './services/bootProfiler'
 import { diagnosticsService } from './services/diagnosticsService'
 
 // Apply the persisted theme (CSS custom properties on <html>) before the
 // first render so themed surfaces never flash the default palette.
 themeService.apply()
+
+// ⏱️ Item 20: primeira marca do profiling de boot (renderer nasceu).
+bootProfiler.mark('rendererStart')
 
 // Forward uncaught renderer errors to the main process so they land in
 // main.log — packaged-app bug reports were blind to the UI side.
