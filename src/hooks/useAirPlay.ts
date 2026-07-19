@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import type { CastStatus } from './useDLNA';
 
 export interface AirPlayDevice {
     id: string;
@@ -103,3 +104,58 @@ export function useAirPlay(videoUrl: string, videoTitle: string) {
         stopCasting
     };
 }
+
+// ===== Item 25: transporte da sessão AirPlay no próprio desktop ==============
+
+export interface AirplayStatusResult {
+    success: boolean;
+    active?: boolean;
+    playing?: boolean;
+    position?: number;
+    duration?: number;
+    title?: string;
+    deviceId?: string;
+    deviceName?: string;
+}
+
+/**
+ * Mapeia a resposta do airplay:status pro shape que o CastControls consome
+ * (mesmo contrato do DLNA/Chromecast). PURO — testado em useAirPlay.test.ts.
+ */
+export function mapAirplayStatus(result: AirplayStatusResult | null):
+    Partial<CastStatus> & { success: boolean; error?: string } {
+    if (!result?.success || !result.active) {
+        return { success: false, error: 'No active cast session' };
+    }
+    return {
+        success: true,
+        state: result.playing ? 'PLAYING' : 'PAUSED_PLAYBACK',
+        position: result.position ?? 0,
+        duration: result.duration ?? 0,
+        // O protocolo AirPlay de vídeo não tem volume (isso é o lado RAOP) —
+        // null esconde o slider no mini-remoto.
+        volume: null,
+        title: result.title || '',
+        deviceId: result.deviceId || 'airplay',
+        queue: [],
+        currentItemId: null,
+        subtitleAvailable: false,
+        audioTracks: [],
+    };
+}
+
+// Mesma assinatura de castControls/chromecastControls — o CastControls troca
+// de backend só pelo deviceType.
+export const airplayControls = {
+    pause: () => window.ipcRenderer.invoke('airplay:set-playing', { playing: false }) as Promise<{ success: boolean }>,
+    resume: () => window.ipcRenderer.invoke('airplay:set-playing', { playing: true }) as Promise<{ success: boolean }>,
+    seek: (seconds: number) => window.ipcRenderer.invoke('airplay:seek', { seconds }) as Promise<{ success: boolean }>,
+    // Sem volume/fila/legenda/áudio neste protocolo — no-ops de paridade.
+    setVolume: (): Promise<{ success: boolean }> => Promise.resolve({ success: false }),
+    stop: (deviceId: string) => window.ipcRenderer.invoke('airplay:stop', { deviceId }) as Promise<{ success: boolean }>,
+    getStatus: async () => mapAirplayStatus(await window.ipcRenderer.invoke('airplay:status') as AirplayStatusResult),
+    queueJump: (): Promise<{ success: boolean }> => Promise.resolve({ success: false }),
+    queueSkip: (): Promise<{ success: boolean }> => Promise.resolve({ success: false }),
+    setSubtitleEnabled: (): Promise<{ success: boolean }> => Promise.resolve({ success: false }),
+    setAudioTrack: (): Promise<{ success: boolean }> => Promise.resolve({ success: false }),
+};

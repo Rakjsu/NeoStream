@@ -7,6 +7,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Pause, Square, Volume2, Tv, ListVideo, SkipBack, SkipForward, Subtitles, AudioLines } from 'lucide-react';
 import { castControls, type CastStatus } from '../hooks/useDLNA';
 import { chromecastControls } from '../hooks/useChromecast';
+import { airplayControls } from '../hooks/useAirPlay';
 import { formatTime } from '../utils/videoHelpers';
 import { useLanguage } from '../services/languageService';
 
@@ -14,7 +15,7 @@ interface CastControlsProps {
     deviceId: string;
     deviceName: string;
     /** Which backend the session runs on (default DLNA). */
-    deviceType?: 'dlna' | 'chromecast';
+    deviceType?: 'dlna' | 'chromecast' | 'airplay';
     onSessionEnded: () => void;
 }
 
@@ -27,7 +28,9 @@ const STOPPED_POLLS_TO_END = 4;
 const FAILED_POLLS_TO_END = 6;
 
 export function CastControls({ deviceId, deviceName, deviceType = 'dlna', onSessionEnded }: CastControlsProps) {
-    const remote = deviceType === 'chromecast' ? chromecastControls : castControls;
+    const remote = deviceType === 'chromecast' ? chromecastControls
+        : deviceType === 'airplay' ? airplayControls
+        : castControls;
     const { t } = useLanguage();
     const [status, setStatus] = useState<CastStatus | null>(null);
     const [pendingVolume, setPendingVolume] = useState<number | null>(null);
