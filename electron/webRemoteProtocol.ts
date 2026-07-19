@@ -148,11 +148,14 @@ export type RemoteCommand =
     | { action: 'cancelReminder'; id: string }
     | { action: 'openMultiview' }
     | { action: 'screenshot' }
+    | { action: 'renameRecording'; name: string; newName: string }
+    | { action: 'toggleProtectRecording'; name: string }
+    | { action: 'navKey'; key: 'up' | 'down' | 'left' | 'right' | 'ok' | 'back' }
 
 const VALID_ACTIONS = new Set([
     'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'setVolume', 'setAudioTrack', 'playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule',
     'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestRecordings', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
-    'sleep', 'requestStats', 'focusApp', 'requestReminders', 'cancelReminder', 'openMultiview', 'screenshot',
+    'sleep', 'requestStats', 'focusApp', 'requestReminders', 'cancelReminder', 'openMultiview', 'screenshot', 'renameRecording', 'toggleProtectRecording', 'navKey',
 ])
 
 const CAST_TARGET_TYPES = new Set<CastTargetType>(['chromecast', 'dlna', 'airplay'])
@@ -226,6 +229,22 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         const name = (parsed as { name?: unknown }).name
         if (typeof name !== 'string' || !name.trim()) return null
         return { action: 'deleteRecording', name: name.trim().slice(0, 200) }
+    }
+    if (action === 'renameRecording') {
+        const name = (parsed as { name?: unknown }).name
+        const newName = (parsed as { newName?: unknown }).newName
+        if (typeof name !== 'string' || !name.trim() || typeof newName !== 'string' || !newName.trim()) return null
+        return { action: 'renameRecording', name: name.trim().slice(0, 200), newName: newName.trim().slice(0, 80) }
+    }
+    if (action === 'toggleProtectRecording') {
+        const name = (parsed as { name?: unknown }).name
+        if (typeof name !== 'string' || !name.trim()) return null
+        return { action: 'toggleProtectRecording', name: name.trim().slice(0, 200) }
+    }
+    if (action === 'navKey') {
+        const key = (parsed as { key?: unknown }).key
+        if (key !== 'up' && key !== 'down' && key !== 'left' && key !== 'right' && key !== 'ok' && key !== 'back') return null
+        return { action: 'navKey', key }
     }
     if (action === 'scheduleNext') {
         const channelId = (parsed as { channelId?: unknown }).channelId
