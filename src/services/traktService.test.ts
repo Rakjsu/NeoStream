@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pickSearchHit, splitTitleYear } from './traktService';
+import { pickSearchHit, splitTitleYear, starsToTraktRating } from './traktService';
 
 describe('splitTitleYear', () => {
     it('separa o ano entre parênteses do nome', () => {
@@ -27,5 +27,18 @@ describe('pickSearchHit', () => {
     it('sem match exato cai no primeiro resultado; vazio dá null', () => {
         expect(pickSearchHit(results, 'Outra Coisa')?.ids).toEqual({ trakt: 1 });
         expect(pickSearchHit([], 'Duna')).toBeNull();
+    });
+});
+
+describe('starsToTraktRating (item 36)', () => {
+    it('mapeia 1–5⭐ pra 2–10 do Trakt', () => {
+        expect(starsToTraktRating(1)).toBe(2);
+        expect(starsToTraktRating(3)).toBe(6);
+        expect(starsToTraktRating(5)).toBe(10);
+    });
+
+    it('valores estranhos ficam presos em 1–10', () => {
+        expect(starsToTraktRating(0.4)).toBe(1);
+        expect(starsToTraktRating(7)).toBe(10);
     });
 });

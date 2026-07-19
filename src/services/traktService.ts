@@ -331,6 +331,31 @@ export async function traktWatchlistRemove(kind: 'movie' | 'series', title: stri
     return traktWatchlistChange(kind, title, true);
 }
 
+/** ⭐ Item 36: converte a nota local (1–5⭐) pra escala do Trakt (2–10). PURO. */
+export function starsToTraktRating(stars: number): number {
+    return Math.max(1, Math.min(10, Math.round(stars * 2)));
+}
+
+/** Espelha a nota pessoal no Trakt (POST /sync/ratings; nota 0 remove a nota de lá). */
+export async function traktRate(kind: 'movie' | 'series', title: string, stars: number): Promise<boolean> {
+    const token = getToken();
+    const { clientId } = getTraktCreds();
+    if (!token || !clientId) return false;
+    try {
+        const ids = kind === 'movie'
+            ? await resolveMovieIds(title, clientId, token.access)
+            : await resolveShowIds(title, clientId, token.access);
+        if (!ids) return false;
+        const remove = !(stars >= 1);
+        const entry = remove ? { ids } : { ids, rating: starsToTraktRating(stars) };
+        const body = kind === 'movie' ? { movies: [entry] } : { shows: [entry] };
+        await traktPost(remove ? '/sync/ratings/remove' : '/sync/ratings', body, clientId, token.access);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 /** 🎬 Filmes marcados como vistos no Trakt (títulos) — pro "ocultar assistidos". */
 export async function fetchTraktWatchedMovies(): Promise<string[]> {
     const token = getToken();

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { allTags, getMark, setRating, toggleTag } from './personalMarksService';
+import { allTags, getMark, setRating, toggleTag, ratingSignals } from './personalMarksService';
 
 describe('personalMarksService (nota + tags pessoais)', () => {
     beforeEach(() => {
@@ -44,5 +44,18 @@ describe('personalMarksService (nota + tags pessoais)', () => {
         toggleTag('series', '2', 'ação');
         toggleTag('movie', '3', 'ZUMBI');
         expect(allTags()).toEqual(['ação', 'Zumbi']);
+    });
+
+    it('ratingSignals separa amados (4-5, melhores primeiro) de rejeitados (1-2)', () => {
+        setRating('movie', 'm4', 4);
+        setRating('movie', 'm5', 5);
+        setRating('series', 's1', 1);
+        setRating('movie', 'm3', 3);
+        const { loved, disliked } = ratingSignals();
+        expect(loved).toEqual([
+            { type: 'movie', id: 'm5', rating: 5 },
+            { type: 'movie', id: 'm4', rating: 4 },
+        ]);
+        expect(disliked).toEqual([{ type: 'series', id: 's1' }]);
     });
 });
