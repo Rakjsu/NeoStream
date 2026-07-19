@@ -293,8 +293,6 @@
     "persona_zapper": "Zapeador en vivo",
     "persona_explorer": "Explorador de un poco de todo",
     "share": "Guardar imagen",
-    "shareSaved": "¡Imagen guardada! Compártela donde quieras",
-    "shareError": "No se pudo generar la imagen",
     "topKicker": "Tus campeones de pantalla",
     "habitsKicker": "Tus hábitos",
     "streakLine": "días seguidos en tu mayor racha",
@@ -403,8 +401,6 @@
     "pipDisplayDesc": "En qué monitor se abre la ventanita flotante",
     "pipDisplayAuto": "Automático (principal)",
     "catalogRefresh": "Actualizar catálogo automáticamente",
-    "transcodeRescue": "Conversión de rescate (ffmpeg)",
-    "transcodeRescueDesc": "Cuando un canal/película falla por códecs (H.265, AC3), lo convierte al vuelo a un formato compatible",
     "screensaver": "Modo vitrina (salvapantallas)",
     "screensaverDesc": "Tras un tiempo sin uso, muestra portadas del catálogo a pantalla completa",
     "screensaverOff": "Apagado",
@@ -820,8 +816,6 @@
     "disableSubtitles": "Desactivar Subtítulos",
     "errorLoadingSubtitles": "Error al cargar subtítulos forzados",
     "streamFallback": "Cambiando a",
-    "transcodeTrying": "Stream incompatible — convirtiendo con ffmpeg...",
-    "transcodeActive": "Convertido: reproduciendo vía ffmpeg",
     "streamUnavailable": "Stream no disponible. No se encontró alternativa."
   },
   "home": {

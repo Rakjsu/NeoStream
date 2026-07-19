@@ -555,8 +555,6 @@
     "pipDisplayDesc": "Em qual monitor a janelinha flutuante abre",
     "pipDisplayAuto": "Automático (principal)",
     "catalogRefresh": "Atualizar catálogo automaticamente",
-    "transcodeRescue": "Conversão de resgate (ffmpeg)",
-    "transcodeRescueDesc": "Quando um canal/filme não abre por codec (H.265, AC3), converte na hora pra um formato compatível",
     "screensaver": "Modo vitrine (descanso de tela)",
     "screensaverDesc": "Depois de um tempo sem uso, mostra capas do catálogo em tela cheia",
     "screensaverOff": "Desligado",
@@ -730,8 +728,6 @@
     "disableSubtitles": "Desativar Legendas",
     "errorLoadingSubtitles": "Erro ao carregar legendas forçadas",
     "streamFallback": "Alternando para",
-    "transcodeTrying": "Stream incompatível — convertendo com ffmpeg...",
-    "transcodeActive": "Convertido: reproduzindo via ffmpeg",
     "streamUnavailable": "Stream indisponível. Nenhuma alternativa encontrada."
   },
   "notifications": {
@@ -775,8 +771,6 @@
     "persona_zapper": "Zapeador ao vivo",
     "persona_explorer": "Explorador de tudo um pouco",
     "share": "Salvar imagem",
-    "shareSaved": "Imagem salva! Compartilhe onde quiser",
-    "shareError": "Não foi possível gerar a imagem",
     "topKicker": "Seus campeões de tela",
     "habitsKicker": "Seus hábitos",
     "streakLine": "dias seguidos na sua maior sequência",
