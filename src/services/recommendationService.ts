@@ -16,6 +16,7 @@ import { watchProgressService } from './watchProgressService';
 import { indexedDBCache } from './indexedDBCache';
 import { searchMovieByName, searchSeriesByName } from './tmdb';
 import { usageStatsService } from './usageStatsService';
+import { blockedRecommendationsService } from './blockedRecommendationsService';
 import { buildHabitProfile, habitBoost, hourBucketOf, type HabitProfile, type HourBucket } from './habitProfile';
 
 // ==================== Types ====================
@@ -433,8 +434,9 @@ export async function getHomeRecommendations(
         movies,
         series,
         excludeTitles: watchedTitles,
-        excludeMovieIds: watchedMovieIds,
-        excludeSeriesIds: watchedSeriesIds,
+        // 🚫 Item 35: títulos banidos pelo usuário nunca voltam a ser sugeridos.
+        excludeMovieIds: new Set([...watchedMovieIds, ...blockedRecommendationsService.getBlockedIds('movie')]),
+        excludeSeriesIds: new Set([...watchedSeriesIds, ...blockedRecommendationsService.getBlockedIds('series')]),
         maxItems: 40, // generous pool so each group can still show up to 20
         habit: {
             profile: habitProfile,
