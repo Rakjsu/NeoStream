@@ -17,6 +17,7 @@ import { bookmarkService, type VideoBookmark } from '../../services/bookmarkServ
 import { traktScrobble, getTraktResumePct } from '../../services/traktService';
 import { loadSubtitleStyle, type SubtitleStyle } from '../../utils/subtitleStyle';
 import { PlayerSettingsMenu } from './PlayerSettingsMenu';
+import { useAmbientLight } from './useAmbientLight';
 import { useSleepTimer, formatSleepCountdown } from './useSleepTimer';
 import { aspectPrefs, aspectPrefKey } from '../../utils/aspectPrefs';
 import { ForcedSubtitlesMenu } from './ForcedSubtitlesMenu';
@@ -306,6 +307,13 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
 
     // 📻 Modo rádio: tela preta com o áudio seguindo (clique volta).
     const [radioMode, setRadioMode] = useState(false);
+    // 🎬 Item 29: modo cinema — vinheta + luz ambiente da cor do filme.
+    const [cinemaMode, setCinemaMode] = useState(() => localStorage.getItem('neostream_cinema_mode') === '1');
+    const toggleCinemaMode = () => {
+        const next = !cinemaMode;
+        localStorage.setItem('neostream_cinema_mode', next ? '1' : '0');
+        setCinemaMode(next);
+    };
     useEffect(() => () => {
         try { void audioGraphRef.current?.ctx.close(); } catch { /* ignore */ }
     }, []);
@@ -495,6 +503,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         setAudioTracks(tracks => tracks.map(tr => ({ ...tr, active: tr.id === id })));
     };
     const containerRef = useRef<HTMLDivElement>(null);
+    const ambientColor = useAmbientLight(videoRef, cinemaMode);
     const progressRef = useRef<HTMLDivElement>(null);
 
     const hideControlsTimeoutRef = React.useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -1095,6 +1104,19 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     crossOrigin="anonymous"
                 />
 
+                {/* 🎬 Modo cinema: vinheta com a luz ambiente da cor do frame. */}
+                {cinemaMode && (
+                    <div
+                        style={{
+                            position: 'absolute',
+                            inset: 0,
+                            pointerEvents: 'none',
+                            boxShadow: `inset 0 0 140px 40px ${ambientColor ?? 'rgba(0,0,0,0.85)'}`,
+                            transition: 'box-shadow 0.8s ease',
+                        }}
+                    />
+                )}
+
                 {/* Custom Subtitle Overlay - replaces native <track> for better HLS sync */}
                 <SubtitleOverlay
                     vttContent={vttContent}
@@ -1534,6 +1556,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             subtitleStyle={subtitleStyle}
                             onSetSubtitleStyle={applySubtitleStyle}
                             onEnterRadioMode={() => setRadioMode(true)}
+                            cinemaMode={cinemaMode}
+                            onToggleCinemaMode={toggleCinemaMode}
                         />
 
                         {/* Channel list toggle (live TV zapping) */}

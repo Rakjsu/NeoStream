@@ -676,6 +676,7 @@
     "expand": "Expandir"
   },
   "player": {
+    "cinemaMode": "Modo cinema",
     "volumeBoost": "Reforço de volume",
     "frameSaved": "📸 Quadro salvo",
     "frameError": "Não deu pra capturar o quadro deste stream",

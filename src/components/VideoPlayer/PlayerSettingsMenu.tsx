@@ -54,6 +54,9 @@ export interface PlayerSettingsMenuProps<TSwitchContent extends SwitchableConten
     onSetSubtitleStyle?: (style: SubtitleStyle) => void;
     /** 📻 Modo rádio: tela preta com o áudio seguindo. */
     onEnterRadioMode?: () => void;
+    /** 🎬 Modo cinema: vinheta + luz ambiente da cor do filme. */
+    cinemaMode?: boolean;
+    onToggleCinemaMode?: () => void;
 }
 
 // Gear settings menu: movie version / live quality switcher, or playback speed.
@@ -83,7 +86,9 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
     onSetVolumeBoost,
     subtitleStyle,
     onSetSubtitleStyle,
-    onEnterRadioMode
+    onEnterRadioMode,
+    cinemaMode,
+    onToggleCinemaMode
 }: PlayerSettingsMenuProps<TSwitchContent>) {
     const { t } = useLanguage();
 
@@ -405,6 +410,20 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
                                         {color === 'white' ? '⚪' : '🟡'}
                                     </button>
                                 ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 🎬 Modo cinema: vinheta + luz ambiente (toggle) */}
+                    {onToggleCinemaMode && (
+                        <div className="settings-section">
+                            <div className="settings-options">
+                                <button
+                                    className={`settings-option ${cinemaMode ? 'active' : ''}`}
+                                    onClick={onToggleCinemaMode}
+                                >
+                                    🎬 {t('player', 'cinemaMode')}
+                                </button>
                             </div>
                         </div>
                     )}

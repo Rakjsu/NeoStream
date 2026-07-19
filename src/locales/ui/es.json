@@ -766,6 +766,7 @@
     "expand": "Expandir"
   },
   "player": {
+    "cinemaMode": "Modo cine",
     "volumeBoost": "Refuerzo de volumen",
     "frameSaved": "📸 Fotograma guardado",
     "frameError": "No se pudo capturar el fotograma de este stream",
