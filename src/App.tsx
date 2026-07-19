@@ -36,6 +36,7 @@ const Favorites = lazy(() => import('./pages/Favorites').then(m => ({ default: m
 const Downloads = lazy(() => import('./pages/Downloads').then(m => ({ default: m.Downloads })));
 const History = lazy(() => import('./pages/History').then(m => ({ default: m.History })));
 const PipWindow = lazy(() => import('./pages/PipWindow').then(m => ({ default: m.PipWindow })));
+const MultiViewWindow = lazy(() => import('./pages/MultiViewWindow'));
 
 function PageLoader() {
   return (
@@ -329,6 +330,7 @@ function App() {
           <Routes>
             <Route path="/welcome" element={<RouteBoundary name="Welcome"><Welcome /></RouteBoundary>} />
             <Route path="/pip" element={<RouteBoundary name="PiP"><PipWindow /></RouteBoundary>} />
+            <Route path="/multiview" element={<RouteBoundary name="MultiViewWindow"><MultiViewWindow /></RouteBoundary>} />
             <Route path="/login" element={<RouteBoundary name="Login"><Login /></RouteBoundary>} />
             <Route
               path="/dashboard"

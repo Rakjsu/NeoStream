@@ -14,6 +14,8 @@ interface MultiViewProps {
     /** Channel pre-selected for the first tile (came from "Multi-view" entry point). */
     initialChannelId?: string | number;
     onClose: () => void;
+    /** 🖥️ Item 17: presente só no mosaico embutido — destaca pra janela própria. */
+    onDetach?: () => void;
 }
 
 /**
@@ -21,7 +23,7 @@ interface MultiViewProps {
  * focused one (click a tile to move the audio there). Each tile runs its own
  * lean hls.js instance — no controls, no fallback chain, mosaic-grade only.
  */
-export function MultiView({ channels, initialChannelId, onClose }: MultiViewProps) {
+export function MultiView({ channels, initialChannelId, onClose, onDetach }: MultiViewProps) {
     const [slots, setSlots] = useState<(MultiViewChannel | null)[]>(() => {
         const first = initialChannelId !== undefined
             ? channels.find(c => String(c.id) === String(initialChannelId)) ?? null
@@ -105,6 +107,15 @@ export function MultiView({ channels, initialChannelId, onClose }: MultiViewProp
                         </button>
                     ))}
                 </div>
+                {onDetach && (
+                    <button
+                        onClick={onDetach}
+                        title="Abrir em janela própria"
+                        style={{ padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                    >
+                        ⧉ Janela
+                    </button>
+                )}
                 <button
                     onClick={onClose}
                     style={{ padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.25)', background: 'transparent', color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
