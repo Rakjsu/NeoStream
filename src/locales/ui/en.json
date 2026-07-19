@@ -312,12 +312,7 @@
     "updateInstalled": "Update Installed!",
     "whatsNew": "What's New in",
     "gotIt": "Got it, let's go!",
-    "i18nTitle": "Interface Animations",
-    "i18nItems": "Animated logo in title bar with equalizer bars|\"NeoStream\" text with shimmering gradient|Animated waving hand greeting on Home",
-    "profilesTitle": "Improved Navigation",
-    "profilesItems": "Carousel arrows with interactive animations|Purple glow effect on hover|Card hover borders fixed",
-    "fixesTitle": "General Improvements",
-    "fixesItems": "Window control translations (minimize, maximize, close)|Consistent scrollbars across all pages|Notifications now clear properly"
+    "fallback": "This version ships improvements and fixes — full notes live on the NeoStream releases page on GitHub."
   },
   "wrapped": {
     "open": "Wrapped",

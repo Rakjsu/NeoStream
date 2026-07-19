@@ -1784,7 +1784,7 @@ export function Home() {
                     fontSize: '11px'
                 }}>
                     <span>NeoStream IPTV</span>
-                    <span>v2.3.0</span>
+                    <span>v{__APP_VERSION__}</span>
                 </div >
             </div >
 
