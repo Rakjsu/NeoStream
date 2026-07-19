@@ -10,6 +10,8 @@ export interface MovieProgress {
     duration: number;
     progress: number; // Percentage 0-100
     watchedAt: number;
+    /** 🎬 Já foi enviado como visto pro Trakt (dispara uma vez, a 85%). */
+    traktSynced?: boolean;
     completed: boolean;
 }
 
@@ -73,10 +75,19 @@ class MovieProgressService {
         const progressPercent = (currentTime / duration) * 100;
         const completed = progressPercent >= 95;
 
-        // 🎬 Trakt: a PRIMEIRA vez que o filme cruza os 95% vira "visto" lá
-        // (fire-and-forget; sem credenciais/conexão a chamada é um no-op).
+        // 🎬 Trakt: a PRIMEIRA vez que o filme cruza 85% vira "visto" lá — 85 e
+        // não 95 porque créditos longos não podem impedir o sync. Quando o Trakt
+        // confirma, um evento avisa o player pra mostrar o feedback visível.
         const previousEntry = progress.find(p => p.movieId === movieId && p.profileId === activeProfile.id);
-        if (completed && !previousEntry?.completed) void syncTraktMovieWatched(movieName);
+        const shouldSyncTrakt = progressPercent >= 85 && !previousEntry?.traktSynced;
+        if (shouldSyncTrakt) {
+            void syncTraktMovieWatched(movieName).then(synced => {
+                if (!synced) return;
+                try {
+                    window.dispatchEvent(new CustomEvent('trakt:synced', { detail: { title: movieName } }));
+                } catch { /* ambiente de teste sem CustomEvent */ }
+            });
+        }
 
         const existing = progress.findIndex((p) => p.movieId === movieId);
 
@@ -89,6 +100,7 @@ class MovieProgressService {
             progress: progressPercent,
             watchedAt: Date.now(),
             completed,
+            traktSynced: previousEntry?.traktSynced || shouldSyncTrakt,
         };
 
         if (existing >= 0) {
