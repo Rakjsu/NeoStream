@@ -42,6 +42,40 @@ export function setEnabled(enabled: boolean): void {
     }
 }
 
+// 🧾 Item 21: erros/warnings também vão pra um ring PERSISTIDO (sobrevive ao
+// restart) — é ele que o visualizador de Diagnósticos mostra e exporta.
+const ERROR_LOG_KEY = 'neostream_error_log_v1';
+const ERROR_LOG_CAP = 100;
+
+function persistError(entry: DiagnosticEntry): void {
+    try {
+        const parsed: unknown = JSON.parse(localStorage.getItem(ERROR_LOG_KEY) || '[]');
+        const list = Array.isArray(parsed) ? (parsed as DiagnosticEntry[]) : [];
+        list.push(entry);
+        localStorage.setItem(ERROR_LOG_KEY, JSON.stringify(list.slice(-ERROR_LOG_CAP)));
+    } catch {
+        // storage indisponível/cheio — o buffer em memória segue valendo
+    }
+}
+
+/** Erros persistidos, mais recente primeiro (pro visualizador). */
+export function getPersistedErrors(): DiagnosticEntry[] {
+    try {
+        const parsed: unknown = JSON.parse(localStorage.getItem(ERROR_LOG_KEY) || '[]');
+        return Array.isArray(parsed) ? (parsed as DiagnosticEntry[]).slice().reverse() : [];
+    } catch {
+        return [];
+    }
+}
+
+export function clearPersistedErrors(): void {
+    try {
+        localStorage.removeItem(ERROR_LOG_KEY);
+    } catch {
+        // nada a limpar
+    }
+}
+
 /**
  * Records a breadcrumb/error into the in-memory ring buffer. Always cheap and
  * always on — recording does not depend on the opt-in flag (only the EXPORT
@@ -52,6 +86,8 @@ export function record(entry: DiagnosticEntry): void {
     if (buffer.length > BUFFER_CAP) {
         buffer.splice(0, buffer.length - BUFFER_CAP);
     }
+    // Erros e warnings ganham persistência (info fica só na memória).
+    if (entry.level !== 'info') persistError(entry);
 }
 
 /** Returns a copy of the current breadcrumbs (oldest → newest). */
@@ -76,6 +112,8 @@ export const diagnosticsService = {
     setEnabled,
     record,
     getBreadcrumbs,
+    getPersistedErrors,
+    clearPersistedErrors,
     formatBreadcrumbs,
     _resetBuffer,
 };

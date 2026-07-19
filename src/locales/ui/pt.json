@@ -341,6 +341,12 @@
     "credentialsNote": "O backup inclui suas playlists (com as senhas dos provedores codificadas). Guarde o arquivo em local seguro."
   },
   "diagnostics": {
+    "errorsTitle": "Erros recentes",
+    "errorsDesc": "Telemetria local: os últimos erros do app ficam guardados neste aparelho (nada é enviado pra fora)",
+    "errorsNone": "Nenhum erro registrado 🎉",
+    "errorsCopy": "Copiar relatório",
+    "errorsCopied": "Copiado ✓",
+    "errorsClear": "Limpar",
     "title": "Diagnóstico",
     "description": "Gere um relatório de erro que você pode compartilhar para ajudar a resolver problemas",
     "enableDetailed": "Ativar diagnóstico detalhado",

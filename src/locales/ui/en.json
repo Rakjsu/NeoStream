@@ -519,6 +519,12 @@
     "credentialsNote": "The backup includes your playlists (provider passwords encoded). Keep the file somewhere safe."
   },
   "diagnostics": {
+    "errorsTitle": "Recent errors",
+    "errorsDesc": "Local telemetry: the latest app errors are kept on this device (nothing is sent anywhere)",
+    "errorsNone": "No errors logged 🎉",
+    "errorsCopy": "Copy report",
+    "errorsCopied": "Copied ✓",
+    "errorsClear": "Clear",
     "title": "Diagnostics",
     "description": "Generate an error report you can share to help troubleshoot issues",
     "enableDetailed": "Enable detailed diagnostics",

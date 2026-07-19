@@ -519,6 +519,12 @@
     "credentialsNote": "La copia incluye tus playlists (contraseñas de proveedores codificadas). Guarda el archivo en un lugar seguro."
   },
   "diagnostics": {
+    "errorsTitle": "Errores recientes",
+    "errorsDesc": "Telemetría local: los últimos errores de la app se guardan en este dispositivo (no se envía nada)",
+    "errorsNone": "Sin errores registrados 🎉",
+    "errorsCopy": "Copiar informe",
+    "errorsCopied": "Copiado ✓",
+    "errorsClear": "Limpiar",
     "title": "Diagnóstico",
     "description": "Genera un informe de error que puedes compartir para ayudar a resolver problemas",
     "enableDetailed": "Activar diagnóstico detallado",

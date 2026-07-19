@@ -9,6 +9,8 @@ import {
     isEnabled,
     setEnabled,
     _resetBuffer,
+    getPersistedErrors,
+    clearPersistedErrors,
 } from './diagnosticsService';
 
 beforeEach(() => {
@@ -67,5 +69,41 @@ describe('diagnostics opt-in flag', () => {
         setEnabled(true);
         setEnabled(false);
         expect(isEnabled()).toBe(false);
+    });
+});
+
+describe('erros persistidos (item 21)', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        _resetBuffer();
+    });
+
+    it('error e warn persistem; info fica só na memória', () => {
+        record({ time: '2026-01-01T00:00:00Z', level: 'error', message: 'boom' });
+        record({ time: '2026-01-01T00:00:01Z', level: 'warn', message: 'aviso' });
+        record({ time: '2026-01-01T00:00:02Z', level: 'info', message: 'passo' });
+        const persisted = getPersistedErrors();
+        expect(persisted).toHaveLength(2);
+        expect(persisted[0].message).toBe('aviso'); // mais recente primeiro
+    });
+
+    it('respeita o teto de 100 entradas', () => {
+        for (let i = 0; i < 110; i++) {
+            record({ time: `2026-01-01T00:00:${String(i).padStart(2, '0')}Z`, level: 'error', message: `e${i}` });
+        }
+        const persisted = getPersistedErrors();
+        expect(persisted).toHaveLength(100);
+        expect(persisted[0].message).toBe('e109');
+    });
+
+    it('clearPersistedErrors limpa tudo', () => {
+        record({ time: '2026-01-01T00:00:00Z', level: 'error', message: 'boom' });
+        clearPersistedErrors();
+        expect(getPersistedErrors()).toEqual([]);
+    });
+
+    it('ignora lixo no localStorage', () => {
+        localStorage.setItem('neostream_error_log_v1', '{broken');
+        expect(getPersistedErrors()).toEqual([]);
     });
 });
