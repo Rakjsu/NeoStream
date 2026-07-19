@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { watchLaterService, type WatchLaterItem } from '../services/watchLater';
+import { fetchTraktWatchlist } from '../services/traktService';
+import { matchCatalogByTitles } from '../services/personSearchHelpers';
 import { castResolvedQueue, type CastQueueItem } from '../services/castQueue';
 import { ContentDetailModal } from '../components/ContentDetailModal';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
@@ -15,6 +17,49 @@ export function WatchLater() {
     const dragIndexRef = useRef<number | null>(null);
     const [removingId, setRemovingId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'all' | 'movies' | 'series'>('all');
+    // ⭐ Item B2-4: importa a watchlist do Trakt cruzando com o catálogo.
+    const [traktImporting, setTraktImporting] = useState(false);
+    const [traktMsg, setTraktMsg] = useState('');
+    const importFromTrakt = () => {
+        if (traktImporting) return;
+        setTraktImporting(true);
+        setTraktMsg('');
+        void (async () => {
+            try {
+                const wishlist = await fetchTraktWatchlist();
+                if (wishlist.length === 0) {
+                    setTraktMsg(t('watchLater', 'traktEmpty'));
+                    return;
+                }
+                const [moviesRes, seriesRes] = await Promise.all([
+                    window.ipcRenderer.invoke('streams:get-vod', {}) as Promise<{ success?: boolean; data?: { stream_id: number; name: string; stream_icon?: string }[] }>,
+                    window.ipcRenderer.invoke('streams:get-series', {}) as Promise<{ success?: boolean; data?: { series_id: number; name: string; cover?: string }[] }>,
+                ]);
+                let added = 0;
+                for (const wish of wishlist) {
+                    if (wish.kind === 'movie') {
+                        const match = matchCatalogByTitles(moviesRes?.data ?? [], [wish.title], 1)[0];
+                        if (match && !watchLaterService.has(String(match.stream_id), 'movie')) {
+                            if (watchLaterService.add({ id: String(match.stream_id), type: 'movie', name: match.name, cover: match.stream_icon || '' }, { skipTrakt: true })) added++;
+                        }
+                    } else {
+                        const match = matchCatalogByTitles(seriesRes?.data ?? [], [wish.title], 1)[0];
+                        if (match && !watchLaterService.has(String(match.series_id), 'series')) {
+                            if (watchLaterService.add({ id: String(match.series_id), type: 'series', name: match.name, cover: match.cover || '' }, { skipTrakt: true })) added++;
+                        }
+                    }
+                }
+                setItems(watchLaterService.getAll());
+                setTraktMsg(added > 0
+                    ? t('watchLater', 'traktImported').replace('{n}', String(added))
+                    : t('watchLater', 'traktNoMatch'));
+            } catch {
+                setTraktMsg(t('watchLater', 'traktFail'));
+            } finally {
+                setTraktImporting(false);
+            }
+        })();
+    };
     const navigate = useNavigate();
     const { t } = useLanguage();
 
@@ -234,6 +279,16 @@ export function WatchLater() {
 
                 {/* Content Grid */}
                 <div className="content-scroll">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                        <button
+                            onClick={importFromTrakt}
+                            disabled={traktImporting}
+                            style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(237, 28, 36, 0.5)', background: 'rgba(237, 28, 36, 0.15)', color: 'white', fontSize: 13, fontWeight: 600, cursor: traktImporting ? 'wait' : 'pointer' }}
+                        >
+                            {traktImporting ? '…' : t('watchLater', 'traktImport')}
+                        </button>
+                        {traktMsg ? <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{traktMsg}</span> : null}
+                    </div>
                     {displayItems.length === 0 ? (
                         <div className="no-items-message">
                             <p>{activeTab === 'movies' ? t('watchLater', 'noMovies') : t('watchLater', 'noSeries')}</p>

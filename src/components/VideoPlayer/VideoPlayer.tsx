@@ -14,7 +14,7 @@ import { useSubtitleManager } from './useSubtitleManager';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { clampBoost, cycleAbState, abLoopTarget, type AbLoopState, filterCssOf, nextVideoFilter } from './playerExtras';
 import { bookmarkService, type VideoBookmark } from '../../services/bookmarkService';
-import { traktScrobble } from '../../services/traktService';
+import { traktScrobble, getTraktResumePct } from '../../services/traktService';
 import { loadSubtitleStyle, type SubtitleStyle } from '../../utils/subtitleStyle';
 import { PlayerSettingsMenu } from './PlayerSettingsMenu';
 import { useSleepTimer, formatSleepCountdown } from './useSleepTimer';
@@ -406,6 +406,22 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
             void traktScrobble(target, 'pause', traktProgressRef.current);
         };
     }, [contentType, title, seasonNumber, episodeNumber]);
+    // ▶️ Item B2-5: sem progresso local, retoma do ponto pausado no Trakt
+    // (outro app). Uma tentativa por mount, só filmes, e só no comecinho.
+    const traktResumeTriedRef = useRef(false);
+    useEffect(() => {
+        if (traktResumeTriedRef.current) return;
+        if (contentType !== 'movie' || !title || resumeTime || state.duration <= 0) return;
+        traktResumeTriedRef.current = true;
+        void getTraktResumePct(title).then(pct => {
+            if (pct == null || pct <= 1 || pct >= 95) return;
+            const target = (pct / 100) * state.duration;
+            if (target > 30 && state.currentTime < 30) {
+                controls.seek(target);
+            }
+        });
+    }, [contentType, title, resumeTime, state.duration, state.currentTime, controls]);
+
     // ✓ Confirmação visível quando o visto sincroniza no Trakt.
     const [traktToast, setTraktToast] = useState(false);
     useEffect(() => {
