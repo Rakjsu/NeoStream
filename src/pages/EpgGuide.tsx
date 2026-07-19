@@ -59,6 +59,7 @@ interface EPGProgram {
     end: string;
     title: string;
     description?: string;
+    category?: string;
     channel_id: string;
 }
 
@@ -272,9 +273,28 @@ export function EpgGuide() {
     }, [isKidsProfile]);
 
     // Channels of the selected category (only these render rows)
+    // 🎭 Item 34: filtro por gênero — só existe quando o XMLTV traz <category>.
+    const [genreFilter, setGenreFilter] = useState('');
+    const availableGenres = useMemo(() => {
+        const genres = new Set<string>();
+        for (const programs of Object.values(epgByChannel)) {
+            for (const program of programs ?? []) {
+                if (program.category) genres.add(program.category);
+            }
+        }
+        return [...genres].sort();
+    }, [epgByChannel]);
+
     const categoryStreams = useMemo(
-        () => streams.filter(s => s.category_id === selectedCategory),
-        [streams, selectedCategory]
+        () => streams.filter(s => {
+            if (s.category_id !== selectedCategory) return false;
+            if (!genreFilter) return true;
+            // EPG é lazy: canal ainda sem programas carregados não some.
+            const programs = epgByChannel[s.name];
+            if (programs === undefined) return true;
+            return programs.some(p => p.category === genreFilter);
+        }),
+        [streams, selectedCategory, genreFilter, epgByChannel]
     );
     const renderedStreams = useMemo(
         () => categoryStreams.slice(0, visibleRows),
@@ -514,6 +534,27 @@ export function EpgGuide() {
                         </option>
                     ))}
                 </select>
+
+                {/* 🎭 Item 34: gênero do XMLTV (some quando o provedor não envia) */}
+                {availableGenres.length > 0 && (
+                    <select
+                        value={genreFilter}
+                        onChange={(e) => setGenreFilter(e.target.value)}
+                        style={{
+                            padding: '8px 12px',
+                            borderRadius: 8,
+                            background: 'rgba(255,255,255,0.08)',
+                            color: 'white',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            fontSize: 13
+                        }}
+                    >
+                        <option value="">{t('guide', 'allGenres')}</option>
+                        {availableGenres.map(genre => (
+                            <option key={genre} value={genre}>{genre}</option>
+                        ))}
+                    </select>
+                )}
 
                 {/* Time paging: ◀ Hoje/Agora ▶ */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -855,6 +896,7 @@ export function EpgGuide() {
                                                 <span style={rowPlaceholderStyle}>{t('guide', 'loadingEpg')}</span>
                                             ) : (() => {
                                                 const blocks = programs
+                                                    .filter(p => !genreFilter || p.category === genreFilter)
                                                     .map(p => ({ program: p, block: programToBlock(p.start, p.end, guideWindow) }))
                                                     .filter((e): e is { program: EPGProgram; block: NonNullable<ReturnType<typeof programToBlock>> } => e.block !== null);
                                                 if (blocks.length === 0) {

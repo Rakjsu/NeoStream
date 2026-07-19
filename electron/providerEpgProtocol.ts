@@ -15,6 +15,8 @@ export interface ProviderEpgProgram {
     end: string
     title: string
     description?: string
+    /** 🎭 Item 34: 1ª <category> do XMLTV (gênero), quando o provedor envia. */
+    category?: string
     channel_id: string
 }
 
@@ -131,6 +133,7 @@ const ATTR_RE: Record<string, RegExp> = {
 }
 const TITLE_RE = /<title[^>]*>([\s\S]*?)<\/title>/i
 const DESC_RE = /<desc[^>]*>([\s\S]*?)<\/desc>/i
+const CATEGORY_RE = /<category[^>]*>([\s\S]*?)<\/category>/i
 
 export interface XmltvIndexResult {
     index: Map<string, ProviderEpgProgram[]>
@@ -183,6 +186,7 @@ export function parseXmltvIndexWithMeta(xml: string, nowMs: number = Date.now())
 
         const titleMatch = TITLE_RE.exec(body)
         const descMatch = DESC_RE.exec(body)
+        const categoryMatch = CATEGORY_RE.exec(body)
         const title = titleMatch ? decodeXmlText(titleMatch[1]) : ''
 
         const program: ProviderEpgProgram = {
@@ -191,6 +195,7 @@ export function parseXmltvIndexWithMeta(xml: string, nowMs: number = Date.now())
             end: new Date(endMs).toISOString(),
             title: title || 'Sem título',
             description: descMatch ? decodeXmlText(descMatch[1]) : '',
+            ...(categoryMatch ? { category: decodeXmlText(categoryMatch[1]).trim() } : {}),
             channel_id: channelId,
         }
 

@@ -14,6 +14,8 @@ interface EPGProgram {
     end: string;
     title: string;
     description?: string;
+    /** 🎭 Item 34: gênero da <category> do XMLTV, quando existir. */
+    category?: string;
     channel_id: string;
 }
 
@@ -574,6 +576,8 @@ export const epgService = {
             const descMatch = prog.match(/<desc[^>]*>([\s\S]*?)<\/desc>/i);
             const description = descMatch ? this.decodeXMLEntities(descMatch[1]) : '';
 
+            const categoryMatch = prog.match(/<category[^>]*>([\s\S]*?)<\/category>/i);
+
             // Parse times
             const startDate = this.parseXMLTVTime(startMatch[1], startMatch[2]);
             const endDate = this.parseXMLTVTime(stopMatch[1], stopMatch[2]);
@@ -585,6 +589,7 @@ export const epgService = {
                     end: endDate.toISOString(),
                     title: title,
                     description: description,
+                    ...(categoryMatch ? { category: this.decodeXMLEntities(categoryMatch[1]).trim() } : {}),
                     channel_id: channelName
                 });
             }
