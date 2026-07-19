@@ -866,6 +866,11 @@
   },
   "watchLater": {
     "castQueue": "Transmitir fila",
+    "traktImport": "⭐ Importar watchlist do Trakt",
+    "traktImported": "{n} título(s) da watchlist do Trakt entraram na lista.",
+    "traktNoMatch": "Watchlist recebida, mas nenhum título casou com o catálogo.",
+    "traktEmpty": "Watchlist do Trakt vazia (ou Trakt desconectado neste PC).",
+    "traktFail": "Não deu pra buscar a watchlist do Trakt.",
     "castingQueue": "Transmitindo...",
     "castResolving": "Preparando a fila...",
     "castNoDevice": "Nenhum Chromecast encontrado",

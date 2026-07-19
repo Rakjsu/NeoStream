@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SortSelect } from '../components/SortSelect';
 import { CatalogFilters } from '../components/CatalogFilters';
 import { fuzzyIncludes, matchesFilters, qualityBadgeOf } from '../utils/catalogFilter';
+import { fetchTraktWatchedMovies } from '../services/traktService';
+import { normalizeTitle } from '../services/personSearchHelpers';
 import { buildCatalogCsv } from '../utils/catalogExport';
 import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { fetchMovieDetails, searchMovieByName, type TMDBMovieDetails, getBackdropUrl } from '../services/tmdb';
@@ -208,6 +210,20 @@ export function VOD() {
 
     // 🙈 Esconder assistidos: filmes com progresso >= 95% saem da grade.
     const [hideWatched, setHideWatchedState] = useState(() => localStorage.getItem('neostream_hide_watched') === 'on');
+    // 🎬 Item B2-6: com "ocultar assistidos" ligado, o que foi visto no TRAKT
+    // (em qualquer app) também some da grade (match por título normalizado).
+    const [traktWatchedTitles, setTraktWatchedTitles] = useState<Set<string>>(new Set());
+    useEffect(() => {
+        if (!hideWatched) {
+            queueMicrotask(() => setTraktWatchedTitles(new Set()));
+            return;
+        }
+        let cancelled = false;
+        void fetchTraktWatchedMovies().then(titles => {
+            if (!cancelled && titles.length > 0) setTraktWatchedTitles(new Set(titles.map(normalizeTitle)));
+        });
+        return () => { cancelled = true; };
+    }, [hideWatched]);
     const watchedIds = useMemo(
         () => (hideWatched ? new Set(movieProgressService.getWatchedMovies()) : new Set<string>()),
         [hideWatched]
@@ -215,6 +231,9 @@ export function VOD() {
 
     const filteredStreams = useMemo(() => sortedStreams.filter(stream => {
         const matchesSearch = fuzzyIncludes(stream.name, searchQuery);
+        if (hideWatched && selectedCategory !== 'WATCHED' && traktWatchedTitles.size > 0 && traktWatchedTitles.has(normalizeTitle(stream.name))) {
+            return false;
+        }
         if (hideWatched && selectedCategory !== 'WATCHED' && watchedIds.has(stream.stream_id.toString())) {
             return false;
         }
@@ -240,7 +259,7 @@ export function VOD() {
     // settings switch (which reloads streams / remounts this page), so it doesn't
     // need to be a dep — keeping it out is what makes scrolling cheap.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }), [sortedStreams, searchQuery, selectedCategory, hideWatched, watchedIds]);
+    }), [sortedStreams, searchQuery, selectedCategory, hideWatched, watchedIds, traktWatchedTitles]);
 
     // Windowed rendering: only ~3 screens of cards stay mounted while the
     // scrollbar reflects the full list (spacer rows keep the geometry).

@@ -284,3 +284,121 @@ export async function fetchTraktProfile(): Promise<string> {
 export function resetTraktCache(): void {
     idsCache.clear();
 }
+
+/** ⭐ Watchlist do Trakt (títulos) — pro cruzamento com o catálogo por nome. */
+export async function fetchTraktWatchlist(): Promise<{ kind: 'movie' | 'series'; title: string }[]> {
+    const token = getToken();
+    const { clientId } = getTraktCreds();
+    if (!token || !clientId) return [];
+    try {
+        const [movies, shows] = await Promise.all([
+            traktGet('/sync/watchlist/movies', clientId, token.access) as Promise<{ movie?: TraktHit }[]>,
+            traktGet('/sync/watchlist/shows', clientId, token.access) as Promise<{ show?: TraktHit }[]>,
+        ]);
+        return [
+            ...movies.flatMap(item => (item.movie?.title ? [{ kind: 'movie' as const, title: item.movie.title }] : [])),
+            ...shows.flatMap(item => (item.show?.title ? [{ kind: 'series' as const, title: item.show.title }] : [])),
+        ];
+    } catch {
+        return [];
+    }
+}
+
+/** Adiciona/remove um título na watchlist do Trakt (resolve os ids pela busca). */
+async function traktWatchlistChange(kind: 'movie' | 'series', title: string, remove: boolean): Promise<boolean> {
+    const token = getToken();
+    const { clientId } = getTraktCreds();
+    if (!token || !clientId) return false;
+    try {
+        const ids = kind === 'movie'
+            ? await resolveMovieIds(title, clientId, token.access)
+            : await resolveShowIds(title, clientId, token.access);
+        if (!ids) return false;
+        const path = remove ? '/sync/watchlist/remove' : '/sync/watchlist';
+        const body = kind === 'movie' ? { movies: [{ ids }] } : { shows: [{ ids }] };
+        await traktPost(path, body, clientId, token.access);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+export async function traktWatchlistAdd(kind: 'movie' | 'series', title: string): Promise<boolean> {
+    return traktWatchlistChange(kind, title, false);
+}
+
+export async function traktWatchlistRemove(kind: 'movie' | 'series', title: string): Promise<boolean> {
+    return traktWatchlistChange(kind, title, true);
+}
+
+/** 🎬 Filmes marcados como vistos no Trakt (títulos) — pro "ocultar assistidos". */
+export async function fetchTraktWatchedMovies(): Promise<string[]> {
+    const token = getToken();
+    const { clientId } = getTraktCreds();
+    if (!token || !clientId) return [];
+    try {
+        const rows = await traktGet('/sync/watched/movies', clientId, token.access) as { movie?: TraktHit }[];
+        return rows.flatMap(row => (row.movie?.title ? [row.movie.title] : []));
+    } catch {
+        return [];
+    }
+}
+
+export interface TraktPlayback {
+    kind: 'movie' | 'episode';
+    /** Nos episódios é o nome da SÉRIE (season/episode dizem o capítulo). */
+    title: string;
+    /** 0–100 — o player converte pra segundos quando souber a duração. */
+    progress: number;
+    pausedAtMs: number;
+    season?: number;
+    episode?: number;
+}
+
+/** ▶️ Reproduções pausadas no Trakt (outros apps: Kodi, celular…). */
+export async function fetchTraktPlayback(): Promise<TraktPlayback[]> {
+    const token = getToken();
+    const { clientId } = getTraktCreds();
+    if (!token || !clientId) return [];
+    try {
+        const rows = await traktGet('/sync/playback', clientId, token.access) as {
+            type?: string;
+            progress?: number;
+            paused_at?: string;
+            movie?: TraktHit;
+            show?: TraktHit;
+            episode?: { season?: number; number?: number };
+        }[];
+        return rows.flatMap((row): TraktPlayback[] => {
+            const progress = Number(row.progress);
+            if (!Number.isFinite(progress) || progress <= 0 || progress >= 95) return [];
+            const pausedAtMs = Date.parse(row.paused_at ?? '') || Date.now();
+            if (row.type === 'movie' && row.movie?.title) {
+                return [{ kind: 'movie', title: row.movie.title, progress, pausedAtMs }];
+            }
+            if (row.type === 'episode' && row.show?.title && row.episode) {
+                const season = Number(row.episode.season);
+                const episode = Number(row.episode.number);
+                if (!Number.isFinite(season) || !Number.isFinite(episode)) return [];
+                return [{ kind: 'episode', title: row.show.title, progress, pausedAtMs, season, episode }];
+            }
+            return [];
+        });
+    } catch {
+        return [];
+    }
+}
+
+// Playback do Trakt buscado uma vez por sessão — o player só consulta.
+let playbackCache: TraktPlayback[] | null = null;
+
+/** % de retomada do Trakt pra um FILME (null sem playback pausado lá). */
+export async function getTraktResumePct(title: string): Promise<number | null> {
+    if (playbackCache === null) {
+        playbackCache = await fetchTraktPlayback().catch(() => []);
+    }
+    const { clean } = splitTitleYear(title);
+    const wanted = clean.toLowerCase();
+    const hit = playbackCache.find(p => p.kind === 'movie' && p.title.toLowerCase() === wanted);
+    return hit ? hit.progress : null;
+}

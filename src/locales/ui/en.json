@@ -866,6 +866,11 @@
   },
   "watchLater": {
     "castQueue": "Cast queue",
+    "traktImport": "⭐ Import Trakt watchlist",
+    "traktImported": "{n} title(s) from your Trakt watchlist were added.",
+    "traktNoMatch": "Watchlist received, but no title matched the catalog.",
+    "traktEmpty": "Trakt watchlist is empty (or Trakt is not connected on this PC).",
+    "traktFail": "Could not fetch the Trakt watchlist.",
     "castingQueue": "Casting...",
     "castResolving": "Preparing the queue...",
     "castNoDevice": "No Chromecast found",

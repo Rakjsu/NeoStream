@@ -1,5 +1,6 @@
 // Watch Later localStorage utility (adapted for profiles, per-playlist scoped)
 import { profileService } from './profileService';
+import { traktWatchlistAdd, traktWatchlistRemove } from './traktService';
 import { playlistScopedKey, hasKnownPlaylistId } from './activePlaylistService';
 import { syncTombstones, tombstoneItemKey } from './syncTombstones';
 import type { Profile, WatchLaterItem } from '../types/profile';
@@ -30,7 +31,7 @@ export const watchLaterService = {
     },
 
     // Add item to watch later
-    add(item: Omit<WatchLaterItem, 'addedAt'>): boolean {
+    add(item: Omit<WatchLaterItem, 'addedAt'>, options?: { skipTrakt?: boolean }): boolean {
         const activeProfile = profileService.getActiveProfile();
         if (!activeProfile) return false;
 
@@ -49,6 +50,9 @@ export const watchLaterService = {
 
             items.push(watchLaterItem);
             this.save(activeProfile, items);
+            // ⭐ Espelha na watchlist do Trakt (no-op sem conexão; o importador
+            // do Trakt passa skipTrakt pra não ecoar de volta).
+            if (!options?.skipTrakt) void traktWatchlistAdd(item.type, item.name);
             return true;
         } catch (error) {
             console.error('Error adding to watch later:', error);
@@ -76,10 +80,13 @@ export const watchLaterService = {
         if (!activeProfile) return false;
 
         try {
+            const removed = this.getAll().find(i => i.id === id && i.type === type);
             const items = this.getAll().filter(
                 i => !(i.id === id && i.type === type)
             );
             this.save(activeProfile, items);
+            // ⭐ Tira também da watchlist do Trakt (no-op sem conexão).
+            if (removed) void traktWatchlistRemove(removed.type, removed.name);
             // Deletions ledger so the machine sync propagates the removal.
             syncTombstones.record(playlistScopedKey(KEY_BASE, activeProfile.id), tombstoneItemKey(id, type));
             return true;
