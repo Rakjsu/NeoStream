@@ -1,6 +1,7 @@
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { Play } from 'lucide-react';
 import { LazyImage } from './LazyImage';
+import { hasSeenNewBadge, markNewBadgeSeen } from '../services/newBadgeService';
 import './HoverPreviewCard.css';
 
 interface HoverPreviewCardProps {
@@ -30,6 +31,8 @@ interface HoverPreviewCardProps {
 // distant items and the owner prefers click-to-open).
 // Keyboard: the card is a Tab stop — Enter/Space opens it like a click.
 function HoverPreviewCardComponent({
+    type,
+    id,
     cover,
     title,
     onMoreInfo,
@@ -37,6 +40,8 @@ function HoverPreviewCardComponent({
     qualityBadge,
     children
 }: HoverPreviewCardProps) {
+    // 🟢 O selo NOVO some no primeiro hover e fica visto pra sempre.
+    const [newSeen, setNewSeen] = useState(() => (isNew ? hasSeenNewBadge(type, id) : false));
     const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault(); // Space must not scroll the grid
@@ -51,11 +56,17 @@ function HoverPreviewCardComponent({
             aria-label={title}
             onClick={onMoreInfo}
             onKeyDown={handleKeyDown}
+            onMouseEnter={() => {
+                if (isNew && !newSeen) {
+                    markNewBadgeSeen(type, id);
+                    setNewSeen(true);
+                }
+            }}
         >
             {/* Poster */}
             <div className="preview-poster" style={{ position: 'relative' }}>
-                {isNew && <span className="preview-new-badge">NOVO</span>}
-                {qualityBadge && !isNew && (
+                {isNew && !newSeen && <span className="preview-new-badge">NOVO</span>}
+                {qualityBadge && !(isNew && !newSeen) && (
                     <span className="preview-new-badge" style={{ background: 'rgba(59, 130, 246, 0.9)' }}>{qualityBadge}</span>
                 )}
                 <LazyImage
