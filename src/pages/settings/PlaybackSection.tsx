@@ -19,6 +19,7 @@ type MpvDownloadState =
 export function PlaybackSection() {
     const [refreshInterval, setRefreshInterval] = useState<RefreshIntervalHours>(() => catalogRefreshService.getIntervalHours());
     const [notifyNewEpisodes, setNotifyNewEpisodes] = useState<boolean>(() => newEpisodeNotifier.isEnabled());
+    const [resumeOnOpen, setResumeOnOpen] = useState<boolean>(() => localStorage.getItem('neostream_resume_on_open') !== '0');
     const [screensaverMin, setScreensaverMin] = useState<number>(() => parseInt(localStorage.getItem(SCREENSAVER_MINUTES_KEY) || '0', 10) || 0);
     const [playbackConfig, setPlaybackConfig] = useState<PlaybackConfig>(playbackService.getConfig());
     // Multi-monitor: where the PiP window opens (list comes from the main process).
@@ -131,6 +132,25 @@ export function PlaybackSection() {
                             </option>
                         ))}
                     </select>
+                </div>
+
+                {/* ⏯️ Retomar ao abrir: oferta única por sessão na Home */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>{t('playback', 'resumeOnOpen')}</label>
+                        <p>{t('playback', 'resumeOnOpenDesc')}</p>
+                    </div>
+                    <label className="toggle-switch">
+                        <input
+                            type="checkbox"
+                            checked={resumeOnOpen}
+                            onChange={(e) => {
+                                localStorage.setItem('neostream_resume_on_open', e.target.checked ? '1' : '0');
+                                setResumeOnOpen(e.target.checked);
+                            }}
+                        />
+                        <span className="toggle-slider"></span>
+                    </label>
                 </div>
 
                 <div className="setting-item">

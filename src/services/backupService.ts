@@ -66,6 +66,8 @@ const EXACT_KEYS = [
     'watchLater',             // legacy pre-profile watch-later list
     'neostream_sync_tombstones', // deletions ledger (sync propagates removals)
     'neostream_tmdb_api_key', // the user's own TMDB key (v3) — also synced
+    'neostream_keymap_v1',    // atalhos de teclado personalizados do player
+    'neostream_resume_on_open', // toggle "retomar ao abrir"
 ];
 
 // Keys included when they start with one of these prefixes

@@ -15,6 +15,8 @@ const invokeChannels = new Set([
     'backup:auto-config-set',
     'backup:auto-save',
     'backup:choose-dir',
+    'backup:cloud-dirs',
+    'backup:cloud-use',
     'backup:export-playlists',
     'backup:import-playlists',
     'backup:load-file',

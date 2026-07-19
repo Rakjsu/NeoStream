@@ -306,6 +306,8 @@
     "checking": "Verificando..."
   },
   "backup": {
+    "cloudUse": "Salvar na nuvem",
+    "cloudSet": "Pasta da nuvem configurada ✓",
     "title": "Backup e Restauração",
     "description": "Exporte ou restaure seus perfis, progresso e preferências",
     "passwordTitle": "Senha do backup (opcional)",
@@ -548,6 +550,8 @@
     "version": "Versão"
   },
   "playback": {
+    "resumeOnOpen": "Retomar ao abrir",
+    "resumeOnOpenDesc": "Ao abrir o app, oferece continuar o último conteúdo que você estava assistindo",
     "title": "Reprodução",
     "description": "Ajuste a reprodução de vídeo e áudio",
     "bufferSize": "Tamanho do Buffer",
@@ -819,6 +823,8 @@
     "disclaimer": "NeoStream não fornece conteúdo. Use sua própria assinatura IPTV."
   },
   "home": {
+    "resumeOpenTitle": "Continuar de onde parou?",
+    "resumeOpenPlay": "Retomar",
     "goodMorning": "Bom dia",
     "expiryWarn": "Sua lista expira em {days} dia(s) — fale com o seu provedor pra renovar.",
     "expiryExpired": "Sua lista expirou — fale com o seu provedor pra renovar.",
@@ -1033,6 +1039,13 @@
     "note": "Os filtros de perfil infantil e controle parental continuam valendo por cima destas opções."
   },
   "shortcuts": {
+    "seekBack": "Voltar 10s",
+    "seekForward": "Avançar 10s",
+    "customize": "Clique numa tecla destacada e pressione a nova pra personalizar",
+    "pressKey": "Pressione a nova tecla (Esc cancela)",
+    "keyInUse": "Essa tecla já está em uso",
+    "keyReserved": "Essa tecla é reservada",
+    "resetKeys": "Restaurar padrão",
     "frameStep": "Quadro a quadro (pausado)",
     "abLoop": "Repetição A-B",
     "bookmark": "Marcar posição (marcador)",

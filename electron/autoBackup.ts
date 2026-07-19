@@ -11,6 +11,7 @@
 
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import path from 'node:path'
+import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import Store from 'electron-store'
 import log from './logger'
@@ -45,6 +46,22 @@ export function isBackupDue(config: AutoBackupConfig, nowMs: number): boolean {
     return nowMs - config.lastBackupAt >= config.intervalDays * 24 * 3600_000
 }
 
+/**
+ * ☁️ Pastas locais dos provedores de nuvem instalados (o cliente de sync do
+ * provedor faz o upload sozinho — o app só grava o arquivo lá dentro).
+ */
+export function detectCloudDirs(): { provider: string; path: string }[] {
+    const home = app.getPath('home')
+    const candidates = [
+        { provider: 'OneDrive', path: process.env.OneDrive || path.join(home, 'OneDrive') },
+        { provider: 'Dropbox', path: path.join(home, 'Dropbox') },
+        { provider: 'Google Drive', path: path.join(home, 'Google Drive') },
+    ]
+    return candidates.filter(c => {
+        try { return fs.existsSync(c.path) } catch { return false }
+    })
+}
+
 async function pruneOldBackups(dirPath: string): Promise<void> {
     try {
         const entries = await fsp.readdir(dirPath)
@@ -69,6 +86,16 @@ export function setupAutoBackup(getWin: () => BrowserWindow | null) {
             ...(typeof partial?.dirPath === 'string' ? { dirPath: partial.dirPath } : {})
         })
         return { success: true, config: next }
+    })
+
+    ipcMain.handle('backup:cloud-dirs', () => ({ success: true, dirs: detectCloudDirs() }))
+
+    // Atalho "salvar na nuvem": subpasta própria na pasta sincronizada + liga o auto-backup.
+    ipcMain.handle('backup:cloud-use', (_e, { dirPath }: { dirPath: string }) => {
+        const valid = detectCloudDirs().some(c => c.path === dirPath)
+        if (!valid) return { success: false, error: 'unknown cloud dir' }
+        const config = setConfig({ dirPath: path.join(dirPath, 'NeoStream Backups'), enabled: true })
+        return { success: true, config }
     })
 
     ipcMain.handle('backup:choose-dir', async () => {
