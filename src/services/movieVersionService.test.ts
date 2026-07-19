@@ -7,6 +7,8 @@ import {
     findMovieVersions,
     isCurrentVersion,
     type MovieLike,
+    getVersionTag,
+    groupByBaseName,
 } from './movieVersionService';
 
 describe('getVersionInfo / getVersionLabel', () => {
@@ -103,5 +105,46 @@ describe('isCurrentVersion', () => {
         const version = { movie, quality: '4k' as const, audio: 'dubbed' as const, label: '4K Dublado' };
         expect(isCurrentVersion(movie, version)).toBe(true);
         expect(isCurrentVersion({ name: 'Avatar', stream_id: 9 }, version)).toBe(false);
+    });
+});
+
+describe('getVersionTag (item 45)', () => {
+    it('monta o rótulo por marcadores crus', () => {
+        expect(getVersionTag('Avatar 4K [L] (2009)')).toBe('4K Legendado');
+        expect(getVersionTag('Avatar FHD (2009)')).toBe('FHD Dublado');
+        expect(getVersionTag('Avatar HD Legendado')).toBe('HD Legendado');
+        expect(getVersionTag('Avatar (2009)')).toBe('Dublado');
+    });
+});
+
+describe('groupByBaseName (item 45)', () => {
+    it('agrupa 4K/FHD/HD/legendado no mesmo card', () => {
+        const movies = [
+            { name: 'Avatar 4K (2009)', stream_id: 1 },
+            { name: 'Avatar FHD (2009)', stream_id: 2 },
+            { name: 'Avatar HD [L] (2009)', stream_id: 3 },
+            { name: 'Duna (2021)', stream_id: 4 },
+        ];
+        const groups = groupByBaseName(movies);
+        expect(groups.size).toBe(2);
+        expect(groups.get('avatar')).toHaveLength(3);
+        expect(groups.get('duna')).toHaveLength(1);
+    });
+
+    it('mantém a ordem: o primeiro da lista é o representante do grupo', () => {
+        const movies = [
+            { name: 'Matrix FHD', stream_id: 10 },
+            { name: 'Matrix 4K', stream_id: 11 },
+        ];
+        const group = groupByBaseName(movies).get('matrix');
+        expect(group?.[0].stream_id).toBe(10);
+    });
+
+    it('sequências diferentes NÃO agrupam', () => {
+        const movies = [
+            { name: 'Velozes e Furiosos 9 4K', stream_id: 20 },
+            { name: 'Velozes e Furiosos 8 4K', stream_id: 21 },
+        ];
+        expect(groupByBaseName(movies).size).toBe(2);
     });
 });

@@ -394,6 +394,8 @@
     "checking": "Checking..."
   },
   "playback": {
+    "groupVersions": "Group movie versions",
+    "groupVersionsDesc": "One card per movie (4K/FHD/HD/subtitled together) with a version picker in the details",
     "resumeOnOpen": "Resume on launch",
     "resumeOnOpenDesc": "When the app opens, offers to continue the last thing you were watching",
     "title": "Playback",

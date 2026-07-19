@@ -394,6 +394,8 @@
     "checking": "Verificando..."
   },
   "playback": {
+    "groupVersions": "Agrupar versiones de película",
+    "groupVersionsDesc": "Una tarjeta por película (4K/FHD/HD/subtitulada juntas) con selector de versión en la ficha",
     "resumeOnOpen": "Reanudar al abrir",
     "resumeOnOpenDesc": "Al abrir la app, ofrece continuar el último contenido que estabas viendo",
     "title": "Reproducción",
