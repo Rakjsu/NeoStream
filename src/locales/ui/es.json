@@ -775,6 +775,9 @@
     "expand": "Expandir"
   },
   "player": {
+    "qrHandoff": "Continuar en el móvil",
+    "qrHandoffHint": "Apunta la cámara del móvil al código: la app abre en este punto",
+    "qrHandoffClose": "Cerrar",
     "cinemaMode": "Modo cine",
     "volumeBoost": "Refuerzo de volumen",
     "frameSaved": "📸 Fotograma guardado",

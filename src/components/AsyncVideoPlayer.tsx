@@ -9,6 +9,7 @@ import MpvPlayerView from './MpvPlayerView';
 interface MediaItem {
     id?: number | string;
     stream_id?: number | string;
+    container_extension?: string;
     series_id?: number | string;
     type?: string;
     season?: number;
@@ -428,12 +429,26 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
         );
     }
 
+    // 📱 Item 39: dados pro QR "continuar no celular" — o app do celular resolve
+    // a URL com a conta DELE (filme: stream_id; série: id do episódio).
+    const handoffType = contentType || (seriesId ? 'series' : 'movie');
+    const handoffSid = handoffType === 'series' ? (movie.id ?? movie.stream_id) : (movie.stream_id ?? movie.id);
+    const mobileHandoff = handoffType !== 'live' && handoffSid !== undefined && handoffSid !== null
+        ? {
+            kind: handoffType as 'movie' | 'series',
+            sid: String(handoffSid),
+            container: movie.container_extension || 'mp4',
+            name: customTitle || movie.name || movie.title || '',
+        }
+        : undefined;
+
     return (
         <>
             <style>{playerStyles}</style>
             <div className="player-backdrop">
                 <div className="player-container">
                     <VideoPlayer
+                        mobileHandoff={mobileHandoff}
                         src={streamUrl}
                         title={customTitle || movie.name}
                         poster={movie.cover || movie.stream_icon}

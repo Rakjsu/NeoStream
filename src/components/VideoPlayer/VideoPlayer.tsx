@@ -18,6 +18,8 @@ import { traktScrobble, getTraktResumePct } from '../../services/traktService';
 import { loadSubtitleStyle, type SubtitleStyle } from '../../utils/subtitleStyle';
 import { PlayerSettingsMenu } from './PlayerSettingsMenu';
 import { useAmbientLight } from './useAmbientLight';
+import { buildHandoffLink, type MobileHandoff } from '../../utils/mobileHandoff';
+import { qrToSvg } from '../../utils/qrEncoder';
 import { useSleepTimer, formatSleepCountdown } from './useSleepTimer';
 import { aspectPrefs, aspectPrefKey } from '../../utils/aspectPrefs';
 import { ForcedSubtitlesMenu } from './ForcedSubtitlesMenu';
@@ -51,6 +53,8 @@ export interface VideoPlayerProps<TSwitchContent extends SwitchableContent = Swi
     // Usage stats tracking
     contentId?: string;
     contentType?: 'movie' | 'series' | 'live';
+    /** 📱 Item 39: QR pro celular continuar este conteúdo (ausente = sem botão). */
+    mobileHandoff?: MobileHandoff;
     genre?: string;
     // For series PiP expand
     seasonNumber?: number;
@@ -96,6 +100,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     onTimeUpdate,
     contentId,
     contentType = 'movie',
+    mobileHandoff,
     genre,
     seasonNumber,
     episodeNumber,
@@ -309,6 +314,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     const [radioMode, setRadioMode] = useState(false);
     // 🎬 Item 29: modo cinema — vinheta + luz ambiente da cor do filme.
     const [cinemaMode, setCinemaMode] = useState(() => localStorage.getItem('neostream_cinema_mode') === '1');
+    // 📱 Item 39: overlay com QR pro celular continuar o conteúdo atual.
+    const [showHandoffQr, setShowHandoffQr] = useState(false);
     const toggleCinemaMode = () => {
         const next = !cinemaMode;
         localStorage.setItem('neostream_cinema_mode', next ? '1' : '0');
@@ -1117,6 +1124,41 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     />
                 )}
 
+                {/* 📱 Item 39: QR pro celular continuar este conteúdo do ponto atual. */}
+                {showHandoffQr && mobileHandoff && (
+                    <div
+                        onClick={() => setShowHandoffQr(false)}
+                        style={{
+                            position: 'absolute', inset: 0, zIndex: 60,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            background: 'rgba(0,0,0,0.75)', cursor: 'pointer',
+                        }}
+                    >
+                        <div
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                                background: 'white', borderRadius: 16, padding: 18,
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                                cursor: 'default',
+                            }}
+                        >
+                            <div
+                                style={{ width: 220, height: 220 }}
+                                dangerouslySetInnerHTML={{ __html: qrToSvg(buildHandoffLink(mobileHandoff, state.currentTime), 4) }}
+                            />
+                            <div style={{ color: '#111', fontSize: 13, fontWeight: 600, maxWidth: 230, textAlign: 'center' }}>
+                                {t('player', 'qrHandoffHint')}
+                            </div>
+                            <button
+                                onClick={() => setShowHandoffQr(false)}
+                                style={{ padding: '6px 18px', borderRadius: 8, border: 'none', background: '#111', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                            >
+                                {t('player', 'qrHandoffClose')}
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Custom Subtitle Overlay - replaces native <track> for better HLS sync */}
                 <SubtitleOverlay
                     vttContent={vttContent}
@@ -1558,6 +1600,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             onEnterRadioMode={() => setRadioMode(true)}
                             cinemaMode={cinemaMode}
                             onToggleCinemaMode={toggleCinemaMode}
+                            onShowMobileQr={mobileHandoff ? () => setShowHandoffQr(true) : undefined}
                         />
 
                         {/* Channel list toggle (live TV zapping) */}
