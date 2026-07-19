@@ -944,6 +944,8 @@
     "exploreSeries": "Explorar Series"
   },
   "downloads": {
+    "activeRecs": "Grabando ahora",
+    "stopRec": "Detener",
     "title": "Descargas",
     "recordings": "Grabaciones",
     "recordingsTooltip": "Ver y reproducir las grabaciones de TV en vivo",

@@ -944,6 +944,8 @@
     "exploreSeries": "Explore Series"
   },
   "downloads": {
+    "activeRecs": "Recording now",
+    "stopRec": "Stop",
     "title": "Downloads",
     "recordings": "Recordings",
     "recordingsTooltip": "View and play live TV recordings",
