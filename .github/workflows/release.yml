@@ -61,8 +61,10 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           # 📝 Release notes automáticas dos PRs mergeados desde a última tag
-          # (dá pra reescrever por cima depois, como sempre).
-          generate_release_notes: true
+          # (dá pra reescrever por cima depois, como sempre). SÓ o job Linux
+          # gera — os três jobs da matrix tocam a mesma release e, cada um
+          # gerando, o bloco "What's Changed" saía triplicado no body.
+          generate_release_notes: ${{ runner.os == 'Linux' }}
           files: |
             release/*.exe
             release/*.exe.blockmap
