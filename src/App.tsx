@@ -32,8 +32,7 @@ const EpgGuide = lazy(() => import('./pages/EpgGuide').then(m => ({ default: m.E
 const VOD = lazy(() => import('./pages/VOD').then(m => ({ default: m.VOD })));
 const Series = lazy(() => import('./pages/Series').then(m => ({ default: m.Series })));
 const Settings = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
-const WatchLater = lazy(() => import('./pages/WatchLater').then(m => ({ default: m.WatchLater })));
-const Favorites = lazy(() => import('./pages/Favorites').then(m => ({ default: m.Favorites })));
+const MyList = lazy(() => import('./pages/MyList').then(m => ({ default: m.MyList })));
 const Downloads = lazy(() => import('./pages/Downloads').then(m => ({ default: m.Downloads })));
 const History = lazy(() => import('./pages/History').then(m => ({ default: m.History })));
 const PipWindow = lazy(() => import('./pages/PipWindow').then(m => ({ default: m.PipWindow })));
@@ -344,8 +343,10 @@ function App() {
               <Route path="guide" element={<RouteBoundary name="EpgGuide"><EpgGuide /></RouteBoundary>} />
               <Route path="vod" element={<RouteBoundary name="VOD"><VOD /></RouteBoundary>} />
               <Route path="series" element={<RouteBoundary name="Series"><Series /></RouteBoundary>} />
-              <Route path="watch-later" element={<RouteBoundary name="WatchLater"><WatchLater /></RouteBoundary>} />
-              <Route path="favorites" element={<RouteBoundary name="Favorites"><Favorites /></RouteBoundary>} />
+              {/* 📚 Item 27: Ver depois + Favoritos viraram "Minha lista" (abas). */}
+              <Route path="my-list" element={<RouteBoundary name="MyList"><MyList /></RouteBoundary>} />
+              <Route path="watch-later" element={<Navigate to="/dashboard/my-list" replace />} />
+              <Route path="favorites" element={<Navigate to="/dashboard/my-list" replace />} />
               <Route path="downloads" element={<RouteBoundary name="Downloads"><Downloads /></RouteBoundary>} />
               <Route path="history" element={<RouteBoundary name="History"><History /></RouteBoundary>} />
               <Route path="settings" element={<RouteBoundary name="Settings"><Settings /></RouteBoundary>} />

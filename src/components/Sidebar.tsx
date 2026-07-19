@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Tv, Film, PlaySquare, Settings, LogOut, Bookmark, Home, Users, Heart, Check, Download, History, Search, CalendarRange } from 'lucide-react';
+import { Tv, Film, PlaySquare, Settings, LogOut, Home, Users, Heart, Check, Download, History, Search, CalendarRange } from 'lucide-react';
 import { GLOBAL_SEARCH_OPEN_EVENT } from './GlobalSearch';
 import { profileService } from '../services/profileService';
 import { useState, useEffect } from 'react';
@@ -93,8 +93,7 @@ export function Sidebar() {
         { icon: CalendarRange, label: t('nav', 'guide'), path: '/dashboard/guide', emoji: '🗓️', gradient: 'linear-gradient(135deg, #8b5cf6, #6d28d9)' },
         { icon: Film, label: t('nav', 'movies'), path: '/dashboard/vod', emoji: '🎬', gradient: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' },
         { icon: PlaySquare, label: t('nav', 'series'), path: '/dashboard/series', emoji: '📺', gradient: 'linear-gradient(135deg, #ec4899, #db2777)' },
-        { icon: Bookmark, label: t('nav', 'myList'), path: '/dashboard/watch-later', emoji: '🔖', gradient: 'linear-gradient(135deg, #10b981, #059669)' },
-        { icon: Heart, label: t('nav', 'favorites'), path: '/dashboard/favorites', emoji: '❤️', gradient: 'linear-gradient(135deg, #ef4444, #dc2626)' },
+        { icon: Heart, label: t('nav', 'myList'), path: '/dashboard/my-list', emoji: '❤️', gradient: 'linear-gradient(135deg, #ef4444, #dc2626)' },
         { icon: Download, label: t('nav', 'downloads'), path: '/dashboard/downloads', emoji: '📥', gradient: 'linear-gradient(135deg, #06b6d4, #0891b2)' },
         { icon: History, label: t('nav', 'history'), path: '/dashboard/history', emoji: '🕘', gradient: 'linear-gradient(135deg, #14b8a6, #0d9488)' },
         { icon: Settings, label: t('nav', 'settings'), path: '/dashboard/settings', emoji: '⚙️', gradient: 'linear-gradient(135deg, #6b7280, #4b5563)' },
