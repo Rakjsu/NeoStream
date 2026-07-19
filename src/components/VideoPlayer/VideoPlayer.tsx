@@ -141,7 +141,11 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         }
     }, [contentType, liveQualityVariants, currentQualityIndex, onSwitchVersion, t]);
 
-    const hlsRef = useHls({ src, videoRef, onStreamError: handleStreamError });
+    // ⏪ Item 15: timeshift — o main copia o canal pra um HLS local com
+    // janela de ~30 min e o player passa a tocar do buffer (pause real).
+    const [timeshiftUrl, setTimeshiftUrl] = useState<string | null>(null);
+    const [timeshiftBusy, setTimeshiftBusy] = useState(false);
+    const hlsRef = useHls({ src: timeshiftUrl ?? src, videoRef, onStreamError: handleStreamError });
 
     // Sleep timer: pauses playback when the countdown hits zero.
     const sleepTimer = useSleepTimer(useCallback(() => {
@@ -714,6 +718,38 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
 
     // Live TV recording (DVR) — ffmpeg in the main process copies the stream.
     const [recording, setRecording] = useState<{ id: string; seconds: number } | null>(null);
+
+    // ⏪ Item 15: liga/desliga o buffer local e troca a fonte do player.
+    const toggleTimeshift = async () => {
+        if (timeshiftBusy) return;
+        if (timeshiftUrl) {
+            // "AO VIVO": volta pro stream direto do provedor.
+            setTimeshiftUrl(null);
+            void window.ipcRenderer.invoke('timeshift:stop').catch(() => undefined);
+            return;
+        }
+        setTimeshiftBusy(true);
+        setRecToast(`⏪ ${t('player', 'timeshiftStarting')}`);
+        const result = await window.ipcRenderer.invoke('timeshift:start', { url: src })
+            .catch(() => null) as { success?: boolean; url?: string; error?: string } | null;
+        setTimeshiftBusy(false);
+        if (result?.success && result.url) {
+            setTimeshiftUrl(result.url);
+            setRecToast(`⏪ ${t('player', 'timeshiftOn')}`);
+            setTimeout(() => setRecToast(null), 4000);
+        } else {
+            setRecToast(`${t('player', 'timeshiftFailed')}${result?.error ? `: ${result.error}` : ''}`);
+            setTimeout(() => setRecToast(null), 5000);
+        }
+    };
+    // Zap/troca de fonte desliga o timeshift (o buffer é do canal anterior);
+    // desmontar o player também derruba a sessão no main.
+    useEffect(() => {
+        queueMicrotask(() => setTimeshiftUrl(null));
+        return () => {
+            void window.ipcRenderer.invoke('timeshift:stop').catch(() => undefined);
+        };
+    }, [src]);
     const [recToast, setRecToast] = useState<string | null>(null);
 
     useEffect(() => {
@@ -1631,6 +1667,26 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             >
                                 <span>⏺</span>
                                 {recording && <span style={{ fontSize: 12, fontWeight: 700 }}>{formatTime(recording.seconds)}</span>}
+                            </button>
+                        )}
+
+                        {/* ⏪ Timeshift (item 15) — pause real na TV ao vivo */}
+                        {contentType === 'live' && (
+                            <button
+                                className="control-btn"
+                                onClick={toggleTimeshift}
+                                title={timeshiftUrl ? t('player', 'timeshiftBackLive') : t('player', 'timeshift')}
+                                style={{
+                                    fontSize: 14,
+                                    color: timeshiftUrl ? 'var(--ns-accent)' : 'white',
+                                    opacity: timeshiftBusy ? 0.5 : 1,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6
+                                }}
+                            >
+                                <span>⏪</span>
+                                {timeshiftUrl && <span style={{ fontSize: 11, fontWeight: 700 }}>{t('player', 'timeshiftBadge')}</span>}
                             </button>
                         )}
 

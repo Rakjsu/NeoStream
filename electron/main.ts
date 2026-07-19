@@ -20,6 +20,7 @@ import { setupMpvHandlers } from './mpvPlayer'
 import { setupNotifyHandlers } from './notifyHandlers'
 import { setupDiagnosticsHandlers } from './diagnosticsHandlers'
 import { setupDvrHandlers } from './dvrHandlers'
+import { setupTimeshiftHandlers, teardownTimeshift } from './timeshiftHandlers'
 import { setupTrayMode, attachCloseToTray } from './trayMode'
 import { setupWinIntegration, routeFromArgv } from './winIntegration'
 import { setupStorageManager } from './storageManager'
@@ -44,12 +45,13 @@ setupDLNAHandlers()
 setupAirPlayHandlers()
 setupCastHandlers()
 setupWebRemote()
-app.on('before-quit', () => { teardownCast(); teardownWebRemote(); })
+app.on('before-quit', () => { teardownCast(); teardownWebRemote(); teardownTimeshift(); })
 setupDownloadHandlers()
 setupCertificateErrorHandler()
 setupMpvHandlers() // EXPERIMENTAL — MPV PoC
 setupDiagnosticsHandlers()
 setupDvrHandlers()
+setupTimeshiftHandlers()
 
 process.env.DIST = path.join(__dirname, '../dist')
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, '../public')
