@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { decadeOf, listDecades, listGenres, matchesFilters, yearOf } from './catalogFilter';
+import { decadeOf, listDecades, listGenres, matchesFilters, yearOf,
+    matchesDuration,
+} from './catalogFilter';
 
 describe('catalogFilter (década + gênero)', () => {
     it('yearOf prefere o release_date e cai pro (YYYY) do nome', () => {
@@ -38,5 +40,27 @@ describe('catalogFilter (década + gênero)', () => {
         expect(matchesFilters(item, 2010, 'Comédia')).toBe(false);
         expect(matchesFilters(item, null, null)).toBe(true);
         expect(matchesFilters({ name: 'Sem ano', genre: 'Terror' }, 2010, null)).toBe(false);
+    });
+});
+
+describe('matchesDuration (item 37)', () => {
+    it('sem filtro passa tudo, inclusive sem duração', () => {
+        expect(matchesDuration(undefined, null)).toBe(true);
+        expect(matchesDuration('95', null)).toBe(true);
+    });
+
+    it('faixas: até 90 / 90-120 / 2h+', () => {
+        expect(matchesDuration('88', 'short')).toBe(true);
+        expect(matchesDuration('95', 'short')).toBe(false);
+        expect(matchesDuration('95', 'medium')).toBe(true);
+        expect(matchesDuration('121', 'medium')).toBe(false);
+        expect(matchesDuration('150', 'long')).toBe(true);
+        expect(matchesDuration(60, 'long')).toBe(false);
+    });
+
+    it('sem duração fica de fora quando há filtro ativo', () => {
+        expect(matchesDuration(undefined, 'short')).toBe(false);
+        expect(matchesDuration('', 'medium')).toBe(false);
+        expect(matchesDuration('0', 'long')).toBe(false);
     });
 });

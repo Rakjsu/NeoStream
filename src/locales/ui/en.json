@@ -1088,6 +1088,11 @@
     "cancelRecording": "Cancel recording"
   },
   "sort": {
+    "duration": "Duration",
+    "allDurations": "Any duration",
+    "durShort": "Up to 90 min",
+    "durMedium": "90–120 min",
+    "durLong": "Over 2h",
     "title": "Sort by",
     "recent": "Most recent",
     "name": "Name (A–Z)",

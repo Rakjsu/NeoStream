@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SortSelect } from '../components/SortSelect';
 import { CatalogFilters } from '../components/CatalogFilters';
-import { fuzzyIncludes, matchesFilters, qualityBadgeOf } from '../utils/catalogFilter';
+import { fuzzyIncludes, matchesFilters, qualityBadgeOf, matchesDuration, type DurationBucket } from '../utils/catalogFilter';
 import { getMovieBaseName, getVersionTag, groupByBaseName } from '../services/movieVersionService';
 import { fetchTraktWatchedMovies } from '../services/traktService';
 import { normalizeTitle } from '../services/personSearchHelpers';
@@ -63,6 +63,8 @@ export function VOD() {
     const [sortBy, setSortBy] = useState<CatalogSort>('recent');
     // 🔎 Filtros de década e gênero — aplicados antes da ordenação.
     const [decade, setDecade] = useState<number | null>(null);
+    // ⏳ Item 37: filtro por duração (episode_run_time do provedor).
+    const [durationFilter, setDurationFilter] = useState<DurationBucket | null>(null);
     const [genreFilter, setGenreFilter] = useState<string | null>(null);
     const [selectedMovie, setSelectedMovie] = useState<VODStream | null>(null);
     const [tmdbData, setTmdbData] = useState<TMDBMovieDetails | null>(null);
@@ -200,12 +202,15 @@ export function VOD() {
     // notably on every scroll frame (the windowed grid updates scrollTop state).
     const sortedStreams = useMemo(
         () => {
-            const base = (decade !== null || genreFilter)
+            const filtered = (decade !== null || genreFilter)
                 ? streams.filter(item => matchesFilters(item, decade, genreFilter))
                 : streams;
+            const base = durationFilter
+                ? filtered.filter(item => matchesDuration(item.episode_run_time, durationFilter))
+                : filtered;
             return sortBy === 'recent' ? base : [...base].sort((a, b) => compareCatalogItems(sortBy, a, b));
         },
-        [streams, sortBy, decade, genreFilter]
+        [streams, sortBy, decade, genreFilter, durationFilter]
     );
 
     // 🙈 Esconder assistidos: filmes com progresso >= 95% saem da grade.
@@ -484,7 +489,7 @@ export function VOD() {
                     placeholder={t('login', 'searchMovies')}
                 />
                 <SortSelect value={sortBy} onChange={setSortBy} />
-                <CatalogFilters items={streams} decade={decade} genre={genreFilter} onDecade={setDecade} onGenre={setGenreFilter} />
+                <CatalogFilters items={streams} decade={decade} genre={genreFilter} onDecade={setDecade} onGenre={setGenreFilter} duration={durationFilter} onDuration={setDurationFilter} />
                 <button
                     onClick={() => {
                         const next = !hideWatched;

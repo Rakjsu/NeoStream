@@ -64,6 +64,23 @@ export function matchesFilters(item: FilterableItem, decade: number | null, genr
  * query podem vir em qualquer ordem e também casam com o nome "achatado"
  * (query "spiderman" acha "Spider-Man").
  */
+/** ⏳ Item 37: faixa de duração do filtro do catálogo. */
+export type DurationBucket = 'short' | 'medium' | 'long';
+
+/**
+ * Casa a duração (episode_run_time do provedor, em minutos) com a faixa.
+ * Sem filtro → passa tudo; com filtro, item SEM duração fica de fora
+ * (não dá pra julgar — comportamento previsível).
+ */
+export function matchesDuration(runtime: string | number | undefined, bucket: DurationBucket | null): boolean {
+    if (!bucket) return true;
+    const minutes = typeof runtime === 'number' ? runtime : parseInt(runtime ?? '', 10);
+    if (!Number.isFinite(minutes) || minutes <= 0) return false;
+    if (bucket === 'short') return minutes <= 90;
+    if (bucket === 'medium') return minutes > 90 && minutes <= 120;
+    return minutes > 120;
+}
+
 export function normalizeSearchText(text: string): string {
     return text
         .toLowerCase()
