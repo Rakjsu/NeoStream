@@ -16,6 +16,9 @@ export function DiagnosticsSection() {
     const [busy, setBusy] = useState(false);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    // 🧾 Item 21: telemetria local — erros persistidos com visualizador.
+    const [loggedErrors, setLoggedErrors] = useState(() => diagnosticsService.getPersistedErrors());
+    const [errorsCopied, setErrorsCopied] = useState(false);
 
     const handleToggle = (value: boolean) => {
         setEnabled(value);
@@ -349,6 +352,66 @@ export function DiagnosticsSection() {
                         <span>{storageBusy ? '⏳' : '💽'}</span>
                         <span>{storageRows ? t('storage', 'refresh') : t('storage', 'measure')}</span>
                     </button>
+                </div>
+
+                {/* 🧾 Item 21: erros recentes (persistidos) com exportação */}
+                <div className="setting-item" style={{ alignItems: 'flex-start' }}>
+                    <div className="setting-info" style={{ width: '100%' }}>
+                        <label>🧾 {t('diagnostics', 'errorsTitle')}</label>
+                        <p>{t('diagnostics', 'errorsDesc')}</p>
+                        {loggedErrors.length === 0 ? (
+                            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginTop: 8 }}>
+                                {t('diagnostics', 'errorsNone')}
+                            </p>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, maxHeight: 220, overflowY: 'auto' }}>
+                                {loggedErrors.slice(0, 15).map((entry, index) => (
+                                    <div key={`${entry.time}-${index}`} style={{ display: 'flex', gap: 8, fontSize: 12, alignItems: 'baseline' }}>
+                                        <span style={{ color: 'rgba(255,255,255,0.4)', flexShrink: 0 }}>
+                                            {new Date(entry.time).toLocaleString()}
+                                        </span>
+                                        <span style={{ color: entry.level === 'error' ? '#f87171' : '#fbbf24', flexShrink: 0 }}>
+                                            {entry.level}
+                                        </span>
+                                        <span style={{ color: 'rgba(255,255,255,0.8)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {entry.message}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {loggedErrors.length > 0 && (
+                            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+                                <button
+                                    className="check-btn"
+                                    style={{ width: 'auto', padding: '10px 18px' }}
+                                    onClick={() => {
+                                        const report = loggedErrors
+                                            .map(entry => `[${entry.time}] [${entry.level}] ${entry.message}`)
+                                            .join('\n');
+                                        void navigator.clipboard.writeText(report).then(() => {
+                                            setErrorsCopied(true);
+                                            setTimeout(() => setErrorsCopied(false), 2500);
+                                        });
+                                    }}
+                                >
+                                    <span>📋</span>
+                                    <span>{errorsCopied ? t('diagnostics', 'errorsCopied') : t('diagnostics', 'errorsCopy')}</span>
+                                </button>
+                                <button
+                                    className="check-btn"
+                                    style={{ width: 'auto', padding: '10px 18px' }}
+                                    onClick={() => {
+                                        diagnosticsService.clearPersistedErrors();
+                                        setLoggedErrors([]);
+                                    }}
+                                >
+                                    <span>🗑️</span>
+                                    <span>{t('diagnostics', 'errorsClear')}</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {errorMessage && (
