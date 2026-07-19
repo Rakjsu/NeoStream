@@ -200,6 +200,7 @@ const receiveChannels = new Set([
     'download:progress',
     'media:control',
     'tray:navigate',
+    'transfer:received',
     'dvr:progress',
     'dvr:stopped',
     'main-process-message',
