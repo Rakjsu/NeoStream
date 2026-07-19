@@ -682,6 +682,9 @@
     "expand": "Expandir"
   },
   "player": {
+    "qrHandoff": "Continuar no celular",
+    "qrHandoffHint": "Aponte a câmera do celular pro código — o app abre no mesmo ponto",
+    "qrHandoffClose": "Fechar",
     "cinemaMode": "Modo cinema",
     "volumeBoost": "Reforço de volume",
     "frameSaved": "📸 Quadro salvo",

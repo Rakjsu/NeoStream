@@ -775,6 +775,9 @@
     "expand": "Expand"
   },
   "player": {
+    "qrHandoff": "Continue on phone",
+    "qrHandoffHint": "Point your phone camera at the code — the app opens at this position",
+    "qrHandoffClose": "Close",
     "cinemaMode": "Cinema mode",
     "volumeBoost": "Volume boost",
     "frameSaved": "📸 Frame saved",

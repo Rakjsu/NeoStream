@@ -57,6 +57,8 @@ export interface PlayerSettingsMenuProps<TSwitchContent extends SwitchableConten
     /** 🎬 Modo cinema: vinheta + luz ambiente da cor do filme. */
     cinemaMode?: boolean;
     onToggleCinemaMode?: () => void;
+    /** 📱 Item 39: abre o QR pro celular continuar o conteúdo atual. */
+    onShowMobileQr?: () => void;
 }
 
 // Gear settings menu: movie version / live quality switcher, or playback speed.
@@ -88,7 +90,8 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
     onSetSubtitleStyle,
     onEnterRadioMode,
     cinemaMode,
-    onToggleCinemaMode
+    onToggleCinemaMode,
+    onShowMobileQr
 }: PlayerSettingsMenuProps<TSwitchContent>) {
     const { t } = useLanguage();
 
@@ -423,6 +426,20 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
                                     onClick={onToggleCinemaMode}
                                 >
                                     🎬 {t('player', 'cinemaMode')}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 📱 QR pro celular: continuar este conteúdo no app do celular */}
+                    {onShowMobileQr && (
+                        <div className="settings-section">
+                            <div className="settings-options">
+                                <button
+                                    className="settings-option"
+                                    onClick={() => { onShowMobileQr(); setShowSettings(false); }}
+                                >
+                                    📱 {t('player', 'qrHandoff')}
                                 </button>
                             </div>
                         </div>
