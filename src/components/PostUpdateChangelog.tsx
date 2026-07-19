@@ -1,14 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../services/languageService';
 
-interface ChangelogEntry {
-    icon: string;
-    title: string;
-    items: string[];
-}
 
 export function PostUpdateChangelog() {
     const [isVisible, setIsVisible] = useState(false);
+    const [notes, setNotes] = useState<string[] | null>(null);
     const [previousVersion, setPreviousVersion] = useState<string>('');
     const { t } = useLanguage();
 
@@ -33,28 +29,31 @@ export function PostUpdateChangelog() {
         setIsVisible(false);
     };
 
-    // Always get changelog from translations (supports PT/EN/ES)
-    const getChangelog = (): ChangelogEntry[] => {
-        return [
-            {
-                icon: '🌐',
-                title: t('changelog', 'i18nTitle'),
-                items: t('changelog', 'i18nItems').split('|')
-            },
-            {
-                icon: '👥',
-                title: t('changelog', 'profilesTitle'),
-                items: t('changelog', 'profilesItems').split('|')
-            },
-            {
-                icon: '🐛',
-                title: t('changelog', 'fixesTitle'),
-                items: t('changelog', 'fixesItems').split('|')
-            }
-        ];
-    };
-
-    const currentChangelog = getChangelog();
+    // As novidades REAIS vêm das release notes da versão instalada (GitHub).
+    // Sem rede (ou release sem notas), fica o fallback genérico com o link.
+    useEffect(() => {
+        if (!isVisible) return;
+        let cancelled = false;
+        fetch(`https://api.github.com/repos/Rakjsu/NeoStream/releases/tags/v${__APP_VERSION__}`)
+            .then(res => (res.ok ? res.json() : null))
+            .then((release: { body?: string } | null) => {
+                if (cancelled || !release?.body) return;
+                const lines = release.body
+                    .split('\n')
+                    .map(line => line
+                        .replace(/^#+\s*/, '')
+                        .replace(/^[-*]\s*/, '')
+                        .replace(/\*\*/g, '')
+                        .trim())
+                    .filter(line => line
+                        && !line.startsWith('🤖')
+                        && !/^full changelog/i.test(line)
+                        && !/^\[/.test(line));
+                if (lines.length > 0) setNotes(lines.slice(0, 16));
+            })
+            .catch(() => { /* offline: fallback já cobre */ });
+        return () => { cancelled = true; };
+    }, [isVisible]);
 
     if (!isVisible) return null;
 
@@ -83,16 +82,19 @@ export function PostUpdateChangelog() {
                 <div className="changelog-content">
                     <h4>✨ {t('changelog', 'whatsNew')} v{__APP_VERSION__}:</h4>
 
-                    {currentChangelog.map((section, index) => (
-                        <div key={index} className="changelog-section">
-                            <h5>{section.icon} {section.title}</h5>
+                    {notes ? (
+                        <div className="changelog-section">
                             <ul>
-                                {section.items.map((item, itemIndex) => (
-                                    <li key={itemIndex}>{item}</li>
+                                {notes.map((line, index) => (
+                                    <li key={index}>{line}</li>
                                 ))}
                             </ul>
                         </div>
-                    ))}
+                    ) : (
+                        <div className="changelog-section">
+                            <p style={{ margin: 0, opacity: 0.8 }}>{t('changelog', 'fallback')}</p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer */}

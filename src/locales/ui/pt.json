@@ -762,12 +762,7 @@
     "updateInstalled": "Atualização Instalada!",
     "whatsNew": "Novidades na",
     "gotIt": "Entendi, vamos lá!",
-    "i18nTitle": "Animações na Interface",
-    "i18nItems": "Logo animado na barra de título com barras equalizadoras|Texto \"NeoStream\" com gradiente brilhante|Saudação animada com mãozinha acenando na Home",
-    "profilesTitle": "Navegação Melhorada",
-    "profilesItems": "Setinhas dos carrosséis com animações interativas|Efeito glow roxo no hover|Bordas dos cards de hover corrigidas",
-    "fixesTitle": "Melhorias Gerais",
-    "fixesItems": "Traduções de controles da janela (minimizar, maximizar, fechar)|Scrollbars consistentes em todas as páginas|Notificações agora limpam corretamente"
+    "fallback": "Esta versão chegou cheia de melhorias e correções — as notas completas estão na página de releases do NeoStream no GitHub."
   },
   "wrapped": {
     "open": "Retrospectiva",
