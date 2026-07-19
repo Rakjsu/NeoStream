@@ -7,7 +7,9 @@ export function NetworkSection() {
     const [allowInvalidProviderCertificates, setAllowInvalidProviderCertificates] = useState(true);
     const [webRemote, setWebRemote] = useState<{ enabled: boolean; https: boolean; url: string | null; pin: string | null }>({ enabled: false, https: false, url: null, pin: null });
     // 📟 Aparelhos conectados no controle web (polling leve enquanto ligado).
-    const [remoteClients, setRemoteClients] = useState<{ ip: string; name: string | null; role: string; connectedAt: number }[]>([]);
+    const [remoteClients, setRemoteClients] = useState<{ id?: string; ip: string; name: string | null; role: string; connectedAt: number }[]>([]);
+    // 🕓 Item 14: histórico de conexões do controle.
+    const [connectionHistory, setConnectionHistory] = useState<{ name: string | null; ip: string; role: string; at: number; event: string }[]>([]);
     const { t } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
 
@@ -19,6 +21,11 @@ export function NetworkSection() {
         }
         let cancelled = false;
         const load = async () => {
+            void window.ipcRenderer.invoke('web-remote:connection-history')
+                .then((r: { success?: boolean; history?: { name: string | null; ip: string; role: string; at: number; event: string }[] } | null) => {
+                    if (!cancelled && r?.success && r.history) setConnectionHistory(r.history);
+                })
+                .catch(() => undefined);
             const res = await window.ipcRenderer.invoke('web-remote:clients-list').catch(() => null) as
                 { success?: boolean; clients?: { ip: string; name: string | null; role: string; connectedAt: number }[] } | null;
             if (!cancelled && res?.success) setRemoteClients(res.clients ?? []);
@@ -179,13 +186,37 @@ export function NetworkSection() {
                                 {remoteClients.length === 0 ? (
                                     <p style={{ margin: '4px 0', fontSize: 12, opacity: 0.7 }}>{t('network', 'devicesEmpty')}</p>
                                 ) : remoteClients.map((c, index) => (
-                                    <p key={`${c.ip}-${index}`} style={{ margin: '4px 0', fontSize: 12 }}>
-                                        {c.role === 'mobile' ? '📱' : '🌐'} {c.name || c.ip}
+                                    <p key={`${c.ip}-${index}`} style={{ margin: '4px 0', fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span>{c.role === 'mobile' ? '📱' : '🌐'} {c.name || c.ip}</span>
                                         <span style={{ opacity: 0.6 }}>
-                                            {' '}· {c.ip} · {c.connectedAt ? new Date(c.connectedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                            · {c.ip} · {c.connectedAt ? new Date(c.connectedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                                         </span>
+                                        {c.id && (
+                                            <button
+                                                onClick={() => {
+                                                    void window.ipcRenderer.invoke('web-remote:disconnect-client', { id: c.id })
+                                                        .then(() => setRemoteClients(prev => prev.filter(x => x.id !== c.id)))
+                                                        .catch(() => undefined);
+                                                }}
+                                                title={t('network', 'devicesDisconnect')}
+                                                style={{ padding: '1px 8px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.4)', background: 'rgba(239,68,68,0.12)', color: '#f87171', fontSize: 11, cursor: 'pointer' }}
+                                            >
+                                                ✕ {t('network', 'devicesDisconnect')}
+                                            </button>
+                                        )}
                                     </p>
                                 ))}
+                                {connectionHistory.length > 0 && (
+                                    <div style={{ marginTop: 10 }}>
+                                        <div style={{ fontSize: 13, fontWeight: 600 }}>🕓 {t('network', 'historyTitle')}</div>
+                                        {connectionHistory.slice(0, 8).map((h, index) => (
+                                            <p key={`${h.at}-${index}`} style={{ margin: '3px 0', fontSize: 11, opacity: 0.75 }}>
+                                                {h.event === 'connect' ? '🔌' : '❌'} {h.name || h.ip}
+                                                <span style={{ opacity: 0.6 }}> · {new Date(h.at).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                                            </p>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             <label style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                                 <input

@@ -49,11 +49,28 @@ interface WebRemoteConfig {
     https: boolean
 }
 
-const store = new Store<{ webRemote: WebRemoteConfig }>({ name: 'web-remote' })
+interface ConnectionEvent {
+    name: string | null
+    ip: string
+    role: string
+    at: number
+    event: 'connect' | 'disconnect'
+}
+
+const store = new Store<{ webRemote: WebRemoteConfig; connectionHistory: ConnectionEvent[] }>({ name: 'web-remote' })
+
+// 🕓 Item 14: histórico de conexões do controle (persistido, teto 50).
+function pushHistory(event: ConnectionEvent): void {
+    const list = (store.get('connectionHistory') as ConnectionEvent[] | undefined) ?? []
+    list.push(event)
+    store.set('connectionHistory', list.slice(-50))
+}
 
 interface ClientSocket {
     socket: Socket
     buffer: Uint8Array
+    /** 📟 Item 14: id estável da sessão — alvo do "desconectar" do painel. */
+    id: string
     /** 📟 Identificação pro painel de aparelhos conectados. */
     ip?: string
     connectedAt?: number
@@ -240,8 +257,9 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
     // Correct PIN: clear any accumulated failures for this client.
     pinGate.delete(ip)
     socket.write(buildHandshakeResponse(key))
-    const client: ClientSocket = { socket, buffer: new Uint8Array(0), ip, connectedAt: Date.now() }
+    const client: ClientSocket = { socket, buffer: new Uint8Array(0), id: crypto.randomUUID(), ip, connectedAt: Date.now() }
     clients.add(client)
+    pushHistory({ name: null, ip: ip ?? '?', role: 'browser', at: Date.now(), event: 'connect' })
     // Send the current state + guide snapshot immediately.
     socket.write(encodeTextFrame(stateMessage()))
     if (guideState) socket.write(encodeTextFrame(guideMessage()))
@@ -281,7 +299,11 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
             socket.destroy()
         }
     })
-    const drop = () => clients.delete(client)
+    const drop = () => {
+        if (clients.delete(client)) {
+            pushHistory({ name: client.name ?? null, ip: client.ip ?? '?', role: client.role ?? 'browser', at: Date.now(), event: 'disconnect' })
+        }
+    }
     socket.on('close', drop)
     socket.on('error', drop)
 }
@@ -542,11 +564,29 @@ export function setupWebRemote(): void {
     ipcMain.handle('web-remote:clients-list', () => ({
         success: true,
         clients: [...clients].map(c => ({
+            id: c.id,
             ip: c.ip ?? '?',
             name: c.name ?? null,
             role: c.role ?? 'browser',
             connectedAt: c.connectedAt ?? 0,
         })),
+    }))
+
+    // 📟 Item 14 fase 2: desconectar um cliente pelo painel + histórico.
+    ipcMain.handle('web-remote:disconnect-client', (_e, raw: unknown) => {
+        const { id } = (raw ?? {}) as { id?: unknown }
+        const target = [...clients].find(c => c.id === id)
+        if (!target) return { success: false }
+        target.socket.destroy()
+        clients.delete(target)
+        pushHistory({ name: target.name ?? null, ip: target.ip ?? '?', role: target.role ?? 'browser', at: Date.now(), event: 'disconnect' })
+        log.info('[WebRemote] cliente desconectado pelo painel:', target.name ?? target.ip)
+        return { success: true }
+    })
+
+    ipcMain.handle('web-remote:connection-history', () => ({
+        success: true,
+        history: (((store.get('connectionHistory') as ConnectionEvent[] | undefined) ?? []).slice().reverse().slice(0, 20)),
     }))
 
     ipcMain.on('web-remote:reminders', (_e, raw: unknown) => {

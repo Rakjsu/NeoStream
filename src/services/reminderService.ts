@@ -173,6 +173,17 @@ class ReminderService {
             console.warn('[Reminders] notify:show failed:', err);
         }
 
+        // (d) 📱 Item 13: celular conectado ao controle também recebe o lembrete.
+        try {
+            const ipc = typeof window !== 'undefined' ? window.ipcRenderer : undefined;
+            if (ipc) {
+                void ipc.invoke('web-remote:notify-mobile', {
+                    title: `🔔 ${reminder.title}`,
+                    body: message
+                }).catch(() => undefined);
+            }
+        } catch { /* ponte indisponível — fica só a notificação local */ }
+
         // (b) Entry in the in-app notifications panel.
         appNotificationService.addNotification({
             type: 'program_reminder',

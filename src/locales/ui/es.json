@@ -305,6 +305,8 @@
     "done": "Concluir"
   },
   "network": {
+    "devicesDisconnect": "Desconectar",
+    "historyTitle": "Historial de conexiones",
     "webRemoteTitle": "Control por el móvil",
     "webRemoteDesc": "Abre un mando en el navegador del móvil (misma Wi-Fi) con play/pausa, volumen y saltar",
     "webRemoteOpen": "Abre en el móvil",
