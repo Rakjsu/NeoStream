@@ -17,6 +17,7 @@ import { newEpisodesService } from '../services/newEpisodesService';
 import { newEpisodeNotifier } from '../services/newEpisodeNotifier';
 import { favoritesService } from '../services/favoritesService';
 import { blockedRecommendationsService } from '../services/blockedRecommendationsService';
+import { bootProfiler } from '../services/bootProfiler';
 import { ContinueFramePreview } from '../components/ContinueFramePreview';
 import { watchLaterService } from '../services/watchLater';
 import { findDepartures, dismissDepartures } from '../services/catalogDeparturesService';
@@ -253,7 +254,9 @@ export function Home() {
                     setRecentMovies(sortedMovies.slice(0, 30));
 
                     setLoading(false);
-                    setTimeout(() => setIsVisible(true), 100);
+                    bootProfiler.mark('homeReady');
+                    bootProfiler.mark('homeReady');
+                setTimeout(() => setIsVisible(true), 100);
                     return;
                 }
 

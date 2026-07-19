@@ -719,6 +719,7 @@
     "cancel": "Cancelar"
   },
   "about": {
+    "bootTime": "Último arranque: Inicio listo en {ms}ms",
     "title": "Acerca de la Aplicación",
     "description": "Información y créditos",
     "appDescription": "El reproductor IPTV completo: TV en vivo con guía, catch-up y grabación (DVR manual y programado), películas y series con tráilers y metadatos de TMDB, multi-view, perfiles con control parental, transmisión a la TV, descargas sin conexión y navegación con mando.",

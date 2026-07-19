@@ -719,6 +719,7 @@
     "cancel": "Cancel"
   },
   "about": {
+    "bootTime": "Last boot: Home ready in {ms}ms",
     "title": "About the App",
     "description": "Information and credits",
     "appDescription": "The complete IPTV player: live TV with guide, catch-up and recording (manual and scheduled DVR), movies and series with trailers and TMDB metadata, multi-view, profiles with parental control, casting to TV, offline downloads and gamepad navigation.",

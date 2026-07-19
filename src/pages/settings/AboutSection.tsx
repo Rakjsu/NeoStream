@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useLanguage } from '../../services/languageService';
+import { bootProfiler } from '../../services/bootProfiler';
 
 export function AboutSection() {
     const { t } = useLanguage();
@@ -19,6 +20,17 @@ export function AboutSection() {
                     </div>
                 </div>
 
+                {/* ⏱️ Item 20: tempo do último boot até a Home */}
+                {(() => {
+                    const profile = bootProfiler.getLast();
+                    const homeMs = profile?.marks?.homeReady;
+                    if (!homeMs) return null;
+                    return (
+                        <p style={{ fontSize: 12, opacity: 0.7, margin: '0 0 12px' }}>
+                            ⏱️ {t('about', 'bootTime').replace('{ms}', String(homeMs))}
+                        </p>
+                    );
+                })()}
                 <div className="about-content">
                     <div className="app-logo">
                         <svg width="80" height="80" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
