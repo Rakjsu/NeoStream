@@ -1119,6 +1119,10 @@
     "clearRecent": "clear"
   },
   "apiKeys": {
+    "traktBackfillBtn": "Send history to Trakt",
+    "traktBackfillRunning": "Sending history…",
+    "traktBackfillDone": "History sent to Trakt",
+    "traktBackfillPartial": "Batch sent — run again to continue",
     "navLabel": "APIs",
     "title": "Metadata APIs",
     "description": "Use your own free API keys for covers, plots, ratings and trailers",

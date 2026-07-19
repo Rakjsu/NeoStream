@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLanguage } from '../../services/languageService';
 import { getTmdbApiKey, setTmdbApiKey, validateTmdbApiKey } from '../../services/tmdbKey';
 import { disconnectTrakt, fetchTraktProfile, getTraktCreds, isTraktConnected, pollDeviceToken, setTraktCreds, startDeviceAuth, type TraktCreds } from '../../services/traktService';
+import { runTraktBackfill } from '../../services/traktBackfillService';
 
 interface OsConfig { apiKey: string; username: string; password: string }
 
@@ -90,6 +91,7 @@ export function ApiKeysSection({ onboarding = false }: { onboarding?: boolean })
     const [trakt, setTrakt] = useState<TraktCreds>(() => getTraktCreds());
     const [traktOn, setTraktOn] = useState(() => isTraktConnected());
     const [traktUser, setTraktUser] = useState('');
+    const [backfillMsg, setBackfillMsg] = useState<'idle' | 'running' | 'done' | 'partial'>('idle');
     const [traktCode, setTraktCode] = useState('');
     const [traktMsg, setTraktMsg] = useState<'idle' | 'saved' | 'fail'>('idle');
 
@@ -100,6 +102,14 @@ export function ApiKeysSection({ onboarding = false }: { onboarding?: boolean })
     const handleTraktSave = () => {
         setTraktCreds(trakt);
         setTraktMsg('saved');
+    };
+
+    // 🎬 Envia o histórico local (pré-conexão) pro Trakt; re-executável.
+    const handleTraktBackfill = async () => {
+        setBackfillMsg('running');
+        const report = await runTraktBackfill(true).catch(() => null);
+        if (!report) { setBackfillMsg('idle'); return; }
+        setBackfillMsg(report.complete ? 'done' : 'partial');
     };
 
     const handleTraktConnect = async () => {
@@ -113,7 +123,13 @@ export function ApiKeysSection({ onboarding = false }: { onboarding?: boolean })
         const tick = async () => {
             if (Date.now() > deadline) { setTraktCode(''); return; }
             const result = await pollDeviceToken(auth.deviceCode);
-            if (result === 'ok') { setTraktCode(''); setTraktOn(true); return; }
+            if (result === 'ok') {
+                setTraktCode('');
+                setTraktOn(true);
+                // Backfill automático: manda o que já foi assistido neste PC.
+                void handleTraktBackfill();
+                return;
+            }
             if (result === 'error') { setTraktCode(''); setTraktMsg('fail'); return; }
             setTimeout(() => { void tick(); }, auth.intervalSec * 1000);
         };
@@ -268,9 +284,18 @@ export function ApiKeysSection({ onboarding = false }: { onboarding?: boolean })
                     <div className="apikeys-actions">
                         <button className="apikeys-btn primary" onClick={handleTraktSave}>{t('apiKeys', 'save')}</button>
                         {traktOn ? (
-                            <button className="apikeys-btn" onClick={() => { disconnectTrakt(); setTraktOn(false); setTraktUser(''); }}>
-                                {t('apiKeys', 'traktDisconnect')}
-                            </button>
+                            <>
+                                <button
+                                    className="apikeys-btn"
+                                    onClick={() => { void handleTraktBackfill(); }}
+                                    disabled={backfillMsg === 'running'}
+                                >
+                                    {backfillMsg === 'running' ? t('apiKeys', 'traktBackfillRunning') : t('apiKeys', 'traktBackfillBtn')}
+                                </button>
+                                <button className="apikeys-btn" onClick={() => { disconnectTrakt(); setTraktOn(false); setTraktUser(''); }}>
+                                    {t('apiKeys', 'traktDisconnect')}
+                                </button>
+                            </>
                         ) : (
                             <button
                                 className="apikeys-btn"
@@ -282,6 +307,8 @@ export function ApiKeysSection({ onboarding = false }: { onboarding?: boolean })
                         )}
                         {traktMsg === 'saved' && <span className="apikeys-feedback ok">✓ {t('apiKeys', 'saved')}</span>}
                         {traktMsg === 'fail' && <span className="apikeys-feedback err">✗ {t('apiKeys', 'traktFail')}</span>}
+                        {backfillMsg === 'done' && <span className="apikeys-feedback ok">✓ {t('apiKeys', 'traktBackfillDone')}</span>}
+                        {backfillMsg === 'partial' && <span className="apikeys-feedback ok">✓ {t('apiKeys', 'traktBackfillPartial')}</span>}
                     </div>
                     <p className="apikeys-label" style={{ marginTop: 10 }}>{t('apiKeys', 'traktHint')}</p>
                 </div>
