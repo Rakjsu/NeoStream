@@ -69,6 +69,7 @@ const EXACT_KEYS = [
     'neostream_keymap_v1',    // atalhos de teclado personalizados do player
     'neostream_resume_on_open', // toggle "retomar ao abrir"
     'neostream_cinema_mode',  // 🎬 modo cinema do player (item 29)
+    'neostream_reminder_autotune', // 📺 lembrete sintoniza sozinho (item 32)
 ];
 
 // Keys included when they start with one of these prefixes

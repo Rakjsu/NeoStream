@@ -33,6 +33,15 @@ export const EXPIRY_GRACE_MS = 5 * 60 * 1000;
 // ---------------------------------------------------------------------------
 
 /** Deterministic id for a (channel, program start) pair — djb2 hash, hex. */
+/** 📺 Item 32: lembrete troca de canal sozinho (aviso de 10s) — default LIGADO. */
+export function isAutoTuneEnabled(): boolean {
+    try {
+        return localStorage.getItem('neostream_reminder_autotune') !== '0';
+    } catch {
+        return true;
+    }
+}
+
 export function reminderId(channelKey: string, startIso: string): string {
     const input = `${channelKey}|${startIso}`;
     let hash = 5381;
@@ -190,6 +199,16 @@ class ReminderService {
             title: reminder.title,
             message
         });
+
+        // 📺 Item 32: a UI global mostra a contagem de 10s com Cancelar e
+        // sintoniza o canal se ninguém intervir (ReminderAutoTuneToast).
+        try {
+            if (isAutoTuneEnabled() && typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('reminder:autotune', {
+                    detail: { streamId: reminder.streamId, channelName: reminder.channelName, title: reminder.title },
+                }));
+            }
+        } catch { /* ambiente de teste sem CustomEvent */ }
 
         // (c) One-shot reminders are removed; recurring ones re-arm for the
         // next occurrence (new id — the id derives from the start time).

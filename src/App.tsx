@@ -12,6 +12,7 @@ import { ProfileSelector } from './pages/ProfileSelector';
 import { UpdateNotification } from './components/UpdateNotification';
 import { PostUpdateChangelog } from './components/PostUpdateChangelog';
 import { WebRemoteBridge } from './components/WebRemoteBridge';
+import { ReminderAutoTuneToast } from './components/ReminderAutoTuneToast';
 import { DvrNotifyBridge } from './components/DvrNotifyBridge';
 import { GlobalCastIndicator } from './components/GlobalCastIndicator';
 import { EpisodeToast } from './components/EpisodeToast';
@@ -326,6 +327,7 @@ function App() {
         <DvrNotifyBridge />
         <GlobalCastIndicator />
         <EpisodeToastWithNavigation />
+        <ReminderAutoTuneToast />
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/welcome" element={<RouteBoundary name="Welcome"><Welcome /></RouteBoundary>} />

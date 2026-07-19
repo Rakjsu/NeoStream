@@ -253,6 +253,9 @@
     "cancel": "Cancelar"
   },
   "notifications": {
+    "autoTuneIn": "Cambiando a {channel} en {s}s…",
+    "autoTuneNow": "Ver ahora",
+    "autoTuneCancel": "Cancelar",
     "title": "Notificaciones",
     "tooltip": "Notificaciones",
     "new": "nueva",
@@ -396,6 +399,8 @@
     "checking": "Verificando..."
   },
   "playback": {
+    "reminderAutoTune": "El recordatorio sintoniza solo",
+    "reminderAutoTuneDesc": "Cuando salte un recordatorio de programa, cambia al canal tras un aviso de 10 segundos (cancelable)",
     "groupVersions": "Agrupar versiones de película",
     "groupVersionsDesc": "Una tarjeta por película (4K/FHD/HD/subtitulada juntas) con selector de versión en la ficha",
     "resumeOnOpen": "Reanudar al abrir",

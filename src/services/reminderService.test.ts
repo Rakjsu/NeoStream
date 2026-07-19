@@ -6,8 +6,7 @@ import {
     isExpired,
     nextOccurrenceIso,
     MAX_TIMEOUT_MS,
-    EXPIRY_GRACE_MS
-} from './reminderService'
+    EXPIRY_GRACE_MS, isAutoTuneEnabled } from './reminderService'
 import type { ProgramReminder } from './reminderService'
 
 const STORAGE_KEY = 'program_reminders_default'
@@ -200,3 +199,15 @@ describe('reminderService.scheduleAll', () => {
         expect(notifications).toHaveLength(0)
     })
 })
+
+describe('isAutoTuneEnabled (item 32)', () => {
+    it('liga por padrão e respeita o desliga explícito', () => {
+        localStorage.removeItem('neostream_reminder_autotune');
+        expect(isAutoTuneEnabled()).toBe(true);
+        localStorage.setItem('neostream_reminder_autotune', '0');
+        expect(isAutoTuneEnabled()).toBe(false);
+        localStorage.setItem('neostream_reminder_autotune', '1');
+        expect(isAutoTuneEnabled()).toBe(true);
+        localStorage.removeItem('neostream_reminder_autotune');
+    });
+});
