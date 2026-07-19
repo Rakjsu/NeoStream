@@ -425,6 +425,15 @@ export function Home() {
         }
     }, [allSeries, allMovies, refreshTrigger]);
 
+
+    // 🎬 Backfill do Trakt: uma vez por sessão, envia o histórico antigo
+    // deste PC (o scrobble só cobre o que é assistido a partir da conexão).
+    useEffect(() => {
+        if (sessionStorage.getItem('neostream_trakt_backfill_tried')) return;
+        sessionStorage.setItem('neostream_trakt_backfill_tried', '1');
+        void import('../services/traktBackfillService').then(m => m.runTraktBackfill());
+    }, []);
+
     // A oferta de retomada expira sozinha depois de 15s na tela.
     useEffect(() => {
         if (!resumeOffer) return;

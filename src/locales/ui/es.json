@@ -1119,6 +1119,10 @@
     "clearRecent": "borrar"
   },
   "apiKeys": {
+    "traktBackfillBtn": "Enviar historial a Trakt",
+    "traktBackfillRunning": "Enviando historial…",
+    "traktBackfillDone": "Historial enviado a Trakt",
+    "traktBackfillPartial": "Lote enviado — ejecuta de nuevo para continuar",
     "navLabel": "APIs",
     "title": "APIs de metadatos",
     "description": "Usa tus propias claves de API — gratuitas — para portadas, sinopsis, notas y tráilers",

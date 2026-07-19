@@ -61,6 +61,20 @@ class MovieProgressService {
         localStorage.setItem(this.getStorageKey(), JSON.stringify(progress));
     }
 
+    /** Todas as entradas do perfil/playlist ativos (pro backfill do Trakt). */
+    getAllEntries(): MovieProgress[] {
+        return this.getProgress();
+    }
+
+    /** Marca traktSynced sem mexer no progresso (backfill do histórico). */
+    markTraktSynced(movieId: string): void {
+        const progress = this.getProgress();
+        const entry = progress.find(p => p.movieId === movieId);
+        if (!entry || entry.traktSynced) return;
+        entry.traktSynced = true;
+        this.saveProgress(progress);
+    }
+
     // Save/update movie watch progress
     saveMovieTime(
         movieId: string,

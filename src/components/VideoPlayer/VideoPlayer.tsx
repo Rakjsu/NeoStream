@@ -337,17 +337,19 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
             void traktScrobble(target, 'pause', traktProgressRef.current);
         };
     }, [contentType, title, seasonNumber, episodeNumber]);
-    // ▶️ Item B2-5: sem progresso local, retoma do ponto pausado no Trakt
-    // (outro app). Uma tentativa por mount, só filmes, e só no comecinho.
+    // ▶️ Retomada via Trakt com "maior progresso vence" (item 44): compara
+    // o % pausado lá com o progresso local e pula pro que estiver mais à
+    // frente. Uma tentativa por mount, só filmes, e só no comecinho.
     const traktResumeTriedRef = useRef(false);
     useEffect(() => {
         if (traktResumeTriedRef.current) return;
-        if (contentType !== 'movie' || !title || resumeTime || state.duration <= 0) return;
+        if (contentType !== 'movie' || !title || state.duration <= 0) return;
         traktResumeTriedRef.current = true;
         void getTraktResumePct(title).then(pct => {
             if (pct == null || pct <= 1 || pct >= 95) return;
             const target = (pct / 100) * state.duration;
-            if (target > 30 && state.currentTime < 30) {
+            const localPct = ((resumeTime || 0) / state.duration) * 100;
+            if (pct > localPct + 1 && target > 30 && state.currentTime < target) {
                 controls.seek(target);
             }
         });
