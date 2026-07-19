@@ -715,6 +715,7 @@
     "stopRecording": "Parar gravação",
     "recordingSaved": "Gravação salva",
     "recordingFailed": "Falha na gravação",
+    "recNoSpace": "Espaço em disco insuficiente pra gravar (menos de 1 GB livre)",
     "fullscreen": "Tela cheia",
     "exitFullscreen": "Sair da tela cheia",
     "nextEpisode": "Próximo episódio",

@@ -47,13 +47,32 @@ export function FloatingMiniPlayer({ content, onZap, onClose, onExpand, onTime }
         if (url) onZap?.({ src: url, title: next.name, contentId: String(next.id) });
     };
 
+    // 🎵 Faixas de áudio do HLS (lidas na hora do clique — lazy, sem eventos).
+    const [audioMenu, setAudioMenu] = useState<{ id: number; name: string; active: boolean }[] | null>(null);
+    const toggleAudioMenu = () => {
+        setAudioMenu(prev => {
+            if (prev) return null;
+            const hls = hlsRef.current;
+            const tracks = hls?.audioTracks ?? [];
+            return tracks.map((track, index) => ({
+                id: index,
+                name: track.name || track.lang || `Áudio ${index + 1}`,
+                active: hls?.audioTrack === index
+            }));
+        });
+    };
+    const pickAudioTrack = (id: number) => {
+        if (hlsRef.current) hlsRef.current.audioTrack = id;
+        setAudioMenu(null);
+    };
+
     const videoRef = useRef<HTMLVideoElement>(null);
     const [paused, setPaused] = useState(false);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
     const dragRef = useRef<{ pointerId: number; startX: number; startY: number; baseX: number; baseY: number } | null>(null);
     const { t } = useLanguage();
 
-    useHls({ src: content.src, videoRef });
+    const hlsRef = useHls({ src: content.src, videoRef });
 
     useEffect(() => {
         const video = videoRef.current;
@@ -148,6 +167,23 @@ export function FloatingMiniPlayer({ content, onZap, onClose, onExpand, onTime }
                 }}>
                     {content.title}
                 </span>
+                {audioMenu && (
+                    <div style={{ position: 'absolute', top: 40, right: 8, zIndex: 5, background: 'rgba(10, 10, 25, 0.96)', border: '1px solid rgba(var(--ns-accent-rgb), 0.4)', borderRadius: 8, padding: 6, minWidth: 140 }}>
+                        {audioMenu.length === 0 && (
+                            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, padding: '4px 6px' }}>—</div>
+                        )}
+                        {audioMenu.map(track => (
+                            <button
+                                key={track.id}
+                                onClick={() => pickAudioTrack(track.id)}
+                                style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: track.active ? 'rgba(var(--ns-accent-rgb), 0.25)' : 'transparent', color: 'white', fontSize: 12, padding: '5px 8px', borderRadius: 6, cursor: 'pointer' }}
+                            >
+                                {track.name}
+                            </button>
+                        ))}
+                    </div>
+                )}
+                <button onClick={toggleAudioMenu} style={headerButtonStyle} title="🎵">🎵</button>
                 {content.contentType === 'live' && (content.channelList?.length ?? 0) > 1 && (
                     <>
                         <button onClick={() => void zap(-1)} style={headerButtonStyle} title="Canal anterior">⏮</button>
