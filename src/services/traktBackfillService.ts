@@ -11,11 +11,32 @@ import {
 } from './traktService';
 
 const PUSH_CAP = 30;
-const DONE_KEY = 'neostream_trakt_backfill_done';
+// v2: a v1 pulava séries já terminadas (nome fora do "continuar assistindo")
+// e marcava concluído mesmo assim — o bump re-roda o backfill uma vez.
+const DONE_KEY = 'neostream_trakt_backfill_done_v2';
 
 /** Nome do provedor → chave de comparação (tira ano e espaços extras). */
 export function cleanTitle(name: string): string {
     return name.replace(/\s*\(\d{4}\)\s*/g, ' ').trim().toLowerCase();
+}
+
+/** titleMatches com os dois lados JÁ normalizados (evita re-limpar em loop). */
+function titleMatchesClean(catalog: string, trakt: string): boolean {
+    if (!catalog || !trakt) return false;
+    if (catalog === trakt) return true;
+    if (!catalog.startsWith(trakt)) return false;
+    return /^\s*[:\-\u2013(]/.test(catalog.slice(trakt.length));
+}
+
+/**
+ * Casamento SEGURO de título Trakt ↔ catálogo: igualdade normalizada, ou um
+ * lado é o outro + subtítulo (": …", " - …", " (…"). Nunca substring solta —
+ * "Drive" não pode casar com "Sex Drive: Rumo ao Sexo". PURO.
+ */
+export function titleMatches(a: string, b: string): boolean {
+    const cleanA = cleanTitle(a);
+    const cleanB = cleanTitle(b);
+    return titleMatchesClean(cleanA, cleanB) || titleMatchesClean(cleanB, cleanA);
 }
 
 export function episodeKey(show: string, season: number, episode: number): string {
@@ -68,10 +89,24 @@ export async function runTraktBackfill(force = false): Promise<TraktBackfillRepo
         }
     }
 
-    // ---- Episódios completos (nome da série vem do agregado) ----
+    // ---- Episódios completos ----
+    // Os nomes das séries vêm do CATÁLOGO: série já terminada sai do
+    // "continuar assistindo" e, na v1, ficava sem nome — as séries vistas
+    // ANTES de conectar o Trakt nunca subiam. O agregado fica de fallback.
+    const seriesCatalog: { id: string; name: string; clean: string }[] = [];
     const seriesNames = new Map<string, string>();
+    try {
+        const catalogResult = await window.ipcRenderer.invoke('streams:get-series', {}) as {
+            success?: boolean; data?: { series_id: number | string; name: string }[];
+        };
+        for (const candidate of catalogResult?.data ?? []) {
+            const id = String(candidate.series_id);
+            seriesCatalog.push({ id, name: candidate.name, clean: cleanTitle(candidate.name) });
+            seriesNames.set(id, candidate.name);
+        }
+    } catch { /* catálogo indisponível — o fallback abaixo cobre as em andamento */ }
     watchProgressService.getContinueWatching().forEach((progress, seriesId) => {
-        seriesNames.set(seriesId, progress.seriesName);
+        if (!seriesNames.has(seriesId)) seriesNames.set(seriesId, progress.seriesName);
     });
     for (const ep of watchProgressService.getEpisodeHistory()) {
         if (budget <= 0) break;
@@ -103,42 +138,40 @@ export async function runTraktBackfill(force = false): Promise<TraktBackfillRepo
         const vodResult = await window.ipcRenderer.invoke('streams:get-vod', {}) as {
             success?: boolean; data?: { stream_id: number | string; name: string }[];
         };
+        const traktMoviesClean = traktMovies.map(cleanTitle);
         for (const movie of vodResult?.data ?? []) {
-            if (!movieSet.has(cleanTitle(movie.name))) continue;
+            const clean = cleanTitle(movie.name);
+            const watchedOnTrakt = movieSet.has(clean)
+                || traktMoviesClean.some(t => titleMatchesClean(clean, t) || titleMatchesClean(t, clean));
+            if (!watchedOnTrakt) continue;
             movieProgressService.markWatchedFromTrakt(String(movie.stream_id), movie.name);
             report.pulledMovies++;
         }
     } catch { /* catálogo indisponível — fica pra próxima rodada */ }
 
     // ---- Fase 2 PULL: episódios vistos no Trakt viram vistos locais ----
-    if (traktEpisodes.length > 0) {
-        try {
-            const seriesResult = await window.ipcRenderer.invoke('streams:get-series', {}) as {
-                success?: boolean; data?: { series_id: number | string; name: string }[];
-            };
-            const seriesList = seriesResult?.data ?? [];
-            const byShow = new Map<string, { season: number; episode: number }[]>();
-            for (const ep of traktEpisodes) {
-                const key = cleanTitle(ep.show);
-                const list = byShow.get(key) ?? [];
-                list.push({ season: ep.season, episode: ep.episode });
-                byShow.set(key, list);
+    // (matching estrito: igualdade ou título+subtítulo — nunca substring)
+    if (traktEpisodes.length > 0 && seriesCatalog.length > 0) {
+        const byShow = new Map<string, { season: number; episode: number }[]>();
+        for (const ep of traktEpisodes) {
+            const key = cleanTitle(ep.show);
+            const list = byShow.get(key) ?? [];
+            list.push({ season: ep.season, episode: ep.episode });
+            byShow.set(key, list);
+        }
+        let showBudget = 15;
+        for (const [showName, eps] of byShow) {
+            if (showBudget <= 0) break;
+            const show = seriesCatalog.find(candidate =>
+                titleMatchesClean(candidate.clean, showName) || titleMatchesClean(showName, candidate.clean));
+            if (!show) continue;
+            showBudget--;
+            for (const ep of eps) {
+                if (watchProgressService.isEpisodeWatched(show.id, ep.season, ep.episode)) continue;
+                watchProgressService.markEpisodeWatched(show.id, ep.season, ep.episode);
+                report.pulledEpisodes++;
             }
-            let showBudget = 15;
-            for (const [showName, eps] of byShow) {
-                if (showBudget <= 0) break;
-                const show = seriesList.find(candidate =>
-                    cleanTitle(candidate.name) === showName || candidate.name.toLowerCase().includes(showName));
-                if (!show) continue;
-                showBudget--;
-                for (const ep of eps) {
-                    const id = String(show.series_id);
-                    if (watchProgressService.isEpisodeWatched(id, ep.season, ep.episode)) continue;
-                    watchProgressService.markEpisodeWatched(id, ep.season, ep.episode);
-                    report.pulledEpisodes++;
-                }
-            }
-        } catch { /* catálogo indisponível — fica pra próxima rodada */ }
+        }
     }
 
     // Só marca "concluído" quando o lote NÃO estourou — senão a próxima
