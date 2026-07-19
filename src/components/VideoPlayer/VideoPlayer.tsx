@@ -20,6 +20,7 @@ import { PlayerSettingsMenu } from './PlayerSettingsMenu';
 import { useAmbientLight } from './useAmbientLight';
 import { buildHandoffLink, type MobileHandoff } from '../../utils/mobileHandoff';
 import { qrToSvg } from '../../utils/qrEncoder';
+import { SeekPreviewThumb } from './SeekPreviewThumb';
 import { useSleepTimer, formatSleepCountdown } from './useSleepTimer';
 import { aspectPrefs, aspectPrefKey } from '../../utils/aspectPrefs';
 import { ForcedSubtitlesMenu } from './ForcedSubtitlesMenu';
@@ -1448,6 +1449,13 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             setHoverTime(null);
                         }}
                     >
+                        {/* 🖼️ Item 31: miniatura do ponto sob o mouse (a barra só existe fora do live) */}
+                        <SeekPreviewThumb
+                            src={src}
+                            timeSec={hoverTime ?? -1}
+                            visible={hoverTime !== null}
+                            x={hoverPosition}
+                        />
                         {/* Time Preview Tooltip */}
                         {hoverTime !== null && (
                             <div

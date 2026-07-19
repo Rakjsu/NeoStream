@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clampBoost, cycleAbState, abLoopTarget } from './playerExtras';
+import { clampBoost, cycleAbState, abLoopTarget, previewBucket, previewSeekTarget } from './playerExtras';
 
 describe('playerExtras — volume boost', () => {
     it('clampBoost limita a 100%–300% e sanitiza lixo', () => {
@@ -32,5 +32,23 @@ describe('playerExtras — repetição A-B', () => {
         expect(abLoopTarget(20, { a: 10, b: 25 })).toBeNull();
         expect(abLoopTarget(25, { a: 10, b: 25 })).toBe(10);
         expect(abLoopTarget(999, { a: 10, b: 25 })).toBe(10);
+    });
+});
+
+describe('preview da barra (item 31)', () => {
+    it('agrupa o hover em janelas de 10s', () => {
+        expect(previewBucket(0)).toBe(0);
+        expect(previewBucket(59.9)).toBe(5);
+        expect(previewBucket(60)).toBe(6);
+    });
+
+    it('tempo inválido ou negativo vira -1', () => {
+        expect(previewBucket(-3)).toBe(-1);
+        expect(previewBucket(NaN)).toBe(-1);
+    });
+
+    it('o seek mira o meio da janela', () => {
+        expect(previewSeekTarget(0)).toBe(5);
+        expect(previewSeekTarget(6)).toBe(65);
     });
 });
