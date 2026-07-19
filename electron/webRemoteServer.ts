@@ -32,6 +32,7 @@ import {
     pickLanAddress,
     type PinGateEntry,
     type NetAddress,
+    parseProgressReport,
 } from './webRemoteProtocol'
 import { renderRemotePage, type RemoteAccent } from './webRemotePage'
 import { buildSetupDeepLink, renderSetupHandoffPage } from './setupPayload'
@@ -309,7 +310,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 }
 
 // Actions that always go to the renderer (never routed to the cast session).
-const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule', 'requestRecordings', 'renameRecording', 'toggleProtectRecording', 'navKey', 'requestFavorites', 'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode', 'sleep', 'requestStats', 'requestReminders', 'cancelReminder'])
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule', 'requestRecordings', 'renameRecording', 'toggleProtectRecording', 'navKey', 'requestFavorites', 'reportProgress', 'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode', 'sleep', 'requestStats', 'requestReminders', 'cancelReminder'])
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
@@ -381,6 +382,9 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         win.webContents.send('media:control', 'sleep', command.minutes)
     } else if (command.action === 'requestStats') {
         win.webContents.send('media:control', 'requestStats')
+    } else if (command.action === 'reportProgress') {
+        // 🔄 Item 11: posição vinda do celular → renderer grava no histórico.
+        win.webContents.send('media:control', 'reportProgress', command.report)
     } else if (command.action === 'playChannel') {
         win.webContents.send('media:control', 'playChannel', command.channelId)
     } else if (command.action === 'requestEpg') {
@@ -522,6 +526,13 @@ export function setupWebRemote(): void {
             name: String(data?.name ?? ''),
         }))
         return { success: count > 0, count }
+    })
+
+    // 🔄 Item 11: amostra de progresso local do renderer → celulares pareados.
+    ipcMain.on('web-remote:progress', (_e, raw: unknown) => {
+        const report = parseProgressReport(raw)
+        if (!report) return
+        sendToMobileClients(JSON.stringify({ type: 'progressSync', ...report }))
     })
 
     // 🔔 Notificação cruzada: espelha um aviso do desktop nos celulares.

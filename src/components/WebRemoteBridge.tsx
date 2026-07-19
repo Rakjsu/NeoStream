@@ -499,6 +499,65 @@ export function WebRemoteBridge() {
             window.ipcRenderer.send('web-remote:reminders', { items });
         };
 
+        // 🔄 Item 11: sync de posições PC ↔ celular. Filme casa por stream_id;
+        // episódio casa por nome da série (cache id ↔ nome montado sob demanda).
+        let applyingRemoteProgress = false;
+        let seriesNameCache: Map<string, string> | null = null;
+        const loadSeriesNames = async (): Promise<Map<string, string>> => {
+            if (seriesNameCache) return seriesNameCache;
+            const result = await window.ipcRenderer.invoke('streams:get-series').catch(() => null) as
+                { success: boolean; data?: SeriesItem[] } | null;
+            const map = new Map<string, string>();
+            for (const s of (result?.success ? result.data ?? [] : [])) map.set(String(s.series_id), s.name || '');
+            seriesNameCache = map;
+            return map;
+        };
+        const applyRemoteProgress = async (raw: unknown) => {
+            const report = (raw ?? {}) as { kind?: string; movieId?: string; title?: string; season?: number; episode?: number; positionSec?: number; durationSec?: number; updatedAt?: number };
+            const positionSec = Number(report.positionSec), durationSec = Number(report.durationSec), updatedAt = Number(report.updatedAt);
+            if (!Number.isFinite(positionSec) || !(durationSec > 0) || !Number.isFinite(updatedAt)) return;
+            applyingRemoteProgress = true;
+            try {
+                if (report.kind === 'movie' && report.movieId) {
+                    // LWW: só aplica se a amostra do celular for mais nova que a local.
+                    const local = movieProgressService.getMoviePositionById(report.movieId);
+                    if (local && local.watchedAt >= updatedAt) return;
+                    movieProgressService.saveMovieTime(report.movieId, String(report.title ?? ''), positionSec, durationSec);
+                } else if (report.kind === 'episode' && report.title && Number.isInteger(report.season) && Number.isInteger(report.episode)) {
+                    const names = await loadSeriesNames();
+                    const wanted = String(report.title).trim().toLowerCase();
+                    let seriesId = '';
+                    for (const [id, name] of names) {
+                        if (name.trim().toLowerCase() === wanted) { seriesId = id; break; }
+                    }
+                    if (!seriesId) return; // série fora do catálogo local — o Trakt cobre.
+                    const local = watchProgressService.getEpisodeProgress(seriesId, report.season!, report.episode!);
+                    if (local && local.duration > 0 && local.currentTime > 0) {
+                        // Sem watchedAt exposto aqui: "maior progresso vence" resolve o empate.
+                        if (local.currentTime >= positionSec) return;
+                    }
+                    watchProgressService.saveVideoTime(seriesId, report.season!, report.episode!, positionSec, durationSec);
+                }
+            } finally {
+                applyingRemoteProgress = false;
+            }
+        };
+        const onLocalProgressSample = (event: Event) => {
+            if (applyingRemoteProgress) return; // eco do que o celular acabou de mandar
+            const detail = (event as CustomEvent).detail as { kind?: string; movieId?: string; title?: string; seriesId?: string; season?: number; episode?: number; positionSec?: number; durationSec?: number; updatedAt?: number } | undefined;
+            if (!detail) return;
+            if (detail.kind === 'movie') {
+                window.ipcRenderer.send('web-remote:progress', { kind: 'movie', movieId: detail.movieId, title: detail.title, positionSec: detail.positionSec, durationSec: detail.durationSec, updatedAt: detail.updatedAt });
+            } else if (detail.kind === 'episode' && detail.seriesId) {
+                void loadSeriesNames().then(names => {
+                    const seriesName = names.get(String(detail.seriesId));
+                    if (!seriesName) return;
+                    window.ipcRenderer.send('web-remote:progress', { kind: 'episode', title: seriesName, season: detail.season, episode: detail.episode, positionSec: detail.positionSec, durationSec: detail.durationSec, updatedAt: detail.updatedAt });
+                });
+            }
+        };
+        window.addEventListener('progress:sample', onLocalProgressSample);
+
         const handler = (_e: unknown, action: string, arg?: unknown, target?: unknown) => {
             if (action === 'requestCatalog') void pushCatalog(typeof arg === 'string' ? arg : '');
             else if (action === 'requestLiveSearch') void pushLiveSearch(typeof arg === 'string' ? arg : '');
@@ -525,6 +584,7 @@ export function WebRemoteBridge() {
             else if (action === 'requestSeries') void pushSeries(typeof arg === 'string' ? arg : '');
             else if (action === 'requestSeriesInfo') void pushSeriesInfo(String(arg ?? ''));
             else if (action === 'castEpisode') void castEpisode(String(arg ?? ''), asTarget(target));
+            else if (action === 'reportProgress') void applyRemoteProgress(arg);
         };
         window.ipcRenderer.on('media:control', handler);
 
@@ -545,7 +605,7 @@ export function WebRemoteBridge() {
             })();
         }, 5000);
 
-        return () => { window.ipcRenderer.off('media:control', handler); clearInterval(historyPoll); };
+        return () => { window.ipcRenderer.off('media:control', handler); window.removeEventListener('progress:sample', onLocalProgressSample); clearInterval(historyPoll); };
     }, []);
 
     return null;

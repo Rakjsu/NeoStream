@@ -144,6 +144,13 @@ class MovieProgressService {
         }
 
         this.saveProgress(progress);
+
+        // 🔄 Item 11: avisa o WebRemoteBridge pra espelhar a posição no celular.
+        try {
+            window.dispatchEvent(new CustomEvent('progress:sample', {
+                detail: { kind: 'movie', movieId, title: movieName, positionSec: currentTime, durationSec: duration, updatedAt: entry.watchedAt },
+            }));
+        } catch { /* ambiente de teste sem CustomEvent */ }
     }
 
     // Get specific movie progress (active profile)

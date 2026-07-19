@@ -137,6 +137,13 @@ class WatchProgressService {
         }
 
         this.saveProgress(progress);
+
+        // 🔄 Item 11: o WebRemoteBridge resolve o nome da série e espelha no celular.
+        try {
+            window.dispatchEvent(new CustomEvent('progress:sample', {
+                detail: { kind: 'episode', seriesId, season: seasonNumber, episode: episodeNumber, positionSec: currentTime, durationSec: duration, updatedAt: entry.watchedAt },
+            }));
+        } catch { /* ambiente de teste sem CustomEvent */ }
     }
 
     // Get saved video time for resume
