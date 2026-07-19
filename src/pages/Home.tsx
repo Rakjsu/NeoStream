@@ -16,6 +16,7 @@ import { getHomeRecommendations, type RecommendationGroup } from '../services/re
 import { newEpisodesService } from '../services/newEpisodesService';
 import { newEpisodeNotifier } from '../services/newEpisodeNotifier';
 import { favoritesService } from '../services/favoritesService';
+import { blockedRecommendationsService } from '../services/blockedRecommendationsService';
 import { ContinueFramePreview } from '../components/ContinueFramePreview';
 import { watchLaterService } from '../services/watchLater';
 import { findDepartures, dismissDepartures } from '../services/catalogDeparturesService';
@@ -529,6 +530,24 @@ export function Home() {
     };
 
     // Row title: "Porque você assistiu {seed}" (seed truncated to keep rows tidy)
+    // 🚫 Item 35: "não me recomende isso" — bane o título e ele some na hora.
+    const blockRecommendation = (item: HomeContentItem) => {
+        const isSeries = 'series_id' in item;
+        const id = isSeries ? String((item as SeriesData).series_id) : String((item as MovieData).stream_id);
+        blockedRecommendationsService.block(isSeries ? 'series' : 'movie', id);
+        setRecommendationGroups(groups => groups
+            .map(group => ({
+                ...group,
+                items: group.items.filter(candidate => {
+                    const rec = candidate as { kind: 'vod' | 'series'; item: { stream_id?: number | string; series_id?: number | string } };
+                    const candidateIsSeries = rec.kind === 'series';
+                    const candidateId = String(candidateIsSeries ? rec.item.series_id : rec.item.stream_id);
+                    return candidateIsSeries !== isSeries || candidateId !== id;
+                })
+            }))
+            .filter(group => group.items.length > 0));
+    };
+
     const becauseYouWatchedTitle = (seedName: string) => {
         const truncated = seedName.length > 28 ? `${seedName.slice(0, 27).trimEnd()}…` : seedName;
         return t('home', 'becauseYouWatched').replace('{name}', truncated);
@@ -816,8 +835,8 @@ export function Home() {
                     flexShrink: 0
                 }}
             >
-                {/* Remove button for continue watching */}
-                {isContinue && (
+                {/* ✕: tira do continuar assistindo OU bane das recomendações */}
+                {onRemove && (
                     <button
                         className="remove-btn"
                         onClick={(e) => {
@@ -842,7 +861,7 @@ export function Home() {
                             justifyContent: 'center',
                             zIndex: 150
                         }}
-                        title={t('home', 'removeFromContinue')}
+                        title={isContinue ? t('home', 'removeFromContinue') : t('home', 'dontRecommend')}
                     >
                         ✕
                     </button>
@@ -1196,7 +1215,11 @@ export function Home() {
                             type: cardType as 'continue' | 'series' | 'movie',
                             showProgress,
                             rating: isSeries ? (item as SeriesData).rating : (item as MovieData).rating,
-                            onRemove: isContinueItem ? () => removeFromContinue(continueItem.id, continueItem.type) : undefined
+                            onRemove: isContinueItem
+                                ? () => removeFromContinue(continueItem.id, continueItem.type)
+                                : type === 'recommendations'
+                                    ? () => blockRecommendation(item)
+                                    : undefined
                         });
                     })}
                 </div>

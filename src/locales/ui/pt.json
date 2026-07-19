@@ -825,6 +825,7 @@
     "disclaimer": "NeoStream não fornece conteúdo. Use sua própria assinatura IPTV."
   },
   "home": {
+    "dontRecommend": "Não me recomende isso",
     "resumeOpenTitle": "Continuar de onde parou?",
     "resumeOpenPlay": "Retomar",
     "goodMorning": "Bom dia",

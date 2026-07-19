@@ -825,6 +825,7 @@
     "streamUnavailable": "Stream unavailable. No alternative found."
   },
   "home": {
+    "dontRecommend": "Don't recommend this",
     "resumeOpenTitle": "Pick up where you left off?",
     "resumeOpenPlay": "Resume",
     "goodMorning": "Good morning",
