@@ -2088,6 +2088,10 @@ export function LiveTV() {
                         }));
                     })()}
                     initialChannelId={selectedChannel?.stream_id}
+                    onDetach={() => {
+                        void window.ipcRenderer.invoke('multiview:open', { initialChannelId: selectedChannel?.stream_id });
+                        setShowMultiView(false);
+                    }}
                     onClose={() => setShowMultiView(false)}
                 />
             )}

@@ -70,6 +70,39 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
     });
 
     // Open PiP window
+    // 🖥️ Item 17: multi-view destacável em janela própria (mosaico independente).
+    let multiViewWindow: BrowserWindow | null = null;
+    ipcMain.handle('multiview:open', (_event, raw: unknown) => {
+        const { initialChannelId } = (raw ?? {}) as { initialChannelId?: string | number };
+        if (multiViewWindow && !multiViewWindow.isDestroyed()) {
+            multiViewWindow.focus();
+            return { success: true };
+        }
+        const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
+        multiViewWindow = new BrowserWindow({
+            width: 1280,
+            height: 720,
+            minWidth: 640,
+            minHeight: 360,
+            backgroundColor: '#0f0f1e',
+            webPreferences: {
+                preload: path.join(__dirname, 'preload.mjs'),
+                nodeIntegration: false,
+                contextIsolation: true,
+                webSecurity: false,
+            },
+        });
+        multiViewWindow.setMenuBarVisibility(false);
+        const hash = `/multiview${initialChannelId !== undefined ? `?initial=${encodeURIComponent(String(initialChannelId))}` : ''}`;
+        if (VITE_DEV_SERVER_URL) {
+            void multiViewWindow.loadURL(`${VITE_DEV_SERVER_URL}#${hash}`);
+        } else {
+            void multiViewWindow.loadFile(path.join(process.env.DIST || '', 'index.html'), { hash });
+        }
+        multiViewWindow.on('closed', () => { multiViewWindow = null; });
+        return { success: true };
+    });
+
     ipcMain.handle('pip:open', async (_event, content: PipContent) => {
         // Store current content
         currentPipContent = content;

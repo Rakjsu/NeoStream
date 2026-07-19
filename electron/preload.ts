@@ -148,6 +148,7 @@ const invokeChannels = new Set([
     'storage:usage',
     'transcode:start',
     'transcode:stop',
+    'multiview:open',
     'streams:get-live',
     'system:get-config',
     'system:set-config',
