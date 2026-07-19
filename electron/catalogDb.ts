@@ -17,9 +17,26 @@
  * Sem imports do electron — o chamador passa os caminhos (testável no vitest).
  */
 
-import { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from 'node:sqlite'
 import path from 'node:path'
 import fs from 'node:fs'
+
+/**
+ * node:sqlite via process.getBuiltinModule (Node >= 22.3): o import ESTÁTICO
+ * quebrava o transform do vitest no CI ("Cannot bundle Node.js built-in") —
+ * em runtime não passa pelo resolver de bundler nenhum. null = indisponível
+ * (o chamador cai no backend JSON).
+ */
+function loadSqlite(): typeof import('node:sqlite') | null {
+    try {
+        const getBuiltin = (process as unknown as {
+            getBuiltinModule?: (id: string) => unknown
+        }).getBuiltinModule
+        return (getBuiltin?.call(process, 'node:sqlite') as typeof import('node:sqlite')) ?? null
+    } catch {
+        return null
+    }
+}
 
 export interface CatalogEntryRow {
     fetchedAt: number
@@ -91,8 +108,13 @@ export function migrateLegacyJsonDir(db: DatabaseSync, legacyDir: string, warn: 
  */
 export function openCatalogStore(dbPath: string, legacyJsonDir: string, warn: Warn = () => {}): CatalogStore | null {
     try {
+        const sqlite = loadSqlite()
+        if (!sqlite) {
+            warn('node:sqlite indisponível neste runtime — cache do catálogo segue em JSON')
+            return null
+        }
         fs.mkdirSync(path.dirname(dbPath), { recursive: true })
-        const db = new DatabaseSync(dbPath)
+        const db = new sqlite.DatabaseSync(dbPath)
         db.exec('PRAGMA journal_mode = WAL')
         db.exec(
             'CREATE TABLE IF NOT EXISTS catalog_cache ('
