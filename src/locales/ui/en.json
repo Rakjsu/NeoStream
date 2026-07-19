@@ -570,6 +570,11 @@
     "openLogsDesc": "Opens the folder where main.log is written",
     "openLogsError": "Could not open the logs folder"
   },
+  "favMosaic": {
+    "title": "Favorites mosaic",
+    "hint": "Thumbnails refresh on their own — click a channel to watch",
+    "close": "Close"
+  },
   "epg": {
     "title": "Program Guide (EPG)",
     "description": "Test and diagnose EPG sources",

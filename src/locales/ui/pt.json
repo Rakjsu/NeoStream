@@ -385,6 +385,11 @@
     "openLogsDesc": "Abre a pasta onde o main.log é gravado",
     "openLogsError": "Não foi possível abrir a pasta de logs"
   },
+  "favMosaic": {
+    "title": "Mosaico de favoritos",
+    "hint": "As miniaturas se atualizam sozinhas — clique num canal pra assistir",
+    "close": "Fechar"
+  },
   "epg": {
     "title": "Guia de Programação (EPG)",
     "description": "Teste e diagnóstico das fontes de EPG",
