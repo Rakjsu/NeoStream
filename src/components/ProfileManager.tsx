@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { profileService } from '../services/profileService';
 import type { Profile } from '../types/profile';
 import { CreateProfileModal } from './CreateProfileModal';
@@ -16,6 +16,9 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
     const [deleteConfirm, setDeleteConfirm] = useState<Profile | null>(null);
     const [editName, setEditName] = useState('');
     const [editAvatar, setEditAvatar] = useState('');
+    // 🖼️ Avatar com imagem própria no editor (mesmo fluxo da criação)
+    const [editError, setEditError] = useState('');
+    const editFileRef = useRef<HTMLInputElement>(null);
 
     // PIN verification states
     const [pendingActivation, setPendingActivation] = useState<Profile | null>(null);
@@ -164,6 +167,23 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
         setEditingProfile(profile);
         setEditName(profile.name);
         setEditAvatar(profile.avatar);
+        setEditError('');
+    };
+
+    const handleEditImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        // Mesmo teto de 50KB da criação — o avatar vive em base64 no localStorage.
+        if (file.size > 50 * 1024) {
+            setEditError(t('profile', 'imageTooBig'));
+            return;
+        }
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setEditAvatar(reader.result as string);
+            setEditError('');
+        };
+        reader.readAsDataURL(file);
     };
 
     const handleActivateProfile = (profile: Profile) => {
@@ -364,6 +384,34 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                                     </button>
                                 ))}
                             </div>
+
+                            {/* 🖼️ Imagem própria como avatar */}
+                            <input
+                                ref={editFileRef}
+                                type="file"
+                                accept="image/*"
+                                onChange={handleEditImageUpload}
+                                style={{ display: 'none' }}
+                            />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                {(editAvatar.startsWith('data:image') || editAvatar.startsWith('http')) && (
+                                    <img
+                                        src={editAvatar}
+                                        alt=""
+                                        style={{ width: 48, height: 48, borderRadius: 10, objectFit: 'cover', border: '2px solid var(--ns-accent)', flexShrink: 0 }}
+                                    />
+                                )}
+                                <button
+                                    className="pm-edit-pin-btn"
+                                    style={{ marginTop: 0, flex: 1 }}
+                                    onClick={() => editFileRef.current?.click()}
+                                >
+                                    🖼️ {(editAvatar.startsWith('data:image') || editAvatar.startsWith('http')) ? t('profile', 'changeImage') : t('profile', 'image')}
+                                </button>
+                            </div>
+                            {editError && (
+                                <p style={{ color: '#ef4444', fontSize: 13, margin: 0 }}>{editError}</p>
+                            )}
 
                             {/* Edit PIN Button */}
                             <button

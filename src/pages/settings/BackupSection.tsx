@@ -24,12 +24,19 @@ export function BackupSection() {
     const [autoBackup, setAutoBackup] = useState<{ enabled: boolean; dirPath: string; lastBackupAt: number } | null>(null);
     // Machine sync config (lives in the main process store)
     const [syncConfig, setSyncConfig] = useState<{ enabled: boolean; dirPath: string; machineId: string; lastSyncAt: number } | null>(null);
+    // ☁️ Pastas de nuvem detectadas (OneDrive/Dropbox/Google Drive locais)
+    const [cloudDirs, setCloudDirs] = useState<{ provider: string; path: string }[]>([]);
 
     useEffect(() => {
         let cancelled = false;
         window.ipcRenderer.invoke('backup:auto-config-get')
             .then((result: { success: boolean; config?: { enabled: boolean; dirPath: string; lastBackupAt: number } }) => {
                 if (!cancelled && result?.success && result.config) setAutoBackup(result.config);
+            })
+            .catch(() => undefined);
+        window.ipcRenderer.invoke('backup:cloud-dirs')
+            .then((result: { success: boolean; dirs?: { provider: string; path: string }[] }) => {
+                if (!cancelled && result?.success && result.dirs) setCloudDirs(result.dirs);
             })
             .catch(() => undefined);
         window.ipcRenderer.invoke('sync:config-get')
@@ -61,6 +68,14 @@ export function BackupSection() {
     const handleSyncNow = async () => {
         await window.ipcRenderer.invoke('sync:run-now').catch(() => undefined);
         setSuccessMessage(t('backup', 'syncStarted'));
+    };
+
+    const handleUseCloudDir = async (dirPath: string) => {
+        const result = await window.ipcRenderer.invoke('backup:cloud-use', { dirPath }) as { success: boolean; config?: { enabled: boolean; dirPath: string; lastBackupAt: number } };
+        if (result.success && result.config) {
+            setAutoBackup(result.config);
+            triggerSaveAnimation('cloud');
+        }
     };
 
     const handleAutoBackupToggle = async (enabled: boolean) => {
@@ -282,6 +297,26 @@ export function BackupSection() {
                         <span className="toggle-slider"></span>
                     </label>
                 </div>
+
+                {/* ☁️ Atalhos: apontar o auto-backup pra pasta sincronizada da nuvem */}
+                {cloudDirs.length > 0 && (
+                    <div className="backup-actions" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                        <span style={{ color: '#9ca3af', fontSize: 13 }}>☁️ {t('backup', 'cloudUse')}:</span>
+                        {cloudDirs.map(dir => (
+                            <button
+                                key={dir.provider}
+                                className="check-btn"
+                                style={{ width: 'auto', padding: '10px 20px' }}
+                                onClick={() => void handleUseCloudDir(dir.path)}
+                            >
+                                <span>{dir.provider}</span>
+                            </button>
+                        ))}
+                        {saveAnimation === 'cloud' && (
+                            <span className="save-indicator">{t('backup', 'cloudSet')}</span>
+                        )}
+                    </div>
+                )}
 
                 {/* Multi-machine sync over a synced folder */}
                 <div className="setting-item">

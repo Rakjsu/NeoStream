@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { FRAME_STEP_SEC } from './playerExtras';
+import { keymapService } from '../../services/keymapService';
 
 interface PlayerKeyboardControls {
     togglePlay: () => void;
@@ -69,37 +70,58 @@ export function useKeyboardShortcuts({
         // Ignore while the cast device selector modal is open
         if (showDeviceSelector) return;
 
-        switch (e.key.toLowerCase()) {
-            case ' ':
-            case 'k':
-                e.preventDefault();
-                controls.togglePlay();
-                break;
-            case 'arrowleft':
-            case 'j':
-                e.preventDefault();
-                // Shift pula 30s — feito pra varrer gravações e VOD longos.
-                controls.seek(Math.max(0, currentTime - (e.shiftKey ? 30 : 10)));
-                break;
-            case 'arrowright':
-            case 'l':
-                e.preventDefault();
-                controls.seek(Math.min(duration, currentTime + (e.shiftKey ? 30 : 10)));
-                break;
+        const key = e.key.toLowerCase();
+
+        // Teclas estruturais fixas (não personalizáveis).
+        switch (key) {
             case ',':
             case '.':
                 if (onFrameStep) {
                     e.preventDefault();
-                    onFrameStep(e.key === ',' ? -FRAME_STEP_SEC : FRAME_STEP_SEC);
+                    onFrameStep(key === ',' ? -FRAME_STEP_SEC : FRAME_STEP_SEC);
                 }
+                return;
+            case 'arrowup':
+                e.preventDefault();
+                controls.setVolume(Math.min(1, volume + 0.1));
+                return;
+            case 'arrowdown':
+                e.preventDefault();
+                controls.setVolume(Math.max(0, volume - 0.1));
+                return;
+            case 'escape':
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                } else if (onClose) {
+                    onClose();
+                }
+                return;
+        }
+
+        // Demais ações resolvidas pelo keymap (letras personalizáveis no "?").
+        const action = keymapService.getKeyToAction()[key];
+        if (!action) return;
+        switch (action) {
+            case 'togglePlay':
+                e.preventDefault();
+                controls.togglePlay();
                 break;
-            case 'i':
+            case 'seekBack':
+                e.preventDefault();
+                // Shift pula 30s — feito pra varrer gravações e VOD longos.
+                controls.seek(Math.max(0, currentTime - (e.shiftKey ? 30 : 10)));
+                break;
+            case 'seekForward':
+                e.preventDefault();
+                controls.seek(Math.min(duration, currentTime + (e.shiftKey ? 30 : 10)));
+                break;
+            case 'stats':
                 if (onToggleStats) {
                     e.preventDefault();
                     onToggleStats();
                 }
                 break;
-            case 'x':
+            case 'bookmark':
                 if (e.shiftKey) {
                     if (onToggleBookmarks) {
                         e.preventDefault();
@@ -110,43 +132,35 @@ export function useKeyboardShortcuts({
                     onAddBookmark();
                 }
                 break;
-            case 'b':
+            case 'abLoop':
                 if (onCycleAbLoop) {
                     e.preventDefault();
                     onCycleAbLoop();
                 }
                 break;
-            case 's':
+            case 'screenshot':
                 if (onScreenshot) {
                     e.preventDefault();
                     onScreenshot();
                 }
                 break;
-            case 'v':
+            case 'videoFilter':
                 if (onCycleVideoFilter) {
                     e.preventDefault();
                     onCycleVideoFilter();
                 }
                 break;
-            case 'n':
+            case 'normalize':
                 if (onToggleNormalize) {
                     e.preventDefault();
                     onToggleNormalize();
                 }
                 break;
-            case 'arrowup':
-                e.preventDefault();
-                controls.setVolume(Math.min(1, volume + 0.1));
-                break;
-            case 'arrowdown':
-                e.preventDefault();
-                controls.setVolume(Math.max(0, volume - 0.1));
-                break;
-            case 'm':
+            case 'mute':
                 e.preventDefault();
                 controls.toggleMute();
                 break;
-            case 'f':
+            case 'fullscreen':
                 e.preventDefault();
                 if (!document.fullscreenElement) {
                     containerRef.current?.requestFullscreen();
@@ -154,18 +168,11 @@ export function useKeyboardShortcuts({
                     document.exitFullscreen();
                 }
                 break;
-            case 'c':
+            case 'subtitles':
                 // The CC button runs an async fetch flow; the shortcut only
                 // toggles visibility when a subtitle is already loaded.
                 if (vttContent) {
                     setSubtitlesEnabled(prev => !prev);
-                }
-                break;
-            case 'escape':
-                if (document.fullscreenElement) {
-                    document.exitFullscreen();
-                } else if (onClose) {
-                    onClose();
                 }
                 break;
         }

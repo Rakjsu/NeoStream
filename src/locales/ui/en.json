@@ -396,6 +396,8 @@
     "checking": "Checking..."
   },
   "playback": {
+    "resumeOnOpen": "Resume on launch",
+    "resumeOnOpenDesc": "When the app opens, offers to continue the last thing you were watching",
     "title": "Playback",
     "description": "Adjust video and audio playback",
     "bufferSize": "Buffer Size",
@@ -484,6 +486,8 @@
     "note": "Some screens still keep the classic palette for now."
   },
   "backup": {
+    "cloudUse": "Save to cloud",
+    "cloudSet": "Cloud folder set ✓",
     "title": "Backup & Restore",
     "description": "Export or restore your profiles, progress and preferences",
     "passwordTitle": "Backup password (optional)",
@@ -825,6 +829,8 @@
     "streamUnavailable": "Stream unavailable. No alternative found."
   },
   "home": {
+    "resumeOpenTitle": "Pick up where you left off?",
+    "resumeOpenPlay": "Resume",
     "goodMorning": "Good morning",
     "expiryWarn": "Your playlist expires in {days} day(s) — contact your provider to renew.",
     "expiryExpired": "Your playlist has expired — contact your provider to renew.",
@@ -1039,6 +1045,13 @@
     "note": "Kids profile and parental control filters still apply on top of these options."
   },
   "shortcuts": {
+    "seekBack": "Back 10s",
+    "seekForward": "Forward 10s",
+    "customize": "Click a highlighted key and press a new one to customize",
+    "pressKey": "Press the new key (Esc cancels)",
+    "keyInUse": "That key is already in use",
+    "keyReserved": "That key is reserved",
+    "resetKeys": "Restore defaults",
     "frameStep": "Frame step (paused)",
     "abLoop": "A-B loop",
     "bookmark": "Bookmark current position",

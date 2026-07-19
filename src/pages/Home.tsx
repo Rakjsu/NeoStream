@@ -91,6 +91,8 @@ export function Home() {
     const [loading, setLoading] = useState(true);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [continueWatching, setContinueWatching] = useState<ContinueWatchingItem[]>([]);
+    // ⏯️ Retomar ao abrir: oferta única por sessão do app (toggle em Reprodução)
+    const [resumeOffer, setResumeOffer] = useState<ContinueWatchingItem | null>(null);
     // Ordem/visibilidade das fileiras (Configurações → Aparência) — lida no mount.
     const [railPrefs] = useState(() => loadHomeRailPrefs());
     const [recentSeries, setRecentSeries] = useState<SeriesData[]>([]);
@@ -410,7 +412,48 @@ export function Home() {
         });
 
         queueMicrotask(() => setContinueWatching(items.slice(0, 30)));
+
+        // ⏯️ Retomar ao abrir: oferece o item mais recente uma vez por sessão
+        // do app (ligado por padrão; some sozinho em 15s).
+        if (
+            items.length > 0 &&
+            localStorage.getItem('neostream_resume_on_open') !== '0' &&
+            !sessionStorage.getItem('neostream_resume_offered')
+        ) {
+            sessionStorage.setItem('neostream_resume_offered', '1');
+            queueMicrotask(() => setResumeOffer(items[0]));
+        }
     }, [allSeries, allMovies, refreshTrigger]);
+
+    // A oferta de retomada expira sozinha depois de 15s na tela.
+    useEffect(() => {
+        if (!resumeOffer) return;
+        const timer = setTimeout(() => setResumeOffer(null), 15000);
+        return () => clearTimeout(timer);
+    }, [resumeOffer]);
+
+    const playResumeOffer = () => {
+        if (!resumeOffer) return;
+        setResumeOffer(null);
+        if (resumeOffer.type === 'movie') {
+            setPlayingContent({
+                id: resumeOffer.id,
+                type: 'movie',
+                name: resumeOffer.name,
+                resumeTime: resumeOffer.movieProgress?.currentTime || 0
+            });
+        } else if (resumeOffer.progress) {
+            const { lastWatchedSeason, lastWatchedEpisode } = resumeOffer.progress;
+            setPlayingContent({
+                id: resumeOffer.id,
+                type: 'series',
+                name: resumeOffer.name,
+                season: lastWatchedSeason,
+                episode: lastWatchedEpisode,
+                resumeTime: watchProgressService.getVideoTime(resumeOffer.id, lastWatchedSeason, lastWatchedEpisode) || 0
+            });
+        }
+    };
 
     // Followed series with new episodes (provider last_modified bumped since
     // the user last opened them) — feeds the "Novos episódios" row.
@@ -1882,6 +1925,63 @@ export function Home() {
                     />
                 )
             }
+
+            {/* ⏯️ Toast "retomar ao abrir" (uma vez por sessão) */}
+            {resumeOffer && !playingContent && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        right: 24,
+                        bottom: 24,
+                        zIndex: 9000,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 14,
+                        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+                        border: '1px solid rgba(var(--ns-accent-rgb), 0.35)',
+                        borderRadius: 16,
+                        padding: '14px 18px',
+                        maxWidth: 440,
+                        boxShadow: '0 16px 48px rgba(0, 0, 0, 0.5)'
+                    }}
+                >
+                    {resumeOffer.cover && (
+                        <img
+                            src={resumeOffer.cover}
+                            alt=""
+                            style={{ width: 44, height: 62, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+                        />
+                    )}
+                    <div style={{ minWidth: 0 }}>
+                        <div style={{ color: '#9ca3af', fontSize: 12 }}>{t('home', 'resumeOpenTitle')}</div>
+                        <div style={{ color: 'white', fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {resumeOffer.name}
+                        </div>
+                    </div>
+                    <button
+                        onClick={playResumeOffer}
+                        style={{
+                            border: 'none',
+                            borderRadius: 10,
+                            padding: '10px 16px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            background: 'linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to))',
+                            color: 'white',
+                            flexShrink: 0
+                        }}
+                    >
+                        ▶ {t('home', 'resumeOpenPlay')}
+                    </button>
+                    <button
+                        onClick={() => setResumeOffer(null)}
+                        aria-label={t('home', 'removeFromContinue')}
+                        style={{ border: 'none', background: 'transparent', color: '#9ca3af', fontSize: 16, cursor: 'pointer', flexShrink: 0 }}
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
 
             {/* Video Player */}
             {

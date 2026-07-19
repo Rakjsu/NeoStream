@@ -396,6 +396,8 @@
     "checking": "Verificando..."
   },
   "playback": {
+    "resumeOnOpen": "Reanudar al abrir",
+    "resumeOnOpenDesc": "Al abrir la app, ofrece continuar el último contenido que estabas viendo",
     "title": "Reproducción",
     "description": "Ajusta la reproducción de video y audio",
     "bufferSize": "Tamaño del Buffer",
@@ -484,6 +486,8 @@
     "note": "Algunas pantallas aún mantienen la paleta clásica por ahora."
   },
   "backup": {
+    "cloudUse": "Guardar en la nube",
+    "cloudSet": "Carpeta de nube configurada ✓",
     "title": "Copia de Seguridad y Restauración",
     "description": "Exporta o restaura tus perfiles, progreso y preferencias",
     "passwordTitle": "Contraseña del backup (opcional)",
@@ -825,6 +829,8 @@
     "streamUnavailable": "Stream no disponible. No se encontró alternativa."
   },
   "home": {
+    "resumeOpenTitle": "¿Continuar donde lo dejaste?",
+    "resumeOpenPlay": "Reanudar",
     "goodMorning": "Buenos días",
     "expiryWarn": "Tu lista expira en {days} día(s) — habla con tu proveedor para renovar.",
     "expiryExpired": "Tu lista expiró — habla con tu proveedor para renovar.",
@@ -1039,6 +1045,13 @@
     "note": "Los filtros de perfil infantil y control parental siguen aplicándose sobre estas opciones."
   },
   "shortcuts": {
+    "seekBack": "Retroceder 10s",
+    "seekForward": "Avanzar 10s",
+    "customize": "Haz clic en una tecla resaltada y pulsa la nueva para personalizar",
+    "pressKey": "Pulsa la nueva tecla (Esc cancela)",
+    "keyInUse": "Esa tecla ya está en uso",
+    "keyReserved": "Esa tecla está reservada",
+    "resetKeys": "Restaurar predeterminado",
     "frameStep": "Fotograma a fotograma (en pausa)",
     "abLoop": "Repetición A-B",
     "bookmark": "Marcar posición",

@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '../services/languageService';
+import { keymapService, type PlayerAction } from '../services/keymapService';
 
 /**
  * Keyboard shortcuts cheatsheet: "?" opens it anywhere in the dashboard
  * (ignored while typing in an input). Esc or clicking outside closes.
+ * As letras do player são personalizáveis: clique na tecla destacada e
+ * pressione a nova (o keymapService valida reservas e conflitos).
  */
 
 interface ShortcutRow {
     keys: string[];
     label: string;
+    /** Ação cuja letra (último kbd da linha) é clicável pra reatribuir. */
+    action?: PlayerAction;
 }
 
 interface ShortcutGroup {
@@ -18,7 +23,16 @@ interface ShortcutGroup {
 
 export function ShortcutsOverlay() {
     const [open, setOpen] = useState(false);
+    const [editing, setEditing] = useState<PlayerAction | null>(null);
+    const [feedback, setFeedback] = useState<string | null>(null);
+    const [letters, setLetters] = useState(() => keymapService.getLetters());
     const { t } = useLanguage();
+
+    useEffect(() => {
+        const refresh = () => setLetters(keymapService.getLetters());
+        window.addEventListener('neostream:keymap', refresh);
+        return () => window.removeEventListener('neostream:keymap', refresh);
+    }, []);
 
     useEffect(() => {
         const onKeyDown = (e: KeyboardEvent) => {
@@ -29,19 +43,43 @@ export function ShortcutsOverlay() {
                 target.tagName === 'SELECT' ||
                 target.isContentEditable
             );
+            // Modo captura de tecla: a próxima tecla vira a nova letra da ação.
+            if (open && editing) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.key === 'Escape') {
+                    setEditing(null);
+                    setFeedback(null);
+                    return;
+                }
+                const result = keymapService.setLetter(editing, e.key);
+                if (result === 'ok') {
+                    setEditing(null);
+                    setFeedback(null);
+                } else if (result === 'conflict') {
+                    setFeedback(t('shortcuts', 'keyInUse'));
+                } else {
+                    setFeedback(t('shortcuts', 'keyReserved'));
+                }
+                return;
+            }
             if (e.key === '?' && !isTyping) {
                 e.preventDefault();
                 setOpen(prev => !prev);
             } else if (e.key === 'Escape' && open) {
                 e.preventDefault();
+                e.stopPropagation();
                 setOpen(false);
             }
         };
-        document.addEventListener('keydown', onKeyDown);
-        return () => document.removeEventListener('keydown', onKeyDown);
-    }, [open]);
+        // Captura: com o overlay aberto, as teclas não vazam pro player.
+        document.addEventListener('keydown', onKeyDown, true);
+        return () => document.removeEventListener('keydown', onKeyDown, true);
+    }, [open, editing, t]);
 
     if (!open) return null;
+
+    const L = (action: PlayerAction) => letters[action].toUpperCase();
 
     const groups: ShortcutGroup[] = [
         {
@@ -55,19 +93,20 @@ export function ShortcutsOverlay() {
         {
             title: t('shortcuts', 'groupPlayer'),
             rows: [
-                { keys: ['Espaço', 'K'], label: t('shortcuts', 'playPause') },
-                { keys: ['←', '→', 'J', 'L'], label: t('shortcuts', 'seek') },
+                { keys: ['Espaço', L('togglePlay')], label: t('shortcuts', 'playPause'), action: 'togglePlay' },
+                { keys: ['←', L('seekBack')], label: t('shortcuts', 'seekBack'), action: 'seekBack' },
+                { keys: ['→', L('seekForward')], label: t('shortcuts', 'seekForward'), action: 'seekForward' },
                 { keys: ['Shift', '←/→'], label: t('shortcuts', 'seek30') },
                 { keys: [',', '.'], label: t('shortcuts', 'frameStep') },
-                { keys: ['B'], label: t('shortcuts', 'abLoop') },
-                { keys: ['X'], label: t('shortcuts', 'bookmark') },
-                { keys: ['Shift', 'X'], label: t('shortcuts', 'bookmarkList') },
-                { keys: ['I'], label: t('shortcuts', 'nerdStats') },
-                { keys: ['S'], label: t('shortcuts', 'screenshot') },
+                { keys: [L('abLoop')], label: t('shortcuts', 'abLoop'), action: 'abLoop' },
+                { keys: [L('bookmark')], label: t('shortcuts', 'bookmark'), action: 'bookmark' },
+                { keys: ['Shift', L('bookmark')], label: t('shortcuts', 'bookmarkList') },
+                { keys: [L('stats')], label: t('shortcuts', 'nerdStats'), action: 'stats' },
+                { keys: [L('screenshot')], label: t('shortcuts', 'screenshot'), action: 'screenshot' },
                 { keys: ['↑', '↓'], label: t('shortcuts', 'volume') },
-                { keys: ['M'], label: t('shortcuts', 'mute') },
-                { keys: ['F'], label: t('shortcuts', 'fullscreen') },
-                { keys: ['C'], label: t('shortcuts', 'subtitles') }
+                { keys: [L('mute')], label: t('shortcuts', 'mute'), action: 'mute' },
+                { keys: [L('fullscreen')], label: t('shortcuts', 'fullscreen'), action: 'fullscreen' },
+                { keys: [L('subtitles')], label: t('shortcuts', 'subtitles'), action: 'subtitles' }
             ]
         },
         {
@@ -87,6 +126,18 @@ export function ShortcutsOverlay() {
             ]
         }
     ];
+
+    const kbdStyle: React.CSSProperties = {
+        padding: '3px 8px',
+        borderRadius: 6,
+        background: 'rgba(255,255,255,0.08)',
+        border: '1px solid rgba(255,255,255,0.2)',
+        borderBottomWidth: 2,
+        color: 'white',
+        fontSize: 11.5,
+        fontFamily: 'inherit',
+        fontWeight: 600
+    };
 
     return (
         <div
@@ -135,30 +186,66 @@ export function ShortcutsOverlay() {
                                     <div key={row.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                                         <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13 }}>{row.label}</span>
                                         <span style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                                            {row.keys.map(key => (
-                                                <kbd
-                                                    key={key}
-                                                    style={{
-                                                        padding: '3px 8px',
-                                                        borderRadius: 6,
-                                                        background: 'rgba(255,255,255,0.08)',
-                                                        border: '1px solid rgba(255,255,255,0.2)',
-                                                        borderBottomWidth: 2,
-                                                        color: 'white',
-                                                        fontSize: 11.5,
-                                                        fontFamily: 'inherit',
-                                                        fontWeight: 600
-                                                    }}
-                                                >
-                                                    {key}
-                                                </kbd>
-                                            ))}
+                                            {row.keys.map((key, index) => {
+                                                const isEditable = !!row.action && index === row.keys.length - 1;
+                                                if (!isEditable) {
+                                                    return <kbd key={`${key}-${index}`} style={kbdStyle}>{key}</kbd>;
+                                                }
+                                                const isEditing = editing === row.action;
+                                                return (
+                                                    <kbd
+                                                        key={`${key}-${index}`}
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        title={t('shortcuts', 'customize')}
+                                                        onClick={() => {
+                                                            setEditing(isEditing ? null : row.action!);
+                                                            setFeedback(null);
+                                                        }}
+                                                        style={{
+                                                            ...kbdStyle,
+                                                            cursor: 'pointer',
+                                                            borderColor: isEditing ? 'var(--ns-accent)' : 'rgba(var(--ns-accent-rgb), 0.55)',
+                                                            background: isEditing ? 'rgba(var(--ns-accent-rgb), 0.3)' : 'rgba(var(--ns-accent-rgb), 0.12)'
+                                                        }}
+                                                    >
+                                                        {isEditing ? '…' : key}
+                                                    </kbd>
+                                                );
+                                            })}
                                         </span>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     ))}
+                </div>
+
+                {/* ⌨️ Personalização das letras do player */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 22, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>
+                        {editing ? t('shortcuts', 'pressKey') : t('shortcuts', 'customize')}
+                        {feedback ? <span style={{ color: '#f87171' }}> · {feedback}</span> : null}
+                    </span>
+                    <button
+                        onClick={() => {
+                            keymapService.resetLetters();
+                            setEditing(null);
+                            setFeedback(null);
+                        }}
+                        style={{
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            borderRadius: 8,
+                            background: 'rgba(255,255,255,0.06)',
+                            color: 'rgba(255,255,255,0.75)',
+                            fontSize: 12,
+                            padding: '6px 12px',
+                            cursor: 'pointer',
+                            flexShrink: 0
+                        }}
+                    >
+                        {t('shortcuts', 'resetKeys')}
+                    </button>
                 </div>
             </div>
         </div>
