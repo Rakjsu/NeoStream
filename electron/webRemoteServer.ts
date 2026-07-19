@@ -14,10 +14,13 @@ import https from 'node:https'
 import crypto from 'node:crypto'
 import os from 'node:os'
 import type { Socket } from 'node:net'
+import path from 'node:path'
+import fs from 'node:fs'
 import { BrowserWindow, ipcMain } from 'electron'
 import Store from 'electron-store'
 import log from './logger'
 import { generateSelfSignedCert } from './selfSignedCert'
+import { recordingsDir } from './dvrHandlers'
 import {
     buildHandshakeResponse,
     encodeTextFrame,
@@ -51,6 +54,9 @@ const store = new Store<{ webRemote: WebRemoteConfig }>({ name: 'web-remote' })
 interface ClientSocket {
     socket: Socket
     buffer: Uint8Array
+    /** 📟 Identificação pro painel de aparelhos conectados. */
+    ip?: string
+    connectedAt?: number
     /** 'mobile' quando o cliente é o app NeoStream Mobile (não a página do navegador). */
     role?: 'mobile'
     name?: string
@@ -234,7 +240,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
     // Correct PIN: clear any accumulated failures for this client.
     pinGate.delete(ip)
     socket.write(buildHandshakeResponse(key))
-    const client: ClientSocket = { socket, buffer: new Uint8Array(0) }
+    const client: ClientSocket = { socket, buffer: new Uint8Array(0), ip, connectedAt: Date.now() }
     clients.add(client)
     // Send the current state + guide snapshot immediately.
     socket.write(encodeTextFrame(stateMessage()))
@@ -281,7 +287,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 }
 
 // Actions that always go to the renderer (never routed to the cast session).
-const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule', 'requestRecordings', 'renameRecording', 'toggleProtectRecording', 'navKey', 'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode', 'sleep', 'requestStats', 'requestReminders', 'cancelReminder'])
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule', 'requestRecordings', 'renameRecording', 'toggleProtectRecording', 'navKey', 'requestFavorites', 'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode', 'sleep', 'requestStats', 'requestReminders', 'cancelReminder'])
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
@@ -369,6 +375,8 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         win.webContents.send('media:control', 'toggleProtectRecording', command.name)
     } else if (command.action === 'navKey') {
         win.webContents.send('media:control', 'navKey', command.key)
+    } else if (command.action === 'requestFavorites') {
+        win.webContents.send('media:control', 'requestFavorites')
     } else if (command.action === 'cancelReminder') {
         win.webContents.send('media:control', 'cancelReminder', command.id)
     } else if (command.action === 'scheduleNext') {
@@ -523,6 +531,24 @@ export function setupWebRemote(): void {
     // fetching that channel's now/next and pushing it here, relayed to phones.
     // 📊 Stats rápidas do renderer → página (hoje / 7 dias / streak).
     // ⏰ Lembretes do renderer pro celular (lista com cancelar remoto).
+    // ⭐ Favoritos do renderer pro app do celular (sync por id do provedor).
+    ipcMain.on('web-remote:favorites', (_e, raw: unknown) => {
+        const payload = (raw ?? {}) as { items?: unknown }
+        const items = Array.isArray(payload.items) ? payload.items.slice(0, 200) : []
+        broadcast(JSON.stringify({ type: 'favorites', items }))
+    })
+
+    // 📟 Item 126: aparelhos conectados no controle web (painel nas Configurações).
+    ipcMain.handle('web-remote:clients-list', () => ({
+        success: true,
+        clients: [...clients].map(c => ({
+            ip: c.ip ?? '?',
+            name: c.name ?? null,
+            role: c.role ?? 'browser',
+            connectedAt: c.connectedAt ?? 0,
+        })),
+    }))
+
     ipcMain.on('web-remote:reminders', (_e, raw: unknown) => {
         const payload = (raw ?? {}) as { items?: unknown }
         const items = Array.isArray(payload.items) ? payload.items.slice(0, 40) : []
@@ -781,6 +807,31 @@ function start(): Promise<void> {
     sessionPin = newPin()
     serverSecure = getConfig().https
     const handler = (req: http.IncomingMessage, res: http.ServerResponse) => {
+        if (req.url && req.url.startsWith('/recording?')) {
+            // ⬇️ Item 122: transfere uma gravação pela LAN (autentica pelo PIN da sessão).
+            const query = new URL(req.url, 'http://localhost').searchParams
+            const pin = query.get('pin') ?? ''
+            const name = path.basename(query.get('name') ?? '')
+            if (!sessionPin || pin !== sessionPin) {
+                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
+                res.end('PIN')
+                return
+            }
+            const file = path.join(recordingsDir(), name)
+            if (!name || !fs.existsSync(file)) {
+                res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
+                res.end('not found')
+                return
+            }
+            res.writeHead(200, {
+                'Content-Type': 'application/octet-stream',
+                'Content-Length': fs.statSync(file).size,
+                'Content-Disposition': `attachment; filename="${encodeURIComponent(name)}"`,
+                'Cache-Control': 'no-store',
+            })
+            fs.createReadStream(file).pipe(res)
+            return
+        }
         if (req.url === '/health') {
             // 🩺 Health-check leve (sem dados sensíveis): monitoração/diagnóstico na LAN.
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })

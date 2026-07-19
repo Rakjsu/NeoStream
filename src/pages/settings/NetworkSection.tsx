@@ -6,10 +6,28 @@ import { qrToSvg } from '../../utils/qrEncoder';
 export function NetworkSection() {
     const [allowInvalidProviderCertificates, setAllowInvalidProviderCertificates] = useState(true);
     const [webRemote, setWebRemote] = useState<{ enabled: boolean; https: boolean; url: string | null; pin: string | null }>({ enabled: false, https: false, url: null, pin: null });
+    // 📟 Aparelhos conectados no controle web (polling leve enquanto ligado).
+    const [remoteClients, setRemoteClients] = useState<{ ip: string; name: string | null; role: string; connectedAt: number }[]>([]);
     const { t } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
 
     // Offline QR of the LAN URL (own pure encoder — no lib, no network).
+    useEffect(() => {
+        if (!webRemote.enabled) {
+            queueMicrotask(() => setRemoteClients([]));
+            return;
+        }
+        let cancelled = false;
+        const load = async () => {
+            const res = await window.ipcRenderer.invoke('web-remote:clients-list').catch(() => null) as
+                { success?: boolean; clients?: { ip: string; name: string | null; role: string; connectedAt: number }[] } | null;
+            if (!cancelled && res?.success) setRemoteClients(res.clients ?? []);
+        };
+        void load();
+        const id = setInterval(load, 5000);
+        return () => { cancelled = true; clearInterval(id); };
+    }, [webRemote.enabled]);
+
     const webRemoteQr = useMemo(() => {
         if (!webRemote.url) return null;
         try {
@@ -156,6 +174,19 @@ export function NetworkSection() {
                                 </div>
                             )}
                             <p style={{ marginTop: 8, fontSize: 12, opacity: 0.7 }}>{t('network', 'webRemoteQrHint')}</p>
+                            <div style={{ marginTop: 12 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600 }}>📟 {t('network', 'devicesTitle')}</div>
+                                {remoteClients.length === 0 ? (
+                                    <p style={{ margin: '4px 0', fontSize: 12, opacity: 0.7 }}>{t('network', 'devicesEmpty')}</p>
+                                ) : remoteClients.map((c, index) => (
+                                    <p key={`${c.ip}-${index}`} style={{ margin: '4px 0', fontSize: 12 }}>
+                                        {c.role === 'mobile' ? '📱' : '🌐'} {c.name || c.ip}
+                                        <span style={{ opacity: 0.6 }}>
+                                            {' '}· {c.ip} · {c.connectedAt ? new Date(c.connectedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                        </span>
+                                    </p>
+                                ))}
+                            </div>
                             <label style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                                 <input
                                     type="checkbox"

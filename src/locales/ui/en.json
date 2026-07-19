@@ -345,6 +345,8 @@
     "webRemotePin": "Pairing PIN",
     "webRemoteHint": "Keep the app open on the computer. Phone and PC on the same Wi-Fi. If it won't open, allow the app through Windows Firewall (private network).",
     "webRemoteQrHint": "Point your phone camera at the code, or open the URL. The PIN shows when you connect.",
+    "devicesTitle": "Connected devices",
+    "devicesEmpty": "No device connected right now.",
     "webRemoteHttps": "Encrypted connection (HTTPS)",
     "webRemoteHttpsHint": "Uses a self-signed certificate: your phone shows a one-time security warning — just accept it. Encrypts traffic on the local network.",
     "webRemoteNewPin": "New PIN"

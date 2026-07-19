@@ -55,6 +55,7 @@ const invokeChannels = new Set([
     'diagnostics:provider-health',
     'diagnostics:probe-urls',
     'diagnostics:export-log',
+    'web-remote:clients-list',
     'diagnostics:open-logs',
     'dlna:add-device',
     'dlna:cast',
