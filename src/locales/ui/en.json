@@ -1,4 +1,8 @@
 {
+  "myListPage": {
+    "tabFavorites": "Favorites",
+    "tabWatchLater": "Watch later"
+  },
   "nav": {
     "updates": "Updates",
     "backup": "Backup",
