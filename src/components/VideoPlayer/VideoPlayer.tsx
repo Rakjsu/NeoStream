@@ -14,6 +14,7 @@ import { useSubtitleManager } from './useSubtitleManager';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { clampBoost, cycleAbState, abLoopTarget, type AbLoopState, filterCssOf, nextVideoFilter } from './playerExtras';
 import { bookmarkService, type VideoBookmark } from '../../services/bookmarkService';
+import { traktScrobble } from '../../services/traktService';
 import { loadSubtitleStyle, type SubtitleStyle } from '../../utils/subtitleStyle';
 import { PlayerSettingsMenu } from './PlayerSettingsMenu';
 import { useSleepTimer, formatSleepCountdown } from './useSleepTimer';
@@ -380,6 +381,41 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
 
     // 🔁 Repetição A-B (tecla B cicla A → A-B → limpo); volta pro A ao passar do B.
     const [abLoop, setAbLoop] = useState<AbLoopState>({ a: null, b: null });
+    // 📡 Trakt "assistindo agora": start ao abrir, pause com o progresso ao
+    // sair (sem conexão as chamadas são no-op). Episódios usam os números
+    // reais das props; o showTitle tira o sufixo SxxEyy do título composto.
+    const traktProgressRef = useRef(0);
+    useEffect(() => {
+        if (state.duration > 0) traktProgressRef.current = (state.currentTime / state.duration) * 100;
+    }, [state.currentTime, state.duration]);
+    useEffect(() => {
+        if (!title || (contentType !== 'movie' && contentType !== 'series')) return;
+        const target = contentType === 'movie'
+            ? { kind: 'movie' as const, title }
+            : (seasonNumber != null && episodeNumber != null
+                ? {
+                    kind: 'episode' as const,
+                    showTitle: title.replace(/\s*[-–—·:]?\s*S\d{1,2}\s*E\d{1,3}.*$/i, '').trim() || title,
+                    season: seasonNumber,
+                    episode: episodeNumber,
+                }
+                : null);
+        if (!target) return;
+        void traktScrobble(target, 'start', 0);
+        return () => {
+            void traktScrobble(target, 'pause', traktProgressRef.current);
+        };
+    }, [contentType, title, seasonNumber, episodeNumber]);
+    // ✓ Confirmação visível quando o visto sincroniza no Trakt.
+    const [traktToast, setTraktToast] = useState(false);
+    useEffect(() => {
+        const onSynced = () => {
+            setTraktToast(true);
+            setTimeout(() => setTraktToast(false), 3500);
+        };
+        window.addEventListener('trakt:synced', onSynced);
+        return () => window.removeEventListener('trakt:synced', onSynced);
+    }, []);
     // ✂️ Exporta o intervalo A–B como clipe (ffmpeg -c copy no main).
     const [clipStatus, setClipStatus] = useState<'idle' | 'busy' | 'ok' | 'fail'>('idle');
     const exportClip = useCallback(async () => {
@@ -985,6 +1021,17 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             {clipStatus === 'busy' ? '⏳' : clipStatus === 'ok' ? '✅' : clipStatus === 'fail' ? '⚠️' : '✂️'}
                         </button>
                     )}
+                </div>
+            )}
+
+            {/* 🎬 Visto sincronizado no Trakt. */}
+            {traktToast && (
+                <div style={{
+                    position: 'absolute', top: 94, right: 70, zIndex: 1100,
+                    background: 'rgba(237, 28, 36, 0.85)', borderRadius: 8,
+                    padding: '4px 10px', fontSize: 12, fontWeight: 700, color: 'white'
+                }}>
+                    ✓ Visto no Trakt
                 </div>
             )}
 

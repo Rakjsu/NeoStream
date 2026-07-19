@@ -236,6 +236,37 @@ export async function syncTraktEpisodeWatched(showTitle: string, season: number,
     }
 }
 
+/**
+ * 📡 Scrobble em tempo real: start ao abrir o player, pause com o progresso ao
+ * sair — o Trakt mostra "assistindo agora". O visto final continua indo pelo
+ * /sync/history (gatilho de 85% do progresso local) — stop aqui duplicaria o play.
+ */
+export async function traktScrobble(
+    target: { kind: 'movie'; title: string } | { kind: 'episode'; showTitle: string; season: number; episode: number },
+    action: 'start' | 'pause',
+    progress: number
+): Promise<boolean> {
+    const token = getToken();
+    const { clientId } = getTraktCreds();
+    if (!token || !clientId) return false;
+    try {
+        let piece: Record<string, unknown> | null = null;
+        if (target.kind === 'movie') {
+            const ids = await resolveMovieIds(target.title, clientId, token.access);
+            if (ids) piece = { movie: { ids } };
+        } else {
+            const ids = await resolveShowIds(target.showTitle, clientId, token.access);
+            if (ids) piece = { show: { ids }, episode: { season: target.season, number: target.episode } };
+        }
+        if (!piece) return false;
+        const clamped = Math.max(0, Math.min(100, Math.round(progress)));
+        await traktPost(`/scrobble/${action}`, { ...piece, progress: clamped }, clientId, token.access);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
 /** Username da conta conectada (GET /users/me) — '' se desconectado/erro. */
 export async function fetchTraktProfile(): Promise<string> {
     const token = getToken();
