@@ -1098,6 +1098,11 @@
     "cancelRecording": "Cancelar gravação"
   },
   "sort": {
+    "duration": "Duração",
+    "allDurations": "Qualquer duração",
+    "durShort": "Até 90 min",
+    "durMedium": "90–120 min",
+    "durLong": "Mais de 2h",
     "title": "Ordenar por",
     "recent": "Mais recentes",
     "name": "Nome (A–Z)",

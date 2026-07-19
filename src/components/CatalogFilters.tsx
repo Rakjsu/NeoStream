@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useLanguage } from '../services/languageService';
-import { listDecades, listGenres, type FilterableItem } from '../utils/catalogFilter';
+import { listDecades, listGenres, type DurationBucket, type FilterableItem } from '../utils/catalogFilter';
 
 interface CatalogFiltersProps {
     items: FilterableItem[];
@@ -8,6 +8,9 @@ interface CatalogFiltersProps {
     genre: string | null;
     onDecade: (decade: number | null) => void;
     onGenre: (genre: string | null) => void;
+    /** ⏳ Item 37: filtro por duração (só o VOD passa — séries não usam). */
+    duration?: DurationBucket | null;
+    onDuration?: (bucket: DurationBucket | null) => void;
     /** Borda direita do select de década (o de gênero fica à esquerda dele). */
     right?: number;
 }
@@ -31,10 +34,15 @@ function selectStyle(right: number) {
 }
 
 /** Filtros de década e gênero das grades de catálogo — par visual do SortSelect. */
-export function CatalogFilters({ items, decade, genre, onDecade, onGenre, right = 215 }: CatalogFiltersProps) {
+export function CatalogFilters({ items, decade, genre, onDecade, onGenre, duration = null, onDuration, right = 215 }: CatalogFiltersProps) {
     const { t } = useLanguage();
     const decades = useMemo(() => listDecades(items), [items]);
     const genres = useMemo(() => listGenres(items), [items]);
+    // Só oferece o filtro quando o catálogo realmente traz duração.
+    const hasDurations = useMemo(
+        () => !!onDuration && items.some(item => parseInt(String((item as { episode_run_time?: string | number }).episode_run_time ?? ''), 10) > 0),
+        [items, onDuration]
+    );
     return (
         <>
             {decades.length >= 2 && (
@@ -57,6 +65,19 @@ export function CatalogFilters({ items, decade, genre, onDecade, onGenre, right 
                 >
                     <option value="">{t('sort', 'allGenres')}</option>
                     {genres.map(item => <option key={item} value={item}>{item}</option>)}
+                </select>
+            )}
+            {hasDurations && onDuration && (
+                <select
+                    value={duration ?? ''}
+                    onChange={(e) => onDuration((e.target.value || null) as DurationBucket | null)}
+                    title={t('sort', 'duration')}
+                    style={selectStyle(right + 256)}
+                >
+                    <option value="">{t('sort', 'allDurations')}</option>
+                    <option value="short">{t('sort', 'durShort')}</option>
+                    <option value="medium">{t('sort', 'durMedium')}</option>
+                    <option value="long">{t('sort', 'durLong')}</option>
                 </select>
             )}
         </>
