@@ -871,6 +871,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
         fhtml += '<div class="chitem"><div class="ph">📼</div>'
           + '<div class="nm">' + (f.locked ? '\ud83d\udd10 ' : '') + esc(f.name) + '</div>'
           + '<span style="flex:none;font-size:12px;color:rgba(255,255,255,.5)">' + (f.sizeMb || 0) + ' MB</span>'
+          + '<a class="chinfo" style="text-decoration:none" href="/recording?name=' + encodeURIComponent(f.name) + '&pin=' + encodeURIComponent(localStorage.getItem('neostream_remote_pin') || '') + '" download title="' + L.recDownload + '">\u2b07\ufe0f</a>'
           + '<button class="chinfo" data-ren="' + esc(f.name) + '" title="' + L.recRename + '">\u270f\ufe0f</button>'
           + '<button class="chinfo" data-lock="' + esc(f.name) + '" title="' + L.recProtect + '">' + (f.locked ? '\ud83d\udd10' : '\ud83d\udd13') + '</button>'
           + '<button class="chinfo" data-del="' + esc(f.name) + '" title="' + (confirming ? L.recDeleteConfirm : L.recDelete) + '"'

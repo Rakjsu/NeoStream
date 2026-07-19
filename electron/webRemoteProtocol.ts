@@ -151,11 +151,12 @@ export type RemoteCommand =
     | { action: 'renameRecording'; name: string; newName: string }
     | { action: 'toggleProtectRecording'; name: string }
     | { action: 'navKey'; key: 'up' | 'down' | 'left' | 'right' | 'ok' | 'back' }
+    | { action: 'requestFavorites' }
 
 const VALID_ACTIONS = new Set([
     'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'setVolume', 'setAudioTrack', 'playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule',
     'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestRecordings', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
-    'sleep', 'requestStats', 'focusApp', 'requestReminders', 'cancelReminder', 'openMultiview', 'screenshot', 'renameRecording', 'toggleProtectRecording', 'navKey',
+    'sleep', 'requestStats', 'focusApp', 'requestReminders', 'cancelReminder', 'openMultiview', 'screenshot', 'renameRecording', 'toggleProtectRecording', 'navKey', 'requestFavorites',
 ])
 
 const CAST_TARGET_TYPES = new Set<CastTargetType>(['chromecast', 'dlna', 'airplay'])

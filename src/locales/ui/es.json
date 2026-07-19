@@ -313,6 +313,8 @@
     "webRemotePin": "PIN de emparejamiento",
     "webRemoteHint": "Mantén la app abierta en el ordenador. Móvil y PC en la misma Wi-Fi. Si no abre, permite la app en el Firewall de Windows (red privada).",
     "webRemoteQrHint": "Apunta la cámara del móvil al código, o abre la URL. El PIN aparece al conectar.",
+    "devicesTitle": "Dispositivos conectados",
+    "devicesEmpty": "Ningún dispositivo conectado ahora.",
     "webRemoteHttps": "Conexión cifrada (HTTPS)",
     "webRemoteHttpsHint": "Usa un certificado propio: el móvil muestra un aviso de seguridad una vez, solo acéptalo. Cifra el tráfico en la red local.",
     "webRemoteNewPin": "Nuevo PIN"

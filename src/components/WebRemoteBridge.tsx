@@ -6,6 +6,7 @@ import { scheduledRecordingService } from '../services/scheduledRecordingService
 import { movieProgressService } from '../services/movieProgressService';
 import { usageStatsService } from '../services/usageStatsService';
 import { reminderService } from '../services/reminderService';
+import { favoritesService } from '../services/favoritesService';
 import { getHomeRecommendations, type RecMovie, type RecSeries } from '../services/recommendationService';
 
 /**
@@ -448,6 +449,13 @@ export function WebRemoteBridge() {
             void pushRecordings();
         };
 
+        // ⭐ Favoritos pro app do celular (ids do provedor — mesmo servidor casa direto).
+        const pushFavorites = () => {
+            const items = favoritesService.getAll().slice(0, 200)
+                .map(f => ({ id: f.id, type: f.type, title: f.title }));
+            window.ipcRenderer.send('web-remote:favorites', { items });
+        };
+
         // 🖐️ Trackpad do celular: swipes viram teclas de navegação no app.
         const dispatchNavKey = (key: string) => {
             const keyMap: Record<string, string> = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', ok: 'Enter', back: 'Escape' };
@@ -509,6 +517,7 @@ export function WebRemoteBridge() {
             else if (action === 'renameRecording') void renameRecording(String(arg ?? ''), String(target ?? ''));
             else if (action === 'toggleProtectRecording') void toggleProtect(String(arg ?? ''));
             else if (action === 'navKey') dispatchNavKey(String(arg ?? ''));
+            else if (action === 'requestFavorites') pushFavorites();
             else if (action === 'requestRecordings') void pushRecordings();
             else if (action === 'cancelSchedule') cancelSchedule(String(arg ?? ''));
             else if (action === 'castMovie') void castMovie(String(arg ?? ''), asTarget(target));

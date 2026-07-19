@@ -76,6 +76,7 @@ describe('parseRemoteCommand', () => {
         expect(parseRemoteCommand('{"action":"toggleProtectRecording","name":"a.ts"}')).toEqual({ action: 'toggleProtectRecording', name: 'a.ts' })
         expect(parseRemoteCommand('{"action":"navKey","key":"up"}')).toEqual({ action: 'navKey', key: 'up' })
         expect(parseRemoteCommand('{"action":"navKey","key":"hack"}')).toBeNull()
+        expect(parseRemoteCommand('{"action":"requestFavorites"}')).toEqual({ action: 'requestFavorites' })
         expect(parseRemoteCommand('{"action":"subtitle"}')).toEqual({ action: 'subtitle' })
         expect(parseRemoteCommand('{"action":"seek","seconds":30}')).toEqual({ action: 'seek', seconds: 30 })
     })
