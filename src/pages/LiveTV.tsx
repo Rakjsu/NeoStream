@@ -117,6 +117,26 @@ export function LiveTV() {
     // (avoids re-subscribing the media:control listener on every zap) + the
     // last-pushed signature so we don't spam identical guides down the socket.
     const zapStreamsRef = useRef<LiveStream[]>([]);
+    // 📺 Item 32: troca pro canal do lembrete quando o toast global manda.
+    const consumePendingTune = useCallback(() => {
+        let id = '';
+        try {
+            id = sessionStorage.getItem('neostream_pending_tune') ?? '';
+        } catch { return; }
+        if (!id) return;
+        const channel = zapStreamsRef.current.find(s => String(s.stream_id) === id);
+        if (!channel) return;
+        try { sessionStorage.removeItem('neostream_pending_tune'); } catch { /* ok */ }
+        queueMicrotask(() => {
+            setSelectedChannel(null);
+            setPlayingChannel(channel);
+        });
+    }, []);
+    useEffect(() => {
+        const onTunePending = () => consumePendingTune();
+        window.addEventListener('live:tune-pending', onTunePending);
+        return () => window.removeEventListener('live:tune-pending', onTunePending);
+    }, [consumePendingTune]);
     const lastGuideSigRef = useRef<string>('');
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const [allowedCategoryIds, setAllowedCategoryIds] = useState<Set<string>>(new Set());
@@ -551,6 +571,8 @@ export function LiveTV() {
         // Keep the tap-to-switch handler's channel list fresh (mutated here in
         // an effect, never during render).
         zapStreamsRef.current = filteredStreams;
+        // 📺 Item 32: sintonia pendente do lembrete (setada pelo toast global).
+        consumePendingTune();
         const channels = filteredStreams.map(s => ({
             id: String(s.stream_id),
             name: s.name,

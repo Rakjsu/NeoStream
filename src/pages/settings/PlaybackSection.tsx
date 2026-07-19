@@ -20,6 +20,8 @@ export function PlaybackSection() {
     const [refreshInterval, setRefreshInterval] = useState<RefreshIntervalHours>(() => catalogRefreshService.getIntervalHours());
     const [notifyNewEpisodes, setNotifyNewEpisodes] = useState<boolean>(() => newEpisodeNotifier.isEnabled());
     const [resumeOnOpen, setResumeOnOpen] = useState<boolean>(() => localStorage.getItem('neostream_resume_on_open') !== '0');
+    // 📺 Item 32: lembrete troca de canal sozinho (aviso de 10s pra cancelar).
+    const [reminderAutoTune, setReminderAutoTune] = useState<boolean>(() => localStorage.getItem('neostream_reminder_autotune') !== '0');
     const [groupVersions, setGroupVersions] = useState<boolean>(() => localStorage.getItem('neostream_group_versions') !== '0');
     const [screensaverMin, setScreensaverMin] = useState<number>(() => parseInt(localStorage.getItem(SCREENSAVER_MINUTES_KEY) || '0', 10) || 0);
     const [playbackConfig, setPlaybackConfig] = useState<PlaybackConfig>(playbackService.getConfig());
@@ -167,6 +169,25 @@ export function PlaybackSection() {
                             onChange={(e) => {
                                 localStorage.setItem('neostream_resume_on_open', e.target.checked ? '1' : '0');
                                 setResumeOnOpen(e.target.checked);
+                            }}
+                        />
+                        <span className="toggle-slider"></span>
+                    </label>
+                </div>
+
+                {/* 📺 Lembrete sintoniza sozinho (aviso de 10s pra cancelar) */}
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>{t('playback', 'reminderAutoTune')}</label>
+                        <p>{t('playback', 'reminderAutoTuneDesc')}</p>
+                    </div>
+                    <label className="toggle-switch">
+                        <input
+                            type="checkbox"
+                            checked={reminderAutoTune}
+                            onChange={(e) => {
+                                localStorage.setItem('neostream_reminder_autotune', e.target.checked ? '1' : '0');
+                                setReminderAutoTune(e.target.checked);
                             }}
                         />
                         <span className="toggle-slider"></span>

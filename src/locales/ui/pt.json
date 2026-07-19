@@ -557,6 +557,8 @@
     "version": "Versão"
   },
   "playback": {
+    "reminderAutoTune": "Lembrete sintoniza sozinho",
+    "reminderAutoTuneDesc": "Quando um lembrete de programa disparar, troca pro canal após um aviso de 10 segundos (dá pra cancelar)",
     "groupVersions": "Agrupar versões de filme",
     "groupVersionsDesc": "Um card por filme (4K/FHD/HD/legendado juntos) com seletor de versão na ficha",
     "resumeOnOpen": "Retomar ao abrir",
@@ -745,6 +747,9 @@
     "streamUnavailable": "Stream indisponível. Nenhuma alternativa encontrada."
   },
   "notifications": {
+    "autoTuneIn": "Trocando pra {channel} em {s}s…",
+    "autoTuneNow": "Assistir agora",
+    "autoTuneCancel": "Cancelar",
     "title": "Notificações",
     "tooltip": "Notificações",
     "new": "nova",

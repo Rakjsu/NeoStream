@@ -285,6 +285,9 @@
     "removeError": "Could not remove the playlist."
   },
   "notifications": {
+    "autoTuneIn": "Switching to {channel} in {s}s…",
+    "autoTuneNow": "Watch now",
+    "autoTuneCancel": "Cancel",
     "title": "Notifications",
     "tooltip": "Notifications",
     "new": "new",
@@ -396,6 +399,8 @@
     "checking": "Checking..."
   },
   "playback": {
+    "reminderAutoTune": "Reminder auto-tunes",
+    "reminderAutoTuneDesc": "When a program reminder fires, switch to the channel after a 10-second warning (cancellable)",
     "groupVersions": "Group movie versions",
     "groupVersionsDesc": "One card per movie (4K/FHD/HD/subtitled together) with a version picker in the details",
     "resumeOnOpen": "Resume on launch",
