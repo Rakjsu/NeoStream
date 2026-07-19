@@ -10,6 +10,9 @@ export interface PlayerChannel {
     favorite?: boolean;
     /** Direct play URL (M3U playlists) — used by the PiP zap. */
     directUrl?: string;
+    /** ⏱️ Posição no histórico de zapping (0 = mais recente) — liga os chips
+     *  "Recentes" do overlay sem precisar de prop nova no player. */
+    recentRank?: number;
 }
 
 interface ChannelZapOverlayProps {
@@ -34,6 +37,14 @@ export function ChannelZapOverlay({ channels, currentId, visible, onSelect, onCl
     const [query, setQuery] = useState('');
     const [onlyFavorites, setOnlyFavorites] = useState(false);
     const hasFavorites = useMemo(() => channels.some(ch => ch.favorite), [channels]);
+
+    // ⏱️ Últimos canais zapeados (sem o atual), mais recente primeiro.
+    const recents = useMemo(() =>
+        channels
+            .filter(ch => ch.recentRank !== undefined && ch.id !== currentId)
+            .sort((a, b) => (a.recentRank ?? 0) - (b.recentRank ?? 0))
+            .slice(0, 6),
+    [channels, currentId]);
 
     const normalized = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
     const filtered = useMemo(() => {
@@ -158,6 +169,46 @@ export function ChannelZapOverlay({ channels, currentId, visible, onSelect, onCl
                     }}
                 />
             </div>
+            {recents.length > 0 && !query.trim() && !onlyFavorites && (
+                <div style={{ padding: '0 16px 10px' }}>
+                    <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
+                        ⏱️ Recentes
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {recents.map(ch => (
+                            <button
+                                key={`recent-${ch.id}`}
+                                onClick={() => onSelect(ch.id)}
+                                title={ch.name}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    padding: '5px 10px',
+                                    borderRadius: 16,
+                                    border: '1px solid rgba(var(--ns-accent-rgb), 0.35)',
+                                    background: 'rgba(var(--ns-accent-rgb), 0.12)',
+                                    color: 'white',
+                                    fontSize: 12,
+                                    cursor: 'pointer',
+                                    maxWidth: 150
+                                }}
+                            >
+                                {ch.logo && (
+                                    <img
+                                        src={ch.logo}
+                                        alt=""
+                                        style={{ width: 16, height: 16, objectFit: 'contain', flexShrink: 0 }}
+                                        loading="lazy"
+                                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                    />
+                                )}
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ch.name}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
             <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '0 12px 16px' }}>
                 {filtered.length === 0 && (
                     <div style={{ padding: 16, textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>
