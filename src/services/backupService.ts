@@ -68,6 +68,7 @@ const EXACT_KEYS = [
     'neostream_tmdb_api_key', // the user's own TMDB key (v3) — also synced
     'neostream_keymap_v1',    // atalhos de teclado personalizados do player
     'neostream_resume_on_open', // toggle "retomar ao abrir"
+    'neostream_cinema_mode',  // 🎬 modo cinema do player (item 29)
 ];
 
 // Keys included when they start with one of these prefixes
