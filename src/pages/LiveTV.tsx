@@ -12,6 +12,8 @@ import { epgService } from '../services/epgService';
 import { scheduledRecordingService } from '../services/scheduledRecordingService';
 import { profileService } from '../services/profileService';
 import { favoritesService } from '../services/favoritesService';
+import { FavoritesMosaic } from '../components/FavoritesMosaic';
+import { pickMosaicChannels } from '../utils/mosaic';
 import { hiddenChannelsService } from '../services/hiddenChannelsService';
 import { zapHistoryService } from '../services/zapHistoryService';
 import { parentalService } from '../services/parentalService';
@@ -155,6 +157,8 @@ export function LiveTV() {
     // 📱 Feedback do "enviar pro celular" (app mobile conectado no controle web)
     const [sendMobileMsg, setSendMobileMsg] = useState('');
     // Favorite channel ids (⭐): re-read whenever the star toggles.
+    // 🧩 Item 33: mosaico de miniaturas dos favoritos (rodizio de capturas).
+    const [showFavMosaic, setShowFavMosaic] = useState(false);
     const [favoriteChannelIds, setFavoriteChannelIds] = useState<Set<string>>(() =>
         new Set(favoritesService.getAll().filter(f => f.type === 'channel').map(f => f.id)));
     // 📅 Filtro "só canais com EPG mapeado" (epg_channel_id) — persistido.
@@ -1168,6 +1172,25 @@ export function LiveTV() {
                 >
                     🔲 Multi-view
                 </button>
+                {favoriteChannelIds.size > 0 && (
+                    <button
+                        onClick={() => setShowFavMosaic(true)}
+                        title={t('favMosaic', 'hint')}
+                        style={{
+                            padding: '9px 16px',
+                            borderRadius: 12,
+                            border: '1px solid rgba(var(--ns-accent-rgb), 0.5)',
+                            background: 'rgba(var(--ns-accent-rgb), 0.15)',
+                            color: 'var(--ns-accent-light)',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        🧩 {t('favMosaic', 'title')}
+                    </button>
+                )}
                 {selectedCategory === 'FAVORITES' && (
                     <button
                         onClick={() => { void checkFavorites(); }}
@@ -2095,6 +2118,19 @@ export function LiveTV() {
                 />
             )}
 
+            {/* 🧩 Item 33: mosaico de miniaturas dos favoritos */}
+            {showFavMosaic && (
+                <FavoritesMosaic
+                    channels={pickMosaicChannels(variantsResult.groups, favoriteChannelIds)}
+                    buildStreamUrl={buildLiveStreamUrl}
+                    onTune={(channel) => {
+                        setShowFavMosaic(false);
+                        setSelectedChannel(null);
+                        setPlayingChannel(channel);
+                    }}
+                    onClose={() => setShowFavMosaic(false)}
+                />
+            )}
             {showMultiView && (
                 <MultiView
                     channels={(() => {

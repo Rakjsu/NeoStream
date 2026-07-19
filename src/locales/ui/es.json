@@ -570,6 +570,11 @@
     "openLogsDesc": "Abre la carpeta donde se escribe main.log",
     "openLogsError": "No se pudo abrir la carpeta de registros"
   },
+  "favMosaic": {
+    "title": "Mosaico de favoritos",
+    "hint": "Las miniaturas se actualizan solas: haz clic en un canal para verlo",
+    "close": "Cerrar"
+  },
   "epg": {
     "title": "Guía de Programación (EPG)",
     "description": "Prueba y diagnóstico de fuentes EPG",
