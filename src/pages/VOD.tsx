@@ -495,28 +495,36 @@ export function VOD() {
                     onChange={setSearchQuery}
                     placeholder={t('login', 'searchMovies')}
                 />
-                <SortSelect value={sortBy} onChange={setSortBy} />
-                <CatalogFilters items={streams} decade={decade} genre={genreFilter} onDecade={setDecade} onGenre={setGenreFilter} duration={durationFilter} onDuration={setDurationFilter} />
-                <button
-                    onClick={() => {
-                        const next = !hideWatched;
-                        setHideWatchedState(next);
-                        if (next) localStorage.setItem('neostream_hide_watched', 'on');
-                        else localStorage.removeItem('neostream_hide_watched');
-                    }}
-                    title={t('contentModal', 'hideWatchedHint')}
-                    style={{
-                        position: 'absolute', top: 30, right: 235, zIndex: 95,
-                        padding: '9px 12px', borderRadius: 12,
-                        border: hideWatched ? '1px solid rgba(var(--ns-accent-rgb), 0.5)' : '1px solid rgba(255, 255, 255, 0.18)',
-                        background: hideWatched ? 'rgba(var(--ns-accent-rgb), 0.2)' : 'rgba(15, 15, 35, 0.85)',
-                        color: hideWatched ? 'var(--ns-accent-light)' : 'rgba(255, 255, 255, 0.85)',
-                        fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                        backdropFilter: 'blur(8px)', whiteSpace: 'nowrap'
-                    }}
-                >
-                    {t('contentModal', 'hideWatched')}
-                </button>
+                {/* Toolbar única de filtros: flex com wrap — os offsets fixos
+                    antigos assumiam larguras dos vizinhos e sobrepunham. */}
+                <div style={{
+                    position: 'absolute', top: 30, right: 90, zIndex: 95,
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    flexWrap: 'wrap', justifyContent: 'flex-end',
+                    maxWidth: 'calc(100% - 330px)'
+                }}>
+                    <CatalogFilters items={streams} decade={decade} genre={genreFilter} onDecade={setDecade} onGenre={setGenreFilter} duration={durationFilter} onDuration={setDurationFilter} inline />
+                    <button
+                        onClick={() => {
+                            const next = !hideWatched;
+                            setHideWatchedState(next);
+                            if (next) localStorage.setItem('neostream_hide_watched', 'on');
+                            else localStorage.removeItem('neostream_hide_watched');
+                        }}
+                        title={t('contentModal', 'hideWatchedHint')}
+                        style={{
+                            padding: '9px 12px', borderRadius: 12,
+                            border: hideWatched ? '1px solid rgba(var(--ns-accent-rgb), 0.5)' : '1px solid rgba(255, 255, 255, 0.18)',
+                            background: hideWatched ? 'rgba(var(--ns-accent-rgb), 0.2)' : 'rgba(15, 15, 35, 0.85)',
+                            color: hideWatched ? 'var(--ns-accent-light)' : 'rgba(255, 255, 255, 0.85)',
+                            fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                            backdropFilter: 'blur(8px)', whiteSpace: 'nowrap'
+                        }}
+                    >
+                        {t('contentModal', 'hideWatched')}
+                    </button>
+                    <SortSelect value={sortBy} onChange={setSortBy} inline />
+                </div>
 
                 <CategoryMenu
                     onSelectCategory={setSelectedCategory}
