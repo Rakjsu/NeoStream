@@ -8,6 +8,7 @@ import { usageStatsService } from '../services/usageStatsService';
 import { reminderService } from '../services/reminderService';
 import { favoritesService } from '../services/favoritesService';
 import { getHomeRecommendations, type RecMovie, type RecSeries } from '../services/recommendationService';
+import { queueService } from '../services/queueService';
 import { downloadService } from '../services/downloadService';
 
 /**
@@ -598,6 +599,12 @@ export function WebRemoteBridge() {
             else if (action === 'requestRecordings') void pushRecordings();
             else if (action === 'cancelSchedule') cancelSchedule(String(arg ?? ''));
             else if (action === 'castMovie') void castMovie(String(arg ?? ''), asTarget(target));
+            // 🎉 Item 40 (modo festa): o filme cai na fila manual da TV — o
+            // VOD toca o próximo da fila quando o atual termina (item 32).
+            else if (action === 'partyAdd') {
+                const movie = moviesRef.current.get(String(arg ?? ''));
+                if (movie) queueService.add({ id: String(movie.stream_id), name: movie.name, cover: movie.stream_icon });
+            }
             else if (action === 'castMovieQueue') void castMovieQueue(Array.isArray(arg) ? (arg as string[]) : [], asTarget(target));
             else if (action === 'requestSeries') void pushSeries(typeof arg === 'string' ? arg : '');
             else if (action === 'requestSeriesInfo') void pushSeriesInfo(String(arg ?? ''));

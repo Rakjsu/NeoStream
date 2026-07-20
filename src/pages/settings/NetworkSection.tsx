@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useLanguage } from '../../services/languageService';
 import { useSaveAnimation } from './useSaveAnimation';
 import { qrToSvg } from '../../utils/qrEncoder';
+import { buildRemoteWsUrl, parsePeerState, sendPeerCommand, type RemotePeerState } from '../../services/desktopRemoteClient';
 
 export function NetworkSection() {
     const [allowInvalidProviderCertificates, setAllowInvalidProviderCertificates] = useState(true);
@@ -12,6 +13,31 @@ export function NetworkSection() {
     const [connectionHistory, setConnectionHistory] = useState<{ name: string | null; ip: string; role: string; at: number; event: string }[]>([]);
     const { t } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
+
+    // 🖥️ Item 38: PC controla PC — cliente WS do controle web de outro NeoStream.
+    const [peerAddr, setPeerAddr] = useState('');
+    const [peerPin, setPeerPin] = useState('');
+    const [peerSocket, setPeerSocket] = useState<WebSocket | null>(null);
+    const [peerState, setPeerState] = useState<RemotePeerState | null>(null);
+    const [peerError, setPeerError] = useState<string | null>(null);
+    const connectPeer = () => {
+        setPeerError(null);
+        try {
+            const socket = new WebSocket(buildRemoteWsUrl(peerAddr, peerPin));
+            socket.onopen = () => setPeerSocket(socket);
+            socket.onmessage = (event) => {
+                const state = parsePeerState(String(event.data));
+                if (state) setPeerState(state);
+            };
+            socket.onerror = () => setPeerError('Não conectou — confira endereço, PIN e se o controle está ativado no outro PC.');
+            socket.onclose = () => { setPeerSocket(null); setPeerState(null); };
+        } catch {
+            setPeerError('Endereço inválido.');
+        }
+    };
+    const disconnectPeer = () => { peerSocket?.close(); };
+    // Desmontar a página fecha o socket (sem vazamento).
+    useEffect(() => () => { peerSocket?.close(); }, [peerSocket]);
 
     // Offline QR of the LAN URL (own pure encoder — no lib, no network).
     useEffect(() => {
@@ -230,6 +256,59 @@ export function NetworkSection() {
                         </div>
                     </div>
                 )}
+
+                {/* 🖥️ Item 38: este PC controla OUTRO NeoStream (mesmo protocolo do celular). */}
+                <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+                    <div className="setting-info">
+                        <label>🖥️ Controlar outro NeoStream</label>
+                        <p>Conecte no controle remoto de outro PC da rede (endereço e PIN mostrados nas Configurações dele) e comande a reprodução daqui.</p>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <input
+                            type="text"
+                            placeholder="192.168.0.20:8974"
+                            value={peerAddr}
+                            onChange={(e) => setPeerAddr(e.target.value)}
+                            disabled={!!peerSocket}
+                            style={{ flex: 2, minWidth: 160, padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'white' }}
+                        />
+                        <input
+                            type="text"
+                            placeholder="PIN"
+                            value={peerPin}
+                            onChange={(e) => setPeerPin(e.target.value)}
+                            disabled={!!peerSocket}
+                            maxLength={4}
+                            style={{ width: 70, padding: '8px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.06)', color: 'white' }}
+                        />
+                        <button
+                            onClick={peerSocket ? disconnectPeer : connectPeer}
+                            disabled={!peerSocket && (!peerAddr.trim() || peerPin.trim().length < 4)}
+                            style={{ padding: '8px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, background: peerSocket ? 'rgba(239,68,68,0.7)' : 'var(--ns-accent)', color: 'white' }}
+                        >
+                            {peerSocket ? 'Desconectar' : 'Conectar'}
+                        </button>
+                    </div>
+                    {peerError && <p style={{ color: '#fca5a5', fontSize: 12, margin: 0 }}>{peerError}</p>}
+                    {peerSocket && (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 12, opacity: 0.8 }}>
+                                🟢 {peerState?.casting ? `Transmitindo: ${peerState.castTitle || '…'}`
+                                    : peerState?.title ? `${peerState.playing ? '▶' : '⏸'} ${peerState.title}` : 'Conectado'}
+                            </span>
+                            {(['previous', 'togglePlay', 'stop', 'next', 'volumeDown', 'volumeUp'] as const).map(action => (
+                                <button
+                                    key={action}
+                                    onClick={() => sendPeerCommand(peerSocket, action)}
+                                    title={action}
+                                    style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.08)', color: 'white', cursor: 'pointer' }}
+                                >
+                                    {action === 'previous' ? '⏮' : action === 'togglePlay' ? '⏯' : action === 'stop' ? '⏹' : action === 'next' ? '⏭' : action === 'volumeDown' ? '🔉' : '🔊'}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
