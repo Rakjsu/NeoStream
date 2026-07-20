@@ -56,3 +56,14 @@ export function pickExpiredRecordings<T extends RecordingFileInfo>(files: T[], m
     const cutoff = nowMs - maxAgeDays * 86_400_000;
     return files.filter(file => !file.recording && !protectedPaths?.has(file.path) && file.mtimeMs > 0 && file.mtimeMs < cutoff);
 }
+
+/** ⏺ Item 16: rótulo de tempo decorrido da gravação ativa (mm:ss ou h:mm:ss). PURO. */
+export function recElapsedLabel(startedAtMs: number, nowMs: number): string {
+    const total = Math.max(0, Math.floor((nowMs - startedAtMs) / 1000));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+    const mm = String(minutes).padStart(2, '0');
+    const ss = String(seconds).padStart(2, '0');
+    return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
+}
