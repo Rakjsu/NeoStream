@@ -8,6 +8,7 @@ import { usageStatsService } from '../services/usageStatsService';
 import { reminderService } from '../services/reminderService';
 import { favoritesService } from '../services/favoritesService';
 import { getHomeRecommendations, type RecMovie, type RecSeries } from '../services/recommendationService';
+import { downloadService } from '../services/downloadService';
 
 /**
  * Always-mounted bridge for the phone web remote's catalog second-screen.
@@ -52,6 +53,23 @@ export function WebRemoteBridge() {
     // Resume positions (seconds) for "continue watching" items, keyed by
     // "movie:<id>" / "ep:<episodeId>", so a cast started from that tab resumes.
     const resumeRef = useRef<Map<string, number>>(new Map());
+
+    // 📥 Item 12: um download enviado pelo celular chegou pelo /transfer —
+    // registra como concluído pra aparecer na página de Downloads.
+    useEffect(() => {
+        const onReceived = (_event: unknown, payload: { title?: string; kind?: string; filePath?: string; size?: number }) => {
+            if (!payload?.filePath || !payload.title) return;
+            const kind = payload.kind === 'episode' ? 'episode' as const : 'movie' as const;
+            void downloadService.registerReceived({
+                title: payload.title,
+                kind,
+                filePath: payload.filePath,
+                size: payload.size ?? 0,
+            });
+        };
+        window.ipcRenderer.on('transfer:received', onReceived);
+        return () => { window.ipcRenderer.off('transfer:received', onReceived); };
+    }, []);
 
     useEffect(() => {
         const sendCastResult = (status: 'ok' | 'no-device' | 'error', deviceName = '') =>

@@ -16,7 +16,7 @@ import os from 'node:os'
 import type { Socket } from 'node:net'
 import path from 'node:path'
 import fs from 'node:fs'
-import { BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain } from 'electron'
 import Store from 'electron-store'
 import log from './logger'
 import { generateSelfSignedCert } from './selfSignedCert'
@@ -36,6 +36,7 @@ import {
 } from './webRemoteProtocol'
 import { renderRemotePage, type RemoteAccent } from './webRemotePage'
 import { buildSetupDeepLink, renderSetupHandoffPage } from './setupPayload'
+import { parseTransferQuery } from './transferReceiver'
 import { exportPlaylistsForSetup, getActivePlaylistIdPublic } from './playlistManager'
 import { REMOTE_ICON_SVG, buildManifest, solidPng } from './webRemoteAssets'
 import { isCastSessionActive, castRemoteControl, getCastStatus } from './castHandlers'
@@ -858,6 +859,68 @@ function start(): Promise<void> {
     sessionPin = newPin()
     serverSecure = getConfig().https
     const handler = (req: http.IncomingMessage, res: http.ServerResponse) => {
+        if (req.method === 'POST' && req.url && req.url.startsWith('/transfer?')) {
+            // 📥 Item 12: recebe um download do celular pela LAN (inverso do
+            // /recording abaixo). Mesmo anti brute-force por IP do /setup.
+            const ip = req.socket.remoteAddress || 'unknown'
+            const now = Date.now()
+            if (isPinLockedOut(pinGate.get(ip), now)) {
+                res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8' })
+                res.end('Aguarde e tente de novo')
+                return
+            }
+            const parsed = parseTransferQuery(req.url)
+            if (!parsed) {
+                res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' })
+                res.end('bad request')
+                return
+            }
+            if (!sessionPin || parsed.pin !== sessionPin) {
+                const entry = registerPinFailure(pinGate.get(ip), now)
+                pinGate.set(ip, entry)
+                if (entry.lockedUntil > now) log.warn(`[WebRemote] PIN do /transfer bloqueado por tentativas: ${ip}`)
+                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
+                res.end('PIN')
+                return
+            }
+            pinGate.delete(ip)
+            const dir = path.join(app.getPath('userData'), 'downloads', 'transfers')
+            try { fs.mkdirSync(dir, { recursive: true }) } catch { /* já existe */ }
+            const target = path.join(dir, parsed.name)
+            const out = fs.createWriteStream(target)
+            let failed = false
+            const fail = (status: number, message: string) => {
+                if (failed) return
+                failed = true
+                out.destroy()
+                try { fs.unlinkSync(target) } catch { /* nunca chegou a existir */ }
+                if (!res.headersSent) res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' })
+                res.end(message)
+            }
+            req.on('error', () => fail(500, 'upload aborted'))
+            out.on('error', () => fail(500, 'write failed'))
+            out.on('finish', () => {
+                if (failed) return
+                let size = 0
+                try { size = fs.statSync(target).size } catch { /* stat falhou; segue 0 */ }
+                if (size === 0) {
+                    fail(400, 'empty upload')
+                    return
+                }
+                log.info(`[WebRemote] transfer recebido: ${parsed.name} (${size} bytes)`)
+                const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
+                win?.webContents.send('transfer:received', {
+                    kind: parsed.kind,
+                    title: parsed.title,
+                    filePath: target,
+                    size,
+                })
+                res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' })
+                res.end('ok')
+            })
+            req.pipe(out)
+            return
+        }
         if (req.url && req.url.startsWith('/recording?')) {
             // ⬇️ Item 122: transfere uma gravação pela LAN (autentica pelo PIN da sessão).
             const query = new URL(req.url, 'http://localhost').searchParams

@@ -274,6 +274,36 @@ class DownloadService {
         return item;
     }
 
+    /**
+     * 📥 Item 12: registra um arquivo que chegou pronto do celular (POST
+     * /transfer do controle web) como download concluído, pra ele aparecer
+     * na página de Downloads e tocar offline como qualquer outro.
+     */
+    async registerReceived(payload: { title: string; kind: 'movie' | 'episode'; filePath: string; size: number }): Promise<DownloadItem> {
+        const id = this.generateId(payload.kind, payload.title);
+        const now = Date.now();
+        const item: DownloadItem = {
+            id,
+            name: payload.title,
+            type: payload.kind,
+            url: '',
+            cover: '',
+            size: payload.size,
+            downloadedBytes: payload.size,
+            status: 'completed',
+            progress: 100,
+            filePath: payload.filePath,
+            createdAt: now,
+            completedAt: now,
+        };
+        this.downloads.set(id, item);
+        await this.saveDownload(item);
+        this.emit('added', item);
+        this.emit('completed', item);
+        appNotificationService.addDownloadNotification('complete', item.name, item.type);
+        return item;
+    }
+
     // Process download queue
     private async processQueue(): Promise<void> {
         if (this.isProcessing || this.activeDownloads >= this.maxConcurrent) {
