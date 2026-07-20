@@ -260,3 +260,15 @@ describe('parseProgressReport (item 11 — sync de posições)', () => {
         expect(command).toEqual({ action: 'reportProgress', report: { kind: 'movie', movieId: '7', title: 'F', positionSec: 60, durationSec: 600, updatedAt: 5 } })
     })
 })
+
+describe('partyAdd (item 40 — modo festa)', () => {
+    it('aceita movieId string e ignora extras', () => {
+        expect(parseRemoteCommand(JSON.stringify({ action: 'partyAdd', movieId: '77' })))
+            .toEqual({ action: 'partyAdd', movieId: '77' })
+    })
+
+    it('rejeita movieId ausente ou não-string', () => {
+        expect(parseRemoteCommand(JSON.stringify({ action: 'partyAdd' }))).toBeNull()
+        expect(parseRemoteCommand(JSON.stringify({ action: 'partyAdd', movieId: 42 }))).toBeNull()
+    })
+})

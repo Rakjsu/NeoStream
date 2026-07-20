@@ -137,6 +137,7 @@ export type RemoteCommand =
     | { action: 'requestRecordings' }
     | { action: 'requestDevices' }
     | { action: 'castMovie'; movieId: string; target?: CastTarget }
+    | { action: 'partyAdd'; movieId: string }
     | { action: 'castMovieQueue'; movieIds: string[]; target?: CastTarget }
     | { action: 'requestSeries'; query?: string }
     | { action: 'requestSeriesInfo'; seriesId: string }
@@ -158,6 +159,7 @@ const VALID_ACTIONS = new Set([
     'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'setVolume', 'setAudioTrack', 'playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule',
     'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestRecordings', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
     'sleep', 'requestStats', 'focusApp', 'requestReminders', 'cancelReminder', 'openMultiview', 'screenshot', 'renameRecording', 'toggleProtectRecording', 'navKey', 'requestFavorites', 'reportProgress',
+    'partyAdd',
 ])
 
 /**
@@ -315,6 +317,12 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         const movieId = (parsed as { movieId?: unknown }).movieId
         if (typeof movieId !== 'string' || !movieId) return null
         return { action, movieId, target: parseCastTarget(parsed) }
+    }
+    // 🎉 Item 40: modo festa — qualquer celular adiciona um filme à fila da TV.
+    if (action === 'partyAdd') {
+        const movieId = (parsed as { movieId?: unknown }).movieId
+        if (typeof movieId !== 'string' || !movieId) return null
+        return { action, movieId }
     }
     if (action === 'castMovieQueue') {
         const raw = (parsed as { movieIds?: unknown }).movieIds

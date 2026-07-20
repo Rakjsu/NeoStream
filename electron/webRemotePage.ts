@@ -696,6 +696,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
         var sel = selected[m.id];
         html += '<div class="chitem' + (sel ? ' playing' : '') + '" data-mv="' + esc(m.id) + '">'
           + logo + '<div class="nm">' + (sel ? '✓ ' : '') + esc(m.name) + '</div>'
+          + '<button class="chinfo" data-party="' + esc(m.id) + '" title="Fila da festa">🎉</button>'
           + '<button class="chinfo" data-cast="' + esc(m.id) + '" title="' + L.castToTv + '">📡</button></div>';
       }
       mvlistEl.innerHTML = html || '<div class="empty">' + L.noMovieFound + '</div>';
@@ -718,6 +719,8 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
       if (!ev.target.closest) return;
       // 📡 casts just that movie; tapping the rest of the row toggles selection.
       var castBtn = ev.target.closest('.chinfo');
+      var partyBtn = e.target.closest('[data-party]');
+      if (partyBtn) { var pid = partyBtn.getAttribute('data-party'); if (pid) { sendCmd('partyAdd', null, null, pid); partyBtn.textContent = '✓'; } return; }
       if (castBtn) { var mid = castBtn.getAttribute('data-cast'); if (mid) sendCmd('castMovie', null, null, mid); return; }
       var row = ev.target.closest('.chitem');
       if (!row) return;
@@ -1293,6 +1296,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
       if (action === 'cancelSchedule') payload.id = channelId;
       if (action === 'cancelReminder') payload.id = channelId;
       if (action === 'castMovie') payload.movieId = movieId;
+      if (action === 'partyAdd') payload.movieId = movieId;
       if (action === 'castMovieQueue') payload.movieIds = arg5;
       if (action === 'requestSeriesInfo') payload.seriesId = arg5;
       if (action === 'castEpisode') payload.episodeId = arg6;
