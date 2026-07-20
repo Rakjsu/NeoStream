@@ -1,42 +1,23 @@
-import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-// app.getPath('userData') → pasta temporária estável (limpa entre os testes).
-const USER_DATA = path.join(os.tmpdir(), 'neostream-catalogcache-test')
+// app.getPath('userData') → pasta temporária NOVA por teste (evita bleed do
+// catalog.db entre testes e entre execuções do runner).
+const state = vi.hoisted(() => ({ dir: '' }))
 
-vi.mock('electron', async () => {
-    const nodeOs = await import('node:os')
-    const nodePath = await import('node:path')
-    return { app: { getPath: () => nodePath.join(nodeOs.tmpdir(), 'neostream-catalogcache-test') } }
-})
+vi.mock('electron', () => ({ app: { getPath: () => state.dir } }))
 vi.mock('./logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
-import { cachedCatalogFetch, invalidatePlaylistCache, isFresh, CATALOG_CACHE_TTL_MS } from './catalogCache'
+import { cachedCatalogFetch, invalidatePlaylistCache, isFresh, CATALOG_CACHE_TTL_MS, closeCatalogStore } from './catalogCache'
 
-const cacheDir = path.join(USER_DATA, 'catalog-cache')
-
-/**
- * O write-behind não é aguardado pelo fetch — espera o arquivo aparecer E
- * conter JSON válido (o writeFile cria o arquivo vazio antes de escrever;
- * em runner lento o existsSync sozinho vencia a corrida e o teste lia '').
- */
-async function waitForFile(file: string): Promise<void> {
-    for (let i = 0; i < 100; i++) {
-        if (fs.existsSync(file)) {
-            try {
-                JSON.parse(fs.readFileSync(file, 'utf-8'))
-                return
-            } catch { /* escrita ainda no meio — tenta de novo */ }
-        }
-        await new Promise(resolve => setTimeout(resolve, 10))
-    }
-    throw new Error(`arquivo de cache não apareceu: ${file}`)
-}
+const cacheDir = () => path.join(state.dir, 'catalog-cache')
+// A escrita no catalog.db sai do caminho da resposta via setImmediate.
+const flushWrite = () => new Promise(resolve => setImmediate(resolve))
 
 let seq = 0
-/** Ids únicos por teste — o Map em memória do módulo vive o arquivo inteiro. */
+/** Ids únicos por teste — legibilidade dos asserts. */
 function freshId(): string {
     return `pl_test_${++seq}`
 }
@@ -49,15 +30,18 @@ describe('isFresh (janela SWR de 15 min)', () => {
     })
 })
 
-describe('cachedCatalogFetch (stale-while-revalidate por playlist+kind)', () => {
+describe('cachedCatalogFetch (stale-while-revalidate por playlist+kind, backend SQLite)', () => {
     beforeEach(() => {
-        fs.rmSync(cacheDir, { recursive: true, force: true })
+        closeCatalogStore()
+        state.dir = fs.mkdtempSync(path.join(os.tmpdir(), 'neostream-catcache-'))
     })
     afterEach(() => {
         vi.restoreAllMocks()
-    })
-    afterAll(() => {
-        fs.rmSync(USER_DATA, { recursive: true, force: true })
+        closeCatalogStore()
+        // Best-effort: um módulo resetado no teste pode segurar o handle do DB.
+        try {
+            fs.rmSync(state.dir, { recursive: true, force: true })
+        } catch { /* dir temporário fica pro SO limpar */ }
     })
 
     it('cache fresco serve sem rede; vencido busca de novo', async () => {
@@ -108,28 +92,44 @@ describe('cachedCatalogFetch (stale-while-revalidate por playlist+kind)', () => 
         expect((await cachedCatalogFetch(b, 'live', vi.fn())).data).toBe('canais-B')
     })
 
-    it('persiste no disco e um "novo processo" (módulo novo) lê o arquivo', async () => {
+    it('persiste no catalog.db e um "novo processo" (módulo novo) lê do disco', async () => {
         const id = freshId()
         await cachedCatalogFetch(id, 'live-categories', vi.fn().mockResolvedValue([{ category_id: '10' }]))
-        const file = path.join(cacheDir, `${id}-live-categories.json`)
-        await waitForFile(file)
+        await flushWrite()
+        closeCatalogStore() // solta o catalog.db pro "novo processo" abrir
 
-        // Módulo recarregado = Map em memória vazio → obriga a via do disco.
+        // Módulo recarregado = memória vazia → obriga a via do disco.
         vi.resetModules()
         const reloaded = await import('./catalogCache')
         const result = await reloaded.cachedCatalogFetch(id, 'live-categories', vi.fn().mockRejectedValue(new Error('offline')))
         expect(result).toEqual({ data: [{ category_id: '10' }], fromCache: true })
+        reloaded.closeCatalogStore()
     })
 
-    it('arquivo corrompido no disco é ignorado (busca de novo)', async () => {
+    it('migra o JSON legado pro catalog.db e a pasta vira o backup do rollback', async () => {
         const id = freshId()
-        fs.mkdirSync(cacheDir, { recursive: true })
-        fs.writeFileSync(path.join(cacheDir, `${id}-vod.json`), 'não-é-json', 'utf-8')
+        fs.mkdirSync(cacheDir(), { recursive: true })
+        fs.writeFileSync(
+            path.join(cacheDir(), `${id}-live.json`),
+            JSON.stringify({ fetchedAt: Date.now(), data: 'migrado' }),
+            'utf-8',
+        )
+        const result = await cachedCatalogFetch(id, 'live', vi.fn().mockRejectedValue(new Error('offline')))
+        expect(result).toEqual({ data: 'migrado', fromCache: true })
+        expect(fs.existsSync(cacheDir())).toBe(false)
+        expect(fs.existsSync(`${cacheDir()}-backup`)).toBe(true)
+    })
+
+    it('JSON legado corrompido é pulado na migração (busca de novo)', async () => {
+        const id = freshId()
+        fs.mkdirSync(cacheDir(), { recursive: true })
+        fs.writeFileSync(path.join(cacheDir(), `${id}-vod.json`), 'não-é-json', 'utf-8')
 
         vi.resetModules()
         const reloaded = await import('./catalogCache')
         const fetcher = vi.fn().mockResolvedValue(['recuperado'])
         expect(await reloaded.cachedCatalogFetch(id, 'vod', fetcher)).toEqual({ data: ['recuperado'], fromCache: false })
+        reloaded.closeCatalogStore()
     })
 
     it('invalidatePlaylistCache derruba os seis kinds da playlist', async () => {
@@ -141,13 +141,16 @@ describe('cachedCatalogFetch (stale-while-revalidate por playlist+kind)', () => 
         expect(fetcher).toHaveBeenCalledTimes(1)
     })
 
-    it('id de playlist com caracteres estranhos vira nome de arquivo seguro', async () => {
+    it('id de playlist com caracteres estranhos vira chave estável (roundtrip via disco)', async () => {
         const id = `..\\/etc?passwd ${freshId()}`
         await cachedCatalogFetch(id, 'live', vi.fn().mockResolvedValue('ok'))
-        // O arquivo fica DENTRO da pasta de cache, com tudo fora de
-        // [a-zA-Z0-9_-] achatado em '_' (sem escapar por ../ ou \).
-        const safe = `${id.replace(/[^a-zA-Z0-9_-]/g, '_')}-live.json`
-        await waitForFile(path.join(cacheDir, safe))
-        expect(fs.readdirSync(cacheDir)).toContain(safe)
+        await flushWrite()
+        closeCatalogStore()
+
+        vi.resetModules()
+        const reloaded = await import('./catalogCache')
+        expect(await reloaded.cachedCatalogFetch(id, 'live', vi.fn().mockRejectedValue(new Error('offline'))))
+            .toEqual({ data: 'ok', fromCache: true })
+        reloaded.closeCatalogStore()
     })
 })

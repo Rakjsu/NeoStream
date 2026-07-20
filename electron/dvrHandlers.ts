@@ -1,4 +1,5 @@
 import { app, ipcMain, shell, dialog, BrowserWindow } from 'electron'
+import { statSync } from 'node:fs'
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
 import path from 'path'
 import fs from 'fs'
@@ -261,13 +262,19 @@ export function setupDvrHandlers() {
 
     ipcMain.handle('dvr:active', async () => ({
         success: true,
-        recordings: Array.from(active.values()).map(r => ({
-            id: r.id,
-            channelName: r.channelName,
-            file: r.file,
-            seconds: r.seconds,
-            startedAt: r.startedAt,
-        })),
+        recordings: Array.from(active.values()).map(r => {
+            // ⏺ Item 16: o painel ao vivo mostra o arquivo crescendo.
+            let sizeBytes = 0
+            try { sizeBytes = statSync(r.file).size } catch { /* ffmpeg ainda não criou o arquivo */ }
+            return {
+                id: r.id,
+                channelName: r.channelName,
+                file: r.file,
+                seconds: r.seconds,
+                startedAt: r.startedAt,
+                sizeBytes,
+            }
+        }),
     }))
 
     ipcMain.handle('dvr:open-folder', async () => {

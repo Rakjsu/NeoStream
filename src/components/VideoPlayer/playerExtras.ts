@@ -59,3 +59,14 @@ export function nextVideoFilter(id: string): VideoFilterPreset {
     const index = VIDEO_FILTERS.findIndex(preset => preset.id === id);
     return VIDEO_FILTERS[(index + 1) % VIDEO_FILTERS.length];
 }
+
+/** 🖼️ Item 31: bucket de cache do preview (agrupa hovers em janelas de 10s). PURO. */
+export function previewBucket(timeSec: number, bucketS = 10): number {
+    if (!Number.isFinite(timeSec) || timeSec < 0) return -1;
+    return Math.floor(timeSec / bucketS);
+}
+
+/** Ponto de seek de um bucket (o meio da janela — frame representativo). PURO. */
+export function previewSeekTarget(bucket: number, bucketS = 10): number {
+    return bucket * bucketS + bucketS / 2;
+}

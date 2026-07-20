@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pickExpiredRecordings } from './dvrSweep';
+import { pickExpiredRecordings, recElapsedLabel } from './dvrSweep';
 
 describe('pickExpiredRecordings (auto-faxina do DVR)', () => {
     const nowMs = 1_800_000_000_000;
@@ -21,5 +21,16 @@ describe('pickExpiredRecordings (auto-faxina do DVR)', () => {
 
     it('gravação protegida nunca entra na varredura', () => {
         expect(pickExpiredRecordings(files, 30, nowMs, new Set(['velha.ts']))).toEqual([]);
+    });
+});
+
+describe('recElapsedLabel (item 16 — painel de gravações ativas)', () => {
+    it('formata mm:ss e h:mm:ss', () => {
+        expect(recElapsedLabel(0, 65_000)).toBe('01:05');
+        expect(recElapsedLabel(0, 3_725_000)).toBe('1:02:05');
+    });
+
+    it('relógio atrasado não fica negativo', () => {
+        expect(recElapsedLabel(10_000, 5_000)).toBe('00:00');
     });
 });

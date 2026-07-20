@@ -4,7 +4,7 @@ import { Download, Trash2, Play, FolderOpen, HardDrive, Film, Tv, AlertTriangle,
 import { downloadService } from '../services/downloadService';
 import type { DownloadItem, StorageInfo } from '../services/downloadService';
 import { useLanguage } from '../services/languageService';
-import { getDvrMaxAgeDays, getProtectedRecordings, pickExpiredRecordings, setDvrMaxAgeDays, toggleProtectedRecording } from '../services/dvrSweep';
+import { getDvrMaxAgeDays, getProtectedRecordings, pickExpiredRecordings, recElapsedLabel, setDvrMaxAgeDays, toggleProtectedRecording } from '../services/dvrSweep';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 
 // Type for grouped series
@@ -66,6 +66,10 @@ export function Downloads() {
     const [playingRecording, setPlayingRecording] = useState<RecordingFile | null>(null);
     const [dvrMaxAge, setDvrMaxAge] = useState(() => getDvrMaxAgeDays());
     const [protectedRecs, setProtectedRecs] = useState<Set<string>>(() => getProtectedRecordings());
+    // ⏺ Item 16: gravações ATIVAS (2+ canais em paralelo) com progresso ao vivo.
+    interface ActiveRec { id: string; channelName: string; seconds: number; startedAt: number; sizeBytes: number }
+    const [activeRecs, setActiveRecs] = useState<ActiveRec[]>([]);
+    const [recTick, setRecTick] = useState(() => Date.now());
     const [renamingPath, setRenamingPath] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState('');
     // ⚙️ Config da fila de downloads (D66).
@@ -76,6 +80,21 @@ export function Downloads() {
     const [convertingPath, setConvertingPath] = useState<string | null>(null);
     const [dvrMsg, setDvrMsg] = useState('');
     const [thumbs, setThumbs] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        if (!showRecordings) return;
+        let cancelled = false;
+        const poll = async () => {
+            const result = await window.ipcRenderer.invoke('dvr:active').catch(() => null) as
+                { success?: boolean; recordings?: ActiveRec[] } | null;
+            if (cancelled) return;
+            setActiveRecs(result?.success ? result.recordings ?? [] : []);
+            setRecTick(Date.now());
+        };
+        void poll();
+        const timer = window.setInterval(() => { void poll(); }, 2000);
+        return () => { cancelled = true; window.clearInterval(timer); };
+    }, [showRecordings]);
 
     const loadRecordings = useCallback(async () => {
         try {
@@ -394,6 +413,40 @@ export function Downloads() {
                         background: 'rgba(239, 68, 68, 0.06)',
                         border: '1px solid rgba(239, 68, 68, 0.25)'
                     }}>
+                        {/* ⏺ Item 16: painel ao vivo das gravações em andamento */}
+                        {activeRecs.length > 0 && (
+                            <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                <div style={{ color: '#fca5a5', fontSize: 13, fontWeight: 800 }}>
+                                    🔴 {t('downloads', 'activeRecs')} ({activeRecs.length})
+                                </div>
+                                {activeRecs.map(rec => (
+                                    <div
+                                        key={rec.id}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px',
+                                            borderRadius: 12, background: 'rgba(239, 68, 68, 0.12)',
+                                            border: '1px solid rgba(239, 68, 68, 0.4)',
+                                        }}
+                                    >
+                                        <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444', animation: 'pulse 1.2s infinite' }} />
+                                        <span style={{ flex: 1, color: 'white', fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rec.channelName}</span>
+                                        <span style={{ color: '#fca5a5', fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>{recElapsedLabel(rec.startedAt, recTick)}</span>
+                                        <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, minWidth: 70, textAlign: 'right' }}>{(rec.sizeBytes / 1048576).toFixed(1)} MB</span>
+                                        <button
+                                            onClick={() => {
+                                                void window.ipcRenderer.invoke('dvr:stop', { id: rec.id }).then(() => {
+                                                    setActiveRecs(prev => prev.filter(r => r.id !== rec.id));
+                                                    void loadRecordings();
+                                                });
+                                            }}
+                                            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.6)', background: 'rgba(239,68,68,0.25)', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+                                        >
+                                            ⏹ {t('downloads', 'stopRec')}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                             <h3 style={{ color: 'white', fontSize: 16, margin: 0 }}>⏺ {t('downloads', 'recordings')}</h3>
                             <button
