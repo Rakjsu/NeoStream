@@ -6,6 +6,9 @@ type IpcListener = (event: IpcRendererEvent, ...args: unknown[]) => void
 const invokeChannels = new Set([
     'airplay:cast',
     'airplay:discover',
+    'airplay:seek',
+    'airplay:set-playing',
+    'airplay:status',
     'airplay:stop',
     'auth:check',
     'auth:get-credentials',

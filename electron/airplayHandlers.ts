@@ -183,7 +183,10 @@ export function setupAirPlayHandlers() {
         try {
             log.info('[AirPlay] Stop requested:', deviceId);
 
-            const device = discoveredDevices.get(deviceId);
+            // Fallback to the tracked session device: a cast can outlive the
+            // mDNS record (TV briefly offline in discovery but still playing).
+            const device = discoveredDevices.get(deviceId)
+                ?? (airplaySession?.device.id === deviceId ? airplaySession.device : undefined);
             if (!device) {
                 throw new Error('Device not found');
             }
@@ -195,6 +198,56 @@ export function setupAirPlayHandlers() {
             return { success: true };
         } catch (error: unknown) {
             log.error('[AirPlay] Stop error:', error);
+            return { success: false, error: getErrorMessage(error) };
+        }
+    });
+
+    // ===== Desktop transport for the tracked session (global mini-remote) ====
+    // The phone remote already drives AirPlay via airplayRemoteControl; these
+    // three handlers give the renderer's own CastControls the same reach.
+
+    ipcMain.handle('airplay:status', async () => {
+        const session = airplaySession;
+        if (!session) return { success: true, active: false };
+        const snapshot = await getAirplayStatusSnapshot();
+        return {
+            success: true,
+            active: true,
+            // Scrub can transiently fail mid-seek — fall back to the tracked
+            // transport state instead of dropping the session.
+            playing: snapshot?.playing ?? session.playing,
+            position: snapshot?.position ?? 0,
+            duration: snapshot?.duration ?? 0,
+            title: session.title,
+            deviceId: session.device.id,
+            deviceName: session.device.name || 'AirPlay',
+        };
+    });
+
+    // Explicit target state (not a toggle) so a stale renderer poll can't
+    // invert the command.
+    ipcMain.handle('airplay:set-playing', async (_, { playing }) => {
+        const session = airplaySession;
+        if (!session) return { success: false, error: 'No active cast session' };
+        try {
+            await airplayRequest(session.device, `/rate?value=${playing ? '1.000000' : '0.000000'}`);
+            session.playing = !!playing;
+            return { success: true };
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) };
+        }
+    });
+
+    // Absolute seek — the mini-remote slider sends seconds from zero, unlike
+    // the phone remote's relative jumps.
+    ipcMain.handle('airplay:seek', async (_, { seconds }) => {
+        const session = airplaySession;
+        if (!session) return { success: false, error: 'No active cast session' };
+        const target = Math.max(0, Number(seconds) || 0);
+        try {
+            await airplayRequest(session.device, `/scrub?position=${target.toFixed(3)}`);
+            return { success: true };
+        } catch (error: unknown) {
             return { success: false, error: getErrorMessage(error) };
         }
     });
