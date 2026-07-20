@@ -1,5 +1,9 @@
 {
   "myListPage": {
+    "tabQueue": "Queue",
+    "queueEmpty": "Your queue is empty",
+    "queueEmptyHint": "Add movies from their page (🎞️ Add to queue) — they play in order when one ends",
+    "queueHint": "When a movie ends, the next in queue plays. Use ↑ ↓ to reorder.",
     "tabFavorites": "Favorites",
     "tabWatchLater": "Watch later"
   },
@@ -205,6 +209,9 @@
     "noScheduleInfo": "No schedule information available"
   },
   "contentModal": {
+    "queueAdd": "Add to queue",
+    "queued": "In queue",
+    "queueRemove": "Remove from queue",
     "sendToPhone": "Play on phone (paired app)",
     "sentToPhone": "📱 Sent to your phone",
     "noPhoneConnected": "No phone connected to the remote",

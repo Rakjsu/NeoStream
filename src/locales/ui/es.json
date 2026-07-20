@@ -1,5 +1,9 @@
 {
   "myListPage": {
+    "tabQueue": "Cola",
+    "queueEmpty": "Tu cola está vacía",
+    "queueEmptyHint": "Añade películas desde su ficha (🎞️ Añadir a la cola): se reproducen en orden al terminar",
+    "queueHint": "Cuando termina una película, se reproduce la siguiente. Usa ↑ ↓ para ordenar.",
     "tabFavorites": "Favoritos",
     "tabWatchLater": "Ver más tarde"
   },
@@ -205,6 +209,9 @@
     "noScheduleInfo": "Sin información de programación"
   },
   "contentModal": {
+    "queueAdd": "Añadir a la cola",
+    "queued": "En la cola",
+    "queueRemove": "Quitar de la cola",
     "sendToPhone": "Reproducir en el móvil (app emparejada)",
     "sentToPhone": "📱 Enviado al móvil",
     "noPhoneConnected": "Ningún móvil conectado al control",

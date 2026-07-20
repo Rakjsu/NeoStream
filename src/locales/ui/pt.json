@@ -1,5 +1,9 @@
 {
   "myListPage": {
+    "tabQueue": "Fila",
+    "queueEmpty": "Sua fila está vazia",
+    "queueEmptyHint": "Adicione filmes pela ficha (🎞️ Adicionar à fila) — eles tocam em sequência quando um termina",
+    "queueHint": "Quando um filme termina, o próximo da fila toca em seguida. Use ↑ ↓ pra ordenar.",
     "tabFavorites": "Favoritos",
     "tabWatchLater": "Ver depois"
   },
@@ -205,6 +209,9 @@
     "noScheduleInfo": "Sem informações de programação"
   },
   "contentModal": {
+    "queueAdd": "Adicionar à fila",
+    "queued": "Na fila",
+    "queueRemove": "Remover da fila",
     "sendToPhone": "Tocar no celular (app pareado)",
     "sentToPhone": "📱 Enviado pro celular",
     "noPhoneConnected": "Nenhum celular conectado ao controle",

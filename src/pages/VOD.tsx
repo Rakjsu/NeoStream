@@ -8,6 +8,7 @@ import { normalizeTitle } from '../services/personSearchHelpers';
 import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { fetchMovieDetails, searchMovieByName, type TMDBMovieDetails, getBackdropUrl } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
+import { queueService } from '../services/queueService';
 import { favoritesService } from '../services/favoritesService';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
@@ -190,6 +191,12 @@ export function VOD() {
     // First "Assistir Depois" movie present in the catalog (excluding the one
     // playing) — the end-of-movie countdown offers it as "A seguir".
     const getNextQueuedMovie = (currentId: string): VODStream | null => {
+        // 🎞️ Item 30: a fila MANUAL vem primeiro; o Ver depois segue de fallback.
+        const manual = queueService.next(currentId);
+        if (manual) {
+            const found = streams.find(s => String(s.stream_id) === manual.id);
+            if (found) return found;
+        }
         for (const queued of watchLaterService.getAll()) {
             if (queued.type !== 'movie' || queued.id === currentId) continue;
             const found = streams.find(s => String(s.stream_id) === queued.id);
@@ -702,7 +709,8 @@ export function VOD() {
                     onNextEpisode={() => {
                         const next = getNextQueuedMovie(String(playingMovie.stream_id));
                         if (!next) return;
-                        // The finished movie leaves the queue.
+                        // The finished movie leaves the queue (manual e Ver depois).
+                        queueService.remove(String(playingMovie.stream_id));
                         watchLaterService.remove(String(playingMovie.stream_id), 'movie');
                         setPipResumeTime(null);
                         setPlayingMovie(next);

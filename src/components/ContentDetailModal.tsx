@@ -5,6 +5,7 @@ import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
 import { profileService } from '../services/profileService';
 import { watchLaterService } from '../services/watchLater';
+import { queueService } from '../services/queueService';
 import { favoritesService } from '../services/favoritesService';
 import { isTraktConnected, traktRate } from '../services/traktService';
 import { downloadService } from '../services/downloadService';
@@ -1060,6 +1061,25 @@ export function ContentDetailModal({
                             {watchLaterService.has(contentId, contentType) ? '✓' : '+'}
                             {watchLaterService.has(contentId, contentType) ? t('contentModal', 'saved') : t('contentModal', 'watchLater')}
                         </button>
+                        {/* 🎞️ Item 30: fila manual de reprodução (só filmes) */}
+                        {contentType === 'movie' && (
+                            <button
+                                onClick={() => {
+                                    if (queueService.has(contentId)) queueService.remove(contentId);
+                                    else queueService.add({ id: contentId, name: contentData.name, cover: contentData.cover });
+                                    setRefresh(r => r + 1);
+                                }}
+                                style={{
+                                    padding: '10px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                                    border: queueService.has(contentId) ? '1px solid var(--ns-accent, #7c3aed)' : '1px solid rgba(255,255,255,0.25)',
+                                    background: queueService.has(contentId) ? 'rgba(124, 58, 237, 0.25)' : 'transparent',
+                                    color: 'white',
+                                }}
+                                title={queueService.has(contentId) ? t('contentModal', 'queueRemove') : t('contentModal', 'queueAdd')}
+                            >
+                                🎞️ {queueService.has(contentId) ? t('contentModal', 'queued') : t('contentModal', 'queueAdd')}
+                            </button>
+                        )}
 
                         {/* Download Button (Movies and Series) */}
                         <button
