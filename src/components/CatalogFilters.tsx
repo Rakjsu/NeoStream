@@ -13,14 +13,17 @@ interface CatalogFiltersProps {
     onDuration?: (bucket: DurationBucket | null) => void;
     /** Borda direita do select de década (o de gênero fica à esquerda dele). */
     right?: number;
+    /** Flui numa toolbar flex em vez de flutuar com offsets absolutos. */
+    inline?: boolean;
 }
 
-function selectStyle(right: number) {
+function selectStyle(right: number, inline: boolean) {
     return {
-        position: 'absolute' as const,
-        top: 30,
-        right,
-        zIndex: 95,
+        // Offsets fixos assumiam larguras dos vizinhos e colidiam quando os
+        // rótulos (por idioma) ou a janela mudavam — inline flui na toolbar.
+        ...(inline
+            ? { position: 'relative' as const }
+            : { position: 'absolute' as const, top: 30, right, zIndex: 95 }),
         padding: '9px 12px',
         borderRadius: 12,
         border: '1px solid rgba(255, 255, 255, 0.18)',
@@ -34,7 +37,7 @@ function selectStyle(right: number) {
 }
 
 /** Filtros de década e gênero das grades de catálogo — par visual do SortSelect. */
-export function CatalogFilters({ items, decade, genre, onDecade, onGenre, duration = null, onDuration, right = 215 }: CatalogFiltersProps) {
+export function CatalogFilters({ items, decade, genre, onDecade, onGenre, duration = null, onDuration, right = 215, inline = false }: CatalogFiltersProps) {
     const { t } = useLanguage();
     const decades = useMemo(() => listDecades(items), [items]);
     const genres = useMemo(() => listGenres(items), [items]);
@@ -50,7 +53,7 @@ export function CatalogFilters({ items, decade, genre, onDecade, onGenre, durati
                     value={decade ?? ''}
                     onChange={(e) => onDecade(e.target.value ? Number(e.target.value) : null)}
                     title={t('sort', 'decade')}
-                    style={selectStyle(right)}
+                    style={selectStyle(right, inline)}
                 >
                     <option value="">{t('sort', 'allDecades')}</option>
                     {decades.map(item => <option key={item} value={item}>{item}s</option>)}
@@ -61,7 +64,7 @@ export function CatalogFilters({ items, decade, genre, onDecade, onGenre, durati
                     value={genre ?? ''}
                     onChange={(e) => onGenre(e.target.value || null)}
                     title={t('sort', 'genre')}
-                    style={selectStyle(right + 128)}
+                    style={selectStyle(inline ? right : right + 128, inline)}
                 >
                     <option value="">{t('sort', 'allGenres')}</option>
                     {genres.map(item => <option key={item} value={item}>{item}</option>)}
@@ -72,7 +75,7 @@ export function CatalogFilters({ items, decade, genre, onDecade, onGenre, durati
                     value={duration ?? ''}
                     onChange={(e) => onDuration((e.target.value || null) as DurationBucket | null)}
                     title={t('sort', 'duration')}
-                    style={selectStyle(right + 256)}
+                    style={selectStyle(inline ? right : right + 256, inline)}
                 >
                     <option value="">{t('sort', 'allDurations')}</option>
                     <option value="short">{t('sort', 'durShort')}</option>
