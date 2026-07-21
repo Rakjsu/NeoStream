@@ -25,6 +25,12 @@ import { matchCatalogByTitles } from '../services/personSearchHelpers';
  * filtered to the term.
  */
 export const GLOBAL_SEARCH_TERM_KEY = 'neostream_global_search_term';
+/**
+ * Além do termo, o item CLICADO: {kind, id} em JSON. A página de destino
+ * consome e abre a ficha direto (o modal de conteúdo também usa esse canal
+ * pra navegar entre fichas — Parecidos/filmografia).
+ */
+export const GLOBAL_SEARCH_OPEN_KEY = 'neostream_global_search_open';
 export const GLOBAL_SEARCH_EVENT = 'neostream-global-search';
 /** Dispatched (e.g. by the Sidebar search button) to open the overlay. */
 export const GLOBAL_SEARCH_OPEN_EVENT = 'neostream-open-global-search';
@@ -446,6 +452,10 @@ export function GlobalSearch() {
         const term = query.trim() || item.name;
         try {
             sessionStorage.setItem(GLOBAL_SEARCH_TERM_KEY, term);
+            // Abrir a FICHA do item clicado (não só filtrar a grade).
+            if (item.kind !== 'live') {
+                sessionStorage.setItem(GLOBAL_SEARCH_OPEN_KEY, JSON.stringify({ kind: item.kind, id: item.id }));
+            }
         } catch {
             // sessionStorage unavailable: navigation still works, just unfiltered
         }

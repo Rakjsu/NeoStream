@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { GLOBAL_SEARCH_OPEN_KEY, GLOBAL_SEARCH_EVENT } from './GlobalSearch';
+import { normalizeTitle } from '../services/personSearchHelpers';
 import { searchSeriesByName, searchMovieByName, fetchMovieTrailer, fetchSeriesTrailer, fetchCollection, fetchSimilarByTmdbId, fetchCastByTmdbId, fetchPersonFilmography, type TMDBSeriesDetails, type TMDBMovieDetails, type TMDBCollection, type TMDBSimilarItem, type TMDBCastMember } from '../services/tmdb';
 import { allTags, getMark, setRating, toggleTag } from '../services/personalMarksService';
 import { watchProgressService } from '../services/watchProgressService';
@@ -81,6 +84,68 @@ export function ContentDetailModal({
     const [similar, setSimilar] = useState<TMDBSimilarItem[]>([]);
     const [castList, setCastList] = useState<TMDBCastMember[]>([]);
     const [filmography, setFilmography] = useState<{ name: string; items: TMDBSimilarItem[] } | null>(null);
+    // 🔗 Índice do catálogo (título normalizado → id) pra cruzar Parecidos e
+    // filmografia: só aparece o que EXISTE no app, e clicável abre a ficha.
+    const [catalogIndex, setCatalogIndex] = useState<{ vod: Map<string, string>; series: Map<string, string> } | null>(null);
+    const navigate = useNavigate();
+
+    // Carrega o índice quando as seções TMDB aparecem (listas vêm do cache
+    // SWR do main — barato). Uma vez por montagem do modal.
+    useEffect(() => {
+        if (!isOpen || catalogIndex) return;
+        if (similar.length === 0 && !filmography) return;
+        let cancelled = false;
+        void (async () => {
+            const [vodRes, seriesRes] = await Promise.all([
+                window.ipcRenderer.invoke('streams:get-vod').catch(() => null),
+                window.ipcRenderer.invoke('streams:get-series').catch(() => null),
+            ]) as [
+                { success?: boolean; data?: { stream_id: number | string; name: string }[] } | null,
+                { success?: boolean; data?: { series_id: number | string; name: string }[] } | null,
+            ];
+            if (cancelled) return;
+            const vod = new Map<string, string>();
+            for (const movie of vodRes?.data ?? []) {
+                const key = normalizeTitle(movie.name);
+                if (key && !vod.has(key)) vod.set(key, String(movie.stream_id));
+            }
+            const seriesIdx = new Map<string, string>();
+            for (const show of seriesRes?.data ?? []) {
+                const key = normalizeTitle(show.name);
+                if (key && !seriesIdx.has(key)) seriesIdx.set(key, String(show.series_id));
+            }
+            setCatalogIndex({ vod, series: seriesIdx });
+        })();
+        return () => { cancelled = true; };
+    }, [isOpen, catalogIndex, similar.length, filmography]);
+
+    // Parecidos: filme cruza com o catálogo de filmes; série com o de séries.
+    const similarInCatalog = useMemo(() => {
+        if (!catalogIndex) return [];
+        const index = contentType === 'movie' ? catalogIndex.vod : catalogIndex.series;
+        return similar
+            .map(item => ({ item, catalogId: index.get(normalizeTitle(item.title)) }))
+            .filter((entry): entry is { item: TMDBSimilarItem; catalogId: string } => !!entry.catalogId);
+    }, [catalogIndex, contentType, similar]);
+
+    // Filmografia da pessoa: sempre filmes.
+    const filmographyInCatalog = useMemo(() => {
+        if (!catalogIndex || !filmography) return [];
+        return filmography.items
+            .map(item => ({ item, catalogId: catalogIndex.vod.get(normalizeTitle(item.title)) }))
+            .filter((entry): entry is { item: TMDBSimilarItem; catalogId: string } => !!entry.catalogId);
+    }, [catalogIndex, filmography]);
+
+    // Abre a ficha de outro item do catálogo: fecha este modal e reusa o canal
+    // da busca global (a página de destino consome o open-id e abre o modal).
+    const openCatalogItem = (kind: 'vod' | 'series', catalogId: string) => {
+        try {
+            sessionStorage.setItem(GLOBAL_SEARCH_OPEN_KEY, JSON.stringify({ kind, id: catalogId }));
+        } catch { /* sem storage: só fecha */ }
+        onClose();
+        navigate(kind === 'vod' ? '/dashboard/vod' : '/dashboard/series');
+        window.dispatchEvent(new Event(GLOBAL_SEARCH_EVENT));
+    };
     const [tagInput, setTagInput] = useState('');
     const [selectedSeason, setSelectedSeason] = useState(1);
     const [selectedEpisode, setSelectedEpisode] = useState(1);
@@ -1399,15 +1464,21 @@ export function ContentDetailModal({
                         </div>
                     )}
 
-                    {/* 🍿 Parecidos com este (TMDB /similar) */}
-                    {similar.length > 0 && (
+                    {/* 🍿 Parecidos com este (TMDB /similar, cruzado com o catálogo:
+                        só aparece o que existe no app — clique abre a ficha) */}
+                    {similarInCatalog.length > 0 && (
                         <div style={{ marginTop: 24 }}>
                             <h3 style={{ color: 'white', fontSize: 15, fontWeight: 700, marginBottom: 10 }}>
                                 🍿 {t('contentModal', 'similarTitle')}
                             </h3>
                             <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6 }}>
-                                {similar.map(item => (
-                                    <div key={item.id} style={{ width: 92, flexShrink: 0 }} title={item.title}>
+                                {similarInCatalog.map(({ item, catalogId }) => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => openCatalogItem(contentType === 'movie' ? 'vod' : 'series', catalogId)}
+                                        title={item.title}
+                                        style={{ width: 92, flexShrink: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+                                    >
                                         <img
                                             src={`https://image.tmdb.org/t/p/w185${item.poster_path}`}
                                             alt={item.title}
@@ -1417,7 +1488,7 @@ export function ContentDetailModal({
                                         <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             {item.title}
                                         </p>
-                                    </div>
+                                    </button>
                                 ))}
                             </div>
                         </div>
@@ -1455,15 +1526,21 @@ export function ContentDetailModal({
                         </div>
                     )}
 
-                    {/* 🎬 Filmografia da pessoa clicada */}
-                    {filmography && filmography.items.length > 0 && (
+                    {/* 🎬 Filmografia da pessoa clicada (só o que existe no app;
+                        clique abre a ficha do filme) */}
+                    {filmography && filmographyInCatalog.length > 0 && (
                         <div style={{ marginTop: 16 }}>
                             <h3 style={{ color: 'white', fontSize: 15, fontWeight: 700, marginBottom: 10 }}>
                                 🎬 {t('contentModal', 'filmographyOf').replace('{name}', filmography.name)}
                             </h3>
                             <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6 }}>
-                                {filmography.items.map(item => (
-                                    <div key={item.id} style={{ width: 92, flexShrink: 0 }} title={item.title}>
+                                {filmographyInCatalog.map(({ item, catalogId }) => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => openCatalogItem('vod', catalogId)}
+                                        title={item.title}
+                                        style={{ width: 92, flexShrink: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+                                    >
                                         <img
                                             src={`https://image.tmdb.org/t/p/w185${item.poster_path}`}
                                             alt={item.title}
@@ -1473,7 +1550,7 @@ export function ContentDetailModal({
                                         <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             {item.title}
                                         </p>
-                                    </div>
+                                    </button>
                                 ))}
                             </div>
                         </div>

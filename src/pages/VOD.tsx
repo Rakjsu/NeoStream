@@ -23,7 +23,7 @@ import { HoverPreviewCard } from '../components/HoverPreviewCard';
 import { closeAllPreviews } from '../components/hoverPreviewActions';
 import { useLanguage } from '../services/languageService';
 import { isRecentlyAdded } from '../services/catalogNew';
-import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
+import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_OPEN_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
 
 interface VODStream {
     num: number;
@@ -105,6 +105,9 @@ export function VOD() {
     // Global search term-bridge: consume (read + remove) the term stored by
     // the Ctrl+K overlay, both on mount (cross-page navigation) and on the
     // event (already on this page).
+    // Ficha pendente de abrir (id vindo da busca global ou do modal).
+    const [pendingOpenId, setPendingOpenId] = useState<string | null>(null);
+
     useEffect(() => {
         const consumeGlobalSearchTerm = () => {
             const term = sessionStorage.getItem(GLOBAL_SEARCH_TERM_KEY);
@@ -112,11 +115,35 @@ export function VOD() {
                 sessionStorage.removeItem(GLOBAL_SEARCH_TERM_KEY);
                 setSearchQuery(term);
             }
+            // Item clicado na busca (ou nos Parecidos/filmografia do modal):
+            // abre a ficha assim que o catálogo estiver carregado.
+            const openRaw = sessionStorage.getItem(GLOBAL_SEARCH_OPEN_KEY);
+            if (openRaw !== null) {
+                try {
+                    const open = JSON.parse(openRaw) as { kind?: string; id?: number | string };
+                    if (open?.kind === 'vod' && open.id != null) {
+                        sessionStorage.removeItem(GLOBAL_SEARCH_OPEN_KEY);
+                        setPendingOpenId(String(open.id));
+                    }
+                } catch {
+                    sessionStorage.removeItem(GLOBAL_SEARCH_OPEN_KEY);
+                }
+            }
         };
         consumeGlobalSearchTerm();
         window.addEventListener(GLOBAL_SEARCH_EVENT, consumeGlobalSearchTerm);
         return () => window.removeEventListener(GLOBAL_SEARCH_EVENT, consumeGlobalSearchTerm);
     }, []);
+
+    // Abre a ficha pendente quando a lista chega (a navegação pode vencer o fetch).
+    useEffect(() => {
+        if (!pendingOpenId || streams.length === 0) return;
+        const hit = streams.find(stream => String(stream.stream_id) === pendingOpenId);
+        queueMicrotask(() => {
+            setPendingOpenId(null);
+            if (hit) setSelectedMovie(hit);
+        });
+    }, [pendingOpenId, streams]);
 
     // Listen for mini player expand event to reopen full player
     useEffect(() => {
