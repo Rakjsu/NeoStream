@@ -23,7 +23,7 @@ import { HoverPreviewCard } from '../components/HoverPreviewCard';
 import { closeAllPreviews } from '../components/hoverPreviewActions';
 import { useLanguage } from '../services/languageService';
 import { isRecentlyAdded } from '../services/catalogNew';
-import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
+import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_OPEN_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
 
 interface Series {
     num: number;
@@ -121,6 +121,9 @@ export function Series() {
     // Global search term-bridge: consume (read + remove) the term stored by
     // the Ctrl+K overlay, both on mount (cross-page navigation) and on the
     // event (already on this page).
+    // Ficha pendente de abrir (id vindo da busca global ou do modal).
+    const [pendingOpenId, setPendingOpenId] = useState<string | null>(null);
+
     useEffect(() => {
         const consumeGlobalSearchTerm = () => {
             const term = sessionStorage.getItem(GLOBAL_SEARCH_TERM_KEY);
@@ -128,11 +131,34 @@ export function Series() {
                 sessionStorage.removeItem(GLOBAL_SEARCH_TERM_KEY);
                 setSearchQuery(term);
             }
+            // Item clicado na busca (ou nos Parecidos do modal): abre a ficha.
+            const openRaw = sessionStorage.getItem(GLOBAL_SEARCH_OPEN_KEY);
+            if (openRaw !== null) {
+                try {
+                    const open = JSON.parse(openRaw) as { kind?: string; id?: number | string };
+                    if (open?.kind === 'series' && open.id != null) {
+                        sessionStorage.removeItem(GLOBAL_SEARCH_OPEN_KEY);
+                        setPendingOpenId(String(open.id));
+                    }
+                } catch {
+                    sessionStorage.removeItem(GLOBAL_SEARCH_OPEN_KEY);
+                }
+            }
         };
         consumeGlobalSearchTerm();
         window.addEventListener(GLOBAL_SEARCH_EVENT, consumeGlobalSearchTerm);
         return () => window.removeEventListener(GLOBAL_SEARCH_EVENT, consumeGlobalSearchTerm);
     }, []);
+
+    // Abre a ficha pendente quando a lista chega (a navegação pode vencer o fetch).
+    useEffect(() => {
+        if (!pendingOpenId || series.length === 0) return;
+        const hit = series.find(item => String(item.series_id) === pendingOpenId);
+        queueMicrotask(() => {
+            setPendingOpenId(null);
+            if (hit) setSelectedSeries(hit);
+        });
+    }, [pendingOpenId, series]);
 
     // Listen for mini player expand event to reopen full player
     useEffect(() => {
