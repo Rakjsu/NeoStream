@@ -4,7 +4,7 @@
 // pra não re-seekar a cada pixel; live fica de fora (sem duração).
 import { useEffect, useRef, useState } from 'react';
 import { useHls } from '../../hooks/useHls';
-import { previewBucket, previewSeekTarget } from './playerExtras';
+import { previewBucket, previewSeekTarget, isConcurrentSafeSource } from './playerExtras';
 
 const THUMB_W = 200;
 const THUMB_H = 112;
@@ -24,7 +24,10 @@ export function SeekPreviewThumb({ src, timeSec, visible, x }: SeekPreviewThumbP
     const videoRef = useRef<HTMLVideoElement>(null);
     const cacheRef = useRef<Map<number, string>>(new Map());
     const [thumb, setThumb] = useState<string | null>(null);
-    useHls({ src, videoRef, onStreamError: () => undefined });
+    const safe = isConcurrentSafeSource(src);
+    // Fonte '' quando o stream é remoto: o useHls sai cedo e nunca abre a 2ª
+    // conexão nem toca no lock do vídeo principal.
+    useHls({ src: safe ? src : '', videoRef, onStreamError: () => undefined });
 
     // Fonte trocou (outra versão/episódio): o cache antigo não vale mais.
     useEffect(() => {
@@ -33,7 +36,7 @@ export function SeekPreviewThumb({ src, timeSec, visible, x }: SeekPreviewThumbP
     }, [src]);
 
     useEffect(() => {
-        if (!visible || timeSec < 0) return;
+        if (!safe || !visible || timeSec < 0) return;
         const bucket = previewBucket(timeSec);
         if (bucket < 0) return;
         const cached = cacheRef.current.get(bucket);
@@ -64,11 +67,11 @@ export function SeekPreviewThumb({ src, timeSec, visible, x }: SeekPreviewThumbP
             } catch { /* metadata ainda não carregou */ }
         }, HOVER_DEBOUNCE_MS);
         return () => window.clearTimeout(timer);
-    }, [visible, timeSec]);
+    }, [safe, visible, timeSec]);
 
     return (
         <>
-            <video ref={videoRef} muted preload="metadata" crossOrigin="anonymous" style={{ display: 'none' }} />
+            {safe && <video ref={videoRef} muted preload="metadata" crossOrigin="anonymous" style={{ display: 'none' }} />}
             {visible && thumb && (
                 <div
                     style={{

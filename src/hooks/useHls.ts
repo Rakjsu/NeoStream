@@ -8,8 +8,13 @@ interface UseHlsOptions {
     onStreamError?: () => void; // Called when stream fails fatally (for fallback logic)
 }
 
-// Global lock with timestamp - prevents Strict Mode double-init for 500ms
-const srcInitTimes = new Map<string, number>();
+// Lock por ELEMENTO de vídeo (não por src) — evita o double-init do Strict
+// Mode por 500ms. Chavear por src quebrava quando dois <video> distintos
+// tocam a MESMA fonte (o player principal + o <video> oculto do preview de
+// miniatura): o que inicializava por último via o lock e era PULADO, ficando
+// sem fonte. Como os efeitos dos filhos rodam antes do pai, o preview vencia
+// e o player principal nunca recebia o stream (o filme "não iniciava").
+const srcInitTimes = new WeakMap<HTMLVideoElement, number>();
 
 // Track retry attempts per source to trigger fallback after max retries
 const retryAttempts = new Map<string, number>();
@@ -31,16 +36,17 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
         const video = videoRef.current;
         if (!video || !src) return;
 
-        // Check if this src was initialized recently (within 500ms = Strict Mode)
-        const lastInitTime = srcInitTimes.get(src) || 0;
+        // Check if THIS video element was initialized recently (within 500ms
+        // = Strict Mode double-invoke on the same element).
+        const lastInitTime = srcInitTimes.get(video) || 0;
         const timeSinceLastInit = Date.now() - lastInitTime;
 
         if (timeSinceLastInit < 500) {
             return; // Don't cleanup on skip, just return without doing anything
         }
 
-        // Mark this src as being initialized NOW
-        srcInitTimes.set(src, Date.now());
+        // Mark this element as being initialized NOW
+        srcInitTimes.set(video, Date.now());
         hasStartedPlaying.current = false;
 
         // Get buffer settings synchronously
@@ -208,7 +214,7 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
                     timeoutRef.current = null;
                 }
                 // Allow re-initialization after 1 second (for genuine source changes)
-                setTimeout(() => srcInitTimes.delete(src), 1000);
+                setTimeout(() => srcInitTimes.delete(video), 1000);
                 hls.destroy();
                 hlsRef.current = null;
             };
@@ -226,7 +232,7 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
                 timeoutRef.current = null;
             }
             // Allow re-initialization after 1 second
-            setTimeout(() => srcInitTimes.delete(src), 1000);
+            setTimeout(() => srcInitTimes.delete(video), 1000);
             // DON'T clear video.src - this causes AbortError
         };
     }, [src, videoRef]); // Removed onStreamError - using ref instead
