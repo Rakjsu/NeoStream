@@ -161,7 +161,7 @@ export function Home() {
     useEffect(() => {
         void (async () => {
             try {
-                const status = await window.ipcRenderer.invoke('auth:status') as {
+                const status = await window.ipcRenderer.invoke('auth:check') as {
                     authenticated?: boolean;
                     user?: { exp_date?: string | number | null };
                 };

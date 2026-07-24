@@ -561,17 +561,27 @@ export function WebRemoteBridge() {
                 applyingRemoteProgress = false;
             }
         };
+        // O espelho de posição roda dentro do onTimeUpdate do player. Um throw
+        // aqui (ex.: canal fora da whitelist do preload) sobe pelo event handler
+        // do <video> e derruba a reprodução — então NUNCA deixe escapar.
+        const sendProgress = (payload: unknown) => {
+            try {
+                window.ipcRenderer.send('web-remote:progress', payload);
+            } catch (error) {
+                console.warn('[WebRemoteBridge] progresso não espelhado:', error);
+            }
+        };
         const onLocalProgressSample = (event: Event) => {
             if (applyingRemoteProgress) return; // eco do que o celular acabou de mandar
             const detail = (event as CustomEvent).detail as { kind?: string; movieId?: string; title?: string; seriesId?: string; season?: number; episode?: number; positionSec?: number; durationSec?: number; updatedAt?: number } | undefined;
             if (!detail) return;
             if (detail.kind === 'movie') {
-                window.ipcRenderer.send('web-remote:progress', { kind: 'movie', movieId: detail.movieId, title: detail.title, positionSec: detail.positionSec, durationSec: detail.durationSec, updatedAt: detail.updatedAt });
+                sendProgress({ kind: 'movie', movieId: detail.movieId, title: detail.title, positionSec: detail.positionSec, durationSec: detail.durationSec, updatedAt: detail.updatedAt });
             } else if (detail.kind === 'episode' && detail.seriesId) {
                 void loadSeriesNames().then(names => {
                     const seriesName = names.get(String(detail.seriesId));
                     if (!seriesName) return;
-                    window.ipcRenderer.send('web-remote:progress', { kind: 'episode', title: seriesName, season: detail.season, episode: detail.episode, positionSec: detail.positionSec, durationSec: detail.durationSec, updatedAt: detail.updatedAt });
+                    sendProgress({ kind: 'episode', title: seriesName, season: detail.season, episode: detail.episode, positionSec: detail.positionSec, durationSec: detail.durationSec, updatedAt: detail.updatedAt });
                 });
             }
         };

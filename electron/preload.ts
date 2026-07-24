@@ -35,6 +35,8 @@ const invokeChannels = new Set([
     'cast:queue-skip',
     'cast:queue-jump',
     'cast:reconnect',
+    'cast:set-subtitle',
+    'cast:set-audio-track',
     'web-remote:get-config',
     'web-remote:notify-mobile',
     'web-remote:play-on-mobile',
@@ -198,6 +200,12 @@ const sendChannels = new Set([
     'web-remote:recordings',
     'web-remote:stats',
     'web-remote:schedule-result',
+    'web-remote:favorites',
+    'web-remote:reminders',
+    // 🔄 Item 11: amostra de posição espelhada no celular. Ficou de fora
+    // desta lista no #319 — o send lançava dentro do onTimeUpdate do player
+    // e derrubava a reprodução (ver preloadChannels.test.ts).
+    'web-remote:progress',
 ])
 
 const receiveChannels = new Set([
