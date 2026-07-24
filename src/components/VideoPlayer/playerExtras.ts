@@ -70,3 +70,15 @@ export function previewBucket(timeSec: number, bucketS = 10): number {
 export function previewSeekTarget(bucket: number, bucketS = 10): number {
     return bucket * bucketS + bucketS / 2;
 }
+
+/**
+ * O preview de miniatura monta um 2º <video> que abre uma conexão concorrente
+ * à MESMA URL. Provedores Xtream/IPTV costumam limitar a 1 conexão por conta —
+ * a 2ª derruba a reprodução principal (o filme "não inicia"). Então o preview
+ * só pode carregar a fonte quando ela é local/baixada (leitura concorrente é
+ * grátis); streams remotos ficam só com o tooltip de tempo. PURO.
+ */
+export function isConcurrentSafeSource(src: string): boolean {
+    return /^(blob:|file:|data:)/i.test(src)
+        || /^https?:\/\/(127\.0\.0\.1|localhost)([:/]|$)/i.test(src);
+}
