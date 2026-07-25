@@ -867,7 +867,8 @@
     "cinemaModeHint": "Luz ambiente con el color de la película",
     "subPreviewSample": "Subtítulo de ejemplo",
     "maximizeWindow": "Maximizar ventana",
-    "restoreWindow": "Restaurar ventana"
+    "restoreWindow": "Restaurar ventana",
+    "qrHandoffFailed": "No se pudo generar el QR de este contenido."
   },
   "home": {
     "dontRecommend": "No me recomiendes esto",
