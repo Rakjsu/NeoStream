@@ -865,7 +865,9 @@
     "streamUnavailable": "Stream no disponible. No se encontró alternativa.",
     "settingsTitle": "Ajustes de reproducción",
     "cinemaModeHint": "Luz ambiente con el color de la película",
-    "subPreviewSample": "Subtítulo de ejemplo"
+    "subPreviewSample": "Subtítulo de ejemplo",
+    "maximizeWindow": "Maximizar ventana",
+    "restoreWindow": "Restaurar ventana"
   },
   "home": {
     "dontRecommend": "No me recomiendes esto",

@@ -326,6 +326,24 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         localStorage.setItem('neostream_cinema_mode', next ? '1' : '0');
         setCinemaMode(next);
     };
+
+    // 🗔 Maximizar/restaurar a janela do app direto da barra do player (o
+    // window:maximize do main já é um toggle; is-maximized diz o estado atual).
+    const hasWindowControls = typeof window !== 'undefined' && !!window.ipcRenderer;
+    const [windowMaximized, setWindowMaximized] = useState(false);
+    useEffect(() => {
+        if (!hasWindowControls) return;
+        window.ipcRenderer.invoke('window:is-maximized')
+            .then((v: unknown) => setWindowMaximized(!!v))
+            .catch(() => undefined);
+    }, [hasWindowControls]);
+    const toggleWindowMaximize = useCallback(() => {
+        if (!hasWindowControls) return;
+        window.ipcRenderer.invoke('window:maximize')
+            .then(() => window.ipcRenderer.invoke('window:is-maximized'))
+            .then((v: unknown) => setWindowMaximized(!!v))
+            .catch(() => undefined);
+    }, [hasWindowControls]);
     useEffect(() => () => {
         try { void audioGraphRef.current?.ctx.close(); } catch { /* ignore */ }
     }, []);
@@ -995,6 +1013,18 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         <div ref={containerRef} className="video-player-container" onMouseMove={resetHideControlsTimer}>
             {onClose && showControls && (
                 <button className="video-player-close" onClick={onClose}>✕</button>
+            )}
+
+            {/* 🗔 Maximizar/restaurar a janela (só no desktop e fora do fullscreen real). */}
+            {showControls && hasWindowControls && !state.fullscreen && (
+                <button
+                    className="video-player-winbtn"
+                    onClick={toggleWindowMaximize}
+                    title={windowMaximized ? t('player', 'restoreWindow') : t('player', 'maximizeWindow')}
+                    aria-label={windowMaximized ? t('player', 'restoreWindow') : t('player', 'maximizeWindow')}
+                >
+                    {windowMaximized ? <Minimize2 size={18} /> : <Maximize size={18} />}
+                </button>
             )}
 
 
