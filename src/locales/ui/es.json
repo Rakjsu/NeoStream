@@ -788,7 +788,7 @@
   },
   "player": {
     "qrHandoff": "Continuar en el móvil",
-    "qrHandoffHint": "Apunta la cámara del móvil al código: la app abre en este punto",
+    "qrHandoffHint": "Muestra un QR para retomar en el celular",
     "qrHandoffClose": "Cerrar",
     "cinemaMode": "Modo cine",
     "volumeBoost": "Refuerzo de volumen",
@@ -823,7 +823,7 @@
     "subBgNone": "Sin fondo",
     "subBgSolid": "Fondo sólido",
     "radioMode": "Modo radio (pantalla negra)",
-    "radioModeHint": "Modo radio — clic para volver",
+    "radioModeHint": "Apaga el video, solo el audio",
     "sleepTimerPaused": "Reproducción pausada por el temporizador",
     "subtitlesOff": "Desactivado",
     "audioTrack": "Pista de audio",
@@ -862,7 +862,10 @@
     "disableSubtitles": "Desactivar Subtítulos",
     "errorLoadingSubtitles": "Error al cargar subtítulos forzados",
     "streamFallback": "Cambiando a",
-    "streamUnavailable": "Stream no disponible. No se encontró alternativa."
+    "streamUnavailable": "Stream no disponible. No se encontró alternativa.",
+    "settingsTitle": "Ajustes de reproducción",
+    "cinemaModeHint": "Luz ambiente con el color de la película",
+    "subPreviewSample": "Subtítulo de ejemplo"
   },
   "home": {
     "dontRecommend": "No me recomiendes esto",

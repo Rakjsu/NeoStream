@@ -1,4 +1,4 @@
-import { Settings } from 'lucide-react';
+import { Settings, Film, Radio, Smartphone, ChevronRight } from 'lucide-react';
 import type { SubtitleStyle } from '../../utils/subtitleStyle';
 import { useLanguage } from '../../services/languageService';
 import { SUBTITLE_LANGUAGE_OPTIONS } from '../../services/subtitleService';
@@ -169,6 +169,10 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
 
             {showSettings && (
                 <div className="settings-menu">
+                    <div className="settings-head">
+                        <span className="sh-ic"><Settings size={15} /></span>
+                        <h4>{t('player', 'settingsTitle')}</h4>
+                    </div>
                     {/* Movie Version Switcher / Live TV Quality Switcher */}
                     {movieVersions && movieVersions.length > 1 && onSwitchVersion ? (
                         <div className="settings-section">
@@ -178,14 +182,15 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
                             <div className="settings-options">
                                 {movieVersions.map(version => {
                                     const isActive = version.movie.stream_id === currentMovieId;
-                                    // Get icon based on quality
-                                    const getQualityIcon = (label: string) => {
+                                    // Colored availability dot by quality tier.
+                                    const getQualityDot = (label: string) => {
                                         const l = label.toLowerCase();
-                                        if (l.includes('4k') || l.includes('uhd')) return '🔵';
-                                        if (l.includes('fhd') || l.includes('h.265') || l.includes('1080')) return '🟢';
-                                        if (l.includes('hd') || l.includes('720')) return '🟡';
-                                        return '⚪'; // SD or unknown
+                                        if (l.includes('4k') || l.includes('uhd')) return '#f59e0b';
+                                        if (l.includes('fhd') || l.includes('h.265') || l.includes('1080')) return '#37d67a';
+                                        if (l.includes('hd') || l.includes('720')) return '#facc15';
+                                        return '#8a97a8'; // SD or unknown
                                     };
+                                    const dotColor = getQualityDot(version.label);
                                     return (
                                         <button
                                             key={version.movie.stream_id}
@@ -198,7 +203,7 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
                                             }}
                                             style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'center' }}
                                         >
-                                            <span style={{ fontSize: '10px' }}>{getQualityIcon(version.label)}</span>
+                                            <span className="opt-dot" style={{ background: dotColor, boxShadow: `0 0 0 3px ${dotColor}28` }}></span>
                                             {version.label}
                                         </button>
                                     );
@@ -344,6 +349,9 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
                                     </button>
                                 ))}
                             </div>
+                            <div className="psm-meter" aria-hidden="true">
+                                <i style={{ width: `${Math.min(100, Math.round((volumeBoost / 3) * 100))}%` }} />
+                            </div>
                         </div>
                     )}
 
@@ -410,51 +418,76 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
                                         className={`settings-option ${subtitleStyle.color === color ? 'active' : ''}`}
                                         onClick={() => onSetSubtitleStyle({ ...subtitleStyle, color })}
                                     >
-                                        {color === 'white' ? '⚪' : '🟡'}
+                                        <span className="sub-swatch" style={{ background: color === 'white' ? '#ffffff' : '#ffd24a' }} />
                                     </button>
                                 ))}
                             </div>
-                        </div>
-                    )}
-
-                    {/* 🎬 Modo cinema: vinheta + luz ambiente (toggle) */}
-                    {onToggleCinemaMode && (
-                        <div className="settings-section">
-                            <div className="settings-options">
-                                <button
-                                    className={`settings-option ${cinemaMode ? 'active' : ''}`}
-                                    onClick={onToggleCinemaMode}
+                            {/* Preview ao vivo: reflete tamanho, fundo e cor escolhidos. */}
+                            <div className="sub-preview" aria-hidden="true">
+                                <span
+                                    className="cap"
+                                    style={{
+                                        fontSize: subtitleStyle.size === 'small' ? 12 : subtitleStyle.size === 'large' ? 19 : 15,
+                                        color: subtitleStyle.color === 'yellow' ? '#ffd24a' : '#ffffff',
+                                        background: subtitleStyle.background === 'none'
+                                            ? 'transparent'
+                                            : subtitleStyle.background === 'solid' ? '#000' : 'rgba(0,0,0,0.55)',
+                                        textShadow: subtitleStyle.background === 'none'
+                                            ? '0 1px 3px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,1)'
+                                            : 'none'
+                                    }}
                                 >
-                                    🎬 {t('player', 'cinemaMode')}
-                                </button>
+                                    {t('player', 'subPreviewSample')}
+                                </span>
                             </div>
                         </div>
                     )}
 
-                    {/* 📱 QR pro celular: continuar este conteúdo no app do celular */}
-                    {onShowMobileQr && (
+                    {/* Modos: cinema (toggle persistente), continuar no celular e
+                        rádio (ações que fecham o menu). */}
+                    {(onToggleCinemaMode || onShowMobileQr || onEnterRadioMode) && (
                         <div className="settings-section">
-                            <div className="settings-options">
-                                <button
-                                    className="settings-option"
-                                    onClick={() => { onShowMobileQr(); setShowSettings(false); }}
-                                >
-                                    📱 {t('player', 'qrHandoff')}
-                                </button>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* 📻 Modo rádio: tela preta, áudio segue (clique volta) */}
-                    {onEnterRadioMode && (
-                        <div className="settings-section">
-                            <div className="settings-options">
-                                <button
-                                    className="settings-option"
-                                    onClick={() => { onEnterRadioMode(); setShowSettings(false); }}
-                                >
-                                    📻 {t('player', 'radioMode')}
-                                </button>
+                            <div className="psm-modes">
+                                {onToggleCinemaMode && (
+                                    <button
+                                        className={`psm-row ${cinemaMode ? 'on' : ''}`}
+                                        aria-pressed={!!cinemaMode}
+                                        onClick={onToggleCinemaMode}
+                                    >
+                                        <span className="psm-ic"><Film size={17} /></span>
+                                        <span className="psm-txt">
+                                            <b>{t('player', 'cinemaMode')}</b>
+                                            <small>{t('player', 'cinemaModeHint')}</small>
+                                        </span>
+                                        <span className="psm-switch" aria-hidden="true"></span>
+                                    </button>
+                                )}
+                                {onShowMobileQr && (
+                                    <button
+                                        className="psm-row action"
+                                        onClick={() => { onShowMobileQr(); setShowSettings(false); }}
+                                    >
+                                        <span className="psm-ic"><Smartphone size={17} /></span>
+                                        <span className="psm-txt">
+                                            <b>{t('player', 'qrHandoff')}</b>
+                                            <small>{t('player', 'qrHandoffHint')}</small>
+                                        </span>
+                                        <span className="psm-chev" aria-hidden="true"><ChevronRight size={18} /></span>
+                                    </button>
+                                )}
+                                {onEnterRadioMode && (
+                                    <button
+                                        className="psm-row"
+                                        onClick={() => { onEnterRadioMode(); setShowSettings(false); }}
+                                    >
+                                        <span className="psm-ic"><Radio size={17} /></span>
+                                        <span className="psm-txt">
+                                            <b>{t('player', 'radioMode')}</b>
+                                            <small>{t('player', 'radioModeHint')}</small>
+                                        </span>
+                                        <span className="psm-chev" aria-hidden="true"><ChevronRight size={18} /></span>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}
