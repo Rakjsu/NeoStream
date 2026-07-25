@@ -26,8 +26,11 @@ jobs:
       # Fail the build on HIGH+ vulnerabilities in PRODUCTION deps only, so a
       # new runtime CVE is caught early without dev-tooling advisories (vite/
       # esbuild dev-server file reads, etc.) blocking every PR.
+      # O gate roda por um script com allowlist explícita (scripts/audit-prod.mjs)
+      # para poder ignorar advisories que comprovadamente não se aplicam ao app
+      # (ex.: react-router modo RSC, que este SPA não usa) sem afrouxar o resto.
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+        run: node scripts/audit-prod.mjs
 
       - name: Typecheck
         run: npx tsc -b
