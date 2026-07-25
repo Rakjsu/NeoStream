@@ -788,7 +788,7 @@
   },
   "player": {
     "qrHandoff": "Continue on phone",
-    "qrHandoffHint": "Point your phone camera at the code — the app opens at this position",
+    "qrHandoffHint": "Shows a QR to resume on your phone",
     "qrHandoffClose": "Close",
     "cinemaMode": "Cinema mode",
     "volumeBoost": "Volume boost",
@@ -823,7 +823,7 @@
     "subBgNone": "No background",
     "subBgSolid": "Solid background",
     "radioMode": "Radio mode (black screen)",
-    "radioModeHint": "Radio mode — click to return",
+    "radioModeHint": "Turns off the video, audio only",
     "sleepTimerPaused": "Playback paused by sleep timer",
     "subtitlesOff": "Off",
     "audioTrack": "Audio track",
@@ -862,7 +862,10 @@
     "disableSubtitles": "Disable Subtitles",
     "errorLoadingSubtitles": "Error loading forced subtitles",
     "streamFallback": "Switching to",
-    "streamUnavailable": "Stream unavailable. No alternative found."
+    "streamUnavailable": "Stream unavailable. No alternative found.",
+    "settingsTitle": "Playback settings",
+    "cinemaModeHint": "Ambient light from the film’s color",
+    "subPreviewSample": "Sample subtitle"
   },
   "home": {
     "dontRecommend": "Don't recommend this",

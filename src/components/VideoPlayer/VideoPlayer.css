@@ -418,7 +418,9 @@
     user-select: none;
 }
 
-/* Settings Menu */
+/* Settings Menu — painel de vidro + controles segmentados.
+   Tudo escopado sob .settings-menu (exclusivo do player) para não vazar
+   nas classes homônimas .settings-section/.settings-option do Welcome. */
 .settings-menu-container {
     position: relative;
 }
@@ -427,49 +429,251 @@
     position: absolute;
     bottom: 50px;
     right: 0;
-    background: rgba(28, 28, 28, 0.95);
+    width: 304px;
+    max-width: calc(100vw - 32px);
+    max-height: min(70vh, 560px);
+    overflow-y: auto;
+    background: rgba(18, 23, 31, 0.92);
+    -webkit-backdrop-filter: blur(26px) saturate(1.3);
+    backdrop-filter: blur(26px) saturate(1.3);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 14px;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.14) inset,
+        0 24px 64px -18px rgba(0, 0, 0, 0.72);
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+.settings-menu::-webkit-scrollbar { width: 8px; }
+.settings-menu::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.14);
     border-radius: 8px;
-    padding: 8px;
-    min-width: 200px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    border: 2px solid transparent;
+    background-clip: padding-box;
 }
 
-.settings-section {
-    padding: 8px;
+/* Header */
+.settings-menu .settings-head {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 2px 2px 12px;
+}
+.settings-menu .settings-head .sh-ic {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    color: var(--ns-accent);
+    background: linear-gradient(145deg, rgba(var(--ns-accent-rgb), 0.16), rgba(var(--ns-accent-grad-to-rgb), 0.10));
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.22);
+}
+.settings-menu .settings-head h4 {
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: 650;
+    color: #fff;
+    letter-spacing: -0.01em;
 }
 
-.settings-label {
-    display: block;
-    color: #9ca3af;
-    font-size: 12px;
-    font-weight: 600;
-    margin-bottom: 8px;
+/* Section */
+.settings-menu .settings-section {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    padding: 11px 2px;
+}
+.settings-menu .settings-section + .settings-section {
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+.settings-menu .settings-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 10.5px;
+    font-weight: 650;
+    letter-spacing: 0.13em;
     text-transform: uppercase;
 }
 
-.settings-options {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
+/* Options → controle segmentado / trilha de chips */
+.settings-menu .settings-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 4px;
+    border-radius: 11px;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+.settings-menu .settings-option {
+    flex: 1 1 auto;
+    min-width: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     gap: 6px;
-}
-
-.settings-option {
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
-    color: white;
-    padding: 8px;
-    border-radius: 4px;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 12.5px;
+    font-weight: 560;
+    white-space: nowrap;
     cursor: pointer;
-    font-size: 13px;
-    transition: all 0.2s ease;
+    font-variant-numeric: tabular-nums;
+    transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
 }
-
-.settings-option:hover {
-    background: rgba(255, 255, 255, 0.2);
+.settings-menu .settings-option:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.07);
 }
-
-.settings-option.active {
+.settings-menu .settings-option.active {
+    color: #fff;
     background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to));
+    box-shadow:
+        0 2px 10px -2px rgba(var(--ns-accent-rgb), 0.4),
+        0 1px 0 rgba(255, 255, 255, 0.2) inset;
+}
+.settings-menu .settings-option:focus-visible {
+    outline: 2px solid var(--ns-accent);
+    outline-offset: 2px;
+}
+
+/* Ponto de disponibilidade (versão/qualidade) */
+.settings-menu .opt-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex: none;
+}
+
+/* Medidor do reforço de volume */
+.settings-menu .psm-meter {
+    position: relative;
+    height: 6px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.06);
+}
+.settings-menu .psm-meter i {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: 6px;
+    background: linear-gradient(90deg, var(--ns-accent), var(--ns-accent-grad-to));
+    box-shadow: 0 0 10px -1px rgba(var(--ns-accent-rgb), 0.5);
+    transition: width 0.32s cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+/* Preview ao vivo da legenda + amostra de cor */
+.settings-menu .sub-preview {
+    position: relative;
+    height: 64px;
+    border-radius: 11px;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 10px;
+    background: linear-gradient(200deg, #243a52, #0d1420 70%);
+}
+.settings-menu .sub-preview .cap {
+    max-width: 88%;
+    text-align: center;
+    line-height: 1.25;
+    font-weight: 650;
+    padding: 2px 8px;
+    border-radius: 6px;
+    transition: font-size 0.18s ease, background 0.18s ease, color 0.18s ease;
+}
+.settings-menu .sub-swatch {
+    display: block;
+    width: 18px;
+    height: 18px;
+    border-radius: 5px;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4) inset;
+}
+
+/* Linhas de modo (toggle / ação) */
+.settings-menu .psm-modes {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+.settings-menu .psm-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    text-align: left;
+    padding: 10px 11px;
+    border-radius: 11px;
+    cursor: pointer;
+    color: #fff;
+    font: inherit;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.16s ease, border-color 0.16s ease;
+}
+.settings-menu .psm-row:hover { background: rgba(255, 255, 255, 0.09); }
+.settings-menu .psm-row .psm-ic {
+    width: 32px;
+    height: 32px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.05);
+    transition: color 0.18s ease, background 0.18s ease;
+}
+.settings-menu .psm-row .psm-txt { flex: 1; min-width: 0; }
+.settings-menu .psm-row .psm-txt b { display: block; font-size: 12.5px; font-weight: 600; }
+.settings-menu .psm-row .psm-txt small { display: block; font-size: 10.5px; color: rgba(255, 255, 255, 0.5); margin-top: 1px; }
+.settings-menu .psm-switch {
+    position: relative;
+    width: 40px;
+    height: 23px;
+    flex: none;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.14);
+    transition: background 0.22s ease;
+}
+.settings-menu .psm-switch::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    transition: transform 0.22s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.settings-menu .psm-row.on .psm-switch { background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to)); }
+.settings-menu .psm-row.on .psm-switch::after { transform: translateX(17px); }
+.settings-menu .psm-row.on .psm-ic { color: #fff; background: linear-gradient(135deg, var(--ns-accent), var(--ns-accent-grad-to)); }
+.settings-menu .psm-row.action {
+    background: linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.12), rgba(var(--ns-accent-grad-to-rgb), 0.07));
+    border-color: rgba(var(--ns-accent-rgb), 0.2);
+}
+.settings-menu .psm-row.action:hover {
+    background: linear-gradient(135deg, rgba(var(--ns-accent-rgb), 0.2), rgba(var(--ns-accent-grad-to-rgb), 0.12));
+    border-color: rgba(var(--ns-accent-rgb), 0.34);
+}
+.settings-menu .psm-row.action .psm-ic { color: var(--ns-accent); background: rgba(var(--ns-accent-rgb), 0.14); }
+.settings-menu .psm-row .psm-chev { flex: none; color: rgba(255, 255, 255, 0.5); }
+
+@media (prefers-reduced-motion: reduce) {
+    .settings-menu *,
+    .settings-menu *::after { transition-duration: 0.001ms !important; }
 }
 
 /* Fullscreen styles */

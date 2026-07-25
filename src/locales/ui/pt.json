@@ -695,7 +695,7 @@
   },
   "player": {
     "qrHandoff": "Continuar no celular",
-    "qrHandoffHint": "Aponte a câmera do celular pro código — o app abre no mesmo ponto",
+    "qrHandoffHint": "Mostra um QR pra retomar no celular",
     "qrHandoffClose": "Fechar",
     "cinemaMode": "Modo cinema",
     "volumeBoost": "Reforço de volume",
@@ -730,7 +730,7 @@
     "subBgNone": "Sem fundo",
     "subBgSolid": "Fundo sólido",
     "radioMode": "Modo rádio (tela preta)",
-    "radioModeHint": "Modo rádio — clique para voltar",
+    "radioModeHint": "Desliga o vídeo, só o áudio",
     "sleepTimerPaused": "Reprodução pausada pelo timer",
     "subtitlesOff": "Desligada",
     "audioTrack": "Faixa de áudio",
@@ -769,7 +769,10 @@
     "disableSubtitles": "Desativar Legendas",
     "errorLoadingSubtitles": "Erro ao carregar legendas forçadas",
     "streamFallback": "Alternando para",
-    "streamUnavailable": "Stream indisponível. Nenhuma alternativa encontrada."
+    "streamUnavailable": "Stream indisponível. Nenhuma alternativa encontrada.",
+    "settingsTitle": "Ajustes de reprodução",
+    "cinemaModeHint": "Luz ambiente com a cor do filme",
+    "subPreviewSample": "Legenda de exemplo"
   },
   "notifications": {
     "autoTuneIn": "Trocando pra {channel} em {s}s…",
