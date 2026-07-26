@@ -1,4 +1,5 @@
 import type { Profile, ProfilesData, CreateProfileData, UpdateProfileData } from '../types/profile';
+import { syncTombstones, tombstoneItemKey } from './syncTombstones';
 import { logParentalEvent } from './parentalLogService';
 
 const STORAGE_KEY = 'neostream_profiles';
@@ -253,6 +254,10 @@ export const profileService = {
 
         data.profiles.splice(index, 1);
         saveStorageData(data);
+        // Ledger de deleções: sem tombstone o unionById do sync trata o perfil
+        // como "novidade do outro lado" e ele volta no ciclo seguinte, já
+        // religado aos dados antigos (que nunca foram apagados).
+        syncTombstones.record(STORAGE_KEY, tombstoneItemKey(profileId));
         return true;
     },
 

@@ -109,6 +109,14 @@ export const favoritesService = {
         if (!activeProfile) return;
 
         const profileData = this.getProfileData();
+        // Cada item apagado precisa do seu tombstone — senão o unionById do
+        // sync trata a lista vazia como "lado sem novidade" e a outra máquina
+        // devolve tudo no ciclo seguinte. `remove()` já fazia isso item a item;
+        // o clear() em massa não fazia.
+        const key = playlistScopedKey(KEY_BASE, activeProfile.id);
+        (profileData.favorites || []).forEach((item: FavoriteItem) => {
+            syncTombstones.record(key, tombstoneItemKey(item.id, item.type));
+        });
         this.saveProfileData({ ...profileData, favorites: [] });
     },
 

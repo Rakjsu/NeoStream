@@ -24,6 +24,13 @@ export interface PlaylistEntry {
     password: string
     userInfo?: unknown
     addedAt: number
+    /**
+     * Quando a CREDENCIAL desta entrada mudou pela última vez. É o que permite
+     * o sync propagar uma senha corrigida sem reverter a correção: quem mudou
+     * por último vence. Ausente em entradas legadas (tratadas como as mais
+     * antigas, logo nunca vencem de uma entrada carimbada).
+     */
+    credentialsUpdatedAt?: number
     /** 'xtream' (default, absent on legacy entries), 'm3u' or 'stalker'. */
     type?: 'xtream' | 'm3u' | 'stalker'
 }
@@ -139,9 +146,11 @@ export interface UpsertResult {
 export function upsertPlaylist(playlists: PlaylistEntry[], input: UpsertInput): UpsertResult {
     const existing = playlists.find(p => p.url === input.url && p.username === input.username)
     if (existing) {
+        const senhaMudou = existing.password !== input.password
         const updated: PlaylistEntry = {
             ...existing,
             password: input.password,
+            credentialsUpdatedAt: senhaMudou ? Date.now() : existing.credentialsUpdatedAt,
             userInfo: input.userInfo ?? existing.userInfo,
             name: input.name?.trim() || existing.name,
             type: input.type ?? existing.type
@@ -160,6 +169,7 @@ export function upsertPlaylist(playlists: PlaylistEntry[], input: UpsertInput): 
         password: input.password,
         userInfo: input.userInfo,
         addedAt: Date.now(),
+        credentialsUpdatedAt: Date.now(),
         type: input.type
     }
     return { playlists: [...playlists, entry], entry }

@@ -80,3 +80,39 @@ describe('syncTombstones.record', () => {
         expect(Object.keys(stored.favorites)).toEqual(['a::movie']);
     });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔒 Regressão (auditoria R1 — #9/#10/#11): tudo que era "apagar em massa" não
+// deixava rastro, e o sync devolvia no ciclo seguinte. E a sessão de convidado
+// vazava pro arquivo de sync, virando perfil fantasma na outra máquina.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('deleções em massa deixam rastro (clear/deleteProfile)', () => {
+    beforeEach(() => localStorage.clear());
+
+    it('isBackupKey exclui as chaves da sessão de convidado', async () => {
+        const { isBackupKey, isGuestKey } = await import('./backupService');
+        expect(isGuestKey('neostream_profile_guest')).toBe(true);
+        expect(isGuestKey('neostream_watchlater_guest__pl_abc')).toBe(true);
+        expect(isBackupKey('neostream_profile_guest')).toBe(false);
+        expect(isBackupKey('neostream_watchlater_guest__pl_abc')).toBe(false);
+        // perfil normal continua entrando
+        expect(isBackupKey('neostream_profile_p1__pl_abc')).toBe(true);
+        // e um id que só CONTÉM "guest" não é confundido
+        expect(isGuestKey('neostream_profile_guestavo')).toBe(false);
+    });
+
+    it('collectBackup remove o perfil convidado do registro de perfis', async () => {
+        const { collectBackup } = await import('./backupService');
+        localStorage.setItem('neostream_profiles', JSON.stringify({
+            activeProfileId: 'p1',
+            profiles: [
+                { id: 'p1', name: 'Eu' },
+                { id: 'guest', name: 'Convidado', isGuest: true },
+            ],
+        }));
+        const payload = collectBackup();
+        const registro = JSON.parse(payload.data['neostream_profiles']);
+        expect(registro.profiles.map((p: { id: string }) => p.id)).toEqual(['p1']);
+        expect(registro.activeProfileId).toBe('p1'); // resto intacto
+    });
+});

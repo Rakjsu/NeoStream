@@ -12,6 +12,12 @@ interface StoreSchema {
     }
     playlists: PlaylistEntry[]
     activePlaylistId?: string
+    /**
+     * Ledger de playlists APAGADAS (chave `url|username` → timestamp). Sem ele,
+     * o sync de pasta reimporta do arquivo da outra máquina toda vez e a
+     * playlist apagada volta pra sempre. Podado por TTL em playlistManager.
+     */
+    removedPlaylists?: Record<string, number>
     favorites: unknown[]
     history: unknown[]
     settings: {
@@ -29,6 +35,7 @@ const store = new Store<StoreSchema>({
     defaults: {
         auth: {},
         playlists: [],
+        removedPlaylists: {},
         favorites: [],
         history: [],
         settings: {
