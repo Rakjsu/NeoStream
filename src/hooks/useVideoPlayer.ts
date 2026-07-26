@@ -109,7 +109,12 @@ export function useVideoPlayer() {
         const handleDurationChange = () => setState(prev => ({ ...prev, duration: video.duration, loading: false }));
         const handleVolumeChange = () => setState(prev => ({ ...prev, volume: video.volume, muted: video.muted }));
         const handleWaiting = () => setState(prev => ({ ...prev, loading: true }));
-        const handleCanPlay = () => setState(prev => ({ ...prev, loading: false }));
+        // `error: null` aqui é o que faz a caixa vermelha SUMIR: sem isso ela
+        // ficava grudada em cima do vídeo já tocando (troca de canal/episódio,
+        // recuperação do hls.js, retry) até o player ser fechado.
+        const handleCanPlay = () => setState(prev => ({ ...prev, loading: false, error: null }));
+        const handlePlaying = () => setState(prev => (prev.error ? { ...prev, error: null } : prev));
+        const handleLoadStart = () => setState(prev => (prev.error ? { ...prev, error: null } : prev));
         const handleError = () => setState(prev => ({ ...prev, error: 'Erro ao carregar vídeo', loading: false }));
         const handleProgress = () => {
             if (video.buffered.length > 0) {
@@ -158,6 +163,8 @@ export function useVideoPlayer() {
         video.addEventListener('volumechange', handleVolumeChange);
         video.addEventListener('waiting', handleWaiting);
         video.addEventListener('canplay', handleCanPlay);
+        video.addEventListener('playing', handlePlaying);
+        video.addEventListener('loadstart', handleLoadStart);
         video.addEventListener('error', handleError);
         video.addEventListener('progress', handleProgress);
 
@@ -175,6 +182,8 @@ export function useVideoPlayer() {
             video.removeEventListener('volumechange', handleVolumeChange);
             video.removeEventListener('waiting', handleWaiting);
             video.removeEventListener('canplay', handleCanPlay);
+            video.removeEventListener('playing', handlePlaying);
+            video.removeEventListener('loadstart', handleLoadStart);
             video.removeEventListener('error', handleError);
             video.removeEventListener('progress', handleProgress);
             document.removeEventListener('fullscreenchange', handleFullscreenChange);

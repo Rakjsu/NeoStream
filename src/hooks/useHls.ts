@@ -6,6 +6,8 @@ interface UseHlsOptions {
     src: string;
     videoRef: React.RefObject<HTMLVideoElement | null>;
     onStreamError?: () => void; // Called when stream fails fatally (for fallback logic)
+    /** Bump para reinicializar a MESMA fonte (botão "Tentar novamente"). */
+    reloadToken?: number;
 }
 
 // Lock por ELEMENTO de vídeo (não por src) — evita o double-init do Strict
@@ -21,7 +23,7 @@ const retryAttempts = new Map<string, number>();
 const MAX_RETRY_ATTEMPTS = 2; // Reduced from 3 for faster fallback
 const STREAM_TIMEOUT_MS = 10000; // 10 seconds timeout
 
-export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
+export function useHls({ src, videoRef, onStreamError, reloadToken = 0 }: UseHlsOptions) {
     const hlsRef = useRef<Hls | null>(null);
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const hasStartedPlaying = useRef(false);
@@ -226,7 +228,33 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
                 video.src = src;
             }
         }
+
+        // ⏱️ Watchdog do caminho NÃO-HLS (mp4/mkv com src direto — o VOD Xtream
+        // comum). O ramo HLS já tinha o seu; aqui não havia nada, então uma
+        // conexão que aceita e não manda dado (provedor sobrecarregado, conta
+        // sem slot) nunca dispara 'error' nem 'canplay' e o player ficava no
+        // spinner pra sempre. Qualquer sinal de vida cancela o timer.
+        const alive = () => {
+            hasStartedPlaying.current = true;
+            if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+                timeoutRef.current = null;
+            }
+        };
+        video.addEventListener('loadeddata', alive);
+        video.addEventListener('playing', alive);
+        video.addEventListener('progress', alive);
+        timeoutRef.current = setTimeout(() => {
+            if (!hasStartedPlaying.current && onStreamErrorRef.current) {
+                console.warn(`[Player] Sem dados após ${STREAM_TIMEOUT_MS / 1000}s na fonte direta — reportando falha`);
+                onStreamErrorRef.current();
+            }
+        }, STREAM_TIMEOUT_MS);
+
         return () => {
+            video.removeEventListener('loadeddata', alive);
+            video.removeEventListener('playing', alive);
+            video.removeEventListener('progress', alive);
             if (timeoutRef.current) {
                 clearTimeout(timeoutRef.current);
                 timeoutRef.current = null;
@@ -235,7 +263,7 @@ export function useHls({ src, videoRef, onStreamError }: UseHlsOptions) {
             setTimeout(() => srcInitTimes.delete(video), 1000);
             // DON'T clear video.src - this causes AbortError
         };
-    }, [src, videoRef]); // Removed onStreamError - using ref instead
+    }, [src, videoRef, reloadToken]); // Removed onStreamError - using ref instead
 
     return hlsRef;
 }

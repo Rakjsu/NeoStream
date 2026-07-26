@@ -122,6 +122,18 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     const { videoRef, state, controls } = useVideoPlayer();
     const { t } = useLanguage();
     const [streamErrorToast, setStreamErrorToast] = useState<string | null>(null);
+    // ⛔ Falha terminal de stream: sem isso o useHls destruía o Hls e o
+    // callback era no-op (só agia em live com 2+ variantes, o caso raro) — o
+    // detach do hls.js não dispara 'error' no elemento, então nem state.error
+    // acendia: ficava "Carregando..." pra sempre, sem toast e sem retry.
+    const [fatalStreamError, setFatalStreamError] = useState(false);
+    // Bump reinicializa a MESMA fonte no useHls ("Tentar novamente").
+    const [streamReloadToken, setStreamReloadToken] = useState(0);
+
+    const retryStream = useCallback(() => {
+        setFatalStreamError(false);
+        setStreamReloadToken(n => n + 1);
+    }, []);
 
     // Handle stream error for fallback
     const handleStreamError = useCallback(() => {
@@ -136,17 +148,20 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                 onSwitchVersion(nextVariant.channel, 0);
             } else {
                 console.warn('[Fallback] No more quality variants available');
-                setStreamErrorToast(t('player', 'streamUnavailable'));
-                setTimeout(() => setStreamErrorToast(null), 5000);
+                setFatalStreamError(true);
             }
+            return;
         }
+        // Sem variante pra cair (VOD, ou canal com uma fonte só): antes daqui
+        // não acontecia NADA — o usuário ficava no spinner eterno.
+        setFatalStreamError(true);
     }, [contentType, liveQualityVariants, currentQualityIndex, onSwitchVersion, t]);
 
     // ⏪ Item 15: timeshift — o main copia o canal pra um HLS local com
     // janela de ~30 min e o player passa a tocar do buffer (pause real).
     const [timeshiftUrl, setTimeshiftUrl] = useState<string | null>(null);
     const [timeshiftBusy, setTimeshiftBusy] = useState(false);
-    const hlsRef = useHls({ src: timeshiftUrl ?? src, videoRef, onStreamError: handleStreamError });
+    const hlsRef = useHls({ src: timeshiftUrl ?? src, videoRef, onStreamError: handleStreamError, reloadToken: streamReloadToken });
 
     // Sleep timer: pauses playback when the countdown hits zero.
     const sleepTimer = useSleepTimer(useCallback(() => {
@@ -761,6 +776,9 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
             setTimeout(() => setRecToast(null), 5000);
         }
     };
+    // Fonte nova = erro anterior não vale mais.
+    useEffect(() => { queueMicrotask(() => setFatalStreamError(false)); }, [src]);
+
     // Zap/troca de fonte desliga o timeshift (o buffer é do canal anterior);
     // desmontar o player também derruba a sessão no main.
     useEffect(() => {
@@ -1338,9 +1356,10 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             left: '50%',
                             transform: 'translateX(-50%)',
                             padding: '12px 24px',
-                            background: streamErrorToast.includes('indisponível')
-                                ? 'linear-gradient(135deg, #ef4444, #dc2626)'
-                                : 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                            // Só mensagens de progresso passam por aqui (fallback de
+                            // qualidade, timeshift, clipe): o erro terminal virou tela
+                            // própria (fatalStreamError), não toast.
+                            background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
                             borderRadius: '10px',
                             color: 'white',
                             fontSize: '0.95rem',
@@ -1353,7 +1372,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             gap: '10px'
                         }}
                     >
-                        {streamErrorToast === t('player', 'streamUnavailable') ? '⚠️' : '🔄'} {streamErrorToast}
+                        🔄 {streamErrorToast}
                     </div>
                 )}
 
@@ -1488,8 +1507,28 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                 </div>
             )}
 
+            {/* ⛔ Falha terminal do stream: o hls.js foi destruído e não há
+                variante pra cair. Substitui o spinner eterno por um estado
+                acionável (tentar de novo / fechar). */}
+            {fatalStreamError && (
+                <div className="video-player-error" style={{ zIndex: 70 }}>
+                    <p>⚠️ {t('player', 'streamUnavailable')}</p>
+                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 12 }}>
+                        <button onClick={retryStream}>{t('player', 'streamRetry')}</button>
+                        {onClose && (
+                            <button
+                                onClick={onClose}
+                                style={{ background: 'transparent', color: 'white', border: '1px solid rgba(255,255,255,0.4)' }}
+                            >
+                                {t('player', 'close')}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* Modern Loading Spinner */}
-            {state.loading && (
+            {!fatalStreamError && state.loading && (
                 <div className="video-player-loading">
                     <div className="modern-spinner">
                         <div className="spinner-ring"></div>
