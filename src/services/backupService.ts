@@ -85,7 +85,19 @@ const PREFIX_KEYS = [
     'program_reminders',      // per-profile EPG program reminders (v2)
 ];
 
+/**
+ * Dados da sessão de CONVIDADO nunca entram no backup/sync. O modo convidado é
+ * efêmero por definição (o `purgeGuestData` limpa ao sair), mas só na máquina
+ * local: se um ciclo de sync rodava durante a sessão, o perfil "Convidado" e o
+ * histórico dele apareciam na outra máquina — e voltavam pra esta no ciclo
+ * seguinte, virando perfil fantasma permanente.
+ */
+export function isGuestKey(key: string): boolean {
+    return /_guest(__pl_|$)/.test(key);
+}
+
 export function isBackupKey(key: string): boolean {
+    if (isGuestKey(key)) return false;
     return EXACT_KEYS.includes(key) || PREFIX_KEYS.some(prefix => key.startsWith(prefix));
 }
 
@@ -139,6 +151,26 @@ export function sanitizeBackupOpenSubtitles(raw: unknown): OpenSubtitlesCreds | 
     return { apiKey: os.apiKey.trim(), username, password };
 }
 
+/** Remove o perfil convidado do JSON do registro (o resto passa intacto). */
+function stripGuestProfiles(raw: string): string {
+    try {
+        const parsed = JSON.parse(raw) as {
+            profiles?: Array<{ id?: string; isGuest?: boolean }>;
+            activeProfileId?: string;
+        };
+        if (!Array.isArray(parsed?.profiles)) return raw;
+        const profiles = parsed.profiles.filter(p => !p?.isGuest && p?.id !== 'guest');
+        // Se o snapshot foi tirado DURANTE uma sessão de convidado, o
+        // activeProfileId apontaria pra um perfil que acabou de sair do payload
+        // — no restore o app ficaria sem perfil selecionado.
+        const activeProfileId = parsed.activeProfileId === 'guest' ? undefined : parsed.activeProfileId;
+        if (profiles.length === parsed.profiles.length && activeProfileId === parsed.activeProfileId) return raw;
+        return JSON.stringify({ ...parsed, profiles, activeProfileId });
+    } catch {
+        return raw;
+    }
+}
+
 export function collectBackup(
     playlists: BackupPlaylist[] = [],
     openSubtitles?: OpenSubtitlesCreds,
@@ -150,9 +182,10 @@ export function collectBackup(
         if (key === null || !isBackupKey(key)) continue;
 
         const value = localStorage.getItem(key);
-        if (value !== null) {
-            data[key] = value;
-        }
+        if (value === null) continue;
+        // O registro de perfis vai sem o convidado (as chaves _guest já ficaram
+        // de fora acima, mas o perfil em si mora dentro deste JSON).
+        data[key] = key === 'neostream_profiles' ? stripGuestProfiles(value) : value;
     }
 
     return {

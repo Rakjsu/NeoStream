@@ -143,16 +143,37 @@ function mergeEpisodeProgress(local: EpisodeProgressLike[], remote: EpisodeProgr
 }
 
 /** Profiles registry: add remote-only profiles; local versions win on conflict. */
-function mergeProfilesRegistry(localRaw: string, remoteRaw: string): { value: string; added: number } | null {
+function mergeProfilesRegistry(
+    localRaw: string,
+    remoteRaw: string,
+    tombs?: Record<string, number>,
+): { value: string; added: number; removed: number } | null {
     const local = parseJson<Record<string, unknown>>(localRaw);
     const remote = parseJson<Record<string, unknown>>(remoteRaw);
     if (!local || !remote) return null;
     const localProfiles = Array.isArray(local.profiles) ? local.profiles as FavoriteLike[] : null;
     const remoteProfiles = Array.isArray(remote.profiles) ? remote.profiles as FavoriteLike[] : null;
     if (!localProfiles || !remoteProfiles) return null;
-    const { items, added } = unionById(localProfiles, remoteProfiles);
-    if (added === 0) return { value: localRaw, added: 0 };
-    return { value: JSON.stringify({ ...local, profiles: items }), added };
+    // Convidado é sessão efêmera: nunca adotar o do outro lado (mesmo que um
+    // backup antigo, de antes do filtro no collectBackup, ainda o carregue).
+    const remoteSemGuest = remoteProfiles.filter(p => {
+        const item = p as { id?: string; isGuest?: boolean };
+        return !item?.isGuest && item?.id !== 'guest';
+    });
+    // 🛡️ O perfil ATIVO desta máquina nunca sai por tombstone alheio. Perfil
+    // não tem `addedAt`, então o tombstone venceria incondicionalmente: apagar
+    // o perfil X na máquina A (onde ele era secundário) derrubaria a sessão em
+    // uso na máquina B, deixando activeProfileId apontando pro vazio e os dados
+    // escopados (`neostream_profile_X__pl_*`) órfãos pra sempre.
+    // Espelha o "Cannot delete active profile" que o profileService já aplica.
+    const activeId = (local as { activeProfileId?: string }).activeProfileId;
+    const tombsSeguros = activeId && tombs
+        ? Object.fromEntries(Object.entries(tombs).filter(([k]) => k !== `${activeId}::`))
+        : tombs;
+    // `tombs` faz um perfil APAGADO aqui não voltar da outra máquina.
+    const { items, added, removed } = unionById(localProfiles, remoteSemGuest, tombsSeguros);
+    if (added === 0 && removed === 0) return { value: localRaw, added: 0, removed: 0 };
+    return { value: JSON.stringify({ ...local, profiles: items }), added, removed };
 }
 
 /** Profile data object (`neostream_profile_*`): union of the favorites array. */
@@ -217,7 +238,7 @@ export function mergeSyncData(
     const mergeOne = (key: string, localValue: string, remoteValue: string) => {
         let result: { value: string; added: number; removed?: number } | null = null;
         if (key === 'neostream_profiles') {
-            result = mergeProfilesRegistry(localValue, remoteValue);
+            result = mergeProfilesRegistry(localValue, remoteValue, tombstones[key]);
         } else if (key.startsWith('neostream_profile_')) {
             result = mergeProfileData(localValue, remoteValue, tombstones[key]);
         } else if (key.startsWith('neostream_watchlater_') || key === 'watchLater') {

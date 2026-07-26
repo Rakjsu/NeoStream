@@ -76,6 +76,9 @@ export function findPlaylist(id: string): PlaylistEntry | undefined {
  */
 export function saveAndActivatePlaylist(input: UpsertInput): PlaylistEntry {
     const { playlists, entry } = upsertPlaylist(getPlaylists(), input)
+    // Re-adicionar à mão é intenção nova: sai do ledger de apagadas, senão a
+    // própria playlist ficaria bloqueada pro sync por 30 dias.
+    clearRemovedPlaylist(input.url, input.username)
     store.set('playlists', playlists)
     store.set('activePlaylistId', entry.id)
     mirrorAuth(entry)
@@ -106,12 +109,45 @@ export interface RemovePlaylistOutcome {
     activeChanged: boolean
 }
 
+/** TTL do ledger de playlists apagadas — mesma janela dos tombstones do renderer. */
+export const REMOVED_PLAYLIST_TTL_MS = 30 * 24 * 3600_000
+
+/** Chave estável de uma playlist no ledger (credencial identifica a entrada). */
+export function removedPlaylistKey(url: string, username: string): string {
+    return `${url.trim()}|${username.trim()}`
+}
+
+/** Ledger podado (entradas velhas saem para não bloquear re-adição pra sempre). */
+export function getRemovedPlaylists(nowMs: number = Date.now()): Record<string, number> {
+    const raw = store.get('removedPlaylists') ?? {}
+    const alive: Record<string, number> = {}
+    for (const [key, at] of Object.entries(raw)) {
+        if (typeof at === 'number' && nowMs - at < REMOVED_PLAYLIST_TTL_MS) alive[key] = at
+    }
+    return alive
+}
+
+/** Marca a playlist como apagada de propósito (o sync não pode ressuscitá-la). */
+function recordRemovedPlaylist(entry: { url: string; username: string }): void {
+    const ledger = getRemovedPlaylists()
+    ledger[removedPlaylistKey(entry.url, entry.username)] = Date.now()
+    store.set('removedPlaylists', ledger)
+}
+
+/** Re-adicionar manualmente limpa o tombstone (intenção nova do usuário). */
+export function clearRemovedPlaylist(url: string, username: string): void {
+    const ledger = getRemovedPlaylists()
+    if (delete ledger[removedPlaylistKey(url, username)]) store.set('removedPlaylists', ledger)
+}
+
 export function removePlaylist(id: string): RemovePlaylistOutcome {
+    const antes = getPlaylists().find(p => p.id === id)
     const result = removePlaylistById(getPlaylists(), id, getActivePlaylistId())
     if (!result.removed) {
         return { removed: false, newActive: null, loggedOut: false, activeChanged: false }
     }
 
+    if (antes) recordRemovedPlaylist(antes)
     store.set('playlists', result.playlists)
 
     if (!result.activeChanged) {
@@ -153,6 +189,8 @@ export interface PlaylistBackupEntry {
     url: string
     username: string
     password: string
+    /** Quando a credencial mudou na origem (ausente em backups antigos). */
+    credentialsUpdatedAt?: number
 }
 
 /** Full playlist entries for the backup file (passwords stay in main until here). */
@@ -161,7 +199,8 @@ export function exportPlaylistsForBackup(): PlaylistBackupEntry[] {
         name: p.name,
         url: p.url,
         username: p.username,
-        password: p.password
+        password: p.password,
+        ...(p.credentialsUpdatedAt ? { credentialsUpdatedAt: p.credentialsUpdatedAt } : {})
     }))
 }
 
@@ -224,9 +263,23 @@ export function importMobileAccounts(entries: MobileAccountEntry[]): number {
 
 export function importPlaylistsFromBackup(entries: PlaylistBackupEntry[]): number {
     let playlists = getPlaylists()
+    const removidas = getRemovedPlaylists()
     let imported = 0
     for (const entry of entries) {
         if (!entry?.url?.trim() || !entry?.username?.trim() || typeof entry.password !== 'string') continue
+        // Apagada de propósito nesta máquina → o arquivo da outra máquina não
+        // pode trazê-la de volta (era ressurreição permanente e auto-propagante).
+        if (removidas[removedPlaylistKey(entry.url, entry.username)]) continue
+        // Já existe aqui: só aceita a credencial remota se ela for comprovada-
+        // mente MAIS NOVA. Antes o upsert sobrescrevia sempre — a senha
+        // corrigida aqui voltava pra velha a cada ciclo (flip-flop entre as
+        // máquinas), quebrando o switch e exportando credencial errada.
+        const local = playlists.find(p => p.url === entry.url && p.username === entry.username)
+        if (local) {
+            const remoteAt = entry.credentialsUpdatedAt ?? 0
+            const localAt = local.credentialsUpdatedAt ?? 0
+            if (remoteAt <= localAt || local.password === entry.password) continue
+        }
         const result = upsertPlaylist(playlists, {
             name: entry.name,
             url: entry.url,

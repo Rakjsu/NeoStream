@@ -197,3 +197,51 @@ describe('tombstones (remoções propagam)', () => {
         expect(result.removedItems).toBe(1);
     });
 });
+
+// 🔒 Regressão (revisão do PR de sync): passar tombstones ao registro de perfis
+// resolvia a ressurreição, mas abria um buraco pior — perfil não tem `addedAt`,
+// então o tombstone vence SEMPRE, inclusive contra o perfil que está ATIVO
+// nesta máquina. Apagar o perfil X na máquina A (onde era secundário) derrubaria
+// a sessão em uso na B.
+describe('mergeSyncData — registro de perfis com tombstones', () => {
+    const registro = (ativo: string, ids: string[]) => JSON.stringify({
+        activeProfileId: ativo,
+        profiles: ids.map(id => ({ id, name: `Perfil ${id}` })),
+    });
+
+    it('perfil apagado na outra máquina não volta', () => {
+        const local = {
+            neostream_profiles: registro('p1', ['p1']),
+            neostream_sync_tombstones: JSON.stringify({ neostream_profiles: { 'p2::': Date.now() } }),
+        };
+        const remote = { neostream_profiles: registro('p9', ['p1', 'p2']) };
+        const out = mergeSyncData(local, remote);
+        const final = JSON.parse(out.changed['neostream_profiles'] ?? local.neostream_profiles);
+        expect(final.profiles.map((p: { id: string }) => p.id)).toEqual(['p1']);
+    });
+
+    it('perfil ATIVO desta máquina sobrevive a tombstone vindo de fora', () => {
+        const local = {
+            neostream_profiles: registro('p2', ['p1', 'p2']),
+            // A outra máquina apagou o p2 (lá ele era secundário).
+            neostream_sync_tombstones: JSON.stringify({ neostream_profiles: { 'p2::': Date.now() } }),
+        };
+        const remote = { neostream_profiles: registro('p1', ['p1']) };
+        const out = mergeSyncData(local, remote);
+        const final = JSON.parse(out.changed['neostream_profiles'] ?? local.neostream_profiles);
+        const ids = final.profiles.map((p: { id: string }) => p.id);
+        expect(ids).toContain('p2');
+        expect(final.activeProfileId).toBe('p2');
+    });
+
+    it('perfil convidado nunca é adotado do remoto', () => {
+        const local = { neostream_profiles: registro('p1', ['p1']) };
+        const remote = { neostream_profiles: JSON.stringify({
+            activeProfileId: 'guest',
+            profiles: [{ id: 'p1', name: 'Eu' }, { id: 'guest', name: 'Convidado', isGuest: true }],
+        }) };
+        const out = mergeSyncData(local, remote);
+        const final = JSON.parse(out.changed['neostream_profiles'] ?? local.neostream_profiles);
+        expect(final.profiles.map((p: { id: string }) => p.id)).toEqual(['p1']);
+    });
+});

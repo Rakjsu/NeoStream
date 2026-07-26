@@ -107,6 +107,12 @@ export const watchLaterService = {
         const activeProfile = profileService.getActiveProfile();
         if (!activeProfile) return;
 
+        // Tombstone item a item: sem isso o sync devolve a lista inteira da
+        // outra máquina no ciclo seguinte (mesma raiz do clear() de favoritos).
+        const key = playlistScopedKey(KEY_BASE, activeProfile.id);
+        this.getAll().forEach((item: WatchLaterItem) => {
+            syncTombstones.record(key, tombstoneItemKey(item.id, item.type));
+        });
         this.save(activeProfile, []);
     },
 

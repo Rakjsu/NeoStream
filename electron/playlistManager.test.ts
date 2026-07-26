@@ -26,6 +26,8 @@ import {
     getActivePlaylistIdPublic,
     exportPlaylistsForBackup,
     importPlaylistsFromBackup,
+    getRemovedPlaylists,
+    removedPlaylistKey,
 } from './playlistManager'
 
 const auth = () => store.get('auth') as { url?: string; username?: string; password?: string }
@@ -149,24 +151,83 @@ describe('rename / deactivate', () => {
 })
 
 describe('backup (export/import sem ativar nem validar)', () => {
-    it('exporta só os 4 campos de credencial', () => {
+    it('exporta só a credencial (+ carimbo de atualização), nunca o userInfo', () => {
         saveAndActivatePlaylist({ name: 'Casa', url: 'http://a.tv', username: 'u', password: 'p', userInfo: { exp: 1 } })
-        expect(exportPlaylistsForBackup()).toEqual([{ name: 'Casa', url: 'http://a.tv', username: 'u', password: 'p' }])
+        const [exported] = exportPlaylistsForBackup()
+        expect(exported).toMatchObject({ name: 'Casa', url: 'http://a.tv', username: 'u', password: 'p' })
+        expect(typeof exported.credentialsUpdatedAt).toBe('number')
+        expect(Object.keys(exported).sort()).toEqual(
+            ['credentialsUpdatedAt', 'name', 'password', 'url', 'username']
+        )
     })
 
-    it('importa válidas, pula inválidas e não mexe na ativa', () => {
+    // 🔒 Regressão (auditoria R1 — H4, cenário B): sem carimbo, o import
+    // sobrescrevia a senha com a do arquivo remoto (possivelmente velha) e a
+    // correção feita aqui voltava atrás a cada ciclo de sync.
+    it('senha remota só vence se for comprovadamente mais nova', () => {
+        const p1 = saveAndActivatePlaylist({ url: 'http://prov.tv', username: 'u', password: 'senha-velha' })
+        const carimboAntigo = 1_000
+
+        // Remoto com carimbo ANTIGO → ignorado (era o flip-flop).
+        importPlaylistsFromBackup([
+            { name: 'X', url: 'http://prov.tv', username: 'u', password: 'senha-obsoleta', credentialsUpdatedAt: carimboAntigo },
+        ])
+        expect(playlists().find(p => p.id === p1.id)?.password).toBe('senha-velha')
+
+        // Backup legado (sem carimbo) também não derruba a credencial local.
+        importPlaylistsFromBackup([
+            { name: 'X', url: 'http://prov.tv', username: 'u', password: 'senha-de-backup-antigo' },
+        ])
+        expect(playlists().find(p => p.id === p1.id)?.password).toBe('senha-velha')
+
+        // Remoto MAIS NOVO → aceito (a correção feita na outra máquina propaga).
+        importPlaylistsFromBackup([
+            { name: 'X', url: 'http://prov.tv', username: 'u', password: 'senha-nova', credentialsUpdatedAt: Date.now() + 60_000 },
+        ])
+        expect(playlists().find(p => p.id === p1.id)?.password).toBe('senha-nova')
+    })
+
+    it('importa válidas, pula inválidas e NÃO sobrescreve credencial existente', () => {
         const active = saveAndActivatePlaylist({ url: 'http://ativa.tv', username: 'u', password: 'p' })
         const imported = importPlaylistsFromBackup([
             { name: 'Nova', url: 'http://nova.tv', username: 'x', password: 'y' },
             { name: 'Sem url', url: '  ', username: 'x', password: 'y' },
             { name: 'Sem senha', url: 'http://z.tv', username: 'x', password: undefined as unknown as string },
-            // Mesmo provedor da ativa: atualiza em vez de duplicar.
-            { name: 'Ativa', url: 'http://ativa.tv', username: 'u', password: 'p-nova' },
+            // Mesmo provedor da ativa, com senha VELHA: tem que ser ignorada.
+            // (Antes o upsert sobrescrevia — era o bug: a senha corrigida aqui
+            // voltava pra antiga a cada ciclo de sync e o switch quebrava.)
+            { name: 'Ativa', url: 'http://ativa.tv', username: 'u', password: 'p-velha' },
         ])
-        expect(imported).toBe(2)
+        expect(imported).toBe(1)
         expect(playlists()).toHaveLength(2)
-        expect(playlists().find(p => p.id === active.id)?.password).toBe('p-nova')
+        expect(playlists().find(p => p.id === active.id)?.password).toBe('p')
         expect(getActivePlaylistIdPublic()).toBe(active.id)
+    })
+
+    // 🔒 Regressão (auditoria R1 — H4): sem ledger de deleções, o arquivo de
+    // sync da outra máquina reimportava a playlist apagada em TODO ciclo — e a
+    // ressurreição se propagava de volta. Apagar de novo não adiantava, nunca.
+    it('playlist apagada não volta pelo import (ledger de deleções)', () => {
+        const p1 = saveAndActivatePlaylist({ name: 'Provedor X', url: 'http://x.tv', username: 'u', password: 'p' })
+        saveAndActivatePlaylist({ name: 'Outra', url: 'http://outra.tv', username: 'u2', password: 'p2' })
+        removePlaylist(p1.id)
+        expect(playlists()).toHaveLength(1)
+
+        const imported = importPlaylistsFromBackup([
+            { name: 'Provedor X', url: 'http://x.tv', username: 'u', password: 'p' },
+        ])
+        expect(imported).toBe(0)
+        expect(playlists()).toHaveLength(1)
+        expect(playlists().some(p => p.url === 'http://x.tv')).toBe(false)
+    })
+
+    it('re-adicionar à mão limpa o ledger (o sync volta a aceitar aquela playlist)', () => {
+        const p1 = saveAndActivatePlaylist({ name: 'Provedor X', url: 'http://x.tv', username: 'u', password: 'p' })
+        removePlaylist(p1.id)
+        expect(getRemovedPlaylists()[removedPlaylistKey('http://x.tv', 'u')]).toBeTruthy();
+
+        saveAndActivatePlaylist({ name: 'Provedor X', url: 'http://x.tv', username: 'u', password: 'p' })
+        expect(getRemovedPlaylists()[removedPlaylistKey('http://x.tv', 'u')]).toBeUndefined();
     })
 
     it('lote todo inválido → 0 e nenhuma escrita', () => {
