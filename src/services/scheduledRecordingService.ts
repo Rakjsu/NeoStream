@@ -24,6 +24,15 @@ const STORAGE_KEY_PREFIX = 'scheduled_recordings';
 /** Extra time recorded after the announced program end (credits, delays). */
 export const END_PADDING_MS = 2 * 60 * 1000;
 
+/** Espera antes de re-tentar (fila de simultâneas e falha transitória no início). */
+export const RETRY_DELAY_MS = 30_000;
+
+/** Resposta do canal `dvr:active` (gravações em curso no main). */
+interface DvrActiveResponse {
+    success?: boolean;
+    recordings?: Array<{ id: string; channelName?: string }>;
+}
+
 /** Margem inicial: liga 2min ANTES do início anunciado (relógio do provedor). */
 export const START_MARGIN_MS = 2 * 60 * 1000;
 
@@ -133,9 +142,24 @@ class ScheduledRecordingService {
         const all = this.list();
         const now = Date.now();
         const alive = all.filter(s => !isScheduleExpired(s.endIso, now));
+        const encerrados = all.filter(s => isScheduleExpired(s.endIso, now));
         if (alive.length !== all.length) this.save(alive);
+        // Um agendamento já encerrado ainda pode ter gravação VIVA no main: se o
+        // renderer recarregou dentro da janela do END_PADDING, o stopTimer morreu
+        // junto e o ffmpeg ficou sem ninguém pra parar. Encerra antes de
+        // descartar — senão grava até o disco encher.
+        encerrados.forEach(rec => void this.stopOrphanRecording(rec));
         alive.forEach(s => this.arm(s));
         this.pushCountToMain(alive.length);
+    }
+
+    /** Encerra no main uma gravação deste agendamento que tenha ficado órfã. */
+    private async stopOrphanRecording(rec: ScheduledRecording): Promise<void> {
+        const recId = await this.findActiveRecording(rec);
+        if (!recId) return;
+        try {
+            await window.ipcRenderer?.invoke('dvr:stop', { id: recId });
+        } catch { /* best-effort: o usuário ainda pode parar em Downloads → Gravações */ }
     }
 
     private arm(rec: ScheduledRecording): void {
@@ -149,6 +173,24 @@ class ScheduledRecordingService {
     }
 
     private async fire(rec: ScheduledRecording): Promise<void> {
+        // 🔁 Reconciliação com o main — PRIMEIRA coisa, antes de qualquer guard.
+        // O renderer recarrega em vários fluxos normais (trocar/remover a
+        // playlist ativa, concluir o login, Ctrl+R) e perde os timers; o main
+        // NÃO reinicia e o ffmpeg segue gravando. Sem esta checagem o boot
+        // re-arma o agendamento, startDelayMs dá 0 pra programa já iniciado e
+        // sobe um SEGUNDO ffmpeg no mesmo canal: duas conexões no provedor
+        // (conta de 1 conexão derruba tudo) e, como o nome do arquivo tem
+        // precisão de minuto e o ffmpeg roda com -y, o segundo TRUNCA o arquivo
+        // que o primeiro está escrevendo.
+        // Vem antes dos guards de propósito: sair por "expirado" ou "fila cheia"
+        // sem adotar deixaria a gravação existente órfã, sem ninguém pra parar.
+        const alreadyRecording = await this.findActiveRecording(rec);
+        if (alreadyRecording) {
+            this.activeRecIds.set(rec.id, alreadyRecording);
+            this.armStop(rec);
+            return;
+        }
+
         // Program already over (slept laptop, long downtime) → drop silently.
         if (isScheduleExpired(rec.endIso, Date.now())) {
             this.save(this.list().filter(s => s.id !== rec.id));
@@ -160,16 +202,17 @@ class ScheduledRecordingService {
             this.startTimers.set(rec.id, setTimeout(() => {
                 this.startTimers.delete(rec.id);
                 void this.fire(rec);
-            }, 30_000));
+            }, RETRY_DELAY_MS));
             return;
         }
+
         try {
             const urlResult = await window.ipcRenderer.invoke('streams:get-live-url', { streamId: rec.streamId });
             if (!urlResult?.success || !urlResult.url) throw new Error(urlResult?.error || 'sem URL');
 
             const started = await window.ipcRenderer.invoke('dvr:start', {
                 url: urlResult.url,
-                channelName: `${rec.title} (${rec.channelName})`
+                channelName: this.recordingLabel(rec)
             });
             if (!started?.success) throw new Error(started?.error || 'dvr:start falhou');
 
@@ -181,21 +224,20 @@ class ScheduledRecordingService {
             });
 
             // Stop when the program ends (+ padding for credits/delays).
-            const stopDelay = computeDelay(rec.endIso, Date.now()) + END_PADDING_MS;
-            this.stopTimers.set(rec.id, setTimeout(async () => {
-                this.stopTimers.delete(rec.id);
-                const recId = this.activeRecIds.get(rec.id);
-                this.activeRecIds.delete(rec.id);
-                if (recId) await window.ipcRenderer.invoke('dvr:stop', { id: recId });
-                this.save(this.list().filter(s => s.id !== rec.id));
-                appNotificationService.addNotification({
-                    type: 'dvr_recording',
-                    title: '⏺ Gravação concluída',
-                    message: `${rec.title} — ${rec.channelName}`
-                });
-            }, stopDelay));
+            this.armStop(rec);
         } catch (err) {
             console.error('[DVR] scheduled recording failed:', err);
+            // Falha transitória no início (rede oscilando, provedor lento) não
+            // pode matar o agendamento: re-tenta enquanto o programa não acabar,
+            // mesmo backoff da fila de simultâneas. Só desiste — e avisa — quando
+            // não há mais o que gravar.
+            if (!isScheduleExpired(rec.endIso, Date.now())) {
+                this.startTimers.set(rec.id, setTimeout(() => {
+                    this.startTimers.delete(rec.id);
+                    void this.fire(rec);
+                }, RETRY_DELAY_MS));
+                return;
+            }
             this.save(this.list().filter(s => s.id !== rec.id));
             appNotificationService.addNotification({
                 type: 'dvr_recording',
@@ -203,6 +245,42 @@ class ScheduledRecordingService {
                 message: `${rec.title} — ${rec.channelName}`
             });
         }
+    }
+
+    /** Rótulo passado ao dvr:start — é a chave que identifica a gravação no main. */
+    private recordingLabel(rec: ScheduledRecording): string {
+        return `${rec.title} (${rec.channelName})`;
+    }
+
+    /** Id da gravação deste agendamento que já esteja rodando no main, se houver. */
+    private async findActiveRecording(rec: ScheduledRecording): Promise<string | null> {
+        try {
+            const res = await window.ipcRenderer?.invoke('dvr:active') as DvrActiveResponse | undefined;
+            if (!res?.success || !Array.isArray(res.recordings)) return null;
+            const label = this.recordingLabel(rec);
+            return res.recordings.find(r => r.channelName === label)?.id ?? null;
+        } catch {
+            return null; // sem preload (testes) ou main indisponível → segue o fluxo normal
+        }
+    }
+
+    /** Agenda o encerramento no fim do programa (+ padding). Idempotente. */
+    private armStop(rec: ScheduledRecording): void {
+        const existing = this.stopTimers.get(rec.id);
+        if (existing) clearTimeout(existing);
+        const stopDelay = computeDelay(rec.endIso, Date.now()) + END_PADDING_MS;
+        this.stopTimers.set(rec.id, setTimeout(async () => {
+            this.stopTimers.delete(rec.id);
+            const recId = this.activeRecIds.get(rec.id);
+            this.activeRecIds.delete(rec.id);
+            if (recId) await window.ipcRenderer.invoke('dvr:stop', { id: recId });
+            this.save(this.list().filter(s => s.id !== rec.id));
+            appNotificationService.addNotification({
+                type: 'dvr_recording',
+                title: '⏺ Gravação concluída',
+                message: `${rec.title} — ${rec.channelName}`
+            });
+        }, stopDelay));
     }
 }
 
