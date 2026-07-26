@@ -21,6 +21,7 @@ import cinemaTvLogo from '../assets/logos/cinema_TV.png';
 import dcLogo from '../assets/logos/DC.png';
 import fourKLogo from '../assets/logos/4K.png';
 
+import { asList } from '../utils/catalogPayload';
 interface CategoryMenuProps {
     onSelectCategory: (categoryId: string) => void;
     selectedCategory: string | null;
@@ -78,7 +79,7 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
 
             const result = await window.ipcRenderer.invoke(action);
             if (result.success) {
-                setCategories(result.data || []);
+                setCategories(asList(result.data));
             }
         } catch (error) {
             console.error('Error fetching categories:', error);

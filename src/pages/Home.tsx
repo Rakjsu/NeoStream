@@ -24,6 +24,7 @@ import { findDepartures, dismissDepartures } from '../services/catalogDepartures
 import { favoredCategoryIds, spinRoulette } from '../services/rouletteService';
 import { useLanguage } from '../services/languageService';
 
+import { asList } from '../utils/catalogPayload';
 interface ContentCounts {
     live: number;
     vod: number;
@@ -275,10 +276,11 @@ export function Home() {
                 // Fetch series data
                 const seriesResult = await window.ipcRenderer.invoke('streams:get-series', { forceRefresh: catalogTick > 0 });
                 if (seriesResult.success && seriesResult.data) {
-                    setAllSeries(seriesResult.data);
-                    dataCache.series = seriesResult.data;
+                    const seriesList = asList<SeriesData>(seriesResult.data);
+                    setAllSeries(seriesList);
+                    dataCache.series = seriesList;
                     // Sort by added date (or stream_id as fallback - higher = newer)
-                    const sortedSeries = [...seriesResult.data].sort((a: SeriesData, b: SeriesData) => {
+                    const sortedSeries = [...seriesList].sort((a: SeriesData, b: SeriesData) => {
                         const aDate = a.added || a.series_id;
                         const bDate = b.added || b.series_id;
                         return bDate - aDate;
@@ -289,10 +291,11 @@ export function Home() {
                 // Fetch movies data
                 const moviesResult = await window.ipcRenderer.invoke('streams:get-vod', { forceRefresh: catalogTick > 0 });
                 if (moviesResult.success && moviesResult.data) {
-                    setAllMovies(moviesResult.data);
-                    dataCache.movies = moviesResult.data;
+                    const moviesList = asList<MovieData>(moviesResult.data);
+                    setAllMovies(moviesList);
+                    dataCache.movies = moviesList;
                     // Sort by added date (or stream_id as fallback - higher = newer)
-                    const sortedMovies = [...moviesResult.data].sort((a: MovieData, b: MovieData) => {
+                    const sortedMovies = [...moviesList].sort((a: MovieData, b: MovieData) => {
                         const aDate = a.added || a.stream_id;
                         const bDate = b.added || b.stream_id;
                         return bDate - aDate;

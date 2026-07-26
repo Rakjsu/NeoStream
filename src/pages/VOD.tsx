@@ -25,6 +25,7 @@ import { useLanguage } from '../services/languageService';
 import { isRecentlyAdded } from '../services/catalogNew';
 import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_OPEN_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
 
+import { asList } from '../utils/catalogPayload';
 interface VODStream {
     num: number;
     name: string;
@@ -199,7 +200,7 @@ export function VOD() {
         try {
             const result = await window.ipcRenderer.invoke('streams:get-vod');
             if (result.success) {
-                setStreams(result.data || []);
+                setStreams(asList<VODStream>(result.data));
             } else {
                 setError(result.error || 'Failed to load movies');
             }
