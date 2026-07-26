@@ -774,7 +774,8 @@
     "cinemaModeHint": "Luz ambiente com a cor do filme",
     "subPreviewSample": "Legenda de exemplo",
     "maximizeWindow": "Maximizar janela",
-    "restoreWindow": "Restaurar janela"
+    "restoreWindow": "Restaurar janela",
+    "qrHandoffFailed": "Não foi possível gerar o QR deste conteúdo."
   },
   "notifications": {
     "autoTuneIn": "Trocando pra {channel} em {s}s…",

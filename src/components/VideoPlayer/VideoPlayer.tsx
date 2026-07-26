@@ -1209,10 +1209,25 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                                 cursor: 'default',
                             }}
                         >
-                            <div
-                                style={{ width: 220, height: 220 }}
-                                dangerouslySetInnerHTML={{ __html: qrToSvg(buildHandoffLink(mobileHandoff, state.currentTime), 4) }}
-                            />
+                            {(() => {
+                                // Blindagem: um link grande demais faria o qrToSvg lançar e
+                                // derrubar a tela (ErrorBoundary). Cai num aviso curto.
+                                try {
+                                    const svg = qrToSvg(buildHandoffLink(mobileHandoff, state.currentTime), 4);
+                                    return (
+                                        <div
+                                            style={{ width: 220, height: 220 }}
+                                            dangerouslySetInnerHTML={{ __html: svg }}
+                                        />
+                                    );
+                                } catch {
+                                    return (
+                                        <div style={{ width: 220, minHeight: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center', color: '#666', fontSize: 12, padding: 16 }}>
+                                            {t('player', 'qrHandoffFailed')}
+                                        </div>
+                                    );
+                                }
+                            })()}
                             <div style={{ color: '#111', fontSize: 13, fontWeight: 600, maxWidth: 230, textAlign: 'center' }}>
                                 {t('player', 'qrHandoffHint')}
                             </div>
