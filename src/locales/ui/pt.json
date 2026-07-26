@@ -775,7 +775,9 @@
     "subPreviewSample": "Legenda de exemplo",
     "maximizeWindow": "Maximizar janela",
     "restoreWindow": "Restaurar janela",
-    "qrHandoffFailed": "Não foi possível gerar o QR deste conteúdo."
+    "qrHandoffFailed": "Não foi possível gerar o QR deste conteúdo.",
+    "streamRetry": "Tentar novamente",
+    "close": "Fechar"
   },
   "notifications": {
     "autoTuneIn": "Trocando pra {channel} em {s}s…",

@@ -868,7 +868,9 @@
     "subPreviewSample": "Subtítulo de ejemplo",
     "maximizeWindow": "Maximizar ventana",
     "restoreWindow": "Restaurar ventana",
-    "qrHandoffFailed": "No se pudo generar el QR de este contenido."
+    "qrHandoffFailed": "No se pudo generar el QR de este contenido.",
+    "streamRetry": "Intentar de nuevo",
+    "close": "Cerrar"
   },
   "home": {
     "dontRecommend": "No me recomiendes esto",

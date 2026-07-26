@@ -868,7 +868,9 @@
     "subPreviewSample": "Sample subtitle",
     "maximizeWindow": "Maximize window",
     "restoreWindow": "Restore window",
-    "qrHandoffFailed": "Could not generate the QR for this content."
+    "qrHandoffFailed": "Could not generate the QR for this content.",
+    "streamRetry": "Try again",
+    "close": "Close"
   },
   "home": {
     "dontRecommend": "Don't recommend this",
