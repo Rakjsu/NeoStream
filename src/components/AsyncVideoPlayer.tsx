@@ -495,8 +495,11 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
                                 externalOnTimeUpdate(currentTime, duration);
                             }
 
-                            // Save video progress for series every 5 seconds
-                            if (seriesId && seasonNumber !== undefined && episodeNumber !== undefined && currentTime % 5 < 0.5) {
+                            // Save video progress for series every 5 seconds. O
+                            // `duration > 0` espelha o ramo de filme logo abaixo:
+                            // sem ele, um timeupdate com duration NaN/0 grava o
+                            // episódio como concluído.
+                            if (seriesId && seasonNumber !== undefined && episodeNumber !== undefined && currentTime % 5 < 0.5 && duration > 0) {
                                 watchProgressService.saveVideoTime(
                                     seriesId,
                                     seasonNumber,
