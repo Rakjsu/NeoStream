@@ -107,6 +107,11 @@ class WatchProgressService {
         currentTime: number,
         duration: number
     ): void {
+        // Sem duração válida não dá pra calcular "assistido": um recoverMediaError
+        // do hls.js zera currentTime e deixa duration NaN, e `0 >= 0 * 0.9` marcaria
+        // o episódio como concluído, escondendo-o do "continuar de onde parou".
+        if (!Number.isFinite(duration) || duration <= 0) return;
+
         const activeProfile = profileService.getActiveProfile();
         if (!activeProfile) return;
 

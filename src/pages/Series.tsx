@@ -328,12 +328,15 @@ export function Series() {
 
     const fixImageUrl = (url: string): string => url && url.startsWith('http') ? url : `https://${url}`;
 
-    const handlePlaySeries = (seriesItem: Series) => {
+    // Season/episode entram por parâmetro: quem chama pode ter acabado de fazer
+    // setSelectedSeason/Episode no mesmo tick, e o state ainda seria o antigo —
+    // o prompt de retomada acabava mostrando o progresso de outro episódio.
+    const handlePlaySeries = (seriesItem: Series, season = selectedSeason, episode = selectedEpisode) => {
         // Check for existing progress
         const progress = watchProgressService.getEpisodeProgress(
             String(seriesItem.series_id),
-            selectedSeason,
-            selectedEpisode
+            season,
+            episode
         );
         const progressPercent = progress ? Math.round((progress.currentTime / progress.duration) * 100) : 0;
         if (progress && progress.currentTime > 10 && progressPercent < 95) {
@@ -717,6 +720,11 @@ export function Series() {
                     episodeNumber={selectedEpisode}
                     resumeTime={pipResumeTime}
                     onNextEpisode={() => {
+                        // O resumeTime capturado ao expandir o mini player vale só
+                        // pro episódio de onde ele veio; sem limpar, todo episódio
+                        // seguinte abriria naquele ponto (e gravaria a posição
+                        // espúria no progresso/Trakt).
+                        setPipResumeTime(null);
                         watchProgressService.markEpisodeWatched(
                             String(playingSeries.series_id),
                             selectedSeason,
@@ -734,6 +742,7 @@ export function Series() {
                         }
                     }}
                     onPreviousEpisode={() => {
+                        setPipResumeTime(null);
                         if (selectedEpisode > 1) {
                             setSelectedEpisode(selectedEpisode - 1);
                         } else if (selectedSeason > 1) {
@@ -833,9 +842,11 @@ export function Series() {
                         youtube_trailer: selectedSeries.youtube_trailer
                     }}
                     onPlay={(season, episode) => {
-                        setSelectedSeason(season || 1);
-                        setSelectedEpisode(episode || 1);
-                        handlePlaySeries(selectedSeries);
+                        const nextSeason = season || 1;
+                        const nextEpisode = episode || 1;
+                        setSelectedSeason(nextSeason);
+                        setSelectedEpisode(nextEpisode);
+                        handlePlaySeries(selectedSeries, nextSeason, nextEpisode);
                     }}
                 />
             )}

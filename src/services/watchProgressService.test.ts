@@ -84,3 +84,36 @@ describe('watchProgressService — per-profile → per-playlist migration', () =
         expect(localStorage.getItem('series_watch_progress_p1__pl_default')).toBeNull();
     });
 });
+
+// 🔒 Regressão: um recoverMediaError do hls.js zera currentTime e deixa duration
+// NaN; sem guarda, `0 >= 0 * 0.9` marcava o episódio como concluído e ele sumia
+// do "continuar de onde parou".
+describe('watchProgressService — saveVideoTime ignora duração inválida', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        activeId = 'p1';
+        playlistId = 'plA';
+    });
+
+    it('duration 0 ou NaN não grava nada (não marca como concluído)', () => {
+        watchProgressService.saveVideoTime('s9', 1, 3, 0, 0);
+        watchProgressService.saveVideoTime('s9', 1, 3, 0, Number.NaN);
+        watchProgressService.saveVideoTime('s9', 1, 3, 10, -1);
+
+        expect(watchProgressService.getEpisodeProgress('s9', 1, 3)).toBeFalsy();
+        expect(watchProgressService.isEpisodeWatched('s9', 1, 3)).toBe(false);
+    });
+
+    it('duração válida continua gravando o progresso normalmente', () => {
+        watchProgressService.saveVideoTime('s9', 1, 3, 300, 1200);
+        const p = watchProgressService.getEpisodeProgress('s9', 1, 3);
+        expect(p?.currentTime).toBe(300);
+        expect(p?.duration).toBe(1200);
+    });
+
+    it('progresso salvo antes não é destruído por um timeupdate com duration 0', () => {
+        watchProgressService.saveVideoTime('s9', 2, 1, 600, 2400);
+        watchProgressService.saveVideoTime('s9', 2, 1, 0, 0);
+        expect(watchProgressService.getEpisodeProgress('s9', 2, 1)?.currentTime).toBe(600);
+    });
+});
