@@ -36,7 +36,12 @@ function rendererFiles(dir: string, out: string[] = []): string[] {
 /** Canais literais usados num método do ipcRenderer (ignora variáveis). */
 function usedChannels(files: string[], method: 'send' | 'invoke' | 'on' | 'off'): Map<string, string> {
     const found = new Map<string, string>()
-    const pattern = new RegExp(`ipcRenderer\\.${method}\\(\\s*'([^']+)'`, 'g')
+    // `\??\.` cobre `ipcRenderer?.send(...)`: o optional chaining é comum nos
+    // serviços (que rodam também sob jsdom) e o padrão antigo, só com ponto,
+    // deixava esses canais invisíveis pro guarda — foi assim que
+    // `dvr:schedules-changed` e `app:accent` ficaram fora da whitelist com o
+    // teste verde.
+    const pattern = new RegExp(`ipcRenderer\\??\\.${method}\\(\\s*'([^']+)'`, 'g')
     for (const file of files) {
         const source = fs.readFileSync(file, 'utf-8')
         for (const match of source.matchAll(pattern)) {
