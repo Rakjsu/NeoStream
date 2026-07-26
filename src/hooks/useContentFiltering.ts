@@ -3,6 +3,7 @@ import { indexedDBCache } from '../services/indexedDBCache';
 import { parentalService } from '../services/parentalService';
 import { searchMovieByName, searchSeriesByName, isKidsFriendly } from '../services/tmdb';
 
+import { asList } from '../utils/catalogPayload';
 export const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'erótico'];
 
 /** Pure rule: does this category name match the blocked keyword list? */
@@ -93,7 +94,7 @@ export function useContentFiltering<T>({
 
                     if (shouldBlockCategories) {
                         const blockedIds = new Set<string>();
-                        (result.data || []).forEach((cat: { category_id: string; category_name: string }) => {
+                        asList<{ category_id: string; category_name: string }>(result.data).forEach((cat) => {
                             if (isCategoryNameBlocked(cat.category_name)) {
                                 blockedIds.add(cat.category_id);
                             }

@@ -86,10 +86,10 @@ describe('cachedCatalogFetch (stale-while-revalidate por playlist+kind, backend 
     it('playlists não se misturam (mesmo kind, ids diferentes)', async () => {
         const a = freshId()
         const b = freshId()
-        await cachedCatalogFetch(a, 'live', vi.fn().mockResolvedValue('canais-A'))
-        await cachedCatalogFetch(b, 'live', vi.fn().mockResolvedValue('canais-B'))
-        expect((await cachedCatalogFetch(a, 'live', vi.fn())).data).toBe('canais-A')
-        expect((await cachedCatalogFetch(b, 'live', vi.fn())).data).toBe('canais-B')
+        await cachedCatalogFetch(a, 'live', vi.fn().mockResolvedValue(['canais-A']))
+        await cachedCatalogFetch(b, 'live', vi.fn().mockResolvedValue(['canais-B']))
+        expect((await cachedCatalogFetch(a, 'live', vi.fn())).data).toEqual(['canais-A'])
+        expect((await cachedCatalogFetch(b, 'live', vi.fn())).data).toEqual(['canais-B'])
     })
 
     it('persiste no catalog.db e um "novo processo" (módulo novo) lê do disco', async () => {
@@ -134,23 +134,55 @@ describe('cachedCatalogFetch (stale-while-revalidate por playlist+kind, backend 
 
     it('invalidatePlaylistCache derruba os seis kinds da playlist', async () => {
         const id = freshId()
-        await cachedCatalogFetch(id, 'live', vi.fn().mockResolvedValue('velho'))
+        await cachedCatalogFetch(id, 'live', vi.fn().mockResolvedValue(['velho']))
         invalidatePlaylistCache(id)
-        const fetcher = vi.fn().mockResolvedValue('novo')
-        expect(await cachedCatalogFetch(id, 'live', fetcher)).toEqual({ data: 'novo', fromCache: false })
+        const fetcher = vi.fn().mockResolvedValue(['novo'])
+        expect(await cachedCatalogFetch(id, 'live', fetcher)).toEqual({ data: ['novo'], fromCache: false })
         expect(fetcher).toHaveBeenCalledTimes(1)
     })
 
     it('id de playlist com caracteres estranhos vira chave estável (roundtrip via disco)', async () => {
         const id = `..\\/etc?passwd ${freshId()}`
-        await cachedCatalogFetch(id, 'live', vi.fn().mockResolvedValue('ok'))
+        await cachedCatalogFetch(id, 'live', vi.fn().mockResolvedValue(['ok']))
         await flushWrite()
         closeCatalogStore()
 
         vi.resetModules()
         const reloaded = await import('./catalogCache')
         expect(await reloaded.cachedCatalogFetch(id, 'live', vi.fn().mockRejectedValue(new Error('offline'))))
-            .toEqual({ data: 'ok', fromCache: true })
+            .toEqual({ data: ['ok'], fromCache: true })
         reloaded.closeCatalogStore()
+    })
+
+    // 🔒 Regressão (auditoria R1 — H2): provedor com conta expirada/domínio
+    // estacionado responde 200 com objeto ou HTML, e o cliente só rejeita
+    // status != 200. Gravar isso envenenava o cache por 15 min (sobrevivendo a
+    // restart) e o `.filter()` do renderer estourava DENTRO do render,
+    // derrubando Home/Filmes/Séries/TV pro ErrorBoundary.
+    it('resposta NÃO-lista do provedor não vira cache — serve o cache bom anterior', async () => {
+        const id = freshId()
+        await cachedCatalogFetch(id, 'vod', vi.fn().mockResolvedValue([{ stream_id: 1 }]))
+
+        // Conta expirou: 200 com objeto no lugar da lista.
+        const lixo = await cachedCatalogFetch(id, 'vod', vi.fn().mockResolvedValue({ user_info: { auth: 0 } }), true)
+        expect(lixo.fromCache).toBe(true)
+        expect(lixo.data).toEqual([{ stream_id: 1 }])
+
+        // E o lixo NÃO foi persistido: uma leitura seguinte continua com o bom.
+        const depois = await cachedCatalogFetch(id, 'vod', vi.fn().mockRejectedValue(new Error('offline')), true)
+        expect(depois.data).toEqual([{ stream_id: 1 }])
+    })
+
+    it('resposta não-lista SEM cache anterior propaga erro (não injeta lixo no state)', async () => {
+        await expect(cachedCatalogFetch(freshId(), 'series', vi.fn().mockResolvedValue('<html>login</html>')))
+            .rejects.toThrow(/esperava lista/)
+    })
+
+    it('lista vazia é resposta legítima e continua sendo cacheada', async () => {
+        const id = freshId()
+        const r = await cachedCatalogFetch(id, 'live-categories', vi.fn().mockResolvedValue([]))
+        expect(r.data).toEqual([])
+        const cache = await cachedCatalogFetch(id, 'live-categories', vi.fn().mockRejectedValue(new Error('x')), true)
+        expect(cache.data).toEqual([])
     })
 })

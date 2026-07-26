@@ -25,6 +25,7 @@ import { useLanguage } from '../services/languageService';
 import { isRecentlyAdded } from '../services/catalogNew';
 import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_OPEN_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
 
+import { asList } from '../utils/catalogPayload';
 interface Series {
     num: number;
     name: string;
@@ -217,7 +218,7 @@ export function Series() {
         try {
             const result = await window.ipcRenderer.invoke('streams:get-series');
             if (result.success) {
-                setSeries(result.data || []);
+                setSeries(asList<Series>(result.data));
             } else {
                 setError(result.error || 'Failed to load series');
             }

@@ -110,6 +110,20 @@ function writeEntry(playlistId: string, kind: CatalogKind, data: unknown): void 
         .catch((error) => log.warn('[CatalogCache] write failed:', error))
 }
 
+/** Descrição curta do que veio no lugar da lista, pro log/erro ficar acionável. */
+function describeShape(value: unknown): string {
+    if (value === null) return 'null'
+    if (typeof value === 'string') {
+        const head = value.trim().slice(0, 40)
+        return `string ("${head}${value.length > 40 ? '…' : ''}")`
+    }
+    if (typeof value === 'object') {
+        const keys = Object.keys(value as Record<string, unknown>).slice(0, 4)
+        return `objeto {${keys.join(', ')}${keys.length === 4 ? ', …' : ''}}`
+    }
+    return typeof value
+}
+
 /**
  * SWR wrapper used by the streams:/categories: handlers.
  * `forceRefresh` bypasses freshness (renderer auto-refresh / pull-to-refresh).
@@ -128,6 +142,17 @@ export async function cachedCatalogFetch(
 
     try {
         const data = await fetcher()
+        // 🛡️ Todo `kind` de catálogo é uma LISTA. Provedor com conta expirada,
+        // senha trocada, domínio estacionado ou portal cativo responde 200 com
+        // objeto/HTML — e o XtreamClient só rejeita status ≠ 200. Gravar isso
+        // envenenava o cache por 15 min (sobrevivendo a restart) e o `.filter()`
+        // do renderer estourava DENTRO do render, trocando Home/Filmes/Séries/TV
+        // pela tela de erro. Tratar como falha faz o SWR servir o cache bom.
+        if (!Array.isArray(data)) {
+            throw new Error(
+                `resposta inválida do provedor para "${kind}": esperava lista, veio ${describeShape(data)}`
+            )
+        }
         writeEntry(playlistId, kind, data)
         return { data, fromCache: false }
     } catch (error) {

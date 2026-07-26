@@ -24,6 +24,7 @@ import { ChannelHoverMiniGuide } from '../components/ChannelHoverMiniGuide';
 import { isReplayable, isRestartable, replayDurationMinutes } from '../utils/epgGuide';
 import { getTimeshiftUrl } from '../services/timeshiftService';
 
+import { asList } from '../utils/catalogPayload';
 interface LiveStream {
     num: number;
     name: string;
@@ -397,7 +398,7 @@ export function LiveTV() {
             const result = await window.ipcRenderer.invoke('streams:get-live');
 
             if (result.success) {
-                setStreams(result.data || []);
+                setStreams(asList(result.data));
             } else {
                 setError(result.error || 'Failed to load channels');
             }
@@ -412,12 +413,12 @@ export function LiveTV() {
         try {
             const result = await window.ipcRenderer.invoke('categories:get-live');
             if (result.success) {
-                setCategories(result.data || []);
+                setCategories(asList(result.data));
 
                 // For Kids profile: extract allowed category IDs (only infantis)
                 if (isKidsProfile) {
                     const allowedIds = new Set<string>();
-                    (result.data || []).forEach((cat: { category_id: string; category_name: string }) => {
+                    asList<{ category_id: string; category_name: string }>(result.data).forEach((cat) => {
                         const lowerName = cat.category_name.toLowerCase();
                         if (KIDS_ALLOWED_PATTERNS.some(p => lowerName.includes(p))) {
                             allowedIds.add(cat.category_id);
@@ -430,7 +431,7 @@ export function LiveTV() {
                 const parentalConfig = parentalService.getConfig();
                 if (parentalConfig.enabled && parentalConfig.blockAdultCategories && !parentalService.isSessionUnlocked()) {
                     const blockedIds = new Set<string>();
-                    (result.data || []).forEach((cat: { category_id: string; category_name: string }) => {
+                    asList<{ category_id: string; category_name: string }>(result.data).forEach((cat) => {
                         const lowerName = cat.category_name.toLowerCase();
                         if (BLOCKED_CATEGORY_PATTERNS.some(p => lowerName.includes(p))) {
                             blockedIds.add(cat.category_id);
