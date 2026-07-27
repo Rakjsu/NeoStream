@@ -13,6 +13,14 @@ import {
     pickLanAddress,
     scoreLanCandidate,
     parseProgressReport,
+    parseMobileHello,
+    buildDesktopHello,
+    compareAppVersions,
+    isOutdatedMobile,
+    markMobileInHistory,
+    parsePushAck,
+    REMOTE_PROTOCOL_VERSION,
+    MIN_MOBILE_APP_VERSION,
 } from './webRemoteProtocol'
 
 /** Mask a text payload as a browser client would (client→server frames). */
@@ -258,6 +266,110 @@ describe('parseProgressReport (item 11 — sync de posições)', () => {
         const text = JSON.stringify({ action: 'reportProgress', report: { kind: 'movie', movieId: '7', title: 'F', positionSec: 60, durationSec: 600, updatedAt: 5 } })
         const command = parseRemoteCommand(text)
         expect(command).toEqual({ action: 'reportProgress', report: { kind: 'movie', movieId: '7', title: 'F', positionSec: 60, durationSec: 600, updatedAt: 5 } })
+    })
+})
+
+describe('handshake versionado (hello com versão + capacidades)', () => {
+    it('hello do APK legado (só action+name) vira peer v0 sem capacidades', () => {
+        // Regressão: o desktop v4.44 tratava esse hello igual ao de um APK com
+        // os gates de tranca/parental — não havia como distinguir os dois.
+        const hello = parseMobileHello(JSON.stringify({ action: 'helloMobile', name: 'NeoStream Mobile' }))
+        expect(hello).toEqual({ name: 'NeoStream Mobile', protocolVersion: 0, appVersion: '', capabilities: [] })
+        expect(isOutdatedMobile(hello!.appVersion)).toBe(true)
+    })
+
+    it('hello versionado traz versão do app e capacidades', () => {
+        const hello = parseMobileHello(JSON.stringify({
+            action: 'helloMobile', name: 'Pixel', protocolVersion: 1, appVersion: '0.21.0',
+            capabilities: ['pushAck', 'gatedPlay'],
+        }))
+        expect(hello).toEqual({ name: 'Pixel', protocolVersion: 1, appVersion: '0.21.0', capabilities: ['pushAck', 'gatedPlay'] })
+        expect(isOutdatedMobile(hello!.appVersion)).toBe(false)
+    })
+
+    it('sanitiza lixo do fio: nome cortado, versão inválida vira 0, capacidades não-string somem', () => {
+        const hello = parseMobileHello(JSON.stringify({
+            action: 'helloMobile', name: 'x'.repeat(80), protocolVersion: 'muitas', appVersion: 42,
+            capabilities: ['ok', 7, null, ''],
+        }))
+        expect(hello?.name).toHaveLength(40)
+        expect(hello?.protocolVersion).toBe(0)
+        expect(hello?.appVersion).toBe('')
+        expect(hello?.capabilities).toEqual(['ok'])
+    })
+
+    it('ignora qualquer outra mensagem e JSON inválido', () => {
+        expect(parseMobileHello(JSON.stringify({ action: 'togglePlay' }))).toBeNull()
+        expect(parseMobileHello(JSON.stringify({ type: 'helloDesktop' }))).toBeNull()
+        expect(parseMobileHello('{oops')).toBeNull()
+    })
+
+    it('buildDesktopHello anuncia versão do protocolo, do app e capacidades', () => {
+        const hello = JSON.parse(buildDesktopHello('4.45.0')) as {
+            type: string; protocolVersion: number; appVersion: string; capabilities: string[]
+        }
+        expect(hello.type).toBe('helloDesktop')
+        expect(hello.protocolVersion).toBe(REMOTE_PROTOCOL_VERSION)
+        expect(hello.appVersion).toBe('4.45.0')
+        expect(hello.capabilities).toContain('pushAck')
+        expect(hello.capabilities).toContain('favoritesSync')
+    })
+
+    it('compareAppVersions compara por número, não por texto', () => {
+        expect(compareAppVersions('4.44.0', '4.9.1')).toBe(1)
+        expect(compareAppVersions('0.19.0', '0.20.0')).toBe(-1)
+        expect(compareAppVersions('0.20.0', '0.20.0')).toBe(0)
+        expect(compareAppVersions('0.20', '0.20.0')).toBe(0)
+    })
+
+    it('APK abaixo do mínimo com os gates é marcado como desatualizado', () => {
+        expect(isOutdatedMobile('0.19.0')).toBe(true)
+        expect(isOutdatedMobile('')).toBe(true)
+        expect(isOutdatedMobile(MIN_MOBILE_APP_VERSION)).toBe(false)
+        expect(isOutdatedMobile('0.21.3')).toBe(false)
+    })
+})
+
+describe('markMobileInHistory (papel real no histórico de conexões)', () => {
+    const connect = (ip: string, role = 'browser') => ({ ip, role, event: 'connect', name: null, at: 1 })
+
+    it('corrige a última conexão daquele IP pra mobile com o nome do app', () => {
+        // Sem isto o connect do app ficava gravado como 'browser' — qualquer
+        // cliente que mandasse helloMobile era indistinguível de um navegador.
+        const history = [connect('10.0.0.5'), connect('10.0.0.9'), connect('10.0.0.5')]
+        const out = markMobileInHistory(history, '10.0.0.5', 'Pixel')
+        expect(out[2]).toMatchObject({ ip: '10.0.0.5', role: 'mobile', name: 'Pixel' })
+        expect(out[0].role).toBe('browser')
+        expect(out[1].role).toBe('browser')
+    })
+
+    it('não mexe em disconnect nem em IP sem conexão registrada', () => {
+        const history = [{ ip: '10.0.0.5', role: 'browser', event: 'disconnect', name: null, at: 1 }]
+        expect(markMobileInHistory(history, '10.0.0.5', 'Pixel')).toBe(history)
+        expect(markMobileInHistory([], '10.0.0.5', 'Pixel')).toEqual([])
+    })
+})
+
+describe('parsePushAck (confirmação do push de reprodução)', () => {
+    it('aceita os desfechos do app', () => {
+        expect(parsePushAck(JSON.stringify({ action: 'pushResult', pushId: 'abc123', status: 'played' })))
+            .toEqual({ pushId: 'abc123', status: 'played' })
+        for (const status of ['locked', 'blocked', 'notFound'] as const) {
+            expect(parsePushAck(JSON.stringify({ action: 'pushResult', pushId: 'x', status }))?.status).toBe(status)
+        }
+    })
+
+    it('recusa status desconhecido, pushId ausente e outras mensagens', () => {
+        expect(parsePushAck(JSON.stringify({ action: 'pushResult', pushId: 'x', status: 'exploded' }))).toBeNull()
+        expect(parsePushAck(JSON.stringify({ action: 'pushResult', status: 'played' }))).toBeNull()
+        expect(parsePushAck(JSON.stringify({ action: 'togglePlay' }))).toBeNull()
+        expect(parsePushAck('nada')).toBeNull()
+    })
+
+    it('não é confundido com um comando do controle (e vice-versa)', () => {
+        const text = JSON.stringify({ action: 'pushResult', pushId: 'x', status: 'played' })
+        expect(parseRemoteCommand(text)).toBeNull()
+        expect(parsePushAck(JSON.stringify({ action: 'helloMobile', name: 'x' }))).toBeNull()
     })
 })
 
