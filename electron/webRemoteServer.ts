@@ -25,11 +25,20 @@ import {
     buildHandshakeResponse,
     encodeTextFrame,
     encodePongFrame,
+    encodePingFrame,
+    encodeCloseFrame,
     decodeFrames,
     parseRemoteCommand,
     isPinLockedOut,
     registerPinFailure,
     pickLanAddress,
+    canDeliverTo,
+    isPeerStale,
+    isLinkPing,
+    LINK_PONG_MESSAGE,
+    WS_CLOSE_PIN_ROTATED,
+    WS_PING_INTERVAL_MS,
+    type FrameAssembly,
     type PinGateEntry,
     type NetAddress,
     parseProgressReport,
@@ -71,6 +80,10 @@ function pushHistory(event: ConnectionEvent): void {
 interface ClientSocket {
     socket: Socket
     buffer: Uint8Array
+    /** Mensagem fragmentada em montagem entre chunks (FIN=0 → continuações). */
+    pending: FrameAssembly | null
+    /** Último byte recebido do cliente — base do keepalive (peer meio-morto). */
+    lastSeenAt: number
     /** 📟 Item 14: id estável da sessão — alvo do "desconectar" do painel. */
     id: string
     /** 📟 Identificação pro painel de aparelhos conectados. */
@@ -192,18 +205,49 @@ function broadcastState(): void {
     broadcast(stateMessage())
 }
 
-/** Envia um comando só pros clientes que são o APP mobile (não a página). */
+/**
+ * Envia um comando só pros clientes que são o APP mobile (não a página).
+ * Só conta como entregue quem está vivo no TCP E deu sinal dentro da janela
+ * do keepalive: escrever num socket meio-morto "funciona" por minutos, e era
+ * esse número que virava {success:true} no "Enviar pro celular".
+ */
 function sendToMobileClients(text: string): number {
     const frame = encodeTextFrame(text)
+    const now = Date.now()
     let delivered = 0
     for (const client of clients) {
         if (client.role !== 'mobile') continue
+        if (!canDeliverTo({ destroyed: client.socket.destroyed, writable: client.socket.writable, lastSeenAt: client.lastSeenAt }, now)) continue
         try {
             client.socket.write(frame)
             delivered++
         } catch { /* dropped on next read */ }
     }
     return delivered
+}
+
+/**
+ * Keepalive: pinga cada cliente e derruba quem passou da tolerância sem dar
+ * um byte. Sem isto o Set guarda fantasmas role='mobile' pra sempre (o socket
+ * só sai em 'close'/'error', que a metade-aberta nunca dispara).
+ */
+function heartbeatTick(): void {
+    if (clients.size === 0) return
+    const now = Date.now()
+    const ping = encodePingFrame()
+    for (const client of [...clients]) {
+        if (isPeerStale(client.lastSeenAt, now)) {
+            log.warn('[WebRemote] cliente sem resposta — derrubando:', client.name ?? client.ip ?? '?')
+            client.socket.destroy()
+            if (clients.delete(client)) {
+                pushHistory({ name: client.name ?? null, ip: client.ip ?? '?', role: client.role ?? 'browser', at: now, event: 'disconnect' })
+            }
+            continue
+        }
+        try {
+            client.socket.write(ping)
+        } catch { /* cai no drop do socket */ }
+    }
 }
 
 /** Sanitize the untrusted guide payload coming from the renderer. */
@@ -259,7 +303,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
     // Correct PIN: clear any accumulated failures for this client.
     pinGate.delete(ip)
     socket.write(buildHandshakeResponse(key))
-    const client: ClientSocket = { socket, buffer: new Uint8Array(0), id: crypto.randomUUID(), ip, connectedAt: Date.now() }
+    const client: ClientSocket = { socket, buffer: new Uint8Array(0), pending: null, lastSeenAt: Date.now(), id: crypto.randomUUID(), ip, connectedAt: Date.now() }
     clients.add(client)
     pushHistory({ name: null, ip: ip ?? '?', role: 'browser', at: Date.now(), event: 'connect' })
     // Send the current state + guide snapshot immediately.
@@ -267,18 +311,26 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
     if (guideState) socket.write(encodeTextFrame(guideMessage()))
 
     socket.on('data', (chunk: Buffer) => {
+        client.lastSeenAt = Date.now() // qualquer byte (inclusive pong) prova vida
         const glued = new Uint8Array(client.buffer.length + chunk.length)
         glued.set(client.buffer, 0)
         glued.set(chunk, client.buffer.length)
         try {
-            const { frames, rest } = decodeFrames(glued)
+            const { frames, rest, pending } = decodeFrames(glued, client.pending)
             client.buffer = rest
+            client.pending = pending
             for (const frame of frames) {
                 if (frame.type === 'close') {
                     socket.end()
                 } else if (frame.type === 'ping') {
                     socket.write(encodePongFrame(frame.payload))
                 } else if (frame.type === 'text') {
+                    // Heartbeat do app: responde na hora, sem passar pelo
+                    // roteamento de comandos (não é uma ação do controle).
+                    if (isLinkPing(frame.text)) {
+                        socket.write(encodeTextFrame(LINK_PONG_MESSAGE))
+                        continue
+                    }
                     // Hello do app mobile: marca o cliente como app — vira o
                     // alvo do "enviar pro celular" (a página do navegador não).
                     if (frame.text.includes('helloMobile')) {
@@ -311,7 +363,7 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
 }
 
 // Actions that always go to the renderer (never routed to the cast session).
-const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule', 'requestRecordings', 'renameRecording', 'toggleProtectRecording', 'navKey', 'requestFavorites', 'reportProgress', 'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode', 'sleep', 'requestStats', 'requestReminders', 'cancelReminder', 'partyAdd'])
+const RENDERER_ONLY = new Set(['playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule', 'requestRecordings', 'renameRecording', 'toggleProtectRecording', 'navKey', 'requestFavorites', 'reportProgress', 'requestProgress', 'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode', 'sleep', 'requestStats', 'requestReminders', 'cancelReminder', 'partyAdd'])
 
 function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     if (!command) return
@@ -386,6 +438,9 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     } else if (command.action === 'reportProgress') {
         // 🔄 Item 11: posição vinda do celular → renderer grava no histórico.
         win.webContents.send('media:control', 'reportProgress', command.report)
+    } else if (command.action === 'requestProgress') {
+        // 🔄 Reconciliação: o celular reconectou e quer o estado daqui.
+        win.webContents.send('media:control', 'requestProgress')
     } else if (command.action === 'playChannel') {
         win.webContents.send('media:control', 'playChannel', command.channelId)
     } else if (command.action === 'requestEpg') {
@@ -501,6 +556,9 @@ export function setupWebRemote(): void {
         }
     }, 2000)
 
+    // Keepalive do WebSocket (independente do cast): detecta peer meio-morto.
+    setInterval(heartbeatTick, WS_PING_INTERVAL_MS)
+
     // Mirror the renderer's player state (the tray listens too; multiple
     // listeners are fine) so new WS clients get the latest snapshot.
     ipcMain.on('media:state', (_e, state: { hasMedia?: boolean; playing?: boolean; title?: string }) => {
@@ -536,6 +594,19 @@ export function setupWebRemote(): void {
         const report = parseProgressReport(raw)
         if (!report) return
         sendToMobileClients(JSON.stringify({ type: 'progressSync', ...report }))
+    })
+
+    // 🔄 Reconciliação: resposta ao requestProgress — o que o PC assistiu
+    // enquanto o celular estava fora. O celular resolve por updatedAt (LWW),
+    // então basta mandar o estado; teto de 40 pra não estourar um frame.
+    ipcMain.on('web-remote:progress-snapshot', (_e, raw: unknown) => {
+        const payload = (raw ?? {}) as { items?: unknown }
+        const items = (Array.isArray(payload.items) ? payload.items : [])
+            .map(parseProgressReport)
+            .filter((r): r is NonNullable<typeof r> => r !== null)
+            .slice(0, 40)
+        if (items.length === 0) return
+        sendToMobileClients(JSON.stringify({ type: 'progressSnapshot', items }))
     })
 
     // 🔔 Notificação cruzada: espelha um aviso do desktop nos celulares.
@@ -846,7 +917,17 @@ export function setupWebRemote(): void {
         if (!serverPort) return { success: false, error: 'Controle desativado' }
         sessionPin = newPin()
         pinGate.clear()
-        for (const client of clients) client.socket.destroy()
+        // Fecha com motivo antes de destruir: o app do celular não tem como
+        // ver "PIN velho" num 1006 e reconectava a cada 15s com a credencial
+        // morta, armando o anti brute-force contra o próprio dono do PC.
+        // `end` (não `destroy`): destruir na hora descarta o frame no buffer.
+        // Sem o listener de dados o cliente revogado não manda mais comando na
+        // janela entre o close frame e o FIN de volta (o `destroy` cortava isso).
+        const bye = Buffer.from(encodeCloseFrame(WS_CLOSE_PIN_ROTATED, 'pin-rotated'))
+        for (const client of clients) {
+            client.socket.removeAllListeners('data')
+            try { client.socket.end(bye) } catch { client.socket.destroy() }
+        }
         clients.clear()
         log.info('[WebRemote] PIN regenerado')
         return { success: true, pin: sessionPin }

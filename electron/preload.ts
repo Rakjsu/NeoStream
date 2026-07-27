@@ -206,6 +206,9 @@ const sendChannels = new Set([
     // desta lista no #319 — o send lançava dentro do onTimeUpdate do player
     // e derrubava a reprodução (ver preloadChannels.test.ts).
     'web-remote:progress',
+    // 🔄 Reconciliação: estado de progresso daqui, pedido pelo celular ao
+    // reconectar (o que o PC assistiu enquanto o link estava fora do ar).
+    'web-remote:progress-snapshot',
     // ⏺ Contagem de gravações agendadas: sem ela o main nunca segura o app
     // ao fechar a janela com gravação marcada (trayClosePolicy).
     'dvr:schedules-changed',
