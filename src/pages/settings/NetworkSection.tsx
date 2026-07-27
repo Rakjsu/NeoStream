@@ -8,7 +8,7 @@ export function NetworkSection() {
     const [allowInvalidProviderCertificates, setAllowInvalidProviderCertificates] = useState(true);
     const [webRemote, setWebRemote] = useState<{ enabled: boolean; https: boolean; url: string | null; pin: string | null }>({ enabled: false, https: false, url: null, pin: null });
     // 📟 Aparelhos conectados no controle web (polling leve enquanto ligado).
-    const [remoteClients, setRemoteClients] = useState<{ id?: string; ip: string; name: string | null; role: string; connectedAt: number }[]>([]);
+    const [remoteClients, setRemoteClients] = useState<{ id?: string; ip: string; name: string | null; role: string; connectedAt: number; appVersion?: string; outdated?: boolean }[]>([]);
     // 🕓 Item 14: histórico de conexões do controle.
     const [connectionHistory, setConnectionHistory] = useState<{ name: string | null; ip: string; role: string; at: number; event: string }[]>([]);
     const { t } = useLanguage();
@@ -53,7 +53,7 @@ export function NetworkSection() {
                 })
                 .catch(() => undefined);
             const res = await window.ipcRenderer.invoke('web-remote:clients-list').catch(() => null) as
-                { success?: boolean; clients?: { ip: string; name: string | null; role: string; connectedAt: number }[] } | null;
+                { success?: boolean; clients?: { ip: string; name: string | null; role: string; connectedAt: number; appVersion?: string; outdated?: boolean }[] } | null;
             if (!cancelled && res?.success) setRemoteClients(res.clients ?? []);
         };
         void load();
@@ -216,7 +216,12 @@ export function NetworkSection() {
                                         <span>{c.role === 'mobile' ? '📱' : '🌐'} {c.name || c.ip}</span>
                                         <span style={{ opacity: 0.6 }}>
                                             · {c.ip} · {c.connectedAt ? new Date(c.connectedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                            {c.appVersion ? ` · v${c.appVersion}` : ''}
                                         </span>
+                                        {/* 📱 APK sem os gates de tranca/parental do push: avisa pra atualizar. */}
+                                        {c.outdated && (
+                                            <span style={{ color: '#fbbf24' }}>⚠️ {t('network', 'devicesOutdated')}</span>
+                                        )}
                                         {c.id && (
                                             <button
                                                 onClick={() => {
