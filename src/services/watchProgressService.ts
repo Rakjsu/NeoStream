@@ -99,13 +99,17 @@ class WatchProgressService {
         this.saveProgress(progress);
     }
 
-    // Save current video time for resume
+    /**
+     * Save current video time for resume.
+     * `watchedAt` explícito = amostra do CELULAR (ver movieProgressService).
+     */
     saveVideoTime(
         seriesId: string,
         seasonNumber: number,
         episodeNumber: number,
         currentTime: number,
-        duration: number
+        duration: number,
+        watchedAt: number = Date.now()
     ): void {
         // Sem duração válida não dá pra calcular "assistido": um recoverMediaError
         // do hls.js zera currentTime e deixa duration NaN, e `0 >= 0 * 0.9` marcaria
@@ -129,7 +133,7 @@ class WatchProgressService {
             seasonNumber,
             episodeNumber,
             profileId: activeProfile.id,
-            watchedAt: Date.now(),
+            watchedAt,
             completed: currentTime >= duration * 0.9, // 90% = completed
             currentTime,
             duration,
@@ -288,7 +292,7 @@ class WatchProgressService {
         seriesId: string,
         seasonNumber: number,
         episodeNumber: number
-    ): { currentTime: number; duration: number; completed: boolean } | null {
+    ): { currentTime: number; duration: number; completed: boolean; watchedAt: number } | null {
         const activeProfile = profileService.getActiveProfile();
         if (!activeProfile) return null;
 
@@ -308,7 +312,11 @@ class WatchProgressService {
         return {
             currentTime: episode.currentTime,
             duration: episode.duration,
-            completed: episode.completed
+            completed: episode.completed,
+            // Exposto pro espelho com o celular: sem ele o desempate do
+            // episódio era "maior posição vence" e rever do início no celular
+            // nunca chegava aqui.
+            watchedAt: episode.watchedAt
         };
     }
 

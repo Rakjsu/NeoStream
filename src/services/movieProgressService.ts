@@ -95,12 +95,19 @@ class MovieProgressService {
         this.saveProgress(progress);
     }
 
-    // Save/update movie watch progress
+    /**
+     * Save/update movie watch progress.
+     * `watchedAt` explícito = amostra vinda do CELULAR: guardamos o carimbo de
+     * ORIGEM em vez do relógio daqui. Carimbar Date.now() jogava fora o
+     * updatedAt do push e, com o PC adiantado, toda amostra seguinte falhava o
+     * LWW — o "continuar assistindo" do PC congelava na primeira.
+     */
     saveMovieTime(
         movieId: string,
         movieName: string,
         currentTime: number,
-        duration: number
+        duration: number,
+        watchedAt: number = Date.now()
     ): void {
         const activeProfile = profileService.getActiveProfile();
         if (!activeProfile) return;
@@ -132,7 +139,7 @@ class MovieProgressService {
             currentTime,
             duration,
             progress: progressPercent,
-            watchedAt: Date.now(),
+            watchedAt,
             completed,
             traktSynced: previousEntry?.traktSynced || shouldSyncTrakt,
         };
