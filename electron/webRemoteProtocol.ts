@@ -178,6 +178,8 @@ export interface ProgressReport {
     positionSec: number
     durationSec: number
     updatedAt: number
+    /** Etiqueta do perfil de ORIGEM; sem ela o progresso vaza entre perfis. */
+    profile?: string
 }
 
 /** Valida uma amostra vinda do fio (entrada do celular, não confiável). PURO. */
@@ -194,16 +196,17 @@ export function parseProgressReport(raw: unknown): ProgressReport | null {
     if (typeof positionSec !== 'number' || !Number.isFinite(positionSec) || positionSec < 0) return null
     if (typeof durationSec !== 'number' || !Number.isFinite(durationSec) || durationSec <= 0) return null
     if (typeof updatedAt !== 'number' || !Number.isFinite(updatedAt) || updatedAt <= 0) return null
+    const profile = typeof r.profile === 'string' ? r.profile.trim().slice(0, 60) : ''
     if (kind === 'movie') {
         const movieId = typeof r.movieId === 'string' ? r.movieId.trim().slice(0, 60) : ''
         if (!movieId) return null
-        return { kind, movieId, title, positionSec, durationSec, updatedAt }
+        return { kind, movieId, title, positionSec, durationSec, updatedAt, profile }
     }
     const season = r.season
     const episode = r.episode
     if (typeof season !== 'number' || !Number.isInteger(season) || season < 0) return null
     if (typeof episode !== 'number' || !Number.isInteger(episode) || episode < 0) return null
-    return { kind, title, season, episode, positionSec, durationSec, updatedAt }
+    return { kind, title, season, episode, positionSec, durationSec, updatedAt, profile }
 }
 
 const CAST_TARGET_TYPES = new Set<CastTargetType>(['chromecast', 'dlna', 'airplay'])

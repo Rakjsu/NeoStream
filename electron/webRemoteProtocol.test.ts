@@ -246,13 +246,23 @@ describe('pickLanAddress (escolhe a LAN real, não VPN/virtual)', () => {
 describe('parseProgressReport (item 11 — sync de posições)', () => {
     it('aceita amostra de filme válida', () => {
         expect(parseProgressReport({ kind: 'movie', movieId: '42', title: 'Filme', positionSec: 300, durationSec: 6000, updatedAt: 1700000000000 }))
-            .toEqual({ kind: 'movie', movieId: '42', title: 'Filme', positionSec: 300, durationSec: 6000, updatedAt: 1700000000000 })
+            .toEqual({ kind: 'movie', movieId: '42', title: 'Filme', positionSec: 300, durationSec: 6000, updatedAt: 1700000000000, profile: '' })
     })
 
     it('aceita episódio com série + SxxEyy', () => {
         const report = parseProgressReport({ kind: 'episode', title: 'Minha Série', season: 2, episode: 5, positionSec: 10, durationSec: 1200, updatedAt: 1 })
         expect(report?.season).toBe(2)
         expect(report?.episode).toBe(5)
+    })
+
+    // Sem o perfil de origem no fio, o progresso do adulto entrava no perfil
+    // infantil do outro aparelho (e o da criança no histórico do adulto).
+    it('carrega o perfil de origem nos dois kinds, com teto de tamanho', () => {
+        expect(parseProgressReport({ kind: 'movie', movieId: '42', title: 'F', positionSec: 1, durationSec: 10, updatedAt: 1, profile: ' Rafael ' })?.profile).toBe('Rafael')
+        expect(parseProgressReport({ kind: 'episode', title: 'S', season: 1, episode: 1, positionSec: 1, durationSec: 10, updatedAt: 1, profile: 'kids' })?.profile).toBe('kids')
+        expect(parseProgressReport({ kind: 'movie', movieId: '42', title: 'F', positionSec: 1, durationSec: 10, updatedAt: 1, profile: 'x'.repeat(500) })?.profile).toHaveLength(60)
+        // Peer numa versão sem o campo continua válido (etiqueta vazia = curinga).
+        expect(parseProgressReport({ kind: 'movie', movieId: '42', title: 'F', positionSec: 1, durationSec: 10, updatedAt: 1 })?.profile).toBe('')
     })
 
     it('rejeita lixo: sem duração, sem movieId, número não finito', () => {
@@ -265,7 +275,7 @@ describe('parseProgressReport (item 11 — sync de posições)', () => {
     it('parseRemoteCommand roteia reportProgress com o report validado', () => {
         const text = JSON.stringify({ action: 'reportProgress', report: { kind: 'movie', movieId: '7', title: 'F', positionSec: 60, durationSec: 600, updatedAt: 5 } })
         const command = parseRemoteCommand(text)
-        expect(command).toEqual({ action: 'reportProgress', report: { kind: 'movie', movieId: '7', title: 'F', positionSec: 60, durationSec: 600, updatedAt: 5 } })
+        expect(command).toEqual({ action: 'reportProgress', report: { kind: 'movie', movieId: '7', title: 'F', positionSec: 60, durationSec: 600, updatedAt: 5, profile: '' } })
     })
 })
 

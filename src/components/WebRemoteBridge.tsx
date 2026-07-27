@@ -10,6 +10,7 @@ import { favoritesService } from '../services/favoritesService';
 import { getHomeRecommendations, type RecMovie, type RecSeries } from '../services/recommendationService';
 import { queueService } from '../services/queueService';
 import { downloadService } from '../services/downloadService';
+import { applyRemoteEpisodeProgress, applyRemoteMovieProgress, localProfileTag } from '../services/progressSyncService';
 
 /**
  * Always-mounted bridge for the phone web remote's catalog second-screen.
@@ -579,16 +580,16 @@ export function WebRemoteBridge() {
             return map;
         };
         const applyRemoteProgress = async (raw: unknown) => {
-            const report = (raw ?? {}) as { kind?: string; movieId?: string; title?: string; season?: number; episode?: number; positionSec?: number; durationSec?: number; updatedAt?: number };
+            const report = (raw ?? {}) as { kind?: string; movieId?: string; title?: string; season?: number; episode?: number; positionSec?: number; durationSec?: number; updatedAt?: number; profile?: string };
             const positionSec = Number(report.positionSec), durationSec = Number(report.durationSec), updatedAt = Number(report.updatedAt);
             if (!Number.isFinite(positionSec) || !(durationSec > 0) || !Number.isFinite(updatedAt)) return;
+            // Identidade de perfil e desempate vivem no progressSyncService — a
+            // mesma regra que o app do celular aplica no sentido contrário.
+            const sample = { positionSec, durationSec, updatedAt, profile: report.profile };
             applyingRemoteProgress = true;
             try {
                 if (report.kind === 'movie' && report.movieId) {
-                    // LWW: só aplica se a amostra do celular for mais nova que a local.
-                    const local = movieProgressService.getMoviePositionById(report.movieId);
-                    if (local && local.watchedAt >= updatedAt) return;
-                    movieProgressService.saveMovieTime(report.movieId, String(report.title ?? ''), positionSec, durationSec);
+                    applyRemoteMovieProgress(report.movieId, String(report.title ?? ''), sample);
                 } else if (report.kind === 'episode' && report.title && Number.isInteger(report.season) && Number.isInteger(report.episode)) {
                     const names = await loadSeriesNames();
                     const wanted = String(report.title).trim().toLowerCase();
@@ -597,12 +598,7 @@ export function WebRemoteBridge() {
                         if (name.trim().toLowerCase() === wanted) { seriesId = id; break; }
                     }
                     if (!seriesId) return; // série fora do catálogo local — o Trakt cobre.
-                    const local = watchProgressService.getEpisodeProgress(seriesId, report.season!, report.episode!);
-                    if (local && local.duration > 0 && local.currentTime > 0) {
-                        // Sem watchedAt exposto aqui: "maior progresso vence" resolve o empate.
-                        if (local.currentTime >= positionSec) return;
-                    }
-                    watchProgressService.saveVideoTime(seriesId, report.season!, report.episode!, positionSec, durationSec);
+                    applyRemoteEpisodeProgress(seriesId, report.season!, report.episode!, sample);
                 }
             } finally {
                 applyingRemoteProgress = false;
@@ -622,13 +618,14 @@ export function WebRemoteBridge() {
             if (applyingRemoteProgress) return; // eco do que o celular acabou de mandar
             const detail = (event as CustomEvent).detail as { kind?: string; movieId?: string; title?: string; seriesId?: string; season?: number; episode?: number; positionSec?: number; durationSec?: number; updatedAt?: number } | undefined;
             if (!detail) return;
+            const profile = localProfileTag();
             if (detail.kind === 'movie') {
-                sendProgress({ kind: 'movie', movieId: detail.movieId, title: detail.title, positionSec: detail.positionSec, durationSec: detail.durationSec, updatedAt: detail.updatedAt });
+                sendProgress({ kind: 'movie', movieId: detail.movieId, title: detail.title, positionSec: detail.positionSec, durationSec: detail.durationSec, updatedAt: detail.updatedAt, profile });
             } else if (detail.kind === 'episode' && detail.seriesId) {
                 void loadSeriesNames().then(names => {
                     const seriesName = names.get(String(detail.seriesId));
                     if (!seriesName) return;
-                    sendProgress({ kind: 'episode', title: seriesName, season: detail.season, episode: detail.episode, positionSec: detail.positionSec, durationSec: detail.durationSec, updatedAt: detail.updatedAt });
+                    sendProgress({ kind: 'episode', title: seriesName, season: detail.season, episode: detail.episode, positionSec: detail.positionSec, durationSec: detail.durationSec, updatedAt: detail.updatedAt, profile });
                 });
             }
         };
