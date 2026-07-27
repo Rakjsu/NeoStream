@@ -14,6 +14,8 @@ import { isTraktConnected, traktRate } from '../services/traktService';
 import { downloadService } from '../services/downloadService';
 import type { CastQueueItem } from '../services/castQueue';
 import { CastDeviceSelector } from './CastDeviceSelector';
+import { MobileTargetPicker } from './MobileTargetPicker';
+import { listMobileTargets, type MobileTarget } from '../utils/mobileTargets';
 import { useLanguage } from '../services/languageService';
 import { extractYouTubeId } from '../utils/youtube';
 import { episodeDisplayTitle, sortedSeasonKeys } from '../utils/seriesEpisodes';
@@ -160,6 +162,8 @@ export function ContentDetailModal({
     const [refresh, setRefresh] = useState(0); // Force re-render for button states
     // 📱 Feedback do "tocar no celular" (app pareado no controle web).
     const [mobileMsg, setMobileMsg] = useState('');
+    // 📱 Com 2+ celulares pareados o usuário escolhe o destino (null = fechado).
+    const [phoneTargets, setPhoneTargets] = useState<MobileTarget[] | null>(null);
     const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'completed'>('idle');
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [showDownloadModal, setShowDownloadModal] = useState(false);
@@ -550,6 +554,32 @@ export function ContentDetailModal({
     // Check movie progress
     const movieProgress = contentType === 'movie' ? movieProgressService.getMoviePositionById(contentId) : null;
     const hasMovieProgress = movieProgress && movieProgress.progress > 0 && movieProgress.progress < 95;
+
+    // 📱 Envio pro celular: sem deviceId o desktop empurra pra TODOS os
+    // aparelhos pareados, então a escolha só é dispensada quando há um só.
+    const sendVodToPhone = async (deviceId?: string) => {
+        const payload = contentType === 'series'
+            ? (() => {
+                const ep = episodes.find(e => Number(e.episode_num) === selectedEpisode);
+                if (!ep) return null;
+                return {
+                    kind: 'series',
+                    sid: String(ep.id),
+                    container: ep.container_extension || 'mp4',
+                    name: `${contentData.name} · S${selectedSeason}E${selectedEpisode}`
+                };
+            })()
+            : {
+                kind: 'movie',
+                sid: contentId,
+                container: contentData.container_extension || 'mp4',
+                name: contentData.name
+            };
+        if (!payload) return;
+        const result = await window.ipcRenderer.invoke('web-remote:play-vod-on-mobile', { ...payload, deviceId }) as { success: boolean; delivered?: number; status?: string };
+        setMobileMsg(t('common', mobilePushMessageKey(result)));
+        setTimeout(() => setMobileMsg(''), 4000);
+    };
 
     return (
         <div
@@ -1263,27 +1293,9 @@ export function ContentDetailModal({
                         {/* 📱 Tocar no celular pareado (app conectado no controle web) */}
                         <button
                             onClick={async () => {
-                                const payload = contentType === 'series'
-                                    ? (() => {
-                                        const ep = episodes.find(e => Number(e.episode_num) === selectedEpisode);
-                                        if (!ep) return null;
-                                        return {
-                                            kind: 'series',
-                                            sid: String(ep.id),
-                                            container: ep.container_extension || 'mp4',
-                                            name: `${contentData.name} · S${selectedSeason}E${selectedEpisode}`
-                                        };
-                                    })()
-                                    : {
-                                        kind: 'movie',
-                                        sid: contentId,
-                                        container: contentData.container_extension || 'mp4',
-                                        name: contentData.name
-                                    };
-                                if (!payload) return;
-                                const result = await window.ipcRenderer.invoke('web-remote:play-vod-on-mobile', payload) as { success: boolean; delivered?: number; status?: string };
-                                setMobileMsg(t('common', mobilePushMessageKey(result)));
-                                setTimeout(() => setMobileMsg(''), 4000);
+                                const targets = await listMobileTargets();
+                                if (targets.length > 1) setPhoneTargets(targets);
+                                else await sendVodToPhone(targets[0]?.id);
                             }}
                             style={{
                                 width: 50,
@@ -1378,6 +1390,16 @@ export function ContentDetailModal({
 
                     {mobileMsg && (
                         <p style={{ color: 'var(--ns-accent-light)', fontSize: 12, marginTop: 10 }}>{mobileMsg}</p>
+                    )}
+
+                    {phoneTargets && (
+                        <MobileTargetPicker
+                            targets={phoneTargets}
+                            title={t('common', 'pickPhone')}
+                            cancelLabel={t('common', 'close')}
+                            onPick={deviceId => { setPhoneTargets(null); void sendVodToPhone(deviceId); }}
+                            onClose={() => setPhoneTargets(null)}
+                        />
                     )}
 
                     {/* ⭐ Minha nota + 🏷️ tags pessoais (locais à máquina) */}

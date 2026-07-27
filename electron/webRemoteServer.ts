@@ -43,7 +43,15 @@ import {
     type PushAckStatus,
 } from './webRemoteProtocol'
 import { renderRemotePage, type RemoteAccent } from './webRemotePage'
-import { buildSetupDeepLink, renderSetupHandoffPage } from './setupPayload'
+import {
+    buildSealedSetupDeepLink,
+    buildSetupQrUrl,
+    buildSetupDeepLink,
+    consumeSetupTicket,
+    issueSetupTicket,
+    renderSetupExpiredPage,
+    renderSetupHandoffPage,
+} from './setupPayload'
 import { parseTransferQuery, transferEntryId, transferSizeVerdict, uniqueTransferName } from './transferReceiver'
 import { recordReceivedTransfer, transfersDir } from './transferHandlers'
 import { resolveSessionPin } from './webRemotePin'
@@ -102,6 +110,8 @@ interface ClientSocket {
     appVersion?: string
     /** O que o app anunciou saber fazer — vazio no app legado. */
     capabilities?: Set<string>
+    /** Id do APARELHO (persistido no celular) — vai no push endereçado. */
+    deviceId?: string
 }
 
 interface GuideChannel {
@@ -216,22 +226,51 @@ function broadcast(text: string): void {
     }
 }
 
-function broadcastState(): void {
-    broadcast(stateMessage())
+/**
+ * Espelho do sendToMobileClients: mensagens que SÓ a página do navegador
+ * consome (state a cada 2s durante cast, screenshot em base64 de centenas de
+ * KB). O app mobile não lê nenhuma das duas — mandar pra ele é jank puro.
+ */
+function broadcastToBrowsers(text: string): void {
+    const frame = encodeTextFrame(text)
+    for (const client of clients) {
+        if (client.role === 'mobile') continue
+        try {
+            client.socket.write(frame)
+        } catch { /* dropped on next read */ }
+    }
 }
 
-/** Envia um comando só pros clientes que são o APP mobile (não a página). */
-function sendToMobileClients(text: string): number {
-    const frame = encodeTextFrame(text)
+function broadcastState(): void {
+    broadcastToBrowsers(stateMessage())
+}
+
+/**
+ * Envia um comando só pros clientes que são o APP mobile (não a página).
+ * Com `targetId` (id de conexão ou do aparelho) vai pra UM celular só — sem
+ * ele, dois celulares da casa recebem o mesmo "enviar pro celular".
+ */
+function sendToMobileClients(text: string, targetId?: string): number {
     let delivered = 0
     for (const client of clients) {
         if (client.role !== 'mobile') continue
+        if (targetId && client.id !== targetId && client.deviceId !== targetId) continue
+        // O `to` deixa o app conferir o destino; só quando ele se identificou.
+        const addressed = targetId && client.deviceId ? withTarget(text, client.deviceId) : text
         try {
-            client.socket.write(frame)
+            client.socket.write(encodeTextFrame(addressed))
             delivered++
         } catch { /* dropped on next read */ }
     }
     return delivered
+}
+
+function withTarget(text: string, deviceId: string): string {
+    try {
+        return JSON.stringify({ ...JSON.parse(text) as object, to: deviceId })
+    } catch {
+        return text
+    }
 }
 
 // 📡 Handshake: o app se identifica com versão + capacidades e o desktop
@@ -246,6 +285,9 @@ function applyMobileHello(client: ClientSocket, hello: MobileHello): void {
     }
     client.role = 'mobile'
     client.name = hello.name
+    // Id do aparelho: sobrevive à reconexão e permite endereçar o push a UM
+    // celular da casa (app antigo manda vazio — aí o envio vale pra todos).
+    client.deviceId = hello.deviceId || undefined
     client.protocolVersion = hello.protocolVersion
     client.appVersion = hello.appVersion
     client.capabilities = new Set(hello.capabilities)
@@ -272,10 +314,12 @@ type PushOutcome = PushAckStatus | 'delivered' | 'timeout' | 'none'
  * resolve com o desfecho real (o app pode descartar por tranca/parental/canal
  * inexistente); sem isso, resolve na hora com o comportamento antigo.
  */
-function pushToMobile(message: Record<string, unknown>): Promise<{ delivered: number; status: PushOutcome }> {
+function pushToMobile(message: Record<string, unknown>, targetId?: string): Promise<{ delivered: number; status: PushOutcome }> {
     const pushId = crypto.randomUUID().slice(0, 8)
-    const waits = [...clients].some(c => c.role === 'mobile' && c.capabilities?.has('pushAck'))
-    const delivered = sendToMobileClients(JSON.stringify({ ...message, pushId }))
+    // Com alvo escolhido, só a capacidade DELE decide se vale esperar o ACK.
+    const waits = [...clients].some(c => c.role === 'mobile' && c.capabilities?.has('pushAck')
+        && (!targetId || c.id === targetId || c.deviceId === targetId))
+    const delivered = sendToMobileClients(JSON.stringify({ ...message, pushId }), targetId)
     if (delivered === 0) return Promise.resolve({ delivered: 0, status: 'none' })
     if (!waits) return Promise.resolve({ delivered, status: 'delivered' })
     return new Promise(resolve => {
@@ -433,16 +477,16 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         // 📷 Captura a janela do app e devolve pra página (reduzida pra LAN).
         const appWin = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
         if (!appWin) {
-            broadcast(JSON.stringify({ type: 'screenshot', dataUrl: null }))
+            broadcastToBrowsers(JSON.stringify({ type: 'screenshot', dataUrl: null }))
             return
         }
         appWin.webContents.capturePage()
             .then(image => {
                 const size = image.getSize()
                 const resized = size.width > 900 ? image.resize({ width: 900 }) : image
-                broadcast(JSON.stringify({ type: 'screenshot', dataUrl: resized.toDataURL() }))
+                broadcastToBrowsers(JSON.stringify({ type: 'screenshot', dataUrl: resized.toDataURL() }))
             })
-            .catch(() => broadcast(JSON.stringify({ type: 'screenshot', dataUrl: null })))
+            .catch(() => broadcastToBrowsers(JSON.stringify({ type: 'screenshot', dataUrl: null })))
         return
     }
     // While a cast session is live, transport commands drive the TV instead of
@@ -606,7 +650,9 @@ export function setupWebRemote(): void {
     // 📱 "Enviar pro celular": empurra um canal pro app NeoStream Mobile
     // conectado neste servidor (o app dá play com a conta dele).
     // 📱 Manda um VOD/episódio pro app do celular pareado tocar.
-    ipcMain.handle('web-remote:play-vod-on-mobile', async (_e, data: { kind?: string; sid?: string; container?: string; name?: string }) => {
+    // deviceId ausente = todos os celulares (compatível com quem não escolhe);
+    // com ele, só o aparelho escolhido no painel de envio recebe.
+    ipcMain.handle('web-remote:play-vod-on-mobile', async (_e, data: { kind?: string; sid?: string; container?: string; name?: string; deviceId?: string }) => {
         const kind = data?.kind === 'series' ? 'series' : 'movie'
         const sid = String(data?.sid ?? '').trim()
         if (!sid) return { success: false, error: 'sid ausente' }
@@ -616,7 +662,7 @@ export function setupWebRemote(): void {
             sid,
             container: String(data?.container ?? 'mp4'),
             name: String(data?.name ?? ''),
-        })
+        }, typeof data?.deviceId === 'string' && data.deviceId ? data.deviceId : undefined)
         // success só é verdade quando o app confirmou (ou é um app legado, que
         // nunca confirma): tranca/parental/conteúdo ausente viram falha honesta.
         return { success: status === 'played' || status === 'delivered', count: delivered, delivered, status }
@@ -639,13 +685,13 @@ export function setupWebRemote(): void {
     })
 
     ipcMain.handle('web-remote:play-on-mobile', async (_e, raw: unknown) => {
-        const data = raw as { streamId?: unknown; name?: unknown } | null
+        const data = raw as { streamId?: unknown; name?: unknown; deviceId?: unknown } | null
         if (!data || data.streamId === undefined) return { success: false, delivered: 0, status: 'none' }
         const { delivered, status } = await pushToMobile({
             type: 'playOnMobile',
             streamId: String(data.streamId),
             name: typeof data.name === 'string' ? data.name.slice(0, 120) : '',
-        })
+        }, typeof data.deviceId === 'string' && data.deviceId ? data.deviceId : undefined)
         return { success: status === 'played' || status === 'delivered', delivered, status }
     })
 
@@ -678,8 +724,19 @@ export function setupWebRemote(): void {
             // gates de tranca/parental: o painel avisa pra atualizar.
             appVersion: c.appVersion ?? '',
             outdated: c.role === 'mobile' && isOutdatedMobile(c.appVersion ?? ''),
+            // Alvo estável do "enviar pro celular" (sobrevive à reconexão).
+            deviceId: c.deviceId ?? null,
         })),
     }))
+
+    // 🔐 QR do "levar pro celular": ticket de uso único (2 min) no lugar do PIN.
+    // A chave de cifra sai daqui pro renderer só pra ir no FRAGMENTO da URL.
+    ipcMain.handle('web-remote:setup-qr', () => {
+        const base = serverUrl()
+        if (!base || !sessionPin) return { success: false }
+        const ticket = issueSetupTicket()
+        return { success: true, url: buildSetupQrUrl(base, ticket), expiresAt: ticket.expiresAt }
+    })
 
     // 📟 Item 14 fase 2: desconectar um cliente pelo painel + histórico.
     ipcMain.handle('web-remote:disconnect-client', (_e, raw: unknown) => {
@@ -1153,7 +1210,29 @@ function start(): Promise<void> {
                 res.end('Aguarde e tente de novo')
                 return
             }
-            const pin = new URL(req.url, 'http://local').searchParams.get('pin') || ''
+            const query = new URL(req.url, 'http://local').searchParams
+            const ticketToken = query.get('t') || ''
+            if (ticketToken) {
+                // 🔐 QR novo: ticket de uso único. A chave veio no fragmento e
+                // NÃO chegou até aqui — o servidor só a conhece porque foi ele
+                // que a emitiu, e o payload sai cifrado com ela.
+                const ticketKey = consumeSetupTicket(ticketToken, now)
+                if (!ticketKey) {
+                    // Não conta como erro de PIN: o token tem 72 bits, não há o
+                    // que forçar bruto, e recarregar a página não pode trancar
+                    // o /setup deste aparelho.
+                    log.warn('[WebRemote] ticket do /setup inválido ou já usado')
+                    res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
+                    res.end(renderSetupExpiredPage(remoteLang))
+                    return
+                }
+                pinGate.delete(ip)
+                const sealed = buildSealedSetupDeepLink(exportPlaylistsForSetup(), getActivePlaylistIdPublic(), ticketKey)
+                res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
+                res.end(renderSetupHandoffPage(sealed, remoteLang))
+                return
+            }
+            const pin = query.get('pin') || ''
             if (pin !== sessionPin) {
                 const entry = registerPinFailure(pinGate.get(ip), now)
                 pinGate.set(ip, entry)

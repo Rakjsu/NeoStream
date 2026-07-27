@@ -209,13 +209,26 @@ export function parseProgressReport(raw: unknown): ProgressReport | null {
     return { kind, title, season, episode, positionSec, durationSec, updatedAt, profile }
 }
 
+/**
+ * Teto dos ids de conteúdo vindos da rede. Sem ele só o limite de frame (1MB)
+ * segurava: um id de 900k chars passava a validação, atravessava o IPC pro
+ * renderer e virava URL gigante na chamada ao provedor. 80 chars sobra pros
+ * ids do Xtream (numéricos) e do Stalker — mesmo teto do cancelSchedule.
+ */
+const ID_MAX = 80
+
+/** Id de conteúdo validado e cortado no teto ('' = ausente/inválido). */
+function contentId(value: unknown): string {
+    return typeof value === 'string' ? value.slice(0, ID_MAX) : ''
+}
+
 const CAST_TARGET_TYPES = new Set<CastTargetType>(['chromecast', 'dlna', 'airplay'])
 
 /** Extract an optional {deviceId, deviceType} target; ignores anything malformed. */
 function parseCastTarget(parsed: unknown): CastTarget | undefined {
-    const deviceId = (parsed as { deviceId?: unknown }).deviceId
+    const deviceId = contentId((parsed as { deviceId?: unknown }).deviceId)
     const deviceType = (parsed as { deviceType?: unknown }).deviceType
-    if (typeof deviceId !== 'string' || !deviceId) return undefined
+    if (!deviceId) return undefined
     if (typeof deviceType !== 'string' || !CAST_TARGET_TYPES.has(deviceType as CastTargetType)) return undefined
     return { deviceId, deviceType: deviceType as CastTargetType }
 }
@@ -264,13 +277,13 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         return { action: 'sleep', minutes: Math.min(480, Math.floor(minutes)) }
     }
     if (action === 'playChannel' || action === 'requestEpg') {
-        const channelId = (parsed as { channelId?: unknown }).channelId
-        if (typeof channelId !== 'string' || !channelId) return null
+        const channelId = contentId((parsed as { channelId?: unknown }).channelId)
+        if (!channelId) return null
         return { action, channelId }
     }
     if (action === 'recordChannel') {
-        const channelId = (parsed as { channelId?: unknown }).channelId
-        if (typeof channelId !== 'string' || !channelId) return null
+        const channelId = contentId((parsed as { channelId?: unknown }).channelId)
+        if (!channelId) return null
         const rawName = (parsed as { channelName?: unknown }).channelName
         const channelName = typeof rawName === 'string' && rawName.trim() ? rawName.trim().slice(0, 160) : undefined
         return { action: 'recordChannel', channelId, channelName }
@@ -302,8 +315,8 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         return { action: 'navKey', key }
     }
     if (action === 'scheduleNext') {
-        const channelId = (parsed as { channelId?: unknown }).channelId
-        if (typeof channelId !== 'string' || !channelId) return null
+        const channelId = contentId((parsed as { channelId?: unknown }).channelId)
+        if (!channelId) return null
         return { action: 'scheduleNext', channelId }
     }
     if (action === 'cancelSchedule') {
@@ -317,31 +330,31 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
         return { action: 'cancelReminder', id: id.trim().slice(0, 80) }
     }
     if (action === 'castMovie') {
-        const movieId = (parsed as { movieId?: unknown }).movieId
-        if (typeof movieId !== 'string' || !movieId) return null
+        const movieId = contentId((parsed as { movieId?: unknown }).movieId)
+        if (!movieId) return null
         return { action, movieId, target: parseCastTarget(parsed) }
     }
     // 🎉 Item 40: modo festa — qualquer celular adiciona um filme à fila da TV.
     if (action === 'partyAdd') {
-        const movieId = (parsed as { movieId?: unknown }).movieId
-        if (typeof movieId !== 'string' || !movieId) return null
+        const movieId = contentId((parsed as { movieId?: unknown }).movieId)
+        if (!movieId) return null
         return { action, movieId }
     }
     if (action === 'castMovieQueue') {
         const raw = (parsed as { movieIds?: unknown }).movieIds
         if (!Array.isArray(raw)) return null
-        const movieIds = raw.filter((id): id is string => typeof id === 'string' && !!id).slice(0, 200)
+        const movieIds = raw.map(contentId).filter(id => !!id).slice(0, 200)
         if (movieIds.length === 0) return null
         return { action: 'castMovieQueue', movieIds, target: parseCastTarget(parsed) }
     }
     if (action === 'requestSeriesInfo') {
-        const seriesId = (parsed as { seriesId?: unknown }).seriesId
-        if (typeof seriesId !== 'string' || !seriesId) return null
+        const seriesId = contentId((parsed as { seriesId?: unknown }).seriesId)
+        if (!seriesId) return null
         return { action, seriesId }
     }
     if (action === 'castEpisode') {
-        const episodeId = (parsed as { episodeId?: unknown }).episodeId
-        if (typeof episodeId !== 'string' || !episodeId) return null
+        const episodeId = contentId((parsed as { episodeId?: unknown }).episodeId)
+        if (!episodeId) return null
         return { action, episodeId, target: parseCastTarget(parsed) }
     }
     if (action === 'requestCatalog') return { action: 'requestCatalog', query: parseQuery(parsed) }
@@ -380,6 +393,8 @@ export interface MobileHello {
     /** '' quando o app não manda a versão (APK ≤ v0.20.0). */
     appVersion: string
     capabilities: string[]
+    /** Id do aparelho ('' no app antigo) — alvo do push endereçado. */
+    deviceId: string
 }
 
 /** Hello do app (entrada do fio, não confiável). PURO. */
@@ -399,6 +414,7 @@ export function parseMobileHello(text: string): MobileHello | null {
         name: typeof hello.name === 'string' ? hello.name.slice(0, 40) : 'celular',
         protocolVersion: typeof version === 'number' && Number.isFinite(version) && version > 0 ? Math.floor(version) : 0,
         appVersion: typeof hello.appVersion === 'string' ? hello.appVersion.trim().slice(0, 20) : '',
+        deviceId: typeof hello.deviceId === 'string' ? hello.deviceId.slice(0, 64) : '',
         capabilities: rawCaps
             .filter((cap): cap is string => typeof cap === 'string' && !!cap)
             .slice(0, 32)

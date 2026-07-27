@@ -26,7 +26,9 @@ export function PlaylistsSection() {
 
     // 🔗 Ecossistema: QR pro celular + importação do backup do mobile
     const [showQr, setShowQr] = useState(false);
-    const [remoteConfig, setRemoteConfig] = useState<{ enabled: boolean; url?: string; pin?: string } | null>(null);
+    // 🔐 URL do QR: ticket de uso único emitido pelo main (o PIN não vai
+    // mais nela). Cada abertura do painel pede um novo — o anterior expira.
+    const [setupUrl, setSetupUrl] = useState<string | null>(null);
     const [importingMobile, setImportingMobile] = useState(false);
     const [importMsg, setImportMsg] = useState('');
 
@@ -49,15 +51,21 @@ export function PlaylistsSection() {
     useEffect(() => {
         if (!showQr) return;
         let cancelled = false;
-        window.ipcRenderer.invoke('web-remote:get-config')
-            .then((config: { enabled?: boolean; url?: string; pin?: string }) => {
-                if (cancelled) return;
-                setRemoteConfig({ enabled: config?.enabled === true, url: config?.url, pin: config?.pin });
-            })
-            .catch(() => {
-                if (!cancelled) setRemoteConfig({ enabled: false });
-            });
-        return () => { cancelled = true; };
+        // Sem controle web ligado o main responde success:false → cai no aviso.
+        const issue = () => {
+            window.ipcRenderer.invoke('web-remote:setup-qr')
+                .then((res: { success?: boolean; url?: string }) => {
+                    if (!cancelled) setSetupUrl(res?.success ? res.url ?? null : null);
+                })
+                .catch(() => {
+                    if (!cancelled) setSetupUrl(null);
+                });
+        };
+        issue();
+        // O ticket morre em 2 min: renova antes disso enquanto o painel estiver
+        // aberto, senão quem volta com o celular na mão escaneia um QR morto.
+        const timer = setInterval(issue, 100_000);
+        return () => { cancelled = true; clearInterval(timer); };
     }, [showQr]);
 
     const hostOf = (url: string) => {
@@ -368,9 +376,6 @@ export function PlaylistsSection() {
                     <p style={{ color: '#34d399', fontSize: 13, margin: '10px 2px 0' }}>{importMsg}</p>
                 )}
                 {showQr && (() => {
-                    const setupUrl = remoteConfig?.enabled && remoteConfig.url && remoteConfig.pin
-                        ? `${remoteConfig.url}/setup?pin=${remoteConfig.pin}`
-                        : null;
                     let setupQr: string | null = null;
                     if (setupUrl) {
                         try { setupQr = qrToSvg(setupUrl, 4); } catch { setupQr = null; }
@@ -394,6 +399,8 @@ export function PlaylistsSection() {
                                     />
                                     <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: 0 }}>
                                         {t('playlists', 'toPhoneHint')}
+                                        <br />
+                                        <span style={{ color: 'rgba(255,255,255,0.45)' }}>{t('playlists', 'toPhoneOneShot')}</span>
                                     </p>
                                 </>
                             ) : (

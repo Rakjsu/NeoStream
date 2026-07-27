@@ -293,7 +293,8 @@
     "switchError": "Could not connect to this playlist.",
     "remove": "Remove",
     "confirmRemove": "Confirm?",
-    "removeError": "Could not remove the playlist."
+    "removeError": "Could not remove the playlist.",
+    "toPhoneOneShot": "Valid for 2 minutes and single use — generate another if needed."
   },
   "notifications": {
     "autoTuneIn": "Switching to {channel} in {s}s…",
@@ -792,7 +793,8 @@
     "phoneNoAnswer": "📱 Sent, but the phone did not answer",
     "phoneLocked": "🔒 The phone app is locked — unlock it to play",
     "phoneBlocked": "🚸 Blocked by the phone's parental control",
-    "phoneNotFound": "Content not found on the phone's account"
+    "phoneNotFound": "Content not found on the phone's account",
+    "pickPhone": "Pick the phone"
   },
   "player": {
     "qrHandoff": "Continue on phone",

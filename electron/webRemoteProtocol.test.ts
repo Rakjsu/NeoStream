@@ -280,11 +280,23 @@ describe('parseProgressReport (item 11 — sync de posições)', () => {
 })
 
 describe('handshake versionado (hello com versão + capacidades)', () => {
+    // 🔒 Regressão (auditoria R3, lacuna 3): sem id de aparelho no hello o
+    // desktop não tinha como endereçar o push a UM celular da casa.
+    it('hello traz o id do aparelho (vazio no app que não manda)', () => {
+        const comId = parseMobileHello(JSON.stringify({
+            action: 'helloMobile', name: 'Pixel', deviceId: 'm-abcdef0123456789',
+        }))
+        expect(comId?.deviceId).toBe('m-abcdef0123456789')
+        expect(parseMobileHello(JSON.stringify({ action: 'helloMobile', name: 'Velho' }))?.deviceId).toBe('')
+        const gigante = parseMobileHello(JSON.stringify({ action: 'helloMobile', deviceId: 'x'.repeat(500) }))
+        expect(gigante?.deviceId.length).toBe(64)
+    })
+
     it('hello do APK legado (só action+name) vira peer v0 sem capacidades', () => {
         // Regressão: o desktop v4.44 tratava esse hello igual ao de um APK com
         // os gates de tranca/parental — não havia como distinguir os dois.
         const hello = parseMobileHello(JSON.stringify({ action: 'helloMobile', name: 'NeoStream Mobile' }))
-        expect(hello).toEqual({ name: 'NeoStream Mobile', protocolVersion: 0, appVersion: '', capabilities: [] })
+        expect(hello).toEqual({ name: 'NeoStream Mobile', protocolVersion: 0, appVersion: '', capabilities: [], deviceId: '' })
         expect(isOutdatedMobile(hello!.appVersion)).toBe(true)
     })
 
@@ -293,7 +305,7 @@ describe('handshake versionado (hello com versão + capacidades)', () => {
             action: 'helloMobile', name: 'Pixel', protocolVersion: 1, appVersion: '0.21.0',
             capabilities: ['pushAck', 'gatedPlay'],
         }))
-        expect(hello).toEqual({ name: 'Pixel', protocolVersion: 1, appVersion: '0.21.0', capabilities: ['pushAck', 'gatedPlay'] })
+        expect(hello).toEqual({ name: 'Pixel', protocolVersion: 1, appVersion: '0.21.0', capabilities: ['pushAck', 'gatedPlay'], deviceId: '' })
         expect(isOutdatedMobile(hello!.appVersion)).toBe(false)
     })
 
@@ -392,5 +404,45 @@ describe('partyAdd (item 40 — modo festa)', () => {
     it('rejeita movieId ausente ou não-string', () => {
         expect(parseRemoteCommand(JSON.stringify({ action: 'partyAdd' }))).toBeNull()
         expect(parseRemoteCommand(JSON.stringify({ action: 'partyAdd', movieId: 42 }))).toBeNull()
+    })
+})
+
+// 🔒 Regressão (auditoria R3): os ids não tinham teto de tamanho — só o limite
+// de frame (1MB) segurava. Um id de ~900k chars passava a validação, ia pro
+// renderer via IPC e virava URL gigante na chamada ao provedor.
+describe('teto de tamanho dos ids (parseRemoteCommand)', () => {
+    const huge = 'A'.repeat(900_000)
+
+    it('corta channelId de playChannel/requestEpg/recordChannel/scheduleNext em 80', () => {
+        for (const action of ['playChannel', 'requestEpg', 'recordChannel', 'scheduleNext']) {
+            const command = parseRemoteCommand(JSON.stringify({ action, channelId: huge })) as { channelId: string } | null
+            expect(command?.channelId.length).toBe(80)
+        }
+    })
+
+    it('corta movieId, seriesId e episodeId em 80', () => {
+        const movie = parseRemoteCommand(JSON.stringify({ action: 'castMovie', movieId: huge })) as { movieId: string } | null
+        expect(movie?.movieId.length).toBe(80)
+        const party = parseRemoteCommand(JSON.stringify({ action: 'partyAdd', movieId: huge })) as { movieId: string } | null
+        expect(party?.movieId.length).toBe(80)
+        const series = parseRemoteCommand(JSON.stringify({ action: 'requestSeriesInfo', seriesId: huge })) as { seriesId: string } | null
+        expect(series?.seriesId.length).toBe(80)
+        const episode = parseRemoteCommand(JSON.stringify({ action: 'castEpisode', episodeId: huge })) as { episodeId: string } | null
+        expect(episode?.episodeId.length).toBe(80)
+    })
+
+    it('corta CADA item da fila (o limite de 200 itens não segurava o tamanho)', () => {
+        const queue = parseRemoteCommand(JSON.stringify({ action: 'castMovieQueue', movieIds: [huge, '7'] })) as { movieIds: string[] } | null
+        expect(queue?.movieIds[0].length).toBe(80)
+        expect(queue?.movieIds[1]).toBe('7')
+    })
+
+    it('corta o deviceId do alvo de cast e segue rejeitando id vazio/não-string', () => {
+        const command = parseRemoteCommand(JSON.stringify({
+            action: 'castMovie', movieId: '7', deviceId: huge, deviceType: 'dlna',
+        })) as { target?: { deviceId: string } } | null
+        expect(command?.target?.deviceId.length).toBe(80)
+        expect(parseRemoteCommand(JSON.stringify({ action: 'playChannel', channelId: '' }))).toBeNull()
+        expect(parseRemoteCommand(JSON.stringify({ action: 'playChannel', channelId: 42 }))).toBeNull()
     })
 })

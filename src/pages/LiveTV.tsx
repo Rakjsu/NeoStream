@@ -26,6 +26,8 @@ import { getTimeshiftUrl } from '../services/timeshiftService';
 import { mobilePushMessageKey } from '../utils/mobilePushResult';
 
 import { asList } from '../utils/catalogPayload';
+import { MobileTargetPicker } from '../components/MobileTargetPicker';
+import { listMobileTargets, type MobileTarget } from '../utils/mobileTargets';
 interface LiveStream {
     num: number;
     name: string;
@@ -158,6 +160,8 @@ export function LiveTV() {
     const [showMultiView, setShowMultiView] = useState(false);
     // 📱 Feedback do "enviar pro celular" (app mobile conectado no controle web)
     const [sendMobileMsg, setSendMobileMsg] = useState('');
+    // 📱 Com 2+ celulares pareados o usuário escolhe o destino (null = fechado).
+    const [phoneTargets, setPhoneTargets] = useState<MobileTarget[] | null>(null);
     // Favorite channel ids (⭐): re-read whenever the star toggles.
     // 🧩 Item 33: mosaico de miniaturas dos favoritos (rodizio de capturas).
     const [showFavMosaic, setShowFavMosaic] = useState(false);
@@ -1120,6 +1124,18 @@ export function LiveTV() {
         );
     }
 
+    // 📱 Envio pro celular: sem deviceId o desktop empurra pra TODOS os
+    // aparelhos pareados, então a escolha só é dispensada quando há um só.
+    const sendChannelToPhone = async (channel: LiveStream, deviceId?: string) => {
+        const result = await window.ipcRenderer.invoke('web-remote:play-on-mobile', {
+            streamId: channel.stream_id,
+            name: channel.name,
+            deviceId
+        }).catch(() => null) as { success?: boolean; delivered?: number; status?: string } | null;
+        setSendMobileMsg(t('common', mobilePushMessageKey(result)));
+        setTimeout(() => setSendMobileMsg(''), 4000);
+    };
+
     return (
         <div style={{ position: 'relative', height: '100vh', overflow: 'hidden' }}>
             {/* Animated Backdrop */}
@@ -1585,14 +1601,10 @@ export function LiveTV() {
                                     </button>
 
                                     <button
-                                        onClick={() => {
-                                            void window.ipcRenderer.invoke('web-remote:play-on-mobile', {
-                                                streamId: selectedChannel.stream_id,
-                                                name: selectedChannel.name
-                                            }).then((result: { success?: boolean; delivered?: number; status?: string }) => {
-                                                setSendMobileMsg(t('common', mobilePushMessageKey(result)));
-                                                setTimeout(() => setSendMobileMsg(''), 4000);
-                                            }).catch(() => undefined);
+                                        onClick={async () => {
+                                            const targets = await listMobileTargets();
+                                            if (targets.length > 1) setPhoneTargets(targets);
+                                            else await sendChannelToPhone(selectedChannel, targets[0]?.id);
                                         }}
                                         title={t('liveTV', 'sendToPhone')}
                                         style={{
@@ -1613,6 +1625,19 @@ export function LiveTV() {
                                         <span style={{ alignSelf: 'center', color: 'rgba(255,255,255,0.75)', fontSize: '12px' }}>
                                             {sendMobileMsg}
                                         </span>
+                                    )}
+
+                                    {phoneTargets && (
+                                        <MobileTargetPicker
+                                            targets={phoneTargets}
+                                            title={t('common', 'pickPhone')}
+                                            cancelLabel={t('common', 'close')}
+                                            onPick={deviceId => {
+                                                setPhoneTargets(null);
+                                                void sendChannelToPhone(selectedChannel, deviceId);
+                                            }}
+                                            onClose={() => setPhoneTargets(null)}
+                                        />
                                     )}
 
                                     <button

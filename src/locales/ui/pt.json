@@ -293,7 +293,8 @@
     "switchError": "Não foi possível conectar a esta playlist.",
     "remove": "Remover",
     "confirmRemove": "Confirmar?",
-    "removeError": "Não foi possível remover a playlist."
+    "removeError": "Não foi possível remover a playlist.",
+    "toPhoneOneShot": "Válido por 2 minutos e só uma vez — gere outro se precisar."
   },
   "updates": {
     "title": "Atualizações Automáticas",
@@ -698,7 +699,8 @@
     "phoneNoAnswer": "📱 Enviado, mas o celular não respondeu",
     "phoneLocked": "🔒 App do celular trancado — destrave pra tocar",
     "phoneBlocked": "🚸 Bloqueado pelo controle parental do celular",
-    "phoneNotFound": "Conteúdo não encontrado na conta do celular"
+    "phoneNotFound": "Conteúdo não encontrado na conta do celular",
+    "pickPhone": "Escolha o celular"
   },
   "player": {
     "qrHandoff": "Continuar no celular",

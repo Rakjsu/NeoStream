@@ -20,29 +20,37 @@ export const HANDOFF_QR_MAX_BYTES = 78;
  *  truncado no que couber no QR — sem nome antes de estourar a capacidade. */
 export function buildHandoffLink(handoff: MobileHandoff, positionSec: number): string {
     const pos = Math.max(0, Math.floor(Number.isFinite(positionSec) ? positionSec : 0));
+    // Query montada na mão com encodeURIComponent: o URLSearchParams usa
+    // form-encoding (espaço vira '+') e o parser de query do expo-router não
+    // desfaz isso — o título chegava no celular como "O+Rei+Leão".
     const build = (name: string): string => {
-        const params = new URLSearchParams({
-            kind: handoff.kind,
-            sid: handoff.sid,
-            container: handoff.container || 'mp4',
-            ...(name ? { name } : {}),
-            pos: String(pos),
-        });
-        return `neostream://open-content?${params.toString()}`;
+        const parts = [
+            `kind=${handoff.kind}`,
+            `sid=${encodeURIComponent(handoff.sid)}`,
+            `container=${encodeURIComponent(handoff.container || 'mp4')}`,
+            ...(name ? [`name=${encodeURIComponent(name)}`] : []),
+            `pos=${pos}`,
+        ];
+        return `neostream://open-content?${parts.join('&')}`;
     };
 
-    const fullName = (handoff.name || '').slice(0, 120);
-    const full = build(fullName);
+    // Fatiar por code point (não por unidade UTF-16): cortar no meio de um par
+    // substituto gera um surrogate solto — que vira '�' no título e faz o
+    // encodeURIComponent LANÇAR. Surrogate solto na entrada também cai fora.
+    const chars = Array.from(handoff.name || '')
+        .filter(char => !(char.length === 1 && char.charCodeAt(0) >= 0xd800 && char.charCodeAt(0) <= 0xdfff))
+        .slice(0, 120);
+    const full = build(chars.join(''));
     if (full.length <= HANDOFF_QR_MAX_BYTES) return full;
 
     // O nome fez o link estourar o QR — trunca pro maior prefixo que ainda cabe
     // (busca binária; a URL é sempre ASCII, então .length == bytes).
     let lo = 0;
-    let hi = fullName.length;
+    let hi = chars.length;
     while (lo < hi) {
         const mid = Math.ceil((lo + hi) / 2);
-        if (build(fullName.slice(0, mid)).length <= HANDOFF_QR_MAX_BYTES) lo = mid;
+        if (build(chars.slice(0, mid).join('')).length <= HANDOFF_QR_MAX_BYTES) lo = mid;
         else hi = mid - 1;
     }
-    return build(fullName.slice(0, lo));
+    return build(chars.slice(0, lo).join(''));
 }

@@ -43,6 +43,7 @@ const invokeChannels = new Set([
     'web-remote:play-vod-on-mobile',
     'web-remote:set-enabled',
     'web-remote:regen-pin',
+    'web-remote:setup-qr',
     'cast:set-volume',
     'categories:get-live',
     'playlists:add-stalker',
