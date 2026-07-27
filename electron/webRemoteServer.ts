@@ -36,7 +36,9 @@ import {
 } from './webRemoteProtocol'
 import { renderRemotePage, type RemoteAccent } from './webRemotePage'
 import { buildSetupDeepLink, renderSetupHandoffPage } from './setupPayload'
-import { parseTransferQuery } from './transferReceiver'
+import { parseTransferQuery, transferEntryId, transferSizeVerdict, uniqueTransferName } from './transferReceiver'
+import { recordReceivedTransfer, transfersDir } from './transferHandlers'
+import { resolveSessionPin } from './webRemotePin'
 import { exportPlaylistsForSetup, getActivePlaylistIdPublic } from './playlistManager'
 import { REMOTE_ICON_SVG, buildManifest, solidPng } from './webRemoteAssets'
 import { isCastSessionActive, castRemoteControl, getCastStatus } from './castHandlers'
@@ -49,6 +51,14 @@ interface WebRemoteConfig {
     enabled: boolean
     /** Opt-in: serve over HTTPS/wss with a self-signed cert (phone accepts once). */
     https: boolean
+    /**
+     * PIN do pareamento, persistido entre sessões. Regenerar a cada start
+     * invalidava o código salvo no celular a cada restart do PC: o app
+     * re-tentava o WS com o PIN velho a cada 15s, caía no lockout por IP e o
+     * POST /transfer respondia 429 — que o celular mostrava como "falha de
+     * rede". Revogar continua manual, pelo botão de gerar novo PIN.
+     */
+    pin: string
 }
 
 interface ConnectionEvent {
@@ -125,7 +135,12 @@ function newPin(): string {
 }
 
 function getConfig(): WebRemoteConfig {
-    return { enabled: false, https: false, ...(store.get('webRemote') as Partial<WebRemoteConfig> | undefined) }
+    return { enabled: false, https: false, pin: '', ...(store.get('webRemote') as Partial<WebRemoteConfig> | undefined) }
+}
+
+/** Grava o PIN em uso (sem mexer no resto da config). */
+function persistPin(pin: string): void {
+    store.set('webRemote', { ...getConfig(), pin })
 }
 
 /** The LAN URL of the running server (http/https), or null when stopped. */
@@ -827,7 +842,7 @@ export function setupWebRemote(): void {
         const current = getConfig()
         const enabled = opts?.enabled ?? current.enabled
         const useHttps = opts?.https ?? current.https
-        store.set('webRemote', { enabled, https: useHttps })
+        store.set('webRemote', { ...current, enabled, https: useHttps })
         // Restart so an https toggle (or on/off) takes effect immediately.
         stop()
         if (enabled) await start()
@@ -845,6 +860,7 @@ export function setupWebRemote(): void {
     ipcMain.handle('web-remote:regen-pin', () => {
         if (!serverPort) return { success: false, error: 'Controle desativado' }
         sessionPin = newPin()
+        persistPin(sessionPin)
         pinGate.clear()
         for (const client of clients) client.socket.destroy()
         clients.clear()
@@ -856,9 +872,25 @@ export function setupWebRemote(): void {
     log.info('[WebRemote] initialized')
 }
 
+// Uploads em andamento (caminho absoluto). Dois envios simultâneos do mesmo
+// título entrelaçavam escritas no MESMO arquivo — cada um ganha o seu.
+const inFlightTransfers = new Set<string>()
+
+/** Bytes livres na partição do destino, ou null quando o SO não informa. */
+function freeDiskBytes(dir: string): number | null {
+    try {
+        const stats = fs.statfsSync(dir)
+        return stats.bavail * stats.bsize
+    } catch {
+        return null
+    }
+}
+
 function start(): Promise<void> {
     if (server) return Promise.resolve()
-    sessionPin = newPin()
+    const resolved = resolveSessionPin(getConfig().pin, newPin)
+    sessionPin = resolved.pin
+    if (resolved.persist) persistPin(sessionPin)
     serverSecure = getConfig().https
     const handler = (req: http.IncomingMessage, res: http.ServerResponse) => {
         if (req.method === 'POST' && req.url && req.url.startsWith('/transfer?')) {
@@ -886,22 +918,50 @@ function start(): Promise<void> {
                 return
             }
             pinGate.delete(ip)
-            const dir = path.join(app.getPath('userData'), 'downloads', 'transfers')
+            const dir = transfersDir()
             try { fs.mkdirSync(dir, { recursive: true }) } catch { /* já existe */ }
-            const target = path.join(dir, parsed.name)
+            // 🚦 Corpo era aceito sem teto nem checagem de espaço: dava pra
+            // encher o disco do PC. Content-Length decide antes do pipe.
+            const verdict = transferSizeVerdict(req.headers['content-length'], freeDiskBytes(dir))
+            if (verdict !== 'ok') {
+                const status = verdict === 'too-large' ? 413 : verdict === 'no-space' ? 507 : 400
+                log.warn(`[WebRemote] /transfer recusado (${verdict}): ${parsed.name}`)
+                res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' })
+                res.end(verdict)
+                return
+            }
+            // Nome único: o app monta o nome só do título, então reenvio ou
+            // homônimo caíam no MESMO arquivo (createWriteStream trunca) e
+            // apagar uma entrada deixava a outra sem mídia.
+            const name = uniqueTransferName(parsed.name, candidate =>
+                inFlightTransfers.has(path.join(dir, candidate)) || fs.existsSync(path.join(dir, candidate)))
+            const target = path.join(dir, name)
+            // Rede de segurança do saneamento: nada pode escapar da pasta.
+            if (path.dirname(path.resolve(target)) !== path.resolve(dir)) {
+                res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' })
+                res.end('bad request')
+                return
+            }
+            inFlightTransfers.add(target)
+            const expected = Number(req.headers['content-length'])
             const out = fs.createWriteStream(target)
             let failed = false
             const fail = (status: number, message: string) => {
                 if (failed) return
                 failed = true
+                inFlightTransfers.delete(target)
                 out.destroy()
                 try { fs.unlinkSync(target) } catch { /* nunca chegou a existir */ }
                 if (!res.headersSent) res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' })
                 res.end(message)
             }
             req.on('error', () => fail(500, 'upload aborted'))
+            // Conexão que morre sem 'error' nem 'finish' deixaria o nome
+            // travado no Set até o próximo start do servidor.
+            req.on('close', () => inFlightTransfers.delete(target))
             out.on('error', () => fail(500, 'write failed'))
             out.on('finish', () => {
+                inFlightTransfers.delete(target)
                 if (failed) return
                 let size = 0
                 try { size = fs.statSync(target).size } catch { /* stat falhou; segue 0 */ }
@@ -909,14 +969,30 @@ function start(): Promise<void> {
                     fail(400, 'empty upload')
                     return
                 }
-                log.info(`[WebRemote] transfer recebido: ${parsed.name} (${size} bytes)`)
-                const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
-                win?.webContents.send('transfer:received', {
+                // Conexão cortada no meio fechava o stream com um arquivo
+                // truncado que virava download "concluído" na biblioteca.
+                if (Number.isInteger(expected) && expected > 0 && size !== expected) {
+                    fail(400, 'incomplete upload')
+                    return
+                }
+                log.info(`[WebRemote] transfer recebido: ${name} (${size} bytes)`)
+                const entry = {
+                    id: transferEntryId(target),
                     kind: parsed.kind,
                     title: parsed.title,
+                    seriesName: parsed.seriesName,
+                    season: parsed.season,
+                    episode: parsed.episode,
                     filePath: target,
                     size,
-                })
+                    receivedAt: Date.now(),
+                }
+                // Manifest ANTES do 200: o send abaixo é fire-and-forget e some
+                // se o renderer estiver recarregando — o arquivo virava órfão
+                // com o celular reportando sucesso. O bridge reconcilia ao montar.
+                recordReceivedTransfer(entry)
+                const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
+                win?.webContents.send('transfer:received', entry)
                 res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' })
                 res.end('ok')
             })
@@ -951,7 +1027,15 @@ function start(): Promise<void> {
         if (req.url === '/health') {
             // 🩺 Health-check leve (sem dados sensíveis): monitoração/diagnóstico na LAN.
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
-            res.end(JSON.stringify({ ok: true, app: 'neostream-remote', uptimeSeconds: Math.round(process.uptime()) }))
+            // `version`/`features`: o app do celular usa pra dizer "atualize o
+            // desktop" em vez de "falha de rede" quando falta um endpoint.
+            res.end(JSON.stringify({
+                ok: true,
+                app: 'neostream-remote',
+                uptimeSeconds: Math.round(process.uptime()),
+                version: app.getVersion(),
+                features: ['transfer', 'setup'],
+            }))
             return
         }
         if (req.url === '/' || req.url === '/index.html') {

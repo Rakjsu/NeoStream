@@ -32,6 +32,18 @@ interface VodMovie {
 interface SeriesItem { series_id: number | string; name: string; cover?: string }
 interface Episode { id: number | string; episode_num: number | string; title?: string; container_extension?: string }
 
+/** Registro de um download recebido do celular (payload do main, item 12). */
+interface TransferEntry {
+    id?: string;
+    kind?: string;
+    title?: string;
+    seriesName?: string;
+    season?: number;
+    episode?: number;
+    filePath?: string;
+    size?: number;
+}
+
 type CastTargetType = 'chromecast' | 'dlna' | 'airplay';
 interface CastTarget { deviceId: string; deviceType: CastTargetType }
 interface DiscoverResult { success: boolean; devices?: { id: string | number; name: string }[] }
@@ -57,18 +69,53 @@ export function WebRemoteBridge() {
 
     // 📥 Item 12: um download enviado pelo celular chegou pelo /transfer —
     // registra como concluído pra aparecer na página de Downloads.
+    //
+    // O evento é fire-and-forget do main: se este bridge não estiver montado
+    // (reload, crash-restart, boot) ele se perde e o arquivo fica órfão com o
+    // celular reportando sucesso. Por isso o main guarda um manifest e aqui a
+    // gente reconcilia as pendências ao montar, confirmando cada id registrado.
     useEffect(() => {
-        const onReceived = (_event: unknown, payload: { title?: string; kind?: string; filePath?: string; size?: number }) => {
-            if (!payload?.filePath || !payload.title) return;
-            const kind = payload.kind === 'episode' ? 'episode' as const : 'movie' as const;
-            void downloadService.registerReceived({
-                title: payload.title,
-                kind,
-                filePath: payload.filePath,
-                size: payload.size ?? 0,
-            });
+        // Falhou o registro? Devolve false pra pendência NÃO sair do manifest
+        // (a próxima montagem tenta de novo em vez de perder o arquivo).
+        const register = async (entry: TransferEntry) => {
+            if (!entry?.filePath || !entry.title) return false;
+            try {
+                await downloadService.registerReceived({
+                    title: entry.title,
+                    kind: entry.kind === 'episode' ? 'episode' : 'movie',
+                    filePath: entry.filePath,
+                    size: entry.size ?? 0,
+                    transferId: entry.id,
+                    seriesName: entry.seriesName,
+                    season: entry.season,
+                    episode: entry.episode,
+                });
+                return true;
+            } catch (error) {
+                console.warn('[WebRemoteBridge] transferência não registrada:', error);
+                return false;
+            }
+        };
+        const consume = (ids: string[]) => {
+            if (ids.length === 0) return;
+            void window.ipcRenderer.invoke('transfer:consume', { ids }).catch(() => undefined);
+        };
+
+        const onReceived = (_event: unknown, payload: TransferEntry) => {
+            void register(payload).then(ok => { if (ok && payload.id) consume([payload.id]); });
         };
         window.ipcRenderer.on('transfer:received', onReceived);
+
+        void (async () => {
+            const res = await window.ipcRenderer.invoke('transfer:pending').catch(() => null) as
+                { success: boolean; items?: TransferEntry[] } | null;
+            const done: string[] = [];
+            for (const entry of res?.items ?? []) {
+                if (await register(entry) && entry.id) done.push(entry.id);
+            }
+            consume(done);
+        })();
+
         return () => { window.ipcRenderer.off('transfer:received', onReceived); };
     }, []);
 
