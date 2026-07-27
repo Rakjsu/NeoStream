@@ -23,8 +23,13 @@ import { MultiView } from '../components/MultiView';
 import { ChannelHoverMiniGuide } from '../components/ChannelHoverMiniGuide';
 import { isReplayable, isRestartable, replayDurationMinutes } from '../utils/epgGuide';
 import { getTimeshiftUrl } from '../services/timeshiftService';
+import { resolveRemoteChannel } from '../services/webRemoteTune';
 
 import { asList } from '../utils/catalogPayload';
+
+/** Prazo pro pedido do celular esperar a lista de canais carregar. */
+const REMOTE_TUNE_WAIT_MS = 15000;
+
 interface LiveStream {
     num: number;
     name: string;
@@ -140,6 +145,24 @@ export function LiveTV() {
         window.addEventListener('live:tune-pending', onTunePending);
         return () => window.removeEventListener('live:tune-pending', onTunePending);
     }, [consumePendingTune]);
+    // 📱 "Assistir no PC": o canal pedido pelo celular. Quando esta página não
+    // estava aberta o main navega pra cá e reenvia o comando — a lista de
+    // canais pode ainda estar carregando, então o pedido fica pendente até ela
+    // chegar. Todo pedido termina com uma resposta pro celular (nunca silêncio).
+    const pendingRemoteTuneRef = useRef<{ id: string; name: string } | null>(null);
+    // Lista já carregada? Sem isto um filtro que não devolve nada seria
+    // confundido com "ainda carregando" e o celular esperaria o prazo inteiro.
+    const streamsLoadedRef = useRef(false);
+    const tuneFromRemote = useCallback((id: string, name: string) => {
+        const channel = resolveRemoteChannel(zapStreamsRef.current, id, name);
+        if (channel) {
+            queueMicrotask(() => {
+                setSelectedChannel(null);
+                setPlayingChannel(channel);
+            });
+        }
+        window.ipcRenderer.send('web-remote:play-channel-result', { status: channel ? 'ok' : 'notFound', channelId: id });
+    }, []);
     const lastGuideSigRef = useRef<string>('');
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const [allowedCategoryIds, setAllowedCategoryIds] = useState<Set<string>>(new Set());
@@ -310,7 +333,7 @@ export function LiveTV() {
     // gated list (same filter the phone sees) and zap to it. Subscribed once;
     // the current channel list lives in a ref to keep this handler stable.
     useEffect(() => {
-        const handler = (_e: unknown, action: string, arg?: unknown) => {
+        const handler = (_e: unknown, action: string, arg?: unknown, arg2?: unknown) => {
             if (action === 'openMultiview') {
                 // 🎛️ Pedido do celular: abre o mosaico por cima da TV ao vivo.
                 setShowMultiView(true);
@@ -318,11 +341,19 @@ export function LiveTV() {
             }
             if (action === 'playChannel') {
                 const id = String(arg ?? '');
-                const channel = zapStreamsRef.current.find(s => String(s.stream_id) === id);
-                if (channel) {
-                    setSelectedChannel(null);
-                    setPlayingChannel(channel);
+                const name = typeof arg2 === 'string' ? arg2 : '';
+                if (zapStreamsRef.current.length === 0 && !streamsLoadedRef.current) {
+                    pendingRemoteTuneRef.current = { id, name };
+                    // A lista pode nunca carregar (erro de rede/provedor): sem
+                    // este prazo o celular ficaria esperando pra sempre.
+                    window.setTimeout(() => {
+                        if (pendingRemoteTuneRef.current?.id !== id) return;
+                        pendingRemoteTuneRef.current = null;
+                        window.ipcRenderer.send('web-remote:play-channel-result', { status: 'notFound', channelId: id });
+                    }, REMOTE_TUNE_WAIT_MS);
+                    return;
                 }
+                tuneFromRemote(id, name);
                 return;
             }
             if (action === 'scheduleNext') {
@@ -380,7 +411,7 @@ export function LiveTV() {
         };
         window.ipcRenderer.on('media:control', handler);
         return () => window.ipcRenderer.off('media:control', handler);
-    }, []);
+    }, [tuneFromRemote]);
 
     // Tell the phone guide the page is gone (shows the "open TV ao vivo" hint)
     // when LiveTV unmounts.
@@ -576,8 +607,16 @@ export function LiveTV() {
         // Keep the tap-to-switch handler's channel list fresh (mutated here in
         // an effect, never during render).
         zapStreamsRef.current = filteredStreams;
+        streamsLoadedRef.current = streams.length > 0;
         // 📺 Item 32: sintonia pendente do lembrete (setada pelo toast global).
         consumePendingTune();
+        // 📱 Canal pedido pelo celular antes da lista existir (ver o handler
+        // de playChannel): agora dá pra resolver e responder.
+        const pendingRemote = pendingRemoteTuneRef.current;
+        if (pendingRemote && streamsLoadedRef.current) {
+            pendingRemoteTuneRef.current = null;
+            tuneFromRemote(pendingRemote.id, pendingRemote.name);
+        }
         const channels = filteredStreams.map(s => ({
             id: String(s.stream_id),
             name: s.name,

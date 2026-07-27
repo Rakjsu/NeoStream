@@ -309,6 +309,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
     var filter = '';
     var epgCache = {};   // channelId → { now, nowStart, nowEnd, next }
     var activeRecs = {}; // channelName → recording id (guia marca 🔴)
+    var lastTuneId = '';  // último playChannel pedido AQUI (filtra o desfecho)
     var recsData = { items: [], files: [], scheduled: [] }; // card 📼 da aba Controle
     var pendingDelete = '';      // nome aguardando o 2º toque do 🗑
     var pendingDeleteTimer = null;
@@ -490,6 +491,11 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
             if (msg.status === 'ok') showToast('📡 ' + L.castingToast + (msg.deviceName ? L.onDevice + msg.deviceName : ''), 'ok');
             else if (msg.status === 'no-device') showToast(L.noTvFound, 'err');
             else showToast(L.castFailed, 'err');
+          } else if (msg.type === 'playChannelResult') {
+            // O app do celular recebe o mesmo aviso — só reage quem pediu
+            // ESTE canal (o desfecho vai pra todos os clientes).
+            if (msg.status !== 'ok' && msg.channelId && msg.channelId === lastTuneId) showToast(L.tuneFail, 'err');
+            if (msg.channelId === lastTuneId) lastTuneId = '';
           }
         } catch (e) {}
       };
@@ -1285,6 +1291,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
       if (action === 'setVolume') payload.level = sec;
       if (action === 'setAudioTrack') payload.trackId = sec;
       if (action === 'playChannel' || action === 'requestEpg') payload.channelId = channelId;
+      if (action === 'playChannel') lastTuneId = String(channelId || '');
       if (action === 'recordChannel') { payload.channelId = channelId; payload.channelName = arg5; }
       if (action === 'stopRecord') payload.id = channelId;
       if (action === 'deleteRecording') payload.name = channelId;

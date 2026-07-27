@@ -469,9 +469,11 @@ export function WebRemoteBridge() {
         };
 
         // ⭐ Favoritos pro app do celular (ids do provedor — mesmo servidor casa direto).
+        // O addedAt vai junto pro celular resolver por last-write-wins: sem o
+        // carimbo, o favorito apagado LÁ voltava a cada reconexão.
         const pushFavorites = () => {
             const items = favoritesService.getAll().slice(0, 200)
-                .map(f => ({ id: f.id, type: f.type, title: f.title }));
+                .map(f => ({ id: f.id, type: f.type, title: f.title, addedAt: Date.parse(f.addedAt) || 0 }));
             window.ipcRenderer.send('web-remote:favorites', { items });
         };
 

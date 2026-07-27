@@ -200,6 +200,7 @@ const sendChannels = new Set([
     'web-remote:recordings',
     'web-remote:stats',
     'web-remote:schedule-result',
+    'web-remote:play-channel-result',
     'web-remote:favorites',
     'web-remote:reminders',
     // 🔄 Item 11: amostra de posição espelhada no celular. Ficou de fora

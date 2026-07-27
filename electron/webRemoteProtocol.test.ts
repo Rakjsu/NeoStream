@@ -85,6 +85,19 @@ describe('parseRemoteCommand', () => {
         expect(parseRemoteCommand('{"action":"playChannel","channelId":"1234"}'))
             .toEqual({ action: 'playChannel', channelId: '1234' })
     })
+    it('playChannel carrega o nome do canal (resgate quando as contas diferem)', () => {
+        const play = (raw: object) => {
+            const command = parseRemoteCommand(JSON.stringify(raw))
+            return command && command.action === 'playChannel' ? command : null
+        }
+        expect(play({ action: 'playChannel', channelId: '1234', name: '  Globo FHD  ' }))
+            .toEqual({ action: 'playChannel', channelId: '1234', name: 'Globo FHD' })
+        // Nome vazio/inválido não vira string vazia — some do comando.
+        expect(play({ action: 'playChannel', channelId: '1', name: '   ' })?.name).toBeUndefined()
+        expect(play({ action: 'playChannel', channelId: '1', name: 42 })?.name).toBeUndefined()
+        // Cap de 160, o mesmo orçamento do channelName do recordChannel.
+        expect(play({ action: 'playChannel', channelId: '1', name: 'x'.repeat(500) })?.name).toHaveLength(160)
+    })
     it('aceita requestEpg com id de canal', () => {
         expect(parseRemoteCommand('{"action":"requestEpg","channelId":"77"}'))
             .toEqual({ action: 'requestEpg', channelId: '77' })
