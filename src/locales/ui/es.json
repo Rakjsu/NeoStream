@@ -331,7 +331,7 @@
     "devicesTitle": "Dispositivos conectados",
     "devicesEmpty": "Ningún dispositivo conectado ahora.",
     "webRemoteHttps": "Conexión cifrada (HTTPS)",
-    "webRemoteHttpsHint": "Usa un certificado propio: el móvil muestra un aviso de seguridad una vez, solo acéptalo. Cifra el tráfico en la red local.",
+    "webRemoteHttpsHint": "Usa un certificado propio: el navegador del móvil muestra un aviso de seguridad una vez, solo acéptalo. Cifra el tráfico en la red local. ⚠️ La APP NeoStream del móvil no acepta ese certificado — con HTTPS activado, enviar descargas al PC y el emparejamiento por QR dejan de funcionar.",
     "webRemoteNewPin": "Nuevo PIN"
   },
   "welcome": {

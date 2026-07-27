@@ -14,6 +14,7 @@ import { setupCastHandlers, teardownCast } from './castHandlers'
 import { setupWebRemote, teardownWebRemote } from './webRemoteServer'
 import { closeCatalogStore } from './catalogCache'
 import { setupDownloadHandlers } from './downloadHandlers'
+import { setupTransferHandlers } from './transferHandlers'
 import { initializeAutoUpdater } from './autoUpdater'
 import { setupPipHandlers } from './pipHandlers'
 import { setupCertificateErrorHandler } from './certificatePolicy'
@@ -48,6 +49,7 @@ setupCastHandlers()
 setupWebRemote()
 app.on('before-quit', () => { teardownCast(); teardownWebRemote(); teardownTimeshift(); closeCatalogStore(); })
 setupDownloadHandlers()
+setupTransferHandlers()
 setupCertificateErrorHandler()
 setupMpvHandlers() // EXPERIMENTAL — MPV PoC
 setupDiagnosticsHandlers()

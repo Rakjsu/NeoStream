@@ -99,6 +99,10 @@ const invokeChannels = new Set([
     'download:open-folder',
     'download:pause',
     'download:start',
+    // 📥 Item 12: reconciliação dos recebidos do celular. Sem estes canais um
+    // 'transfer:received' perdido num reload deixa o arquivo órfão pra sempre.
+    'transfer:pending',
+    'transfer:consume',
     'epg:fetch-meuguia',
     'epg:fetch-mitv',
     'epg:get-cache-info',
