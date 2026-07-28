@@ -17,6 +17,7 @@ import { CastDeviceSelector } from './CastDeviceSelector';
 import { useLanguage } from '../services/languageService';
 import { extractYouTubeId } from '../utils/youtube';
 import { episodeDisplayTitle, sortedSeasonKeys } from '../utils/seriesEpisodes';
+import { mobilePushMessageKey } from '../utils/mobilePushResult';
 
 interface ContentDetailModalProps {
     isOpen: boolean;
@@ -1280,8 +1281,8 @@ export function ContentDetailModal({
                                         name: contentData.name
                                     };
                                 if (!payload) return;
-                                const result = await window.ipcRenderer.invoke('web-remote:play-vod-on-mobile', payload) as { success: boolean };
-                                setMobileMsg(t('contentModal', result?.success ? 'sentToPhone' : 'noPhoneConnected'));
+                                const result = await window.ipcRenderer.invoke('web-remote:play-vod-on-mobile', payload) as { success: boolean; delivered?: number; status?: string };
+                                setMobileMsg(t('common', mobilePushMessageKey(result)));
                                 setTimeout(() => setMobileMsg(''), 4000);
                             }}
                             style={{

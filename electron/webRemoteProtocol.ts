@@ -287,6 +287,8 @@ export interface ProgressReport {
     positionSec: number
     durationSec: number
     updatedAt: number
+    /** Etiqueta do perfil de ORIGEM; sem ela o progresso vaza entre perfis. */
+    profile?: string
 }
 
 /** Valida uma amostra vinda do fio (entrada do celular, não confiável). PURO. */
@@ -303,16 +305,17 @@ export function parseProgressReport(raw: unknown): ProgressReport | null {
     if (typeof positionSec !== 'number' || !Number.isFinite(positionSec) || positionSec < 0) return null
     if (typeof durationSec !== 'number' || !Number.isFinite(durationSec) || durationSec <= 0) return null
     if (typeof updatedAt !== 'number' || !Number.isFinite(updatedAt) || updatedAt <= 0) return null
+    const profile = typeof r.profile === 'string' ? r.profile.trim().slice(0, 60) : ''
     if (kind === 'movie') {
         const movieId = typeof r.movieId === 'string' ? r.movieId.trim().slice(0, 60) : ''
         if (!movieId) return null
-        return { kind, movieId, title, positionSec, durationSec, updatedAt }
+        return { kind, movieId, title, positionSec, durationSec, updatedAt, profile }
     }
     const season = r.season
     const episode = r.episode
     if (typeof season !== 'number' || !Number.isInteger(season) || season < 0) return null
     if (typeof episode !== 'number' || !Number.isInteger(episode) || episode < 0) return null
-    return { kind, title, season, episode, positionSec, durationSec, updatedAt }
+    return { kind, title, season, episode, positionSec, durationSec, updatedAt, profile }
 }
 
 const CAST_TARGET_TYPES = new Set<CastTargetType>(['chromecast', 'dlna', 'airplay'])
@@ -462,6 +465,131 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
     if (action === 'requestProgress') return { action: 'requestProgress' }
     if (action === 'focusApp') return { action: 'focusApp' }
     return { action: action as 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' | 'subtitle' }
+}
+
+// ------------------------------------------------------ handshake versionado --
+// Até a v4.44 o hello do app era só {action:'helloMobile', name}: o desktop não
+// tinha como distinguir um APK com os gates de tranca/parental (v0.20.0+) de um
+// sem eles, e empurrava conteúdo igual. Agora os dois lados anunciam versão e
+// capacidades. A AUSÊNCIA dos campos significa "peer legado" — nunca "recusar":
+// contra um app/desktop antigo tudo continua funcionando como antes.
+
+/** Versão do contrato desktop↔app. 0 = peer sem hello versionado (legado). */
+export const REMOTE_PROTOCOL_VERSION = 1
+
+/** O que ESTE desktop sabe fazer — o app usa pra não pedir sync no vazio. */
+export const DESKTOP_CAPABILITIES = [
+    'favoritesSync', 'remindersSync', 'progressSync', 'vodPush', 'notifyPush', 'pushAck',
+] as const
+
+/** Primeiro APK com os gates de tranca/parental no push (Rodada 2). */
+export const MIN_MOBILE_APP_VERSION = '0.20.0'
+
+export interface MobileHello {
+    name: string
+    protocolVersion: number
+    /** '' quando o app não manda a versão (APK ≤ v0.20.0). */
+    appVersion: string
+    capabilities: string[]
+}
+
+/** Hello do app (entrada do fio, não confiável). PURO. */
+export function parseMobileHello(text: string): MobileHello | null {
+    let parsed: unknown
+    try {
+        parsed = JSON.parse(text)
+    } catch {
+        return null
+    }
+    if (parsed === null || typeof parsed !== 'object') return null
+    const hello = parsed as Record<string, unknown>
+    if (hello.action !== 'helloMobile') return null
+    const version = hello.protocolVersion
+    const rawCaps = Array.isArray(hello.capabilities) ? hello.capabilities : []
+    return {
+        name: typeof hello.name === 'string' ? hello.name.slice(0, 40) : 'celular',
+        protocolVersion: typeof version === 'number' && Number.isFinite(version) && version > 0 ? Math.floor(version) : 0,
+        appVersion: typeof hello.appVersion === 'string' ? hello.appVersion.trim().slice(0, 20) : '',
+        capabilities: rawCaps
+            .filter((cap): cap is string => typeof cap === 'string' && !!cap)
+            .slice(0, 32)
+            .map(cap => cap.slice(0, 32)),
+    }
+}
+
+/** Resposta ao hello: versão + capacidades deste desktop (app legado ignora). */
+export function buildDesktopHello(appVersion: string): string {
+    return JSON.stringify({
+        type: 'helloDesktop',
+        protocolVersion: REMOTE_PROTOCOL_VERSION,
+        appVersion,
+        capabilities: [...DESKTOP_CAPABILITIES],
+    })
+}
+
+/** Compara versões "x.y.z" numericamente (4.9.1 < 4.44.0). PURO. */
+export function compareAppVersions(a: string, b: string): number {
+    const parts = (value: string) => value.split('.').map(part => Number.parseInt(part, 10) || 0)
+    const left = parts(a)
+    const right = parts(b)
+    for (let i = 0; i < Math.max(left.length, right.length); i++) {
+        const diff = (left[i] ?? 0) - (right[i] ?? 0)
+        if (diff !== 0) return diff > 0 ? 1 : -1
+    }
+    return 0
+}
+
+/** APK sem versão no hello ou abaixo do mínimo com os gates de tranca/parental. */
+export function isOutdatedMobile(appVersion: string): boolean {
+    if (!appVersion) return true
+    return compareAppVersions(appVersion, MIN_MOBILE_APP_VERSION) < 0
+}
+
+/**
+ * O papel real do cliente só chega no helloMobile — DEPOIS de o connect já ter
+ * entrado no histórico como 'browser'. Corrige a última entrada daquele IP pra
+ * que um cliente que se diz app não fique indistinguível de um navegador. PURO.
+ */
+export function markMobileInHistory<T extends { ip: string; role: string; event: string; name: string | null }>(
+    history: T[],
+    ip: string,
+    name: string,
+): T[] {
+    for (let i = history.length - 1; i >= 0; i--) {
+        const entry = history[i]
+        if (entry.event !== 'connect' || entry.ip !== ip || entry.role === 'mobile') continue
+        const out = history.slice()
+        out[i] = { ...entry, role: 'mobile', name }
+        return out
+    }
+    return history
+}
+
+/** Desfecho de um push de reprodução, reportado pelo app. */
+export type PushAckStatus = 'played' | 'locked' | 'blocked' | 'notFound'
+
+const PUSH_ACK_STATUSES = new Set<string>(['played', 'locked', 'blocked', 'notFound'])
+
+export interface PushAck {
+    pushId: string
+    status: PushAckStatus
+}
+
+/** ACK do app a um playOnMobile/playVodOnMobile (entrada do fio). PURO. */
+export function parsePushAck(text: string): PushAck | null {
+    let parsed: unknown
+    try {
+        parsed = JSON.parse(text)
+    } catch {
+        return null
+    }
+    if (parsed === null || typeof parsed !== 'object') return null
+    const ack = parsed as Record<string, unknown>
+    if (ack.action !== 'pushResult') return null
+    const pushId = typeof ack.pushId === 'string' ? ack.pushId.trim().slice(0, 40) : ''
+    const status = ack.status
+    if (!pushId || typeof status !== 'string' || !PUSH_ACK_STATUSES.has(status)) return null
+    return { pushId, status: status as PushAckStatus }
 }
 
 // ------------------------------------------------------------- LAN address --

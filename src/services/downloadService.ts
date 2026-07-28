@@ -80,6 +80,10 @@ class DownloadService {
     private dbName = 'neostream_downloads';
     private storeName = 'downloads';
     private db: IDBDatabase | null = null;
+    // Abertura do IndexedDB + primeira carga. Quem PRECISA persistir espera
+    // aqui: saveDownload é no-op com `db` nulo, e um registro feito antes do
+    // banco abrir sumia no próximo boot.
+    private ready: Promise<void>;
 
     constructor() {
         // ⚙️ Config da fila persistida (limite simultâneo + modo madrugada).
@@ -90,7 +94,7 @@ class DownloadService {
         } catch { /* storage indisponível */ }
         // 🌙 Reavalia a fila periodicamente (a janela da madrugada abre sozinha).
         setInterval(() => { void this.processQueue(); }, 5 * 60_000);
-        this.initDB();
+        this.ready = this.initDB().catch(() => undefined);
     }
 
     private async initDB(): Promise<void> {
@@ -101,8 +105,10 @@ class DownloadService {
 
             request.onsuccess = () => {
                 this.db = request.result;
-                this.loadDownloads();
-                resolve();
+                // Só resolve depois da carga: quem escreve logo no boot
+                // (transferência recebida do celular) seria sobrescrito pelo
+                // snapshot antigo do getAll se corresse em paralelo.
+                void this.loadDownloads().then(resolve, resolve);
             };
 
             request.onupgradeneeded = (event) => {
@@ -121,16 +127,20 @@ class DownloadService {
         const store = transaction.objectStore(this.storeName);
         const request = store.getAll();
 
-        request.onsuccess = () => {
-            const items = request.result as DownloadItem[];
-            items.forEach(item => {
-                // Reset downloading items to paused on app restart
-                if (item.status === 'downloading') {
-                    item.status = 'paused';
-                }
-                this.downloads.set(item.id, item);
-            });
-        };
+        await new Promise<void>(resolve => {
+            request.onsuccess = () => {
+                const items = request.result as DownloadItem[];
+                items.forEach(item => {
+                    // Reset downloading items to paused on app restart
+                    if (item.status === 'downloading') {
+                        item.status = 'paused';
+                    }
+                    this.downloads.set(item.id, item);
+                });
+                resolve();
+            };
+            request.onerror = () => resolve();
+        });
     }
 
     private async saveDownload(item: DownloadItem): Promise<void> {
@@ -278,10 +288,33 @@ class DownloadService {
      * 📥 Item 12: registra um arquivo que chegou pronto do celular (POST
      * /transfer do controle web) como download concluído, pra ele aparecer
      * na página de Downloads e tocar offline como qualquer outro.
+     *
+     * O `transferId` (id do manifest do main, derivado do arquivo) torna o
+     * registro IDEMPOTENTE: o mesmo recebimento pode chegar pelo evento ao vivo
+     * E pela reconciliação de boot sem virar duas entradas pro mesmo arquivo.
      */
-    async registerReceived(payload: { title: string; kind: 'movie' | 'episode'; filePath: string; size: number }): Promise<DownloadItem> {
-        const id = this.generateId(payload.kind, payload.title);
+    async registerReceived(payload: {
+        title: string;
+        kind: 'movie' | 'episode';
+        filePath: string;
+        size: number;
+        transferId?: string;
+        seriesName?: string;
+        season?: number;
+        episode?: number;
+    }): Promise<DownloadItem> {
+        await this.ready; // sem o banco aberto, o registro sumia no próximo boot
+        const id = payload.transferId
+            ? `transfer_${payload.transferId}`
+            : this.generateId(payload.kind, payload.title);
         const now = Date.now();
+        // A grade principal esconde type==='episode' e o agrupamento por série
+        // exige seriesName — sem ele o episódio recebido não aparecia em lugar
+        // NENHUM da página, só comia disco. Título "Série · T1E2" é o resgate.
+        const seriesName = payload.kind === 'episode'
+            ? (payload.seriesName?.trim() || payload.title.split(' · ')[0].trim() || 'Recebidos do celular')
+            : undefined;
+        const existing = this.downloads.get(id);
         const item: DownloadItem = {
             id,
             name: payload.title,
@@ -293,14 +326,19 @@ class DownloadService {
             status: 'completed',
             progress: 100,
             filePath: payload.filePath,
-            createdAt: now,
+            createdAt: existing?.createdAt ?? now,
             completedAt: now,
+            ...(seriesName && {
+                seriesName,
+                season: payload.season ?? 0,
+                episode: payload.episode ?? 0,
+            }),
         };
         this.downloads.set(id, item);
         await this.saveDownload(item);
         this.emit('added', item);
         this.emit('completed', item);
-        appNotificationService.addDownloadNotification('complete', item.name, item.type);
+        if (!existing) appNotificationService.addDownloadNotification('complete', item.name, item.type);
         return item;
     }
 

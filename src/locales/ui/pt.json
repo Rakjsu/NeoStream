@@ -691,7 +691,14 @@
     "episode": "Episódio",
     "minutes": "min",
     "hours": "h",
-    "expand": "Expandir"
+    "expand": "Expandir",
+    "sentToPhone": "📱 Enviado pro celular ✓",
+    "noPhoneConnected": "Nenhum celular conectado ao controle",
+    "phoneSentNoAck": "📱 Enviado — app do celular desatualizado (sem confirmação)",
+    "phoneNoAnswer": "📱 Enviado, mas o celular não respondeu",
+    "phoneLocked": "🔒 App do celular trancado — destrave pra tocar",
+    "phoneBlocked": "🚸 Bloqueado pelo controle parental do celular",
+    "phoneNotFound": "Conteúdo não encontrado na conta do celular"
   },
   "player": {
     "qrHandoff": "Continuar no celular",
@@ -836,6 +843,7 @@
   },
   "network": {
     "devicesDisconnect": "Desconectar",
+    "devicesOutdated": "app desatualizado",
     "historyTitle": "Histórico de conexões",
     "webRemoteTitle": "Controle pelo celular",
     "webRemoteDesc": "Abre um controle remoto no navegador do celular (mesma rede Wi-Fi) com play/pause, volume e avançar/voltar",
@@ -846,7 +854,7 @@
     "devicesTitle": "Aparelhos conectados",
     "devicesEmpty": "Nenhum aparelho conectado agora.",
     "webRemoteHttps": "Conexão criptografada (HTTPS)",
-    "webRemoteHttpsHint": "Usa um certificado próprio: o celular mostra um aviso de segurança uma vez, é só aceitar. Protege o tráfego na rede local.",
+    "webRemoteHttpsHint": "Usa um certificado próprio: o navegador do celular mostra um aviso de segurança uma vez, é só aceitar. Protege o tráfego na rede local. ⚠️ O APP NeoStream do celular não aceita esse certificado — com HTTPS ligado, enviar downloads pro PC e o pareamento por QR param de funcionar.",
     "webRemoteNewPin": "Gerar novo PIN"
   },
   "welcome": {
