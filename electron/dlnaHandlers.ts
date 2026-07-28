@@ -18,6 +18,8 @@ import {
     getHeader,
     parseSsdpMessage,
     looksLikeMediaRenderer,
+    isHttpLocation,
+    isTrustedSsdpLocation,
     createSearchMessage,
     getMimeForUrl,
     needsRemux,
@@ -734,7 +736,15 @@ function isSamsungDevice(device: Partial<DlnaDevice>, server?: string): boolean 
 }
 
 function createDiscoveredDevice(headers: SsdpHeaders, address: string): DlnaDevice {
-    const location = getHeader(headers, 'LOCATION')
+    const advertised = getHeader(headers, 'LOCATION')
+    // O aparelho continua na lista (nada some da tela de transmitir), mas um
+    // LOCATION que não é http(s) OU que aponta para um host diferente de quem
+    // respondeu o M-SEARCH é descartado: sem ele nada é buscado sozinho e o
+    // "aparelho" forjado não recebe a URL do provedor num clique.
+    const location = isTrustedSsdpLocation(advertised, address) ? advertised : undefined
+    if (advertised && !location) {
+        log.warn('[DLNA] LOCATION recusado (não bate com o remetente):', advertised, 'de', address)
+    }
     const server = getHeader(headers, 'SERVER')
     const usn = getHeader(headers, 'USN')
     const host = getHostFromLocation(location) || normalizeHost(address)
@@ -752,7 +762,9 @@ function createDiscoveredDevice(headers: SsdpHeaders, address: string): DlnaDevi
 }
 
 async function enrichDeviceFromDescription(device: DlnaDevice, server?: string): Promise<DlnaDevice> {
-    if (!device.location) {
+    // Segunda barreira: este fetch é o único que sai para uma URL que o app não
+    // montou, então o esquema é conferido aqui também.
+    if (!isHttpLocation(device.location)) {
         return {
             ...device,
             isSamsung: isSamsungDevice(device, server)
@@ -801,7 +813,10 @@ async function enrichDeviceFromDescription(device: DlnaDevice, server?: string):
 function upsertDiscoveredDevice(device: DlnaDevice) {
     const locationHost = getHostFromLocation(device.location)
     const duplicate = Array.from(discoveredDevices.entries()).find(([, existing]) =>
-        existing.location === device.location ||
+        // `location` pode faltar (LOCATION ausente ou recusado): comparar dois
+        // undefined daria "duplicado" e fundiria aparelhos distintos numa
+        // entrada só. Só vale como igualdade quando os dois têm location.
+        (Boolean(device.location) && existing.location === device.location) ||
         normalizeHost(existing.host) === normalizeHost(device.host) ||
         (locationHost && normalizeHost(existing.host) === locationHost)
     )
