@@ -55,24 +55,66 @@ export function encodePongFrame(payload: Uint8Array): Uint8Array {
     return Uint8Array.from([0x8a, len, ...payload])
 }
 
+/** Ping originado pelo servidor (o keepalive; o cliente responde pong). */
+export function encodePingFrame(): Uint8Array {
+    return Uint8Array.from([0x89, 0])
+}
+
+/**
+ * Close com código (RFC 6455 §5.5.1). Usado pra avisar o motivo do
+ * fechamento: sem ele o app do celular só vê 1006 e não sabe se caiu a rede
+ * ou se o pareamento foi revogado — e reconecta pra sempre com o PIN velho.
+ */
+export function encodeCloseFrame(code: number, reason = ''): Uint8Array {
+    const body = Buffer.from(reason, 'utf-8').subarray(0, 123)
+    const payload = Buffer.alloc(2 + body.length)
+    payload.writeUInt16BE(code, 0)
+    body.copy(payload, 2)
+    return Uint8Array.from([0x88, payload.length, ...payload])
+}
+
+/** Código privado (4000-4999): "o PIN foi regenerado, pareie de novo". */
+export const WS_CLOSE_PIN_ROTATED = 4001
+
 export type DecodedFrame =
     | { type: 'text'; text: string }
     | { type: 'ping'; payload: Uint8Array }
     | { type: 'pong' }
     | { type: 'close' }
 
+/** Mensagem fragmentada em montagem (FIN=0 → continuações até o FIN=1). */
+export interface FrameAssembly {
+    opcode: number
+    chunks: Uint8Array[]
+    size: number
+}
+
+const MAX_FRAME_BYTES = 1_000_000
+
 /**
  * Pull complete frames off an accumulating client buffer (client→server
  * frames are always masked). Returns the frames and the unconsumed remainder.
  * Throws on a malformed/oversized frame so the caller can drop the socket.
+ *
+ * O bit FIN importa: OkHttp (o WebSocket do React Native) e proxies da LAN
+ * podem partir uma mensagem em vários frames. Tratar o 1º pedaço como
+ * mensagem inteira gerava JSON truncado descartado em silêncio — daí o
+ * `pending`, que atravessa as chamadas até o frame com FIN=1 fechar o texto.
+ * O UTF-8 só é decodificado no payload REMONTADO: um caractere multibyte pode
+ * ficar partido entre dois fragmentos.
  */
-export function decodeFrames(buffer: Uint8Array): { frames: DecodedFrame[]; rest: Uint8Array } {
+export function decodeFrames(
+    buffer: Uint8Array,
+    pending: FrameAssembly | null = null,
+): { frames: DecodedFrame[]; rest: Uint8Array; pending: FrameAssembly | null } {
     const frames: DecodedFrame[] = []
     let offset = 0
+    let assembly = pending
 
     while (buffer.length - offset >= 2) {
         const first = buffer[offset]
         const second = buffer[offset + 1]
+        const fin = (first & 0x80) !== 0
         const opcode = first & 0x0f
         const masked = (second & 0x80) !== 0
         let len = second & 0x7f
@@ -90,7 +132,7 @@ export function decodeFrames(buffer: Uint8Array): { frames: DecodedFrame[]; rest
             len = (buffer[cursor + 4] << 24) | (buffer[cursor + 5] << 16) | (buffer[cursor + 6] << 8) | buffer[cursor + 7]
             cursor += 8
         }
-        if (len > 1_000_000) throw new Error('frame grande demais')
+        if (len > MAX_FRAME_BYTES) throw new Error('frame grande demais')
 
         const maskLen = masked ? 4 : 0
         if (buffer.length - cursor < maskLen + len) break // incomplete
@@ -104,14 +146,80 @@ export function decodeFrames(buffer: Uint8Array): { frames: DecodedFrame[]; rest
         cursor += len
         offset = cursor
 
-        if (opcode === 0x8) frames.push({ type: 'close' })
-        else if (opcode === 0x9) frames.push({ type: 'ping', payload })
-        else if (opcode === 0xa) frames.push({ type: 'pong' })
-        else if (opcode === 0x1) frames.push({ type: 'text', text: Buffer.from(payload).toString('utf-8') })
-        // opcode 0x0 (continuation) and binary 0x2 unused by the remote.
+        // Frames de controle nunca são fragmentados e podem chegar NO MEIO de
+        // uma mensagem em pedaços — não encostam na montagem em curso.
+        if (opcode === 0x8) { frames.push({ type: 'close' }); continue }
+        if (opcode === 0x9) { frames.push({ type: 'ping', payload }); continue }
+        if (opcode === 0xa) { frames.push({ type: 'pong' }); continue }
+
+        if (opcode === 0x0) {
+            if (!assembly) throw new Error('continuação sem frame inicial')
+            const size = assembly.size + payload.length
+            if (size > MAX_FRAME_BYTES) throw new Error('frame grande demais')
+            const chunks = [...assembly.chunks, payload]
+            if (!fin) {
+                assembly = { opcode: assembly.opcode, chunks, size }
+                continue
+            }
+            const isText = assembly.opcode === 0x1
+            assembly = null
+            if (isText) frames.push({ type: 'text', text: Buffer.concat(chunks.map(c => Buffer.from(c))).toString('utf-8') })
+            continue
+        }
+
+        // Frame de dados (0x1 texto / 0x2 binário).
+        if (assembly) throw new Error('frame novo no meio de uma mensagem fragmentada')
+        if (!fin) {
+            assembly = { opcode, chunks: [payload], size: payload.length }
+            continue
+        }
+        if (opcode === 0x1) frames.push({ type: 'text', text: Buffer.from(payload).toString('utf-8') })
+        // Binário (0x2) não é usado pelo controle remoto.
     }
 
-    return { frames, rest: buffer.subarray(offset) }
+    return { frames, rest: buffer.subarray(offset), pending: assembly }
+}
+
+// ---------------------------------------------------------------- liveness --
+// Um TCP meio-morto (celular trocou de Wi-Fi sem FIN, PC hibernou) aceita
+// `write` por minutos sem entregar nada. Sem keepalive o desktop conta esse
+// write como entrega e responde {success:true} pro "Enviar pro celular".
+// O servidor origina ping e derruba quem não dá sinal de vida na tolerância.
+
+/** Intervalo entre pings originados pelo servidor. */
+export const WS_PING_INTERVAL_MS = 20_000
+/** Sem NENHUM byte do cliente por este tempo, o socket é considerado morto. */
+export const WS_PEER_TIMEOUT_MS = 50_000
+
+/** Cliente calado além da tolerância (≈2 pings perdidos + folga). */
+export function isPeerStale(lastSeenAt: number, now: number, timeoutMs: number = WS_PEER_TIMEOUT_MS): boolean {
+    return now - lastSeenAt > timeoutMs
+}
+
+/** Vale contar como entregue? Socket vivo no TCP E respondendo na janela. */
+export function canDeliverTo(
+    client: { destroyed?: boolean; writable?: boolean; lastSeenAt: number },
+    now: number,
+    timeoutMs: number = WS_PEER_TIMEOUT_MS,
+): boolean {
+    if (client.destroyed === true || client.writable === false) return false
+    return !isPeerStale(client.lastSeenAt, now, timeoutMs)
+}
+
+/**
+ * Heartbeat do app mobile. O WebSocket do React Native não expõe ping/pong
+ * ao JS, então o app não enxerga o ping do servidor — precisa de um ping em
+ * nível de aplicação pra saber que o PC ainda está do outro lado.
+ */
+export const LINK_PONG_MESSAGE = '{"type":"pong"}'
+
+export function isLinkPing(text: string): boolean {
+    if (!text.includes('"ping"')) return false
+    try {
+        return (JSON.parse(text) as { action?: unknown } | null)?.action === 'ping'
+    } catch {
+        return false
+    }
 }
 
 /** Where a cast goes. Absent = legacy behaviour (first Chromecast on the LAN). */
@@ -154,12 +262,13 @@ export type RemoteCommand =
     | { action: 'navKey'; key: 'up' | 'down' | 'left' | 'right' | 'ok' | 'back' }
     | { action: 'requestFavorites' }
     | { action: 'reportProgress'; report: ProgressReport }
+    | { action: 'requestProgress' }
 
 const VALID_ACTIONS = new Set([
     'togglePlay', 'stop', 'next', 'previous', 'volumeUp', 'volumeDown', 'mute', 'subtitle', 'seek', 'setVolume', 'setAudioTrack', 'playChannel', 'requestEpg', 'recordChannel', 'stopRecord', 'deleteRecording', 'scheduleNext', 'cancelSchedule',
     'requestCatalog', 'requestLiveSearch', 'requestContinue', 'requestRecommended', 'requestRecordings', 'requestDevices', 'castMovie', 'castMovieQueue', 'requestSeries', 'requestSeriesInfo', 'castEpisode',
     'sleep', 'requestStats', 'focusApp', 'requestReminders', 'cancelReminder', 'openMultiview', 'screenshot', 'renameRecording', 'toggleProtectRecording', 'navKey', 'requestFavorites', 'reportProgress',
-    'partyAdd',
+    'partyAdd', 'requestProgress',
 ])
 
 /**
@@ -352,6 +461,8 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
     if (action === 'requestRecordings') return { action: 'requestRecordings' }
     if (action === 'requestDevices') return { action: 'requestDevices' }
     if (action === 'requestStats') return { action: 'requestStats' }
+    // 🔄 Reconciliação: o celular pede o estado de progresso ao reconectar.
+    if (action === 'requestProgress') return { action: 'requestProgress' }
     if (action === 'focusApp') return { action: 'focusApp' }
     return { action: action as 'togglePlay' | 'stop' | 'next' | 'previous' | 'volumeUp' | 'volumeDown' | 'mute' | 'subtitle' }
 }

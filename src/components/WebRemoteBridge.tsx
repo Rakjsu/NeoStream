@@ -614,6 +614,36 @@ export function WebRemoteBridge() {
                 console.warn('[WebRemoteBridge] progresso não espelhado:', error);
             }
         };
+        // 🔄 Reconciliação: o celular reconectou e pediu o estado daqui. Sem
+        // isto, o que o PC assistiu com o link fora do ar nunca chegava ao
+        // celular — o contrato só transportava amostras ao vivo.
+        const pushProgressSnapshot = () => {
+            const items: { kind: 'movie' | 'episode'; movieId?: string; title: string; season?: number; episode?: number; positionSec: number; durationSec: number; updatedAt: number }[] = [];
+            for (const id of movieProgressService.getMoviesInProgress()) {
+                const p = movieProgressService.getMoviePositionById(id);
+                if (!p || p.completed || !(p.duration > 0) || !(p.currentTime > 0)) continue;
+                items.push({
+                    kind: 'movie', movieId: String(id), title: p.movieName || '',
+                    positionSec: p.currentTime, durationSec: p.duration, updatedAt: p.watchedAt || 0,
+                });
+            }
+            for (const [seriesId, sp] of watchProgressService.getContinueWatching()) {
+                const prog = watchProgressService.getEpisodeProgress(seriesId, sp.lastWatchedSeason, sp.lastWatchedEpisode);
+                if (!prog || !(prog.duration > 0) || !(prog.currentTime > 0)) continue;
+                items.push({
+                    kind: 'episode', title: sp.seriesName || '',
+                    season: sp.lastWatchedSeason, episode: sp.lastWatchedEpisode,
+                    positionSec: prog.currentTime, durationSec: prog.duration, updatedAt: sp.lastWatchedAt || 0,
+                });
+            }
+            const valid = items.filter(i => i.title && i.updatedAt > 0).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 40);
+            if (valid.length === 0) return;
+            try {
+                window.ipcRenderer.send('web-remote:progress-snapshot', { items: valid });
+            } catch (error) {
+                console.warn('[WebRemoteBridge] snapshot de progresso não enviado:', error);
+            }
+        };
         const onLocalProgressSample = (event: Event) => {
             if (applyingRemoteProgress) return; // eco do que o celular acabou de mandar
             const detail = (event as CustomEvent).detail as { kind?: string; movieId?: string; title?: string; seriesId?: string; season?: number; episode?: number; positionSec?: number; durationSec?: number; updatedAt?: number } | undefined;
@@ -664,6 +694,7 @@ export function WebRemoteBridge() {
             else if (action === 'requestSeriesInfo') void pushSeriesInfo(String(arg ?? ''));
             else if (action === 'castEpisode') void castEpisode(String(arg ?? ''), asTarget(target));
             else if (action === 'reportProgress') void applyRemoteProgress(arg);
+            else if (action === 'requestProgress') pushProgressSnapshot();
         };
         window.ipcRenderer.on('media:control', handler);
 
