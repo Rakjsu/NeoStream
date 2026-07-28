@@ -57,6 +57,10 @@ export class StalkerClient {
 
     private async rawCall(query: string, token?: string): Promise<unknown> {
         const url = `${this.loadUrl}?${query}`
+        // Resolvido FORA do laço de retry: dentro dele o callback não é async, e
+        // repetir a resolução por tentativa refaria o probe de TLS (e poderia
+        // repetir o diálogo de confiança) a cada falha de rede.
+        const httpsAgent = await resolveProviderHttpsAgent(this.loadUrl, this.loadUrl)
         // One retry for transient failures (network blip / 5xx); permanent
         // portal errors (401/404) rethrow untouched.
         const response = await requestWithRetry(() => axios.get(url, {
@@ -77,7 +81,7 @@ export class StalkerClient {
                 'X-User-Agent': 'Model: MAG250; Link: WiFi',
                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
-            httpsAgent: await resolveProviderHttpsAgent(this.loadUrl, this.loadUrl),
+            httpsAgent,
         }))
         return response.data
     }
