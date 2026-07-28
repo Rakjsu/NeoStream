@@ -646,10 +646,52 @@ export function pickLanAddress(interfaces: Record<string, NetAddress[] | undefin
 export interface PinGateEntry {
     fails: number
     lockedUntil: number
+    /** Quando a última falha entrou — base do decaimento por tempo. */
+    lastFailAt?: number
 }
 
 export const PIN_MAX_FAILS = 5
 export const PIN_LOCK_MS = 30_000
+
+/**
+ * Teto GLOBAL, somando todos os clientes. O cooldown por IP sozinho é
+ * multiplicável: quem tem várias origens (aliases de IPv4/IPv6, um /64 inteiro
+ * de IPv6, ou só reconectar de outra máquina) ganha 5 tentativas por endereço.
+ * Com 10 mil combinações possíveis, isso é a diferença entre horas e minutos.
+ */
+export const PIN_GLOBAL_MAX_FAILS = 30
+export const PIN_GLOBAL_LOCK_MS = 60_000
+/**
+ * O contador global DECAI. Sem isso ele só acumula: um aparelho com PIN velho
+ * reconectando a cada 15s soma falhas pra sempre e acaba trancando o DONO —
+ * justamente quando ele acabou de gerar um PIN novo e tenta parear.
+ */
+export const PIN_GLOBAL_DECAY_MS = 10 * 60_000
+
+/**
+ * `::ffff:192.168.0.5` e `192.168.0.5` são o MESMO cliente — contá-los
+ * separado dobra a cota de tentativas de graça.
+ */
+export function pinGateKey(ip: string | undefined): string {
+    const raw = (ip ?? '').trim().toLowerCase()
+    if (!raw) return 'unknown'
+    return raw.startsWith('::ffff:') ? raw.slice(7) : raw
+}
+
+/**
+ * Comparação de PIN em tempo constante. `!==` sai no primeiro dígito diferente;
+ * na LAN, com milhares de amostras, essa diferença é mensurável.
+ */
+export function pinMatches(candidate: string, expected: string): boolean {
+    if (!expected) return false
+    // O XOR percorre o comprimento do esperado SEMPRE, mesmo com tamanhos
+    // diferentes, pra não vazar o tamanho do segredo.
+    let diff = candidate.length ^ expected.length
+    for (let i = 0; i < expected.length; i++) {
+        diff |= candidate.charCodeAt(i % (candidate.length || 1)) ^ expected.charCodeAt(i)
+    }
+    return diff === 0
+}
 
 /** True while the client is inside its cooldown window. */
 export function isPinLockedOut(entry: PinGateEntry | undefined, now: number): boolean {
@@ -665,8 +707,14 @@ export function registerPinFailure(
     now: number,
     maxFails: number = PIN_MAX_FAILS,
     lockMs: number = PIN_LOCK_MS,
+    decayMs = 0,
 ): PinGateEntry {
-    const fails = (entry?.fails ?? 0) + 1
-    if (fails >= maxFails) return { fails: 0, lockedUntil: now + lockMs }
-    return { fails, lockedUntil: 0 }
+    // Falha velha o bastante não conta mais: quem erra uma vez por hora não
+    // deve chegar no teto por acúmulo eterno.
+    const vivo = decayMs > 0 && entry?.lastFailAt !== undefined && now - entry.lastFailAt > decayMs
+        ? undefined
+        : entry
+    const fails = (vivo?.fails ?? 0) + 1
+    if (fails >= maxFails) return { fails: 0, lockedUntil: now + lockMs, lastFailAt: now }
+    return { fails, lockedUntil: 0, lastFailAt: now }
 }

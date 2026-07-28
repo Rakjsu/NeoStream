@@ -31,6 +31,11 @@ import {
     parseRemoteCommand,
     isPinLockedOut,
     registerPinFailure,
+    pinGateKey,
+    pinMatches,
+    PIN_GLOBAL_MAX_FAILS,
+    PIN_GLOBAL_LOCK_MS,
+    PIN_GLOBAL_DECAY_MS,
     pickLanAddress,
     canDeliverTo,
     isPeerStale,
@@ -147,6 +152,82 @@ let sessionPin = ''
 // Per-client PIN failure tracking, so a wrong PIN can't be brute-forced over
 // the LAN (10k combos). Keyed by remote IP; cleared on the server stopping.
 const pinGate = new Map<string, PinGateEntry>()
+// Contador GLOBAL: o cooldown por IP é multiplicável por quem tem vários
+// endereços (aliases, /64 de IPv6, outra máquina). Este teto é o piso comum.
+let pinGlobal: PinGateEntry = { fails: 0, lockedUntil: 0 }
+/**
+ * Endereços que já acertaram o PIN nesta sessão. Eles continuam sujeitos ao
+ * cooldown por IP, mas ficam FORA do teto global: sem isso, os aparelhos do
+ * próprio dono (que reconectam sozinhos com credencial velha depois de um
+ * `regen-pin`) trancavam o pareamento do PIN novo — auto-DoS sem atacante.
+ */
+const pinKnown = new Set<string>()
+
+/** Resultado de uma checagem de PIN — o chamador só decide a resposta HTTP. */
+type PinVerdict = 'ok' | 'locked' | 'wrong'
+
+/**
+ * 🔐 A ÚNICA porta de PIN do servidor. Toda rota autenticada e o upgrade do
+ * WebSocket passam por aqui.
+ *
+ * Existir em cópias foi exatamente o que deixou o `/recording` sem cooldown:
+ * ele comparava o PIN à mão e respondia 403 sem registrar nada, virando um
+ * oráculo de força bruta ilimitado — e, como o PIN certo caía num 404 e o
+ * errado num 403, bastava varrer as 10 mil combinações e olhar o status. Com o
+ * PIN em mãos, `/setup` entrega usuário e senha de todos os provedores.
+ */
+function checkPin(ip: string | undefined, candidate: string, now: number): PinVerdict {
+    const key = pinGateKey(ip)
+    const conhecido = pinKnown.has(key)
+    if (isPinLockedOut(pinGate.get(key), now)) return 'locked'
+    if (!conhecido && isPinLockedOut(pinGlobal, now)) return 'locked'
+    if (!sessionPin || !pinMatches(candidate, sessionPin)) {
+        const entry = registerPinFailure(pinGate.get(key), now)
+        pinGate.set(key, entry)
+        // O acerto de um cliente NÃO zera o teto global — durante um ataque, o
+        // celular do dono reconectando apagaria a evidência dos outros.
+        if (!conhecido) {
+            pinGlobal = registerPinFailure(pinGlobal, now, PIN_GLOBAL_MAX_FAILS, PIN_GLOBAL_LOCK_MS, PIN_GLOBAL_DECAY_MS)
+            if (pinGlobal.lockedUntil > now) log.warn('[WebRemote] PIN bloqueado globalmente — tentativas de vários endereços')
+        }
+        if (entry.lockedUntil > now) log.warn(`[WebRemote] PIN bloqueado por tentativas: ${key}`)
+        return 'wrong'
+    }
+    pinGate.delete(key)
+    pinKnown.add(key)
+    return 'ok'
+}
+
+/** PIN novo (ou servidor parando): tudo que era conhecido deixa de ser. */
+function resetPinGate(): void {
+    pinGate.clear()
+    pinKnown.clear()
+    pinGlobal = { fails: 0, lockedUntil: 0 }
+}
+
+/**
+ * Aplica o gate e já responde 429/403 quando barra. `true` = pode seguir.
+ * Toda rota autenticada usa ESTA função — `webRemoteRoutes.test.ts` percorre a
+ * lista e falha se alguma parar de passar por aqui.
+ */
+function respondPin(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    candidate: string,
+    /** Status do PIN errado. O `/recording` usa 404 pra não virar oráculo. */
+    wrongStatus = 403,
+): boolean {
+    const verdict = checkPin(req.socket.remoteAddress, candidate, Date.now())
+    if (verdict === 'ok') return true
+    if (verdict === 'locked') {
+        res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8' })
+        res.end('Aguarde e tente de novo')
+        return false
+    }
+    res.writeHead(wrongStatus, { 'Content-Type': 'text/plain; charset=utf-8' })
+    res.end(wrongStatus === 404 ? 'not found' : 'PIN')
+    return false
+}
 const clients = new Set<ClientSocket>()
 let mediaState = { hasMedia: false, playing: false, title: '' }
 // Second-screen guide: the live channel list + now/next EPG of the playing
@@ -370,23 +451,15 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
     // is refused before the WebSocket is established; too many wrong PINs from
     // the same client trip a cooldown (anti brute-force).
     const ip = socket.remoteAddress || 'unknown'
-    const now = Date.now()
-    if (isPinLockedOut(pinGate.get(ip), now)) {
-        socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n')
-        socket.destroy()
-        return
-    }
     const url = new URL(request.url || '/', 'http://localhost')
-    if (url.searchParams.get('pin') !== sessionPin) {
-        const entry = registerPinFailure(pinGate.get(ip), now)
-        pinGate.set(ip, entry)
-        if (entry.lockedUntil > now) log.warn(`[WebRemote] PIN bloqueado por tentativas: ${ip}`)
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
+    const verdict = checkPin(ip, url.searchParams.get('pin') ?? '', Date.now())
+    if (verdict !== 'ok') {
+        socket.write(verdict === 'locked'
+            ? 'HTTP/1.1 429 Too Many Requests\r\n\r\n'
+            : 'HTTP/1.1 401 Unauthorized\r\n\r\n')
         socket.destroy()
         return
     }
-    // Correct PIN: clear any accumulated failures for this client.
-    pinGate.delete(ip)
     socket.write(buildHandshakeResponse(key))
     const client: ClientSocket = { socket, buffer: new Uint8Array(0), pending: null, lastSeenAt: Date.now(), id: crypto.randomUUID(), ip, connectedAt: Date.now() }
     clients.add(client)
@@ -1048,7 +1121,10 @@ export function setupWebRemote(): void {
         if (!serverPort) return { success: false, error: 'Controle desativado' }
         sessionPin = newPin()
         persistPin(sessionPin)
-        pinGate.clear()
+        // Zera TUDO, inclusive o teto global e a lista de conhecidos: os
+        // aparelhos com o PIN velho vão errar em massa nos próximos segundos e
+        // não podem trancar o pareamento do PIN novo.
+        resetPinGate()
         // Fecha com motivo antes de destruir: o app do celular não tem como
         // ver "PIN velho" num 1006 e reconectava a cada 15s com a credencial
         // morta, armando o anti brute-force contra o próprio dono do PC.
@@ -1093,28 +1169,13 @@ function start(): Promise<void> {
         if (req.method === 'POST' && req.url && req.url.startsWith('/transfer?')) {
             // 📥 Item 12: recebe um download do celular pela LAN (inverso do
             // /recording abaixo). Mesmo anti brute-force por IP do /setup.
-            const ip = req.socket.remoteAddress || 'unknown'
-            const now = Date.now()
-            if (isPinLockedOut(pinGate.get(ip), now)) {
-                res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8' })
-                res.end('Aguarde e tente de novo')
-                return
-            }
             const parsed = parseTransferQuery(req.url)
             if (!parsed) {
                 res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' })
                 res.end('bad request')
                 return
             }
-            if (!sessionPin || parsed.pin !== sessionPin) {
-                const entry = registerPinFailure(pinGate.get(ip), now)
-                pinGate.set(ip, entry)
-                if (entry.lockedUntil > now) log.warn(`[WebRemote] PIN do /transfer bloqueado por tentativas: ${ip}`)
-                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
-                res.end('PIN')
-                return
-            }
-            pinGate.delete(ip)
+            if (!respondPin(req, res, parsed.pin)) return
             const dir = transfersDir()
             try { fs.mkdirSync(dir, { recursive: true }) } catch { /* já existe */ }
             // 🚦 Corpo era aceito sem teto nem checagem de espaço: dava pra
@@ -1199,13 +1260,10 @@ function start(): Promise<void> {
         if (req.url && req.url.startsWith('/recording?')) {
             // ⬇️ Item 122: transfere uma gravação pela LAN (autentica pelo PIN da sessão).
             const query = new URL(req.url, 'http://localhost').searchParams
-            const pin = query.get('pin') ?? ''
             const name = path.basename(query.get('name') ?? '')
-            if (!sessionPin || pin !== sessionPin) {
-                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
-                res.end('PIN')
-                return
-            }
+            // 404 nos DOIS casos (PIN errado e arquivo inexistente): o par
+            // 403/404 era o oráculo que tornava a força bruta observável.
+            if (!respondPin(req, res, query.get('pin') ?? '', 404)) return
             const file = path.join(recordingsDir(), name)
             if (!name || !fs.existsSync(file)) {
                 res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
@@ -1263,23 +1321,8 @@ function start(): Promise<void> {
         // so the phone imports the desktop accounts by scanning the QR.
         if (req.url && req.url.startsWith('/setup')) {
             // Mesmo anti brute-force do WebSocket: cooldown por IP no PIN.
-            const ip = req.socket.remoteAddress || 'unknown'
-            const now = Date.now()
-            if (isPinLockedOut(pinGate.get(ip), now)) {
-                res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8' })
-                res.end('Aguarde e tente de novo')
-                return
-            }
             const pin = new URL(req.url, 'http://local').searchParams.get('pin') || ''
-            if (pin !== sessionPin) {
-                const entry = registerPinFailure(pinGate.get(ip), now)
-                pinGate.set(ip, entry)
-                if (entry.lockedUntil > now) log.warn(`[WebRemote] PIN do /setup bloqueado por tentativas: ${ip}`)
-                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
-                res.end('PIN')
-                return
-            }
-            pinGate.delete(ip)
+            if (!respondPin(req, res, pin)) return
             const link = buildSetupDeepLink(exportPlaylistsForSetup(), getActivePlaylistIdPublic())
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
             res.end(renderSetupHandoffPage(link, remoteLang))
@@ -1335,7 +1378,9 @@ function stop(): void {
     serverPort = 0
     serverSecure = false
     sessionPin = ''
-    pinGate.clear()
+    // Desligar e religar o controle é o reflexo de quem levou 429 — tem que
+    // destravar de verdade.
+    resetPinGate()
 }
 
 export function teardownWebRemote(): void {
