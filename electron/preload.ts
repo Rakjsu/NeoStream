@@ -38,6 +38,7 @@ const invokeChannels = new Set([
     'cast:set-subtitle',
     'cast:set-audio-track',
     'web-remote:get-config',
+    'web-remote:arm-setup',
     'web-remote:notify-mobile',
     'web-remote:play-on-mobile',
     'web-remote:play-vod-on-mobile',

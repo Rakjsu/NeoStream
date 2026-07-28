@@ -47,6 +47,10 @@ export function NetworkSection() {
         }
         let cancelled = false;
         const load = async () => {
+            // 🔐 Esta é a tela de pareamento: enquanto ela estiver aberta, o
+            // "parear com desktop" do app do celular pode exportar as contas
+            // pelo /setup. Fechou a tela, a janela expira sozinha.
+            void window.ipcRenderer.invoke('web-remote:arm-setup').catch(() => undefined);
             void window.ipcRenderer.invoke('web-remote:connection-history')
                 .then((r: { success?: boolean; history?: { name: string | null; ip: string; role: string; at: number; event: string }[] } | null) => {
                     if (!cancelled && r?.success && r.history) setConnectionHistory(r.history);

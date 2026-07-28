@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildSetupDeepLink, renderSetupHandoffPage } from './setupPayload'
+import { buildSetupDeepLink, renderSetupHandoffPage, isHandoffArmed, matchesHandoffToken } from './setupPayload'
 
 describe('buildSetupDeepLink (formato do NeoStream Mobile)', () => {
     it('gera neostream://setup?d=base64(JSON) com contas e activeId', () => {
@@ -45,5 +45,32 @@ describe('renderSetupHandoffPage', () => {
     it('respeita o idioma do app', () => {
         expect(renderSetupHandoffPage('neostream://setup?d=x', 'en')).toContain('Open in NeoStream')
         expect(renderSetupHandoffPage('neostream://setup?d=x', 'es')).toContain('Abrir en NeoStream')
+    })
+})
+
+describe('janela de exportação do /setup (uso único, prazo curto)', () => {
+    const armado = { token: 'a1b2c3d4', expiresAt: 1_000 }
+
+    it('sem janela armada não exporta nada', () => {
+        expect(isHandoffArmed(null, 500)).toBe(false)
+        expect(matchesHandoffToken(null, 'a1b2c3d4', 500)).toBe(false)
+    })
+
+    it('janela vale só dentro do prazo', () => {
+        expect(isHandoffArmed(armado, 999)).toBe(true)
+        expect(isHandoffArmed(armado, 1_000)).toBe(false)
+        expect(isHandoffArmed(armado, 5_000)).toBe(false)
+    })
+
+    it('token confere apenas idêntico e dentro do prazo', () => {
+        expect(matchesHandoffToken(armado, 'a1b2c3d4', 500)).toBe(true)
+        expect(matchesHandoffToken(armado, 'a1b2c3d4', 5_000)).toBe(false)
+    })
+
+    it('recusa token errado, prefixo do token e vazio', () => {
+        expect(matchesHandoffToken(armado, 'a1b2c3d5', 500)).toBe(false)
+        expect(matchesHandoffToken(armado, 'a1b2', 500)).toBe(false)
+        expect(matchesHandoffToken(armado, 'a1b2c3d4ff', 500)).toBe(false)
+        expect(matchesHandoffToken(armado, '', 500)).toBe(false)
     })
 })

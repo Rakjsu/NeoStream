@@ -30,6 +30,39 @@ export function buildSetupDeepLink(playlists: SetupAccountSource[], activeId: st
     return `neostream://setup?d=${encodeURIComponent(b64)}`
 }
 
+/* ------------------------------------------------------------------------ *
+ * 🔐 Janela de exportação.
+ *
+ * O /setup devolve usuário e senha de TODAS as playlists — a assinatura IPTV
+ * inteira, reutilizável em qualquer player. Um PIN permanente de 4 dígitos,
+ * que qualquer visita lê na tela das Configurações, não é credencial à altura
+ * disso: bastava um `curl` pra levar tudo. A exportação passa a exigir que o
+ * dono tenha a tela de pareamento aberta no desktop, e o QR carrega um token
+ * de uso único no lugar do PIN.
+ * ------------------------------------------------------------------------ */
+
+export interface SetupHandoffWindow {
+    /** Token de uso único que vai no QR (curto: o QR próprio só vai até v4). */
+    token: string
+    /** Instante (ms) em que a janela deixa de valer. */
+    expiresAt: number
+}
+
+/** A tela de pareamento está aberta (janela armada e dentro do prazo)? */
+export function isHandoffArmed(handoff: SetupHandoffWindow | null, now: number): boolean {
+    return handoff !== null && handoff.expiresAt > now
+}
+
+/** Token do QR confere? Comparação de tempo constante, sem vazar prefixo. */
+export function matchesHandoffToken(handoff: SetupHandoffWindow | null, token: string, now: number): boolean {
+    if (!isHandoffArmed(handoff, now) || !token) return false
+    const expected = handoff!.token
+    if (token.length !== expected.length) return false
+    let diff = 0
+    for (let i = 0; i < token.length; i++) diff |= token.charCodeAt(i) ^ expected.charCodeAt(i)
+    return diff === 0
+}
+
 const HANDOFF_STRINGS = {
     pt: {
         title: 'Levar pro celular',

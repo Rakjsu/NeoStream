@@ -718,3 +718,44 @@ export function registerPinFailure(
     if (fails >= maxFails) return { fails: 0, lockedUntil: now + lockMs, lastFailAt: now }
     return { fails, lockedUntil: 0, lastFailAt: now }
 }
+
+// ------------------------------------------------------- teto de conexões --
+// O PIN certo não podia significar conexões infinitas: cada socket segura até
+// ~2 MB de remontagem de frame e recebe TODO broadcast (estado a cada 2s,
+// guia, catálogo). Mil conexões de um script travavam o processo main — o que
+// derruba reprodução, DVR e cast. Helpers PUROS; a contagem vive no servidor.
+
+/** Sockets simultâneos aceitos no total (celular + página + PC-controla-PC). */
+export const WS_MAX_CLIENTS = 8
+/** Teto por IP: um aparelho sozinho não toma todas as vagas. */
+export const WS_MAX_CLIENTS_PER_IP = 4
+
+export type ClientAdmission = 'ok' | 'too-many' | 'too-many-from-ip'
+
+/**
+ * Cabe mais um cliente? `connectedIps` é o IP de cada socket já aceito (com
+ * repetição), na ordem que estiver — só a contagem importa.
+ */
+export function admitClient(
+    connectedIps: readonly string[],
+    ip: string,
+    maxTotal: number = WS_MAX_CLIENTS,
+    maxPerIp: number = WS_MAX_CLIENTS_PER_IP,
+): ClientAdmission {
+    if (connectedIps.length >= maxTotal) return 'too-many'
+    let sameIp = 0
+    for (const other of connectedIps) if (other === ip) sameIp++
+    if (sameIp >= maxPerIp) return 'too-many-from-ip'
+    return 'ok'
+}
+
+/**
+ * Teto do buffer de recepção por conexão. Um frame completo pode ocupar
+ * MAX_FRAME_BYTES + cabeçalho antes de ser decodificado; acima disso é alguém
+ * anunciando um tamanho enorme e gotejando os bytes pra segurar memória.
+ */
+export const WS_MAX_BUFFER_BYTES = MAX_FRAME_BYTES + 100_000
+
+export function isClientBufferOverflow(bufferedBytes: number, maxBytes: number = WS_MAX_BUFFER_BYTES): boolean {
+    return bufferedBytes > maxBytes
+}
