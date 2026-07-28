@@ -26,6 +26,11 @@ interface StoreSchema {
         player?: unknown
         allowInvalidProviderCertificates?: boolean
         approvedProviderHosts?: string[]
+        /**
+         * Domínios em que o dono aceitou EXPLICITAMENTE certificado inválido,
+         * depois do aviso do que está em risco (certificatePolicy.ts).
+         */
+        trustedInvalidCertDomains?: string[]
         // EXPERIMENTAL — user-configured mpv.exe path for the MPV PoC (mpvPlayer.ts)
         mpvPath?: string
     }
@@ -42,7 +47,8 @@ const store = new Store<StoreSchema>({
             theme: 'dark',
             language: 'en',
             allowInvalidProviderCertificates: true,
-            approvedProviderHosts: []
+            approvedProviderHosts: [],
+            trustedInvalidCertDomains: []
         }
     }
 })

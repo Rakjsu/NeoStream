@@ -17,7 +17,8 @@ import { findPlaylist, getActivePlaylistIdPublic } from './playlistManager'
 import { parseM3uHeader } from './m3uProtocol'
 import { fetchWithRetry } from './fetchRetry'
 import log from './logger'
-import { getProviderHttpsAgent, registerApprovedProviderUrl } from './certificatePolicy'
+import { resolveProviderHttpsAgent, registerApprovedProviderUrl } from './certificatePolicy'
+import { readResponseTextWithLimit, XMLTV_MAX_BYTES, JSON_MAX_BYTES } from './httpLimits'
 import {
     buildSimpleDataTableUrl,
     buildXmltvUrl,
@@ -127,8 +128,8 @@ async function fetchXmltvWithCache(url: string): Promise<string | null> {
 
     try {
         const fetch = (await import('node-fetch')).default
-        const response = await fetchWithRetry(() => fetch(url, {
-            agent: getProviderHttpsAgent(url),
+        const response = await fetchWithRetry(async () => fetch(url, {
+            agent: await resolveProviderHttpsAgent(url),
             // Generous: provider xmltv files are big; failure falls back to stale cache.
             signal: AbortSignal.timeout(60000),
             headers: FETCH_HEADERS
@@ -139,7 +140,10 @@ async function fetchXmltvWithCache(url: string): Promise<string | null> {
             return await readStaleCache(fs, cacheFile)
         }
 
-        const data = await response.text()
+        // Teto de tamanho: o XMLTV é materializado inteiro no processo
+        // principal ANTES de `looksLikeXmltv`, então um corpo gigante do
+        // provedor estouraria a heap — e o probe roda no boot.
+        const data = await readResponseTextWithLimit(response, XMLTV_MAX_BYTES)
         registerApprovedProviderUrl(response.url || url)
         log.info('[Provider EPG] Downloaded xmltv, length:', data.length)
 
@@ -282,8 +286,8 @@ async function fetchSimpleDataTable(streamId: number, channelId: string): Promis
     try {
         const url = buildSimpleDataTableUrl(credentials.url, credentials.username, credentials.password, streamId)
         const fetch = (await import('node-fetch')).default
-        const response = await fetchWithRetry(() => fetch(url, {
-            agent: getProviderHttpsAgent(url),
+        const response = await fetchWithRetry(async () => fetch(url, {
+            agent: await resolveProviderHttpsAgent(url),
             signal: AbortSignal.timeout(20000),
             headers: FETCH_HEADERS
         }))
@@ -294,7 +298,7 @@ async function fetchSimpleDataTable(streamId: number, channelId: string): Promis
             return []
         }
 
-        const text = await response.text()
+        const text = await readResponseTextWithLimit(response, JSON_MAX_BYTES)
         let payload: unknown
         try {
             payload = JSON.parse(text)

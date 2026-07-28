@@ -8,7 +8,7 @@ import dgram from 'dgram';
 import http from 'http';
 import os from 'os';
 import { randomUUID } from 'crypto';
-import { getProviderHttpsAgent } from './certificatePolicy';
+import { resolveProviderHttpsAgent } from './certificatePolicy';
 import log from './logger';
 import {
     DLNA_FEATURES,
@@ -154,7 +154,7 @@ function rewritePlaylist(playlist: string, baseUrl: string, deviceHost: string):
 async function fetchUpstream(url: string, range?: string) {
     const fetch = (await import('node-fetch')).default
     return fetch(url, {
-        agent: getProviderHttpsAgent(url),
+        agent: await resolveProviderHttpsAgent(url),
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept': '*/*',

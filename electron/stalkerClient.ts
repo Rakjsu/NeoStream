@@ -10,7 +10,7 @@
 import axios from 'axios'
 import log from './logger'
 import { requestWithRetry } from './fetchRetry'
-import { getProviderHttpsAgent } from './certificatePolicy'
+import { resolveProviderHttpsAgent } from './certificatePolicy'
 import {
     STALKER_USER_AGENT,
     buildStalkerCookie,
@@ -77,7 +77,7 @@ export class StalkerClient {
                 'X-User-Agent': 'Model: MAG250; Link: WiFi',
                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
-            httpsAgent: getProviderHttpsAgent(this.loadUrl, this.loadUrl),
+            httpsAgent: await resolveProviderHttpsAgent(this.loadUrl, this.loadUrl),
         }))
         return response.data
     }
