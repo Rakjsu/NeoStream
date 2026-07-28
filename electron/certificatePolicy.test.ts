@@ -13,15 +13,24 @@ vi.mock('./store', () => {
     }
 })
 vi.mock('./logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
-vi.mock('electron', () => ({ app: { on: vi.fn(), whenReady: () => new Promise(() => undefined) }, session: {} }))
+// `isReady: false` mantém o probe TLS e o diálogo fora do teste unitário — o
+// que sobra é exatamente a política: sem consentimento salvo, não há bypass.
+vi.mock('electron', () => ({
+    app: { on: vi.fn(), whenReady: () => new Promise(() => undefined), isReady: () => false },
+    session: {},
+    dialog: { showMessageBox: vi.fn() },
+    BrowserWindow: { getFocusedWindow: () => null, getAllWindows: () => [] },
+}))
 
 import store from './store'
 import {
     getCertificateSettings,
     setAllowInvalidProviderCertificates,
+    forgetTrustedCertificateDomains,
     isProviderUrl,
     registerApprovedProviderUrl,
-    getProviderHttpsAgent,
+    resolveProviderHttpsAgent,
+    canAllowInvalidCertificateForUrl,
     isTlsCertificateError,
 } from './certificatePolicy'
 
@@ -29,6 +38,12 @@ beforeEach(() => {
     store.set('settings', {})
     store.set('auth', { url: 'https://provider.example.com/player_api.php', username: 'u', password: 'p' })
 })
+
+/** Atalho: marca o domínio como autorizado pelo dono (o que o diálogo faria). */
+function trust(domain: string) {
+    const settings = (store.get('settings') || {}) as Record<string, unknown>
+    store.set('settings', { ...settings, trustedInvalidCertDomains: [domain] })
+}
 
 describe('isProviderUrl (o modo compatível só vale pro host do provedor)', () => {
     it('mesmo host e subdomínios do mesmo domínio registrável passam', () => {
@@ -39,6 +54,19 @@ describe('isProviderUrl (o modo compatível só vale pro host do provedor)', () 
     it('host de terceiro não passa (nem com certificado quebrado)', () => {
         expect(isProviderUrl('https://evil.attacker.net/live/1.ts')).toBe(false)
         expect(isProviderUrl('https://exampleXcom.net/')).toBe(false)
+    })
+
+    it('🔒 provedor .com.br NÃO adota todo o sufixo público', () => {
+        store.set('auth', { url: 'https://lista.meuiptv.com.br/player_api.php' })
+        expect(isProviderUrl('https://cdn7.meuiptv.com.br/live/1.ts')).toBe(true)
+        expect(isProviderUrl('https://internetbanking.banco.com.br/x')).toBe(false)
+        expect(isProviderUrl('https://qualquercoisa.com.br/x')).toBe(false)
+    })
+
+    it('🔒 o mesmo vale para .co.uk e outros sufixos de duas partes', () => {
+        store.set('auth', { url: 'https://painel.provedor.co.uk/player_api.php' })
+        expect(isProviderUrl('https://cdn.provedor.co.uk/1.ts')).toBe(true)
+        expect(isProviderUrl('https://evil.co.uk/1.ts')).toBe(false)
     })
 
     it('IPs só casam por igualdade exata (sem "domínio registrável")', () => {
@@ -76,27 +104,58 @@ describe('registerApprovedProviderUrl (aprendizado dos hosts do provedor)', () =
         expect(registerApprovedProviderUrl('https://evil.net/a.ts')).toBe(false)
         expect(getCertificateSettings().approvedProviderHosts).toEqual([])
     })
+
+    it('🔒 provedor .com.br não consegue plantar host de terceiro na allowlist', () => {
+        store.set('auth', { url: 'https://lista.meuiptv.com.br/player_api.php' })
+        expect(registerApprovedProviderUrl('https://internetbanking.banco.com.br/x')).toBe(false)
+        expect(getCertificateSettings().approvedProviderHosts).toEqual([])
+    })
 })
 
-describe('getProviderHttpsAgent (agent permissivo só pra HTTPS do provedor)', () => {
-    it('URL https do provedor ganha um Agent com rejectUnauthorized=false', () => {
-        const agent = getProviderHttpsAgent('https://provider.example.com/movie/9.mp4')
+describe('bypass de TLS exige consentimento explícito por domínio', () => {
+    it('🔒 sem consentimento salvo, host do provedor NÃO ganha agent permissivo', async () => {
+        await expect(resolveProviderHttpsAgent('https://provider.example.com/movie/9.mp4')).resolves.toBeUndefined()
+        expect(canAllowInvalidCertificateForUrl('https://provider.example.com/movie/9.mp4')).toBe(false)
+    })
+
+    it('com o domínio autorizado pelo dono, o agent permissivo volta', async () => {
+        trust('example.com')
+        const agent = await resolveProviderHttpsAgent('https://provider.example.com/movie/9.mp4')
         expect(agent).toBeInstanceOf(https.Agent)
         expect((agent as https.Agent & { options: { rejectUnauthorized?: boolean } }).options.rejectUnauthorized).toBe(false)
         // Efeito colateral esperado: o host entra na lista aprovada.
         expect(getCertificateSettings().approvedProviderHosts).toContain('provider.example.com')
     })
 
-    it('http, URL inválida ou host de terceiro → undefined', () => {
-        expect(getProviderHttpsAgent('http://provider.example.com/1.ts')).toBeUndefined()
-        expect(getProviderHttpsAgent('não-url')).toBeUndefined()
-        expect(getProviderHttpsAgent('https://evil.net/1.ts')).toBeUndefined()
+    it('🔒 consentimento de um domínio não vaza para vizinho do mesmo sufixo', async () => {
+        store.set('auth', { url: 'https://lista.meuiptv.com.br/player_api.php' })
+        trust('meuiptv.com.br')
+        await expect(resolveProviderHttpsAgent('https://cdn2.meuiptv.com.br/1.ts')).resolves.toBeInstanceOf(https.Agent)
+        await expect(resolveProviderHttpsAgent('https://internetbanking.banco.com.br/x')).resolves.toBeUndefined()
     })
 
-    it('com o modo compatível DESLIGADO nunca entrega agent', () => {
+    it('http, URL inválida ou host de terceiro → undefined', async () => {
+        trust('example.com')
+        await expect(resolveProviderHttpsAgent('http://provider.example.com/1.ts')).resolves.toBeUndefined()
+        await expect(resolveProviderHttpsAgent('não-url')).resolves.toBeUndefined()
+        await expect(resolveProviderHttpsAgent('https://evil.net/1.ts')).resolves.toBeUndefined()
+    })
+
+    it('com o modo compatível DESLIGADO nunca entrega agent, mesmo autorizado', async () => {
+        trust('example.com')
         setAllowInvalidProviderCertificates(false)
         expect(getCertificateSettings().allowInvalidProviderCertificates).toBe(false)
-        expect(getProviderHttpsAgent('https://provider.example.com/1.ts')).toBeUndefined()
+        // Desligar revoga o que já tinha sido autorizado.
+        expect(getCertificateSettings().trustedInvalidCertDomains).toEqual([])
+        await expect(resolveProviderHttpsAgent('https://provider.example.com/1.ts')).resolves.toBeUndefined()
+    })
+
+    it('revogar apaga as autorizações sem mexer no interruptor', () => {
+        trust('example.com')
+        const settings = forgetTrustedCertificateDomains()
+        expect(settings.trustedInvalidCertDomains).toEqual([])
+        expect(settings.approvedProviderHosts).toEqual([])
+        expect(settings.allowInvalidProviderCertificates).toBe(true)
     })
 })
 

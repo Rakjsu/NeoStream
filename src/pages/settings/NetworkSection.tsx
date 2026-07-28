@@ -6,6 +6,8 @@ import { buildRemoteWsUrl, parsePeerState, sendPeerCommand, type RemotePeerState
 
 export function NetworkSection() {
     const [allowInvalidProviderCertificates, setAllowInvalidProviderCertificates] = useState(true);
+    // Domínios em que o dono aceitou certificado inválido (decisão explícita, revogável).
+    const [trustedCertDomains, setTrustedCertDomains] = useState<string[]>([]);
     const [webRemote, setWebRemote] = useState<{ enabled: boolean; https: boolean; url: string | null; pin: string | null }>({ enabled: false, https: false, url: null, pin: null });
     // 📟 Aparelhos conectados no controle web (polling leve enquanto ligado).
     const [remoteClients, setRemoteClients] = useState<{ id?: string; ip: string; name: string | null; role: string; connectedAt: number; appVersion?: string; outdated?: boolean }[]>([]);
@@ -80,6 +82,7 @@ export function NetworkSection() {
                 const result = await window.ipcRenderer.invoke('security:get-certificate-settings');
                 if (result.success && result.settings) {
                     setAllowInvalidProviderCertificates(Boolean(result.settings.allowInvalidProviderCertificates));
+                    setTrustedCertDomains(result.settings.trustedInvalidCertDomains ?? []);
                 }
             } catch (error) {
                 console.error('Failed to load certificate settings:', error);
@@ -123,11 +126,24 @@ export function NetworkSection() {
             const result = await window.ipcRenderer.invoke('security:set-allow-invalid-provider-certificates', value);
             if (result.success && result.settings) {
                 setAllowInvalidProviderCertificates(Boolean(result.settings.allowInvalidProviderCertificates));
+                setTrustedCertDomains(result.settings.trustedInvalidCertDomains ?? []);
             }
             triggerSaveAnimation('allowInvalidProviderCertificates');
         } catch (error) {
             console.error('Failed to save certificate settings:', error);
             setAllowInvalidProviderCertificates(prev => !prev);
+        }
+    };
+
+    const handleForgetTrustedCertDomains = async () => {
+        try {
+            const result = await window.ipcRenderer.invoke('security:forget-trusted-certificate-domains');
+            if (result?.success && result.settings) {
+                setTrustedCertDomains(result.settings.trustedInvalidCertDomains ?? []);
+            }
+            triggerSaveAnimation('allowInvalidProviderCertificates');
+        } catch (error) {
+            console.error('Failed to clear trusted certificate domains:', error);
         }
     };
 
@@ -145,7 +161,7 @@ export function NetworkSection() {
                 <div className="setting-item">
                     <div className="setting-info">
                         <label>Modo compatível com certificados inválidos</label>
-                        <p>Permite certificados inválidos e compatibilidade CORS somente para o provedor IPTV configurado e subdomínios relacionados. Útil para provedores antigos, mas reduz a segurança dessa conexão.</p>
+                        <p>Quando o provedor apresenta um certificado que não pode ser verificado, o app pergunta uma vez e só continua se você autorizar. Vale apenas para o servidor IPTV configurado e subdomínios do mesmo domínio. Desligue para nunca aceitar certificado inválido.</p>
                     </div>
                     <label className="toggle-switch">
                         <input
@@ -162,7 +178,24 @@ export function NetworkSection() {
 
                 {allowInvalidProviderCertificates && (
                     <div className="certificate-warning">
-                        <strong>Atenção:</strong> este modo não libera certificados inválidos nem CORS para TMDB, atualizações, GitHub ou domínios externos independentes. Ele vale apenas para o servidor IPTV salvo no app e hosts relacionados aprovados.
+                        <strong>Atenção:</strong> nenhum certificado inválido é aceito em silêncio — o app pede sua confirmação por domínio antes de continuar. Isso nunca vale para TMDB, atualizações, GitHub ou outros domínios externos.
+                    </div>
+                )}
+
+                {trustedCertDomains.length > 0 && (
+                    <div className="certificate-warning" style={{ borderColor: 'rgba(239, 68, 68, 0.4)', background: 'rgba(239, 68, 68, 0.12)' }}>
+                        <strong>Certificado inválido autorizado por você em:</strong>{' '}
+                        {trustedCertDomains.join(', ')}
+                        <div style={{ marginTop: 10 }}>
+                            <button
+                                className="check-btn"
+                                style={{ width: 'auto', padding: '10px 18px' }}
+                                onClick={() => void handleForgetTrustedCertDomains()}
+                            >
+                                <span>🔒</span>
+                                <span>Revogar autorizações</span>
+                            </button>
+                        </div>
                     </div>
                 )}
 

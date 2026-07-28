@@ -2,8 +2,9 @@ import { ipcMain, BrowserWindow, dialog, screen, shell } from 'electron'
 import axios from 'axios'
 import { XtreamClient } from './xtreamClient'
 import store from './store'
-import { getCertificateSettings, getProviderHttpsAgent, registerApprovedProviderUrl, setAllowInvalidProviderCertificates } from './certificatePolicy'
+import { getCertificateSettings, resolveProviderHttpsAgent, registerApprovedProviderUrl, setAllowInvalidProviderCertificates, forgetTrustedCertificateDomains } from './certificatePolicy'
 import { fetchWithRetry, requestWithRetry } from './fetchRetry'
+import { readResponseTextWithLimit, M3U_MAX_BYTES, XMLTV_MAX_BYTES } from './httpLimits'
 import { ensureProviderEpgLoaded, getProviderUtcOffsetMinutes, resetProviderEpgState, setupProviderEpgHandlers } from './providerEpg'
 import { formatTimeshiftStart } from './timeshiftProtocol'
 import {
@@ -38,11 +39,15 @@ let savedWindowBounds: Electron.Rectangle | null = null
 async function fetchM3uChannels(url: string) {
     // One retry for transient failures — a momentary 502 on first boot (no
     // SWR cache yet) otherwise means an empty catalog.
-    const response = await requestWithRetry(() => axios.get(url, {
+    const response = await requestWithRetry(async () => axios.get(url, {
         timeout: 20000,
         responseType: 'text',
         transformResponse: [(data: unknown) => data],
-        httpsAgent: getProviderHttpsAgent(url, url)
+        httpsAgent: await resolveProviderHttpsAgent(url, url),
+        // Teto de tamanho: sem isto o provedor derruba o processo principal
+        // devolvendo alguns GB — a M3U é bufferizada inteira antes de validar.
+        maxContentLength: M3U_MAX_BYTES,
+        maxBodyLength: M3U_MAX_BYTES
     }))
     const text = String(response.data ?? '')
     if (!looksLikeM3u(text)) {
@@ -153,7 +158,7 @@ async function probeTimeshiftM3u8(url: string, baseUrl: string): Promise<boolean
             timeout: 2000,
             validateStatus: () => true,
             responseType: 'stream',
-            httpsAgent: getProviderHttpsAgent(url, baseUrl)
+            httpsAgent: await resolveProviderHttpsAgent(url, baseUrl)
         })
         const body = response.data as { destroy?: () => void } | undefined
         body?.destroy?.()
@@ -478,6 +483,10 @@ export function setupIpcHandlers() {
         return { success: true, settings: setAllowInvalidProviderCertificates(Boolean(value)) }
     })
 
+    ipcMain.handle('security:forget-trusted-certificate-domains', () => {
+        return { success: true, settings: forgetTrustedCertificateDomains() }
+    })
+
     // Get content counts
     ipcMain.handle('content:get-counts', async () => {
         try {
@@ -584,8 +593,8 @@ export function setupIpcHandlers() {
         try {
             const fetch = (await import('node-fetch')).default
             log.info('[Fetch URL] Fetching:', url.substring(0, 100))
-            const response = await fetchWithRetry(() => fetch(url, {
-                agent: getProviderHttpsAgent(url),
+            const response = await fetchWithRetry(async () => fetch(url, {
+                agent: await resolveProviderHttpsAgent(url),
                 signal: AbortSignal.timeout(20000),
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -663,8 +672,8 @@ export function setupIpcHandlers() {
             // Download fresh data
             log.info('[EPG Cache] Downloading from:', url)
             const fetch = (await import('node-fetch')).default
-            const response = await fetchWithRetry(() => fetch(url, {
-                agent: getProviderHttpsAgent(url),
+            const response = await fetchWithRetry(async () => fetch(url, {
+                agent: await resolveProviderHttpsAgent(url),
                 // Generous: EPG XML files are big; a failure falls back to stale cache.
                 signal: AbortSignal.timeout(60000),
                 headers: {
@@ -686,7 +695,7 @@ export function setupIpcHandlers() {
                 }
             }
 
-            const data = await response.text()
+            const data = await readResponseTextWithLimit(response, XMLTV_MAX_BYTES)
             registerApprovedProviderUrl(response.url || url)
             log.info('[EPG Cache] Downloaded data, length:', data.length)
 
@@ -858,7 +867,7 @@ export function setupIpcHandlers() {
             const infoUrl = `${base}/player_api.php?username=${encodeURIComponent(auth.username)}&password=${encodeURIComponent(auth.password)}&action=get_series_info&series_id=${encodeURIComponent(String(seriesId ?? ''))}`
             const response = await axios.get(infoUrl, {
                 timeout: 15000,
-                httpsAgent: getProviderHttpsAgent(infoUrl, base)
+                httpsAgent: await resolveProviderHttpsAgent(infoUrl, base)
             })
             return { success: true, info: response.data }
         } catch (error: unknown) {
@@ -1122,7 +1131,7 @@ export function setupIpcHandlers() {
                     timeout: 8000,
                     validateStatus: () => true,
                     responseType: 'stream',
-                    httpsAgent: getProviderHttpsAgent(target.url, target.url)
+                    httpsAgent: await resolveProviderHttpsAgent(target.url, target.url)
                 })
                 const body = response.data as { destroy?: () => void } | undefined
                 body?.destroy?.()
@@ -1157,7 +1166,7 @@ export function setupIpcHandlers() {
                     timeout: 8000,
                     validateStatus: () => true,
                     responseType: 'stream',
-                    httpsAgent: getProviderHttpsAgent(url, base)
+                    httpsAgent: await resolveProviderHttpsAgent(url, base)
                 })
                 const body = response.data as { destroy?: () => void } | undefined
                 body?.destroy?.()
@@ -1176,7 +1185,7 @@ export function setupIpcHandlers() {
                     timeout: 15000,
                     validateStatus: () => true,
                     responseType: 'stream',
-                    httpsAgent: getProviderHttpsAgent(url, base)
+                    httpsAgent: await resolveProviderHttpsAgent(url, base)
                 })
                 const stream = response.data as NodeJS.ReadableStream & { destroy?: () => void }
                 let bytes = 0

@@ -7,6 +7,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import dgram from 'dgram';
 import http from 'http';
 import os from 'os';
+import { resolveProviderHttpsAgent } from './certificatePolicy';
 import log from './logger';
 import {
     DLNA_FEATURES,
@@ -44,7 +45,7 @@ import {
     tokensToRevoke,
     type ProxyTokenEntry,
 } from './dlnaProxyGuard';
-import { getCertificateSettings, getProviderHttpsAgent } from './certificatePolicy';
+import { getCertificateSettings } from './certificatePolicy';
 
 const require = createRequire(import.meta.url);
 
@@ -243,7 +244,9 @@ async function fetchUpstream(url: string, range?: string) {
         const response = await fetch(currentUrl, {
             // Agent do salto atual, com o da URL original como reserva: seguir
             // redirecionamento não pode ficar MAIS estrito no TLS do que antes.
-            agent: getProviderHttpsAgent(currentUrl) || getProviderHttpsAgent(url),
+            // `resolve` (assíncrono) porque a confiança em certificado inválido
+            // passou a depender de consentimento por domínio.
+            agent: (await resolveProviderHttpsAgent(currentUrl)) || (await resolveProviderHttpsAgent(url)),
             redirect: 'manual',
             headers
         })

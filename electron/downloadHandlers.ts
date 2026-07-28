@@ -5,6 +5,7 @@ import https from 'https'
 import http from 'http'
 import log from './logger'
 import { setTaskbarProgress } from './winIntegration'
+import { resolveDownloadFile, resolveSeriesFolder, sanitizeDownloadName } from './downloadPaths'
 
 interface ActiveDownload {
     id: string;
@@ -35,9 +36,9 @@ function getDownloadsPath(): string {
     return downloadsPath;
 }
 
-function sanitizeFilename(name: string): string {
-    return name.replace(/[<>:"/\\|?*]/g, '_').substring(0, 200);
-}
+// Regra única de saneamento (downloadPaths.ts): criar e apagar TÊM que
+// concordar sobre o nome da pasta, senão excluir série vira no-op.
+const sanitizeFilename = sanitizeDownloadName;
 
 function getFileSizeSync(filePath: string): number {
     try {
@@ -431,7 +432,14 @@ export function setupDownloadHandlers() {
     // Delete file
     ipcMain.handle('download:delete-file', async (_, { filePath }) => {
         try {
-            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+            // Mesma disciplina do dvr:delete-file: só apaga dentro da pasta
+            // de downloads do app.
+            const target = resolveDownloadFile(getDownloadsPath(), filePath);
+            if (!target) {
+                log.warn('[Download] delete-file recusado, fora da pasta de downloads');
+                return { success: false, error: 'Caminho fora da pasta de downloads' };
+            }
+            if (fs.existsSync(target)) fs.unlinkSync(target);
             return { success: true };
         } catch (error: unknown) {
             return { success: false, error: getErrorMessage(error) };
@@ -495,9 +503,16 @@ export function setupDownloadHandlers() {
     // Delete series folder
     ipcMain.handle('download:delete-folder', async (_, { folderName }: { folderName: string }) => {
         try {
-            const folderPath = path.join(getDownloadsPath(), folderName);
+            // O nome da série vem do CATÁLOGO DO PROVEDOR: sem reancorar em
+            // <downloads>/series/<nome saneado>, um provedor hostil publica uma
+            // série chamada `..\..\Documents` e um clique em "excluir série"
+            // apagava recursivamente a pasta escolhida por ele.
+            const folderPath = resolveSeriesFolder(getDownloadsPath(), folderName);
+            if (!folderPath) {
+                log.warn('[Download] delete-folder recusado, nome inválido:', String(folderName).slice(0, 120));
+                return { success: false, error: 'Nome de pasta inválido' };
+            }
             if (fs.existsSync(folderPath)) {
-                // Remove folder recursively
                 fs.rmSync(folderPath, { recursive: true, force: true });
             }
             return { success: true };
