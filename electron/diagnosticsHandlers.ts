@@ -4,10 +4,13 @@
  *   - diagnostics:export-report  → gathers app/system info + the tail of
  *       main.log, assembles a redacted .txt report (see diagnosticsProtocol),
  *       prompts for a save location and writes it.
+ *   - diagnostics:export-log     → saves main.log, redigido, onde o usuário
+ *       escolher.
  *   - diagnostics:open-logs      → opens the logs folder in the OS file manager.
  *
- * The pure assembly + secret redaction lives in diagnosticsProtocol.ts so it
- * can be unit-tested without Electron.
+ * A montagem do relatório é pura (diagnosticsProtocol.ts) e a redação de
+ * credenciais é a mesma do transporte de log (logRedaction.ts) — os dois botões
+ * de exportação passam por ela.
  */
 import { ipcMain, app, dialog, shell } from 'electron'
 import os from 'os'
@@ -15,6 +18,7 @@ import path from 'path'
 import { promises as fs } from 'fs'
 import log from './logger'
 import { buildReportText, type ReportSystemInfo } from './diagnosticsProtocol'
+import { redactSecrets } from './logRedaction'
 
 const getErrorMessage = (error: unknown): string =>
     error instanceof Error ? error.message : String(error)
@@ -110,13 +114,20 @@ export function setupDiagnosticsHandlers() {
     })
 
     // 💾 Exporta o arquivo de log principal pra onde o usuário escolher.
+    //
+    // Lê e redige em vez de copiar: este é o botão que o usuário aperta quando
+    // o suporte pede "me manda o log", então o arquivo que sai daqui vai parar
+    // em grupo de Telegram e issue pública. O main.log em repouso já nasce
+    // redigido (logger.ts), mas um log antigo — gravado por uma versão anterior
+    // do app — continuaria vazando se fosse copiado byte a byte.
     ipcMain.handle('diagnostics:export-log', async () => {
         try {
             const source = path.join(app.getPath('logs'), 'main.log')
             const stamp = new Date().toISOString().slice(0, 10)
             const result = await dialog.showSaveDialog({ defaultPath: `neostream-log-${stamp}.log` })
             if (result.canceled || !result.filePath) return { success: false, canceled: true }
-            await fs.copyFile(source, result.filePath)
+            const raw = await fs.readFile(source, 'utf-8')
+            await fs.writeFile(result.filePath, redactSecrets(raw), 'utf-8')
             return { success: true, path: result.filePath }
         } catch (error: unknown) {
             log.error('[Diagnostics] Export log error:', getErrorMessage(error))
