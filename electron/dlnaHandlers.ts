@@ -7,8 +7,6 @@ import { spawn, type ChildProcess } from 'child_process';
 import dgram from 'dgram';
 import http from 'http';
 import os from 'os';
-import { randomUUID } from 'crypto';
-import { getProviderHttpsAgent } from './certificatePolicy';
 import log from './logger';
 import {
     DLNA_FEATURES,
@@ -33,6 +31,17 @@ import {
     rewritePlaylistUris,
 } from './dlnaProtocol';
 import { planDlnaCommand, clampVolume, stepVolume, muteTarget, type DlnaStatusRaw } from './dlnaRemoteRouting';
+import {
+    MAX_PROXY_REDIRECTS,
+    canAcceptTranscode,
+    classifyProxyTarget,
+    isTokenValid,
+    newProxyToken,
+    planUpstreamRedirect,
+    tokensToRevoke,
+    type ProxyTokenEntry,
+} from './dlnaProxyGuard';
+import { getCertificateSettings, getProviderHttpsAgent } from './certificatePolicy';
 
 const require = createRequire(import.meta.url);
 
@@ -74,20 +83,74 @@ let manualDevices: DlnaDevice[] = [];
 let isDiscovering = false;
 let proxyServer: http.Server | null = null;
 let proxyPort: number | null = null;
-// token -> upstream URL, with creation time so stale entries can be pruned.
-// Entries are NOT removed on first read (devices re-request playlists/segments
-// repeatedly during a cast session), so without pruning this grows unbounded.
-const proxyUrls: Map<string, { url: string; createdAt: number }> = new Map();
-const PROXY_URL_TTL_MS = 60 * 60 * 1000; // 1 hour
+// token -> upstream URL. Entries are NOT removed on first read (devices
+// re-request playlists/segments repeatedly during a cast session): a validade
+// é por INATIVIDADE, renovada a cada acerto. É o que impede que um token
+// capturado no SOAP em claro valha a sessão inteira do app.
+const proxyUrls: Map<string, ProxyUrlEntry> = new Map();
 const PROXY_URL_MAX_ENTRIES = 5000;
 
 // token -> SRT subtitle content served at /dlna-sub/<token>.srt
-const proxySubtitles: Map<string, { srt: string; createdAt: number }> = new Map();
+const proxySubtitles: Map<string, SubtitleEntry> = new Map();
 // token -> raw WebVTT served at /cast-sub/<token>.vtt (Chromecast text track)
-const castSubtitles: Map<string, { vtt: string; createdAt: number }> = new Map();
+const castSubtitles: Map<string, CastSubtitleEntry> = new Map();
 // token -> upstream URL remuxed by ffmpeg at /dlna-transcode/<token>
-const transcodeUrls: Map<string, { url: string; createdAt: number }> = new Map();
+const transcodeUrls: Map<string, ProxyUrlEntry> = new Map();
 const activeTranscodes: Set<ChildProcess> = new Set();
+
+interface ProxyUrlEntry extends ProxyTokenEntry { url: string }
+interface SubtitleEntry extends ProxyTokenEntry { srt: string }
+interface CastSubtitleEntry extends ProxyTokenEntry { vtt: string }
+
+function newTokenEntry(deviceHost: string): ProxyTokenEntry {
+    const now = Date.now()
+    return { deviceHost, createdAt: now, lastUsedAt: now }
+}
+
+function pruneTokenMap<T extends ProxyTokenEntry>(map: Map<string, T>, now: number): void {
+    for (const [token, entry] of map) {
+        if (!isTokenValid(entry, now)) map.delete(token)
+    }
+}
+
+/** Lookup que expira o token vencido e renova a validade do que está em uso. */
+function useToken<T extends ProxyTokenEntry>(map: Map<string, T>, token: string): T | undefined {
+    const now = Date.now()
+    pruneTokenMap(map, now)
+    const entry = map.get(token)
+    if (!entry || !isTokenValid(entry, now)) return undefined
+    entry.lastUsedAt = now
+    return entry
+}
+
+// Stream longo (filme inteiro num range só, remux de horas) não volta ao
+// lookup: fica marcado como em uso e renova a validade quando termina.
+function beginStream(entry: ProxyTokenEntry | undefined): void {
+    if (entry) entry.inFlight = (entry.inFlight ?? 0) + 1
+}
+
+function endStream(entry: ProxyTokenEntry | undefined): void {
+    if (!entry) return
+    entry.inFlight = Math.max(0, (entry.inFlight ?? 1) - 1)
+    entry.lastUsedAt = Date.now()
+}
+
+/** Fim do cast daquele aparelho = fim dos tokens dele (o SOAP já vazou todos). */
+function revokeDeviceTokens(deviceHost: string): void {
+    let revoked = 0
+    for (const map of [proxyUrls, transcodeUrls, proxySubtitles, castSubtitles] as Map<string, ProxyTokenEntry>[]) {
+        for (const token of tokensToRevoke(map, deviceHost)) {
+            map.delete(token)
+            revoked++
+        }
+    }
+    if (revoked > 0) log.info('[DLNA] Tokens revogados no stop:', revoked)
+}
+
+/** Hosts já reconhecidos como do provedor (além do host da própria playlist). */
+function knownProviderHosts(): string[] {
+    return getCertificateSettings().approvedProviderHosts
+}
 
 function resolveFfmpegPath(): string | null {
     try {
@@ -101,10 +164,7 @@ function resolveFfmpegPath(): string | null {
 }
 
 function pruneProxyUrls(): void {
-    const now = Date.now()
-    for (const [token, entry] of proxyUrls) {
-        if (now - entry.createdAt > PROXY_URL_TTL_MS) proxyUrls.delete(token)
-    }
+    pruneTokenMap(proxyUrls, Date.now())
     // Safety valve: drop oldest entries if a long session rewrites huge playlists.
     if (proxyUrls.size > PROXY_URL_MAX_ENTRIES) {
         const excess = proxyUrls.size - PROXY_URL_MAX_ENTRIES
@@ -140,27 +200,62 @@ function getLocalAddressForDevice(deviceHost: string): string {
     return candidates[0]?.address || '127.0.0.1'
 }
 
+// URL escolhida pelo próprio app (stream do cast, HLS de resgate em loopback):
+// não passa pelo confinamento de destino, que existe para o que vem da playlist.
 function createProxyUrl(upstreamUrl: string, deviceHost: string): string {
-    const token = randomUUID()
+    const token = newProxyToken()
     pruneProxyUrls()
-    proxyUrls.set(token, { url: upstreamUrl, createdAt: Date.now() })
+    proxyUrls.set(token, { url: upstreamUrl, ...newTokenEntry(deviceHost) })
     return `http://${getLocalAddressForDevice(deviceHost)}:${proxyPort}/dlna-proxy/${token}?deviceHost=${encodeURIComponent(deviceHost)}`
 }
 
+// Cada URI da playlist do provedor decide seu destino: só o que é do provedor
+// vira token do proxy (o resto viraria SSRF cega com o IP do desktop).
 function rewritePlaylist(playlist: string, baseUrl: string, deviceHost: string): string {
-    return rewritePlaylistUris(playlist, baseUrl, (absoluteUrl) => createProxyUrl(absoluteUrl, deviceHost))
+    const providerHosts = knownProviderHosts()
+    return rewritePlaylistUris(playlist, baseUrl, (absoluteUrl) => {
+        const verdict = classifyProxyTarget(absoluteUrl, baseUrl, providerHosts)
+        if (verdict === 'proxy') return createProxyUrl(absoluteUrl, deviceHost)
+        if (verdict === 'passthrough') return absoluteUrl
+        // Interno: nem o desktop busca nem a TV recebe (ela também alcança a LAN).
+        // Token nunca registrado => o próprio proxy responde 404 e a playlist
+        // continua estruturalmente válida.
+        log.warn('[DLNA] URI da playlist recusada (destino interno):', absoluteUrl.slice(0, 120))
+        return `http://${getLocalAddressForDevice(deviceHost)}:${proxyPort}/dlna-proxy/${newProxyToken()}`
+    })
 }
 
 async function fetchUpstream(url: string, range?: string) {
     const fetch = (await import('node-fetch')).default
-    return fetch(url, {
-        agent: getProviderHttpsAgent(url),
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': '*/*',
-            ...(range ? { Range: range } : {})
+    const headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': '*/*',
+        ...(range ? { Range: range } : {})
+    }
+
+    // Redirecionamento é seguido à mão: o provedor manda o Location, e um 302
+    // para 127.0.0.1/LAN recriaria a SSRF que o filtro da playlist fecha.
+    let currentUrl = url
+    for (let hop = 0; hop <= MAX_PROXY_REDIRECTS; hop++) {
+        const response = await fetch(currentUrl, {
+            // Agent do salto atual, com o da URL original como reserva: seguir
+            // redirecionamento não pode ficar MAIS estrito no TLS do que antes.
+            agent: getProviderHttpsAgent(currentUrl) || getProviderHttpsAgent(url),
+            redirect: 'manual',
+            headers
+        })
+
+        const plan = planUpstreamRedirect(currentUrl, response.status, response.headers.get('location'))
+        if (plan.kind === 'stop') return response
+
+        response.body?.destroy?.()
+        if (plan.kind === 'block') {
+            throw new Error(`Redirecionamento recusado (${plan.reason})`)
         }
-    })
+        currentUrl = plan.url
+    }
+
+    throw new Error('Redirecionamentos demais do provedor')
 }
 
 // location|serviceType -> resolved control URL
@@ -276,7 +371,7 @@ async function ensureProxyServer(): Promise<number> {
             // Chromecast subtitle route: raw WebVTT (Cast wants text/vtt).
             if (requestUrl.pathname.startsWith('/cast-sub/')) {
                 const subToken = requestUrl.pathname.replace('/cast-sub/', '').replace(/\.vtt$/i, '')
-                const subtitle = castSubtitles.get(subToken)
+                const subtitle = useToken(castSubtitles, subToken)
                 if (!subtitle) {
                     response.writeHead(404)
                     response.end('Not found')
@@ -295,7 +390,7 @@ async function ensureProxyServer(): Promise<number> {
             // Subtitle route: serve stored SRT content.
             if (requestUrl.pathname.startsWith('/dlna-sub/')) {
                 const subToken = requestUrl.pathname.replace('/dlna-sub/', '').replace(/\.srt$/i, '')
-                const subtitle = proxySubtitles.get(subToken)
+                const subtitle = useToken(proxySubtitles, subToken)
                 log.info(`[DLNA] Proxy ${request.method} subtitle token=${subToken.slice(0, 8)}… known=${Boolean(subtitle)}`)
                 if (!subtitle) {
                     response.writeHead(404)
@@ -314,24 +409,37 @@ async function ensureProxyServer(): Promise<number> {
             // Transcode route: remux upstream to MPEG-TS via ffmpeg.
             if (requestUrl.pathname.startsWith('/dlna-transcode/')) {
                 const tToken = requestUrl.pathname.replace('/dlna-transcode/', '')
-                const entry = transcodeUrls.get(tToken)
+                const entry = useToken(transcodeUrls, tToken)
                 log.info(`[DLNA] Proxy ${request.method} transcode token=${tToken.slice(0, 8)}… known=${Boolean(entry)}`)
                 if (!entry) {
                     response.writeHead(404)
                     response.end('Not found')
                     return
                 }
-                response.writeHead(200, dlnaHeaders({ 'Content-Type': 'video/MP2T' }))
                 if (request.method === 'HEAD') {
+                    response.writeHead(200, dlnaHeaders({ 'Content-Type': 'video/MP2T' }))
                     response.end()
                     return
                 }
 
                 const ffmpegPath = resolveFfmpegPath()
                 if (!ffmpegPath) {
-                    response.destroy()
+                    response.writeHead(503)
+                    response.end('Transcoder unavailable')
                     return
                 }
+                // Teto de processos: cada GET aqui é um ffmpeg. Sem ele, algumas
+                // centenas de conexões (vizinho de LAN ou TV maluca) saturam a
+                // máquina. Recusa na hora em vez de enfileirar: a fila só
+                // seguraria socket sem dado até a TV desistir, com o mesmo custo.
+                if (!canAcceptTranscode(activeTranscodes.size)) {
+                    log.warn('[DLNA] Remux recusado: teto de processos atingido', activeTranscodes.size)
+                    response.writeHead(503, { 'Retry-After': '5' })
+                    response.end('Too many transcodes')
+                    return
+                }
+                response.writeHead(200, dlnaHeaders({ 'Content-Type': 'video/MP2T' }))
+                beginStream(entry)
                 // Remux only (-c copy): container conversion without re-encoding,
                 // cheap enough for any machine. The TV gets a TS stream it can
                 // play regardless of the source container (MKV/AVI).
@@ -351,6 +459,7 @@ async function ensureProxyServer(): Promise<number> {
                 })
                 const cleanup = () => {
                     activeTranscodes.delete(ffmpeg)
+                    endStream(entry)
                     try { ffmpeg.kill('SIGKILL') } catch { /* already dead */ }
                 }
                 response.on('close', cleanup)
@@ -362,7 +471,8 @@ async function ensureProxyServer(): Promise<number> {
             }
 
             const token = requestUrl.pathname.replace('/dlna-proxy/', '')
-            const upstreamUrl = proxyUrls.get(token)?.url
+            const proxyEntry = useToken(proxyUrls, token)
+            const upstreamUrl = proxyEntry?.url
             log.info(`[DLNA] Proxy ${request.method} token=${token.slice(0, 8)}… range=${request.headers.range || '-'} known=${Boolean(upstreamUrl)}`)
 
             if (!upstreamUrl) {
@@ -421,9 +531,11 @@ async function ensureProxyServer(): Promise<number> {
                     log.warn('[DLNA] Proxy upstream stream error:', error.message)
                     response.destroy()
                 })
+                beginStream(proxyEntry)
                 response.on('close', () => {
                     // Device hung up; stop pulling from upstream.
                     upstreamResponse.body?.destroy?.()
+                    endStream(proxyEntry)
                 })
                 upstreamResponse.body.pipe(response)
             } else {
@@ -914,8 +1026,9 @@ export function setupDLNAHandlers() {
             let castUrl = streamUrl;
             let effectiveMime = getMimeForUrl(streamUrl);
             if (useTranscode) {
-                const tToken = randomUUID();
-                transcodeUrls.set(tToken, { url: streamUrl, createdAt: Date.now() });
+                const tToken = newProxyToken();
+                pruneTokenMap(transcodeUrls, Date.now());
+                transcodeUrls.set(tToken, { url: streamUrl, ...newTokenEntry(device.host) });
                 castUrl = `http://${getLocalAddressForDevice(device.host)}:${proxyPort}/dlna-transcode/${tToken}`;
                 effectiveMime = 'video/MP2T';
                 log.info(`[DLNA] ${streamUrl.split('?')[0].slice(-12)} container needs remux; casting via ffmpeg MPEG-TS`);
@@ -927,8 +1040,9 @@ export function setupDLNAHandlers() {
             // reference it in the DIDL via Samsung's sec:CaptionInfoEx.
             let subtitleUrl: string | undefined;
             if (typeof subtitleVtt === 'string' && subtitleVtt.trim() && isRemoteHttp) {
-                const subToken = randomUUID();
-                proxySubtitles.set(subToken, { srt: vttToSrt(subtitleVtt), createdAt: Date.now() });
+                const subToken = newProxyToken();
+                pruneTokenMap(proxySubtitles, Date.now());
+                proxySubtitles.set(subToken, { srt: vttToSrt(subtitleVtt), ...newTokenEntry(device.host) });
                 subtitleUrl = `http://${getLocalAddressForDevice(device.host)}:${proxyPort}/dlna-sub/${subToken}.srt`;
                 log.info('[DLNA] Subtitle attached to cast');
             }
@@ -1027,6 +1141,7 @@ export function setupDLNAHandlers() {
                 try { ffmpeg.kill('SIGKILL') } catch { /* already dead */ }
             }
             activeTranscodes.clear();
+            revokeDeviceTokens(device.host);
 
             return { success: true };
         } catch (error: unknown) {
@@ -1124,12 +1239,10 @@ export async function createLanProxyUrlFor(upstreamUrl: string, deviceHost: stri
  */
 export async function registerCastSubtitleVtt(vtt: string, deviceHost: string): Promise<string> {
     const port = await ensureProxyServer()
-    const token = Math.random().toString(36).slice(2) + Date.now().toString(36)
-    castSubtitles.set(token, { vtt, createdAt: Date.now() })
-    // Same 30-min sweep policy as the SRT map (small strings, low risk).
-    for (const [key, entry] of castSubtitles) {
-        if (Date.now() - entry.createdAt > 30 * 60_000) castSubtitles.delete(key)
-    }
+    // Era Math.random()+relógio: adivinhável a partir do instante do cast.
+    const token = newProxyToken()
+    pruneTokenMap(castSubtitles, Date.now())
+    castSubtitles.set(token, { vtt, ...newTokenEntry(deviceHost) })
     return `http://${getLocalAddressForDevice(deviceHost)}:${port}/cast-sub/${token}.vtt`
 }
 
@@ -1232,6 +1345,7 @@ export function dlnaRemoteControl(action: string, value?: number): boolean {
                     try { ffmpeg.kill('SIGKILL') } catch { /* already dead */ }
                 }
                 activeTranscodes.clear()
+                revokeDeviceTokens(getHostFromLocation(session.location) || '')
                 return
             case 'seekRelative': {
                 const pos = await sendAvTransportAction(session.avTransportUrl, 'GetPositionInfo', '<InstanceID>0</InstanceID>', 5000)

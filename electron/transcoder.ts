@@ -20,6 +20,7 @@ import log from './logger'
 import {
     buildTranscodeArgs,
     isPlaylistReady,
+    newTranscodeSessionId,
     safeJoinTranscodePath,
     contentTypeFor,
     type TranscodeVariant
@@ -35,7 +36,6 @@ interface Session {
 const sessions = new Map<string, Session>()
 let server: http.Server | null = null
 let serverPort = 0
-let sessionCounter = 0
 
 function transcodeRoot(): string {
     return path.join(app.getPath('userData'), 'transcode')
@@ -98,7 +98,7 @@ async function startSession(sourceUrl: string, variant: TranscodeVariant): Promi
     const ffmpeg = resolveFfmpegPath()
     if (!ffmpeg) return null
 
-    const id = `t${Date.now().toString(36)}${(sessionCounter++).toString(36)}`
+    const id = newTranscodeSessionId()
     const dir = path.join(transcodeRoot(), id)
     await fsp.mkdir(dir, { recursive: true })
 
