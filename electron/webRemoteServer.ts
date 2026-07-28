@@ -63,6 +63,7 @@ import { dlnaRemoteControl, isDlnaSessionActive, getDlnaStatusSnapshot } from '.
 import { dlnaStateFields } from './dlnaRemoteRouting'
 import { airplayRemoteControl, isAirplaySessionActive, getAirplayStatusSnapshot } from './airplayHandlers'
 import { airplayStateFields } from './airplayRemoteRouting'
+import { localRequestVerdict } from './localServerGuard'
 
 interface WebRemoteConfig {
     enabled: boolean
@@ -1222,17 +1223,14 @@ function start(): Promise<void> {
             return
         }
         if (req.url === '/health') {
-            // 🩺 Health-check leve (sem dados sensíveis): monitoração/diagnóstico na LAN.
+            // 🩺 Rota pública de propósito: é assim que o app do celular acha o
+            // desktop varrendo a /24 (ele confere só `ok` + `app`).
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
-            // `version`/`features`: o app do celular usa pra dizer "atualize o
-            // desktop" em vez de "falha de rede" quando falta um endpoint.
-            res.end(JSON.stringify({
-                ok: true,
-                app: 'neostream-remote',
-                uptimeSeconds: Math.round(process.uptime()),
-                version: app.getVersion(),
-                features: ['transfer', 'setup'],
-            }))
+            // Versão, features e uptime SAÍRAM daqui: sem PIN nenhum, eles
+            // diziam a um scanner qual build cada PC roda (logo, quais furos
+            // ele tem) e há quanto tempo o dono está longe. Quem precisa da
+            // versão é o app, e ele já a recebe no hello do WS — autenticado.
+            res.end(JSON.stringify({ ok: true, app: 'neostream-remote' }))
             return
         }
         if (req.url === '/' || req.url === '/index.html') {
@@ -1289,6 +1287,36 @@ function start(): Promise<void> {
         res.end()
     }
     return new Promise<void>((resolve) => {
+        // Teto de linhas por start: sem ele, uma página recusada em laço vira um
+        // jeito barato de rotacionar o main.log e apagar o rastro do resto.
+        let refusalsLogged = 0
+        const logRefusal = (what: string, req: http.IncomingMessage, verdict: string) => {
+            if (refusalsLogged >= 20) return
+            refusalsLogged++
+            log.warn(`[WebRemote] ${what} recusado (${verdict}) host=${req.headers.host ?? '-'} origin=${req.headers.origin ?? '-'}`)
+        }
+        // 🛡️ Guarda de Host/Origin ANTES de qualquer rota — inclusive antes do
+        // gate de PIN. Sem isso o servidor é alcançável por qualquer página que
+        // o dono abrir: o `Host` de domínio entrega o controle por DNS
+        // rebinding, e o `Origin` de terceiro é o que sobra quando a página vai
+        // direto no IP (o POST /transfer com text/plain é "simple request" e
+        // não passa por preflight nenhum). Ver localServerGuard.ts.
+        const guarded = (req: http.IncomingMessage, res: http.ServerResponse) => {
+            // Clickjacking: a página do controle recupera o PIN do localStorage
+            // e reconecta sozinha, então um iframe invisível já nasce pareado.
+            res.setHeader('X-Frame-Options', 'DENY')
+            res.setHeader('Content-Security-Policy', "frame-ancestors 'none'")
+            const verdict = localRequestVerdict(req.headers.host, req.headers.origin, serverPort)
+            if (verdict !== 'ok') {
+                logRefusal('pedido', req, verdict)
+                // 421 diz "esse Host não é meu" — a resposta canônica de quem
+                // recusa rebinding; 403 pro Origin de terceiro.
+                res.writeHead(verdict === 'bad-host' ? 421 : 403, { 'Content-Type': 'text/plain; charset=utf-8' })
+                res.end(verdict)
+                return
+            }
+            handler(req, res)
+        }
         if (serverSecure) {
             // Fresh self-signed cert per start (hand-rolled X.509). The phone
             // accepts it once; the page connects over wss on the same port. The
@@ -1297,11 +1325,23 @@ function start(): Promise<void> {
                 commonName: getLanAddress(),
                 altNames: [getLanAddress(), '127.0.0.1', 'localhost'],
             })
-            server = https.createServer({ key, cert }, handler)
+            server = https.createServer({ key, cert }, guarded)
         } else {
-            server = http.createServer(handler)
+            server = http.createServer(guarded)
         }
-        server.on('upgrade', (req, socket) => handleUpgrade(req, socket as Socket))
+        server.on('upgrade', (req, socket) => {
+            // WebSocket não é submetido a CORS: sem esta checagem, uma aba em
+            // evil.com abre ws://<ip>:8974/?pin= e manda comandos (inclusive
+            // screenshot da janela do app) assim que acertar o PIN.
+            const verdict = localRequestVerdict(req.headers.host, req.headers.origin, serverPort)
+            if (verdict !== 'ok') {
+                logRefusal('upgrade', req, verdict)
+                socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
+                socket.destroy()
+                return
+            }
+            handleUpgrade(req, socket as Socket)
+        })
         // Fixed port first: the phone's installed PWA keeps its URL across app
         // restarts (an ephemeral port would break it every session). If the
         // preferred port is taken, fall back to an ephemeral one — the QR code

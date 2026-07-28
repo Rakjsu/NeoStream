@@ -39,10 +39,19 @@ export function timeshiftContentType(fileName: string): string {
 
 /**
  * Resolve um caminho de URL pra um arquivo DENTRO da pasta do buffer.
- * null = nome inválido/path traversal (o servidor responde 404).
+ * null = token errado, nome inválido ou path traversal (o servidor responde 404).
+ *
+ * O `token` é o segredo da sessão: o servidor escuta em porta efêmera e o nome
+ * do arquivo era FIXO (`/buffer.m3u8`), então uma página varrendo as ~16k
+ * portas do loopback acertava por dedução. Com o token no caminho não há o que
+ * deduzir. O hls.js resolve os segmentos relativos à playlist, então o prefixo
+ * viaja sozinho e o player não precisa saber de nada.
  */
-export function resolveTimeshiftFile(rootDir: string, urlPath: string): string | null {
-    const name = urlPath.replace(/^\/+/, '').split('?')[0]
+export function resolveTimeshiftFile(rootDir: string, urlPath: string, token: string): string | null {
+    const withoutQuery = urlPath.split('?')[0]
+    const prefix = `/${token}/`
+    if (!token || !withoutQuery.startsWith(prefix)) return null
+    const name = withoutQuery.slice(prefix.length)
     if (!name || name.includes('/') || name.includes('\\') || name.includes('..')) return null
     if (!/^[\w.-]+\.(m3u8|ts)$/i.test(name)) return null
     return path.join(rootDir, name)

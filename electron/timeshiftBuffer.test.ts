@@ -23,15 +23,26 @@ describe('timeshiftBuffer (item 15 — pausar TV ao vivo)', () => {
         expect(timeshiftContentType('outro.bin')).toBe('application/octet-stream')
     })
 
-    it('resolveTimeshiftFile aceita só nomes simples .m3u8/.ts', () => {
+    it('resolveTimeshiftFile aceita só nomes simples .m3u8/.ts sob o token', () => {
         const root = 'C:\\buf'
-        expect(resolveTimeshiftFile(root, '/buffer.m3u8')).toBe(path.join(root, 'buffer.m3u8'))
-        expect(resolveTimeshiftFile(root, '/seg00042.ts?x=1')).toBe(path.join(root, 'seg00042.ts'))
+        const tok = 'a1b2c3'
+        expect(resolveTimeshiftFile(root, `/${tok}/buffer.m3u8`, tok)).toBe(path.join(root, 'buffer.m3u8'))
+        expect(resolveTimeshiftFile(root, `/${tok}/seg00042.ts?x=1`, tok)).toBe(path.join(root, 'seg00042.ts'))
         // Path traversal / nomes fora do padrão → null.
-        expect(resolveTimeshiftFile(root, '/../segredo.ts')).toBeNull()
-        expect(resolveTimeshiftFile(root, '/sub/seg.ts')).toBeNull()
-        expect(resolveTimeshiftFile(root, '/nada.mp4')).toBeNull()
-        expect(resolveTimeshiftFile(root, '/')).toBeNull()
+        expect(resolveTimeshiftFile(root, `/${tok}/../segredo.ts`, tok)).toBeNull()
+        expect(resolveTimeshiftFile(root, `/${tok}/sub/seg.ts`, tok)).toBeNull()
+        expect(resolveTimeshiftFile(root, `/${tok}/nada.mp4`, tok)).toBeNull()
+        expect(resolveTimeshiftFile(root, `/${tok}/`, tok)).toBeNull()
+    })
+
+    it('sem o token no caminho não se chega no buffer', () => {
+        // O nome era FIXO (/buffer.m3u8) e o servidor mora numa porta efêmera
+        // do loopback: uma página varrendo portas achava, por dedução, o canal
+        // ao vivo que o dono estava assistindo.
+        const root = 'C:\\buf'
+        expect(resolveTimeshiftFile(root, '/buffer.m3u8', 'a1b2c3')).toBeNull()
+        expect(resolveTimeshiftFile(root, '/outro/buffer.m3u8', 'a1b2c3')).toBeNull()
+        expect(resolveTimeshiftFile(root, '/a1b2c3/buffer.m3u8', '')).toBeNull()
     })
 
     it('bufferedSecondsFromPlaylist soma os EXTINF', () => {

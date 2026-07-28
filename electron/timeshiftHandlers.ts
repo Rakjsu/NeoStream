@@ -13,8 +13,10 @@ import { spawn, type ChildProcess } from 'child_process'
 import http from 'node:http'
 import path from 'node:path'
 import fs from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { createRequire } from 'node:module'
 import log from './logger'
+import { isAppOwnOrigin } from './localServerGuard'
 import {
     buildTimeshiftArgs,
     bufferedSecondsFromPlaylist,
@@ -41,6 +43,8 @@ interface TimeshiftSession {
     server: http.Server
     dir: string
     port: number
+    /** Segredo do caminho (`/<token>/buffer.m3u8`) — ver resolveTimeshiftFile. */
+    token: string
 }
 
 let session: TimeshiftSession | null = null
@@ -104,9 +108,21 @@ export function setupTimeshiftHandlers(): void {
                 }
             })
 
-            // Servidor do buffer: só loopback, só nomes simples .m3u8/.ts.
+            // Servidor do buffer: só loopback, só nomes simples .m3u8/.ts,
+            // e só sob o token da sessão.
+            const token = randomUUID()
             const server = http.createServer((request, response) => {
-                const file = resolveTimeshiftFile(dir, request.url ?? '')
+                // 🛡️ O bind em 127.0.0.1 não exclui o navegador do dono, que
+                // alcança o loopback: era o `Access-Control-Allow-Origin: *`
+                // abaixo que deixava uma aba em evil.com LER o que ele está
+                // assistindo. Só a origem do próprio app passa daqui.
+                if (!isAppOwnOrigin(request.headers.origin, process.env['VITE_DEV_SERVER_URL'])) {
+                    log.warn(`[Timeshift] origem recusada: ${request.headers.origin}`)
+                    response.writeHead(403)
+                    response.end()
+                    return
+                }
+                const file = resolveTimeshiftFile(dir, request.url ?? '', token)
                 if (!file || !fs.existsSync(file)) {
                     response.writeHead(404)
                     response.end()
@@ -115,7 +131,12 @@ export function setupTimeshiftHandlers(): void {
                 response.writeHead(200, {
                     'Content-Type': timeshiftContentType(file),
                     'Cache-Control': 'no-store',
+                    // Mantido porque o renderer empacotado carrega de file://
+                    // (origem opaca) e o hls.js precisa de CORS pra ler; quem
+                    // não é o app já foi recusado acima. Vary pra nenhum cache
+                    // intermediário reaproveitar a resposta entre origens.
                     'Access-Control-Allow-Origin': '*',
+                    'Vary': 'Origin',
                 })
                 fs.createReadStream(file).pipe(response)
             })
@@ -126,7 +147,7 @@ export function setupTimeshiftHandlers(): void {
             const address = server.address()
             const port = typeof address === 'object' && address ? address.port : 0
 
-            session = { proc, server, dir, port }
+            session = { proc, server, dir, port, token }
 
             const ready = await waitForBuffer(path.join(dir, 'buffer.m3u8'), 15_000)
             if (!ready || session?.proc !== proc) {
@@ -136,7 +157,7 @@ export function setupTimeshiftHandlers(): void {
             }
 
             log.info(`[Timeshift] ativo na porta ${port} (janela ~30 min)`)
-            return { success: true, url: `http://127.0.0.1:${port}/buffer.m3u8` }
+            return { success: true, url: `http://127.0.0.1:${port}/${token}/buffer.m3u8` }
         } catch (error: unknown) {
             stopSession()
             const message = error instanceof Error ? error.message : String(error)
