@@ -1,5 +1,23 @@
 import { describe, it, expect } from 'vitest'
-import { buildTranscodeArgs, isPlaylistReady, safeJoinTranscodePath, contentTypeFor } from './transcodeProtocol'
+import { buildTranscodeArgs, isPlaylistReady, newTranscodeSessionId, safeJoinTranscodePath, contentTypeFor } from './transcodeProtocol'
+
+describe('newTranscodeSessionId', () => {
+    it('nao deriva do relogio: id imprevisivel', () => {
+        const id = newTranscodeSessionId()
+        expect(id).not.toContain(Date.now().toString(36))
+        expect(id).toMatch(/^t[0-9a-f]{32}$/)
+    })
+
+    it('ids diferentes no mesmo milissegundo', () => {
+        const ids = new Set(Array.from({ length: 50 }, () => newTranscodeSessionId()))
+        expect(ids.size).toBe(50)
+    })
+
+    it('continua servivel pelo servidor de loopback', () => {
+        const id = newTranscodeSessionId()
+        expect(safeJoinTranscodePath('/root', `/${id}/index.m3u8`)).toBe(`/root/${id}/index.m3u8`)
+    })
+})
 
 describe('buildTranscodeArgs', () => {
     it('full: reencode h264+aac em HLS ao vivo', () => {

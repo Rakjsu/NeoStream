@@ -8,7 +8,18 @@
  *   - 'full':  video → H.264 veryfast + audio → AAC (universal, CPU-heavy)
  */
 
+import { randomUUID } from 'node:crypto'
+
 export type TranscodeVariant = 'audio' | 'full'
+
+/**
+ * Id da sessão de resgate. Ele é o único segredo do path servido em loopback
+ * (/<id>/index.m3u8), então não pode sair do relógio: derivado de Date.now()
+ * uma página aberta durante o resgate adivinha a janela e lê o manifesto.
+ */
+export function newTranscodeSessionId(): string {
+    return `t${randomUUID().replace(/-/g, '')}`
+}
 
 /** ffmpeg argv for a live HLS rescue of `sourceUrl`, writing into cwd. */
 export function buildTranscodeArgs(sourceUrl: string, variant: TranscodeVariant): string[] {

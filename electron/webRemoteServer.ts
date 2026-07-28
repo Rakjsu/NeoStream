@@ -19,7 +19,12 @@ import fs from 'node:fs'
 import { app, BrowserWindow, ipcMain } from 'electron'
 import Store from 'electron-store'
 import log from './logger'
-import { generateSelfSignedCert } from './selfSignedCert'
+import {
+    generateSelfSignedCert,
+    shouldReuseStoredCert,
+    mergeCertAltNames,
+    type StoredSelfSignedCert,
+} from './selfSignedCert'
 import { recordingsDir } from './dvrHandlers'
 import {
     buildHandshakeResponse,
@@ -33,6 +38,11 @@ import {
     registerPinFailure,
     admitClient,
     isClientBufferOverflow,
+    pinGateKey,
+    pinMatches,
+    PIN_GLOBAL_MAX_FAILS,
+    PIN_GLOBAL_LOCK_MS,
+    PIN_GLOBAL_DECAY_MS,
     pickLanAddress,
     canDeliverTo,
     isPeerStale,
@@ -175,6 +185,82 @@ let sessionPin = ''
 // Per-client PIN failure tracking, so a wrong PIN can't be brute-forced over
 // the LAN (10k combos). Keyed by remote IP; cleared on the server stopping.
 const pinGate = new Map<string, PinGateEntry>()
+// Contador GLOBAL: o cooldown por IP é multiplicável por quem tem vários
+// endereços (aliases, /64 de IPv6, outra máquina). Este teto é o piso comum.
+let pinGlobal: PinGateEntry = { fails: 0, lockedUntil: 0 }
+/**
+ * Endereços que já acertaram o PIN nesta sessão. Eles continuam sujeitos ao
+ * cooldown por IP, mas ficam FORA do teto global: sem isso, os aparelhos do
+ * próprio dono (que reconectam sozinhos com credencial velha depois de um
+ * `regen-pin`) trancavam o pareamento do PIN novo — auto-DoS sem atacante.
+ */
+const pinKnown = new Set<string>()
+
+/** Resultado de uma checagem de PIN — o chamador só decide a resposta HTTP. */
+type PinVerdict = 'ok' | 'locked' | 'wrong'
+
+/**
+ * 🔐 A ÚNICA porta de PIN do servidor. Toda rota autenticada e o upgrade do
+ * WebSocket passam por aqui.
+ *
+ * Existir em cópias foi exatamente o que deixou o `/recording` sem cooldown:
+ * ele comparava o PIN à mão e respondia 403 sem registrar nada, virando um
+ * oráculo de força bruta ilimitado — e, como o PIN certo caía num 404 e o
+ * errado num 403, bastava varrer as 10 mil combinações e olhar o status. Com o
+ * PIN em mãos, `/setup` entrega usuário e senha de todos os provedores.
+ */
+function checkPin(ip: string | undefined, candidate: string, now: number): PinVerdict {
+    const key = pinGateKey(ip)
+    const conhecido = pinKnown.has(key)
+    if (isPinLockedOut(pinGate.get(key), now)) return 'locked'
+    if (!conhecido && isPinLockedOut(pinGlobal, now)) return 'locked'
+    if (!sessionPin || !pinMatches(candidate, sessionPin)) {
+        const entry = registerPinFailure(pinGate.get(key), now)
+        pinGate.set(key, entry)
+        // O acerto de um cliente NÃO zera o teto global — durante um ataque, o
+        // celular do dono reconectando apagaria a evidência dos outros.
+        if (!conhecido) {
+            pinGlobal = registerPinFailure(pinGlobal, now, PIN_GLOBAL_MAX_FAILS, PIN_GLOBAL_LOCK_MS, PIN_GLOBAL_DECAY_MS)
+            if (pinGlobal.lockedUntil > now) log.warn('[WebRemote] PIN bloqueado globalmente — tentativas de vários endereços')
+        }
+        if (entry.lockedUntil > now) log.warn(`[WebRemote] PIN bloqueado por tentativas: ${key}`)
+        return 'wrong'
+    }
+    pinGate.delete(key)
+    pinKnown.add(key)
+    return 'ok'
+}
+
+/** PIN novo (ou servidor parando): tudo que era conhecido deixa de ser. */
+function resetPinGate(): void {
+    pinGate.clear()
+    pinKnown.clear()
+    pinGlobal = { fails: 0, lockedUntil: 0 }
+}
+
+/**
+ * Aplica o gate e já responde 429/403 quando barra. `true` = pode seguir.
+ * Toda rota autenticada usa ESTA função — `webRemoteRoutes.test.ts` percorre a
+ * lista e falha se alguma parar de passar por aqui.
+ */
+function respondPin(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    candidate: string,
+    /** Status do PIN errado. O `/recording` usa 404 pra não virar oráculo. */
+    wrongStatus = 403,
+): boolean {
+    const verdict = checkPin(req.socket.remoteAddress, candidate, Date.now())
+    if (verdict === 'ok') return true
+    if (verdict === 'locked') {
+        res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8' })
+        res.end('Aguarde e tente de novo')
+        return false
+    }
+    res.writeHead(wrongStatus, { 'Content-Type': 'text/plain; charset=utf-8' })
+    res.end(wrongStatus === 404 ? 'not found' : 'PIN')
+    return false
+}
 const clients = new Set<ClientSocket>()
 let mediaState = { hasMedia: false, playing: false, title: '' }
 // Second-screen guide: the live channel list + now/next EPG of the playing
@@ -219,6 +305,67 @@ function serverUrl(): string | null {
 /** Best LAN IPv4 the phone can reach (skips VPN/virtual adapters), or 127.0.0.1. */
 export function getLanAddress(): string {
     return pickLanAddress(os.networkInterfaces() as Record<string, NetAddress[] | undefined>)
+}
+
+// ------------------------------------------------- certificado do modo https --
+
+/** Chave + cert do modo https, guardados entre sessões. */
+const CERT_FILE = 'webremote-cert.json'
+/** 10 anos: o objetivo é estabilidade (confiar uma vez), não rotação. */
+const CERT_VALIDITY_DAYS = 3650
+
+function certFilePath(): string {
+    return path.join(app.getPath('userData'), CERT_FILE)
+}
+
+function readStoredCert(): Partial<StoredSelfSignedCert> | null {
+    try {
+        return JSON.parse(fs.readFileSync(certFilePath(), 'utf-8')) as Partial<StoredSelfSignedCert>
+    } catch {
+        return null // ausente, ilegível ou corrompido → gera um novo
+    }
+}
+
+function writeStoredCert(value: StoredSelfSignedCert): void {
+    try {
+        // 0o600 porque o arquivo carrega a chave privada. No Linux/macOS isso
+        // deixa o arquivo só para o dono; no Windows o modo só reflete o
+        // atributo somente-leitura e quem protege é a ACL da pasta do usuário.
+        fs.writeFileSync(certFilePath(), JSON.stringify(value), { mode: 0o600 })
+        try { fs.chmodSync(certFilePath(), 0o600) } catch { /* sem suporte a modo */ }
+    } catch (error) {
+        log.warn('[WebRemote] não consegui gravar o certificado https:', error)
+    }
+}
+
+/**
+ * Par chave/cert do https, reaproveitado entre sessões.
+ *
+ * Regerar a cada start fazia o celular ver um certificado diferente toda vez:
+ * confiar uma vez era impossível e o usuário aprendia a apertar "avançar mesmo
+ * assim" em qualquer certificado — inclusive no de um impostor na mesma LAN.
+ * Agora só regeramos quando não há nada gravado, quando o cert está perto de
+ * vencer ou quando o SAN não cobre o endereço desta rede. Para forçar um par
+ * novo à mão, basta apagar `webremote-cert.json` na pasta userData.
+ */
+function loadOrCreateCert(now: number): { key: string; cert: string } {
+    const lanAddress = getLanAddress()
+    const wanted = [lanAddress, '127.0.0.1', 'localhost']
+    const stored = readStoredCert()
+
+    if (stored && shouldReuseStoredCert(stored, now, wanted)) {
+        return { key: stored.key as string, cert: stored.cert as string }
+    }
+
+    const altNames = mergeCertAltNames(stored?.altNames, wanted)
+    const fresh = generateSelfSignedCert(now, {
+        commonName: lanAddress,
+        validityDays: CERT_VALIDITY_DAYS,
+        altNames,
+    })
+    writeStoredCert({ key: fresh.key, cert: fresh.cert, altNames, notAfter: fresh.notAfter })
+    log.info('[WebRemote] novo certificado https gerado para', altNames.join(', '))
+    return { key: fresh.key, cert: fresh.cert }
 }
 
 // Latest DLNA session snapshot, refreshed by the 2s poll below (SOAP is too
@@ -412,23 +559,15 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
     // is refused before the WebSocket is established; too many wrong PINs from
     // the same client trip a cooldown (anti brute-force).
     const ip = socket.remoteAddress || 'unknown'
-    const now = Date.now()
-    if (isPinLockedOut(pinGate.get(ip), now)) {
-        socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n')
-        socket.destroy()
-        return
-    }
     const url = new URL(request.url || '/', 'http://localhost')
-    if (url.searchParams.get('pin') !== sessionPin) {
-        const entry = registerPinFailure(pinGate.get(ip), now)
-        pinGate.set(ip, entry)
-        if (entry.lockedUntil > now) log.warn(`[WebRemote] PIN bloqueado por tentativas: ${ip}`)
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n')
+    const verdict = checkPin(ip, url.searchParams.get('pin') ?? '', Date.now())
+    if (verdict !== 'ok') {
+        socket.write(verdict === 'locked'
+            ? 'HTTP/1.1 429 Too Many Requests\r\n\r\n'
+            : 'HTTP/1.1 401 Unauthorized\r\n\r\n')
         socket.destroy()
         return
     }
-    // Correct PIN: clear any accumulated failures for this client.
-    pinGate.delete(ip)
     // Teto de conexões: PIN certo não pode significar sockets infinitos (cada
     // um segura memória de remontagem e recebe todo broadcast).
     const admission = admitClient([...clients].map(c => c.ip ?? 'unknown'), ip)
@@ -1118,7 +1257,10 @@ export function setupWebRemote(): void {
         if (!serverPort) return { success: false, error: 'Controle desativado' }
         sessionPin = newPin()
         persistPin(sessionPin)
-        pinGate.clear()
+        // Zera TUDO, inclusive o teto global e a lista de conhecidos: os
+        // aparelhos com o PIN velho vão errar em massa nos próximos segundos e
+        // não podem trancar o pareamento do PIN novo.
+        resetPinGate()
         // Fecha com motivo antes de destruir: o app do celular não tem como
         // ver "PIN velho" num 1006 e reconectava a cada 15s com a credencial
         // morta, armando o anti brute-force contra o próprio dono do PC.
@@ -1163,28 +1305,13 @@ function start(): Promise<void> {
         if (req.method === 'POST' && req.url && req.url.startsWith('/transfer?')) {
             // 📥 Item 12: recebe um download do celular pela LAN (inverso do
             // /recording abaixo). Mesmo anti brute-force por IP do /setup.
-            const ip = req.socket.remoteAddress || 'unknown'
-            const now = Date.now()
-            if (isPinLockedOut(pinGate.get(ip), now)) {
-                res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8' })
-                res.end('Aguarde e tente de novo')
-                return
-            }
             const parsed = parseTransferQuery(req.url)
             if (!parsed) {
                 res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' })
                 res.end('bad request')
                 return
             }
-            if (!sessionPin || parsed.pin !== sessionPin) {
-                const entry = registerPinFailure(pinGate.get(ip), now)
-                pinGate.set(ip, entry)
-                if (entry.lockedUntil > now) log.warn(`[WebRemote] PIN do /transfer bloqueado por tentativas: ${ip}`)
-                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
-                res.end('PIN')
-                return
-            }
-            pinGate.delete(ip)
+            if (!respondPin(req, res, parsed.pin)) return
             const dir = transfersDir()
             try { fs.mkdirSync(dir, { recursive: true }) } catch { /* já existe */ }
             // 🚦 Corpo era aceito sem teto nem checagem de espaço: dava pra
@@ -1269,13 +1396,10 @@ function start(): Promise<void> {
         if (req.url && req.url.startsWith('/recording?')) {
             // ⬇️ Item 122: transfere uma gravação pela LAN (autentica pelo PIN da sessão).
             const query = new URL(req.url, 'http://localhost').searchParams
-            const pin = query.get('pin') ?? ''
             const name = path.basename(query.get('name') ?? '')
-            if (!sessionPin || pin !== sessionPin) {
-                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
-                res.end('PIN')
-                return
-            }
+            // 404 nos DOIS casos (PIN errado e arquivo inexistente): o par
+            // 403/404 era o oráculo que tornava a força bruta observável.
+            if (!respondPin(req, res, query.get('pin') ?? '', 404)) return
             const file = path.join(recordingsDir(), name)
             if (!name || !fs.existsSync(file)) {
                 res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
@@ -1346,23 +1470,9 @@ function start(): Promise<void> {
                     return
                 }
             } else {
-                // Caminho do app do celular ("parear com desktop"): mesmo anti
-                // brute-force por IP do WebSocket.
-                if (isPinLockedOut(pinGate.get(ip), now)) {
-                    res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8' })
-                    res.end('Aguarde e tente de novo')
-                    return
-                }
-                const pin = query.get('pin') || ''
-                if (pin !== sessionPin) {
-                    const entry = registerPinFailure(pinGate.get(ip), now)
-                    pinGate.set(ip, entry)
-                    if (entry.lockedUntil > now) log.warn(`[WebRemote] PIN do /setup bloqueado por tentativas: ${ip}`)
-                    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
-                    res.end('PIN')
-                    return
-                }
-                pinGate.delete(ip)
+                // Caminho do app do celular ("parear com desktop"): passa pelo
+                // gate único, que já cuida do cooldown por IP e do teto global.
+                if (!respondPin(req, res, query.get('pin') || '')) return
                 // PIN certo ainda não basta pra levar as senhas de todas as
                 // playlists: o dono precisa estar na tela de pareamento.
                 if (!isHandoffArmed(setupHandoff, now)) {
@@ -1384,13 +1494,10 @@ function start(): Promise<void> {
     }
     return new Promise<void>((resolve) => {
         if (serverSecure) {
-            // Fresh self-signed cert per start (hand-rolled X.509). The phone
-            // accepts it once; the page connects over wss on the same port. The
-            // LAN IP goes in the SAN so mobile browsers validate the host.
-            const { key, cert } = generateSelfSignedCert(Date.now(), {
-                commonName: getLanAddress(),
-                altNames: [getLanAddress(), '127.0.0.1', 'localhost'],
-            })
+            // Self-signed cert (hand-rolled X.509) PERSISTIDO entre sessões: o
+            // celular aceita uma vez e volta a ver o mesmo certificado nas
+            // próximas. A LAN IP vai no SAN para o navegador validar o host.
+            const { key, cert } = loadOrCreateCert(Date.now())
             server = https.createServer({ key, cert }, handler)
         } else {
             server = http.createServer(handler)
@@ -1431,7 +1538,9 @@ function stop(): void {
     serverSecure = false
     sessionPin = ''
     setupHandoff = null
-    pinGate.clear()
+    // Desligar e religar o controle é o reflexo de quem levou 429 — tem que
+    // destravar de verdade.
+    resetPinGate()
 }
 
 export function teardownWebRemote(): void {

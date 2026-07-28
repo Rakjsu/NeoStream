@@ -15,6 +15,9 @@ import {
     formatUpnpTime,
     vttToSrt,
     rewritePlaylistUris,
+    normalizeDiscoveryHost,
+    isHttpLocation,
+    isTrustedSsdpLocation,
     DLNA_FEATURES,
 } from './dlnaProtocol'
 
@@ -56,6 +59,51 @@ describe('SSDP parsing', () => {
         expect(msg).toContain('MAN: "ssdp:discover"')
         expect(msg).toContain('ST: ssdp:all')
         expect(msg.endsWith('\r\n\r\n')).toBe(true)
+    })
+})
+
+describe('LOCATION do SSDP: esquema + host igual ao remetente', () => {
+    it('aceita o caso real de uma TV (mesmo IP do datagrama)', () => {
+        expect(isTrustedSsdpLocation('http://10.0.0.109:9197/dmr', '10.0.0.109')).toBe(true)
+        expect(isTrustedSsdpLocation('https://192.168.1.42:8443/description.xml', '192.168.1.42')).toBe(true)
+        // Sem porta e com caminho longo continua valendo.
+        expect(isTrustedSsdpLocation('http://192.168.0.7/rootDesc.xml?v=2', '192.168.0.7')).toBe(true)
+    })
+
+    it('recusa LOCATION apontando para outro host que não o remetente', () => {
+        // O "aparelho" responde do IP dele mas manda o app buscar em outro lugar.
+        expect(isTrustedSsdpLocation('http://192.168.0.1/setup.cgi', '192.168.0.66')).toBe(false)
+        expect(isTrustedSsdpLocation('http://127.0.0.1:8974/', '192.168.0.66')).toBe(false)
+        expect(isTrustedSsdpLocation('http://attacker.example.com/x.xml', '192.168.0.66')).toBe(false)
+        // Truque de userinfo: o host real é o que vem depois do @.
+        expect(isTrustedSsdpLocation('http://192.168.0.66@evil.example/x', '192.168.0.66')).toBe(false)
+    })
+
+    it('recusa esquemas fora de http/https', () => {
+        expect(isTrustedSsdpLocation('file:///C:/Windows/win.ini', '192.168.0.66')).toBe(false)
+        expect(isTrustedSsdpLocation('ftp://192.168.0.66/x', '192.168.0.66')).toBe(false)
+        expect(isTrustedSsdpLocation('javascript:alert(1)', '192.168.0.66')).toBe(false)
+        expect(isTrustedSsdpLocation('//192.168.0.66/x', '192.168.0.66')).toBe(false)
+    })
+
+    it('recusa LOCATION ausente, vazio ou não parseável', () => {
+        expect(isTrustedSsdpLocation(undefined, '192.168.0.66')).toBe(false)
+        expect(isTrustedSsdpLocation('', '192.168.0.66')).toBe(false)
+        expect(isTrustedSsdpLocation('http://', '192.168.0.66')).toBe(false)
+        expect(isTrustedSsdpLocation('http://192.168.0.66/', '')).toBe(false)
+    })
+
+    it('compara IPv6 e IPv4 mapeado sem falso negativo', () => {
+        expect(isTrustedSsdpLocation('http://[fe80::1]:9197/dmr', 'fe80::1%eth0')).toBe(true)
+        expect(isTrustedSsdpLocation('http://10.0.0.109:9197/dmr', '::ffff:10.0.0.109')).toBe(true)
+        expect(normalizeDiscoveryHost('[FE80::1]%wlan0')).toBe('fe80::1')
+    })
+
+    it('isHttpLocation separa esquema válido de tudo mais', () => {
+        expect(isHttpLocation('http://x/')).toBe(true)
+        expect(isHttpLocation('https://x/')).toBe(true)
+        expect(isHttpLocation('file:///etc/passwd')).toBe(false)
+        expect(isHttpLocation(undefined)).toBe(false)
     })
 })
 

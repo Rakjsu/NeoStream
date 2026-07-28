@@ -86,7 +86,14 @@ export class XtreamClient {
             }));
 
             log.info('[XtreamClient] Response status:', response.status, response.statusText);
-            log.info('[XtreamClient] Response data:', response.data);
+            // O player_api.php devolve user_info.username/password em texto puro:
+            // logamos só os campos de diagnóstico, nunca o objeto inteiro. (A
+            // redação do transporte também pegaria, mas o segredo que não é
+            // escrito é o que não vaza.)
+            const info = response.data?.user_info;
+            log.info('[XtreamClient] Response user_info:',
+                'auth=', info?.auth, 'status=', info?.status, 'exp_date=', info?.exp_date,
+                'max_connections=', info?.max_connections);
 
             if (response.status !== 200) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
