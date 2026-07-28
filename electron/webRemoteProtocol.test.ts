@@ -13,6 +13,14 @@ import {
     pickLanAddress,
     scoreLanCandidate,
     parseProgressReport,
+    encodePingFrame,
+    encodeCloseFrame,
+    isPeerStale,
+    canDeliverTo,
+    isLinkPing,
+    LINK_PONG_MESSAGE,
+    WS_CLOSE_PIN_ROTATED,
+    WS_PEER_TIMEOUT_MS,
     parseMobileHello,
     buildDesktopHello,
     compareAppVersions,
@@ -27,6 +35,13 @@ import {
 function maskedClientTextFrame(text: string, mask = [0x12, 0x34, 0x56, 0x78]): Uint8Array {
     const payload = Buffer.from(text, 'utf-8')
     const header = [0x81, 0x80 | payload.length, ...mask]
+    const masked = payload.map((b, i) => b ^ mask[i & 3])
+    return Uint8Array.from([...header, ...masked])
+}
+
+/** Um pedaço mascarado com FIN/opcode escolhidos (fragmentação do cliente). */
+function maskedFragment(opcode: number, fin: boolean, payload: Buffer, mask = [0x12, 0x34, 0x56, 0x78]): Uint8Array {
+    const header = [(fin ? 0x80 : 0) | opcode, 0x80 | payload.length, ...mask]
     const masked = payload.map((b, i) => b ^ mask[i & 3])
     return Uint8Array.from([...header, ...masked])
 }
@@ -73,6 +88,98 @@ describe('frames', () => {
         const close = Uint8Array.from([0x88, 0x80, 0, 0, 0, 0])
         expect(decodeFrames(close).frames[0]).toEqual({ type: 'close' })
         expect(encodePongFrame(Uint8Array.from([1, 2]))[0]).toBe(0x8a)
+    })
+})
+
+describe('fragmentação (FIN/continuation)', () => {
+    // O OkHttp do React Native (e proxies da LAN) pode partir uma mensagem em
+    // vários frames. Sem ler o FIN, o 1º pedaço virava JSON truncado engolido
+    // e as continuações, lixo órfão — "sync que às vezes não pega".
+    it('remonta uma mensagem partida em dois frames', () => {
+        const full = '{"action":"reportProgress","report":{"kind":"movie"}}'
+        const half = Math.floor(full.length / 2)
+        const glued = new Uint8Array([
+            ...maskedFragment(0x1, false, Buffer.from(full.slice(0, half), 'utf-8')),
+            ...maskedFragment(0x0, true, Buffer.from(full.slice(half), 'utf-8')),
+        ])
+        const { frames, pending } = decodeFrames(glued)
+        expect(frames).toEqual([{ type: 'text', text: full }])
+        expect(pending).toBeNull()
+    })
+
+    it('atravessa chamadas: o pedaço fica em pending até o FIN', () => {
+        const first = decodeFrames(maskedFragment(0x1, false, Buffer.from('{"a":', 'utf-8')))
+        expect(first.frames).toHaveLength(0)
+        expect(first.pending?.opcode).toBe(0x1)
+        const second = decodeFrames(maskedFragment(0x0, true, Buffer.from('1}', 'utf-8')), first.pending)
+        expect(second.frames).toEqual([{ type: 'text', text: '{"a":1}' }])
+        expect(second.pending).toBeNull()
+    })
+
+    it('decodifica UTF-8 só no payload remontado (multibyte partido)', () => {
+        const bytes = Buffer.from('Ação', 'utf-8') // "ç" ocupa 2 bytes
+        const glued = new Uint8Array([
+            ...maskedFragment(0x1, false, bytes.subarray(0, 3)),
+            ...maskedFragment(0x0, true, bytes.subarray(3)),
+        ])
+        expect(decodeFrames(glued).frames).toEqual([{ type: 'text', text: 'Ação' }])
+    })
+
+    it('ping no meio da fragmentação não quebra a montagem', () => {
+        const glued = new Uint8Array([
+            ...maskedFragment(0x1, false, Buffer.from('oi ', 'utf-8')),
+            ...maskedFragment(0x9, true, Buffer.alloc(0)),
+            ...maskedFragment(0x0, true, Buffer.from('mundo', 'utf-8')),
+        ])
+        const { frames } = decodeFrames(glued)
+        expect(frames.map(f => f.type)).toEqual(['ping', 'text'])
+        expect(frames[1]).toEqual({ type: 'text', text: 'oi mundo' })
+    })
+
+    it('fluxo fora de sincronia derruba o cliente (throw)', () => {
+        expect(() => decodeFrames(maskedFragment(0x0, true, Buffer.from('x', 'utf-8')))).toThrow()
+        const novoNoMeio = new Uint8Array([
+            ...maskedFragment(0x1, false, Buffer.from('a', 'utf-8')),
+            ...maskedFragment(0x1, true, Buffer.from('b', 'utf-8')),
+        ])
+        expect(() => decodeFrames(novoNoMeio)).toThrow()
+    })
+})
+
+describe('liveness (peer meio-morto)', () => {
+    it('encodePingFrame e encodeCloseFrame trazem opcode e código', () => {
+        expect(encodePingFrame()[0]).toBe(0x89)
+        const bye = encodeCloseFrame(WS_CLOSE_PIN_ROTATED, 'pin-rotated')
+        expect(bye[0]).toBe(0x88)
+        expect((bye[2] << 8) | bye[3]).toBe(4001)
+        expect(Buffer.from(bye.subarray(4)).toString('utf-8')).toBe('pin-rotated')
+    })
+
+    it('isPeerStale só depois da tolerância', () => {
+        expect(isPeerStale(1000, 1000 + WS_PEER_TIMEOUT_MS)).toBe(false)
+        expect(isPeerStale(1000, 1000 + WS_PEER_TIMEOUT_MS + 1)).toBe(true)
+    })
+
+    it('canDeliverTo não conta socket destruído, fechado nem calado', () => {
+        const now = 1_000_000
+        expect(canDeliverTo({ destroyed: false, writable: true, lastSeenAt: now - 1000 }, now)).toBe(true)
+        expect(canDeliverTo({ destroyed: true, writable: true, lastSeenAt: now }, now)).toBe(false)
+        expect(canDeliverTo({ destroyed: false, writable: false, lastSeenAt: now }, now)).toBe(false)
+        // Metade-aberta: o write "funciona", mas ninguém dá sinal há minutos.
+        expect(canDeliverTo({ destroyed: false, writable: true, lastSeenAt: now - 120_000 }, now)).toBe(false)
+    })
+
+    it('isLinkPing reconhece só o heartbeat do app', () => {
+        expect(isLinkPing('{"action":"ping"}')).toBe(true)
+        expect(isLinkPing(JSON.stringify({ action: 'ping', t: 5 }))).toBe(true)
+        expect(isLinkPing('{"action":"togglePlay"}')).toBe(false)
+        expect(isLinkPing('{"action":"deleteRecording","name":"ping"}')).toBe(false)
+        expect(isLinkPing('não-json "ping"')).toBe(false)
+        expect(JSON.parse(LINK_PONG_MESSAGE)).toEqual({ type: 'pong' })
+    })
+
+    it('parseRemoteCommand aceita requestProgress (reconciliação)', () => {
+        expect(parseRemoteCommand('{"action":"requestProgress"}')).toEqual({ action: 'requestProgress' })
     })
 })
 
