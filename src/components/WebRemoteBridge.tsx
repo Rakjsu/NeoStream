@@ -10,6 +10,7 @@ import { favoritesService } from '../services/favoritesService';
 import { getHomeRecommendations, type RecMovie, type RecSeries } from '../services/recommendationService';
 import { queueService } from '../services/queueService';
 import { downloadService } from '../services/downloadService';
+import { applyRemoteEpisodeProgress, applyRemoteMovieProgress, localProfileTag } from '../services/progressSyncService';
 
 /**
  * Always-mounted bridge for the phone web remote's catalog second-screen.
@@ -31,6 +32,18 @@ interface VodMovie {
 
 interface SeriesItem { series_id: number | string; name: string; cover?: string }
 interface Episode { id: number | string; episode_num: number | string; title?: string; container_extension?: string }
+
+/** Registro de um download recebido do celular (payload do main, item 12). */
+interface TransferEntry {
+    id?: string;
+    kind?: string;
+    title?: string;
+    seriesName?: string;
+    season?: number;
+    episode?: number;
+    filePath?: string;
+    size?: number;
+}
 
 type CastTargetType = 'chromecast' | 'dlna' | 'airplay';
 interface CastTarget { deviceId: string; deviceType: CastTargetType }
@@ -57,18 +70,53 @@ export function WebRemoteBridge() {
 
     // 📥 Item 12: um download enviado pelo celular chegou pelo /transfer —
     // registra como concluído pra aparecer na página de Downloads.
+    //
+    // O evento é fire-and-forget do main: se este bridge não estiver montado
+    // (reload, crash-restart, boot) ele se perde e o arquivo fica órfão com o
+    // celular reportando sucesso. Por isso o main guarda um manifest e aqui a
+    // gente reconcilia as pendências ao montar, confirmando cada id registrado.
     useEffect(() => {
-        const onReceived = (_event: unknown, payload: { title?: string; kind?: string; filePath?: string; size?: number }) => {
-            if (!payload?.filePath || !payload.title) return;
-            const kind = payload.kind === 'episode' ? 'episode' as const : 'movie' as const;
-            void downloadService.registerReceived({
-                title: payload.title,
-                kind,
-                filePath: payload.filePath,
-                size: payload.size ?? 0,
-            });
+        // Falhou o registro? Devolve false pra pendência NÃO sair do manifest
+        // (a próxima montagem tenta de novo em vez de perder o arquivo).
+        const register = async (entry: TransferEntry) => {
+            if (!entry?.filePath || !entry.title) return false;
+            try {
+                await downloadService.registerReceived({
+                    title: entry.title,
+                    kind: entry.kind === 'episode' ? 'episode' : 'movie',
+                    filePath: entry.filePath,
+                    size: entry.size ?? 0,
+                    transferId: entry.id,
+                    seriesName: entry.seriesName,
+                    season: entry.season,
+                    episode: entry.episode,
+                });
+                return true;
+            } catch (error) {
+                console.warn('[WebRemoteBridge] transferência não registrada:', error);
+                return false;
+            }
+        };
+        const consume = (ids: string[]) => {
+            if (ids.length === 0) return;
+            void window.ipcRenderer.invoke('transfer:consume', { ids }).catch(() => undefined);
+        };
+
+        const onReceived = (_event: unknown, payload: TransferEntry) => {
+            void register(payload).then(ok => { if (ok && payload.id) consume([payload.id]); });
         };
         window.ipcRenderer.on('transfer:received', onReceived);
+
+        void (async () => {
+            const res = await window.ipcRenderer.invoke('transfer:pending').catch(() => null) as
+                { success: boolean; items?: TransferEntry[] } | null;
+            const done: string[] = [];
+            for (const entry of res?.items ?? []) {
+                if (await register(entry) && entry.id) done.push(entry.id);
+            }
+            consume(done);
+        })();
+
         return () => { window.ipcRenderer.off('transfer:received', onReceived); };
     }, []);
 
@@ -534,16 +582,16 @@ export function WebRemoteBridge() {
             return map;
         };
         const applyRemoteProgress = async (raw: unknown) => {
-            const report = (raw ?? {}) as { kind?: string; movieId?: string; title?: string; season?: number; episode?: number; positionSec?: number; durationSec?: number; updatedAt?: number };
+            const report = (raw ?? {}) as { kind?: string; movieId?: string; title?: string; season?: number; episode?: number; positionSec?: number; durationSec?: number; updatedAt?: number; profile?: string };
             const positionSec = Number(report.positionSec), durationSec = Number(report.durationSec), updatedAt = Number(report.updatedAt);
             if (!Number.isFinite(positionSec) || !(durationSec > 0) || !Number.isFinite(updatedAt)) return;
+            // Identidade de perfil e desempate vivem no progressSyncService — a
+            // mesma regra que o app do celular aplica no sentido contrário.
+            const sample = { positionSec, durationSec, updatedAt, profile: report.profile };
             applyingRemoteProgress = true;
             try {
                 if (report.kind === 'movie' && report.movieId) {
-                    // LWW: só aplica se a amostra do celular for mais nova que a local.
-                    const local = movieProgressService.getMoviePositionById(report.movieId);
-                    if (local && local.watchedAt >= updatedAt) return;
-                    movieProgressService.saveMovieTime(report.movieId, String(report.title ?? ''), positionSec, durationSec);
+                    applyRemoteMovieProgress(report.movieId, String(report.title ?? ''), sample);
                 } else if (report.kind === 'episode' && report.title && Number.isInteger(report.season) && Number.isInteger(report.episode)) {
                     const names = await loadSeriesNames();
                     const wanted = String(report.title).trim().toLowerCase();
@@ -552,12 +600,7 @@ export function WebRemoteBridge() {
                         if (name.trim().toLowerCase() === wanted) { seriesId = id; break; }
                     }
                     if (!seriesId) return; // série fora do catálogo local — o Trakt cobre.
-                    const local = watchProgressService.getEpisodeProgress(seriesId, report.season!, report.episode!);
-                    if (local && local.duration > 0 && local.currentTime > 0) {
-                        // Sem watchedAt exposto aqui: "maior progresso vence" resolve o empate.
-                        if (local.currentTime >= positionSec) return;
-                    }
-                    watchProgressService.saveVideoTime(seriesId, report.season!, report.episode!, positionSec, durationSec);
+                    applyRemoteEpisodeProgress(seriesId, report.season!, report.episode!, sample);
                 }
             } finally {
                 applyingRemoteProgress = false;
@@ -577,13 +620,14 @@ export function WebRemoteBridge() {
             if (applyingRemoteProgress) return; // eco do que o celular acabou de mandar
             const detail = (event as CustomEvent).detail as { kind?: string; movieId?: string; title?: string; seriesId?: string; season?: number; episode?: number; positionSec?: number; durationSec?: number; updatedAt?: number } | undefined;
             if (!detail) return;
+            const profile = localProfileTag();
             if (detail.kind === 'movie') {
-                sendProgress({ kind: 'movie', movieId: detail.movieId, title: detail.title, positionSec: detail.positionSec, durationSec: detail.durationSec, updatedAt: detail.updatedAt });
+                sendProgress({ kind: 'movie', movieId: detail.movieId, title: detail.title, positionSec: detail.positionSec, durationSec: detail.durationSec, updatedAt: detail.updatedAt, profile });
             } else if (detail.kind === 'episode' && detail.seriesId) {
                 void loadSeriesNames().then(names => {
                     const seriesName = names.get(String(detail.seriesId));
                     if (!seriesName) return;
-                    sendProgress({ kind: 'episode', title: seriesName, season: detail.season, episode: detail.episode, positionSec: detail.positionSec, durationSec: detail.durationSec, updatedAt: detail.updatedAt });
+                    sendProgress({ kind: 'episode', title: seriesName, season: detail.season, episode: detail.episode, positionSec: detail.positionSec, durationSec: detail.durationSec, updatedAt: detail.updatedAt, profile });
                 });
             }
         };

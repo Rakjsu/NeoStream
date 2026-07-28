@@ -352,6 +352,7 @@
   },
   "network": {
     "devicesDisconnect": "Disconnect",
+    "devicesOutdated": "outdated app",
     "historyTitle": "Connection history",
     "webRemoteTitle": "Phone remote",
     "webRemoteDesc": "Opens a remote in your phone's browser (same Wi-Fi) with play/pause, volume and skip",
@@ -362,7 +363,7 @@
     "devicesTitle": "Connected devices",
     "devicesEmpty": "No device connected right now.",
     "webRemoteHttps": "Encrypted connection (HTTPS)",
-    "webRemoteHttpsHint": "Uses a self-signed certificate: your phone shows a one-time security warning — just accept it. Encrypts traffic on the local network.",
+    "webRemoteHttpsHint": "Uses a self-signed certificate: your phone browser shows a one-time security warning — just accept it. Encrypts traffic on the local network. ⚠️ The NeoStream phone APP does not accept that certificate — with HTTPS on, sending downloads to the PC and QR pairing stop working.",
     "webRemoteNewPin": "New PIN"
   },
   "welcome": {
@@ -784,7 +785,14 @@
     "episode": "Episode",
     "minutes": "min",
     "hours": "h",
-    "expand": "Expand"
+    "expand": "Expand",
+    "sentToPhone": "📱 Sent to the phone ✓",
+    "noPhoneConnected": "No phone connected to the remote",
+    "phoneSentNoAck": "📱 Sent — the phone app is outdated (no confirmation)",
+    "phoneNoAnswer": "📱 Sent, but the phone did not answer",
+    "phoneLocked": "🔒 The phone app is locked — unlock it to play",
+    "phoneBlocked": "🚸 Blocked by the phone's parental control",
+    "phoneNotFound": "Content not found on the phone's account"
   },
   "player": {
     "qrHandoff": "Continue on phone",

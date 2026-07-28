@@ -320,6 +320,7 @@
   },
   "network": {
     "devicesDisconnect": "Desconectar",
+    "devicesOutdated": "app desactualizada",
     "historyTitle": "Historial de conexiones",
     "webRemoteTitle": "Control por el móvil",
     "webRemoteDesc": "Abre un mando en el navegador del móvil (misma Wi-Fi) con play/pausa, volumen y saltar",
@@ -330,7 +331,7 @@
     "devicesTitle": "Dispositivos conectados",
     "devicesEmpty": "Ningún dispositivo conectado ahora.",
     "webRemoteHttps": "Conexión cifrada (HTTPS)",
-    "webRemoteHttpsHint": "Usa un certificado propio: el móvil muestra un aviso de seguridad una vez, solo acéptalo. Cifra el tráfico en la red local.",
+    "webRemoteHttpsHint": "Usa un certificado propio: el navegador del móvil muestra un aviso de seguridad una vez, solo acéptalo. Cifra el tráfico en la red local. ⚠️ La APP NeoStream del móvil no acepta ese certificado — con HTTPS activado, enviar descargas al PC y el emparejamiento por QR dejan de funcionar.",
     "webRemoteNewPin": "Nuevo PIN"
   },
   "welcome": {
@@ -784,7 +785,14 @@
     "episode": "Episodio",
     "minutes": "min",
     "hours": "h",
-    "expand": "Expandir"
+    "expand": "Expandir",
+    "sentToPhone": "📱 Enviado al celular ✓",
+    "noPhoneConnected": "Ningún celular conectado al control",
+    "phoneSentNoAck": "📱 Enviado — la app del celular está desactualizada (sin confirmación)",
+    "phoneNoAnswer": "📱 Enviado, pero el celular no respondió",
+    "phoneLocked": "🔒 La app del celular está bloqueada — desbloquéala para reproducir",
+    "phoneBlocked": "🚸 Bloqueado por el control parental del celular",
+    "phoneNotFound": "Contenido no encontrado en la cuenta del celular"
   },
   "player": {
     "qrHandoff": "Continuar en el móvil",

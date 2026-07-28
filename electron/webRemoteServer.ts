@@ -33,10 +33,20 @@ import {
     type PinGateEntry,
     type NetAddress,
     parseProgressReport,
+    parseMobileHello,
+    buildDesktopHello,
+    parsePushAck,
+    isOutdatedMobile,
+    markMobileInHistory,
+    MIN_MOBILE_APP_VERSION,
+    type MobileHello,
+    type PushAckStatus,
 } from './webRemoteProtocol'
 import { renderRemotePage, type RemoteAccent } from './webRemotePage'
 import { buildSetupDeepLink, renderSetupHandoffPage } from './setupPayload'
-import { parseTransferQuery } from './transferReceiver'
+import { parseTransferQuery, transferEntryId, transferSizeVerdict, uniqueTransferName } from './transferReceiver'
+import { recordReceivedTransfer, transfersDir } from './transferHandlers'
+import { resolveSessionPin } from './webRemotePin'
 import { exportPlaylistsForSetup, getActivePlaylistIdPublic } from './playlistManager'
 import { REMOTE_ICON_SVG, buildManifest, solidPng } from './webRemoteAssets'
 import { isCastSessionActive, castRemoteControl, getCastStatus } from './castHandlers'
@@ -49,6 +59,14 @@ interface WebRemoteConfig {
     enabled: boolean
     /** Opt-in: serve over HTTPS/wss with a self-signed cert (phone accepts once). */
     https: boolean
+    /**
+     * PIN do pareamento, persistido entre sessões. Regenerar a cada start
+     * invalidava o código salvo no celular a cada restart do PC: o app
+     * re-tentava o WS com o PIN velho a cada 15s, caía no lockout por IP e o
+     * POST /transfer respondia 429 — que o celular mostrava como "falha de
+     * rede". Revogar continua manual, pelo botão de gerar novo PIN.
+     */
+    pin: string
 }
 
 interface ConnectionEvent {
@@ -79,6 +97,11 @@ interface ClientSocket {
     /** 'mobile' quando o cliente é o app NeoStream Mobile (não a página do navegador). */
     role?: 'mobile'
     name?: string
+    /** 0 = app sem hello versionado (APK ≤ v0.20.0): nada é negociado. */
+    protocolVersion?: number
+    appVersion?: string
+    /** O que o app anunciou saber fazer — vazio no app legado. */
+    capabilities?: Set<string>
 }
 
 interface GuideChannel {
@@ -125,7 +148,12 @@ function newPin(): string {
 }
 
 function getConfig(): WebRemoteConfig {
-    return { enabled: false, https: false, ...(store.get('webRemote') as Partial<WebRemoteConfig> | undefined) }
+    return { enabled: false, https: false, pin: '', ...(store.get('webRemote') as Partial<WebRemoteConfig> | undefined) }
+}
+
+/** Grava o PIN em uso (sem mexer no resto da config). */
+function persistPin(pin: string): void {
+    store.set('webRemote', { ...getConfig(), pin })
 }
 
 /** The LAN URL of the running server (http/https), or null when stopped. */
@@ -206,6 +234,63 @@ function sendToMobileClients(text: string): number {
     return delivered
 }
 
+// 📡 Handshake: o app se identifica com versão + capacidades e o desktop
+// responde com as dele. Sem esses campos o cliente é LEGADO — segue valendo o
+// comportamento antigo (entrega sem confirmação, sync no escuro).
+function applyMobileHello(client: ClientSocket, hello: MobileHello): void {
+    // 🔐 O helloMobile é a ÚNICA coisa que separa "app" de "página": registra
+    // quando um segundo cliente assume o papel (recebe progresso e os pushes).
+    const other = [...clients].find(c => c !== client && c.role === 'mobile')
+    if (other) {
+        log.warn(`[WebRemote] segundo cliente assumiu o papel de celular: ${hello.name} (${client.ip}) — já havia ${other.name ?? '?'} (${other.ip})`)
+    }
+    client.role = 'mobile'
+    client.name = hello.name
+    client.protocolVersion = hello.protocolVersion
+    client.appVersion = hello.appVersion
+    client.capabilities = new Set(hello.capabilities)
+    const history = (store.get('connectionHistory') as ConnectionEvent[] | undefined) ?? []
+    store.set('connectionHistory', markMobileInHistory(history, client.ip ?? '?', hello.name))
+    log.info(`[WebRemote] app mobile conectado: ${hello.name} (v${hello.appVersion || '?'}, protocolo v${hello.protocolVersion})`)
+    if (isOutdatedMobile(hello.appVersion)) {
+        log.warn(`[WebRemote] app do celular desatualizado (mínimo ${MIN_MOBILE_APP_VERSION}) — sem os gates de tranca/parental no push`)
+    }
+    try {
+        client.socket.write(encodeTextFrame(buildDesktopHello(app.getVersion())))
+    } catch { /* dropado na próxima leitura */ }
+}
+
+// ⏳ Pushes de reprodução aguardando o ACK do app (só quem anuncia 'pushAck').
+// O timeout SEMPRE resolve — um app que não responde nunca trava o botão.
+const PUSH_ACK_TIMEOUT_MS = 3000
+const pendingPushes = new Map<string, (status: PushAckStatus) => void>()
+
+type PushOutcome = PushAckStatus | 'delivered' | 'timeout' | 'none'
+
+/**
+ * Entrega um push pros celulares pareados. Com o peer anunciando 'pushAck',
+ * resolve com o desfecho real (o app pode descartar por tranca/parental/canal
+ * inexistente); sem isso, resolve na hora com o comportamento antigo.
+ */
+function pushToMobile(message: Record<string, unknown>): Promise<{ delivered: number; status: PushOutcome }> {
+    const pushId = crypto.randomUUID().slice(0, 8)
+    const waits = [...clients].some(c => c.role === 'mobile' && c.capabilities?.has('pushAck'))
+    const delivered = sendToMobileClients(JSON.stringify({ ...message, pushId }))
+    if (delivered === 0) return Promise.resolve({ delivered: 0, status: 'none' })
+    if (!waits) return Promise.resolve({ delivered, status: 'delivered' })
+    return new Promise(resolve => {
+        const timer = setTimeout(() => {
+            pendingPushes.delete(pushId)
+            resolve({ delivered, status: 'timeout' })
+        }, PUSH_ACK_TIMEOUT_MS)
+        pendingPushes.set(pushId, (status) => {
+            clearTimeout(timer)
+            pendingPushes.delete(pushId)
+            resolve({ delivered, status })
+        })
+    })
+}
+
 /** Sanitize the untrusted guide payload coming from the renderer. */
 function sanitizeGuide(raw: unknown): GuideState {
     const obj = (raw ?? {}) as Record<string, unknown>
@@ -282,15 +367,19 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
                     // Hello do app mobile: marca o cliente como app — vira o
                     // alvo do "enviar pro celular" (a página do navegador não).
                     if (frame.text.includes('helloMobile')) {
-                        try {
-                            const hello = JSON.parse(frame.text) as { action?: unknown; name?: unknown } | null
-                            if (hello?.action === 'helloMobile') {
-                                client.role = 'mobile'
-                                client.name = typeof hello.name === 'string' ? hello.name.slice(0, 40) : 'celular'
-                                log.info('[WebRemote] app mobile conectado:', client.name)
-                                continue
-                            }
-                        } catch { /* não era o hello — segue o parse normal */ }
+                        const hello = parseMobileHello(frame.text)
+                        if (hello) {
+                            applyMobileHello(client, hello)
+                            continue
+                        }
+                    }
+                    // ✅ ACK de um push de reprodução: solta quem espera o desfecho.
+                    if (frame.text.includes('pushResult')) {
+                        const ack = parsePushAck(frame.text)
+                        if (ack) {
+                            pendingPushes.get(ack.pushId)?.(ack.status)
+                            continue
+                        }
                     }
                     const command = parseRemoteCommand(frame.text)
                     if (command) forwardCommand(command)
@@ -536,18 +625,20 @@ export function setupWebRemote(): void {
     // 📱 "Enviar pro celular": empurra um canal pro app NeoStream Mobile
     // conectado neste servidor (o app dá play com a conta dele).
     // 📱 Manda um VOD/episódio pro app do celular pareado tocar.
-    ipcMain.handle('web-remote:play-vod-on-mobile', (_e, data: { kind?: string; sid?: string; container?: string; name?: string }) => {
+    ipcMain.handle('web-remote:play-vod-on-mobile', async (_e, data: { kind?: string; sid?: string; container?: string; name?: string }) => {
         const kind = data?.kind === 'series' ? 'series' : 'movie'
         const sid = String(data?.sid ?? '').trim()
         if (!sid) return { success: false, error: 'sid ausente' }
-        const count = sendToMobileClients(JSON.stringify({
+        const { delivered, status } = await pushToMobile({
             type: 'playVodOnMobile',
             kind,
             sid,
             container: String(data?.container ?? 'mp4'),
             name: String(data?.name ?? ''),
-        }))
-        return { success: count > 0, count }
+        })
+        // success só é verdade quando o app confirmou (ou é um app legado, que
+        // nunca confirma): tranca/parental/conteúdo ausente viram falha honesta.
+        return { success: status === 'played' || status === 'delivered', count: delivered, delivered, status }
     })
 
     // 🔄 Item 11: amostra de progresso local do renderer → celulares pareados.
@@ -566,15 +657,15 @@ export function setupWebRemote(): void {
         return { success: count > 0, count }
     })
 
-    ipcMain.handle('web-remote:play-on-mobile', (_e, raw: unknown) => {
+    ipcMain.handle('web-remote:play-on-mobile', async (_e, raw: unknown) => {
         const data = raw as { streamId?: unknown; name?: unknown } | null
-        if (!data || data.streamId === undefined) return { success: false, delivered: 0 }
-        const delivered = sendToMobileClients(JSON.stringify({
+        if (!data || data.streamId === undefined) return { success: false, delivered: 0, status: 'none' }
+        const { delivered, status } = await pushToMobile({
             type: 'playOnMobile',
             streamId: String(data.streamId),
             name: typeof data.name === 'string' ? data.name.slice(0, 120) : '',
-        }))
-        return { success: true, delivered }
+        })
+        return { success: status === 'played' || status === 'delivered', delivered, status }
     })
 
     ipcMain.on('web-remote:guide', (_e, raw: unknown) => {
@@ -619,6 +710,10 @@ export function setupWebRemote(): void {
             name: c.name ?? null,
             role: c.role ?? 'browser',
             connectedAt: c.connectedAt ?? 0,
+            // 📱 App sem versão no hello (ou abaixo do mínimo) roda sem os
+            // gates de tranca/parental: o painel avisa pra atualizar.
+            appVersion: c.appVersion ?? '',
+            outdated: c.role === 'mobile' && isOutdatedMobile(c.appVersion ?? ''),
         })),
     }))
 
@@ -863,7 +958,7 @@ export function setupWebRemote(): void {
         const current = getConfig()
         const enabled = opts?.enabled ?? current.enabled
         const useHttps = opts?.https ?? current.https
-        store.set('webRemote', { enabled, https: useHttps })
+        store.set('webRemote', { ...current, enabled, https: useHttps })
         // Restart so an https toggle (or on/off) takes effect immediately.
         stop()
         if (enabled) await start()
@@ -881,6 +976,7 @@ export function setupWebRemote(): void {
     ipcMain.handle('web-remote:regen-pin', () => {
         if (!serverPort) return { success: false, error: 'Controle desativado' }
         sessionPin = newPin()
+        persistPin(sessionPin)
         pinGate.clear()
         for (const client of clients) client.socket.destroy()
         clients.clear()
@@ -892,9 +988,25 @@ export function setupWebRemote(): void {
     log.info('[WebRemote] initialized')
 }
 
+// Uploads em andamento (caminho absoluto). Dois envios simultâneos do mesmo
+// título entrelaçavam escritas no MESMO arquivo — cada um ganha o seu.
+const inFlightTransfers = new Set<string>()
+
+/** Bytes livres na partição do destino, ou null quando o SO não informa. */
+function freeDiskBytes(dir: string): number | null {
+    try {
+        const stats = fs.statfsSync(dir)
+        return stats.bavail * stats.bsize
+    } catch {
+        return null
+    }
+}
+
 function start(): Promise<void> {
     if (server) return Promise.resolve()
-    sessionPin = newPin()
+    const resolved = resolveSessionPin(getConfig().pin, newPin)
+    sessionPin = resolved.pin
+    if (resolved.persist) persistPin(sessionPin)
     serverSecure = getConfig().https
     const handler = (req: http.IncomingMessage, res: http.ServerResponse) => {
         if (req.method === 'POST' && req.url && req.url.startsWith('/transfer?')) {
@@ -922,22 +1034,50 @@ function start(): Promise<void> {
                 return
             }
             pinGate.delete(ip)
-            const dir = path.join(app.getPath('userData'), 'downloads', 'transfers')
+            const dir = transfersDir()
             try { fs.mkdirSync(dir, { recursive: true }) } catch { /* já existe */ }
-            const target = path.join(dir, parsed.name)
+            // 🚦 Corpo era aceito sem teto nem checagem de espaço: dava pra
+            // encher o disco do PC. Content-Length decide antes do pipe.
+            const verdict = transferSizeVerdict(req.headers['content-length'], freeDiskBytes(dir))
+            if (verdict !== 'ok') {
+                const status = verdict === 'too-large' ? 413 : verdict === 'no-space' ? 507 : 400
+                log.warn(`[WebRemote] /transfer recusado (${verdict}): ${parsed.name}`)
+                res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' })
+                res.end(verdict)
+                return
+            }
+            // Nome único: o app monta o nome só do título, então reenvio ou
+            // homônimo caíam no MESMO arquivo (createWriteStream trunca) e
+            // apagar uma entrada deixava a outra sem mídia.
+            const name = uniqueTransferName(parsed.name, candidate =>
+                inFlightTransfers.has(path.join(dir, candidate)) || fs.existsSync(path.join(dir, candidate)))
+            const target = path.join(dir, name)
+            // Rede de segurança do saneamento: nada pode escapar da pasta.
+            if (path.dirname(path.resolve(target)) !== path.resolve(dir)) {
+                res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' })
+                res.end('bad request')
+                return
+            }
+            inFlightTransfers.add(target)
+            const expected = Number(req.headers['content-length'])
             const out = fs.createWriteStream(target)
             let failed = false
             const fail = (status: number, message: string) => {
                 if (failed) return
                 failed = true
+                inFlightTransfers.delete(target)
                 out.destroy()
                 try { fs.unlinkSync(target) } catch { /* nunca chegou a existir */ }
                 if (!res.headersSent) res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' })
                 res.end(message)
             }
             req.on('error', () => fail(500, 'upload aborted'))
+            // Conexão que morre sem 'error' nem 'finish' deixaria o nome
+            // travado no Set até o próximo start do servidor.
+            req.on('close', () => inFlightTransfers.delete(target))
             out.on('error', () => fail(500, 'write failed'))
             out.on('finish', () => {
+                inFlightTransfers.delete(target)
                 if (failed) return
                 let size = 0
                 try { size = fs.statSync(target).size } catch { /* stat falhou; segue 0 */ }
@@ -945,14 +1085,30 @@ function start(): Promise<void> {
                     fail(400, 'empty upload')
                     return
                 }
-                log.info(`[WebRemote] transfer recebido: ${parsed.name} (${size} bytes)`)
-                const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
-                win?.webContents.send('transfer:received', {
+                // Conexão cortada no meio fechava o stream com um arquivo
+                // truncado que virava download "concluído" na biblioteca.
+                if (Number.isInteger(expected) && expected > 0 && size !== expected) {
+                    fail(400, 'incomplete upload')
+                    return
+                }
+                log.info(`[WebRemote] transfer recebido: ${name} (${size} bytes)`)
+                const entry = {
+                    id: transferEntryId(target),
                     kind: parsed.kind,
                     title: parsed.title,
+                    seriesName: parsed.seriesName,
+                    season: parsed.season,
+                    episode: parsed.episode,
                     filePath: target,
                     size,
-                })
+                    receivedAt: Date.now(),
+                }
+                // Manifest ANTES do 200: o send abaixo é fire-and-forget e some
+                // se o renderer estiver recarregando — o arquivo virava órfão
+                // com o celular reportando sucesso. O bridge reconcilia ao montar.
+                recordReceivedTransfer(entry)
+                const win = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
+                win?.webContents.send('transfer:received', entry)
                 res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' })
                 res.end('ok')
             })
@@ -987,7 +1143,15 @@ function start(): Promise<void> {
         if (req.url === '/health') {
             // 🩺 Health-check leve (sem dados sensíveis): monitoração/diagnóstico na LAN.
             res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
-            res.end(JSON.stringify({ ok: true, app: 'neostream-remote', uptimeSeconds: Math.round(process.uptime()) }))
+            // `version`/`features`: o app do celular usa pra dizer "atualize o
+            // desktop" em vez de "falha de rede" quando falta um endpoint.
+            res.end(JSON.stringify({
+                ok: true,
+                app: 'neostream-remote',
+                uptimeSeconds: Math.round(process.uptime()),
+                version: app.getVersion(),
+                features: ['transfer', 'setup'],
+            }))
             return
         }
         if (req.url === '/' || req.url === '/index.html') {

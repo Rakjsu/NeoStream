@@ -24,6 +24,7 @@ import { ChannelHoverMiniGuide } from '../components/ChannelHoverMiniGuide';
 import { isReplayable, isRestartable, replayDurationMinutes } from '../utils/epgGuide';
 import { getTimeshiftUrl } from '../services/timeshiftService';
 import { resolveRemoteChannel } from '../services/webRemoteTune';
+import { mobilePushMessageKey } from '../utils/mobilePushResult';
 
 import { asList } from '../utils/catalogPayload';
 
@@ -1627,10 +1628,8 @@ export function LiveTV() {
                                             void window.ipcRenderer.invoke('web-remote:play-on-mobile', {
                                                 streamId: selectedChannel.stream_id,
                                                 name: selectedChannel.name
-                                            }).then((result: { success?: boolean; delivered?: number }) => {
-                                                setSendMobileMsg((result?.delivered ?? 0) > 0
-                                                    ? t('liveTV', 'sentToPhone')
-                                                    : t('liveTV', 'noPhoneConnected'));
+                                            }).then((result: { success?: boolean; delivered?: number; status?: string }) => {
+                                                setSendMobileMsg(t('common', mobilePushMessageKey(result)));
                                                 setTimeout(() => setSendMobileMsg(''), 4000);
                                             }).catch(() => undefined);
                                         }}
