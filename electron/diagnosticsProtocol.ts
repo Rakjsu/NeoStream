@@ -3,12 +3,13 @@
  * no fs, no network, no state. The side-effectful parts (reading main.log,
  * showSaveDialog, writeFile, shell.openPath) live in diagnosticsHandlers.ts.
  *
- * Two pure functions are unit-tested here:
- *   - redactSecrets(text): masks obvious credentials that may have leaked into
- *     logs (username=/password= query params, "password":"..." JSON).
- *   - buildReportText({...}): assembles the human-readable .txt report. The
- *     log tail and breadcrumbs are redacted before being embedded.
+ * A redação de credenciais vive em logRedaction.ts (é a mesma usada pelo
+ * transporte de arquivo do electron-log — um redator só, um comportamento só) e
+ * é reexportada aqui pra não quebrar quem já importava daqui.
  */
+import { redactSecrets } from './logRedaction'
+
+export { redactSecrets }
 
 export interface ReportSystemInfo {
     platform: string
@@ -31,26 +32,6 @@ export interface BuildReportInput {
     breadcrumbs?: string
     /** Tail of main.log (already truncated to the size budget). */
     logTail?: string
-}
-
-/**
- * Masks obvious secrets that may appear in the assembled report text:
- *   - `username=<v>` / `password=<v>` query-string params → value replaced.
- *   - `"password":"<v>"` JSON fields → value replaced.
- *
- * Conservative on purpose: only touches well-known credential shapes so the
- * report stays useful for debugging.
- */
-export function redactSecrets(text: string): string {
-    if (!text) return text
-
-    return text
-        // username= / password= in URLs or query strings. Value runs until the
-        // next & or whitespace (so we don't eat the rest of the line/URL).
-        .replace(/\b(username|password)=([^&\s"']*)/gi, '$1=***REDACTED***')
-        // "password":"..." (and 'password':'...') JSON-ish fields. Tolerates
-        // spaces around the colon.
-        .replace(/(["']password["']\s*:\s*)["']([^"']*)["']/gi, '$1"***REDACTED***"')
 }
 
 /**
