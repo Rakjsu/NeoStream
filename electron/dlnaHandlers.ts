@@ -33,6 +33,7 @@ import {
     rewritePlaylistUris,
 } from './dlnaProtocol';
 import { planDlnaCommand, clampVolume, stepVolume, muteTarget, type DlnaStatusRaw } from './dlnaRemoteRouting';
+import { isAllowedHost } from './localServerGuard';
 import {
     MAX_PROXY_REDIRECTS,
     canAcceptTranscode,
@@ -368,6 +369,18 @@ async function ensureProxyServer(): Promise<number> {
 
     proxyServer = http.createServer(async (request, response) => {
         try {
+            // 🛡️ O proxy escuta em 0.0.0.0 e a TV/Chromecast sempre chega por IP
+            // literal (é o endereço que vai no SetAVTransportURI). Um Host de
+            // domínio só pode ser página que rebindou o DNS pra cá — recusa
+            // antes de tocar em qualquer token. Origin NÃO é checado de
+            // propósito: o receiver do Chromecast busca a legenda de uma origem
+            // do Google, e barrá-lo mataria a legenda no cast.
+            if (!isAllowedHost(request.headers.host, proxyPort)) {
+                log.warn(`[DLNA] Proxy recusou Host suspeito: ${request.headers.host}`)
+                response.writeHead(421)
+                response.end()
+                return
+            }
             const requestUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
 
             // Chromecast subtitle route: raw WebVTT (Cast wants text/vtt).

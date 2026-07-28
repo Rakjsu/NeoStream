@@ -17,6 +17,7 @@ import path from 'node:path'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import log from './logger'
+import { isAppOwnOrigin } from './localServerGuard'
 import {
     buildTranscodeArgs,
     isPlaylistReady,
@@ -59,6 +60,15 @@ function ensureServer(): Promise<number> {
     return new Promise((resolve, reject) => {
         const root = transcodeRoot()
         server = http.createServer((req, res) => {
+            // 🛡️ Estar preso ao 127.0.0.1 não exclui o navegador do dono — ele
+            // alcança o loopback. Era o wildcard de CORS abaixo que deixava uma
+            // aba qualquer LER o vídeo em resgate depois de varrer as portas.
+            if (!isAppOwnOrigin(req.headers.origin, process.env['VITE_DEV_SERVER_URL'])) {
+                log.warn('[Transcode] origem recusada:', req.headers.origin)
+                res.writeHead(403)
+                res.end()
+                return
+            }
             const target = safeJoinTranscodePath(root, (req.url ?? '').split('?')[0])
             if (!target || !fs.existsSync(target)) {
                 res.writeHead(404)
@@ -68,7 +78,10 @@ function ensureServer(): Promise<number> {
             res.writeHead(200, {
                 'Content-Type': contentTypeFor(target),
                 'Cache-Control': 'no-store',
-                'Access-Control-Allow-Origin': '*'
+                // Necessário pro hls.js do renderer empacotado (file:// tem
+                // origem opaca); quem não é o app já foi recusado acima.
+                'Access-Control-Allow-Origin': '*',
+                'Vary': 'Origin'
             })
             fs.createReadStream(target).pipe(res)
         })
@@ -98,6 +111,9 @@ async function startSession(sourceUrl: string, variant: TranscodeVariant): Promi
     const ffmpeg = resolveFfmpegPath()
     if (!ffmpeg) return null
 
+    // O id é o único segredo do caminho servido no loopback: derivá-lo do
+    // relógio (`t` + Date.now()) deixava uma página adivinhá-lo, porque ela
+    // conhece o mesmo relógio com precisão de milissegundos.
     const id = newTranscodeSessionId()
     const dir = path.join(transcodeRoot(), id)
     await fsp.mkdir(dir, { recursive: true })
