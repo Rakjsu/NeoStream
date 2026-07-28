@@ -391,8 +391,13 @@ async function ensureProxyServer(): Promise<number> {
 
             const upstreamResponse = await fetchUpstream(upstreamUrl, request.headers.range)
             if (!upstreamResponse.ok && upstreamResponse.status !== 206) {
+                // O corpo de erro do provedor costuma ecoar o caminho da
+                // requisição — que no Xtream é /movie/USUARIO/SENHA/…. O proxy
+                // escuta em 0.0.0.0, então quem tem o token teria a credencial
+                // de graça. Detalhe só no log (redigido pelo transporte).
+                log.warn(`[DLNA] Proxy upstream ${upstreamResponse.status}:`, (await upstreamResponse.text()).slice(0, 300))
                 response.writeHead(upstreamResponse.status)
-                response.end(await upstreamResponse.text())
+                response.end('upstream error')
                 return
             }
 
@@ -433,8 +438,14 @@ async function ensureProxyServer(): Promise<number> {
             if (response.headersSent) {
                 response.destroy()
             } else {
-                response.writeHead(500)
-                response.end(getErrorMessage(error))
+                // Corpo FIXO: a FetchError do node-fetch é montada como
+                // "request to <URL COMPLETA> failed", e a URL upstream do Xtream
+                // carrega usuário e senha no caminho. Devolver a mensagem crua
+                // entregava a assinatura do dono a qualquer um na LAN que
+                // tivesse um token do proxy e forçasse o upstream a falhar.
+                log.warn('[DLNA] Proxy error:', getErrorMessage(error))
+                response.writeHead(502)
+                response.end('upstream error')
             }
         }
     })
