@@ -115,6 +115,8 @@ export interface SelfSignedResult {
     key: string
     /** PEM certificate. */
     cert: string
+    /** Epoch ms do notAfter — quem persiste o par usa isso para decidir a renovação. */
+    notAfter: number
 }
 
 /**
@@ -162,10 +164,74 @@ export function generateSelfSignedCert(
     const certPem = toPem(Buffer.from(certDer), 'CERTIFICATE')
     const keyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }) as string
 
-    return { key: keyPem, cert: certPem }
+    return { key: keyPem, cert: certPem, notAfter: notAfter.getTime() }
 }
 
 function toPem(der: Buffer, label: string): string {
     const b64 = der.toString('base64').replace(/(.{64})/g, '$1\n').trim()
     return `-----BEGIN ${label}-----\n${b64}\n-----END ${label}-----\n`
+}
+
+// ------------------------------------------------------- reaproveitamento --
+
+/** O que fica gravado em disco entre sessões (chave privada inclusa). */
+export interface StoredSelfSignedCert {
+    key: string
+    cert: string
+    /** Nomes cobertos pelo subjectAltName do cert gravado. */
+    altNames: string[]
+    /** Epoch ms do notAfter. */
+    notAfter: number
+}
+
+/** Renova com folga: um cert que vence amanhã já não serve para a próxima sessão. */
+export const CERT_RENEW_BEFORE_MS = 7 * 24 * 60 * 60 * 1000
+
+/** Teto de nomes acumulados — o cert cresce a cada rede nova, mas não sem fim. */
+export const CERT_MAX_ALT_NAMES = 8
+
+/**
+ * Decide se o par chave/cert já gravado pode ser reaproveitado.
+ *
+ * Gerar um cert novo a cada start é o que torna impossível confiar uma vez: o
+ * celular vê um certificado diferente toda sessão e o usuário aprende a aceitar
+ * qualquer um — inclusive o de um impostor na LAN. Reaproveitamos enquanto o
+ * cert existir, não estiver perto de vencer e o subjectAltName já cobrir os
+ * nomes desta sessão (o navegador valida o host pelo SAN, não pelo CN).
+ */
+export function shouldReuseStoredCert(
+    stored: Partial<StoredSelfSignedCert> | null | undefined,
+    now: number,
+    wantedAltNames: string[],
+    renewBeforeMs: number = CERT_RENEW_BEFORE_MS,
+): boolean {
+    if (!stored || typeof stored.key !== 'string' || typeof stored.cert !== 'string') return false
+    if (!stored.key.includes('PRIVATE KEY') || !stored.cert.includes('CERTIFICATE')) return false
+    if (typeof stored.notAfter !== 'number' || !Number.isFinite(stored.notAfter)) return false
+    if (stored.notAfter - now <= renewBeforeMs) return false
+
+    const covered = new Set((stored.altNames ?? []).map((name) => name.toLowerCase()))
+    return wantedAltNames.length > 0 && wantedAltNames.every((name) => covered.has(name.toLowerCase()))
+}
+
+/**
+ * Nomes do próximo cert: os desta sessão primeiro, depois os que o cert antigo
+ * já cobria. Assim voltar para uma rede conhecida (casa → trabalho → casa)
+ * reaproveita o mesmo certificado em vez de trocar a cada mudança de IP.
+ */
+export function mergeCertAltNames(
+    previous: string[] | undefined,
+    wanted: string[],
+    max: number = CERT_MAX_ALT_NAMES,
+): string[] {
+    const merged: string[] = []
+    const seen = new Set<string>()
+    for (const name of [...wanted, ...(previous ?? [])]) {
+        const key = name.toLowerCase()
+        if (!name || seen.has(key)) continue
+        seen.add(key)
+        merged.push(name)
+        if (merged.length >= max) break
+    }
+    return merged
 }

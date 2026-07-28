@@ -8,6 +8,11 @@ import {
     parseRemoteCommand,
     isPinLockedOut,
     registerPinFailure,
+    pinGateKey,
+    pinMatches,
+    PIN_GLOBAL_MAX_FAILS,
+    PIN_GLOBAL_LOCK_MS,
+    PIN_GLOBAL_DECAY_MS,
     PIN_MAX_FAILS,
     PIN_LOCK_MS,
     pickLanAddress,
@@ -319,7 +324,7 @@ describe('parseRemoteCommand', () => {
 describe('PIN lockout', () => {
     it('conta falhas e só bloqueia ao atingir o limite', () => {
         let entry = registerPinFailure(undefined, 1000)
-        expect(entry).toEqual({ fails: 1, lockedUntil: 0 })
+        expect(entry).toEqual({ fails: 1, lockedUntil: 0, lastFailAt: 1000 })
         for (let i = 2; i < PIN_MAX_FAILS; i++) {
             entry = registerPinFailure(entry, 1000)
             expect(entry.fails).toBe(i)
@@ -512,5 +517,77 @@ describe('partyAdd (item 40 — modo festa)', () => {
     it('rejeita movieId ausente ou não-string', () => {
         expect(parseRemoteCommand(JSON.stringify({ action: 'partyAdd' }))).toBeNull()
         expect(parseRemoteCommand(JSON.stringify({ action: 'partyAdd', movieId: 42 }))).toBeNull()
+    })
+})
+
+// 🔐 O PIN tem 4 dígitos: 10 mil combinações. O cooldown por IP é a única
+// coisa entre um vizinho de Wi-Fi e o `/setup`, que devolve usuário e senha de
+// todos os provedores.
+describe('gate de PIN — endereço e comparação', () => {
+    it('IPv4 mapeado em IPv6 é o MESMO cliente (senão a cota dobra de graça)', () => {
+        expect(pinGateKey('::ffff:192.168.0.5')).toBe(pinGateKey('192.168.0.5'))
+        expect(pinGateKey('::FFFF:192.168.0.5')).toBe('192.168.0.5')
+    })
+
+    it('endereço ausente cai num balde só, não em baldes distintos', () => {
+        expect(pinGateKey(undefined)).toBe(pinGateKey(''))
+        expect(pinGateKey('  ')).toBe('unknown')
+    })
+
+    it('IPs diferentes continuam separados', () => {
+        expect(pinGateKey('192.168.0.5')).not.toBe(pinGateKey('192.168.0.6'))
+    })
+
+    it('pinMatches aceita só o PIN exato', () => {
+        expect(pinMatches('1234', '1234')).toBe(true)
+        expect(pinMatches('1235', '1234')).toBe(false)
+        expect(pinMatches('123', '1234')).toBe(false)
+        expect(pinMatches('12345', '1234')).toBe(false)
+        expect(pinMatches('', '1234')).toBe(false)
+    })
+
+    it('PIN de sessão vazio nunca casa (servidor sem PIN não libera nada)', () => {
+        expect(pinMatches('', '')).toBe(false)
+        expect(pinMatches('0000', '')).toBe(false)
+    })
+
+    it('o teto GLOBAL fecha a multiplicação por vários endereços', () => {
+        // Cada IP tem 5 tentativas; quem controla um /64 de IPv6 teria uma cota
+        // por endereço. O contador global é o piso comum.
+        let global = { fails: 0, lockedUntil: 0 }
+        const agora = 1_000_000
+        for (let i = 0; i < PIN_GLOBAL_MAX_FAILS; i++) {
+            global = registerPinFailure(global, agora, PIN_GLOBAL_MAX_FAILS, PIN_GLOBAL_LOCK_MS)
+        }
+        expect(isPinLockedOut(global, agora)).toBe(true)
+        expect(isPinLockedOut(global, agora + PIN_GLOBAL_LOCK_MS + 1)).toBe(false)
+    })
+
+    it('o teto global é mais folgado que o por IP (uso legítimo não trava)', () => {
+        expect(PIN_GLOBAL_MAX_FAILS).toBeGreaterThan(PIN_MAX_FAILS)
+    })
+})
+
+describe('decaimento do contador global', () => {
+    it('falha velha nao conta: quem erra uma vez por hora nunca chega ao teto', () => {
+        const decay = PIN_GLOBAL_DECAY_MS
+        let e = registerPinFailure(undefined, 0, PIN_GLOBAL_MAX_FAILS, PIN_GLOBAL_LOCK_MS, decay)
+        expect(e.fails).toBe(1)
+        // Passou da janela: a contagem recomeca do 1, nao vai pra 2.
+        e = registerPinFailure(e, decay + 1, PIN_GLOBAL_MAX_FAILS, PIN_GLOBAL_LOCK_MS, decay)
+        expect(e.fails).toBe(1)
+    })
+
+    it('falhas dentro da janela continuam somando', () => {
+        const decay = PIN_GLOBAL_DECAY_MS
+        let e = registerPinFailure(undefined, 0, PIN_GLOBAL_MAX_FAILS, PIN_GLOBAL_LOCK_MS, decay)
+        e = registerPinFailure(e, 1000, PIN_GLOBAL_MAX_FAILS, PIN_GLOBAL_LOCK_MS, decay)
+        expect(e.fails).toBe(2)
+    })
+
+    it('sem decaimento o comportamento antigo continua (por IP)', () => {
+        let e = registerPinFailure(undefined, 0)
+        e = registerPinFailure(e, 99_999_999)
+        expect(e.fails).toBe(2)
     })
 })

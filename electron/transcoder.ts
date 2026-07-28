@@ -16,12 +16,12 @@ import http from 'node:http'
 import path from 'node:path'
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
-import { randomUUID } from 'node:crypto'
 import log from './logger'
 import { isAppOwnOrigin } from './localServerGuard'
 import {
     buildTranscodeArgs,
     isPlaylistReady,
+    newTranscodeSessionId,
     safeJoinTranscodePath,
     contentTypeFor,
     type TranscodeVariant
@@ -114,7 +114,7 @@ async function startSession(sourceUrl: string, variant: TranscodeVariant): Promi
     // O id é o único segredo do caminho servido no loopback: derivá-lo do
     // relógio (`t` + Date.now()) deixava uma página adivinhá-lo, porque ela
     // conhece o mesmo relógio com precisão de milissegundos.
-    const id = `t${randomUUID()}`
+    const id = newTranscodeSessionId()
     const dir = path.join(transcodeRoot(), id)
     await fsp.mkdir(dir, { recursive: true })
 
