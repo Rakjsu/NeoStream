@@ -26,7 +26,9 @@ export function PlaylistsSection() {
 
     // 🔗 Ecossistema: QR pro celular + importação do backup do mobile
     const [showQr, setShowQr] = useState(false);
-    const [remoteConfig, setRemoteConfig] = useState<{ enabled: boolean; url?: string; pin?: string } | null>(null);
+    // O QR carrega um token de uso único (não mais o PIN permanente): abrir
+    // este painel é o que libera a exportação das contas no controle web.
+    const [setupHandoff, setSetupHandoff] = useState<{ url: string; token: string } | null>(null);
     const [importingMobile, setImportingMobile] = useState(false);
     const [importMsg, setImportMsg] = useState('');
 
@@ -49,13 +51,13 @@ export function PlaylistsSection() {
     useEffect(() => {
         if (!showQr) return;
         let cancelled = false;
-        window.ipcRenderer.invoke('web-remote:get-config')
-            .then((config: { enabled?: boolean; url?: string; pin?: string }) => {
+        window.ipcRenderer.invoke('web-remote:arm-setup')
+            .then((res: { success?: boolean; url?: string | null; token?: string }) => {
                 if (cancelled) return;
-                setRemoteConfig({ enabled: config?.enabled === true, url: config?.url, pin: config?.pin });
+                setSetupHandoff(res?.success && res.url && res.token ? { url: res.url, token: res.token } : null);
             })
             .catch(() => {
-                if (!cancelled) setRemoteConfig({ enabled: false });
+                if (!cancelled) setSetupHandoff(null);
             });
         return () => { cancelled = true; };
     }, [showQr]);
@@ -368,8 +370,10 @@ export function PlaylistsSection() {
                     <p style={{ color: '#34d399', fontSize: 13, margin: '10px 2px 0' }}>{importMsg}</p>
                 )}
                 {showQr && (() => {
-                    const setupUrl = remoteConfig?.enabled && remoteConfig.url && remoteConfig.pin
-                        ? `${remoteConfig.url}/setup?pin=${remoteConfig.pin}`
+                    // A URL do controle vem com barra no fim: concatenar direto
+                    // gerava `//setup`, que o servidor não reconhece como rota.
+                    const setupUrl = setupHandoff
+                        ? `${setupHandoff.url.replace(/\/+$/, '')}/setup?t=${setupHandoff.token}`
                         : null;
                     let setupQr: string | null = null;
                     if (setupUrl) {

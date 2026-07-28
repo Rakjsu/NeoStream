@@ -31,6 +31,8 @@ import {
     parseRemoteCommand,
     isPinLockedOut,
     registerPinFailure,
+    admitClient,
+    isClientBufferOverflow,
     pickLanAddress,
     canDeliverTo,
     isPeerStale,
@@ -52,7 +54,13 @@ import {
     type PushAckStatus,
 } from './webRemoteProtocol'
 import { renderRemotePage, type RemoteAccent } from './webRemotePage'
-import { buildSetupDeepLink, renderSetupHandoffPage } from './setupPayload'
+import {
+    buildSetupDeepLink,
+    renderSetupHandoffPage,
+    isHandoffArmed,
+    matchesHandoffToken,
+    type SetupHandoffWindow,
+} from './setupPayload'
 import { parseTransferQuery, transferEntryId, transferSizeVerdict, uniqueTransferName } from './transferReceiver'
 import { recordReceivedTransfer, transfersDir } from './transferHandlers'
 import { resolveSessionPin } from './webRemotePin'
@@ -89,10 +97,30 @@ interface ConnectionEvent {
 const store = new Store<{ webRemote: WebRemoteConfig; connectionHistory: ConnectionEvent[] }>({ name: 'web-remote' })
 
 // 🕓 Item 14: histórico de conexões do controle (persistido, teto 50).
-function pushHistory(event: ConnectionEvent): void {
+//
+// Gravado com atraso: cada evento fazia um `store.set`, ou seja, uma reescrita
+// SÍNCRONA do JSON em disco por connect/disconnect. Um laço de reconexão virava
+// martelo de I/O no processo main. O buffer é esvaziado antes de qualquer
+// leitura do histórico e no stop(), então nada se perde no caminho normal.
+const HISTORY_FLUSH_MS = 1_000
+let historyBuffer: ConnectionEvent[] = []
+let historyTimer: NodeJS.Timeout | null = null
+
+function flushHistory(): void {
+    if (historyTimer) {
+        clearTimeout(historyTimer)
+        historyTimer = null
+    }
+    if (historyBuffer.length === 0) return
     const list = (store.get('connectionHistory') as ConnectionEvent[] | undefined) ?? []
-    list.push(event)
-    store.set('connectionHistory', list.slice(-50))
+    store.set('connectionHistory', [...list, ...historyBuffer].slice(-50))
+    historyBuffer = []
+}
+
+function pushHistory(event: ConnectionEvent): void {
+    historyBuffer.push(event)
+    if (historyBuffer.length > 50) historyBuffer = historyBuffer.slice(-50)
+    if (!historyTimer) historyTimer = setTimeout(flushHistory, HISTORY_FLUSH_MS)
 }
 
 interface ClientSocket {
@@ -153,6 +181,20 @@ let mediaState = { hasMedia: false, playing: false, title: '' }
 // channel, pushed by the LiveTV renderer while it's mounted. Null until the
 // user opens the TV ao vivo page (the phone shows a hint in the meantime).
 let guideState: GuideState | null = null
+
+// 🔐 Exportação de contas pelo /setup: só enquanto a tela de pareamento do
+// desktop estiver aberta. Rearmar prorroga o prazo SEM trocar o token — as
+// duas telas que armam (Playlists e Rede) não podem invalidar o QR uma da
+// outra. Consumido no primeiro uso, nos dois caminhos (token e PIN).
+const SETUP_WINDOW_MS = 5 * 60_000
+let setupHandoff: SetupHandoffWindow | null = null
+
+function armSetupHandoff(): SetupHandoffWindow {
+    const now = Date.now()
+    const token = isHandoffArmed(setupHandoff, now) ? setupHandoff!.token : crypto.randomBytes(12).toString('hex')
+    setupHandoff = { token, expiresAt: now + SETUP_WINDOW_MS }
+    return setupHandoff
+}
 
 /** Fresh 4-digit pairing PIN (regenerated each time the server starts). */
 function newPin(): string {
@@ -387,6 +429,15 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
     }
     // Correct PIN: clear any accumulated failures for this client.
     pinGate.delete(ip)
+    // Teto de conexões: PIN certo não pode significar sockets infinitos (cada
+    // um segura memória de remontagem e recebe todo broadcast).
+    const admission = admitClient([...clients].map(c => c.ip ?? 'unknown'), ip)
+    if (admission !== 'ok') {
+        log.warn(`[WebRemote] upgrade recusado (${admission}): ${ip}`)
+        socket.write('HTTP/1.1 503 Service Unavailable\r\n\r\n')
+        socket.destroy()
+        return
+    }
     socket.write(buildHandshakeResponse(key))
     const client: ClientSocket = { socket, buffer: new Uint8Array(0), pending: null, lastSeenAt: Date.now(), id: crypto.randomUUID(), ip, connectedAt: Date.now() }
     clients.add(client)
@@ -400,6 +451,13 @@ function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
         const glued = new Uint8Array(client.buffer.length + chunk.length)
         glued.set(client.buffer, 0)
         glued.set(chunk, client.buffer.length)
+        // Frame anunciado como gigante e gotejado byte a byte segurava memória
+        // do main sem nunca fechar: acima do teto o cliente cai.
+        if (isClientBufferOverflow(glued.length)) {
+            log.warn(`[WebRemote] buffer estourado, encerrando cliente: ${client.ip ?? '?'}`)
+            socket.destroy()
+            return
+        }
         try {
             const { frames, rest, pending } = decodeFrames(glued, client.pending)
             client.buffer = rest
@@ -800,10 +858,13 @@ export function setupWebRemote(): void {
         return { success: true }
     })
 
-    ipcMain.handle('web-remote:connection-history', () => ({
-        success: true,
-        history: (((store.get('connectionHistory') as ConnectionEvent[] | undefined) ?? []).slice().reverse().slice(0, 20)),
-    }))
+    ipcMain.handle('web-remote:connection-history', () => {
+        flushHistory() // o painel não pode mostrar um histórico atrasado
+        return {
+            success: true,
+            history: (((store.get('connectionHistory') as ConnectionEvent[] | undefined) ?? []).slice().reverse().slice(0, 20)),
+        }
+    })
 
     ipcMain.on('web-remote:reminders', (_e, raw: unknown) => {
         const payload = (raw ?? {}) as { items?: unknown }
@@ -1024,6 +1085,15 @@ export function setupWebRemote(): void {
         url: serverUrl(),
         pin: serverPort ? sessionPin : null,
     }))
+
+    // 🔐 A tela de pareamento do desktop libera a exportação de contas e leva
+    // um token de uso único pro QR. Enquanto ela estiver aberta o "parear com
+    // desktop" do app do celular (que manda o PIN) também passa.
+    ipcMain.handle('web-remote:arm-setup', () => {
+        if (!serverPort) return { success: false, error: 'Controle desativado' }
+        const armed = armSetupHandoff()
+        return { success: true, token: armed.token, url: serverUrl(), expiresAt: armed.expiresAt }
+    })
 
     ipcMain.handle('web-remote:set-enabled', async (_e, opts: { enabled?: boolean; https?: boolean }) => {
         const current = getConfig()
@@ -1262,24 +1332,48 @@ function start(): Promise<void> {
         // 🔗 Hand-off: page that bounces into the neostream://setup deep link
         // so the phone imports the desktop accounts by scanning the QR.
         if (req.url && req.url.startsWith('/setup')) {
-            // Mesmo anti brute-force do WebSocket: cooldown por IP no PIN.
             const ip = req.socket.remoteAddress || 'unknown'
             const now = Date.now()
-            if (isPinLockedOut(pinGate.get(ip), now)) {
-                res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8' })
-                res.end('Aguarde e tente de novo')
-                return
+            const query = new URL(req.url, 'http://local').searchParams
+            const token = query.get('t') || ''
+            if (token) {
+                // Caminho do QR: o token de uso único é a credencial inteira —
+                // o PIN permanente não vai mais impresso no código da tela.
+                if (!matchesHandoffToken(setupHandoff, token, now)) {
+                    log.warn(`[WebRemote] /setup com token inválido ou expirado: ${ip}`)
+                    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
+                    res.end('Link expirado — reabra "Levar pro celular" no PC')
+                    return
+                }
+            } else {
+                // Caminho do app do celular ("parear com desktop"): mesmo anti
+                // brute-force por IP do WebSocket.
+                if (isPinLockedOut(pinGate.get(ip), now)) {
+                    res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8' })
+                    res.end('Aguarde e tente de novo')
+                    return
+                }
+                const pin = query.get('pin') || ''
+                if (pin !== sessionPin) {
+                    const entry = registerPinFailure(pinGate.get(ip), now)
+                    pinGate.set(ip, entry)
+                    if (entry.lockedUntil > now) log.warn(`[WebRemote] PIN do /setup bloqueado por tentativas: ${ip}`)
+                    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
+                    res.end('PIN')
+                    return
+                }
+                pinGate.delete(ip)
+                // PIN certo ainda não basta pra levar as senhas de todas as
+                // playlists: o dono precisa estar na tela de pareamento.
+                if (!isHandoffArmed(setupHandoff, now)) {
+                    log.warn(`[WebRemote] /setup recusado (exportação não liberada no desktop): ${ip}`)
+                    res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
+                    res.end('Abra Configurações → Playlists → "Levar pro celular" no PC e tente de novo')
+                    return
+                }
             }
-            const pin = new URL(req.url, 'http://local').searchParams.get('pin') || ''
-            if (pin !== sessionPin) {
-                const entry = registerPinFailure(pinGate.get(ip), now)
-                pinGate.set(ip, entry)
-                if (entry.lockedUntil > now) log.warn(`[WebRemote] PIN do /setup bloqueado por tentativas: ${ip}`)
-                res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
-                res.end('PIN')
-                return
-            }
-            pinGate.delete(ip)
+            setupHandoff = null // uso único: um handoff, uma exportação
+            log.info(`[WebRemote] contas exportadas pelo /setup para ${ip}`)
             const link = buildSetupDeepLink(exportPlaylistsForSetup(), getActivePlaylistIdPublic())
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
             res.end(renderSetupHandoffPage(link, remoteLang))
@@ -1330,11 +1424,13 @@ function start(): Promise<void> {
 function stop(): void {
     for (const client of clients) client.socket.destroy()
     clients.clear()
+    flushHistory()
     server?.close()
     server = null
     serverPort = 0
     serverSecure = false
     sessionPin = ''
+    setupHandoff = null
     pinGate.clear()
 }
 

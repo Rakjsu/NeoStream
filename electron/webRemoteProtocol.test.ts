@@ -8,6 +8,11 @@ import {
     parseRemoteCommand,
     isPinLockedOut,
     registerPinFailure,
+    admitClient,
+    isClientBufferOverflow,
+    WS_MAX_CLIENTS,
+    WS_MAX_CLIENTS_PER_IP,
+    WS_MAX_BUFFER_BYTES,
     PIN_MAX_FAILS,
     PIN_LOCK_MS,
     pickLanAddress,
@@ -512,5 +517,37 @@ describe('partyAdd (item 40 — modo festa)', () => {
     it('rejeita movieId ausente ou não-string', () => {
         expect(parseRemoteCommand(JSON.stringify({ action: 'partyAdd' }))).toBeNull()
         expect(parseRemoteCommand(JSON.stringify({ action: 'partyAdd', movieId: 42 }))).toBeNull()
+    })
+})
+
+describe('teto de conexões WebSocket', () => {
+    it('aceita cliente enquanto há vaga', () => {
+        expect(admitClient([], '10.0.0.5')).toBe('ok')
+        expect(admitClient(['10.0.0.1', '10.0.0.2'], '10.0.0.5')).toBe('ok')
+    })
+
+    it('recusa acima do teto total (um script não trava o main)', () => {
+        const cheio = Array.from({ length: WS_MAX_CLIENTS }, (_, i) => `10.0.0.${i}`)
+        expect(admitClient(cheio, '10.0.0.99')).toBe('too-many')
+    })
+
+    it('recusa acima do teto por IP mesmo com vaga no total', () => {
+        const mesmoIp = Array.from({ length: WS_MAX_CLIENTS_PER_IP }, () => '10.0.0.7')
+        expect(admitClient(mesmoIp, '10.0.0.7')).toBe('too-many-from-ip')
+        expect(admitClient(mesmoIp, '10.0.0.8')).toBe('ok')
+    })
+
+    it('o teto por IP não pode ser maior que o total', () => {
+        expect(WS_MAX_CLIENTS_PER_IP).toBeLessThanOrEqual(WS_MAX_CLIENTS)
+    })
+})
+
+describe('teto do buffer por conexão', () => {
+    it('deixa passar um frame completo dentro do máximo', () => {
+        expect(isClientBufferOverflow(1_000_000)).toBe(false)
+    })
+
+    it('derruba quem goteja bytes de um frame anunciado como gigante', () => {
+        expect(isClientBufferOverflow(WS_MAX_BUFFER_BYTES + 1)).toBe(true)
     })
 })

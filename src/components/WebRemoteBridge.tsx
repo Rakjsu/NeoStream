@@ -11,6 +11,21 @@ import { getHomeRecommendations, type RecMovie, type RecSeries } from '../servic
 import { queueService } from '../services/queueService';
 import { downloadService } from '../services/downloadService';
 import { applyRemoteEpisodeProgress, applyRemoteMovieProgress, localProfileTag } from '../services/progressSyncService';
+import { parentalService } from '../services/parentalService';
+import { profileService } from '../services/profileService';
+import { indexedDBCache } from '../services/indexedDBCache';
+import { asList } from '../utils/catalogPayload';
+import {
+    isCategoryNameBlocked,
+    isCategoryNameKidsAllowed,
+    isContentGateOff,
+    isItemVisibleUnderGate,
+    isLiveCategoryVisible,
+    isParentalActive,
+    shouldBlockAdultCategories,
+    toCategoryIds,
+    type ContentGateState,
+} from '../services/contentGate';
 
 /**
  * Always-mounted bridge for the phone web remote's catalog second-screen.
@@ -28,10 +43,107 @@ interface VodMovie {
     name: string;
     stream_icon?: string;
     container_extension?: string;
+    category_id?: number | string;
 }
 
-interface SeriesItem { series_id: number | string; name: string; cover?: string }
+interface SeriesItem { series_id: number | string; name: string; cover?: string; category_id?: number | string | (number | string)[] }
 interface Episode { id: number | string; episode_num: number | string; title?: string; container_extension?: string }
+interface LiveChannel { stream_id: number | string; name: string; stream_icon?: string; category_id?: number | string }
+
+/* ------------------------------------------------------------------------ *
+ * 👶 Gate parental / perfil infantil do controle web.
+ *
+ * O bridge mandava pro celular o catálogo CRU do provedor: quem estivesse com
+ * o PIN de 4 dígitos (a criança da casa, a visita a quem o controle foi dado)
+ * buscava "xxx", recebia a lista inteira e mandava o filme pra TV da sala —
+ * o cadeado do desktop nunca era consultado nesse caminho. As regras abaixo
+ * vêm de services/contentGate, as MESMAS que a grade do app aplica; o gate é
+ * relido a cada pedido porque trocar de perfil ou destravar o parental não
+ * remonta este bridge.
+ * ------------------------------------------------------------------------ */
+
+type GateKind = 'movie' | 'series';
+
+const CATEGORY_CHANNEL: Record<GateKind | 'live', string> = {
+    movie: 'categories:get-vod',
+    series: 'categories:get-series',
+    live: 'categories:get-live',
+};
+
+interface RawCategory { category_id: string; category_name: string }
+
+const loadCategories = async (kind: GateKind | 'live'): Promise<RawCategory[]> => {
+    const result = await window.ipcRenderer.invoke(CATEGORY_CHANNEL[kind]).catch(() => null) as
+        { success?: boolean; data?: unknown } | null;
+    return result?.success ? asList<RawCategory>(result.data) : [];
+};
+
+const currentGateState = (): ContentGateState => {
+    const config = parentalService.getConfig();
+    return {
+        isKidsProfile: profileService.getActiveProfile()?.isKids === true,
+        parentalEnabled: config.enabled,
+        blockAdultCategories: config.blockAdultCategories,
+        sessionUnlocked: parentalService.isSessionUnlocked(),
+    };
+};
+
+interface CatalogGate {
+    state: ContentGateState;
+    blockedCategoryIds: Set<string>;
+    hiddenNames: Set<string>;
+    cachedRatings: Map<string, string | null>;
+}
+
+const loadCatalogGate = async (kind: GateKind): Promise<CatalogGate> => {
+    const state = currentGateState();
+    const gate: CatalogGate = { state, blockedCategoryIds: new Set(), hiddenNames: new Set(), cachedRatings: new Map() };
+    if (isContentGateOff(state)) return gate;
+    if (shouldBlockAdultCategories(state)) {
+        for (const cat of await loadCategories(kind)) {
+            if (isCategoryNameBlocked(cat.category_name || '')) gate.blockedCategoryIds.add(String(cat.category_id));
+        }
+    }
+    if (state.isKidsProfile) {
+        gate.hiddenNames = new Set(await indexedDBCache.getHiddenItems(kind).catch(() => [] as string[]));
+    }
+    if (isParentalActive(state)) {
+        gate.cachedRatings = await (kind === 'series'
+            ? indexedDBCache.getAllCachedSeries()
+            : indexedDBCache.getAllCachedMovies()
+        ).catch(() => new Map<string, string | null>());
+    }
+    return gate;
+};
+
+const passesGate = (gate: CatalogGate, name: string, categoryIds: string[]): boolean =>
+    isItemVisibleUnderGate({
+        categoryIds,
+        name,
+        blockedCategoryIds: gate.blockedCategoryIds,
+        hiddenNames: gate.hiddenNames,
+        cachedRatings: gate.cachedRatings,
+        isRatingBlocked: rating => parentalService.isContentBlocked(rating),
+        state: gate.state,
+    });
+
+const seriesCategoryIds = (series: SeriesItem): string[] => toCategoryIds(series.category_id);
+
+/** Gate da TV ao vivo: blacklist do parental + whitelist do perfil infantil. */
+const loadLiveGate = async (): Promise<{ blockedCategoryIds: Set<string>; allowedCategoryIds: Set<string> | null }> => {
+    const state = currentGateState();
+    if (isContentGateOff(state)) return { blockedCategoryIds: new Set(), allowedCategoryIds: null };
+    const blockedCategoryIds = new Set<string>();
+    const allowedCategoryIds = state.isKidsProfile ? new Set<string>() : null;
+    const blockAdult = shouldBlockAdultCategories(state);
+    for (const cat of await loadCategories('live')) {
+        const id = String(cat.category_id);
+        const name = cat.category_name || '';
+        if (blockAdult && isCategoryNameBlocked(name)) blockedCategoryIds.add(id);
+        if (allowedCategoryIds && isCategoryNameKidsAllowed(name)) allowedCategoryIds.add(id);
+    }
+    return { blockedCategoryIds, allowedCategoryIds };
+};
 
 /** Registro de um download recebido do celular (payload do main, item 12). */
 interface TransferEntry {
@@ -124,13 +236,48 @@ export function WebRemoteBridge() {
         const sendCastResult = (status: 'ok' | 'no-device' | 'error', deviceName = '') =>
             window.ipcRenderer.send('web-remote:cast-result', { status, deviceName });
 
+        // 👶 Filtrar a listagem não basta: o celular guarda os ids da lista
+        // anterior e o perfil pode ter virado infantil no meio. Todo caminho
+        // que RESOLVE uma URL revalida o gate agora, não no envio da lista.
+        const movieAllowed = async (movieId: string): Promise<boolean> => {
+            const gate = await loadCatalogGate('movie');
+            if (isContentGateOff(gate.state)) return true;
+            const movie = moviesRef.current.get(movieId);
+            if (!movie) return false;
+            return passesGate(gate, movie.name || '', toCategoryIds(movie.category_id));
+        };
+
+        const liveChannelAllowed = async (channelId: string): Promise<boolean> => {
+            const liveGate = await loadLiveGate();
+            if (liveGate.blockedCategoryIds.size === 0 && liveGate.allowedCategoryIds === null) return true;
+            const res = await window.ipcRenderer.invoke('streams:get-live').catch(() => null) as
+                { success: boolean; data?: LiveChannel[] } | null;
+            const found = (res?.success ? res.data ?? [] : []).find(c => String(c.stream_id) === channelId);
+            if (!found) return false;
+            return isLiveCategoryVisible(String(found.category_id ?? ''), liveGate);
+        };
+
+        const seriesAllowed = async (seriesId: string): Promise<boolean> => {
+            const gate = await loadCatalogGate('series');
+            if (isContentGateOff(gate.state)) return true;
+            const res = await window.ipcRenderer.invoke('streams:get-series').catch(() => null) as
+                { success: boolean; data?: SeriesItem[] } | null;
+            const found = (res?.success ? res.data ?? [] : []).find(s => String(s.series_id) === seriesId);
+            if (!found) return false; // fora do catálogo desta conta: nada a liberar
+            return passesGate(gate, found.name || '', seriesCategoryIds(found));
+        };
+
         // Push the movie list; with a query, filter the WHOLE catalog server-side
         // (not just the first 400 the phone happened to load) — streams:get-vod is
         // main-cached (SWR), so filtering on each keystroke stays cheap.
         const pushCatalog = async (query = '') => {
             const result = await window.ipcRenderer.invoke('streams:get-vod').catch(() => null) as
                 { success: boolean; data?: VodMovie[] } | null;
-            const movies = result?.success ? (result.data ?? []) : [];
+            // 👶 Só sai daqui o que a grade do desktop mostraria — inclusive no
+            // `moviesRef`, que é o que o castMovie do celular consegue resolver.
+            const gate = await loadCatalogGate('movie');
+            const movies = (result?.success ? (result.data ?? []) : [])
+                .filter(m => passesGate(gate, m.name || '', toCategoryIds(m.category_id)));
             const map = new Map<string, VodMovie>();
             for (const m of movies) map.set(String(m.stream_id), m);
             moviesRef.current = map;
@@ -149,12 +296,19 @@ export function WebRemoteBridge() {
         // Live channels matching the phone's global search — straight from the
         // main-cached list, so it works even with the LiveTV page closed.
         const pushLiveSearch = async (query = '') => {
-            const res = await window.ipcRenderer.invoke('streams:get-live').catch(() => null) as
-                { success: boolean; data?: { stream_id: number | string; name: string; stream_icon?: string }[] } | null;
             const q = query.trim().toLowerCase();
-            const matches = q
-                ? (res?.data ?? []).filter(c => (c.name || '').toLowerCase().includes(q))
-                : [];
+            if (!q) {
+                window.ipcRenderer.send('web-remote:live-results', { items: [] });
+                return;
+            }
+            const res = await window.ipcRenderer.invoke('streams:get-live').catch(() => null) as
+                { success: boolean; data?: LiveChannel[] } | null;
+            // 👶 Mesmo gate da TV ao vivo (categoria adulta fora, perfil
+            // infantil só nas categorias infantis).
+            const liveGate = await loadLiveGate();
+            const matches = (res?.data ?? []).filter(c =>
+                (c.name || '').toLowerCase().includes(q)
+                && isLiveCategoryVisible(String(c.category_id ?? ''), liveGate));
             window.ipcRenderer.send('web-remote:live-results', {
                 items: matches.slice(0, 100).map(c => ({
                     id: String(c.stream_id), name: c.name, logo: c.stream_icon || '',
@@ -256,7 +410,7 @@ export function WebRemoteBridge() {
 
         const castMovie = async (movieId: string, target?: CastTarget) => {
             const movie = moviesRef.current.get(movieId);
-            if (!movie) { sendCastResult('error'); return; }
+            if (!movie || !(await movieAllowed(movieId))) { sendCastResult('error'); return; }
             const urlRes = await window.ipcRenderer.invoke('streams:get-vod-url', {
                 streamId: movie.stream_id,
                 container: movie.container_extension || 'mp4',
@@ -266,10 +420,12 @@ export function WebRemoteBridge() {
         };
 
         const castMovieQueue = async (movieIds: string[], target?: CastTarget) => {
+            // Gate lido uma vez pra fila inteira (por item seriam N idas ao main).
+            const gate = await loadCatalogGate('movie');
             const queue: CastQueueItem[] = [];
             for (const id of movieIds) {
                 const movie = moviesRef.current.get(id);
-                if (!movie) continue;
+                if (!movie || !passesGate(gate, movie.name || '', toCategoryIds(movie.category_id))) continue;
                 const urlRes = await window.ipcRenderer.invoke('streams:get-vod-url', {
                     streamId: movie.stream_id,
                     container: movie.container_extension || 'mp4',
@@ -283,7 +439,9 @@ export function WebRemoteBridge() {
         const pushSeries = async (query = '') => {
             const result = await window.ipcRenderer.invoke('streams:get-series').catch(() => null) as
                 { success: boolean; data?: SeriesItem[] } | null;
-            const series = result?.success ? (result.data ?? []) : [];
+            const gate = await loadCatalogGate('series');
+            const series = (result?.success ? (result.data ?? []) : [])
+                .filter(s => passesGate(gate, s.name || '', seriesCategoryIds(s)));
             const q = query.trim().toLowerCase();
             const matches = q ? series.filter(s => (s.name || '').toLowerCase().includes(q)) : series;
             window.ipcRenderer.send('web-remote:series', {
@@ -295,6 +453,12 @@ export function WebRemoteBridge() {
         };
 
         const pushSeriesInfo = async (seriesId: string) => {
+            // Série bloqueada: responde vazio em vez de resolver os episódios
+            // (é o que alimenta o episodesRef, de onde sai a URL do castEpisode).
+            if (!(await seriesAllowed(seriesId))) {
+                window.ipcRenderer.send('web-remote:series-info', { seriesId, episodes: [] });
+                return;
+            }
             const result = await window.ipcRenderer.invoke('series:get-info', { seriesId }).catch(() => null) as
                 { success: boolean; info?: { episodes?: Record<string, Episode[]> } } | null;
             const seasons = result?.success ? (result.info?.episodes ?? {}) : {};
@@ -322,16 +486,28 @@ export function WebRemoteBridge() {
         // in-progress series), resolving the episode stream ids so a tap can cast
         // straight to them, and record resume positions for a seek-after-load.
         const pushContinue = async () => {
+            // 👶 O histórico não é porta de fuga do gate: o que sumiu da grade
+            // não pode voltar pelo "continuar assistindo" do celular.
+            const movieGate = await loadCatalogGate('movie');
+            const movieGateOn = !isContentGateOff(movieGate.state);
+            const seriesGate = await loadCatalogGate('series');
+            const seriesGateOn = !isContentGateOff(seriesGate.state);
+
             const vodRes = await window.ipcRenderer.invoke('streams:get-vod').catch(() => null) as
                 { success: boolean; data?: VodMovie[] } | null;
-            const vod = vodRes?.success ? (vodRes.data ?? []) : [];
+            const vod = (vodRes?.success ? (vodRes.data ?? []) : [])
+                .filter(m => passesGate(movieGate, m.name || '', toCategoryIds(m.category_id)));
             const vodById = new Map<string, VodMovie>();
             for (const m of vod) { vodById.set(String(m.stream_id), m); moviesRef.current.set(String(m.stream_id), m); }
 
             const seriesRes = await window.ipcRenderer.invoke('streams:get-series').catch(() => null) as
                 { success: boolean; data?: SeriesItem[] } | null;
             const coverBySeries = new Map<string, string>();
-            for (const s of seriesRes?.success ? (seriesRes.data ?? []) : []) coverBySeries.set(String(s.series_id), s.cover || '');
+            const allowedSeriesIds = new Set<string>();
+            for (const s of seriesRes?.success ? (seriesRes.data ?? []) : []) {
+                coverBySeries.set(String(s.series_id), s.cover || '');
+                if (passesGate(seriesGate, s.name || '', seriesCategoryIds(s))) allowedSeriesIds.add(String(s.series_id));
+            }
 
             const items: { kind: 'movie' | 'series'; castId: string; name: string; cover: string; pct: number; at: number }[] = [];
 
@@ -339,6 +515,7 @@ export function WebRemoteBridge() {
                 const p = movieProgressService.getMoviePositionById(id);
                 if (!p || p.completed) continue;
                 const movie = vodById.get(String(id));
+                if (movieGateOn && !movie) continue; // fora da lista liberada
                 resumeRef.current.set('movie:' + id, p.currentTime || 0);
                 items.push({
                     kind: 'movie', castId: String(id), name: p.movieName || movie?.name || 'Filme',
@@ -347,6 +524,7 @@ export function WebRemoteBridge() {
             }
 
             for (const [seriesId, sp] of watchProgressService.getContinueWatching()) {
+                if (seriesGateOn && !allowedSeriesIds.has(String(seriesId))) continue;
                 const info = await window.ipcRenderer.invoke('series:get-info', { seriesId }).catch(() => null) as
                     { success: boolean; info?: { episodes?: Record<string, Episode[]> } } | null;
                 const seasonEps = info?.success ? (info.info?.episodes?.[String(sp.lastWatchedSeason)] ?? []) : [];
@@ -376,14 +554,20 @@ export function WebRemoteBridge() {
         // Habit-based "porque você assistiu" rows for the phone's Continuar tab —
         // same engine as the Home page, fed by the main-cached catalog lists.
         const pushRecommended = async () => {
+            // 👶 As recomendações saem do catálogo JÁ filtrado — o motor de
+            // afinidade não pode sugerir o que a grade esconde.
+            const movieGate = await loadCatalogGate('movie');
+            const seriesGate = await loadCatalogGate('series');
             const vodRes = await window.ipcRenderer.invoke('streams:get-vod').catch(() => null) as
                 { success: boolean; data?: VodMovie[] } | null;
-            const vod = vodRes?.success ? (vodRes.data ?? []) : [];
+            const vod = (vodRes?.success ? (vodRes.data ?? []) : [])
+                .filter(m => passesGate(movieGate, m.name || '', toCategoryIds(m.category_id)));
             // Register the movies so a castMovie for a recommended id resolves.
             for (const m of vod) moviesRef.current.set(String(m.stream_id), m);
             const seriesRes = await window.ipcRenderer.invoke('streams:get-series').catch(() => null) as
                 { success: boolean; data?: SeriesItem[] } | null;
-            const series = seriesRes?.success ? (seriesRes.data ?? []) : [];
+            const series = (seriesRes?.success ? (seriesRes.data ?? []) : [])
+                .filter(s => passesGate(seriesGate, s.name || '', seriesCategoryIds(s)));
             const groups = await getHomeRecommendations(
                 vod as unknown as RecMovie[],
                 series as unknown as RecSeries[],
@@ -411,6 +595,7 @@ export function WebRemoteBridge() {
         const castEpisode = async (episodeId: string, target?: CastTarget) => {
             const ep = episodesRef.current.get(episodeId);
             if (!ep) { sendCastResult('error'); return; }
+            if (ep.seriesId && !(await seriesAllowed(ep.seriesId))) { sendCastResult('error'); return; }
             const urlRes = await window.ipcRenderer.invoke('streams:get-series-url', {
                 streamId: ep.id, container: ep.container,
             }).catch(() => null) as { success: boolean; url?: string } | null;
@@ -425,6 +610,12 @@ export function WebRemoteBridge() {
         // page — the bridge lives at the app root.
         const recordChannel = async (channelId: string, channelName: string) => {
             const name = channelName || 'Canal';
+            // 👶 Gravar é outra forma de assistir: o arquivo do canal bloqueado
+            // voltaria pro celular pelo /recording. Mesmo gate da TV ao vivo.
+            if (!(await liveChannelAllowed(channelId))) {
+                window.ipcRenderer.send('web-remote:record-result', { status: 'error', name });
+                return;
+            }
             const urlRes = await window.ipcRenderer.invoke('streams:get-live-url', { streamId: channelId })
                 .catch(() => null) as { success: boolean; url?: string } | null;
             if (!urlRes?.success || !urlRes.url) {
@@ -688,8 +879,11 @@ export function WebRemoteBridge() {
             // 🎉 Item 40 (modo festa): o filme cai na fila manual da TV — o
             // VOD toca o próximo da fila quando o atual termina (item 32).
             else if (action === 'partyAdd') {
-                const movie = moviesRef.current.get(String(arg ?? ''));
-                if (movie) queueService.add({ id: String(movie.stream_id), name: movie.name, cover: movie.stream_icon });
+                const movieId = String(arg ?? '');
+                void movieAllowed(movieId).then(allowed => {
+                    const movie = allowed ? moviesRef.current.get(movieId) : undefined;
+                    if (movie) queueService.add({ id: String(movie.stream_id), name: movie.name, cover: movie.stream_icon });
+                });
             }
             else if (action === 'castMovieQueue') void castMovieQueue(Array.isArray(arg) ? (arg as string[]) : [], asTarget(target));
             else if (action === 'requestSeries') void pushSeries(typeof arg === 'string' ? arg : '');

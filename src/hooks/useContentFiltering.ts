@@ -4,13 +4,17 @@ import { parentalService } from '../services/parentalService';
 import { searchMovieByName, searchSeriesByName, isKidsFriendly } from '../services/tmdb';
 
 import { asList } from '../utils/catalogPayload';
-export const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'terror', 'horror', 'erotic', 'erótico'];
+import {
+    BLOCKED_CATEGORY_PATTERNS,
+    isCategoryNameBlocked,
+    isItemVisibleUnderGate,
+    normalizeContentName,
+    shouldBlockAdultCategories,
+} from '../services/contentGate';
 
-/** Pure rule: does this category name match the blocked keyword list? */
-export function isCategoryNameBlocked(categoryName: string): boolean {
-    const lowerName = categoryName.toLowerCase();
-    return BLOCKED_CATEGORY_PATTERNS.some(p => lowerName.includes(p));
-}
+// As regras puras mudaram de casa (services/contentGate) pra que o controle
+// web possa aplicar as MESMAS; reexportadas aqui pelos consumidores antigos.
+export { BLOCKED_CATEGORY_PATTERNS, isCategoryNameBlocked };
 
 export type FilterableContentType = 'movie' | 'series';
 
@@ -29,8 +33,7 @@ interface UseContentFilteringOptions<T> {
     onAllowed: (item: T) => void;
 }
 
-const normalizeName = (name: string): string =>
-    name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
+const normalizeName = normalizeContentName;
 
 /**
  * Kids-profile + Parental Control filtering and click-gating, generic over
@@ -90,7 +93,12 @@ export function useContentFiltering<T>({
                 const result = await window.ipcRenderer.invoke(channel);
                 if (result.success) {
                     const parentalConfig = parentalService.getConfig();
-                    const shouldBlockCategories = isKidsProfile || (parentalConfig.enabled && parentalConfig.blockAdultCategories && !parentalService.isSessionUnlocked());
+                    const shouldBlockCategories = shouldBlockAdultCategories({
+                        isKidsProfile,
+                        parentalEnabled: parentalConfig.enabled,
+                        blockAdultCategories: parentalConfig.blockAdultCategories,
+                        sessionUnlocked: parentalService.isSessionUnlocked(),
+                    });
 
                     if (shouldBlockCategories) {
                         const blockedIds = new Set<string>();
@@ -111,33 +119,25 @@ export function useContentFiltering<T>({
         fetchBlockedCategories();
     }, [isKidsProfile, contentType]);
 
-    // Kids/Parental portion of the grid filter (search/category filtering stays in the page)
+    // Kids/Parental portion of the grid filter (search/category filtering stays
+    // in the page). A regra em si vive em contentGate — o controle web aplica
+    // a MESMA função antes de mandar catálogo pro celular.
     const isItemVisible = (item: T): boolean => {
-        const normalizedName = normalizeName(getItemName(item));
-
-        // Parental Control filtering (applies to all profiles)
-        if (getItemCategoryIds(item).some(catId => blockedCategoryIds.has(catId))) {
-            return false;
-        }
-
-        // Parental Control: Filter by cached rating
         const parentalConfig = parentalService.getConfig();
-        if (parentalConfig.enabled && !parentalService.isSessionUnlocked()) {
-            const cachedRating = cachedRatings.get(normalizedName);
-            if (cachedRating && parentalService.isContentBlocked(cachedRating)) {
-                return false;
-            }
-        }
-
-        // Kids profile filtering (additional checks)
-        if (isKidsProfile) {
-            // Block items that have been marked as hidden
-            if (hiddenItems.has(normalizedName)) {
-                return false;
-            }
-        }
-
-        return true;
+        return isItemVisibleUnderGate({
+            categoryIds: getItemCategoryIds(item),
+            name: getItemName(item),
+            blockedCategoryIds,
+            hiddenNames: hiddenItems,
+            cachedRatings,
+            isRatingBlocked: rating => parentalService.isContentBlocked(rating),
+            state: {
+                isKidsProfile,
+                parentalEnabled: parentalConfig.enabled,
+                blockAdultCategories: parentalConfig.blockAdultCategories,
+                sessionUnlocked: parentalService.isSessionUnlocked(),
+            },
+        });
     };
 
     // Handle content card click - check Kids filter and Parental Control, always cache for future use
