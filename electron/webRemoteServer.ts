@@ -19,7 +19,12 @@ import fs from 'node:fs'
 import { app, BrowserWindow, ipcMain } from 'electron'
 import Store from 'electron-store'
 import log from './logger'
-import { generateSelfSignedCert } from './selfSignedCert'
+import {
+    generateSelfSignedCert,
+    shouldReuseStoredCert,
+    mergeCertAltNames,
+    type StoredSelfSignedCert,
+} from './selfSignedCert'
 import { recordingsDir } from './dvrHandlers'
 import {
     buildHandshakeResponse,
@@ -177,6 +182,67 @@ function serverUrl(): string | null {
 /** Best LAN IPv4 the phone can reach (skips VPN/virtual adapters), or 127.0.0.1. */
 export function getLanAddress(): string {
     return pickLanAddress(os.networkInterfaces() as Record<string, NetAddress[] | undefined>)
+}
+
+// ------------------------------------------------- certificado do modo https --
+
+/** Chave + cert do modo https, guardados entre sessões. */
+const CERT_FILE = 'webremote-cert.json'
+/** 10 anos: o objetivo é estabilidade (confiar uma vez), não rotação. */
+const CERT_VALIDITY_DAYS = 3650
+
+function certFilePath(): string {
+    return path.join(app.getPath('userData'), CERT_FILE)
+}
+
+function readStoredCert(): Partial<StoredSelfSignedCert> | null {
+    try {
+        return JSON.parse(fs.readFileSync(certFilePath(), 'utf-8')) as Partial<StoredSelfSignedCert>
+    } catch {
+        return null // ausente, ilegível ou corrompido → gera um novo
+    }
+}
+
+function writeStoredCert(value: StoredSelfSignedCert): void {
+    try {
+        // 0o600 porque o arquivo carrega a chave privada. No Linux/macOS isso
+        // deixa o arquivo só para o dono; no Windows o modo só reflete o
+        // atributo somente-leitura e quem protege é a ACL da pasta do usuário.
+        fs.writeFileSync(certFilePath(), JSON.stringify(value), { mode: 0o600 })
+        try { fs.chmodSync(certFilePath(), 0o600) } catch { /* sem suporte a modo */ }
+    } catch (error) {
+        log.warn('[WebRemote] não consegui gravar o certificado https:', error)
+    }
+}
+
+/**
+ * Par chave/cert do https, reaproveitado entre sessões.
+ *
+ * Regerar a cada start fazia o celular ver um certificado diferente toda vez:
+ * confiar uma vez era impossível e o usuário aprendia a apertar "avançar mesmo
+ * assim" em qualquer certificado — inclusive no de um impostor na mesma LAN.
+ * Agora só regeramos quando não há nada gravado, quando o cert está perto de
+ * vencer ou quando o SAN não cobre o endereço desta rede. Para forçar um par
+ * novo à mão, basta apagar `webremote-cert.json` na pasta userData.
+ */
+function loadOrCreateCert(now: number): { key: string; cert: string } {
+    const lanAddress = getLanAddress()
+    const wanted = [lanAddress, '127.0.0.1', 'localhost']
+    const stored = readStoredCert()
+
+    if (stored && shouldReuseStoredCert(stored, now, wanted)) {
+        return { key: stored.key as string, cert: stored.cert as string }
+    }
+
+    const altNames = mergeCertAltNames(stored?.altNames, wanted)
+    const fresh = generateSelfSignedCert(now, {
+        commonName: lanAddress,
+        validityDays: CERT_VALIDITY_DAYS,
+        altNames,
+    })
+    writeStoredCert({ key: fresh.key, cert: fresh.cert, altNames, notAfter: fresh.notAfter })
+    log.info('[WebRemote] novo certificado https gerado para', altNames.join(', '))
+    return { key: fresh.key, cert: fresh.cert }
 }
 
 // Latest DLNA session snapshot, refreshed by the 2s poll below (SOAP is too
@@ -1290,13 +1356,10 @@ function start(): Promise<void> {
     }
     return new Promise<void>((resolve) => {
         if (serverSecure) {
-            // Fresh self-signed cert per start (hand-rolled X.509). The phone
-            // accepts it once; the page connects over wss on the same port. The
-            // LAN IP goes in the SAN so mobile browsers validate the host.
-            const { key, cert } = generateSelfSignedCert(Date.now(), {
-                commonName: getLanAddress(),
-                altNames: [getLanAddress(), '127.0.0.1', 'localhost'],
-            })
+            // Self-signed cert (hand-rolled X.509) PERSISTIDO entre sessões: o
+            // celular aceita uma vez e volta a ver o mesmo certificado nas
+            // próximas. A LAN IP vai no SAN para o navegador validar o host.
+            const { key, cert } = loadOrCreateCert(Date.now())
             server = https.createServer({ key, cert }, handler)
         } else {
             server = http.createServer(handler)

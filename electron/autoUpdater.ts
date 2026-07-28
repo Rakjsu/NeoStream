@@ -1,7 +1,10 @@
 import { autoUpdater } from 'electron-updater';
-import { BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
+import fs from 'node:fs';
+import path from 'node:path';
 import store from './store';
 import log from './logger';
+import { checkUpdateArtifacts, checkUpdateFeedConfig, type PolicyVerdict } from './updatePolicy';
 
 interface UpdateConfig {
     checkFrequency: 'on-open' | '1-day' | '1-week' | '1-month';
@@ -18,6 +21,18 @@ const DEFAULT_CONFIG: UpdateConfig = {
 
 const getErrorMessage = (error: unknown): string =>
     error instanceof Error ? error.message : String(error);
+
+/** Release oficial — qualquer outro destino de feed é recusado. */
+const EXPECTED_FEED = { owner: 'Rakjsu', repo: 'NeoStream' };
+
+/** `app-update.yml` empacotado ao lado do app: é ele que define o feed. */
+function readPackagedFeedConfig(): string | null {
+    try {
+        return fs.readFileSync(path.join(process.resourcesPath, 'app-update.yml'), 'utf-8');
+    } catch {
+        return null;
+    }
+}
 
 export function initializeAutoUpdater(mainWindow: BrowserWindow) {
     // Get or initialize config
@@ -57,8 +72,41 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
     // Configure autoUpdater
     autoUpdater.autoDownload = false; // Manual download control
     autoUpdater.autoInstallOnAppQuit = true;
-    // Disable code signature verification for unsigned apps
-    autoUpdater.forceDevUpdateConfig = true;
+    // `forceDevUpdateConfig` NÃO desliga verificação de assinatura (isso é
+    // `verifyUpdateCodeSignature`, no package.json): ele só fazia o updater
+    // rodar fora do pacote, buscando um `dev-app-update.yml` qualquer da pasta
+    // do projeto. No app empacotado era inócuo; em dev, transformava um arquivo
+    // solto no repo num feed de atualização. Removido.
+    autoUpdater.allowDowngrade = false;   // um latest.yml antigo não empurra versão vulnerável
+    autoUpdater.disableWebInstaller = true; // web installer não passa por verificação de assinatura
+    // (allowPrerelease fica como o electron-updater deduziu da versão atual —
+    // mexer nele quebraria um eventual canal beta e não protege de nada.)
+
+    // Sem certificado de código não há como verificar a assinatura do
+    // instalador (ver updatePolicy.ts). O que sobra — e é o que aplicamos aqui
+    // — é: (a) o feed tem que ser o do GitHub oficial por https e (b) todo
+    // artefato tem que trazer sha512, senão o download não é conferido contra
+    // nada e o .exe roda com elevação.
+    const feedVerdict: PolicyVerdict = app.isPackaged
+        ? checkUpdateFeedConfig(readPackagedFeedConfig(), EXPECTED_FEED)
+        // Fora do pacote o electron-updater já fica inativo por conta própria.
+        : { ok: true };
+    if (!feedVerdict.ok) {
+        log.error('[update] feed de atualização não confiável:', feedVerdict.reason);
+    }
+
+    // Vira true quando o feed da versão anunciada passou na checagem de sha512.
+    let artifactsTrusted = false;
+    // Vira true só quando um download verificado terminou NESTE processo.
+    let downloadedThisSession = false;
+
+    const guardedCheck = async () => {
+        if (!feedVerdict.ok) {
+            log.error('[update] checagem cancelada:', feedVerdict.reason);
+            return null;
+        }
+        return autoUpdater.checkForUpdates();
+    };
 
     // Setup event handlers
     autoUpdater.on('checking-for-update', () => {
@@ -68,6 +116,16 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
 
     autoUpdater.on('update-available', (info) => {
         log.info('Update available:', info.version);
+
+        const artifacts = checkUpdateArtifacts(info);
+        artifactsTrusted = artifacts.ok;
+        if (!artifacts.ok) {
+            log.error('[update] atualização recusada:', artifacts.reason);
+            mainWindow.webContents.send('update:error', {
+                message: `Atualização recusada por falta de verificação de integridade (${artifacts.reason}).`
+            });
+            return;
+        }
 
         const config = getConfig();
 
@@ -99,6 +157,7 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
 
     autoUpdater.on('update-downloaded', (info) => {
         log.info('Update downloaded:', info.version);
+        downloadedThisSession = true;
         mainWindow.webContents.send('update:downloaded', info);
 
         const config = getConfig();
@@ -124,6 +183,13 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
     // IPC Handlers
     ipcMain.handle('update:check-now', async () => {
         try {
+            if (!feedVerdict.ok) {
+                return {
+                    updateAvailable: false,
+                    currentVersion: autoUpdater.currentVersion.version,
+                    error: `Feed de atualização não confiável: ${feedVerdict.reason}`
+                };
+            }
             const result = await autoUpdater.checkForUpdates();
             updateLastCheck();
 
@@ -152,6 +218,10 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
 
     ipcMain.handle('update:download', async () => {
         try {
+            if (!feedVerdict.ok) return { success: false, error: feedVerdict.reason };
+            if (!artifactsTrusted) {
+                return { success: false, error: 'Nenhuma atualização com sha512 publicado foi anunciada' };
+            }
             await autoUpdater.downloadUpdate();
             return { success: true };
         } catch (error: unknown) {
@@ -162,6 +232,14 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
 
     ipcMain.handle('update:install', () => {
         try {
+            // O instalador NSIS é perMachine + allowElevation e roda em silêncio:
+            // é o único caminho de execução elevada do produto. Só liberamos
+            // depois de um download que o próprio processo principal validou —
+            // uma chamada avulsa deste canal não dispara instalador nenhum.
+            if (!downloadedThisSession) {
+                log.warn('[update] install recusado: nenhuma atualização verificada nesta sessão');
+                return { success: false, error: 'Nenhuma atualização verificada foi baixada nesta sessão' };
+            }
             // Quit and install immediately, silently (no NSIS wizard)
             autoUpdater.quitAndInstall(true, true);
             return { success: true };
@@ -190,7 +268,7 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
         // Wait 5 seconds after app starts to check for updates
         setTimeout(() => {
             log.info('Checking for updates (scheduled)...');
-            autoUpdater.checkForUpdates().catch(err => {
+            guardedCheck().catch(err => {
                 log.error('Scheduled update check failed:', err);
             });
         }, 5000);
@@ -200,7 +278,7 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
     setInterval(() => {
         if (shouldCheckForUpdates()) {
             log.info('Checking for updates (periodic)...');
-            autoUpdater.checkForUpdates().catch(err => {
+            guardedCheck().catch(err => {
                 log.error('Periodic update check failed:', err);
             });
         }

@@ -60,6 +60,44 @@ export function looksLikeMediaRenderer(headers: SsdpHeaders): boolean {
     return target.includes('mediarenderer') || target.includes('avtransport') || target.includes('renderingcontrol')
 }
 
+/** Host normalizado para comparação: sem colchetes de IPv6, sem zona (%eth0), minúsculo. */
+export function normalizeDiscoveryHost(host: string): string {
+    const bare = host.trim().toLowerCase().replace(/[[\]]/g, '').split('%')[0]
+    const mapped = bare.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/)
+    return mapped ? mapped[1] : bare
+}
+
+/** Só http:// e https:// — `file:`, `ftp:` e afins nunca são buscados. */
+export function isHttpLocation(location: string | undefined | null): boolean {
+    if (!location) return false
+    try {
+        const protocol = new URL(location).protocol
+        return protocol === 'http:' || protocol === 'https:'
+    } catch {
+        return false
+    }
+}
+
+/**
+ * A descoberta SSDP é entrada não autenticada: qualquer aparelho da LAN responde
+ * ao M-SEARCH e escolhe o que vai no header LOCATION — que o app busca sozinho,
+ * sem clique nenhum. Sem esta checagem o remetente aponta o LOCATION para onde
+ * quiser (`file:///`, o painel do roteador, um host externo) e o processo
+ * principal faz a requisição por ele, a partir do IP de confiança do desktop.
+ * Aceitamos só quando é http(s) E o host é exatamente o IP que enviou o
+ * datagrama — que é o que qualquer renderer UPnP real anuncia.
+ */
+export function isTrustedSsdpLocation(location: string | undefined | null, remoteAddress: string): boolean {
+    if (!isHttpLocation(location)) return false
+    try {
+        const host = normalizeDiscoveryHost(new URL(location as string).hostname)
+        const sender = normalizeDiscoveryHost(remoteAddress || '')
+        return host !== '' && host === sender
+    } catch {
+        return false
+    }
+}
+
 export function createSearchMessage(target: string): string {
     return [
         'M-SEARCH * HTTP/1.1',
