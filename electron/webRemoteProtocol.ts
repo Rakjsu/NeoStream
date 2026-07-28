@@ -231,7 +231,7 @@ export type RemoteCommand =
     | { action: 'seek'; seconds: number }
     | { action: 'setVolume'; level: number }
     | { action: 'setAudioTrack'; trackId: number }
-    | { action: 'playChannel'; channelId: string }
+    | { action: 'playChannel'; channelId: string; name?: string }
     | { action: 'requestEpg'; channelId: string }
     | { action: 'recordChannel'; channelId: string; channelName?: string }
     | { action: 'stopRecord'; id: string }
@@ -375,7 +375,13 @@ export function parseRemoteCommand(text: string): RemoteCommand | null {
     if (action === 'playChannel' || action === 'requestEpg') {
         const channelId = (parsed as { channelId?: unknown }).channelId
         if (typeof channelId !== 'string' || !channelId) return null
-        return { action, channelId }
+        if (action === 'requestEpg') return { action, channelId }
+        // Nome é o resgate quando as contas dos dois lados são diferentes: o
+        // stream_id do celular não existe aqui e só o nome casa (é o mesmo
+        // fallback que o playOnMobile já dá na direção contrária).
+        const rawName = (parsed as { name?: unknown }).name
+        const name = typeof rawName === 'string' && rawName.trim() ? rawName.trim().slice(0, 160) : undefined
+        return { action, channelId, name }
     }
     if (action === 'recordChannel') {
         const channelId = (parsed as { channelId?: unknown }).channelId

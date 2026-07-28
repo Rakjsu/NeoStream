@@ -481,6 +481,27 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
         }
         return
     }
+    if (command.action === 'playChannel') {
+        // 📱 O listener de playChannel só existe na TV ao vivo MONTADA (a
+        // página zera a guia ao desmontar, então guideState sem canais = fora
+        // dela). Antes o comando morria aí em silêncio, com o celular
+        // afirmando sucesso: agora traz o app, navega e reenvia com atraso —
+        // o mesmo caminho que o openMultiview já usava.
+        const appWin = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
+        if (!appWin) return
+        if ((guideState?.channels.length ?? 0) > 0) {
+            appWin.webContents.send('media:control', 'playChannel', command.channelId, command.name)
+            return
+        }
+        if (appWin.isMinimized()) appWin.restore()
+        appWin.show()
+        appWin.focus()
+        appWin.webContents.send('tray:navigate', '/dashboard/live')
+        setTimeout(() => {
+            if (!appWin.isDestroyed()) appWin.webContents.send('media:control', 'playChannel', command.channelId, command.name)
+        }, 700)
+        return
+    }
     if (command.action === 'screenshot') {
         // 📷 Captura a janela do app e devolve pra página (reduzida pra LAN).
         const appWin = BrowserWindow.getAllWindows().find(w => !w.isDestroyed())
@@ -530,8 +551,6 @@ function forwardCommand(command: ReturnType<typeof parseRemoteCommand>): void {
     } else if (command.action === 'requestProgress') {
         // 🔄 Reconciliação: o celular reconectou e quer o estado daqui.
         win.webContents.send('media:control', 'requestProgress')
-    } else if (command.action === 'playChannel') {
-        win.webContents.send('media:control', 'playChannel', command.channelId)
     } else if (command.action === 'requestEpg') {
         win.webContents.send('media:control', 'requestEpg', command.channelId)
     } else if (command.action === 'recordChannel') {
@@ -725,6 +744,20 @@ export function setupWebRemote(): void {
         broadcast(guideMessage())
     })
 
+    // 📱 Desfecho do playChannel: sem isto o pedido do celular sumia quando o
+    // canal não existia nesta conta. Vai com o channelId pra cada cliente só
+    // reagir ao que ELE pediu (o celular e a página mandam o mesmo comando).
+    ipcMain.on('web-remote:play-channel-result', (_e, raw: unknown) => {
+        const data = (raw ?? {}) as { status?: unknown; channelId?: unknown }
+        const channelId = String(data.channelId ?? '')
+        if (!channelId) return
+        broadcast(JSON.stringify({
+            type: 'playChannelResult',
+            status: data.status === 'ok' ? 'ok' : 'notFound',
+            channelId,
+        }))
+    })
+
     // On-demand EPG for a single channel: the renderer answers a requestEpg by
     // fetching that channel's now/next and pushing it here, relayed to phones.
     // 📊 Stats rápidas do renderer → página (hoje / 7 dias / streak).
@@ -733,7 +766,10 @@ export function setupWebRemote(): void {
     ipcMain.on('web-remote:favorites', (_e, raw: unknown) => {
         const payload = (raw ?? {}) as { items?: unknown }
         const items = Array.isArray(payload.items) ? payload.items.slice(0, 200) : []
-        broadcast(JSON.stringify({ type: 'favorites', items }))
+        // Só pros apps: a página do navegador não consome 'favorites' e o
+        // broadcast fazia qualquer aba pedindo favoritos reimportar a lista
+        // inteira no celular (ressuscitando o que ele tinha apagado).
+        sendToMobileClients(JSON.stringify({ type: 'favorites', items }))
     })
 
     // 📟 Item 126: aparelhos conectados no controle web (painel nas Configurações).
