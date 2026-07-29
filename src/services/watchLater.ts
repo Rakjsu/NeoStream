@@ -3,6 +3,7 @@ import { profileService } from './profileService';
 import { traktWatchlistAdd, traktWatchlistRemove } from './traktService';
 import { playlistScopedKey, hasKnownPlaylistId } from './activePlaylistService';
 import { syncTombstones, tombstoneItemKey } from './syncTombstones';
+import { readJson } from './storageJsonCache';
 import type { Profile, WatchLaterItem } from '../types/profile';
 
 // Re-export type for compatibility
@@ -21,13 +22,8 @@ export const watchLaterService = {
         if (!activeProfile) return [];
 
         this.migrate();
-        try {
-            const key = playlistScopedKey(KEY_BASE, activeProfile.id);
-            const data = localStorage.getItem(key);
-            return data ? (JSON.parse(data) as WatchLaterItem[]) : [];
-        } catch {
-            return [];
-        }
+        const key = playlistScopedKey(KEY_BASE, activeProfile.id);
+        return readJson<WatchLaterItem[]>(key, []);
     },
 
     // Add item to watch later

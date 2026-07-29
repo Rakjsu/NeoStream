@@ -21,6 +21,8 @@ import {
     searchPrograms,
     isReplayable,
     replayDurationMinutes,
+    computeGuideRowWindow,
+    mergeGuideGenres,
     HALF_HOUR_MS,
     PX_PER_HALF_HOUR,
     WINDOW_HALF_HOURS,
@@ -71,8 +73,9 @@ const CHANNEL_COL_WIDTH = 220;
 const ROW_HEIGHT = 64;
 const HEADER_HEIGHT = 40;
 const TIMELINE_WIDTH = WINDOW_HALF_HOURS * PX_PER_HALF_HOUR;
-const INITIAL_ROWS = 25;
-const ROWS_INCREMENT = 25;
+const GUIDE_OVERSCAN_ROWS = 6;
+/** Janela de coalescência das resoluções de EPG (um setState por leva). */
+const EPG_BATCH_MS = 120;
 const MAX_CONCURRENT_EPG = 4;
 
 // ---------------------------------------------------------------------------
@@ -128,7 +131,11 @@ export function EpgGuide() {
     const [selectedCategory, setSelectedCategory] = useState<string>('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    const [visibleRows, setVisibleRows] = useState(INITIAL_ROWS);
+    // Virtualização por linha: a grade guarda a linha do topo, não uma contagem
+    // que só cresce (o `visibleRows` antigo nunca encolhia — 600 linhas vivas
+    // depois de percorrer uma categoria grande).
+    const [scrollRow, setScrollRow] = useState(0);
+    const [viewportHeight, setViewportHeight] = useState(0);
     const [epgByChannel, setEpgByChannel] = useState<Record<string, EPGProgram[] | undefined>>({});
     const [now, setNow] = useState(() => Date.now());
     const [playingChannel, setPlayingChannel] = useState<LiveStream | null>(null);
@@ -275,37 +282,89 @@ export function EpgGuide() {
     // Channels of the selected category (only these render rows)
     // 🎭 Item 34: filtro por gênero — só existe quando o XMLTV traz <category>.
     const [genreFilter, setGenreFilter] = useState('');
-    const availableGenres = useMemo(() => {
-        const genres = new Set<string>();
-        for (const programs of Object.values(epgByChannel)) {
-            for (const program of programs ?? []) {
-                if (program.category) genres.add(program.category);
-            }
-        }
-        return [...genres].sort();
+    // Gêneros acumulados canal a canal: o cálculo anterior varria TODOS os
+    // canais carregados × TODOS os programas de cada um a cada canal que
+    // resolvia (com 500 canais isso dava dezenas de milhões de Set.add só no
+    // carregamento). `genreScanned` marca quem já foi contabilizado.
+    const [availableGenres, setAvailableGenres] = useState<string[]>([]);
+    const genreScanned = useRef(new Set<string>());
+    // A fusão fica FORA do updater do setState de propósito: ela marca canais em
+    // `genreScanned`, e um updater pode ser reexecutado com o mesmo `prev` —
+    // na segunda passada tudo já estaria marcado e o resultado voltaria vazio.
+    const knownGenres = useRef<string[]>([]);
+    useEffect(() => {
+        const next = mergeGuideGenres(knownGenres.current, epgByChannel, genreScanned.current);
+        if (next === knownGenres.current) return;
+        knownGenres.current = next;
+        setAvailableGenres(next);
     }, [epgByChannel]);
 
     const categoryStreams = useMemo(
-        () => streams.filter(s => {
-            if (s.category_id !== selectedCategory) return false;
-            if (!genreFilter) return true;
+        () => streams.filter(s => s.category_id === selectedCategory),
+        [streams, selectedCategory]
+    );
+    // O filtro de gênero é o ÚNICO recorte que depende do EPG carregado. Sem
+    // ele a lista é devolvida com a MESMA identidade, para que um canal que
+    // resolve não invalide a grade inteira.
+    const filteredStreams = useMemo(() => {
+        if (!genreFilter) return categoryStreams;
+        return categoryStreams.filter(s => {
             // EPG é lazy: canal ainda sem programas carregados não some.
             const programs = epgByChannel[s.name];
             if (programs === undefined) return true;
             return programs.some(p => p.category === genreFilter);
-        }),
-        [streams, selectedCategory, genreFilter, epgByChannel]
-    );
+        });
+    }, [categoryStreams, genreFilter, epgByChannel]);
+
+    const rowWindow = useMemo(() => computeGuideRowWindow({
+        scrollRow,
+        viewportHeight,
+        rowHeight: ROW_HEIGHT,
+        rowCount: filteredStreams.length,
+        overscanRows: GUIDE_OVERSCAN_ROWS
+    }), [scrollRow, viewportHeight, filteredStreams.length]);
+
     const renderedStreams = useMemo(
-        () => categoryStreams.slice(0, visibleRows),
-        [categoryStreams, visibleRows]
+        () => filteredStreams.slice(rowWindow.start, rowWindow.end),
+        [filteredStreams, rowWindow.start, rowWindow.end]
     );
 
-    // Reset windowed rows when category changes (deferred setState)
+    // Back to the top when the category changes.
     useEffect(() => {
-        queueMicrotask(() => setVisibleRows(INITIAL_ROWS));
+        queueMicrotask(() => setScrollRow(0));
         if (scrollRef.current) scrollRef.current.scrollTop = 0;
     }, [selectedCategory]);
+
+    // Altura do viewport da grade (a janela de linhas depende dela). Reatado
+    // quando o scroller aparece — durante o loading ele nem existe.
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const measure = () => setViewportHeight(prev => (prev === el.clientHeight ? prev : el.clientHeight));
+        measure();
+        const observer = new ResizeObserver(measure);
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [loading]);
+
+    // Resoluções de EPG coalescidas: um setState por leva, não um por canal.
+    // Cada setState re-renderiza a grade, e com 4 buscas simultâneas as
+    // resoluções chegam em rajada.
+    const epgBuffer = useRef<Record<string, EPGProgram[]>>({});
+    const epgFlushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const publishEpg = useCallback((channelName: string, programs: EPGProgram[]) => {
+        epgBuffer.current[channelName] = programs;
+        if (epgFlushTimer.current !== null) return;
+        epgFlushTimer.current = setTimeout(() => {
+            epgFlushTimer.current = null;
+            const batch = epgBuffer.current;
+            epgBuffer.current = {};
+            setEpgByChannel(prev => ({ ...prev, ...batch }));
+        }, EPG_BATCH_MS);
+    }, []);
+    useEffect(() => () => {
+        if (epgFlushTimer.current !== null) clearTimeout(epgFlushTimer.current);
+    }, []);
 
     // Lazy EPG fetch for the rendered rows (concurrency-limited, module-cached)
     useEffect(() => {
@@ -313,35 +372,27 @@ export function EpgGuide() {
         for (const channel of renderedStreams) {
             const cached = epgCache.get(channel.name);
             if (cached) {
-                if (epgByChannel[channel.name] === undefined) {
-                    queueMicrotask(() => setEpgByChannel(prev =>
-                        prev[channel.name] === undefined ? { ...prev, [channel.name]: cached } : prev
-                    ));
-                }
+                if (epgByChannel[channel.name] === undefined) publishEpg(channel.name, cached);
                 continue;
             }
             void loadChannelEpg(channel).then(programs => {
-                if (!cancelled) {
-                    setEpgByChannel(prev => ({ ...prev, [channel.name]: programs }));
-                }
+                if (!cancelled) publishEpg(channel.name, programs);
             });
         }
         return () => { cancelled = true; };
         // epgByChannel intentionally omitted: it is only written here, and
         // including it would re-run the loop on every fetch resolution.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [renderedStreams]);
+    }, [renderedStreams, publishEpg]);
 
-    // Load more rows when scrolling near the bottom
+    // Rolagem: só a LINHA do topo vira estado — dentro da mesma linha a janela
+    // é idêntica, então publicar o pixel seria re-render sem mudança nenhuma.
     const handleScroll = useCallback(() => {
         const el = scrollRef.current;
         if (!el) return;
-        if (el.scrollTop + el.clientHeight >= el.scrollHeight - ROW_HEIGHT * 4) {
-            setVisibleRows(prev =>
-                prev < categoryStreams.length ? Math.min(prev + ROWS_INCREMENT, categoryStreams.length) : prev
-            );
-        }
-    }, [categoryStreams.length]);
+        const row = Math.max(0, Math.floor(Math.max(0, el.scrollTop - HEADER_HEIGHT) / ROW_HEIGHT));
+        setScrollRow(prev => (prev === row ? prev : row));
+    }, []);
 
     // Time paging: shift the visible window in 2h steps, clamped to the data range
     const pageWindow = useCallback((direction: 1 | -1) => {
@@ -380,20 +431,22 @@ export function EpgGuide() {
     // Scroll to (and briefly highlight) the searched channel's row once rendered
     useEffect(() => {
         if (!pendingScrollChannel) return;
-        const index = categoryStreams.findIndex(s => s.name === pendingScrollChannel);
+        const index = filteredStreams.findIndex(s => s.name === pendingScrollChannel);
         if (index === -1) return;
-        if (index >= visibleRows) {
-            queueMicrotask(() => setVisibleRows(index + 1));
+        const row = rowRefs.current.get(pendingScrollChannel);
+        if (!row) {
+            // Linha fora da janela virtual: leva o scroller até a altura dela
+            // (ROW_HEIGHT é fixo) — o render seguinte a monta e este efeito
+            // roda de novo para centralizar de fato.
+            if (scrollRef.current) scrollRef.current.scrollTop = index * ROW_HEIGHT;
             return;
         }
-        const row = rowRefs.current.get(pendingScrollChannel);
-        if (!row) return;
         row.scrollIntoView({ block: 'center', behavior: 'smooth' });
         setHighlightedChannel(pendingScrollChannel);
         setPendingScrollChannel(null);
         const timer = setTimeout(() => setHighlightedChannel(null), 2200);
         return () => clearTimeout(timer);
-    }, [pendingScrollChannel, categoryStreams, visibleRows]);
+    }, [pendingScrollChannel, filteredStreams, rowWindow.start, rowWindow.end]);
 
     const buildLiveStreamUrl = async (channel: LiveStream): Promise<string> => {
         const result = await window.ipcRenderer.invoke('auth:get-credentials');
@@ -732,7 +785,7 @@ export function EpgGuide() {
                 </div>
 
                 <span style={{ fontSize: '13px', color: 'rgba(148, 163, 184, 0.9)' }}>
-                    {categoryStreams.length} {t('guide', 'channels')}
+                    {filteredStreams.length} {t('guide', 'channels')}
                 </span>
             </div>
 
@@ -750,7 +803,7 @@ export function EpgGuide() {
                     background: 'rgba(15, 15, 26, 0.6)'
                 }}
             >
-                {categoryStreams.length === 0 ? (
+                {filteredStreams.length === 0 ? (
                     <div style={{ padding: '60px 20px', textAlign: 'center', color: 'rgba(156, 163, 175, 1)' }}>
                         <div style={{ fontSize: '48px', marginBottom: '12px', opacity: 0.5 }}>📺</div>
                         {t('guide', 'noChannels')}
@@ -811,6 +864,10 @@ export function EpgGuide() {
                                 </div>
                             )}
 
+                            {/* Spacers da virtualização: mantêm a barra de rolagem
+                                do tamanho da categoria inteira com só ~2 telas
+                                de linhas montadas. */}
+                            {rowWindow.topSpacer > 0 && <div style={{ height: rowWindow.topSpacer }} />}
                             {renderedStreams.map(channel => {
                                 const programs = epgByChannel[channel.name];
                                 return (
@@ -1012,6 +1069,7 @@ export function EpgGuide() {
                                     </div>
                                 );
                             })}
+                            {rowWindow.bottomSpacer > 0 && <div style={{ height: rowWindow.bottomSpacer }} />}
                         </div>
                     </div>
                 )}

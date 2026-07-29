@@ -303,6 +303,22 @@ export function Series() {
     const windowStart = gridWindow.ready ? gridWindow.start : 0;
     const windowEnd = gridWindow.ready ? gridWindow.end : Math.min(visibleCount, filteredSeries.length);
 
+    // Listas de estado do usuário lidas UMA vez por render, não por card (o
+    // mesmo motivo da VOD: cada card fazia getItem+JSON.parse do histórico
+    // inteiro). Os serviços devolvem a MESMA referência enquanto o localStorage
+    // não muda, então indexar com useMemo sobre elas não congela dado velho.
+    const favoriteEntries = favoritesService.getAll();
+    const favoriteSeriesIds = useMemo(
+        () => new Set(favoriteEntries.filter(f => f.type === 'series').map(f => f.id)),
+        [favoriteEntries]
+    );
+    const watchLaterEntries = watchLaterService.getAll();
+    const savedSeriesIds = useMemo(
+        () => new Set(watchLaterEntries.filter(i => i.type === 'series').map(i => i.id)),
+        [watchLaterEntries]
+    );
+    const seriesProgressIndex = watchProgressService.getSeriesProgressIndex();
+
     // Followed series (favorites/in progress) whose provider last_modified
     // bumped since the user last opened them → "new episodes" badge.
     const [updatedSeriesIds, setUpdatedSeriesIds] = useState<Set<string>>(new Set());
@@ -573,9 +589,9 @@ export function Series() {
                                     <div data-spacer="true" style={{ gridColumn: '1 / -1', height: gridWindow.topSpacer }} />
                                 )}
                                 {filteredSeries.slice(windowStart, windowEnd).map((s, index) => {
-                                    const isSaved = watchLaterService.has(String(s.series_id), 'series');
-                                    const isFavorite = favoritesService.has(String(s.series_id), 'series');
-                                    const hasProgress = watchProgressService.getSeriesProgress(String(s.series_id), s.name);
+                                    const isSaved = savedSeriesIds.has(String(s.series_id));
+                                    const isFavorite = favoriteSeriesIds.has(String(s.series_id));
+                                    const hasProgress = seriesProgressIndex.get(String(s.series_id));
                                     const isCompleted = watchProgressService.isSeriesCompleted(String(s.series_id));
                                     const yearMatch = s.release_date?.match(/(\d{4})/);
                                     const year = yearMatch ? yearMatch[1] : undefined;

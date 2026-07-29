@@ -404,14 +404,32 @@ export function VOD() {
         }
     };
 
+    // Listas de estado do usuário lidas UMA vez por render, não por card: antes
+    // cada card fazia getItem+JSON.parse do histórico inteiro (×5), o que a
+    // ~60 cards montados custava mais que o orçamento de um frame inteiro.
+    // Os serviços devolvem a MESMA referência enquanto o localStorage não muda,
+    // então indexar com useMemo sobre elas é correto por construção: identidade
+    // nova = dado novo (não há como congelar valor velho na tela).
+    const favoriteEntries = favoritesService.getAll();
+    const favoriteMovieIds = useMemo(
+        () => new Set(favoriteEntries.filter(f => f.type === 'movie').map(f => f.id)),
+        [favoriteEntries]
+    );
+    const watchLaterEntries = watchLaterService.getAll();
+    const savedMovieIds = useMemo(
+        () => new Set(watchLaterEntries.filter(i => i.type === 'movie').map(i => i.id)),
+        [watchLaterEntries]
+    );
+    const progressById = movieProgressService.getProgressIndex();
+
     const getProgress = (movieId: number) => {
-        const progress = movieProgressService.getMoviePositionById(movieId.toString());
+        const progress = progressById.get(movieId.toString());
         if (!progress || !progress.duration) return 0;
         return Math.round((progress.currentTime / progress.duration) * 100);
     };
 
     const getMovieProgress = (movieId: number) => {
-        return movieProgressService.getMoviePositionById(movieId.toString());
+        return progressById.get(movieId.toString()) ?? null;
     };
 
     const formatRemainingTime = (currentTime: number, duration: number) => {
@@ -586,8 +604,8 @@ export function VOD() {
                                         ? Math.max(...groupList.map(v => getProgress(v.stream_id)))
                                         : getProgress(stream.stream_id);
                                     const movieProgress = getMovieProgress(stream.stream_id);
-                                    const isSaved = watchLaterService.has(String(stream.stream_id), 'movie');
-                                    const isFavorite = favoritesService.has(String(stream.stream_id), 'movie');
+                                    const isSaved = savedMovieIds.has(String(stream.stream_id));
+                                    const isFavorite = favoriteMovieIds.has(String(stream.stream_id));
                                     const yearMatch = stream.release_date?.match(/(\d{4})/);
                                     const year = yearMatch ? yearMatch[1] : undefined;
                                     const genres = stream.genre?.split(',').map(g => g.trim()).filter(Boolean);

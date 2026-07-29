@@ -255,3 +255,88 @@ export function windowForDay(dayMs: number, now: number = Date.now()): GuideWind
     const start = Math.floor(dayMs / HALF_HOUR_MS) * HALF_HOUR_MS;
     return clampWindow({ start, end: start + WINDOW_HALF_HOURS * HALF_HOUR_MS }, now);
 }
+
+// ---------------------------------------------------------------------------
+// Grade do Guia: janela de linhas + agregação incremental de gêneros
+// ---------------------------------------------------------------------------
+
+export interface GuideRowWindowInput {
+    /** Índice da primeira linha encostada no topo do viewport. */
+    scrollRow: number;
+    /** Altura visível do scroller, em px. */
+    viewportHeight: number;
+    /** Altura fixa de uma linha da grade, em px. */
+    rowHeight: number;
+    /** Total de canais da categoria. */
+    rowCount: number;
+    /** Linhas extras montadas de cada lado do viewport. */
+    overscanRows: number;
+}
+
+export interface GuideRowWindow {
+    start: number;
+    end: number;
+    topSpacer: number;
+    bottomSpacer: number;
+}
+
+/**
+ * Fatia de linhas montada pela grade do Guia.
+ *
+ * A grade antiga só CRESCIA (`visibleRows += 25` a cada rolagem, nunca
+ * encolhia): depois de percorrer uma categoria de 600 canais havia 600 linhas
+ * vivas no DOM, e o tique de "agora" de 60 s reconciliava todas elas. Como
+ * `rowHeight` aqui é constante, a janela é aritmética pura e os dois spacers
+ * mantêm a barra de rolagem com o tamanho da categoria inteira.
+ */
+export function computeGuideRowWindow({
+    scrollRow,
+    viewportHeight,
+    rowHeight,
+    rowCount,
+    overscanRows
+}: GuideRowWindowInput): GuideRowWindow {
+    if (rowCount <= 0 || rowHeight <= 0) {
+        return { start: 0, end: 0, topSpacer: 0, bottomSpacer: 0 };
+    }
+    const rowsInViewport = Math.ceil(Math.max(0, viewportHeight) / rowHeight) + 1;
+    const clampedRow = Math.max(0, Math.min(scrollRow, rowCount - 1));
+    const start = Math.max(0, clampedRow - overscanRows);
+    const end = Math.min(rowCount, clampedRow + rowsInViewport + overscanRows + 1);
+    return {
+        start,
+        end,
+        topSpacer: start * rowHeight,
+        bottomSpacer: (rowCount - end) * rowHeight
+    };
+}
+
+/**
+ * Acumula os gêneros do EPG à medida que os canais resolvem, em vez de varrer
+ * TODOS os canais × TODOS os programas a cada canal que chega.
+ *
+ * `scanned` é o conjunto (mutável) de canais já contabilizados — é o que faz a
+ * varredura ser incremental. Quando a leva não traz gênero novo, devolve a
+ * MESMA referência de `previous`, para o setState do React sair sem re-render.
+ */
+export function mergeGuideGenres(
+    previous: string[],
+    byChannel: Record<string, { category?: string }[] | undefined>,
+    scanned: Set<string>
+): string[] {
+    let added: Set<string> | null = null;
+    for (const channelName of Object.keys(byChannel)) {
+        if (scanned.has(channelName)) continue;
+        const programs = byChannel[channelName];
+        if (programs === undefined) continue;
+        scanned.add(channelName);
+        for (const program of programs) {
+            if (!program.category) continue;
+            if (previous.includes(program.category)) continue;
+            if (added === null) added = new Set<string>();
+            added.add(program.category);
+        }
+    }
+    if (added === null) return previous;
+    return [...previous, ...added].sort();
+}
