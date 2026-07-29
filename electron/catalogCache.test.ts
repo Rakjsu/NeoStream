@@ -10,7 +10,7 @@ const state = vi.hoisted(() => ({ dir: '' }))
 vi.mock('electron', () => ({ app: { getPath: () => state.dir } }))
 vi.mock('./logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
-import { cachedCatalogFetch, invalidatePlaylistCache, isFresh, CATALOG_CACHE_TTL_MS, closeCatalogStore } from './catalogCache'
+import { cachedCatalogFetch, invalidatePlaylistCache, isFresh, CATALOG_CACHE_TTL_MS, closeCatalogStore, catalogMemoryKeys } from './catalogCache'
 
 const cacheDir = () => path.join(state.dir, 'catalog-cache')
 // A escrita no catalog.db sai do caminho da resposta via setImmediate.
@@ -184,5 +184,101 @@ describe('cachedCatalogFetch (stale-while-revalidate por playlist+kind, backend 
         expect(r.data).toEqual([])
         const cache = await cachedCatalogFetch(id, 'live-categories', vi.fn().mockRejectedValue(new Error('x')), true)
         expect(cache.data).toEqual([])
+    })
+
+    // 🚀 R5: dois consumidores simultâneos com o cache vencido (Ctrl+K dispara
+    // os seis kinds num Promise.all enquanto a Home monta) baixavam, parseavam
+    // e regravavam a MESMA lista duas vezes.
+    describe('dedupe de requisições em voo', () => {
+        it('duas chamadas concorrentes ao mesmo kind = UM fetch', async () => {
+            const id = freshId()
+            let liberar!: (value: unknown) => void
+            const fetcher = vi.fn(() => new Promise(resolve => { liberar = resolve }))
+
+            const a = cachedCatalogFetch(id, 'vod', fetcher)
+            const b = cachedCatalogFetch(id, 'vod', fetcher)
+            expect(fetcher).toHaveBeenCalledTimes(1)
+
+            liberar([{ stream_id: 7 }])
+            expect(await a).toEqual({ data: [{ stream_id: 7 }], fromCache: false })
+            expect(await b).toEqual({ data: [{ stream_id: 7 }], fromCache: false })
+            expect(fetcher).toHaveBeenCalledTimes(1)
+        })
+
+        it('kinds diferentes não se atropelam', async () => {
+            const id = freshId()
+            const vod = vi.fn().mockResolvedValue(['filmes'])
+            const live = vi.fn().mockResolvedValue(['canais'])
+            const [a, b] = await Promise.all([
+                cachedCatalogFetch(id, 'vod', vod),
+                cachedCatalogFetch(id, 'live', live),
+            ])
+            expect(a.data).toEqual(['filmes'])
+            expect(b.data).toEqual(['canais'])
+        })
+
+        it('a entrada em voo sai no fim — a busca seguinte não fica presa na anterior', async () => {
+            const id = freshId()
+            const primeiro = vi.fn().mockRejectedValue(new Error('caiu'))
+            await expect(cachedCatalogFetch(id, 'series', primeiro)).rejects.toThrow('caiu')
+
+            const segundo = vi.fn().mockResolvedValue(['ok'])
+            expect((await cachedCatalogFetch(id, 'series', segundo)).data).toEqual(['ok'])
+            expect(segundo).toHaveBeenCalledTimes(1)
+        })
+    })
+
+    // 🚀 R5: a camada de memória só guardava e nunca soltava — quem alternava
+    // entre duas contas ficava com duas listas de 50 mil itens (≈34 MB cada)
+    // presas no main até fechar o app.
+    describe('poda: a memória só guarda a playlist residente', () => {
+        it('trocar de playlist solta as chaves da anterior', async () => {
+            const a = freshId()
+            const b = freshId()
+            await cachedCatalogFetch(a, 'vod', vi.fn().mockResolvedValue(['filmes-A']))
+            await cachedCatalogFetch(a, 'live', vi.fn().mockResolvedValue(['canais-A']))
+            await flushWrite()
+            expect(catalogMemoryKeys()).toHaveLength(2)
+
+            await cachedCatalogFetch(b, 'vod', vi.fn().mockResolvedValue(['filmes-B']))
+            expect(catalogMemoryKeys()).toEqual([`${b}-vod`])
+        })
+
+        it('nunca passa dos seis kinds da playlist ativa', async () => {
+            const id = freshId()
+            for (const kind of ['live', 'vod', 'series', 'live-categories', 'vod-categories', 'series-categories'] as const) {
+                await cachedCatalogFetch(id, kind, vi.fn().mockResolvedValue([kind]))
+            }
+            await flushWrite()
+            expect(catalogMemoryKeys()).toHaveLength(6)
+        })
+
+        it('podar a memória não perde dado: o catalog.db devolve a playlist antiga', async () => {
+            const a = freshId()
+            const b = freshId()
+            await cachedCatalogFetch(a, 'vod', vi.fn().mockResolvedValue(['filmes-A']))
+            await flushWrite()
+            await cachedCatalogFetch(b, 'vod', vi.fn().mockResolvedValue(['filmes-B']))
+            expect(catalogMemoryKeys()).toEqual([`${b}-vod`])
+
+            // Provedor fora do ar: sem o disco isto viraria erro/lista vazia.
+            const voltou = await cachedCatalogFetch(a, 'vod', vi.fn().mockRejectedValue(new Error('offline')))
+            expect(voltou).toEqual({ data: ['filmes-A'], fromCache: true })
+        })
+
+        // 🛡️ O despejo NUNCA pode ser a única cópia: enquanto a gravação em
+        // disco não termina, a entrada fica na memória mesmo sendo de outra
+        // playlist — senão o SWR não teria o que servir se o provedor cair.
+        it('entrada com gravação em voo não é despejada', async () => {
+            const a = freshId()
+            const b = freshId()
+            await cachedCatalogFetch(a, 'vod', vi.fn().mockResolvedValue(['filmes-A']))
+            // SEM flushWrite: a escrita no catalog.db ainda não rodou.
+            await cachedCatalogFetch(b, 'vod', vi.fn().mockResolvedValue(['filmes-B']))
+            expect(catalogMemoryKeys()).toContain(`${a}-vod`)
+
+            const voltou = await cachedCatalogFetch(a, 'vod', vi.fn().mockRejectedValue(new Error('offline')))
+            expect(voltou).toEqual({ data: ['filmes-A'], fromCache: true })
+        })
     })
 })
