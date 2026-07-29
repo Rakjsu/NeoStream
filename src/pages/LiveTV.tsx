@@ -27,9 +27,24 @@ import { resolveRemoteChannel } from '../services/webRemoteTune';
 import { mobilePushMessageKey } from '../utils/mobilePushResult';
 
 import { asList } from '../utils/catalogPayload';
+import { buildChannelVariantIndex, findQualityVariants } from '../utils/channelQualityVariants';
+import { channelEpgKey, needsEpgRefetch } from '../utils/liveEpgSchedule';
+import { createTtlMemo } from '../utils/ttlMemo';
 
 /** Prazo pro pedido do celular esperar a lista de canais carregar. */
 const REMOTE_TUNE_WAIT_MS = 15000;
+
+/** Zapping rápido não busca EPG dos canais de passagem — só de onde o dedo
+ *  parou. Curto de propósito: acima disso o mini-guia parece travado. */
+const EPG_ZAP_DEBOUNCE_MS = 350;
+/** O guia do provedor tem validade de horas; refazer a cadeia a cada zap ou a
+ *  cada minuto não traz informação nova. */
+const EPG_MEMO_TTL_MS = 5 * 60 * 1000;
+/** Teto de canais guardados no memo (zapar a lista inteira não pode reter o
+ *  guia de milhares de canais). */
+const EPG_MEMO_MAX_CHANNELS = 80;
+/** De quanto em quanto tempo se PERGUNTA se o guia ainda cobre o agora. */
+const EPG_TICK_MS = 60000;
 
 interface LiveStream {
     num: number;
@@ -270,13 +285,30 @@ export function LiveTV() {
     }, [currentProgram]);
 
 
+    // Memo do mini-guia: junta buscas do mesmo canal (zapping rápido dispara
+    // várias) e devolve na hora o guia de um canal já visitado.
+    const epgMemo = useMemo(
+        () => createTtlMemo<EPGProgram[]>({ ttlMs: EPG_MEMO_TTL_MS, maxEntries: EPG_MEMO_MAX_CHANNELS }),
+        []
+    );
+    // Guia em memória do canal ATUAL, pro tick decidir se precisa de rede.
+    const epgDataRef = useRef<EPGProgram[]>([]);
+    useEffect(() => { epgDataRef.current = epgData; }, [epgData]);
+
+    // The guide follows the selected channel — or the PLAYING one, so the
+    // player's mini-EPG survives "Assistir Agora" clearing the side panel.
+    const epgChannel = selectedChannel ?? playingChannel;
+    // Identidade do canal em PRIMITIVAS: com os objetos nas deps o efeito
+    // remontava (e refazia a cadeia inteira) a cada render da página.
+    const epgKey = channelEpgKey(epgChannel);
+    const epgChannelId = epgChannel?.epg_channel_id || '';
+    const epgChannelName = epgChannel?.name || '';
+    const epgStreamId = epgChannel?.stream_id;
+
     // Fetch EPG when channel is selected
     useEffect(() => {
-        // The guide follows the selected channel — or the PLAYING one, so the
-        // player's mini-EPG survives "Assistir Agora" clearing the side panel.
-        const epgChannel = selectedChannel ?? playingChannel;
         // Allow EPG fetch if we have any identifier (epg_channel_id OR name)
-        if (!epgChannel || (!epgChannel.epg_channel_id && !epgChannel.name)) {
+        if (!epgKey) {
             queueMicrotask(() => {
                 setEpgData([]);
                 setCurrentProgram(null);
@@ -285,12 +317,20 @@ export function LiveTV() {
             return;
         }
 
+        // Canal novo: o guia do canal anterior não conta como cobertura.
+        epgDataRef.current = [];
+        let cancelled = false;
+
         const fetchEPG = async () => {
             try {
-                console.log('[EPG] Fetching EPG for channel:', epgChannel.name, 'EPG ID:', epgChannel.epg_channel_id);
                 // Pass both EPG ID and channel name (for Open-EPG Portugal and meuguia.tv fallback)
-                const programs = await epgService.fetchChannelEPG(epgChannel.epg_channel_id || '', epgChannel.name, epgChannel.stream_id);
-                console.log('[EPG] Got programs:', programs.length);
+                const programs = await epgMemo.run(
+                    epgKey,
+                    () => epgService.fetchChannelEPG(epgChannelId, epgChannelName, epgStreamId)
+                );
+                // ⛔ O usuário já zapeou: o guia deste canal não entra na tela
+                // (antes, cadeias fora de ordem pintavam o canal de passagem).
+                if (cancelled) return;
                 setEpgData(programs);
 
                 const current = epgService.getCurrentProgram(programs);
@@ -300,19 +340,27 @@ export function LiveTV() {
                 setUpcomingPrograms(upcoming);
             } catch (error) {
                 // Network hiccup on the EPG source: keep whatever guide data we
-                // already have instead of crashing the 60s refresh loop.
+                // already have instead of crashing the refresh loop.
                 console.warn('[EPG] Fetch failed, keeping previous data:', error);
             }
         };
 
-        fetchEPG();
-        // Refresh EPG every 60 seconds
-        const intervalId = setInterval(fetchEPG, 60000);
+        // Guia já em memória pinta na hora; canal novo espera o dedo parar.
+        const firstFetch = setTimeout(() => { void fetchEPG(); }, epgMemo.peek(epgKey) ? 0 : EPG_ZAP_DEBOUNCE_MS);
+        // O tick não refaz a busca por refazer: só quando o guia em memória
+        // deixa de cobrir o agora (o "agora/a seguir" sai do array de memória
+        // no tick de 10 s do progresso).
+        const intervalId = setInterval(() => {
+            if (cancelled || !needsEpgRefetch(epgDataRef.current, Date.now())) return;
+            void fetchEPG();
+        }, EPG_TICK_MS);
 
         return () => {
-            if (intervalId) clearInterval(intervalId);
+            cancelled = true;
+            clearTimeout(firstFetch);
+            clearInterval(intervalId);
         };
-    }, [selectedChannel, playingChannel]);
+    }, [epgKey, epgChannelId, epgChannelName, epgStreamId, epgMemo]);
 
     // Turn the current program over locally on the 10s progress tick, from the
     // already-fetched EPG (no network). Without this the "agora/a seguir" — in
@@ -618,12 +666,6 @@ export function LiveTV() {
             pendingRemoteTuneRef.current = null;
             tuneFromRemote(pendingRemote.id, pendingRemote.name);
         }
-        const channels = filteredStreams.map(s => ({
-            id: String(s.stream_id),
-            name: s.name,
-            logo: s.stream_icon || '',
-            num: s.num,
-        }));
         const playingId = playingChannel ? String(playingChannel.stream_id) : '';
         const epg = currentProgram
             ? {
@@ -633,153 +675,65 @@ export function LiveTV() {
                 next: upcomingPrograms[0]?.title || '',
             }
             : null;
+        // Assinatura ANTES do map: quase sempre o guia é o mesmo, e materializar
+        // N objetos + N strings só pra descobrir isso era lixo puro.
         const sig = [
-            channels.length,
-            channels[0]?.id ?? '',
-            channels[channels.length - 1]?.id ?? '',
+            filteredStreams.length,
+            filteredStreams[0]?.stream_id ?? '',
+            filteredStreams[filteredStreams.length - 1]?.stream_id ?? '',
             playingId,
             epg ? `${epg.now}|${epg.nowStart}|${epg.next}` : '',
         ].join('~');
         if (sig === lastGuideSigRef.current) return;
         lastGuideSigRef.current = sig;
+        const channels = filteredStreams.map(s => ({
+            id: String(s.stream_id),
+            name: s.name,
+            logo: s.stream_icon || '',
+            num: s.num,
+        }));
         window.ipcRenderer.send('web-remote:guide', { channels, playingId, epg });
-    });
+    }, [filteredStreams, streams.length, playingChannel, currentProgram, upcomingPrograms, consumePendingTune, tuneFromRemote]);
 
-    // Find quality variants for a channel (e.g., Globo SP matches Globo [4K])
-    const getChannelQualityVariants = (channel: LiveStream) => {
-        // Brazilian state abbreviations for regional channels
-        const stateAbbreviations = new Set([
-            'sp', 'rj', 'mg', 'rs', 'pr', 'sc', 'ba', 'pe', 'ce', 'pa',
-            'go', 'ma', 'pb', 'am', 'rn', 'pi', 'al', 'mt', 'ms', 'se',
-            'ro', 'to', 'ac', 'ap', 'rr', 'es', 'df'
-        ]);
+    // 🧬 Índice de variantes de qualidade (Globo SP ↔ Globo [4K]): o custo das
+    // regex é pago UMA vez por lista, não a cada render da página.
+    const qualityIndex = useMemo(() => buildChannelVariantIndex(streams), [streams]);
+    const getChannelQualityVariants = useCallback(
+        (channel: LiveStream) => findQualityVariants(channel, qualityIndex),
+        [qualityIndex]
+    );
+    const playingQualityVariants = useMemo(
+        () => (playingChannel ? getChannelQualityVariants(playingChannel) : []),
+        [playingChannel, getChannelQualityVariants]
+    );
 
-        // Function to extract base name, quality and codec from a channel name
-        const extractInfo = (name: string): { baseName: string; quality: string; codec: string; label: string; priority: number; hasOnlyQuality: boolean; regionSuffix: string } => {
-            const workingName = name.trim();
-            let quality = '';
-            let codec = '';
-            let priority = 2; // Default HD priority
+    // 📺 Lista de canais do player. Era remontada (N objetos + N strings) em
+    // TODO render da página — inclusive a 60 fps durante o scroll da grade —,
+    // o que ainda desregistrava/registrava os atalhos de teclado do player a
+    // cada tick de 10 s, porque a prop entrava nas deps daqueles efeitos.
+    const playerChannelList = useMemo(() => {
+        const rankOf = new Map(zapRecent.map((id, index) => [id, index]));
+        return filteredStreams.map(s => {
+            const id = String(s.stream_id);
+            return {
+                id: s.stream_id,
+                name: s.name,
+                logo: s.stream_icon,
+                num: s.num,
+                favorite: favoriteChannelIds.has(id),
+                directUrl: s.direct_source || undefined,
+                recentRank: rankOf.get(id)
+            };
+        });
+    }, [filteredStreams, zapRecent, favoriteChannelIds]);
 
-            // Detect resolution quality
-            if (/\[4K\]|\(4K\)|2160p/i.test(workingName)) {
-                quality = '4K';
-                priority = 0;
-            } else if (/\[UHD\]|\(UHD\)/i.test(workingName)) {
-                quality = 'UHD';
-                priority = 0;
-            } else if (/\[FHD\]|\(FHD\)|1080p/i.test(workingName)) {
-                quality = 'FHD';
-                priority = 1;
-            } else if (/\[HD\]|\(HD\)|720p/i.test(workingName)) {
-                quality = 'HD';
-                priority = 2;
-            } else if (/\[SD\]|\(SD\)|480p/i.test(workingName)) {
-                quality = 'SD';
-                priority = 3;
-            }
-
-            // Detect codec (H.265/HEVC)
-            if (/\[H\.?265\]|\(H\.?265\)|HEVC/i.test(workingName)) {
-                codec = 'H.265';
-                // H.265 gives slightly higher priority within same quality
-                priority = Math.max(0, priority - 0.5);
-            }
-
-            // Create label
-            let label = quality || 'HD';
-            if (codec) {
-                label = quality ? `${quality} ${codec}` : codec;
-            }
-
-            // Strip ALL quality/codec indicators to get base name
-            const baseName = workingName
-                .replace(/\s*\[(?:FHD|HD|SD|4K|UHD|H\.?265|HEVC)\]\s*/gi, ' ')
-                .replace(/\s*\((?:FHD|HD|SD|4K|UHD|H\.?265|HEVC)\)\s*/gi, ' ')
-                .replace(/\s*(?:2160|1080|720|480)p?\s*/gi, ' ')
-                .replace(/\s+FHD\s+/gi, ' ')
-                .replace(/\s+HD\s+/gi, ' ')
-                .replace(/\s+SD\s+/gi, ' ')
-                .replace(/\s+/g, ' ')
-                .trim();
-
-            // Check if channel only has quality indicator (e.g., "Globo [4K]" -> baseName is "Globo")
-            const hasOnlyQuality = !!(quality || codec) && baseName.length < workingName.length * 0.7;
-
-            // Extract regional suffix (last word if it's a state abbreviation)
-            const words = baseName.split(' ');
-            const lastWord = words[words.length - 1]?.toLowerCase() || '';
-            const regionSuffix = stateAbbreviations.has(lastWord) ? lastWord : '';
-
-            return { baseName, quality, codec, label, priority, hasOnlyQuality, regionSuffix };
-        };
-
-        const currentInfo = extractInfo(channel.name);
-        const { baseName } = currentInfo;
-
-        // Find all channels that match this base name
-        const variants: Array<{
-            channel: LiveStream;
-            quality: string;
-            priority: number;
-            label: string;
-        }> = [];
-
-        for (const stream of streams) {
-            const info = extractInfo(stream.name);
-            const streamBaseLower = info.baseName.toLowerCase();
-            const currentBaseLower = baseName.toLowerCase();
-
-            // Match conditions:
-            // 1. Exact base name match (e.g., "Globo SP" === "Globo SP")
-            const isExactMatch = streamBaseLower === currentBaseLower;
-
-            // 2. For quality-only channels (e.g., "Globo [4K]"):
-            //    Only match channels with same core name + state abbreviation (e.g., "Globo SP", "Globo RJ")
-            //    NOT channels with different names (e.g., "Globo News", "Globo Minas")
-            let isQualityVariant = false;
-            if (currentInfo.hasOnlyQuality && currentBaseLower.length >= 3) {
-                // Stream must have a state suffix and core name must match
-                if (info.regionSuffix) {
-                    const streamCoreWords = info.baseName.toLowerCase().split(' ');
-                    streamCoreWords.pop(); // Remove state suffix
-                    const streamCore = streamCoreWords.join(' ');
-                    isQualityVariant = streamCore === currentBaseLower;
-                }
-            }
-
-            // 3. For regional channels (e.g., "Globo SP"):
-            //    Match quality-only channels with same core name (e.g., "Globo [4K]")
-            let isCurrentRegionalVariant = false;
-            if (currentInfo.regionSuffix && !currentInfo.hasOnlyQuality) {
-                if (info.hasOnlyQuality) {
-                    const currentCoreWords = currentBaseLower.split(' ');
-                    currentCoreWords.pop(); // Remove state suffix
-                    const currentCore = currentCoreWords.join(' ');
-                    isCurrentRegionalVariant = info.baseName.toLowerCase() === currentCore;
-                }
-            }
-
-            if (isExactMatch || isQualityVariant || isCurrentRegionalVariant) {
-                // If no quality/codec detected, use "SD" as default label
-                const label = (info.quality || info.codec) ? info.label : 'SD';
-                const priority = (info.quality || info.codec) ? info.priority : 4;
-
-                variants.push({
-                    channel: stream,
-                    quality: info.quality || 'SD',
-                    priority: priority,
-                    label: label
-                });
-            }
+    const switchPlayingChannel = useCallback((id: string | number) => {
+        const next = filteredStreams.find(s => String(s.stream_id) === String(id));
+        if (next) {
+            setSelectedChannel(next);
+            setPlayingChannel(next);
         }
-
-        // Sort by priority (4K first, then FHD H.265, then FHD, then HD, then SD, then unmarked)
-        variants.sort((a, b) => a.priority - b.priority);
-
-        // Only return variants if there's more than one option
-        return variants.length > 1 ? variants : [];
-    };
+    }, [filteredStreams]);
 
     // Memoized so AsyncVideoPlayer's URL effect (which lists buildStreamUrl in
     // its deps) doesn't re-run on every LiveTV render. Without this, the rapid
@@ -2115,15 +2069,9 @@ export function LiveTV() {
                             progressPct: epgService.getProgramProgress(currentProgram),
                             nextTitle: upcomingPrograms[0]?.title
                         } : undefined}
-                        channelList={filteredStreams.map(s => { const rank = zapRecent.indexOf(String(s.stream_id)); return { id: s.stream_id, name: s.name, logo: s.stream_icon, num: s.num, favorite: favoriteChannelIds.has(String(s.stream_id)), directUrl: s.direct_source || undefined, recentRank: rank >= 0 ? rank : undefined }; })}
-                        onSwitchChannel={(id) => {
-                            const next = filteredStreams.find(s => String(s.stream_id) === String(id));
-                            if (next) {
-                                setSelectedChannel(next);
-                                setPlayingChannel(next);
-                            }
-                        }}
-                        liveQualityVariants={getChannelQualityVariants(playingChannel)}
+                        channelList={playerChannelList}
+                        onSwitchChannel={switchPlayingChannel}
+                        liveQualityVariants={playingQualityVariants}
                         onSwitchQuality={(channel: LiveStream) => {
                             setPlayingChannel(channel);
                             // Save quality preference based on selected variant
