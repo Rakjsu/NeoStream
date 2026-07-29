@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { computeRowWindow, rowIndexAt } from './windowedGridMath';
 
 /**
  * Windowed rendering for the content grids (VOD/Series/LiveTV) — v2.
@@ -15,6 +16,12 @@ import { useState, useEffect, useRef, useCallback } from 'react';
  *
  * Until the first row height is measured the page should render its plain
  * slice (`ready` false) — no layout flash, no 1-column bug.
+ *
+ * v3: o estado de scroll guardado é o ÍNDICE DA LINHA do topo, não o
+ * `scrollTop` em pixels. Com pixels, o rAF de scroll disparava um setState (e
+ * portanto um render da página inteira) a cada frame — e cada card da VOD/Séries
+ * refazia leituras de localStorage no caminho. Com a linha, só há re-render
+ * quando a fatia montada realmente muda. A aritmética vive em windowedGridMath.
  */
 
 /** Single switch to disable windowing app-wide if an edge case appears. */
@@ -51,9 +58,11 @@ export function useWindowedGrid({
     overscanRows = 3
 }: WindowedGridOptions): WindowedGridResult {
     const [geometry, setGeometry] = useState<{ columns: number; rowHeight: number; rowGap: number } | null>(null);
-    const [scrollTop, setScrollTop] = useState(0);
+    const [scrollRow, setScrollRow] = useState(0);
     const [viewportHeight, setViewportHeight] = useState(0);
     const rafRef = useRef<number | null>(null);
+    // Última linha publicada — evita setState quando a rolagem não trocou de linha.
+    const lastRowRef = useRef(0);
 
     // Measure geometry from the REAL rendered grid: column count comes from
     // the computed grid-template-columns (CSS truth — no parallel math to
@@ -74,8 +83,14 @@ export function useWindowedGrid({
         const cardHeight = firstCard.getBoundingClientRect().height;
 
         if (columnCount > 0 && cardHeight > 0) {
-            setGeometry({ columns: columnCount, rowHeight: cardHeight + rowGap, rowGap });
-            setViewportHeight(scroller.clientHeight);
+            const rowHeight = cardHeight + rowGap;
+            // Só publica quando algum número muda: o ResizeObserver dispara a
+            // cada ajuste de altura dos spacers durante a rolagem, e um objeto
+            // novo idêntico re-renderizaria a página à toa.
+            setGeometry(prev => (prev && prev.columns === columnCount && prev.rowHeight === rowHeight && prev.rowGap === rowGap)
+                ? prev
+                : { columns: columnCount, rowHeight, rowGap });
+            setViewportHeight(prev => (prev === scroller.clientHeight ? prev : scroller.clientHeight));
         }
     }, [gridRef, scrollRef]);
 
@@ -96,16 +111,22 @@ export function useWindowedGrid({
     });
     useEffect(() => () => observerRef.current?.disconnect(), []);
 
-    // Track scroll position (rAF-throttled).
+    // Track scroll position (rAF-throttled), quantizado por LINHA: dentro da
+    // mesma linha a janela é idêntica, então publicar o pixel só geraria
+    // re-render sem mudança de fatia.
     useEffect(() => {
         const scroller = scrollRef.current;
         if (!scroller) return;
+        const rowHeight = geometry?.rowHeight ?? 0;
 
         const onScroll = () => {
             if (rafRef.current !== null) return;
             rafRef.current = requestAnimationFrame(() => {
                 rafRef.current = null;
-                setScrollTop(scroller.scrollTop);
+                const row = rowIndexAt(scroller.scrollTop, rowHeight);
+                if (row === lastRowRef.current) return;
+                lastRowRef.current = row;
+                setScrollRow(row);
             });
         };
 
@@ -114,37 +135,24 @@ export function useWindowedGrid({
             scroller.removeEventListener('scroll', onScroll);
             if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
         };
-        // scrollRef identity is stable for the page's lifetime.
-    }, [scrollRef, geometry !== null]); // eslint-disable-line react-hooks/exhaustive-deps
+        // scrollRef identity is stable for the page's lifetime; `geometry` só
+        // troca de identidade quando algum número da medição muda.
+    }, [scrollRef, geometry]);
 
     if (!ENABLE_WINDOWED_GRIDS || !geometry || itemCount === 0) {
         return { ready: false, start: 0, end: itemCount, topSpacer: 0, bottomSpacer: 0, columns: geometry?.columns ?? 0 };
     }
 
     const { columns, rowHeight, rowGap } = geometry;
-    const totalRows = Math.ceil(itemCount / columns);
+    const slice = computeRowWindow({
+        scrollRow,
+        viewportHeight,
+        rowHeight,
+        rowGap,
+        itemCount,
+        columns,
+        overscanRows
+    });
 
-    const firstVisibleRow = Math.max(0, Math.floor(scrollTop / rowHeight) - overscanRows);
-    const lastVisibleRow = Math.min(
-        totalRows - 1,
-        Math.ceil((scrollTop + viewportHeight) / rowHeight) + overscanRows
-    );
-
-    const start = firstVisibleRow * columns;
-    const end = Math.min(itemCount, (lastVisibleRow + 1) * columns);
-
-    // N skipped rows normally occupy N*rowHeight (card + gap each). The
-    // spacer replaces those rows but, being a grid row itself, the grid adds
-    // one extra gap between it and the adjacent card row — subtract it.
-    const spacerFor = (skippedRows: number) =>
-        skippedRows > 0 ? Math.max(0, skippedRows * rowHeight - rowGap) : 0;
-
-    return {
-        ready: true,
-        start,
-        end,
-        topSpacer: spacerFor(firstVisibleRow),
-        bottomSpacer: spacerFor(totalRows - 1 - lastVisibleRow),
-        columns
-    };
+    return { ready: true, ...slice, columns };
 }

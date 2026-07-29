@@ -4,6 +4,7 @@ import { favoritesService, type FavoriteItem } from '../services/favoritesServic
 import { ContentDetailModal } from '../components/ContentDetailModal';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { ResumeModal } from '../components/ResumeModal';
+import { LazyImage } from '../components/LazyImage';
 import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
 import { useLanguage } from '../services/languageService';
@@ -13,6 +14,9 @@ interface ProviderEpisode {
     episode_num: string | number;
     container_extension?: string;
 }
+
+/** Pôster que o provedor não entregou (mesmo SVG do onError anterior). */
+const POSTER_PLACEHOLDER = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTUwIiB2aWV3Qm94PSIwIDAgMTAwIDE1MCI+PHJlY3QgZmlsbD0iIzFmMjkzNyIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxNTAiLz48dGV4dCBmaWxsPSIjNGI1NTYzIiBmb250LXNpemU9IjQwIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgeD0iNTAlIiB5PSI1MCUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj4/PC90ZXh0Pjwvc3ZnPg==';
 
 /** Catalog favorites only — channel favorites live in LiveTV's ⭐ category. */
 type CatalogFavorite = FavoriteItem & { type: 'series' | 'movie' };
@@ -68,9 +72,10 @@ export function Favorites() {
         }, 300);
     }, [loadItems]);
 
-    const getMovieProgress = (movieId: string) => {
-        return movieProgressService.getMoviePositionById(movieId);
-    };
+    // Índices lidos UMA vez por render: os cards consultavam progresso de filme
+    // e de série um a um, e cada consulta reparseava o histórico inteiro.
+    const movieProgressById = movieProgressService.getProgressIndex();
+    const seriesProgressById = watchProgressService.getSeriesProgressIndex();
 
     const formatRemainingTime = (currentTime: number, duration: number) => {
         const remaining = Math.max(0, duration - currentTime);
@@ -190,25 +195,30 @@ export function Favorites() {
                 {/* Cards Grid */}
                 <div className="cards-grid">
                     {displayItems.map((item, index) => {
-                        const movieProgress = item.type === 'movie' ? getMovieProgress(item.id) : null;
+                        const movieProgress = item.type === 'movie' ? movieProgressById.get(item.id) : undefined;
                         const progressPercent = movieProgress ? Math.round((movieProgress.currentTime / movieProgress.duration) * 100) : 0;
-                        const seriesProgress = item.type === 'series' ? watchProgressService.getSeriesProgress(item.id, item.title) : null;
+                        const seriesProgress = item.type === 'series' ? seriesProgressById.get(item.id) : undefined;
 
+                        // O escalonamento da entrada para no 12º card: com 300
+                        // itens ele virava uma animação de 15 s.
                         return (
                             <div
                                 key={`${item.type}-${item.id}`}
                                 className={`card ${removingId === `${item.type}-${item.id}` ? 'removing' : ''}`}
-                                style={{ animationDelay: `${index * 0.05}s` }}
+                                style={{ animationDelay: `${Math.min(index, 12) * 0.05}s` }}
                                 onClick={() => handleItemClick(item)}
                             >
                                 <div className="card-poster">
-                                    <img
-                                        src={item.poster}
-                                        alt={item.title}
-                                        onError={(e) => {
-                                            (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTUwIiB2aWV3Qm94PSIwIDAgMTAwIDE1MCI+PHJlY3QgZmlsbD0iIzFmMjkzNyIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxNTAiLz48dGV4dCBmaWxsPSIjNGI1NTYzIiBmb250LXNpemU9IjQwIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgeD0iNTAlIiB5PSI1MCUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj4/PC90ZXh0Pjwvc3ZnPg==';
-                                        }}
-                                    />
+                                    {/* LazyImage (IntersectionObserver, 200px de margem): com
+                                        <img> cru o Chromium pedia e decodificava os 300 pôsteres
+                                        de uma vez, inclusive os 20 telas abaixo. */}
+                                    <div className="card-poster-img">
+                                        <LazyImage
+                                            src={item.poster}
+                                            alt={item.title}
+                                            fallback={<img src={POSTER_PLACEHOLDER} alt="" />}
+                                        />
+                                    </div>
                                     <div className="card-type">
                                         {item.type === 'movie' ? '🎬' : '📺'}
                                     </div>
@@ -589,6 +599,13 @@ const favoritesStyles = `
     position: relative;
     aspect-ratio: 2/3;
     overflow: hidden;
+}
+
+/* Wrapper do LazyImage: o componente traz um <div> de 100%×100%, então este
+   aqui é quem lhe dá a caixa do pôster dentro do .card-poster. */
+.card-poster-img {
+    position: absolute;
+    inset: 0;
 }
 
 .card-poster img {

@@ -1,6 +1,7 @@
 import type { Profile, ProfilesData, CreateProfileData, UpdateProfileData } from '../types/profile';
 import { syncTombstones, tombstoneItemKey } from './syncTombstones';
 import { logParentalEvent } from './parentalLogService';
+import { readJson } from './storageJsonCache';
 
 const STORAGE_KEY = 'neostream_profiles';
 const MAX_PROFILES = 5;
@@ -15,17 +16,12 @@ async function hashPin(pin: string): Promise<string> {
 }
 
 // Get all data from storage
+// getActiveProfile() é chamado várias vezes por card das grades (todo serviço
+// de estado do usuário começa por ele), então a leitura passa pelo cache de
+// parse — que revalida pela string crua e devolve o mesmo objeto enquanto o
+// texto não muda. Todos os mutadores daqui leem, mutam e SALVAM em seguida.
 function getStorageData(): ProfilesData {
-    try {
-        const data = localStorage.getItem(STORAGE_KEY);
-        if (!data) {
-            return { profiles: [], activeProfileId: null };
-        }
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('Error reading profiles from storage:', error);
-        return { profiles: [], activeProfileId: null };
-    }
+    return readJson<ProfilesData>(STORAGE_KEY, { profiles: [], activeProfileId: null });
 }
 
 // Save data to storage

@@ -2,6 +2,7 @@
 import { profileService } from './profileService';
 import { playlistScopedKey, hasKnownPlaylistId } from './activePlaylistService';
 import { syncTombstones, tombstoneItemKey } from './syncTombstones';
+import { readJson } from './storageJsonCache';
 
 // localStorage key base. Per-profile per-playlist key is
 // `neostream_profile_${profileId}__pl_${activePlaylistId}`; the legacy
@@ -126,13 +127,8 @@ export const favoritesService = {
         if (!activeProfile) return {};
 
         this.migrate();
-        try {
-            const key = playlistScopedKey(KEY_BASE, activeProfile.id);
-            const data = localStorage.getItem(key);
-            return data ? JSON.parse(data) as FavoriteProfileData : {};
-        } catch {
-            return {};
-        }
+        const key = playlistScopedKey(KEY_BASE, activeProfile.id);
+        return readJson<FavoriteProfileData>(key, {});
     },
 
     // Save profile data to localStorage (per-profile per-playlist key)

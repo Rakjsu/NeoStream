@@ -1,6 +1,7 @@
 import { profileService } from './profileService';
 import { playlistScopedKey, hasKnownPlaylistId } from './activePlaylistService';
 import { syncTraktMovieWatched } from './traktService';
+import { readJson } from './storageJsonCache';
 
 export interface MovieProgress {
     movieId: string;
@@ -52,8 +53,28 @@ class MovieProgressService {
 
     // Get all movie progress for the active profile
     private getProgress(): MovieProgress[] {
-        const stored = localStorage.getItem(this.getStorageKey());
-        return stored ? JSON.parse(stored) : [];
+        return readJson<MovieProgress[]>(this.getStorageKey(), []);
+    }
+
+    /**
+     * Índice movieId → progresso, memoizado pela IDENTIDADE do array parseado
+     * (que só muda quando o texto no localStorage muda). Os cards da grade
+     * consultavam `getMoviePositionById` um a um, o que era uma varredura
+     * linear do histórico inteiro por card.
+     */
+    private indexCache = new WeakMap<MovieProgress[], Map<string, MovieProgress>>();
+    getProgressIndex(): Map<string, MovieProgress> {
+        // Sem perfil ativo a chave cai no prefixo legado — mesma guarda que
+        // getMoviePositionById sempre teve.
+        if (!profileService.getActiveProfile()) return new Map();
+        const progress = this.getProgress();
+        const cached = this.indexCache.get(progress);
+        if (cached) return cached;
+        const index = new Map<string, MovieProgress>();
+        // Primeiro vence, pra casar com o `.find()` que existia antes.
+        for (const entry of progress) if (!index.has(entry.movieId)) index.set(entry.movieId, entry);
+        this.indexCache.set(progress, index);
+        return index;
     }
 
     // Save movie progress for the active profile
@@ -163,7 +184,7 @@ class MovieProgressService {
     // Get specific movie progress (active profile)
     getMoviePositionById(movieId: string): MovieProgress | null {
         if (!profileService.getActiveProfile()) return null;
-        return this.getProgress().find((p) => p.movieId === movieId) || null;
+        return this.getProgressIndex().get(movieId) || null;
     }
 
     // Get movies in progress (1-94%)

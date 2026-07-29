@@ -1,5 +1,6 @@
 import { profileService } from './profileService';
 import { playlistScopedKey, hasKnownPlaylistId } from './activePlaylistService';
+import { readJson } from './storageJsonCache';
 
 export interface EpisodeProgress {
     seriesId: string;
@@ -54,8 +55,46 @@ class WatchProgressService {
 
     // Get all watch progress for current profile
     private getProgress(): EpisodeProgress[] {
-        const stored = localStorage.getItem(this.getStorageKey());
-        return stored ? JSON.parse(stored) : [];
+        return readJson<EpisodeProgress[]>(this.getStorageKey(), []);
+    }
+
+    /**
+     * Índice seriesId → resumo, memoizado pela IDENTIDADE do array parseado
+     * (que só muda quando o texto no localStorage muda). Cada card de Séries
+     * chamava `getSeriesProgress`, que varria o histórico de episódios inteiro.
+     */
+    private seriesIndexCache = new WeakMap<EpisodeProgress[], Map<string, Omit<SeriesProgress, 'seriesName'>>>();
+    getSeriesProgressIndex(): Map<string, Omit<SeriesProgress, 'seriesName'>> {
+        const activeProfile = profileService.getActiveProfile();
+        const progress = this.getProgress();
+        const cached = this.seriesIndexCache.get(progress);
+        if (cached) return cached;
+
+        const index = new Map<string, Omit<SeriesProgress, 'seriesName'>>();
+        if (activeProfile) {
+            for (const ep of progress) {
+                if (ep.profileId !== activeProfile.id) continue;
+                const current = index.get(ep.seriesId);
+                if (!current) {
+                    index.set(ep.seriesId, {
+                        seriesId: ep.seriesId,
+                        lastWatchedSeason: ep.seasonNumber,
+                        lastWatchedEpisode: ep.episodeNumber,
+                        lastWatchedAt: ep.watchedAt,
+                        episodeCount: 1
+                    });
+                    continue;
+                }
+                current.episodeCount++;
+                if (ep.watchedAt > current.lastWatchedAt) {
+                    current.lastWatchedSeason = ep.seasonNumber;
+                    current.lastWatchedEpisode = ep.episodeNumber;
+                    current.lastWatchedAt = ep.watchedAt;
+                }
+            }
+        }
+        this.seriesIndexCache.set(progress, index);
+        return index;
     }
 
     // Save progress for current profile
@@ -210,29 +249,8 @@ class WatchProgressService {
 
     // Get series progress WITHOUT needing total episodes
     getSeriesProgress(seriesId: string, seriesName: string): SeriesProgress | null {
-        const activeProfile = profileService.getActiveProfile();
-        if (!activeProfile) return null;
-
-        const progress = this.getProgress();
-        const seriesEpisodes = progress.filter((p) => p.seriesId === seriesId && p.profileId === activeProfile.id);
-
-        if (seriesEpisodes.length === 0) {
-            return null;
-        }
-
-        // Find last watched episode
-        const lastWatched = seriesEpisodes.reduce((latest, current) => {
-            return current.watchedAt > latest.watchedAt ? current : latest;
-        });
-
-        return {
-            seriesId,
-            seriesName,
-            lastWatchedSeason: lastWatched.seasonNumber,
-            lastWatchedEpisode: lastWatched.episodeNumber,
-            lastWatchedAt: lastWatched.watchedAt,
-            episodeCount: seriesEpisodes.length,
-        };
+        const summary = this.getSeriesProgressIndex().get(seriesId);
+        return summary ? { ...summary, seriesName } : null;
     }
 
     // Get all series with ANY watch history (for Continue Watching)
