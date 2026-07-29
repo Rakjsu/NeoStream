@@ -108,6 +108,7 @@ const invokeChannels = new Set([
     'epg:fetch-mitv',
     'epg:get-cache-info',
     'epg:get-cached',
+    'epg:channel-programs',
     'epg:provider-available',
     'epg:provider-channel',
     'epg:provider-search',

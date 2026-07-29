@@ -7,6 +7,7 @@ import { fetchWithRetry, requestWithRetry } from './fetchRetry'
 import { readResponseTextWithLimit, M3U_MAX_BYTES, XMLTV_MAX_BYTES } from './httpLimits'
 import { ensureProviderEpgLoaded, getProviderUtcOffsetMinutes, resetProviderEpgState, setupProviderEpgHandlers } from './providerEpg'
 import { formatTimeshiftStart } from './timeshiftProtocol'
+import { addDocumentToIndex, emptyIndex, finalizeIndex, lookupChannel, type XmltvIndex } from './epgIndexProtocol'
 import {
     activatePlaylist,
     deactivatePlaylists,
@@ -180,6 +181,89 @@ function getOpenSubtitlesConfig(): OpenSubtitlesConfig {
         username: (saved.username || process.env.OPEN_SUBTITLES_USERNAME || '').trim(),
         password: saved.password || process.env.OPEN_SUBTITLES_PASSWORD || '',
     }
+}
+
+/**
+ * 📺 Índices de XMLTV vivos, por GRUPO de arquivos.
+ *
+ * Um país tem vários arquivos que **se sobrepõem** — ficar com o primeiro que
+ * responde jogava fora até 23 h de grade em centenas de canais. Por isso o
+ * índice é do grupo inteiro, com união e dedup.
+ *
+ * LRU de verdade (o acerto reinsere): com FIFO e o laço do renderer sempre
+ * recomeçando no arquivo 1, um cache pequeno dava 100% de miss e ficava mais
+ * lento que o código que este índice substitui.
+ */
+interface IndexEntry { chave: string; index: XmltvIndex }
+const xmltvIndexes = new Map<string, IndexEntry>()
+/** Grupos vivos: o do país corrente e o XMLTV do usuário. */
+const XMLTV_INDEX_MAX = 2
+/** Builds em voo, para 4 canais simultâneos não construírem o mesmo 4 vezes. */
+const xmltvBuilding = new Map<string, Promise<XmltvIndex | null>>()
+
+const EPG_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+
+/** Arquivo + meta de um cacheKey. `null` quando não existe ou está vencido. */
+async function epgFileStatus(cacheKey: string, url: string): Promise<{ file: string; stamp: string } | null> {
+    const fs = await import('fs/promises')
+    const path = await import('path')
+    const { app } = await import('electron')
+    const dir = path.join(app.getPath('userData'), 'epg_cache')
+    const file = path.join(dir, `${cacheKey}.xml`)
+    try {
+        const stat = await fs.stat(file)
+        const meta = JSON.parse(await fs.readFile(path.join(dir, `${cacheKey}.meta.json`), 'utf-8'))
+        // O TTL e a troca de URL continuam mandando: sem isto o índice serviria
+        // um guia vencido para sempre, porque o download só acontece quando
+        // alguém diz que o arquivo falta.
+        if (typeof meta?.timestamp !== 'number' || Date.now() - meta.timestamp >= EPG_CACHE_TTL_MS) return null
+        if (typeof meta?.url === 'string' && meta.url !== url) return null
+        return { file, stamp: `${stat.mtimeMs}` }
+    } catch {
+        return null
+    }
+}
+
+async function getGroupIndex(
+    grupo: string,
+    arquivos: { file: string; stamp: string }[],
+): Promise<XmltvIndex | null> {
+    const chave = arquivos.map(a => a.stamp).join('|')
+    const vivo = xmltvIndexes.get(grupo)
+    if (vivo && vivo.chave === chave) {
+        // Reinsere: `Map` mantém ordem de inserção, então isto é o "usado agora".
+        xmltvIndexes.delete(grupo)
+        xmltvIndexes.set(grupo, vivo)
+        return vivo.index
+    }
+    const emVoo = xmltvBuilding.get(grupo + chave)
+    if (emVoo) return emVoo
+
+    const build = (async () => {
+        try {
+            const fs = await import('fs/promises')
+            const t0 = Date.now()
+            const index = emptyIndex()
+            for (const a of arquivos) {
+                addDocumentToIndex(index, await fs.readFile(a.file, 'utf-8'))
+            }
+            finalizeIndex(index)
+            log.info(`[EPG Index] ${grupo}: ${index.total} programas -> ${index.byChannel.size} canais (${Date.now() - t0} ms)`)
+            if (xmltvIndexes.size >= XMLTV_INDEX_MAX && !xmltvIndexes.has(grupo)) {
+                const lru = xmltvIndexes.keys().next().value
+                if (lru !== undefined) xmltvIndexes.delete(lru)
+            }
+            xmltvIndexes.set(grupo, { chave, index })
+            return index
+        } catch (error: unknown) {
+            log.error('[EPG Index] Falha ao indexar:', getErrorMessage(error))
+            return null
+        } finally {
+            xmltvBuilding.delete(grupo + chave)
+        }
+    })()
+    xmltvBuilding.set(grupo + chave, build)
+    return build
 }
 
 export function setupIpcHandlers() {
@@ -712,6 +796,60 @@ export function setupIpcHandlers() {
 
         } catch (error: unknown) {
             log.error('[EPG Cache] Error:', getErrorMessage(error))
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
+    /**
+     * 📺 Programas de UM canal, a partir do índice do XMLTV.
+     *
+     * O `epg:get-cached` acima devolve o documento INTEIRO — e o renderer
+     * rodava um regex global nele só pra achar um canal, a cada zap e a cada
+     * 60 s. Com o guia dos EUA (297 mil blocos de programa em 10 arquivos)
+     * isso custava centenas de MB e até 2 s de thread travada por troca de
+     * canal. Aqui o documento é indexado UMA vez por arquivo e só os programas
+     * pedidos atravessam o IPC.
+     *
+     * O índice é invalidado pelo mtime do arquivo, então o refresh de 24 h do
+     * `epg:get-cached` continua mandando — sem segunda política de validade.
+     */
+    /**
+     * 📺 Programas de UM canal, a partir do índice do grupo de arquivos.
+     *
+     * O `epg:get-cached` devolve o documento INTEIRO — e o renderer rodava um
+     * regex global nele só pra achar um canal, a cada zap e a cada 60 s. Com o
+     * guia dos EUA (297 mil blocos de programa em 10 arquivos) isso custava
+     * centenas de MB e até 2 s de thread travada por troca de canal.
+     *
+     * `arquivos` é o GRUPO inteiro do país: eles se sobrepõem, então parar no
+     * primeiro que responde perderia grade. `indexed:false` significa "algum
+     * arquivo falta ou venceu" — aí o renderer manda baixar e pergunta de novo.
+     */
+    ipcMain.handle('epg:channel-programs', async (_, args: {
+        grupo: string
+        arquivos: { url: string; cacheKey: string }[]
+        epgChannelId?: string
+        channelName?: string
+    }) => {
+        try {
+            const status = await Promise.all(args.arquivos.map(a => epgFileStatus(a.cacheKey, a.url)))
+            const faltando = args.arquivos.filter((_a, i) => !status[i]).map(a => a.cacheKey)
+            const prontos = status.filter((x): x is { file: string; stamp: string } => !!x)
+            // Sem NENHUM arquivo válido não há o que indexar. Com alguns, serve
+            // o que tem e avisa quais faltam — a grade parcial é melhor que nada
+            // enquanto o download acontece.
+            if (!prontos.length) return { success: true, programs: [], indexed: false, faltando }
+
+            const index = await getGroupIndex(args.grupo, prontos)
+            if (!index) return { success: true, programs: [], indexed: false, faltando }
+            return {
+                success: true,
+                programs: lookupChannel(index, { epgChannelId: args.epgChannelId, channelName: args.channelName }),
+                indexed: true,
+                faltando,
+            }
+        } catch (error: unknown) {
+            log.error('[EPG Index] Falhou:', getErrorMessage(error))
             return { success: false, error: getErrorMessage(error) }
         }
     })

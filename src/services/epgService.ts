@@ -121,42 +121,58 @@ export const epgService = {
         } catch { /* storage indisponível */ }
     },
 
-    /** Acha o id do canal no XMLTV pelo display-name (tags de qualidade fora). */
-    findXmltvChannelId(xml: string, channelName: string): string | null {
-        const wanted = stripQualityTags(channelName).toLowerCase();
-        if (!wanted) return null;
-        const channels = xml.match(/<channel[^>]+id="[^"]+"[\s\S]*?<\/channel>/gi) || [];
-        for (const entry of channels) {
-            const id = entry.match(/id="([^"]+)"/i)?.[1];
-            if (!id) continue;
-            const names = entry.match(/<display-name[^>]*>([^<]*)<\/display-name>/gi) || [];
-            for (const nameTag of names) {
-                const name = nameTag.replace(/<[^>]+>/g, '').trim();
-                if (name && stripQualityTags(name).toLowerCase() === wanted) return id;
+
+    /**
+     * Programas de um canal, pedidos ao índice do processo principal.
+     *
+     * Antes o renderer recebia o XMLTV INTEIRO por IPC e varria o documento com
+     * regex pra achar um canal — a cada zap e a cada 60 s. O `epg:get-cached`
+     * continua responsável por baixar/renovar o arquivo; aqui só perguntamos.
+     */
+    /**
+     * Programas de um canal, pedidos ao índice do processo principal.
+     *
+     * Antes o renderer recebia o XMLTV INTEIRO por IPC e varria o documento com
+     * regex pra achar um canal — a cada zap e a cada 60 s. O grupo vai junto
+     * porque os arquivos de um mesmo país se sobrepõem: pedir um a um e parar no
+     * primeiro que responde perdia até 23 h de grade.
+     */
+    async fetchIndexedChannel(
+        grupo: string,
+        arquivos: { url: string; cacheKey: string }[],
+        opts: { epgChannelId?: string; channelName?: string },
+    ): Promise<EPGProgram[]> {
+        try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ipcRenderer = (window as any).ipcRenderer;
+            if (!ipcRenderer?.invoke) return [];
+            const pedido = { grupo, arquivos, ...opts };
+            let result = await ipcRenderer.invoke('epg:channel-programs', pedido);
+
+            // `faltando` = arquivo ausente OU vencido (o TTL de 24 h vive no
+            // main). Baixar é responsabilidade do `epg:get-cached`; aqui só
+            // acionamos e perguntamos de novo.
+            const faltando: string[] = Array.isArray(result?.faltando) ? result.faltando : [];
+            if (faltando.length) {
+                await Promise.all(faltando.map(cacheKey => {
+                    const alvo = arquivos.find(a => a.cacheKey === cacheKey);
+                    return alvo
+                        ? ipcRenderer.invoke('epg:get-cached', { url: alvo.url, cacheKey, forceRefresh: false })
+                            .catch(() => undefined)
+                        : Promise.resolve();
+                }));
+                result = await ipcRenderer.invoke('epg:channel-programs', pedido);
             }
+            return result?.success && Array.isArray(result.programs) ? result.programs : [];
+        } catch {
+            return [];
         }
-        return null;
     },
 
     async fetchFromUserXmltv(channelName: string): Promise<EPGProgram[]> {
         const url = this.getUserEpgUrl();
         if (!url) return [];
-        try {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const ipcRenderer = (window as any).ipcRenderer;
-            if (!ipcRenderer?.invoke) return [];
-            const result = await ipcRenderer.invoke('epg:get-cached', {
-                url: url,
-                cacheKey: 'user-external',
-                forceRefresh: false
-            });
-            if (!result?.success || !result.data) return [];
-            const channelId = this.findXmltvChannelId(result.data, channelName);
-            if (!channelId) return [];
-            return this.parseXMLTV(result.data, channelId, channelName);
-        } catch {
-            return [];
-        }
+        return this.fetchIndexedChannel('user-external', [{ url, cacheKey: 'user-external' }], { channelName });
     },
 
     // Main function to fetch EPG for a channel
@@ -287,45 +303,14 @@ export const epgService = {
 
     // Fetch from Open-EPG Portugal using the cache system (downloads both portugal1 and portugal2)
     async fetchFromOpenEpgPortugal(channelName: string, channelId: string): Promise<EPGProgram[]> {
-        try {
-            let combinedXml = '';
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const ipcRenderer = (window as any).ipcRenderer;
-
-            // Download both EPG files and combine them
-            if (ipcRenderer?.invoke) {
-                for (let i = 0; i < OPEN_EPG_PORTUGAL_URLS.length; i++) {
-                    const url = OPEN_EPG_PORTUGAL_URLS[i];
-                    const cacheKey = `portugal${i + 1}`;
-
-                    try {
-                        const result = await ipcRenderer.invoke('epg:get-cached', {
-                            url: url,
-                            cacheKey: cacheKey,
-                            forceRefresh: false
-                        });
-
-                        if (result.success && result.data) {
-                            combinedXml += result.data;
-                        } else {
-                            console.error(`[EPG] Failed to download ${cacheKey}:`, result.error);
-                        }
-                    } catch (err) {
-                        console.error(`[EPG] Error downloading ${cacheKey}:`, err);
-                    }
-                }
-            }
-
-            if (!combinedXml) {
-                console.error('[EPG] No XML data received from any source');
-                return [];
-            }
-
-            return this.parseXMLTV(combinedXml, channelId, channelName);
-        } catch (error) {
-            console.error('[EPG] Open-EPG Portugal error:', error);
-            return [];
-        }
+        // Antes: baixava os N arquivos, concatenava numa string só (dezenas de
+        // MB) e varria tudo com regex — a cada zap e a cada 60 s. Agora cada
+        // arquivo é indexado UMA vez no processo principal e devolve só o canal.
+        return this.fetchIndexedChannel(
+            'portugal',
+            OPEN_EPG_PORTUGAL_URLS.map((url, i) => ({ url, cacheKey: `portugal${i + 1}` })),
+            { epgChannelId: channelId, channelName },
+        );
     },
 
     // Get Open-EPG Argentina ID from channel name
@@ -365,45 +350,14 @@ export const epgService = {
 
     // Fetch from Open-EPG Argentina using the cache system (downloads all 7 files)
     async fetchFromOpenEpgArgentina(channelName: string, channelId: string): Promise<EPGProgram[]> {
-        try {
-            let combinedXml = '';
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const ipcRenderer = (window as any).ipcRenderer;
-
-            // Download all 7 EPG files and combine them
-            if (ipcRenderer?.invoke) {
-                for (let i = 0; i < OPEN_EPG_ARGENTINA_URLS.length; i++) {
-                    const url = OPEN_EPG_ARGENTINA_URLS[i];
-                    const cacheKey = `argentina${i + 1}`;
-
-                    try {
-                        const result = await ipcRenderer.invoke('epg:get-cached', {
-                            url: url,
-                            cacheKey: cacheKey,
-                            forceRefresh: false
-                        });
-
-                        if (result.success && result.data) {
-                            combinedXml += result.data;
-                        } else {
-                            console.error(`[EPG] Failed to download ${cacheKey}:`, result.error);
-                        }
-                    } catch (err) {
-                        console.error(`[EPG] Error downloading ${cacheKey}:`, err);
-                    }
-                }
-            }
-
-            if (!combinedXml) {
-                console.error('[EPG] No Argentina XML data received');
-                return [];
-            }
-
-            return this.parseXMLTV(combinedXml, channelId, channelName);
-        } catch (error) {
-            console.error('[EPG] Open-EPG Argentina error:', error);
-            return [];
-        }
+        // Antes: baixava os N arquivos, concatenava numa string só (dezenas de
+        // MB) e varria tudo com regex — a cada zap e a cada 60 s. Agora cada
+        // arquivo é indexado UMA vez no processo principal e devolve só o canal.
+        return this.fetchIndexedChannel(
+            'argentina',
+            OPEN_EPG_ARGENTINA_URLS.map((url, i) => ({ url, cacheKey: `argentina${i + 1}` })),
+            { epgChannelId: channelId, channelName },
+        );
     },
 
     // Get Open-EPG USA ID from channel name
@@ -443,45 +397,14 @@ export const epgService = {
 
     // Fetch from Open-EPG USA using the cache system (downloads all 10 files)
     async fetchFromOpenEpgUSA(channelName: string, channelId: string): Promise<EPGProgram[]> {
-        try {
-            let combinedXml = '';
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const ipcRenderer = (window as any).ipcRenderer;
-
-            // Download all 10 EPG files and combine them
-            if (ipcRenderer?.invoke) {
-                for (let i = 0; i < OPEN_EPG_USA_URLS.length; i++) {
-                    const url = OPEN_EPG_USA_URLS[i];
-                    const cacheKey = `usa${i + 1}`;
-
-                    try {
-                        const result = await ipcRenderer.invoke('epg:get-cached', {
-                            url: url,
-                            cacheKey: cacheKey,
-                            forceRefresh: false
-                        });
-
-                        if (result.success && result.data) {
-                            combinedXml += result.data;
-                        } else {
-                            console.error(`[EPG] Failed to download ${cacheKey}:`, result.error);
-                        }
-                    } catch (err) {
-                        console.error(`[EPG] Error downloading ${cacheKey}:`, err);
-                    }
-                }
-            }
-
-            if (!combinedXml) {
-                console.error('[EPG] No USA XML data received');
-                return [];
-            }
-
-            return this.parseXMLTV(combinedXml, channelId, channelName);
-        } catch (error) {
-            console.error('[EPG] Open-EPG USA error:', error);
-            return [];
-        }
+        // Antes: baixava os N arquivos, concatenava numa string só (dezenas de
+        // MB) e varria tudo com regex — a cada zap e a cada 60 s. Agora cada
+        // arquivo é indexado UMA vez no processo principal e devolve só o canal.
+        return this.fetchIndexedChannel(
+            'usa',
+            OPEN_EPG_USA_URLS.map((url, i) => ({ url, cacheKey: `usa${i + 1}` })),
+            { epgChannelId: channelId, channelName },
+        );
     },
 
     // Get Open-EPG Brazil ID from channel name (for channels not in mi.tv)
@@ -509,133 +432,17 @@ export const epgService = {
 
     // Fetch from Open-EPG Brazil using the cache system (downloads all 5 files)
     async fetchFromOpenEpgBrazil(channelName: string, channelId: string): Promise<EPGProgram[]> {
-        try {
-            let combinedXml = '';
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const ipcRenderer = (window as any).ipcRenderer;
-
-            // Download all 5 EPG files and combine them
-            if (ipcRenderer?.invoke) {
-                for (let i = 0; i < OPEN_EPG_BRAZIL_URLS.length; i++) {
-                    const url = OPEN_EPG_BRAZIL_URLS[i];
-                    const cacheKey = `brazil${i + 1}`;
-
-                    try {
-                        const result = await ipcRenderer.invoke('epg:get-cached', {
-                            url: url,
-                            cacheKey: cacheKey,
-                            forceRefresh: false
-                        });
-
-                        if (result.success && result.data) {
-                            combinedXml += result.data;
-                        } else {
-                            console.error(`[EPG] Failed to download ${cacheKey}:`, result.error);
-                        }
-                    } catch (err) {
-                        console.error(`[EPG] Error downloading ${cacheKey}:`, err);
-                    }
-                }
-            }
-
-            if (!combinedXml) {
-                console.error('[EPG] No Brazil XML data received');
-                return [];
-            }
-
-            return this.parseXMLTV(combinedXml, channelId, channelName);
-        } catch (error) {
-            console.error('[EPG] Open-EPG Brazil error:', error);
-            return [];
-        }
+        // Antes: baixava os N arquivos, concatenava numa string só (dezenas de
+        // MB) e varria tudo com regex — a cada zap e a cada 60 s. Agora cada
+        // arquivo é indexado UMA vez no processo principal e devolve só o canal.
+        return this.fetchIndexedChannel(
+            'brazil',
+            OPEN_EPG_BRAZIL_URLS.map((url, i) => ({ url, cacheKey: `brazil${i + 1}` })),
+            { epgChannelId: channelId, channelName },
+        );
     },
 
-    parseXMLTV(xml: string, channelId: string, channelName: string): EPGProgram[] {
-        const programs: EPGProgram[] = [];
 
-        // Find all programmes for this channel
-        // Use a simpler regex that's more flexible with attribute order and whitespace
-        const allProgrammes = xml.match(/<programme[^>]+>[\s\S]*?<\/programme>/gi) || [];
-
-        for (const prog of allProgrammes) {
-            // Check if this programme is for our channel
-            const channelMatch = prog.match(/channel="([^"]+)"/i);
-            if (!channelMatch || channelMatch[1] !== channelId) continue;
-
-            // Extract start and stop times
-            const startMatch = prog.match(/start="(\d{14})\s*([+-]\d{4})"/i);
-            const stopMatch = prog.match(/stop="(\d{14})\s*([+-]\d{4})"/i);
-
-            if (!startMatch || !stopMatch) continue;
-
-            // Extract title
-            const titleMatch = prog.match(/<title[^>]*>([^<]+)<\/title>/i);
-            const title = titleMatch ? this.decodeXMLEntities(titleMatch[1]) : 'Sem título';
-
-            // Extract description
-            const descMatch = prog.match(/<desc[^>]*>([\s\S]*?)<\/desc>/i);
-            const description = descMatch ? this.decodeXMLEntities(descMatch[1]) : '';
-
-            const categoryMatch = prog.match(/<category[^>]*>([\s\S]*?)<\/category>/i);
-
-            // Parse times
-            const startDate = this.parseXMLTVTime(startMatch[1], startMatch[2]);
-            const endDate = this.parseXMLTVTime(stopMatch[1], stopMatch[2]);
-
-            if (startDate && endDate) {
-                programs.push({
-                    id: `openepg-${startDate.getTime()}`,
-                    start: startDate.toISOString(),
-                    end: endDate.toISOString(),
-                    title: title,
-                    description: description,
-                    ...(categoryMatch ? { category: this.decodeXMLEntities(categoryMatch[1]).trim() } : {}),
-                    channel_id: channelName
-                });
-            }
-        }
-
-        return programs;
-    },
-
-    // Parse XMLTV time format: YYYYMMDDHHMMSS +ZZZZ
-    parseXMLTVTime(timeStr: string, tzOffset: string): Date | null {
-        try {
-            const year = parseInt(timeStr.substring(0, 4));
-            const month = parseInt(timeStr.substring(4, 6)) - 1; // JS months are 0-indexed
-            const day = parseInt(timeStr.substring(6, 8));
-            const hour = parseInt(timeStr.substring(8, 10));
-            const minute = parseInt(timeStr.substring(10, 12));
-            const second = parseInt(timeStr.substring(12, 14));
-
-            // Parse timezone offset (+0000 format)
-            const tzSign = tzOffset.startsWith('-') ? -1 : 1;
-            const tzHours = parseInt(tzOffset.substring(1, 3));
-            const tzMinutes = parseInt(tzOffset.substring(3, 5));
-            const tzOffsetMs = tzSign * (tzHours * 60 + tzMinutes) * 60 * 1000;
-
-            // Create date in UTC
-            const utcDate = Date.UTC(year, month, day, hour, minute, second);
-            // Adjust for timezone offset to get actual UTC time
-            const actualUtcMs = utcDate - tzOffsetMs;
-
-            return new Date(actualUtcMs);
-        } catch (error) {
-            console.error('[EPG] Failed to parse XMLTV time:', timeStr, tzOffset, error);
-            return null;
-        }
-    },
-
-    // Decode XML entities
-    decodeXMLEntities(text: string): string {
-        return text
-            .replace(/&amp;/g, '&')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&quot;/g, '"')
-            .replace(/&apos;/g, "'")
-            .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code)));
-    },
 
     // Fetch from mi.tv via the main-process proxy (direct fetch is CORS-blocked
     // in the renderer — webSecurity is on)

@@ -22,64 +22,6 @@ function prog(id: string, fromMs: number, toMs: number): EPGProgram {
     };
 }
 
-describe('parseXMLTVTime', () => {
-    it('converte YYYYMMDDHHMMSS +0000 pra UTC exata', () => {
-        const d = epgService.parseXMLTVTime('20260705213000', '+0000');
-        expect(d?.toISOString()).toBe('2026-07-05T21:30:00.000Z');
-    });
-
-    it('aplica offset negativo (Brasil -0300 → UTC +3h)', () => {
-        const d = epgService.parseXMLTVTime('20260705210000', '-0300');
-        expect(d?.toISOString()).toBe('2026-07-06T00:00:00.000Z');
-    });
-
-    it('aplica offset positivo com minutos (+0530)', () => {
-        const d = epgService.parseXMLTVTime('20260705120000', '+0530');
-        expect(d?.toISOString()).toBe('2026-07-05T06:30:00.000Z');
-    });
-});
-
-describe('decodeXMLEntities', () => {
-    it('decodifica as entidades nomeadas e numéricas', () => {
-        expect(epgService.decodeXMLEntities('A &amp; B &lt;3 &gt; &quot;x&quot; &apos;y&apos; caf&#233;'))
-            .toBe(`A & B <3 > "x" 'y' café`);
-    });
-});
-
-describe('parseXMLTV', () => {
-    const xml = `<?xml version="1.0"?>
-<tv>
-  <programme start="20260705200000 +0000" stop="20260705210000 +0000" channel="globo.br">
-    <title lang="pt">Jornal &amp; Not&#237;cias</title>
-    <desc>Edi&#231;&#227;o da noite</desc>
-  </programme>
-  <programme start="20260705210000 +0000" stop="20260705220000 +0000" channel="globo.br">
-    <title>Novela</title>
-  </programme>
-  <programme start="20260705200000 +0000" stop="20260705230000 +0000" channel="sbt.br">
-    <title>Outro canal</title>
-  </programme>
-  <programme start="INVALID" stop="20260705220000 +0000" channel="globo.br">
-    <title>Sem start válido</title>
-  </programme>
-</tv>`;
-
-    it('filtra pelo channel e decodifica título/descrição', () => {
-        const programs = epgService.parseXMLTV(xml, 'globo.br', 'Globo');
-        expect(programs).toHaveLength(2);
-        expect(programs[0].title).toBe('Jornal & Notícias');
-        expect(programs[0].description).toBe('Edição da noite');
-        expect(programs[0].start).toBe('2026-07-05T20:00:00.000Z');
-        expect(programs[0].end).toBe('2026-07-05T21:00:00.000Z');
-        expect(programs[0].channel_id).toBe('Globo');
-        expect(programs[1].title).toBe('Novela');
-    });
-
-    it('canal sem programação → lista vazia', () => {
-        expect(epgService.parseXMLTV(xml, 'inexistente', 'X')).toEqual([]);
-    });
-});
-
 describe('getMiTVSlug', () => {
     it('remove sufixos de qualidade/codec e vira slug sem acento', () => {
         expect(epgService.getMiTVSlug('Meu Canal Ação [FHD]')).toBe('meu-canal-acao');
@@ -130,19 +72,5 @@ describe('programa atual / próximo / a seguir', () => {
         const half = epgService.getProgress(prog('meio', -1_800_000, 1_800_000));
         expect(half).toBeGreaterThanOrEqual(49);
         expect(half).toBeLessThanOrEqual(51);
-    });
-});
-
-describe('findXmltvChannelId (XMLTV do usuário)', () => {
-    it('casa display-name ignorando tags de qualidade', async () => {
-        const { epgService } = await import('./epgService');
-        const xml = `
-            <tv>
-              <channel id="espn.br"><display-name>ESPN</display-name></channel>
-              <channel id="globo.br"><display-name>Globo HD</display-name></channel>
-            </tv>`;
-        expect(epgService.findXmltvChannelId(xml, 'ESPN FHD')).toBe('espn.br');
-        expect(epgService.findXmltvChannelId(xml, 'Globo')).toBe('globo.br');
-        expect(epgService.findXmltvChannelId(xml, 'Inexistente')).toBeNull();
     });
 });
