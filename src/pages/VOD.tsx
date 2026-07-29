@@ -754,16 +754,12 @@ export function VOD() {
                     nextCountdownLabel={t('player', 'upNextIn')}
                     nextActionLabel={t('player', 'upNext')}
                     resumeTime={pipResumeTime !== null ? pipResumeTime : (movieProgressService.getMoviePositionById(playingMovie.stream_id.toString())?.currentTime || null)}
-                    onTimeUpdate={(currentTime, duration) => {
-                        if (Math.floor(currentTime) % 5 === 0) {
-                            movieProgressService.saveMovieTime(
-                                playingMovie.stream_id.toString(),
-                                playingMovie.name,
-                                currentTime,
-                                duration
-                            );
-                        }
-                    }}
+                    // Sem onTimeUpdate de propósito: o AsyncVideoPlayer já grava
+                    // o progresso do filme (mesmo id, mesmo serviço). A cópia que
+                    // ficava aqui gravava DE NOVO e com `Math.floor(t) % 5 === 0`,
+                    // verdadeiro durante um segundo INTEIRO — ~4 gravações por
+                    // janela de 5 s, cada uma reescrevendo o array de progresso
+                    // no localStorage e mandando IPC pro celular pareado.
                     allMovies={streams}
                     onSwitchVersion={(newMovie, currentTime) => {
                         // Switch to new movie version while maintaining playback time

@@ -39,16 +39,26 @@ export function buildSimpleDataTableUrl(serverUrl: string, username: string, pas
         + `&action=get_simple_data_table&stream_id=${encodeURIComponent(String(streamId))}`
 }
 
+/** Busca case-insensitive sem materializar cópia do documento (ver abaixo). */
+const PROGRAMME_TAG_RE = /<programme/i
+
 /**
  * Quick sanity check on a downloaded xmltv.php body. Providers without EPG
  * typically answer 404, an HTML error page or an empty/minimal document —
  * none of those contain <programme> entries.
+ *
+ * O teste NÃO pode ser `text.toLowerCase().includes(...)`: num XMLTV de 120 MB
+ * isso aloca uma cópia inteira do documento em minúsculas só pra procurar um
+ * substring — e a função é chamada duas vezes no mesmo corpo (ao gravar o
+ * cache e ao indexar). O `includes` cru resolve o caso comum (tag minúscula)
+ * parando no primeiro acerto, e o regex só entra como fallback para provedores
+ * que escrevem `<PROGRAMME`; nenhum dos dois aloca.
  */
 export function looksLikeXmltv(text: string): boolean {
     if (!text) return false
     const head = text.slice(0, 2000).toLowerCase()
     if (head.includes('<html') || head.includes('<!doctype html')) return false
-    return text.toLowerCase().includes('<programme')
+    return text.includes('<programme') || PROGRAMME_TAG_RE.test(text)
 }
 
 /**
@@ -153,15 +163,36 @@ export function parseXmltvIndex(xml: string, nowMs: number = Date.now()): Map<st
     return parseXmltvIndexWithMeta(xml, nowMs).index
 }
 
-/** Same scan as parseXmltvIndex, additionally tallying the dominant UTC offset. */
-export function parseXmltvIndexWithMeta(xml: string, nowMs: number = Date.now()): XmltvIndexResult {
-    const index = new Map<string, ProviderEpgProgram[]>()
-    const window = buildDefaultWindow(nowMs)
-    const offsetCounts = new Map<number, number>()
+interface XmltvScan {
+    index: Map<string, ProviderEpgProgram[]>
+    offsetCounts: Map<number, number>
+    window: XmltvWindow
+    /**
+     * Regex PRÓPRIO deste scan: `lastIndex` é estado, e um scan fatiado (ver
+     * parseXmltvIndexWithMetaAsync) não pode compartilhá-lo com outro scan.
+     */
+    re: RegExp
+}
 
-    PROGRAMME_RE.lastIndex = 0
+function createXmltvScan(nowMs: number): XmltvScan {
+    return {
+        index: new Map(),
+        offsetCounts: new Map(),
+        window: buildDefaultWindow(nowMs),
+        re: new RegExp(PROGRAMME_RE.source, PROGRAMME_RE.flags),
+    }
+}
+
+/**
+ * Consome até `maxMatches` blocos <programme>. Devolve `true` quando parou por
+ * cota (ainda há documento), `false` quando o scan chegou ao fim.
+ */
+function scanXmltvChunk(scan: XmltvScan, xml: string, maxMatches: number): boolean {
+    const { index, offsetCounts, window } = scan
+    let seen = 0
     let match: RegExpExecArray | null
-    while ((match = PROGRAMME_RE.exec(xml)) !== null) {
+    while (seen < maxMatches && (match = scan.re.exec(xml)) !== null) {
+        seen++
         const attrs = match[1]
         const body = match[2]
 
@@ -203,11 +234,20 @@ export function parseXmltvIndexWithMeta(xml: string, nowMs: number = Date.now())
         if (list) list.push(program)
         else index.set(channelId, [program])
     }
+    return seen === maxMatches
+}
 
-    for (const programs of index.values()) {
-        programs.sort((a, b) => a.start.localeCompare(b.start))
-    }
+/**
+ * Ordem por horário de início. As strings são sempre `toISOString()` — mesmo
+ * comprimento e mesmo alfabeto — então comparar por código é equivalente ao
+ * `localeCompare` e ordens de grandeza mais barato em centenas de milhares
+ * de programas.
+ */
+function compareByStart(a: ProviderEpgProgram, b: ProviderEpgProgram): number {
+    return a.start < b.start ? -1 : a.start > b.start ? 1 : 0
+}
 
+function dominantOffset(offsetCounts: Map<number, number>): number | null {
     let utcOffsetMinutes: number | null = null
     let bestCount = 0
     for (const [offset, count] of offsetCounts) {
@@ -216,8 +256,59 @@ export function parseXmltvIndexWithMeta(xml: string, nowMs: number = Date.now())
             bestCount = count
         }
     }
+    return utcOffsetMinutes
+}
 
-    return { index, utcOffsetMinutes }
+/** Same scan as parseXmltvIndex, additionally tallying the dominant UTC offset. */
+export function parseXmltvIndexWithMeta(xml: string, nowMs: number = Date.now()): XmltvIndexResult {
+    const scan = createXmltvScan(nowMs)
+    scanXmltvChunk(scan, xml, Number.POSITIVE_INFINITY)
+    for (const programs of scan.index.values()) programs.sort(compareByStart)
+    return { index: scan.index, utcOffsetMinutes: dominantOffset(scan.offsetCounts) }
+}
+
+/** Blocos <programme> por fatia, e canais ordenados por fatia. */
+export const XMLTV_SCAN_CHUNK = 4000
+const XMLTV_SORT_CHUNK = 400
+
+/** Devolve o controle ao event loop até o próximo tick de check. */
+function yieldToEventLoop(): Promise<void> {
+    return new Promise<void>(resolve => {
+        if (typeof setImmediate === 'function') setImmediate(resolve)
+        else setTimeout(resolve, 0)
+    })
+}
+
+/**
+ * Mesmo índice de parseXmltvIndexWithMeta, mas cedendo o event loop a cada
+ * fatia — o XMLTV do provedor tem centenas de milhares de programas e o scan
+ * síncrono congelava TODO o IPC do processo principal por segundos (o app
+ * inteiro para: player, playlist, histórico).
+ *
+ * Ninguém vê índice meio construído: o Map só é publicado no retorno, depois
+ * da última fatia. Quem chama é que precisa checar se ainda quer o resultado
+ * (ver a "geração" em providerEpg.ts).
+ */
+export async function parseXmltvIndexWithMetaAsync(
+    xml: string,
+    nowMs: number = Date.now(),
+    yieldTo: () => Promise<void> = yieldToEventLoop,
+): Promise<XmltvIndexResult> {
+    const scan = createXmltvScan(nowMs)
+    while (scanXmltvChunk(scan, xml, XMLTV_SCAN_CHUNK)) {
+        await yieldTo()
+    }
+
+    let sinceYield = 0
+    for (const programs of scan.index.values()) {
+        programs.sort(compareByStart)
+        if (++sinceYield >= XMLTV_SORT_CHUNK) {
+            sinceYield = 0
+            await yieldTo()
+        }
+    }
+
+    return { index: scan.index, utcOffsetMinutes: dominantOffset(scan.offsetCounts) }
 }
 
 /** Decode a base64 string as UTF-8 text (Xtream get_simple_data_table fields). */

@@ -15,6 +15,7 @@ import {
     parseSimpleDataTable,
     parseXmltvIndex,
     parseXmltvIndexWithMeta,
+    parseXmltvIndexWithMetaAsync,
     parseXmltvOffsetMinutes,
     parseXmltvTime,
     PROVIDER_EPG_FUTURE_WINDOW_MS,
@@ -49,6 +50,15 @@ describe('looksLikeXmltv', () => {
         expect(looksLikeXmltv('<!DOCTYPE html><html><body>404 Not Found</body></html>')).toBe(false)
         expect(looksLikeXmltv('<html><head><title>Error</title></head></html>')).toBe(false)
         expect(looksLikeXmltv('<?xml version="1.0"?><tv></tv>')).toBe(false)
+    })
+
+    it('aceita a tag em maiúsculas mesmo longe do começo do documento', () => {
+        // Regressão do caminho sem toLowerCase(): o fallback case-insensitive
+        // continua valendo, e a tag pode vir depois de uma lista de canais
+        // gigante — não dá pra olhar só o cabeçalho.
+        const canais = '<channel id="a.tv"><display-name>A</display-name></channel>'.repeat(500)
+        expect(looksLikeXmltv(`<?xml version="1.0"?><tv>${canais}<PROGRAMME channel="a.tv"/></tv>`)).toBe(true)
+        expect(looksLikeXmltv(`<?xml version="1.0"?><tv>${canais}</tv>`)).toBe(false)
     })
 })
 
@@ -205,6 +215,69 @@ describe('parseXmltvIndexWithMeta', () => {
         const result = parseXmltvIndexWithMeta(xml, NOW)
         expect(result.index.get('a')).toHaveLength(1)
         expect(result.utcOffsetMinutes).toBeNull()
+    })
+})
+
+describe('parseXmltvIndexWithMetaAsync (parse fatiado)', () => {
+    /** XMLTV com programas suficientes pra forçar várias fatias (todos na janela). */
+    const SLOT_MS = 5 * 60 * 1000
+    function bigXmltv(channels: number, perChannel: number): string {
+        const fmt = (ms: number) => new Date(ms).toISOString().replace(/[-:T]/g, '').slice(0, 14) + ' +0000'
+        const parts = ['<tv>']
+        for (let c = 0; c < channels; c++) {
+            for (let p = 0; p < perChannel; p++) {
+                parts.push(`<programme start="${fmt(NOW + p * SLOT_MS)}" stop="${fmt(NOW + (p + 1) * SLOT_MS)}" channel="ch${c}">`
+                    + `<title>P ${c}-${p}</title></programme>`)
+            }
+        }
+        parts.push('</tv>')
+        return parts.join('')
+    }
+
+    it('produz exatamente o mesmo índice do parse síncrono', async () => {
+        const esperado = parseXmltvIndexWithMeta(XMLTV_FIXTURE, NOW)
+        const obtido = await parseXmltvIndexWithMetaAsync(XMLTV_FIXTURE, NOW)
+
+        expect([...obtido.index.keys()].sort()).toEqual([...esperado.index.keys()].sort())
+        for (const [channel, programs] of esperado.index) {
+            expect(obtido.index.get(channel)).toEqual(programs)
+        }
+        expect(obtido.utcOffsetMinutes).toBe(esperado.utcOffsetMinutes)
+    })
+
+    it('cede o event loop em vez de varrer o documento num bloco só', async () => {
+        // 9 mil programas > XMLTV_SCAN_CHUNK: o scan síncrono seria um bloco
+        // único; o fatiado tem que devolver o controle entre as fatias.
+        const xml = bigXmltv(30, 300)
+        let fatias = 0
+        const resultado = await parseXmltvIndexWithMetaAsync(xml, NOW, async () => { fatias++ })
+
+        expect(fatias).toBeGreaterThan(1)
+        expect(resultado.index.size).toBe(30)
+        expect(resultado.index.get('ch0')).toHaveLength(300)
+    })
+
+    it('não expõe índice meio construído: a fatia só resolve com tudo pronto', async () => {
+        const xml = bigXmltv(30, 300)
+        let vistoNoMeio: number | null = null
+        const resultado = await parseXmltvIndexWithMetaAsync(xml, NOW, async () => {
+            // Durante as fatias nada foi publicado — o Map só existe no retorno.
+            vistoNoMeio = (vistoNoMeio ?? 0) + 1
+        })
+
+        expect(vistoNoMeio).toBeGreaterThan(0)
+        // Ordenação por canal já aplicada no resultado final.
+        const ch0 = resultado.index.get('ch0')!
+        expect(ch0.every((p, i) => i === 0 || ch0[i - 1].start <= p.start)).toBe(true)
+    })
+
+    it('mantém a ordenação por horário mesmo com o documento fora de ordem', async () => {
+        const xml = `<tv>
+            <programme start="20260612130000 +0000" stop="20260612140000 +0000" channel="a"><title>2º</title></programme>
+            <programme start="20260612110000 +0000" stop="20260612120000 +0000" channel="a"><title>1º</title></programme>
+        </tv>`
+        const { index } = await parseXmltvIndexWithMetaAsync(xml, NOW)
+        expect(index.get('a')!.map(p => p.title)).toEqual(['1º', '2º'])
     })
 })
 

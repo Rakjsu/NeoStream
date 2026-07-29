@@ -4,6 +4,7 @@ import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
 import { findMovieVersions } from '../services/movieVersionService';
 import { playbackService } from '../services/playbackService';
+import { shouldSampleProgress } from '../utils/progressSampling';
 import MpvPlayerView from './MpvPlayerView';
 
 interface MediaItem {
@@ -103,6 +104,11 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
     const urlLoadedRef = useRef(false);
     const lastMovieIdRef = useRef<string | number | null>(null);
     const lastEpisodeRef = useRef<string | null>(null);
+    // Último `currentTime` gravado, por mídia: o `timeupdate` dispara ~4x/s e a
+    // condição antiga (`currentTime % 5 < 0.5`) era verdadeira em MEIO segundo,
+    // ou seja ~2 gravações por janela de 5 s. A chave zera a referência quando
+    // o episódio/filme troca.
+    const lastSavedProgressRef = useRef<{ key: string; time: number } | null>(null);
 
     // EXPERIMENTAL — MPV phase 2. When the toggle is on, live channels, movies
     // AND series episodes are handed to a pseudo-embedded MPV window with
@@ -495,11 +501,25 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
                                 externalOnTimeUpdate(currentTime, duration);
                             }
 
+                            const movieId = movie ? (movie.stream_id || movie.id || movie.series_id) : null;
+                            const progressKey = seriesId
+                                ? `s:${seriesId}-${seasonNumber}-${episodeNumber}`
+                                : `m:${movieId ?? ''}`;
+                            const lastSaved = lastSavedProgressRef.current?.key === progressKey
+                                ? lastSavedProgressRef.current.time
+                                : null;
+                            // Uma gravação por janela de 5 s — e não uma por
+                            // `timeupdate` caído dentro da janela.
+                            const sample = duration > 0 && shouldSampleProgress(currentTime, lastSaved);
+                            if (sample) {
+                                lastSavedProgressRef.current = { key: progressKey, time: currentTime };
+                            }
+
                             // Save video progress for series every 5 seconds. O
                             // `duration > 0` espelha o ramo de filme logo abaixo:
                             // sem ele, um timeupdate com duration NaN/0 grava o
                             // episódio como concluído.
-                            if (seriesId && seasonNumber !== undefined && episodeNumber !== undefined && currentTime % 5 < 0.5 && duration > 0) {
+                            if (sample && seriesId && seasonNumber !== undefined && episodeNumber !== undefined) {
                                 watchProgressService.saveVideoTime(
                                     seriesId,
                                     seasonNumber,
@@ -510,17 +530,13 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
                             }
 
                             // Save movie progress every 5 seconds (if not a series)
-                            if (!seriesId && movie && currentTime % 5 < 0.5 && duration > 0) {
-                                const movieId = movie.stream_id || movie.id || movie.series_id;
-                                const movieName = movie.name || movie.title || 'Unknown';
-                                if (movieId) {
-                                    movieProgressService.saveMovieTime(
-                                        String(movieId),
-                                        movieName,
-                                        currentTime,
-                                        duration
-                                    );
-                                }
+                            if (sample && !seriesId && movieId) {
+                                movieProgressService.saveMovieTime(
+                                    String(movieId),
+                                    movie.name || movie.title || 'Unknown',
+                                    currentTime,
+                                    duration
+                                );
                             }
                         }}
                     />

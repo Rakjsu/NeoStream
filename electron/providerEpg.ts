@@ -24,7 +24,7 @@ import {
     buildXmltvUrl,
     looksLikeXmltv,
     parseSimpleDataTable,
-    parseXmltvIndexWithMeta,
+    parseXmltvIndexWithMetaAsync,
     searchEpgIndex,
 } from './providerEpgProtocol'
 import type { ProviderEpgProgram } from './providerEpgProtocol'
@@ -48,6 +48,10 @@ interface Credentials {
 let xmltvAvailability: Availability = 'unknown'
 let xmltvIndex: Map<string, ProviderEpgProgram[]> | null = null
 let xmltvLoading: Promise<void> | null = null
+// Carimbo da rodada de indexação. O download e o parse cedem o event loop, e
+// uma troca de playlist no meio deles invalida tudo: sem esta checagem, a
+// rodada antiga publicava o guia do provedor ANTIGO por cima do novo.
+let xmltvGeneration = 0
 // Provider's local UTC offset (minutes) learned from the xmltv timestamps —
 // used to format timeshift (catch-up) start strings in provider-local time.
 let providerUtcOffsetMinutes: number | null = null
@@ -66,6 +70,7 @@ function getCredentials(): Credentials | null {
 
 /** Reset all session state (e.g. after switching providers). Exported for tests/future use. */
 export function resetProviderEpgState() {
+    xmltvGeneration++
     xmltvAvailability = 'unknown'
     xmltvIndex = null
     xmltvLoading = null
@@ -179,7 +184,13 @@ function ensureXmltvIndex(): Promise<void> {
     if (xmltvAvailability !== 'unknown') return Promise.resolve()
     if (xmltvLoading) return xmltvLoading
 
-    xmltvLoading = (async () => {
+    // Carimbo desta rodada: se resetProviderEpgState() rodar enquanto ela
+    // baixa/parseia, o resultado é descartado em vez de sobrescrever o estado
+    // já reconstruído para a playlist nova.
+    const generation = xmltvGeneration
+    const stillCurrent = () => generation === xmltvGeneration
+
+    const loading = (async () => {
         const credentials = getCredentials()
         if (!credentials) {
             // Not logged in yet — stay 'unknown' so the next call (post-login) retries.
@@ -209,11 +220,12 @@ function ensureXmltvIndex(): Promise<void> {
                     log.info('[Provider EPG] Stalker portal EPG unavailable:', error instanceof Error ? error.message : String(error))
                 }
                 if (!syntheticXml || !looksLikeXmltv(syntheticXml)) {
-                    xmltvAvailability = 'unavailable'
+                    if (stillCurrent()) xmltvAvailability = 'unavailable'
                     return
                 }
                 const parseStart = Date.now()
-                const parsed = parseXmltvIndexWithMeta(syntheticXml)
+                const parsed = await parseXmltvIndexWithMetaAsync(syntheticXml)
+                if (!stillCurrent()) return
                 xmltvIndex = parsed.index
                 providerUtcOffsetMinutes = parsed.utcOffsetMinutes
                 xmltvAvailability = 'ready'
@@ -235,7 +247,7 @@ function ensureXmltvIndex(): Promise<void> {
                 }).then(r => String(r.data ?? '')).catch(() => '')
                 const { urlTvg } = parseM3uHeader(head)
                 if (!urlTvg) {
-                    xmltvAvailability = 'unavailable'
+                    if (stillCurrent()) xmltvAvailability = 'unavailable'
                     log.info('[Provider EPG] M3U playlist has no url-tvg — provider EPG disabled')
                     return
                 }
@@ -244,13 +256,17 @@ function ensureXmltvIndex(): Promise<void> {
             const xml = await fetchXmltvWithCache(url)
 
             if (!xml || !looksLikeXmltv(xml)) {
-                xmltvAvailability = 'unavailable'
+                if (stillCurrent()) xmltvAvailability = 'unavailable'
                 log.info('[Provider EPG] Provider xmltv unavailable (empty/404/HTML), disabled for this session')
                 return
             }
 
             const parseStart = Date.now()
-            const parsed = parseXmltvIndexWithMeta(xml)
+            const parsed = await parseXmltvIndexWithMetaAsync(xml)
+            if (!stillCurrent()) {
+                log.info('[Provider EPG] Índice descartado: a playlist mudou durante a indexação')
+                return
+            }
             xmltvIndex = parsed.index
             providerUtcOffsetMinutes = parsed.utcOffsetMinutes
             xmltvAvailability = 'ready'
@@ -263,14 +279,18 @@ function ensureXmltvIndex(): Promise<void> {
             log.info('[Provider EPG] Indexed', xmltvIndex.size, 'channels /', programCount,
                 'programs in', Date.now() - parseStart, 'ms')
         } catch (error) {
-            xmltvAvailability = 'unavailable'
+            if (stillCurrent()) xmltvAvailability = 'unavailable'
             log.error('[Provider EPG] xmltv probe error:', error instanceof Error ? error.message : String(error))
         }
     })().finally(() => {
-        xmltvLoading = null
+        // Só solta a própria promessa: um reset no meio já zerou xmltvLoading e
+        // pode ter uma rodada NOVA em voo — nulificá-la aqui faria a próxima
+        // chamada disparar um terceiro download/parse em paralelo.
+        if (stillCurrent()) xmltvLoading = null
     })
 
-    return xmltvLoading
+    xmltvLoading = loading
+    return loading
 }
 
 /** Per-channel JSON EPG (secondary source when xmltv.php is unavailable). */
