@@ -1,9 +1,39 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // electron-log puxa 'electron' — fora de questão num unit test.
 vi.mock('./logger', () => ({
     default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }))
+
+/** TLS falso: o `connectTransport` roda de verdade, sem rede. */
+const tlsFake = await vi.hoisted(async () => {
+    const { EventEmitter } = await import('node:events')
+    const sockets: FakeTlsSocket[] = []
+
+    class FakeTlsSocket extends EventEmitter {
+        destroyed = false
+        setTimeout() { return this }
+        write() { return true }
+        end() { this.emit('close') }
+        destroy() {
+            if (this.destroyed) return
+            this.destroyed = true
+            this.emit('close')
+        }
+    }
+
+    return {
+        sockets,
+        connect: (_options: unknown, onConnect: () => void) => {
+            const socket = new FakeTlsSocket()
+            sockets.push(socket)
+            onConnect()
+            return socket
+        },
+    }
+})
+
+vi.mock('node:tls', () => ({ default: { connect: tlsFake.connect } }))
 
 import { CastSession, type CastMediaMeta } from './castClient'
 import { extractFrames, NS_MEDIA, type CastMessage } from './castProtocol'
@@ -18,7 +48,13 @@ function fakeSession() {
     const session = new CastSession('192.168.0.10', 'TV Teste')
     const written: Uint8Array[] = []
     const s = session as unknown as {
-        socket: { write: (b: Uint8Array) => boolean; end: () => void } | null
+        socket: {
+            write: (b: Uint8Array) => boolean
+            end: () => void
+            destroy?: () => void
+            removeAllListeners?: () => void
+            on?: (event: string, listener: () => void) => void
+        } | null
         transportId: string | null
         mediaSessionId: number | null
         queueMetas: (CastMediaMeta | null)[]
@@ -27,7 +63,13 @@ function fakeSession() {
         intentionalClose: boolean
         handleMessage: (message: CastMessage) => void
     }
-    s.socket = { write: (b: Uint8Array) => { written.push(b); return true }, end: () => undefined }
+    s.socket = {
+        write: (b: Uint8Array) => { written.push(b); return true },
+        end: () => undefined,
+        destroy: () => undefined,
+        removeAllListeners: () => undefined,
+        on: () => undefined,
+    }
     s.transportId = 'transport-1'
     s.mediaSessionId = 7
 
@@ -187,7 +229,13 @@ describe('attemptReconnect (queda de conexão)', () => {
         const { session, s, r, inst } = reconnectHarness()
         // Fiel ao real: attach reabre o transporte (repõe o socket).
         inst.attach = vi.fn(async () => {
-            s.socket = { write: () => true, end: () => undefined }
+            s.socket = {
+                write: () => true,
+                end: () => undefined,
+                destroy: () => undefined,
+                removeAllListeners: () => undefined,
+                on: () => undefined,
+            }
         })
         inst.connectAndLaunch = vi.fn(async () => undefined)
 
@@ -260,5 +308,82 @@ describe('attemptReconnect (queda de conexão)', () => {
         r.reloadMedia = null
         await r.attemptReconnect()
         expect(r.closed).toBe(true)
+    })
+})
+
+describe('reconexão não deixa socket nem heartbeat órfãos', () => {
+    interface Internals {
+        socket: {
+            destroy?: () => void
+            removeAllListeners?: () => void
+            on?: (event: string, listener: () => void) => void
+        } | null
+        heartbeatTimer: ReturnType<typeof setInterval> | null
+        reloadMedia: (() => void) | null
+        attemptReconnect: () => Promise<void>
+        connectTransport: () => Promise<void>
+        attach: () => Promise<void>
+        connectAndLaunch: () => Promise<void>
+    }
+
+    beforeEach(() => {
+        tlsFake.sockets.length = 0
+    })
+
+    it('a tentativa anterior é desligada: socket destruído e heartbeat morto', async () => {
+        vi.useFakeTimers()
+        const session = new CastSession('192.168.0.10', 'TV Teste')
+        const inst = session as unknown as Internals
+        const eventos: string[] = []
+
+        // Estado de uma tentativa que já tinha aberto TLS + heartbeat de 5 s.
+        inst.socket = {
+            destroy: () => eventos.push('destroy'),
+            removeAllListeners: () => eventos.push('removeAllListeners'),
+            on: () => undefined,
+        }
+        inst.heartbeatTimer = setInterval(() => undefined, 5000)
+        inst.reloadMedia = vi.fn()
+        expect(vi.getTimerCount()).toBe(1)
+
+        // Caminho comum: a TV foi desligada, o attach falha e o app relança.
+        inst.attach = vi.fn(async () => { throw new Error('nenhuma sessão ativa') })
+        inst.connectAndLaunch = vi.fn(async () => undefined)
+
+        const done = inst.attemptReconnect()
+        await vi.advanceTimersByTimeAsync(1000)
+        await done
+
+        expect(eventos).toContain('removeAllListeners')
+        expect(eventos).toContain('destroy')
+        // O heartbeat inalcançável (que retinha a CastSession inteira) morreu.
+        expect(vi.getTimerCount()).toBe(0)
+        vi.useRealTimers()
+    })
+
+    it('socket órfão que cai depois não mata o heartbeat da conexão viva', async () => {
+        vi.useFakeTimers()
+        const session = new CastSession('192.168.0.10', 'TV Teste')
+        const inst = session as unknown as Internals
+
+        await inst.connectTransport()
+        const orfao = tlsFake.sockets[0]
+        // Uma segunda conexão (reconexão) substitui a primeira.
+        await inst.connectTransport()
+        const vivo = tlsFake.sockets[1]
+
+        // Um heartbeat só: o da conexão atual.
+        expect(vi.getTimerCount()).toBe(1)
+
+        // A TV finalmente derruba o socket abandonado da tentativa anterior.
+        orfao.emit('close')
+
+        expect(vi.getTimerCount()).toBe(1) // o keep-alive da conexão viva segue de pé
+        expect(session.isActive).toBe(true) // e nada de reconexão fantasma
+        expect(vivo.destroyed).toBe(false)
+
+        session.close()
+        expect(vi.getTimerCount()).toBe(0)
+        vi.useRealTimers()
     })
 })

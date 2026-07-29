@@ -361,7 +361,14 @@ export class CastSession {
             }
         })
         socket.on('close', () => {
-            if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
+            // Só o socket ATUAL comanda a sessão. Um socket de uma tentativa
+            // anterior que morre depois não pode matar o heartbeat da conexão
+            // viva nem disparar reconexão de uma sessão já substituída.
+            if (this.socket !== socket) return
+            if (this.heartbeatTimer) {
+                clearInterval(this.heartbeatTimer)
+                this.heartbeatTimer = null
+            }
             // A user stop (or a give-up) is intentional; anything else is a drop.
             if (this.intentionalClose || this.reconnecting) return
             log.warn('[Cast] conexão caiu, tentando reconectar a', this.deviceName)
@@ -371,8 +378,10 @@ export class CastSession {
             log.warn('[Cast] socket error:', error.message)
         })
 
-        // Virtual connection + keep-alive.
+        // Virtual connection + keep-alive. Um heartbeat anterior que tenha
+        // sobrado seria inalcançável (a referência é sobrescrita logo abaixo).
         this.send(CAST_RECEIVER_ID, NS_CONNECTION, connectPayload())
+        if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
         this.heartbeatTimer = setInterval(() => {
             this.send(CAST_RECEIVER_ID, NS_HEARTBEAT, pingPayload())
         }, HEARTBEAT_MS)
@@ -384,7 +393,25 @@ export class CastSession {
      * the user doesn't have to re-cast by hand. Gives up after a few tries.
      */
     private resetConnectionState(): void {
+        // Zerar só a referência abandonava, por tentativa de reconexão, um
+        // socket TLS ainda conectado à TV (que consome um dos poucos slots de
+        // conexão do Chromecast) e um setInterval de 5s inalcançável que
+        // retinha a CastSession inteira — fila, metas e legendas junto.
+        if (this.heartbeatTimer) {
+            clearInterval(this.heartbeatTimer)
+            this.heartbeatTimer = null
+        }
+        const previous = this.socket
         this.socket = null
+        if (previous) {
+            // Sem removeAllListeners, o destroy abaixo dispara o handler de
+            // 'close' do socket velho — que mandaria reconectar de novo. Mas um
+            // 'error' sem ouvinte derruba o processo principal, então o socket
+            // abandonado fica com um ouvinte mudo até morrer.
+            previous.removeAllListeners()
+            previous.on('error', () => { /* socket descartado */ })
+            previous.destroy()
+        }
         this.buffer = new Uint8Array(0)
         this.transportId = null
         this.sessionId = null
@@ -516,7 +543,10 @@ export class CastSession {
                 this.send(CAST_RECEIVER_ID, NS_RECEIVER, stopAppPayload(this.requestId++, this.sessionId))
             }
         } catch { /* best-effort */ }
-        if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
+        if (this.heartbeatTimer) {
+            clearInterval(this.heartbeatTimer)
+            this.heartbeatTimer = null
+        }
         this.socket?.end()
         this.socket = null
     }

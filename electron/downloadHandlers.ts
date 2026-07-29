@@ -15,6 +15,8 @@ interface ActiveDownload {
     cancelled: boolean;
     /** Conexões dos chunks paralelos — sem isto, pause/cancel eram no-op nesse caminho. */
     requests?: http.ClientRequest[];
+    /** Timer de progresso do caminho paralelo — pause/cancel também têm que matá-lo. */
+    progressInterval?: ReturnType<typeof setInterval> | null;
 }
 
 const activeDownloads: Map<string, ActiveDownload> = new Map();
@@ -276,6 +278,10 @@ export function setupDownloadHandlers() {
     // Start download with parallel connections
     ipcMain.handle('download:start', async (event, { id, url, name, type, seriesName, season, episode }) => {
         log.info('[Download] Starting parallel download:', { id, name, type, seriesName, season, episode });
+        // Declarados FORA do try: o `finally` precisa alcançá-los em todo
+        // caminho de saída (erro do provedor, pause, cancelamento).
+        let progressInterval: ReturnType<typeof setInterval> | null = null;
+        let entry: ActiveDownload | null = null;
         try {
             const downloadsPath = getDownloadsPath();
             let filePath: string;
@@ -329,7 +335,7 @@ export function setupDownloadHandlers() {
             }
 
             let totalDownloaded = 0;
-            const progressInterval = setInterval(() => {
+            progressInterval = setInterval(() => {
                 const progress = Math.round((totalDownloaded / totalBytes) * 100);
                 BrowserWindow.getAllWindows().forEach(win => {
                     win.webContents.send('download:progress', { id, progress, downloadedBytes: totalDownloaded, totalBytes });
@@ -338,15 +344,20 @@ export function setupDownloadHandlers() {
             }, 500);
 
             // Download all chunks in parallel (registrados pra pause/cancel).
-            const entry: ActiveDownload = { id, request: null, stream: null, paused: false, cancelled: false, requests: [] };
-            activeDownloads.set(id, entry);
+            const parallelEntry: ActiveDownload = {
+                id, request: null, stream: null, paused: false, cancelled: false, requests: [], progressInterval,
+            };
+            entry = parallelEntry;
+            activeDownloads.set(id, parallelEntry);
             const downloadPromises = chunks.map(chunk =>
-                downloadChunk(url, chunk.start, chunk.end, `${filePath}.part${chunk.index}`, req => entry.requests?.push(req))
+                downloadChunk(url, chunk.start, chunk.end, `${filePath}.part${chunk.index}`, req => parallelEntry.requests?.push(req))
                     .then(bytes => { totalDownloaded += bytes; return bytes; })
             );
 
             await Promise.all(downloadPromises);
             clearInterval(progressInterval);
+            progressInterval = null;
+            parallelEntry.progressInterval = null;
 
             // Merge chunks (streamed to avoid loading whole parts into memory)
             log.info('[Download] Merging chunks...');
@@ -393,8 +404,18 @@ export function setupDownloadHandlers() {
 
         } catch (error: unknown) {
             log.error('[Download] Error:', error);
-            setTaskbarProgress(null);
             return { success: false, error: getErrorMessage(error) };
+        } finally {
+            // 🧹 O `clearInterval` ficava DEPOIS do `await Promise.all`: qualquer
+            // caminho que não fosse o feliz (provedor cortando a conexão, pause,
+            // cancelamento) deixava o timer de 500 ms batendo IPC e taskbar até
+            // o app fechar, e a entrada de activeDownloads segurava os
+            // ClientRequest. Aqui vale para TODA saída do handler.
+            if (progressInterval) clearInterval(progressInterval);
+            // Só remove a PRÓPRIA entrada: um retry (resume) reusa o mesmo id e
+            // já registrou a dele antes deste `finally` de um handler antigo.
+            if (entry && activeDownloads.get(id) === entry) activeDownloads.delete(id);
+            setTaskbarProgress(null);
         }
     });
 
@@ -406,6 +427,13 @@ export function setupDownloadHandlers() {
             if (download.request) download.request.destroy();
             for (const req of download.requests ?? []) {
                 try { req.destroy(); } catch { /* já caiu */ }
+            }
+            // Redundante com o `finally` do download:start, mas cobre o caso de
+            // um chunk que nunca chegou a registrar sua request e só cai no
+            // timeout de 120 s — até lá o timer não deve mais bater na taskbar.
+            if (download.progressInterval) {
+                clearInterval(download.progressInterval);
+                download.progressInterval = null;
             }
             return { success: true };
         }
@@ -422,6 +450,10 @@ export function setupDownloadHandlers() {
                 try { req.destroy(); } catch { /* já caiu */ }
             }
             if (download.stream) download.stream.close();
+            if (download.progressInterval) {
+                clearInterval(download.progressInterval);
+                download.progressInterval = null;
+            }
             activeDownloads.delete(id);
             setTaskbarProgress(null);
             return { success: true };
