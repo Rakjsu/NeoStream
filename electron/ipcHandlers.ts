@@ -24,7 +24,8 @@ import {
 import type { PlaylistBackupEntry, MobileAccountEntry } from './playlistManager'
 
 import { cachedCatalogFetch, invalidatePlaylistCache, type CatalogKind } from './catalogCache'
-import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uToVodStreams, m3uCategories, classifyM3uChannels, m3uToSeries, m3uSeriesInfo, findM3uEpisodeUrl } from './m3uProtocol'
+import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uToVodStreams, m3uCategories, m3uToSeries, m3uSeriesInfo, findM3uEpisodeUrl } from './m3uProtocol'
+import { cachedM3uDocument, resetM3uDocumentCache } from './m3uCache'
 import { normalizeMac, stalkerChannelsToLiveStreams, stalkerGenresToCategories, stalkerVodToStreams, stalkerVodCategories, stalkerSeriesToList, stalkerSeriesCategories, stalkerSeriesInfo, parseStalkerEpisodeId, STALKER_SENTINEL } from './stalkerProtocol'
 import { StalkerClient, resolvePortal } from './stalkerClient'
 import log from './logger'
@@ -60,6 +61,14 @@ async function fetchM3uChannels(url: string) {
     return channels
 }
 
+/**
+ * 🚀 R5: leituras de catálogo M3U passam por aqui. `fetchM3uChannels` continua
+ * cru só onde o download É o teste (adicionar/ativar playlist, diagnóstico).
+ */
+function m3uDocument(url: string, forceRefresh: boolean = false) {
+    return cachedM3uDocument(url, () => fetchM3uChannels(url), { forceRefresh })
+}
+
 async function catalogListHandler(
     kind: CatalogKind,
     method: 'getLiveStreams' | 'getVODStreams' | 'getSeries' | 'getLiveCategories' | 'getVodCategories' | 'getSeriesCategories',
@@ -82,8 +91,8 @@ async function catalogListHandler(
                 playlistId,
                 kind,
                 async () => {
-                    const channels = await fetchM3uChannels(activeEntry.url)
-                    const { live, vod, series } = classifyM3uChannels(channels)
+                    // Um download por janela de TTL para os SEIS kinds, não seis.
+                    const { live, vod, series } = (await m3uDocument(activeEntry.url, payload?.forceRefresh === true)).classified
                     switch (kind) {
                         case 'live': return m3uToLiveStreams(live)
                         case 'live-categories': return m3uCategories(live)
@@ -323,7 +332,9 @@ export function setupIpcHandlers() {
             if (!/^https?:\/\//.test(m3uUrl)) {
                 return { success: false, error: 'URL inválida' }
             }
-            const channels = await fetchM3uChannels(m3uUrl)
+            // forceRefresh: adicionar TEM que ir na rede (é a validação da URL),
+            // mas o download já fica residente pro catálogo que carrega em seguida.
+            const { channels } = await m3uDocument(m3uUrl, true)
 
             const entry = saveAndActivatePlaylist({
                 name: typeof name === 'string' && name.trim() ? name.trim() : `M3U (${channels.length} canais)`,
@@ -395,7 +406,7 @@ export function setupIpcHandlers() {
 
             if (target.type === 'm3u') {
                 // M3U has no auth endpoint — validate by refetching the list.
-                await fetchM3uChannels(target.url)
+                await m3uDocument(target.url, true)
                 activatePlaylist(target.id)
                 resetProviderEpgState()
                 return { success: true }
@@ -428,6 +439,8 @@ export function setupIpcHandlers() {
     ipcMain.handle('playlists:remove', (_, { id }) => {
         try {
             invalidatePlaylistCache(String(id))
+            // A playlist removida não pode continuar residente no cache do documento.
+            resetM3uDocumentCache()
             const outcome = removePlaylist(String(id))
             if (!outcome.removed) {
                 return { success: false, error: 'Playlist not found' }
@@ -472,6 +485,7 @@ export function setupIpcHandlers() {
         // Clears the active playlist + auth mirror; saved playlists are kept.
         deactivatePlaylists()
         resetProviderEpgState()
+        resetM3uDocumentCache()
         return { success: true }
     })
 
@@ -752,8 +766,7 @@ export function setupIpcHandlers() {
             const activeId = getActivePlaylistIdPublic()
             const activeEntry = activeId ? findPlaylist(activeId) : undefined
             if (activeEntry?.type === 'm3u') {
-                const channels = await fetchM3uChannels(activeEntry.url)
-                const vod = m3uToVodStreams(classifyM3uChannels(channels).vod)
+                const vod = m3uToVodStreams((await m3uDocument(activeEntry.url)).classified.vod)
                 const movie = vod.find(v => v.stream_id === Number(streamId))
                 if (!movie) return { success: false, error: 'Filme não encontrado na lista M3U' }
                 registerApprovedProviderUrl(movie.direct_source, activeEntry.url)
@@ -801,8 +814,7 @@ export function setupIpcHandlers() {
             const activeId = getActivePlaylistIdPublic()
             const activeEntry = activeId ? findPlaylist(activeId) : undefined
             if (activeEntry?.type === 'm3u') {
-                const channels = await fetchM3uChannels(activeEntry.url)
-                const { series } = classifyM3uChannels(channels)
+                const { series } = (await m3uDocument(activeEntry.url)).classified
                 const url = findM3uEpisodeUrl(series, Number(streamId))
                 if (!url) return { success: false, error: 'Episódio não encontrado na lista M3U' }
                 registerApprovedProviderUrl(url, activeEntry.url)
@@ -844,8 +856,9 @@ export function setupIpcHandlers() {
             const activeId = getActivePlaylistIdPublic()
             const activeEntry = activeId ? findPlaylist(activeId) : undefined
             if (activeEntry?.type === 'm3u') {
-                const channels = await fetchM3uChannels(activeEntry.url)
-                const { series } = classifyM3uChannels(channels)
+                // 🚀 R5: era `fetchM3uChannels` direto — abrir CADA ficha de série
+                // baixava a M3U inteira (teto de 50 MB) e reparseava tudo.
+                const { series } = (await m3uDocument(activeEntry.url)).classified
                 return { success: true, info: m3uSeriesInfo(series, Number(seriesId)) }
             }
             if (activeEntry?.type === 'stalker') {
@@ -893,7 +906,7 @@ export function setupIpcHandlers() {
                     activeId ?? 'default',
                     'live',
                     async () => activeEntry.type === 'm3u'
-                        ? m3uToLiveStreams(classifyM3uChannels(await fetchM3uChannels(activeEntry.url)).live)
+                        ? m3uToLiveStreams((await m3uDocument(activeEntry.url)).classified.live)
                         : stalkerChannelsToLiveStreams(await new StalkerClient(activeEntry.url, activeEntry.username).getAllChannels()),
                     false
                 )

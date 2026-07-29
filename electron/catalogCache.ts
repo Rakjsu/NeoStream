@@ -22,13 +22,61 @@ export type CatalogKind =
     | 'live' | 'vod' | 'series'
     | 'live-categories' | 'vod-categories' | 'series-categories'
 
+const ALL_KINDS: CatalogKind[] = [
+    'live', 'vod', 'series', 'live-categories', 'vod-categories', 'series-categories',
+]
+
 interface CacheEntry {
     fetchedAt: number
     data: unknown
 }
 
 // In-memory layer over the disk backend (SQLite, or legacy JSON files).
+//
+// 🚀 R5: a camada só guarda os seis kinds da playlist RESIDENTE. Antes ela
+// crescia por playlist e só era limpa na REMOÇÃO da playlist ou no quit — quem
+// alternava entre duas contas ficava com duas listas de 50 mil itens presas no
+// main (medimos 34 MB por cópia de VOD). Trocar de playlist agora devolve a
+// cópia antiga; o catalog.db recarrega em ~67 ms se o usuário voltar.
 const memory = new Map<string, CacheEntry>()
+let residentPlaylistId: string | null = null
+
+/**
+ * Chaves cuja cópia em DISCO já existe. Só estas podem sair da memória: o SWR
+ * serve o cache velho quando o provedor cai, e despejar uma entrada cuja
+ * gravação ainda está em voo (o `setImmediate` do writeEntry, ou o writeFile do
+ * fallback JSON) apagaria a única cópia — é assim que "a lista some".
+ */
+const persisted = new Set<string>()
+
+/** Despeja as chaves de outras playlists que já estão salvas em disco. */
+function keepMemoryScopedTo(playlistId: string): void {
+    if (residentPlaylistId === playlistId) return
+    residentPlaylistId = playlistId
+    const manter = new Set(ALL_KINDS.map(kind => keyOf(playlistId, kind)))
+    for (const key of [...memory.keys()]) {
+        if (!manter.has(key) && persisted.has(key)) memory.delete(key)
+    }
+}
+
+/** Gravação concluída: a partir daqui a entrada pode ser despejada. */
+function markPersisted(playlistId: string, key: string): void {
+    persisted.add(key)
+    if (residentPlaylistId !== playlistId) memory.delete(key)
+}
+
+/** Chaves vivas na camada de memória (exportado para os testes). */
+export function catalogMemoryKeys(): string[] {
+    return [...memory.keys()]
+}
+
+/**
+ * Requisições em voo por (playlist, kind). Sem isto, os seis `cachedCatalogFetch`
+ * que o Ctrl+K dispara em paralelo com o cache vencido viravam seis downloads +
+ * seis parses + seis gravações da MESMA lista (o pior caso é a M3U, que ainda
+ * paga um download inteiro por kind).
+ */
+const inFlight = new Map<string, Promise<{ data: unknown; fromCache: boolean }>>()
 
 function cacheDir(): string {
     return path.join(app.getPath('userData'), 'catalog-cache')
@@ -55,6 +103,9 @@ export function closeCatalogStore(): void {
     sqliteStore?.close()
     sqliteStore = undefined
     memory.clear()
+    residentPlaylistId = null
+    persisted.clear()
+    inFlight.clear()
 }
 
 function keyOf(playlistId: string, kind: CatalogKind): string {
@@ -72,6 +123,7 @@ export function isFresh(fetchedAt: number, nowMs: number, ttlMs: number = CATALO
 }
 
 function readEntry(playlistId: string, kind: CatalogKind): CacheEntry | null {
+    keepMemoryScopedTo(playlistId)
     const key = keyOf(playlistId, kind)
     const inMemory = memory.get(key)
     if (inMemory) return inMemory
@@ -80,6 +132,7 @@ function readEntry(playlistId: string, kind: CatalogKind): CacheEntry | null {
         const row = store.read(key)
         if (!row) return null
         memory.set(key, row)
+        persisted.add(key) // veio do disco: o disco tem
         return row
     }
     // Fallback legado: JSON por chave (mesmo comportamento de sempre).
@@ -88,6 +141,7 @@ function readEntry(playlistId: string, kind: CatalogKind): CacheEntry | null {
         const parsed = JSON.parse(raw) as CacheEntry
         if (typeof parsed?.fetchedAt !== 'number' || !('data' in parsed)) return null
         memory.set(key, parsed)
+        persisted.add(key)
         return parsed
     } catch {
         return null
@@ -95,18 +149,26 @@ function readEntry(playlistId: string, kind: CatalogKind): CacheEntry | null {
 }
 
 function writeEntry(playlistId: string, kind: CatalogKind, data: unknown): void {
+    keepMemoryScopedTo(playlistId)
     const key = keyOf(playlistId, kind)
     const entry: CacheEntry = { fetchedAt: Date.now(), data }
     memory.set(key, entry)
+    // A cópia em disco anterior ficou velha: só volta a valer quando a nova
+    // gravação terminar (até lá esta entrada não pode ser despejada).
+    persisted.delete(key)
     const store = getStore()
     if (store) {
         // Fora do caminho da resposta (mesmo espírito do write-behind).
-        setImmediate(() => store.write(key, entry))
+        setImmediate(() => {
+            store.write(key, entry)
+            markPersisted(playlistId, key)
+        })
         return
     }
     // Write-behind: the response never waits for the disk.
     void fsp.mkdir(cacheDir(), { recursive: true })
         .then(() => fsp.writeFile(fileOf(key), JSON.stringify(entry), 'utf-8'))
+        .then(() => markPersisted(playlistId, key))
         .catch((error) => log.warn('[CatalogCache] write failed:', error))
 }
 
@@ -140,6 +202,27 @@ export async function cachedCatalogFetch(
         return { data: cached.data, fromCache: true }
     }
 
+    // Só um fetch por (playlist, kind) de cada vez — quem chega no meio pega a
+    // MESMA promessa. Vale inclusive para `forceRefresh`: a busca em voo já é
+    // uma ida ao provedor, então repetir só duplicaria download, parse e escrita.
+    const key = keyOf(playlistId, kind)
+    const running = inFlight.get(key)
+    if (running) return running
+
+    const promise = runCatalogFetch(playlistId, kind, fetcher, cached)
+        .finally(() => {
+            if (inFlight.get(key) === promise) inFlight.delete(key)
+        })
+    inFlight.set(key, promise)
+    return promise
+}
+
+async function runCatalogFetch(
+    playlistId: string,
+    kind: CatalogKind,
+    fetcher: () => Promise<unknown>,
+    cached: CacheEntry | null
+): Promise<{ data: unknown; fromCache: boolean }> {
     try {
         const data = await fetcher()
         // 🛡️ Todo `kind` de catálogo é uma LISTA. Provedor com conta expirada,
@@ -167,9 +250,13 @@ export async function cachedCatalogFetch(
 
 /** Drop everything for one playlist (e.g. after it is removed). */
 export function invalidatePlaylistCache(playlistId: string): void {
-    for (const kind of ['live', 'vod', 'series', 'live-categories', 'vod-categories', 'series-categories'] as CatalogKind[]) {
+    for (const kind of ALL_KINDS) {
         const key = keyOf(playlistId, kind)
         memory.delete(key)
+        persisted.delete(key)
+        // Uma busca em voo desta playlist ainda gravaria por cima depois do
+        // invalidate — tirar do mapa faz a próxima chamada começar do zero.
+        inFlight.delete(key)
         getStore()?.remove(key)
         // JSON legado some junto mesmo no backend SQLite (higiene do fallback).
         void fsp.rm(fileOf(key), { force: true }).catch(() => undefined)
