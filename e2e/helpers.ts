@@ -1,5 +1,6 @@
 import { _electron as electron, type ElectronApplication, type Page } from 'playwright';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +28,31 @@ export interface LaunchedApp {
 
 const ROOT = path.resolve(__dirname, '..');
 const MAIN_JS = path.join(ROOT, 'dist-electron', 'main.js');
+
+/** Espera `ms` sem segurar o worker vivo (timer unref'd). */
+function delay(ms: number): Promise<false> {
+    return new Promise<false>((resolve) => setTimeout(resolve, ms, false).unref());
+}
+
+/**
+ * Mata os ffmpeg de DVR que o app registrou em dvr-pids.txt (dvrHandlers.ts
+ * escreve quando NEOSTREAM_E2E_USER_DATA está setado). Escopado aos PIDs que
+ * ESTE app iniciou — nunca um taskkill global em ffmpeg.exe, que pegaria
+ * processos alheios do runner.
+ */
+function killTrackedFfmpeg(userDataDir: string): void {
+    let raw: string;
+    try {
+        raw = readFileSync(path.join(userDataDir, 'dvr-pids.txt'), 'utf-8');
+    } catch {
+        return; // o teste não gravou nada
+    }
+    for (const line of raw.split(/\r?\n/)) {
+        const pid = Number(line.trim());
+        if (!Number.isInteger(pid) || pid <= 0) continue;
+        try { process.kill(pid, 'SIGKILL'); } catch { /* já morreu */ }
+    }
+}
 
 /**
  * Launches the BUILT app (dist/ + dist-electron/main.js) with an isolated,
@@ -76,7 +102,25 @@ export async function launchApp(options: {
         page,
         userDataDir,
         close: async () => {
-            await app.close().catch(() => undefined);
+            // Teardown com teto de tempo: um ffmpeg de DVR órfão no Windows
+            // herda os pipes do Electron e o app.close() nunca resolve — foi
+            // isso que estourava o worker teardown do remoteRecord no CI. Se
+            // o close não terminar em 15s, mata os ffmpeg registrados e a
+            // árvore inteira do Electron (taskkill /T precisa do PID raiz
+            // ainda vivo, por isso roda antes de desistir de esperar).
+            const electronProc = app.process();
+            const closed = app.close().then(() => true, () => true);
+            if (!await Promise.race([closed, delay(15_000)])) {
+                killTrackedFfmpeg(userDataDir);
+                if (electronProc.pid) {
+                    if (process.platform === 'win32') {
+                        spawnSync('taskkill', ['/PID', String(electronProc.pid), '/T', '/F'], { windowsHide: true });
+                    } else {
+                        try { electronProc.kill('SIGKILL'); } catch { /* já saiu */ }
+                    }
+                }
+                await Promise.race([closed, delay(10_000)]);
+            }
             // Best effort: Electron may still hold locks on Windows for a moment
             try {
                 rmSync(userDataDir, { recursive: true, force: true });
