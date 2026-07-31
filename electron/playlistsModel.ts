@@ -33,6 +33,24 @@ export interface PlaylistEntry {
     credentialsUpdatedAt?: number
     /** 'xtream' (default, absent on legacy entries), 'm3u' or 'stalker'. */
     type?: 'xtream' | 'm3u' | 'stalker'
+    /**
+     * Quando o userInfo foi confirmado com o provedor pela última vez.
+     * Ausente em entradas legadas — tratadas como nunca confirmadas.
+     */
+    userInfoAt?: number
+}
+
+/**
+ * Idade máxima de um userInfo pra valer como "fresco". O aviso de expiração
+ * decidia por um retrato tirado NO CADASTRO da conta — quem renovava com o
+ * provedor continuava vendo "sua lista expirou" pra sempre. Dentro do TTL o
+ * retrato serve; fora dele, só rede.
+ */
+export const USER_INFO_TTL_MS = 6 * 3600_000
+
+/** O retrato ainda vale, ou é hora de perguntar ao provedor? (PURO) */
+export function isUserInfoFresh(userInfoAt: number | undefined, nowMs: number, ttlMs: number = USER_INFO_TTL_MS): boolean {
+    return typeof userInfoAt === 'number' && Number.isFinite(userInfoAt) && nowMs - userInfoAt < ttlMs
 }
 
 /** What the renderer is allowed to see — never includes the password. */

@@ -13,7 +13,9 @@ import {
     deactivatePlaylists,
     exportPlaylistsForBackup,
     findPlaylist,
+    getActivePlaylist,
     getActivePlaylistIdPublic,
+    refreshActiveUserInfo,
     importPlaylistsFromBackup,
     listPublicPlaylists,
     migratePlaylistsOnStartup,
@@ -23,6 +25,7 @@ import {
     importMobileAccounts,
 } from './playlistManager'
 import type { PlaylistBackupEntry, MobileAccountEntry } from './playlistManager'
+import { isUserInfoFresh } from './playlistsModel'
 
 import { cachedCatalogFetch, invalidatePlaylistCache, type CatalogKind } from './catalogCache'
 import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uToVodStreams, m3uCategories, m3uToSeries, m3uSeriesInfo, findM3uEpisodeUrl } from './m3uProtocol'
@@ -555,6 +558,29 @@ export function setupIpcHandlers() {
             return { authenticated: true, user: auth.userInfo }
         }
         return { authenticated: false }
+    })
+
+    // A verdade sobre a expiração mora no PROVEDOR, não no retrato tirado no
+    // cadastro: o banner "sua lista expirou" disparava com lista renovada
+    // porque o exp_date guardado nunca era reconferido. Este handler devolve
+    // userInfo confirmado há menos de 6h — reconferindo na rede se preciso —
+    // e, sem rede, devolve falha: melhor banner nenhum do que banner mentiroso.
+    ipcMain.handle('auth:refresh-user-info', async () => {
+        const active = getActivePlaylist()
+        if (!active || (active.type ?? 'xtream') !== 'xtream') {
+            return { success: false, reason: 'no-xtream-account' }
+        }
+        if (isUserInfoFresh(active.userInfoAt, Date.now())) {
+            return { success: true, user: active.userInfo }
+        }
+        try {
+            const client = new XtreamClient(active.url, active.username, active.password)
+            const data = await client.authenticate()
+            refreshActiveUserInfo(data.user_info)
+            return { success: true, user: data.user_info }
+        } catch (error: unknown) {
+            return { success: false, reason: 'network', error: getErrorMessage(error) }
+        }
     })
 
     ipcMain.handle('auth:get-credentials', () => {

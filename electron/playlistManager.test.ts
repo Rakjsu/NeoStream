@@ -235,3 +235,43 @@ describe('backup (export/import sem ativar nem validar)', () => {
         expect(playlists()).toHaveLength(0)
     })
 })
+
+// ------------------------------------------------ userInfo fresco --------
+
+describe('refreshActiveUserInfo / getActivePlaylist', () => {
+    it('grava userInfo novo com carimbo na ativa e re-espelha o auth', async () => {
+        const { refreshActiveUserInfo, getActivePlaylist } = await import('./playlistManager')
+        saveAndActivatePlaylist({ url: 'http://a.tv', username: 'u', password: 'p', userInfo: { exp_date: '1' } })
+
+        expect(refreshActiveUserInfo({ exp_date: '999' }, 123)).toBe(true)
+
+        const ativa = getActivePlaylist()
+        expect(ativa?.userInfo).toEqual({ exp_date: '999' })
+        expect(ativa?.userInfoAt).toBe(123)
+        // O espelho `auth` é o que o auth:check devolve — tem que acompanhar.
+        expect((store.get('auth') as { userInfo?: unknown }).userInfo).toEqual({ exp_date: '999' })
+    })
+
+    it('sem playlist ativa, devolve false e não inventa entrada', async () => {
+        const { refreshActiveUserInfo } = await import('./playlistManager')
+        deactivatePlaylists()
+        expect(refreshActiveUserInfo({ exp_date: '999' })).toBe(false)
+    })
+
+    it('cadastrar com userInfo carimba a hora (retrato não nasce eterno)', () => {
+        const antes = Date.now()
+        const entry = saveAndActivatePlaylist({ url: 'http://b.tv', username: 'u', password: 'p', userInfo: { exp_date: '2' } })
+        expect(entry.userInfoAt).toBeGreaterThanOrEqual(antes)
+    })
+})
+
+describe('isUserInfoFresh', () => {
+    it('fresco dentro do TTL; vencido fora; legado (sem carimbo) nunca é fresco', async () => {
+        const { isUserInfoFresh, USER_INFO_TTL_MS } = await import('./playlistsModel')
+        expect(isUserInfoFresh(1_000, 1_000 + USER_INFO_TTL_MS - 1)).toBe(true)
+        expect(isUserInfoFresh(1_000, 1_000 + USER_INFO_TTL_MS)).toBe(false)
+        // Entrada de antes deste fix não tem carimbo: o retrato dela pode ter
+        // QUALQUER idade — é exatamente o caso do bug, então nunca é fresco.
+        expect(isUserInfoFresh(undefined, 1_000)).toBe(false)
+    })
+})

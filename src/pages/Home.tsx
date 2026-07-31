@@ -157,16 +157,20 @@ export function Home() {
     const [blockMessage, setBlockMessage] = useState<string | null>(null);
 
     // ⚠️ Lista perto de expirar (exp_date do provedor): banner com 7 dias
-    // de antecedência, dispensável por 24h.
+    // de antecedência, dispensável por 24h. SÓ com dado confirmado fresco:
+    // o auth:check devolvia o retrato do dia do CADASTRO, e quem renovava com
+    // o provedor via "sua lista expirou" pra sempre. Sem rede, sem banner —
+    // melhor nenhum aviso do que um aviso mentiroso.
     const [expiryBanner, setExpiryBanner] = useState<number | null>(null);
     useEffect(() => {
         void (async () => {
             try {
-                const status = await window.ipcRenderer.invoke('auth:check') as {
-                    authenticated?: boolean;
+                const status = await window.ipcRenderer.invoke('auth:refresh-user-info') as {
+                    success?: boolean;
                     user?: { exp_date?: string | number | null };
                 };
-                const days = daysToExpiry(status?.user?.exp_date, Date.now());
+                if (!status?.success) return;
+                const days = daysToExpiry(status.user?.exp_date, Date.now());
                 if (shouldWarnExpiry(days) && !isExpirySnoozed(localStorage.getItem(EXPIRY_SNOOZE_KEY), Date.now())) {
                     setExpiryBanner(days);
                 }

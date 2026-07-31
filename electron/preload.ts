@@ -12,6 +12,7 @@ const invokeChannels = new Set([
     'airplay:stop',
     'auth:check',
     'auth:get-credentials',
+    'auth:refresh-user-info',
     'auth:login',
     'auth:logout',
     'backup:auto-config-get',
