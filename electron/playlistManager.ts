@@ -76,13 +76,16 @@ export function findPlaylist(id: string): PlaylistEntry | undefined {
  */
 export function saveAndActivatePlaylist(input: UpsertInput): PlaylistEntry {
     const { playlists, entry } = upsertPlaylist(getPlaylists(), input)
+    // userInfo no cadastro vem de um authenticate recém-feito → carimba a hora
+    // (sem o carimbo, o aviso de expiração trataria o retrato como eterno).
+    const stamped: PlaylistEntry = input.userInfo !== undefined ? { ...entry, userInfoAt: Date.now() } : entry
     // Re-adicionar à mão é intenção nova: sai do ledger de apagadas, senão a
     // própria playlist ficaria bloqueada pro sync por 30 dias.
     clearRemovedPlaylist(input.url, input.username)
-    store.set('playlists', playlists)
+    store.set('playlists', playlists.map(p => (p.id === entry.id ? stamped : p)))
     store.set('activePlaylistId', entry.id)
-    mirrorAuth(entry)
-    return entry
+    mirrorAuth(stamped)
+    return stamped
 }
 
 /** Make a saved playlist active (credentials already revalidated by caller). */
@@ -91,13 +94,37 @@ export function activatePlaylist(id: string, userInfo?: unknown): PlaylistEntry 
     const entry = playlists.find(p => p.id === id)
     if (!entry) return null
 
-    const updated: PlaylistEntry = userInfo !== undefined ? { ...entry, userInfo } : entry
+    // userInfo aqui veio de um authenticate recém-feito → carimba a hora.
+    const updated: PlaylistEntry = userInfo !== undefined ? { ...entry, userInfo, userInfoAt: Date.now() } : entry
     if (userInfo !== undefined) {
         store.set('playlists', playlists.map(p => (p.id === id ? updated : p)))
     }
     store.set('activePlaylistId', id)
     mirrorAuth(updated)
     return updated
+}
+
+/** Active entry with everything (main-only — inclui senha e userInfo). */
+export function getActivePlaylist(): PlaylistEntry | null {
+    const id = getActivePlaylistId()
+    if (!id) return null
+    return getPlaylists().find(p => p.id === id) ?? null
+}
+
+/**
+ * Grava um userInfo recém-confirmado com o provedor na playlist ATIVA (com
+ * carimbo de hora) e re-espelha o `auth`. É o que impede o aviso de expiração
+ * de decidir por um retrato do dia do cadastro.
+ */
+export function refreshActiveUserInfo(userInfo: unknown, at: number = Date.now()): boolean {
+    const id = getActivePlaylistId()
+    const playlists = getPlaylists()
+    const entry = playlists.find(p => p.id === id)
+    if (!entry) return false
+    const updated: PlaylistEntry = { ...entry, userInfo, userInfoAt: at }
+    store.set('playlists', playlists.map(p => (p.id === id ? updated : p)))
+    mirrorAuth(updated)
+    return true
 }
 
 export interface RemovePlaylistOutcome {
