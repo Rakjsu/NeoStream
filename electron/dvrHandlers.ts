@@ -116,6 +116,13 @@ export function setupDvrHandlers() {
             active.set(id, rec)
             log.info(`[DVR] Recording started (${id}): ${data.channelName} -> ${file}`)
 
+            // E2E: registra o PID pra suite conseguir matar um ffmpeg perdido
+            // se o teardown estourar (e2e/helpers.ts lê dvr-pids.txt no close).
+            const e2eDir = process.env.NEOSTREAM_E2E_USER_DATA
+            if (e2eDir && proc.pid) {
+                try { fs.appendFileSync(path.join(e2eDir, 'dvr-pids.txt'), `${proc.pid}\n`) } catch { /* best-effort */ }
+            }
+
             proc.stderr.on('data', (chunk: Buffer) => {
                 const secs = parseFfmpegTime(chunk.toString())
                 if (secs !== null && active.has(id)) {
@@ -331,10 +338,45 @@ export function setupDvrHandlers() {
         }
     })
 
-    // Stop everything on quit so files finalize.
-    app.on('before-quit', () => {
-        for (const rec of active.values()) {
-            try { rec.proc.stdin.write('q') } catch { /* ignore */ }
+    // Stop everything on quit so files finalize. Só escrever 'q' não basta:
+    // ffmpeg preso abrindo o input nunca processa o stdin e vira órfão — e no
+    // Windows o órfão herda os pipes do app, segurando o teardown de quem
+    // espera o processo morrer (e2e). Segura o quit por um grace curto e
+    // força SIGKILL em quem ficar antes de deixar o app sair.
+    let quitCleanupStarted = false
+    const stillRunning = (rec: ActiveRecording) =>
+        rec.proc.exitCode === null && rec.proc.signalCode === null
+    app.on('before-quit', (e) => {
+        if (quitCleanupStarted) return
+        const pending = Array.from(active.values()).filter(stillRunning)
+        if (pending.length === 0) return
+        quitCleanupStarted = true
+        e.preventDefault()
+        // Fora do mapa: sem broadcast de dvr:stopped (janelas já fechando) e
+        // o segundo before-quit (do app.quit() abaixo) passa direto.
+        active.clear()
+        for (const rec of pending) {
+            try { rec.proc.stdin.write('q') } catch { /* stdin já fechado */ }
+        }
+        let remaining = pending.length
+        let resumed = false
+        const resumeQuit = () => {
+            if (resumed) return
+            resumed = true
+            clearTimeout(hardKill)
+            app.quit()
+        }
+        const hardKill = setTimeout(() => {
+            for (const rec of pending) {
+                if (stillRunning(rec)) {
+                    try { rec.proc.kill('SIGKILL') } catch { /* já morreu */ }
+                }
+            }
+            // SIGKILL é imediato; um último fôlego pro 'close' propagar.
+            setTimeout(resumeQuit, 1000)
+        }, 1500)
+        for (const rec of pending) {
+            rec.proc.once('close', () => { remaining -= 1; if (remaining === 0) resumeQuit() })
         }
     })
 
