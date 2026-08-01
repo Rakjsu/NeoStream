@@ -15,5 +15,10 @@ export default defineConfig({
     // First-load IPC (content fetch over the mock server) can take a moment
     timeout: 60_000,
     expect: { timeout: 15_000 },
-    reporter: process.env.CI ? [['list'], ['github']] : [['list'], ['html', { open: 'never' }]],
+    // No CI o html também é gerado: o ci.yml sobe playwright-report/ quando o
+    // job falha — sem este reporter o passo de upload nunca achava nada (foi o
+    // que deixou a investigação do remoteRecord sem error-context/stdout).
+    reporter: process.env.CI
+        ? [['list'], ['github'], ['html', { open: 'never' }]]
+        : [['list'], ['html', { open: 'never' }]],
 });
