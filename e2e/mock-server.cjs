@@ -21,6 +21,10 @@
  * time-paging E2E flows have deterministic program data. Anything else
  * (stream URLs, per-channel EPG) answers 404 — the app tolerates that
  * (pages render "Sem programação" / fallbacks).
+ *
+ * A exceção é `/live/*` pedido pelo ffmpeg do DVR: aí sai um MPEG-TS sem fim
+ * (ver `streamEndlessTs`). Todo o resto — inclusive o hls.js do renderer —
+ * continua levando 404.
  */
 
 const http = require('node:http');
@@ -31,6 +35,20 @@ const FIXTURES_DIR = path.join(__dirname, 'fixtures');
 
 const USERNAME = 'e2euser';
 const PASSWORD = 'e2epass';
+
+/**
+ * MPEG-TS de 5s, 64x48, mpeg2video (~47 KB) que alimenta o DVR. Regerar com:
+ *
+ *   node_modules/ffmpeg-static/ffmpeg -f lavfi -i "testsrc=size=64x48:rate=10" \
+ *     -t 5 -c:v mpeg2video -b:v 80k -g 10 -f mpegts -y e2e/fixtures/live-stream-loop.mpegts
+ *
+ * Extensão `.mpegts` de propósito: `.ts` cairia nos globs de TypeScript
+ * (tsc/eslint/vitest) e viraria erro de parse.
+ */
+const LIVE_TS_FIXTURE = path.join(FIXTURES_DIR, 'live-stream-loop.mpegts');
+const LIVE_TS_SECONDS = 5;
+/** Uma fatia a cada 200ms ⇒ o loop escoa em tempo real (25 fatias / 5s). */
+const LIVE_TICK_MS = 200;
 
 function loadFixture(name) {
     return JSON.parse(fs.readFileSync(path.join(FIXTURES_DIR, name), 'utf-8'));
@@ -129,11 +147,80 @@ function buildXmltv() {
     );
 }
 
+/** O ffmpeg se anuncia como `Lavf/<versão>`; o Chromium, nunca. */
+function isFfmpegClient(req) {
+    return /Lavf|ffmpeg/i.test(String(req.headers['user-agent'] || ''));
+}
+
+let liveTsBytes;
+/** Fixture lida uma vez; `null` (fixture sumiu) volta pro 404 de sempre. */
+function liveTsPayload() {
+    if (liveTsBytes === undefined) {
+        try {
+            liveTsBytes = fs.readFileSync(LIVE_TS_FIXTURE);
+        } catch {
+            liveTsBytes = null;
+        }
+    }
+    return liveTsBytes;
+}
+
+/**
+ * MPEG-TS que não acaba, para o ffmpeg do DVR.
+ *
+ * `dvr:start` (electron/dvrHandlers.ts) spawna um ffmpeg de verdade contra a
+ * URL ao vivo que o app resolve — `{base}/live/{user}/{pass}/{id}.m3u8`.
+ * Enquanto `/live/*` respondia 404 esse ffmpeg morria em menos de 1s, e o
+ * `remoteRecord.spec.ts` corria com ele: o `requestRecordings` só lista o que
+ * ainda está no mapa `active` (1 falha em 10 rodadas locais, 01/08/2026).
+ * Sustentar o stream mata a corrida e faz o `stopRecord` exercitar o caminho
+ * real do 'q' no stdin em vez de encontrar um processo já morto.
+ *
+ * O ffmpeg escolhe o demuxer sondando o corpo, não a extensão `.m3u8` — então
+ * um TS válido repetido em loop basta, sem precisar servir playlist HLS.
+ *
+ * **Escopo:** só o ffmpeg (User-Agent `Lavf/*`) recebe isso. O hls.js do
+ * renderer continua levando o mesmo 404 de sempre, então nenhum dos 40+ specs
+ * de playback muda de comportamento.
+ *
+ * @param {import('node:http').ServerResponse} res
+ * @param {Buffer} payload bytes da fixture (repetidos em loop)
+ * @param {Set<() => void>} openStreams cancelamentos pendentes (limpos no close)
+ */
+function streamEndlessTs(res, payload, openStreams) {
+    const sliceSize = Math.ceil(payload.length / ((LIVE_TS_SECONDS * 1000) / LIVE_TICK_MS));
+    let offset = 0;
+
+    res.writeHead(200, { 'Content-Type': 'video/mp2t', 'Cache-Control': 'no-cache' });
+
+    let timer = null;
+    const stop = () => {
+        clearInterval(timer);
+        openStreams.delete(stop);
+        res.destroy();
+    };
+    // Pipe morto emite EPIPE ASSÍNCRONO (evento 'error' do stream); sem
+    // listener isso derruba o processo do worker do Playwright.
+    res.on('error', stop);
+    res.on('close', stop);
+
+    timer = setInterval(() => {
+        if (res.writableNeedDrain) return; // deixa o socket respirar
+        res.write(payload.subarray(offset, offset + sliceSize));
+        offset += sliceSize;
+        if (offset >= payload.length) offset = 0; // rebobina: o canal não acaba
+    }, LIVE_TICK_MS);
+    openStreams.add(stop);
+}
+
 /**
  * Starts the mock server on an ephemeral port.
  * @returns {Promise<{ url: string, port: number, close: () => Promise<void> }>}
  */
 function startMockServer() {
+    /** Streams ao vivo em curso — precisam morrer no close() ou ele nunca resolve. */
+    const openStreams = new Set();
+
     const server = http.createServer((req, res) => {
         const url = new URL(req.url, 'http://127.0.0.1');
 
@@ -282,6 +369,16 @@ function startMockServer() {
             return;
         }
 
+        // Stream ao vivo: só o ffmpeg do DVR recebe bytes de verdade — o
+        // renderer continua no 404 histórico (ver streamEndlessTs).
+        if (url.pathname.startsWith('/live/') && isFfmpegClient(req)) {
+            const payload = liveTsPayload();
+            if (payload) {
+                streamEndlessTs(res, payload, openStreams);
+                return;
+            }
+        }
+
         if (url.pathname !== '/player_api.php') {
             res.writeHead(404, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'not found' }));
@@ -324,7 +421,12 @@ function startMockServer() {
             resolve({
                 url: `http://127.0.0.1:${port}`,
                 port,
-                close: () => new Promise((r) => server.close(() => r())),
+                close: () => new Promise((r) => {
+                    // Um stream ao vivo aberto segura o server.close() para
+                    // sempre — derruba os pendentes antes de fechar.
+                    for (const stop of Array.from(openStreams)) stop();
+                    server.close(() => r());
+                }),
             });
         });
     });
