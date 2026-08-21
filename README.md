@@ -1,74 +1,133 @@
-# NeoStream 📺
+<div align="center">
 
-Player IPTV completo para desktop, construído com **Electron**, **React** e **TypeScript**. TV ao vivo com guia e gravação, filmes e séries com visual inspirado em streaming, metadados do TMDB e integração profunda com o Windows.
+<img src="public/neostream-logo.png" alt="NeoStream" width="120">
+
+# NeoStream
+
+**Você traz o seu serviço de streaming. Ele toca.**
+
+Player IPTV para desktop — TV ao vivo com guia e gravação, filmes e séries com cara de streaming, e o celular como controle remoto.
+
+[![Versão](https://img.shields.io/github/v/release/Rakjsu/NeoStream?style=flat-square&color=8b5cf6&label=vers%C3%A3o)](https://github.com/Rakjsu/NeoStream/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/Rakjsu/NeoStream/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Rakjsu/NeoStream/actions/workflows/ci.yml)
+[![Testes](https://img.shields.io/badge/testes-1429%20unit%20%C2%B7%2070%20e2e-22c55e?style=flat-square)](#-sob-o-capô)
+[![Licença](https://img.shields.io/github/license/Rakjsu/NeoStream?style=flat-square&color=64748b)](LICENSE)
+[![Plataformas](https://img.shields.io/badge/Windows%20%C2%B7%20macOS%20%C2%B7%20Linux-1e293b?style=flat-square)](#-baixar)
+
+[Baixar](#-baixar) · [O que faz](#-o-que-ele-faz) · [Ecossistema](#-o-celular-vira-controle) · [Sob o capô](#-sob-o-capô) · [Desenvolvimento](#-desenvolvimento)
+
+</div>
 
 ---
+
+O NeoStream é **um player**, no mesmo sentido que o VLC é um player. Ele não vem com nada dentro: na primeira abertura a tela está vazia — nenhuma lista, nenhum provedor, nenhum canal. Você informa o endereço de um serviço que **já** contratou, e ele reproduz. Não há servidor deste projeto no meio, não há catálogo, não há busca por fontes.
+
+Fala os protocolos abertos de sempre: **Xtream Codes**, **playlist M3U/M3U8**, **portal Stalker/Ministra**, **EPG XMLTV** e **HLS**.
+
+## 📥 Baixar
+
+| Sistema | Arquivo | Observação |
+|---|---|---|
+| **Windows** | `Installer.exe` ou `Portable.exe` | O portátil roda sem instalar |
+| **macOS** | `.dmg` ou `-mac.zip` | Apple Silicon (arm64); sem assinatura da Apple |
+| **Linux** | `.AppImage` | `chmod +x` e executar |
+
+**[→ Última versão](https://github.com/Rakjsu/NeoStream/releases/latest)**
+
+Depois de instalado, o app **se atualiza sozinho** — com que frequência, e se instala automático, você decide em Configurações → Atualizações.
 
 ## ✨ O que ele faz
 
-### 📡 TV ao Vivo
-- Canais agrupados por qualidade (4K/FHD/HD/SD) com fallback automático quando um stream cai
-- **Guia EPG** em grade (fonte primária: o próprio provedor via `xmltv.php`; fallback pra mi.tv/meuguia/Open-EPG), com busca de programas e paginação
-- **Catch-up/replay** (timeshift) em canais com arquivo do provedor
-- **Zapping dentro do player**: lista de canais com busca, PgUp/PgDn troca canal, digitar o número pula direto (com OSD estilo TV)
-- **Multi-view 2×2**: até 4 canais ao mesmo tempo, clique move o áudio
-- **Lembretes de programa** com notificação nativa do Windows
+### 📡 TV ao vivo
+Guia de programação em grade (do seu provedor, do **seu próprio XMLTV** ou de fontes públicas), com busca de programas, filtro por gênero e mini-guia ao pairar no canal. As variantes do mesmo canal (FHD/HD/SD) se agrupam num card só. Zapping dentro do player com busca, PgUp/PgDn e número digitado, com OSD de TV — mais histórico dos últimos canais, zap aleatório e a possibilidade de esconder o que você nunca assiste.
 
-### ⏺ DVR (gravação)
-- Botão de gravar no player ao vivo (ffmpeg embutido, MPEG-TS à prova de queda)
-- **Gravação agendada pelo guia**: clica num programa futuro → grava sozinho do início ao fim
-- Seção **Gravações** em Downloads: assistir no app, excluir, abrir pasta
-- **Modo bandeja**: fechar a janela mantém o app vivo — agendamentos e lembretes disparam mesmo "fechado"; opção de iniciar com o Windows
+**Pausar o ao vivo** com buffer local de ~30 minutos, **catch-up/replay** onde o provedor oferece, **assistir do início** um programa em andamento, e **multi-view 2×2** com o áudio seguindo o clique.
 
-### 🎬 Filmes e Séries
-- Grades virtualizadas com capas, busca global esperta (Ctrl+K, fuzzy e sem acento)
-- Modal de detalhes com **trailer tocando no topo** (YouTube via TMDB), episódios ao lado, navegação por teclado e progresso por episódio
-- **Autoplay do próximo episódio** com countdown cancelável
-- Progresso, favoritos, histórico e "assistir depois" **por perfil e por playlist**
-- Downloads offline (paralelo, com fila por temporada)
-- Legendas automáticas (OpenSubtitles) com escolha de idioma; faixas de áudio em streams HLS
+### ⏺ Gravação (DVR)
+Grave o canal ao vivo com um botão, ou **agende pelo guia** clicando num programa futuro. Dá para criar **regras**: "grave tudo cujo título casar com esta expressão". As gravações têm renomear, proteger contra a faxina automática, exportar e converter para MP4 sem perda.
 
-### 👤 Perfis e aparência
-- Até 5 perfis com avatar, **cor própria (re-tema o app ao trocar)** e PIN opcional
-- Perfil Kids com filtragem de conteúdo + Controle Parental por categoria
-- Temas: fundo padrão/AMOLED + 6 cores de destaque
-- Multi-playlist: vários provedores Xtream salvos, troca rápida
+Fechar a janela mantém o app na bandeja — **agendamento e lembrete disparam com o app "fechado"**.
 
-### 🖥️ Integrações
-- **Cast** para Smart TVs via DLNA (com remux automático pra Samsung) e AirPlay
-- **MPV opcional** (download com 1 clique): pseudo-embutido, troca de faixa de áudio/legenda em MP4 com memória por conteúdo
-- **Gamepad**: navegue o app inteiro pelo controle (D-pad, A/B, LB/RB pra zapping)
-- Picture-in-Picture flutuante, atalhos de teclado no player
-- **Auto-update silencioso** via GitHub Releases (Windows/Linux/macOS)
+### 🎬 Filmes e séries
+Grades virtualizadas, busca global esperta (Ctrl+K, sem acento, tolerante a erro de digitação, e também **por pessoa**, cruzando filmografia com o seu catálogo). Ficha com **trailer tocando no topo**, episódios ao lado e progresso por episódio. Autoplay do próximo com contagem cancelável.
 
----
+Downloads offline com fila por temporada, **só de madrugada** se você preferir, e download inteligente que já enfileira o próximo episódio. Legendas do OpenSubtitles com estilo, sincronização e suporte a legenda forçada.
 
-## 🚀 Desenvolvimento
+### 📱 O celular vira controle
+Este é o pedaço que separa o NeoStream de um player comum. Um **servidor próprio na sua rede local** (HTTP + WebSocket escritos do zero) transforma qualquer celular em controle, sem instalar nada: abre o navegador, aponta a câmera para o **QR** e digita o **PIN de 4 dígitos**.
+
+Do celular você **controla o player** (play, pause, seek, volume, faixa de áudio, sleep, zap por número, trackpad que vira setas), **navega o guia e o catálogo**, **manda gravar**, **transmite para o Chromecast** e vê **o que está tocando**. Também dá para **baixar no celular** uma gravação do PC, **mandar para o PC** um download feito no celular, e **passar o vídeo de um aparelho para o outro** de onde parou, por QR.
+
+Com o app companheiro, ainda há **espelho do "continuar assistindo"** entre PC e celular, e **modo festa** 🎉 — qualquer celular pareado joga um filme na fila da TV.
+
+> O pareamento é opt-in, protegido por PIN com bloqueio por tentativas, e **nada disso sai da sua rede local**. Há HTTPS opcional com certificado próprio.
+
+### 👥 Perfis, família e privacidade
+Até 5 perfis com avatar, cor que **re-tematiza o app** e PIN opcional, mais uma **sessão de convidado** que não deixa histórico. Controle parental por categoria, perfil infantil com **limite diário de tela**, **janela de horário permitido**, troca automática para o Kids no horário e relatório semanal de uso.
+
+### 🖥️ Integrações e conforto
+**Chromecast**, **DLNA** (com remux automático para as Samsungs) e **AirPlay** — todos implementados do zero. **Gamepad** navega o app inteiro. **MPV opcional** em um clique. Picture-in-picture, **modo cinema** com luz ambiente amostrada do próprio vídeo, **modo rádio** (só áudio), marcadores de posição, loop A–B, screenshot do frame, filtros de vídeo e **atalhos remapeáveis**.
+
+E **estatísticas de verdade**: mapa do ano, heatmap de hábitos, tempo por canal e por perfil, recordes, meta diária — mais a **retrospectiva anual** com a sua persona de espectador.
+
+### 💾 Backup e várias máquinas
+Backup completo (perfis, progresso, favoritos, estatísticas, playlists e as suas chaves de API), com **senha opcional e cifra AES**. Automático semanal, se quiser. E **sincronização entre máquinas** por uma pasta do Dropbox/Drive/OneDrive: cada máquina escreve o seu arquivo, o app faz o merge — inclusive respeitando o que você apagou de propósito.
+
+## 🔧 Sob o capô
+
+Coisas que não aparecem na tela, mas explicam o resto:
+
+- **16 dependências de produção.** WebSocket, DLNA, Chromecast, AirPlay, encoder de QR (com Reed-Solomon), parser do feed de update e public suffix list — tudo escrito à mão, de propósito. Menos superfície, menos surpresa.
+- **1429 testes unitários** em 154 arquivos e **70 testes E2E** em 31, com Playwright dirigindo o Electron de verdade contra um servidor Xtream simulado.
+- **CI em camadas** no Windows, Linux e macOS: auditoria de dependências, typecheck, lint, unitários, build, *bundle guard* (um empacotamento errado do ffmpeg mata o DVR em silêncio — o CI barra), E2E e regressão visual. Mais uma rodada semanal para pegar CVE em dependência que não mudou.
+- **Segurança tratada como recurso**: credenciais são apagadas do log antes de tocar o disco, os servidores locais só aceitam a origem do próprio app, o proxy DLNA valida token e confina destino, e o feed de auto-update é re-hasheado no CI antes de virar release.
+- **Catálogo em SQLite** (o embutido no Node, sem dependência nativa), com migração transacional e rollback automático para o formato anterior se algo der errado.
+
+## 🛠️ Desenvolvimento
 
 ```bash
-npm install       # dependências
-npm run dev       # Vite + Electron em modo dev
-npm run test:run  # ~390 testes unitários (vitest)
-npm run test:e2e  # ~24 testes E2E (Playwright + mock Xtream)
-npm run build:win # build Windows (NSIS + portable)
+npm install        # dependências
+npm run dev        # Vite + Electron
+npm run test:run   # 1429 testes unitários (vitest)
+npm run test:e2e   # 70 testes E2E (Playwright + Electron + mock Xtream)
+npm run lint
+npm run build:win  # também: build:mac, build:linux
 ```
 
-- **Stack:** Electron 43 · React 19 · TypeScript 6 · Vite 8 · Tailwind 4
-- **CI:** typecheck + lint + unit + E2E + `npm audit` em Windows/Linux/macOS; tag `v*.*.*` publica a release com feeds de auto-update
-- **Chaves de API são do usuário:** os builds **não embutem** chave nenhuma. Cada pessoa configura as próprias em **Configurações → APIs** dentro do app — TMDB (gratuita: capas, sinopses, notas, trailers e controle parental) e OpenSubtitles (opcional: busca de legendas online). Ao adicionar a primeira playlist, o app guia a configuração. Para desenvolvimento local, `VITE_TMDB_API_KEY` e `OPEN_SUBTITLES_*` num `.env` (nunca commitado) valem como fallback.
+**Stack:** Electron 43 · React 19 · TypeScript 6 · Vite 8 · Tailwind 4 · Node 22 no CI
 
----
+Interface em **português, inglês e espanhol** (1151 strings por idioma), incluindo a página do controle no celular.
+
+> **Nota:** o TypeScript está travado no 6 de propósito. O `typescript-eslint` estável ainda não aceita o 7 — subir quebra o `npm ci` do CI, e isso já derrubou a `main` duas vezes. A trava e a condição para removê-la estão em [`.github/dependabot.yml`](.github/dependabot.yml).
+
+## 🔑 Chaves de API
+
+**Os builds não embutem chave nenhuma.** Cada pessoa cadastra as suas em **Configurações → APIs**:
+
+- **TMDB** (gratuita) — capas, sinopses, notas, elenco, trailers e a classificação usada pelo controle parental
+- **OpenSubtitles** (opcional) — busca de legendas
+- **Trakt** (opcional) — sincroniza o que você assistiu, com aplicativo criado por você
+
+O app guia essa configuração ao adicionar a primeira playlist. Para desenvolvimento local, um `.env` (nunca commitado) serve de fallback.
+
+## ⚖️ Aviso legal
+
+O NeoStream **não hospeda, não indexa, não distribui e não sugere** conteúdo, provedores, listas ou fontes. Não existe servidor deste projeto, catálogo embutido ou mecanismo de busca por fontes — sem um endereço que **você** forneça, o app não tem o que exibir e não contata servidor de conteúdo nenhum.
+
+**Use apenas com serviços e conteúdos que você tem o direito de acessar** — a assinatura que você contratou, o seu próprio servidor de mídia, transmissões abertas ou material licenciado. A responsabilidade pelo que se acessa é de quem configura.
+
+É titular de direitos e acredita que algo aqui viola os seus? Abra uma [issue](https://github.com/Rakjsu/NeoStream/issues) apontando o ponto exato — o material sob controle do projeto é removido ou corrigido, e você é informado do que foi feito. Falha de segurança tem [canal privado](https://github.com/Rakjsu/NeoStream/security/advisories/new).
 
 ## 🙏 Créditos
 
-- [TMDB](https://www.themoviedb.org/) pela API de metadados de filmes/séries
-- [hls.js](https://github.com/video-dev/hls.js) e [mpv](https://mpv.io/) pelo playback
-- [OpenSubtitles](https://www.opensubtitles.com/) pelas legendas
+[TMDB](https://www.themoviedb.org/) pelos metadados · [hls.js](https://github.com/video-dev/hls.js) e [mpv](https://mpv.io/) pela reprodução · [OpenSubtitles](https://www.opensubtitles.com/) pelas legendas · [ffmpeg](https://ffmpeg.org/) pela gravação
 
-## ⚠️ Aviso
-
-Aplicativo para uso pessoal. Garanta que você tem os direitos de reproduzir o conteúdo do seu provedor IPTV. Este produto usa a API do TMDB mas não é endossado ou certificado pelo TMDB.
+Este produto usa a API do TMDB, mas não é endossado nem certificado pelo TMDB.
 
 ---
 
-**Built with ❤️ by [Rakjsu](https://github.com/Rakjsu)**
+<div align="center">
+
+**[Rakjsu](https://github.com/Rakjsu)** · [MIT](LICENSE) · Irmãos do projeto: [NeoStream TV](https://github.com/Rakjsu/NeoStream-TV) (Samsung Tizen)
+
+</div>
