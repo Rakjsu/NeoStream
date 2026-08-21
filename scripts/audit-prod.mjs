@@ -15,6 +15,27 @@ const ALLOWLIST = {
     // migrar pro react-router v8.
     'GHSA-qwww-vcr4-c8h2':
         'react-router RSC Mode CSRF — app é SPA Electron, não usa React Server Components.',
+
+    // fast-uri "host confusion via backslash": chega por
+    // electron-store → conf → ajv, onde serve pra resolver $id/$ref de JSON
+    // Schema. VERIFICADO: `electron/store.ts` instancia o electron-store SEM
+    // schema, então o ajv não valida nada e este código nunca é exercitado.
+    // Correção só existe no fast-uri 4.x e o ajv 8 fixa o ^3 — não dá pra
+    // subir sem override arriscado num pacote que nem roda. Reavaliar se
+    // algum dia passarmos um schema ao electron-store.
+    'GHSA-7p8r-x3mc-p8w7':
+        'fast-uri host confusion — electron-store é usado sem schema; o ajv nunca resolve URI.',
+
+    // js-yaml "quadratic CPU em !!omap": chega por electron-updater, que usa
+    // pra ler o latest.yml do feed. É DoS (CPU), não execução de código, e o
+    // YAML vem por https do GitHub Releases do próprio projeto. Para explorar
+    // seria preciso quebrar o TLS do github.com ou ter escrita no repositório
+    // — cenários em que queimar CPU é o menor dos problemas. O app ainda
+    // aplica `checkUpdateArtifacts` (electron/updatePolicy.ts) antes de
+    // aceitar o feed. O fix não foi retroportado pro 4.x e o electron-updater
+    // (já na última, 6.8.9) fixa o 4.x. Reavaliar quando ele adotar o 5.x.
+    'GHSA-5p4m-2wfm-xmqj':
+        'js-yaml CPU quadrática — feed de update vem por https do próprio repo; impacto é DoS, sem caminho de execução.',
 };
 
 function runAudit() {
