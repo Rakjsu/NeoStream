@@ -6,7 +6,11 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist', 'dist-electron', 'release', 'installer-shell']),
+  // `.claude` guarda worktrees — cópias INTEIRAS do repo, cada uma com o seu
+  // tsconfig. O flat config do ESLint 10 não lê o .gitignore, então sem esta
+  // linha o lint local morre com "multiple candidate TSConfigRootDirs" assim
+  // que existir uma sessão paralela aberta (941 erros que não são do código).
+  globalIgnores(['dist', 'dist-electron', 'release', 'installer-shell', '.claude']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
