@@ -1,0 +1,33 @@
+name: 💡 Ideia
+description: Sugerir um recurso ou uma melhoria
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideias são bem-vindas. As que costumam entrar são as que descrevem **o problema**, não só a solução — muitas vezes existe um caminho melhor do que o imaginado.
+
+  - type: textarea
+    id: problema
+    attributes:
+      label: Que problema isso resolve
+      description: O que hoje é chato, lento ou impossível.
+      placeholder: |
+        Quando volto de viagem, perdi programas que queria ver e não tenho como
+        saber quais foram sem abrir canal por canal no guia.
+    validations:
+      required: true
+
+  - type: textarea
+    id: ideia
+    attributes:
+      label: Como você imagina
+      description: Sem precisar ser técnico.
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        **Fora de escopo, sempre:** lista de canais embutida, provedor recomendado, catálogo, índice de fontes ou qualquer coisa que aponte para onde achar conteúdo. O NeoStream é um player — o serviço é você que traz. Pedidos assim são fechados sem discussão.

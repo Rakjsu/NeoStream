@@ -1,0 +1,76 @@
+name: 🐞 Problema
+description: Algo não funciona como deveria
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por relatar. Quanto mais concreto, mais rápido o conserto.
+
+        ⚠️ **Falha de segurança não vai aqui** — use o [canal privado](https://github.com/Rakjsu/NeoStream/security/advisories/new).
+
+        🔒 **Não cole endereço, usuário ou senha do seu provedor** em nada abaixo. Se precisar mostrar uma URL, troque o domínio por `provedor.exemplo`.
+
+  - type: textarea
+    id: oque
+    attributes:
+      label: O que acontece
+      description: E o que você esperava que acontecesse.
+      placeholder: |
+        Ao trocar de canal na TV ao vivo, a tela fica preta e o áudio continua.
+        Esperava que o vídeo do novo canal aparecesse.
+    validations:
+      required: true
+
+  - type: textarea
+    id: passos
+    attributes:
+      label: Como reproduzir
+      description: Passo a passo. Se acontece só às vezes, diga com que frequência.
+      placeholder: |
+        1. Abrir TV ao vivo
+        2. Tocar um canal qualquer
+        3. Apertar PgDn duas vezes seguidas, rápido
+        4. A tela fica preta
+    validations:
+      required: true
+
+  - type: input
+    id: versao
+    attributes:
+      label: Versão do NeoStream
+      description: Aparece em Configurações → Sobre.
+      placeholder: "4.47.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: so
+    attributes:
+      label: Sistema
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tipo-lista
+    attributes:
+      label: Tipo de lista
+      description: Sem citar o provedor — só o formato.
+      options:
+        - Xtream Codes
+        - Playlist M3U
+        - Portal Stalker
+        - Não se aplica / não sei
+    validations:
+      required: true
+
+  - type: textarea
+    id: erros
+    attributes:
+      label: Registro de erros (opcional)
+      description: Configurações → Sobre → registro de erros. Confira que não há credencial no texto antes de colar.
+      render: text

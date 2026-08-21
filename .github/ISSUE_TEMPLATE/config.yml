@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Falha de segurança
+    url: https://github.com/Rakjsu/NeoStream/security/advisories/new
+    about: Relato privado, visível só para você e o mantenedor. Nunca abra issue pública para isso.
+  - name: 📥 Baixar a última versão
+    url: https://github.com/Rakjsu/NeoStream/releases/latest
+    about: Instalador, portátil, macOS e Linux.
+  - name: ⚖️ Direitos autorais
+    url: https://github.com/Rakjsu/NeoStream#-aviso-legal
+    about: Posição do projeto e canal para titulares de direitos.

@@ -15,6 +15,17 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      # ⛔ TypeScript major fica travado no 6.x até o typescript-eslint
+      # ESTÁVEL aceitar a próxima major. O peer dele é `>=4.8.4 <6.1.0` —
+      # subir o TS sozinho faz o `npm ci` do CI morrer com ERESOLVE, e o
+      # gate local NÃO pega (node_modules velho resolve; só instalação
+      # limpa quebra). Já derrubou a main DUAS vezes: v4.45.0 e 4.47.1.
+      # Para destravar: conferir `npm view typescript-eslint peerDependencies`
+      # e só então remover esta entrada.
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-major
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
