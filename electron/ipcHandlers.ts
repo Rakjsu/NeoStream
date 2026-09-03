@@ -302,15 +302,19 @@ export function setupIpcHandlers() {
         else log.error(message + stack)
     })
 
-    // Window controls for custom title bar
-    ipcMain.handle('window:minimize', () => {
-        const win = BrowserWindow.getFocusedWindow()
+    // Window controls for custom title bar.
+    // A janela é a que PEDIU (fromWebContents), não a focada: PiP e multi-view
+    // carregam o mesmo bundle e o mesmo title bar; com uma delas em foco, o X
+    // da principal fechava a outra — e elas não passam pela proteção da
+    // bandeja, então eram destruídas de verdade.
+    ipcMain.handle('window:minimize', (event) => {
+        const win = BrowserWindow.fromWebContents(event.sender)
         if (win) win.minimize()
     })
 
     // Custom maximize that respects taskbar (doesn't use native maximize)
-    ipcMain.handle('window:maximize', () => {
-        const win = BrowserWindow.getFocusedWindow()
+    ipcMain.handle('window:maximize', (event) => {
+        const win = BrowserWindow.fromWebContents(event.sender)
         if (!win) return
 
         // If we have saved bounds, we're maximized - restore
@@ -334,8 +338,8 @@ export function setupIpcHandlers() {
         }
     })
 
-    ipcMain.handle('window:close', () => {
-        const win = BrowserWindow.getFocusedWindow()
+    ipcMain.handle('window:close', (event) => {
+        const win = BrowserWindow.fromWebContents(event.sender)
         if (win) win.close()
     })
 

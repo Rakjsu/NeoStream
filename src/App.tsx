@@ -25,6 +25,7 @@ import { movieProgressService } from './services/movieProgressService';
 import { activePlaylistService } from './services/activePlaylistService';
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { useGamepadNavigation } from './hooks/useGamepadNavigation';
+import { restaurarJanela } from './utils/windowChrome';
 
 const Home = lazy(() => import('./pages/Home').then(m => ({ default: m.Home })));
 const LiveTV = lazy(() => import('./pages/LiveTV').then(m => ({ default: m.LiveTV })));
@@ -63,6 +64,22 @@ function ProgramReminderBridge() {
     return () => window.ipcRenderer.off('notify:clicked', handleNotifyClicked);
   }, [navigate]);
 
+  return null;
+}
+
+// A janela pode voltar da bandeja com estilos de animação pendentes no body
+// (era a "tela cinza" ao reabrir: o X zerava a opacidade e o main só escondia).
+// O main avisa em 'show' — por qualquer caminho de volta: menu da bandeja,
+// duplo clique no ícone, second-instance, clique na notificação, web remote.
+// Fica aqui, e não no CustomTitleBar, porque o title bar não monta durante o
+// loading nem no seletor de perfis, e o listener precisa existir sempre.
+function WindowShownBridge() {
+  useEffect(() => {
+    if (!window.ipcRenderer) return;
+    const handler = () => restaurarJanela(document.body.style);
+    window.ipcRenderer.on('window:shown', handler);
+    return () => { window.ipcRenderer?.off('window:shown', handler); };
+  }, []);
   return null;
 }
 
@@ -322,6 +339,7 @@ function App() {
       <PostUpdateChangelog />
       <HashRouter>
         <ProgramReminderBridge />
+        <WindowShownBridge />
         <WebRemoteBridge />
         <DvrNotifyBridge />
         <GlobalCastIndicator />
