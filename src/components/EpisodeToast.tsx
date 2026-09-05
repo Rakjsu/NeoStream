@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Tv } from 'lucide-react';
 import { episodeNotificationService, type AppNotification } from '../services/episodeNotificationService';
+import { anunciar } from '../services/anunciador';
 
 interface EpisodeToastProps {
     onNavigateToSeries?: (seriesId: string) => void;
@@ -42,6 +43,14 @@ export function EpisodeToast({ onNavigateToSeries }: EpisodeToastProps) {
             stopPeriodic();
         };
     }, []);
+
+    // Um toast que so existe na tela nao aconteceu, pra quem usa leitor de
+    // tela. Estes chegam sozinhos, sem acao nenhuma do usuario — sao
+    // exatamente o caso que a regiao viva existe pra cobrir.
+    useEffect(() => {
+        if (toasts.length === 0) return;
+        anunciar(toasts.map(toast => `${toast.title}. ${toast.message}`).join(' '));
+    }, [toasts]);
 
     // Auto-dismiss toasts after 8 seconds
     useEffect(() => {
