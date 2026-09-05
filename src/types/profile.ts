@@ -25,7 +25,12 @@ export interface Profile {
     id: string;
     name: string;
     avatar: string; // Base64 image data or emoji
-    pin?: string; // SHA-256 hash (optional)
+    pin?: string; // hash do PIN (opcional) — ver pinCrypto
+    /**
+     * Sal do PIN, em hexadecimal. Ausente = registro no formato antigo (SHA-256
+     * do PIN puro), migrado no primeiro acerto do PIN.
+     */
+    pinSalt?: string;
     isKids?: boolean; // Kids profile with content filtering
     /** 👶 Whitelist de canais pra perfis kids — vazia/ausente = sem restrição por canal. */
     allowedChannelIds?: string[];
