@@ -404,6 +404,42 @@ class DownloadService {
     // Download file using Electron IPC
     private async downloadFile(item: DownloadItem): Promise<void> {
         return new Promise((resolve, reject) => {
+            // 📶 Progresso deste download. Registrado ANTES do invoke de
+            // proposito: o main comeca a emitir assim que o arquivo abre.
+            const progressHandler = (_event: unknown, data: DownloadProgressPayload) => {
+                if (data.id === item.id) {
+                    item.progress = data.progress;
+                    item.downloadedBytes = data.downloadedBytes;
+                    item.size = data.totalBytes;
+                    // 📶 MB/s: delta de bytes / delta de tempo entre eventos.
+                    const mark = this.speedMarks.get(item.id);
+                    const now = Date.now();
+                    if (mark && now > mark.ts && data.downloadedBytes >= mark.bytes) {
+                        item.speedBps = ((data.downloadedBytes - mark.bytes) * 1000) / (now - mark.ts);
+                    }
+                    this.speedMarks.set(item.id, { bytes: data.downloadedBytes, ts: now });
+                    this.emit('progress', item);
+                }
+            };
+            window.ipcRenderer.on('download:progress', progressHandler);
+
+            /**
+             * Solta o listener em TODOS os caminhos de saida. Sem isto, cada
+             * download deixava um handler vivo pra sempre: o wrapper fica no
+             * Map do preload (electron/preload.ts:255), entao nem o closure nem
+             * o DownloadItem capturado sao coletados, e todo evento de
+             * progresso passa a percorrer os N handlers acumulados.
+             *
+             * O sintoma visivel era outro: retomar um download registrava um
+             * SEGUNDO handler com o mesmo id, os dois passavam no `data.id ===
+             * item.id`, e cada evento virava dois `emit('progress')` — que na
+             * tela de Downloads (src/pages/Downloads.tsx:166) sao dois
+             * `loadData()`, com IPC de armazenamento em dobro.
+             */
+            const soltarProgresso = () => {
+                window.ipcRenderer.off('download:progress', progressHandler);
+            };
+
             // Start download via IPC
             window.ipcRenderer.invoke('download:start', {
                 id: item.id,
@@ -440,26 +476,7 @@ class DownloadService {
                 } else {
                     reject(new Error(result.error || 'Download failed'));
                 }
-            }).catch(reject);
-
-            // Listen for progress updates
-            const progressHandler = (_event: unknown, data: DownloadProgressPayload) => {
-                if (data.id === item.id) {
-                    item.progress = data.progress;
-                    item.downloadedBytes = data.downloadedBytes;
-                    item.size = data.totalBytes;
-                    // 📶 MB/s: delta de bytes / delta de tempo entre eventos.
-                    const mark = this.speedMarks.get(item.id);
-                    const now = Date.now();
-                    if (mark && now > mark.ts && data.downloadedBytes >= mark.bytes) {
-                        item.speedBps = ((data.downloadedBytes - mark.bytes) * 1000) / (now - mark.ts);
-                    }
-                    this.speedMarks.set(item.id, { bytes: data.downloadedBytes, ts: now });
-                    this.emit('progress', item);
-                }
-            };
-
-            window.ipcRenderer.on('download:progress', progressHandler);
+            }).then(soltarProgresso, (erro) => { soltarProgresso(); reject(erro); });
         });
     }
 
