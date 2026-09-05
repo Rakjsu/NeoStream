@@ -363,8 +363,9 @@
     "devicesTitle": "Connected devices",
     "devicesEmpty": "No device connected right now.",
     "webRemoteHttps": "Encrypted connection (HTTPS)",
-    "webRemoteHttpsHint": "Uses a self-signed certificate: your phone browser shows a one-time security warning — just accept it. Encrypts traffic on the local network. ⚠️ The NeoStream phone APP does not accept that certificate — with HTTPS on, sending downloads to the PC and QR pairing stop working.",
-    "webRemoteNewPin": "New PIN"
+    "webRemoteHttpsHint": "Uses a self-signed certificate: the phone browser warns once and you accept it. Protects traffic on the local network.",
+    "webRemoteNewPin": "New PIN",
+    "webRemoteHttpsAppWarn": "The NeoStream phone APP does not accept this certificate. With HTTPS on, sending downloads to the PC and QR pairing stop working — the browser still works."
   },
   "welcome": {
     "stepLanguageTitle": "Welcome to NeoStream",
