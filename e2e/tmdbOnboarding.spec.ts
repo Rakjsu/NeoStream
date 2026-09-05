@@ -38,7 +38,7 @@ async function addM3uPlaylist(page: Page): Promise<void> {
     await page.locator('.playlists-add-form button[type="submit"]').click();
 }
 
-test('adicionar playlist SEM chave TMDB redireciona pra Configurações → APIs com o banner', async () => {
+test('adicionar playlist SEM chave TMDB convida na Home, sem sequestrar o primeiro acesso', async () => {
     const page = await boot();
 
     // Simula o app instalado: sem chave própria e sem fallback de .env.
@@ -46,16 +46,35 @@ test('adicionar playlist SEM chave TMDB redireciona pra Configurações → APIs
 
     await addM3uPlaylist(page);
 
-    // Depois do reload, o Home consome a flag e leva pra seção APIs.
-    await expect(page.getByText('Playlist adicionada! Só falta um passo…')).toBeVisible({ timeout: 20000 });
-    await expect(page.getByText('APIs de metadados')).toBeVisible();
+    // O usuário cai na HOME — que é o que ele quis ao cadastrar a lista — com o
+    // convite num banner. Antes, a primeira tela era o formulário de chave.
+    await expect(page.getByText(GREETING)).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText('Playlist adicionada! Só falta um passo…')).toBeVisible();
+    await expect(page.getByText('APIs de metadados')).toHaveCount(0);
+
+    // E o convite leva pra lá quando ELE quer.
+    await page.getByRole('button', { name: 'Configurar agora' }).click();
+    await expect(page.getByText('APIs de metadados')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('TMDB (The Movie Database)')).toBeVisible();
 
-    // A flag é de consumo único: sair e voltar pro Home não redireciona de novo.
+    // A flag é de consumo único: voltar pro Home não mostra o convite de novo.
     await page.locator('button.nav-item[title="Início"]').click();
     await expect(page.getByText(GREETING)).toBeVisible({ timeout: 10000 });
     await page.waitForTimeout(800);
-    await expect(page.getByText('APIs de metadados')).toHaveCount(0);
+    await expect(page.getByText('Playlist adicionada! Só falta um passo…')).toHaveCount(0);
+});
+
+test('o convite da TMDB é dispensável', async () => {
+    const page = await boot();
+    await page.evaluate(() => localStorage.setItem('neostream_tmdb_ignore_env', '1'));
+
+    await addM3uPlaylist(page);
+    await expect(page.getByText('Playlist adicionada! Só falta um passo…')).toBeVisible({ timeout: 20000 });
+
+    await page.getByRole('button', { name: 'Agora não' }).click();
+    await expect(page.getByText('Playlist adicionada! Só falta um passo…')).toHaveCount(0);
+    // E continua na Home, sem ir pra lugar nenhum.
+    await expect(page.getByText(GREETING)).toBeVisible();
 });
 
 test('adicionar playlist COM chave TMDB configurada não redireciona', async () => {
@@ -68,7 +87,7 @@ test('adicionar playlist COM chave TMDB configurada não redireciona', async () 
 
     await addM3uPlaylist(page);
 
-    // Fica no dashboard normal — sem banner, sem seção APIs.
+    // Fica no dashboard normal — sem convite, sem seção APIs.
     await expect(page.getByText(GREETING)).toBeVisible({ timeout: 45000 });
     await page.waitForTimeout(800);
     await expect(page.getByText('Playlist adicionada! Só falta um passo…')).toHaveCount(0);

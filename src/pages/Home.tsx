@@ -82,13 +82,23 @@ const isCacheValid = () => Date.now() - dataCache.timestamp < dataCache.TTL;
 export function Home() {
     const navigate = useNavigate();
 
-    // Playlist just added and no TMDB key yet → walk the user (once) through
-    // Configurações → APIs, which explains why and how to create a free key.
-    useEffect(() => {
-        if (consumeTmdbOnboardingPending() && !hasTmdbApiKey()) {
-            navigate('/dashboard/settings?section=apis&onboarding=1');
-        }
-    }, [navigate]);
+    // Acabou de cadastrar a lista e ainda não tem chave da TMDB.
+    //
+    // Isto EMPURRAVA o usuário pra Configurações → APIs: a primeira tela depois
+    // de cadastrar a lista era um formulário de chave de API, antes de ele ver
+    // um único filme. Agora ele cai na Home — que é o que ele quis — e o
+    // convite fica num banner que ele dispensa se não quiser.
+    //
+    // A flag continua de consumo único: o convite aparece uma vez, não a cada
+    // boot até ser dispensado.
+    //
+    // Lido no inicializador do useState, não num effect: `consume...` APAGA a
+    // flag, e o inicializador roda uma vez por montagem. Vale porque o
+    // StrictMode está desligado neste app (main.tsx:50) — com ele, a montagem
+    // dupla do modo de desenvolvimento consumiria a flag antes do estado final.
+    const [convidarTmdb, setConvidarTmdb] = useState(
+        () => consumeTmdbOnboardingPending() && !hasTmdbApiKey()
+    );
 
     const [counts, setCounts] = useState<ContentCounts>({ live: 0, vod: 0, series: 0 });
     const [loading, setLoading] = useState(true);
@@ -1450,6 +1460,48 @@ export function Home() {
                 scrollbarWidth: 'thin',
                 scrollbarColor: 'rgba(var(--ns-accent-rgb), 0.4) transparent'
             }}>
+                {/* 🎬 Convite pra chave da TMDB — dispensável, e no lugar de um
+                    redirecionamento que sequestrava o primeiro acesso. */}
+                {convidarTmdb && (
+                    <div style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        background: 'rgba(var(--ns-accent-rgb), 0.10)',
+                        border: '1px solid rgba(var(--ns-accent-rgb), 0.35)',
+                        borderRadius: 12, padding: '12px 16px', marginBottom: 18,
+                        fontSize: 13, position: 'relative', zIndex: 1
+                    }}>
+                        <span style={{ fontSize: 18 }}>🎬</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <strong style={{ display: 'block', color: 'var(--ns-accent)', marginBottom: 2 }}>
+                                {t('apiKeys', 'onboardingTitle')}
+                            </strong>
+                            <span style={{ color: 'rgba(255,255,255,0.72)' }}>
+                                {t('apiKeys', 'onboardingText')}
+                            </span>
+                        </div>
+                        <button
+                            onClick={() => navigate('/dashboard/settings?section=apis&onboarding=1')}
+                            style={{
+                                flexShrink: 0, padding: '8px 16px', borderRadius: 8, border: 'none',
+                                background: 'var(--ns-accent)', color: '#0b0b12',
+                                fontSize: 13, fontWeight: 700, cursor: 'pointer'
+                            }}
+                        >
+                            {t('apiKeys', 'onboardingCta')}
+                        </button>
+                        <button
+                            onClick={() => setConvidarTmdb(false)}
+                            style={{
+                                flexShrink: 0, padding: '8px 12px', borderRadius: 8,
+                                border: '1px solid rgba(255,255,255,0.2)', background: 'transparent',
+                                color: 'rgba(255,255,255,0.7)', fontSize: 13, cursor: 'pointer'
+                            }}
+                        >
+                            {t('apiKeys', 'onboardingDismiss')}
+                        </button>
+                    </div>
+                )}
+
                 {/* ⚠️ Aviso de expiração da lista */}
                 {expiryBanner !== null && (
                     <div style={{
