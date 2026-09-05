@@ -24,7 +24,6 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes('node_modules')) {
             if (id.includes('hls.js')) return 'vendor-hls';
-            if (id.includes('vidstack')) return 'vendor-vidstack';
           }
         },
       },
