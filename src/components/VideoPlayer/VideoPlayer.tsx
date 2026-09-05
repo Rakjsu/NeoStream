@@ -161,7 +161,10 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     // janela de ~30 min e o player passa a tocar do buffer (pause real).
     const [timeshiftUrl, setTimeshiftUrl] = useState<string | null>(null);
     const [timeshiftBusy, setTimeshiftBusy] = useState(false);
-    const hlsRef = useHls({ src: timeshiftUrl ?? src, videoRef, onStreamError: handleStreamError, reloadToken: streamReloadToken });
+    // reportBandwidth so aqui: este e o player PRINCIPAL. O mosaico de favoritos
+    // e o mini-player tambem usam o useHls, e a banda de uma miniatura nao pode
+    // definir o buffer da proxima reproducao de verdade.
+    const hlsRef = useHls({ src: timeshiftUrl ?? src, videoRef, onStreamError: handleStreamError, reloadToken: streamReloadToken, reportBandwidth: true });
 
     // Sleep timer: pauses playback when the countdown hits zero.
     const sleepTimer = useSleepTimer(useCallback(() => {

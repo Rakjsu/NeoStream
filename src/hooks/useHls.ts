@@ -8,6 +8,14 @@ interface UseHlsOptions {
     onStreamError?: () => void; // Called when stream fails fatally (for fallback logic)
     /** Bump para reinicializar a MESMA fonte (botão "Tentar novamente"). */
     reloadToken?: number;
+    /**
+     * Informar a banda medida pelo hls.js ao playbackService.
+     *
+     * Opt-in de propósito: o mosaico de favoritos troca de canal a cada 5 s e o
+     * mini-player toca em segundo plano. Deixar os dois reportarem faria a
+     * banda de uma miniatura definir o buffer da próxima reprodução de verdade.
+     */
+    reportBandwidth?: boolean;
 }
 
 // Lock por ELEMENTO de vídeo (não por src) — evita o double-init do Strict
@@ -23,7 +31,7 @@ const retryAttempts = new Map<string, number>();
 const MAX_RETRY_ATTEMPTS = 2; // Reduced from 3 for faster fallback
 const STREAM_TIMEOUT_MS = 10000; // 10 seconds timeout
 
-export function useHls({ src, videoRef, onStreamError, reloadToken = 0 }: UseHlsOptions) {
+export function useHls({ src, videoRef, onStreamError, reloadToken = 0, reportBandwidth = false }: UseHlsOptions) {
     const hlsRef = useRef<Hls | null>(null);
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const hasStartedPlaying = useRef(false);
@@ -126,6 +134,24 @@ export function useHls({ src, videoRef, onStreamError, reloadToken = 0 }: UseHls
                 retryAttempts.delete(src); // Reset retry counter on success
             };
             video.addEventListener('playing', handlePlaying);
+
+            if (reportBandwidth) {
+                hls.on(Hls.Events.FRAG_BUFFERED, (_event, data) => {
+                    // Os mesmos descartes que o ABR do hls.js aplica: sem eles
+                    // o primeiro FRAG_BUFFERED de um HLS fMP4 (o initSegment)
+                    // passaria antes de existir qualquer amostra.
+                    if (data.frag.sn === 'initSegment' || data.frag.type !== 'main') return;
+                    if (data.frag.stats?.aborted) return;
+
+                    const estimativa = hls.bandwidthEstimate;
+                    // `bandwidthEstimate` devolve o abrEwmaDefaultEstimate (a
+                    // constante logo abaixo, 5 Mbps) enquanto o estimador não
+                    // tiver amostra própria. Gravar isso seria trocar um número
+                    // inventado por outro, agora com cara de medição.
+                    if (!Number.isFinite(estimativa) || estimativa === hls.abrEwmaDefaultEstimate) return;
+                    playbackService.reportMeasuredBandwidth(estimativa / 1_000_000);
+                });
+            }
 
             hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
 
@@ -263,7 +289,7 @@ export function useHls({ src, videoRef, onStreamError, reloadToken = 0 }: UseHls
             setTimeout(() => srcInitTimes.delete(video), 1000);
             // DON'T clear video.src - this causes AbortError
         };
-    }, [src, videoRef, reloadToken]); // Removed onStreamError - using ref instead
+    }, [src, videoRef, reloadToken, reportBandwidth]); // Removed onStreamError - using ref instead
 
     return hlsRef;
 }
