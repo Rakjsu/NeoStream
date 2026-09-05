@@ -25,10 +25,8 @@
     "test:e2e:build": "vite build && playwright test"
   },
   "dependencies": {
-    "@vidstack/react": "^1.12.13",
     "axios": "^1.19.0",
     "bonjour-service": "^1.4.4",
-    "clsx": "^2.1.1",
     "dompurify": "^3.4.8",
     "electron-log": "^5.4.4",
     "electron-store": "^11.0.2",
@@ -42,9 +40,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-i18next": "^17.0.11",
-    "react-router-dom": "^7.18.2",
-    "tailwind-merge": "^3.4.0",
-    "vidstack": "^1.12.13"
+    "react-router-dom": "^7.18.2"
   },
   "devDependencies": {
     "@electron/packager": "^20.0.4",
@@ -54,7 +50,6 @@
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.1.17",
-    "@testing-library/jest-dom": "^7.0.0",
     "@types/node": "^26.1.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
