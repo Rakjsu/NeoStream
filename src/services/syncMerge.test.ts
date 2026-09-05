@@ -16,7 +16,7 @@ describe('mergeSyncData', () => {
         expect(result.adoptedKeys).toBe(1);
     });
 
-    it('ignora chaves fora da allowlist de backup', () => {
+    it('ignora chaves fora da politica de backup', () => {
         const result = mergeSyncData({}, { 'tmdb_cache_x': 'lixo', 'evil': '1' });
         expect(result.changed).toEqual({});
     });

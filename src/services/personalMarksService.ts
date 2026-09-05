@@ -1,6 +1,8 @@
 /**
  * Marcas pessoais do catálogo: nota (1–5 ⭐) e tags livres por conteúdo.
- * localStorage — local à máquina, de propósito fora de perfis/parental.
+ * localStorage, fora de perfis/parental de propósito. Desde a política de
+ * chaves v4 do backupService, ELAS VIAJAM: entram no arquivo de backup e no
+ * sync entre máquinas, como qualquer outro dado do usuário.
  */
 const STORAGE_KEY = 'neostream_personal_marks';
 
