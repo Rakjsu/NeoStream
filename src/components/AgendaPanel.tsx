@@ -110,7 +110,11 @@ export function AgendaPanel() {
                                             padding: '10px 14px',
                                             borderRadius: 10,
                                             background: 'rgba(255,255,255,0.04)',
-                                            border: inFlight ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid rgba(255,255,255,0.07)'
+                                            border: inFlight
+                                                ? '1px solid rgba(239, 68, 68, 0.5)'
+                                                : entry.emConflito
+                                                    ? '1px solid rgba(245, 158, 11, 0.55)'
+                                                    : '1px solid rgba(255,255,255,0.07)'
                                         }}
                                     >
                                         <span style={{ fontSize: 16, flexShrink: 0 }}>
@@ -128,6 +132,14 @@ export function AgendaPanel() {
                                         {inFlight && (
                                             <span style={{ color: '#ef4444', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
                                                 {t('agenda', 'recordingNow')}
+                                            </span>
+                                        )}
+                                        {!inFlight && entry.emConflito && (
+                                            <span
+                                                title={t('agenda', 'conflictHint')}
+                                                style={{ color: '#f59e0b', fontSize: 11, fontWeight: 700, flexShrink: 0 }}
+                                            >
+                                                ⚠ {t('agenda', 'conflict')}
                                             </span>
                                         )}
                                         <button

@@ -1,28 +1,24 @@
 import { memo, useState } from 'react';
-import { Play } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { LazyImage } from './LazyImage';
 import { hasSeenNewBadge, markNewBadgeSeen } from '../services/newBadgeService';
 import './HoverPreviewCard.css';
 
+// A interface tinha 17 props e o componente lia 8. As outras 9 (backdrop,
+// year, rating, genres, plot, youtubeTrailer, isFavorite, onPlay,
+// onToggleFavorite) sobraram do tempo em que o hover abria uma prévia — o
+// componente as recebia e descartava, e as duas páginas montavam closures a
+// cada card do catálogo para alimentá-las.
 interface HoverPreviewCardProps {
     type: 'movie' | 'series';
     id: string | number;
     cover: string;
-    backdrop?: string;
     title: string;
-    year?: string;
-    rating?: string;
-    genres?: string[];
-    plot?: string;
-    youtubeTrailer?: string;
-    isFavorite?: boolean;
     /** Selo "NOVO": item que entrou no catálogo há poucos dias. */
     isNew?: boolean;
     /** Selo de qualidade (4K/FHD/HD) extraído do nome do provedor. */
     qualityBadge?: string | null;
-    onPlay: () => void;
     onMoreInfo: () => void;
-    onToggleFavorite?: () => void;
     children?: React.ReactNode;
 }
 
@@ -79,10 +75,13 @@ function HoverPreviewCardComponent({
                     )}
                 />
 
-                {/* Overlay with play button */}
-                <div className="card-overlay">
-                    <div className="play-icon">
-                        <Play size={24} fill="white" />
+                {/* O card ABRE A FICHA — nunca reproduziu. O ▶ no hover
+                    prometia play e entregava a ficha; agora o ícone diz o que
+                    o clique faz. `aria-hidden` porque o alvo clicável é o card
+                    inteiro, que já tem role e rótulo. */}
+                <div className="card-overlay" aria-hidden="true">
+                    <div className="info-icon">
+                        <Info size={24} />
                     </div>
                 </div>
 

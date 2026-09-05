@@ -3,14 +3,9 @@ import { statSync } from 'node:fs'
 import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
 import path from 'path'
 import fs from 'fs'
-import { createRequire } from 'module'
 import log from './logger'
 import { recordingFilename, buildRecordingArgs, parseFfmpegTime, buildMp4RemuxArgs, buildThumbnailArgs, mp4PathFor } from './dvrProtocol'
-
-// Runtime require: resolves the REAL ffmpeg-static from node_modules. A bare
-// top-level require would get inlined by the bundler, whose __dirname shim
-// points at dist-electron and yields a path that doesn't exist (dead DVR).
-const requireRuntime = createRequire(import.meta.url)
+import { resolveFfmpegPath } from './ffmpegPath'
 
 interface ActiveRecording {
     id: string
@@ -28,17 +23,6 @@ export function activeRecordingCount(): number {
     return active.size
 }
 let nextId = 1
-
-function resolveFfmpegPath(): string | null {
-    try {
-        const ffmpegPath = requireRuntime('ffmpeg-static') as string | null
-        if (!ffmpegPath) return null
-        // Packaged builds keep ffmpeg outside the asar (asarUnpack).
-        return ffmpegPath.replace('app.asar', 'app.asar.unpacked')
-    } catch {
-        return null
-    }
-}
 
 export function recordingsDir(): string {
     return path.join(app.getPath('videos'), 'NeoStream', 'Gravacoes')

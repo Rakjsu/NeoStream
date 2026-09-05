@@ -84,3 +84,63 @@ describe('downloadService.registerReceived (transferência do celular)', () => {
         expect(appNotificationService.addDownloadNotification).toHaveBeenCalledTimes(1);
     });
 });
+
+/**
+ * 🧹 Vazamento do listener de progresso.
+ *
+ * Cada download registrava `ipcRenderer.on('download:progress', ...)` e ninguém
+ * dava `off`. O wrapper fica guardado num Map dentro do preload
+ * (electron/preload.ts:255), então nem o closure nem o DownloadItem capturado
+ * eram coletados, e todo evento de progresso passava a percorrer os N handlers
+ * acumulados desde que o app abriu.
+ *
+ * O sintoma que o usuário via era outro: retomar um download registrava um
+ * SEGUNDO handler com o mesmo id, e cada evento virava dois `emit('progress')`.
+ */
+describe('downloadService: listener de progresso', () => {
+    function instalarIpc(inicioDoDownload: () => Promise<unknown>) {
+        const on = vi.fn();
+        const off = vi.fn();
+        const invoke = vi.fn(async (canal: string) => {
+            if (canal === 'download:start') return inicioDoDownload();
+            if (canal === 'download:cache-image') return { success: false };
+            return { success: true };
+        });
+        (window as unknown as { ipcRenderer: unknown }).ipcRenderer = { on, off, invoke, send: vi.fn() };
+        return { on, off, invoke };
+    }
+
+    /** O handler de 'download:progress' que foi passado ao on/off. */
+    const handlerDe = (espia: { mock: { calls: unknown[][] } }) =>
+        espia.mock.calls.find(chamada => chamada[0] === 'download:progress')?.[1];
+
+    it('solta o listener quando o download termina', async () => {
+        const { on, off } = instalarIpc(async () => ({ success: true, filePath: 'C:/x/a.mp4', size: 10 }));
+
+        await downloadService.addDownload('Filme do teste de leak', 'movie', 'http://x/a.mp4', '');
+        await vi.waitFor(() => expect(off).toHaveBeenCalled());
+
+        // O que sai tem que ser exatamente o que entrou: o `off` do preload
+        // casa por identidade da função (electron/preload.ts:273-281), então
+        // soltar um handler equivalente-mas-diferente não removeria nada.
+        expect(handlerDe(off)).toBe(handlerDe(on));
+    });
+
+    it('solta o listener também quando o download falha', async () => {
+        const { on, off } = instalarIpc(async () => ({ success: false, error: 'provedor caiu' }));
+
+        await downloadService.addDownload('Filme que falha no teste de leak', 'movie', 'http://x/b.mp4', '');
+        await vi.waitFor(() => expect(off).toHaveBeenCalled());
+
+        expect(handlerDe(off)).toBe(handlerDe(on));
+    });
+
+    it('solta o listener quando o próprio invoke rejeita', async () => {
+        const { on, off } = instalarIpc(async () => { throw new Error('IPC morreu'); });
+
+        await downloadService.addDownload('Filme com IPC morto no teste de leak', 'movie', 'http://x/c.mp4', '');
+        await vi.waitFor(() => expect(off).toHaveBeenCalled());
+
+        expect(handlerDe(off)).toBe(handlerDe(on));
+    });
+});

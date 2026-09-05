@@ -175,6 +175,26 @@ export function ContentDetailModal({
     // Lightweight windowing for long episode lists (uniform-height rows).
     const [epScroll, setEpScroll] = useState({ top: 0, height: 0 });
     const modalRef = useRef<HTMLDivElement>(null);
+    // 🧹 Handlers de progresso registrados por cliques em "Baixar". Eles viviam
+    // pra sempre: cada clique somava um par (progress + completed) no emitter
+    // do serviço, e ninguém dava off. Multiplicava o trabalho de TODO evento de
+    // progresso do app, não só o deste modal.
+    const progressHandlersRef = useRef<Array<(item: DownloadProgressItem) => void>>([]);
+
+    const soltarProgresso = (handler: (item: DownloadProgressItem) => void) => {
+        downloadService.off('progress', handler);
+        downloadService.off('completed', handler);
+        progressHandlersRef.current = progressHandlersRef.current.filter(h => h !== handler);
+    };
+
+    useEffect(() => () => {
+        // Fechar o modal no meio do download também solta.
+        progressHandlersRef.current.forEach(handler => {
+            downloadService.off('progress', handler);
+            downloadService.off('completed', handler);
+        });
+        progressHandlersRef.current = [];
+    }, []);
     const { t } = useLanguage();
 
     // Mute/unmute the YouTube trailer in place via the IFrame API (no reload).
@@ -498,11 +518,13 @@ export function ContentDetailModal({
                         setDownloadProgress(item.progress);
                         if (item.status === 'completed') {
                             setDownloadStatus('completed');
+                            soltarProgresso(handleProgress);
                         }
                     }
                 };
                 downloadService.on('progress', handleProgress);
                 downloadService.on('completed', handleProgress);
+                progressHandlersRef.current.push(handleProgress);
             }
         } catch (err) {
             console.error('Download error:', err);
@@ -1214,11 +1236,13 @@ export function ContentDetailModal({
                                                 setDownloadProgress(item.progress);
                                                 if (item.status === 'completed') {
                                                     setDownloadStatus('completed');
+                                                    soltarProgresso(handleProgress);
                                                 }
                                             }
                                         };
                                         downloadService.on('progress', handleProgress);
                                         downloadService.on('completed', handleProgress);
+                                        progressHandlersRef.current.push(handleProgress);
                                     }
                                 } catch (err) {
                                     console.error('Download error:', err);

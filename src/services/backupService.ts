@@ -9,8 +9,25 @@
 //   - TMDB key (localStorage, rides the normal data map)
 //   - OpenSubtitles credentials (live in the main-process store; the caller
 //     fetches/applies them over IPC — this module stays IPC-free)
-// Still EXCLUDED: caches (tmdb_*, EPG test results, contentLastFetch) and
-// transient flags (shouldAutoPlayNextEpisode, parentalUnlocked).
+// v4 muda a POLITICA, nao o formato: a inclusao deixou de ser allowlist e
+// passou a ser PREFIXO + DENYLIST. Entra tudo que comeca com `neostream_`,
+// mais as chaves LEGADAS (anteriores ao prefixo), menos as listadas abaixo.
+//
+// Motivo: a allowlist exigia editar este arquivo a cada preferencia nova e, na
+// pratica, ninguem editava. Regras de gravacao, alertas de EPG, marcadores,
+// limites do Kids e o XMLTV do usuario nunca viajaram — nem no backup, nem no
+// sync. E `neostream_profile_daily_limit_min_<id>` viajava por ACIDENTE, so
+// porque casava com o prefixo `neostream_profile_`: o limite por perfil ia e o
+// limite global do Kids ficava.
+//
+// Uma chave nova entra na DENYLIST quando ela:
+//   (a) e estado desta maquina (ponteiro, timestamp, log, caminho de arquivo);
+//   (b) e credencial ou segredo;
+//   (c) dispara efeito destrutivo (apagar arquivo) ou de rede (baixar URL);
+//   (d) descreve o APARELHO, nao o usuario (modo TV, protetor de tela).
+//
+// ATENCAO: `isBackupKey` tambem filtra o SYNC entre maquinas (syncMerge.ts).
+// O que for arriscado APENAS no sync automatico vai em SYNC_LOCAL_ONLY.
 
 export const BACKUP_VERSION = 3;
 export const BACKUP_APP = 'neostream';
@@ -55,28 +72,21 @@ export interface ApplyReport {
     playlistsImported: number;
 }
 
-// Keys included by exact name
-const EXACT_KEYS = [
-    'neostream_profiles',     // profiles + active profile + watch-later lists
-    'neostream_language',     // UI language
-    'neostream_theme',        // background + accent color (v2)
+/** Prefixo dos dados do app: tudo que comeca com ele entra, salvo a denylist. */
+const NEOSTREAM_PREFIX = 'neostream_';
+
+// Chaves LEGADAS de dados do usuario — nasceram antes do prefixo. Lista
+// FECHADA: chave nova nasce com `neostream_` e entra sozinha.
+const LEGACY_EXACT_KEYS = [
     'parentalConfig',         // parental control config (PIN hash included)
     'playerVolume',           // last player volume
-    'neostream_mpv_volume',   // last MPV volume (stable player)
     'watchLater',             // legacy pre-profile watch-later list
-    'neostream_sync_tombstones', // deletions ledger (sync propagates removals)
-    'neostream_tmdb_api_key', // the user's own TMDB key (v3) — also synced
-    'neostream_keymap_v1',    // atalhos de teclado personalizados do player
-    'neostream_resume_on_open', // toggle "retomar ao abrir"
-    'neostream_cinema_mode',  // 🎬 modo cinema do player (item 29)
-    'neostream_reminder_autotune', // 📺 lembrete sintoniza sozinho (item 32)
+    'recording_rules_v1',     // regras de gravacao automatica (recordingRuleService)
+    'video_bookmarks_v1',     // marcadores de posicao em VOD/series (bookmarkService)
 ];
 
-// Keys included when they start with one of these prefixes
-const PREFIX_KEYS = [
-    'neostream_profile_',     // per-profile favorites, incl. _<profileId>__pl_<playlistId>
-    'neostream_watchlater_',  // per-(profile,playlist) watch-later, _<profileId>__pl_<playlistId>
-    'neostream_mpv_tracks_',  // per-profile MPV audio/subtitle language prefs (v2)
+// Prefixos LEGADOS (sem `neostream_`). Lista FECHADA, mesmo motivo de cima.
+const LEGACY_PREFIX_KEYS = [
     'playbackConfig',         // playbackConfig and playbackConfig_<profileId>
     'movie_watch_progress',   // movie resume positions, incl. per-(profile,playlist)
     'series_watch_progress',  // series progress, incl. per-(profile,playlist)
@@ -84,6 +94,58 @@ const PREFIX_KEYS = [
     'scheduled_recordings',   // per-profile scheduled DVR recordings (v2)
     'program_reminders',      // per-profile EPG program reminders (v2)
 ];
+
+// DENYLIST: chaves `neostream_*` que NAO viajam. Cache TMDB, contentLastFetch,
+// parentalUnlocked e afins ja ficam de fora por nao terem o prefixo nem estarem
+// nas legadas — so precisa listar aqui o que TEM o prefixo.
+const VOLATILE_KEYS = [
+    // (a) estado DESTA maquina — restaurar noutra corrompe ou mente
+    'neostream_active_playlist_id',   // e o `__pl_<id>` que escopa favoritos e progresso;
+                                      // importar o de outra maquina aponta o escopo pra
+                                      // uma playlist que nao existe aqui
+    'neostream_tmdb_onboarding',      // flag transitoria de onboarding
+    'neostream_tmdb_ignore_env',      // gancho de E2E
+    'neostream_boot_profile_v1',      // marcas de tempo do boot desta maquina
+    'neostream_error_log_v1',         // log de erros desta maquina
+    'neostream_parental_log',         // auditoria de PIN: evento local, nao configuracao
+    'neostream_dvr_protected',        // CAMINHOS de arquivo das gravacoes protegidas
+    'neostream_catalog_last_refresh', // quando ATUALIZOU aqui (a config em horas viaja)
+    // Ledgers de "ja avisei": ressincronizar reabre ou silencia avisos
+    'neostream_epg_keyword_seen',     // (as PALAVRAS, neostream_epg_keywords, viajam)
+    'neostream_expiry_snooze',
+    'neostream_weekly_summary_week',
+    'neostream_wrapped_notified_year',
+    'neostream_trakt_backfill_done_v2',
+    // (c) gatilho DESTRUTIVO: a faxina automatica apaga gravacao pela idade, e a
+    // lista de protegidas (neostream_dvr_protected) e local. Deixar so o gatilho
+    // viajar apagaria gravacao alheia.
+    'neostream_dvr_max_age_days',
+    'neostream_dvr_max_concurrent',   // capacidade desta maquina
+    'neostream_dl_max_concurrent',
+    'neostream_dl_smart',
+    'neostream_dl_night_only',
+    // (d) descreve o APARELHO, nao o usuario
+    'neostream_tv_mode',              // UI de 3 metros, zoom 1.25x
+    'neostream_screensaver_min',
+    'neostream_diagnostics_enabled',
+];
+
+const VOLATILE_PREFIXES = [
+    'neostream_play_queue',   // fila da sessao
+    'neostream_zap_history_', // historico de zapping desta maquina
+    'neostream_series_seen_', // ledger de "episodio novo ja mostrado"
+];
+
+/**
+ * Entra no arquivo de backup, mas NAO no sync automatico.
+ *
+ * O sync le qualquer `neostream-sync-*.json` da pasta compartilhada sem checar
+ * origem (electron/syncFolder.ts). A URL de XMLTV e baixada pelo app com
+ * prioridade sobre o EPG do provedor (epgService.ts) — numa maquina que ainda
+ * nao tem uma configurada, um arquivo naquela pasta a instalaria. No backup,
+ * que o usuario exporta e importa conscientemente, ela e dado legitimo dele.
+ */
+const SYNC_LOCAL_ONLY = ['neostream_external_epg_url'];
 
 /**
  * Dados da sessão de CONVIDADO nunca entram no backup/sync. O modo convidado é
@@ -96,9 +158,21 @@ export function isGuestKey(key: string): boolean {
     return /_guest(__pl_|$)/.test(key);
 }
 
+/** Volateis, locais ou secretas: nunca entram, nem no backup nem no sync. */
+export function isVolatileKey(key: string): boolean {
+    return VOLATILE_KEYS.includes(key) || VOLATILE_PREFIXES.some(prefix => key.startsWith(prefix));
+}
+
 export function isBackupKey(key: string): boolean {
     if (isGuestKey(key)) return false;
-    return EXACT_KEYS.includes(key) || PREFIX_KEYS.some(prefix => key.startsWith(prefix));
+    if (isVolatileKey(key)) return false;
+    if (key.startsWith(NEOSTREAM_PREFIX)) return true;
+    return LEGACY_EXACT_KEYS.includes(key) || LEGACY_PREFIX_KEYS.some(prefix => key.startsWith(prefix));
+}
+
+/** O que o sync automatico entre maquinas pode carregar. */
+export function isSyncKey(key: string): boolean {
+    return isBackupKey(key) && !SYNC_LOCAL_ONLY.includes(key);
 }
 
 export function encodePlaylistPassword(password: string): string {

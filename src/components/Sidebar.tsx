@@ -429,13 +429,6 @@ export function Sidebar() {
                     </div>
                 </div>
             )}
-
-            {/* Update Modal */}
-            <UpdateModal
-                isOpen={showUpdateModal}
-                onClose={() => setShowUpdateModal(false)}
-                updateInfo={updateInfo}
-            />
         </>
     );
 }

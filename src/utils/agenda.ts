@@ -5,6 +5,7 @@
 
 import type { ProgramReminder } from '../services/reminderService';
 import type { ScheduledRecording } from '../services/scheduledRecordingService';
+import { conflitosDoAgendamento } from '../services/scheduledRecordingService';
 
 export interface AgendaEntry {
     kind: 'reminder' | 'recording';
@@ -15,6 +16,12 @@ export interface AgendaEntry {
     /** Recordings only. */
     endIso?: string;
     startMs: number;
+    /**
+     * Gravacao que disputa vaga com outras alem do limite de simultaneas: ela
+     * pode simplesmente nao acontecer. Sem esta marca, o usuario so descobria
+     * pela ausencia do arquivo no dia seguinte.
+     */
+    emConflito?: boolean;
 }
 
 /** Merge + sort; drops entries already finished (reminders: already started). */
@@ -54,7 +61,23 @@ export function buildAgenda(
         });
     }
 
-    return entries.sort((a, b) => a.startMs - b.startMs);
+    return marcarConflitos(entries, recordings).sort((a, b) => a.startMs - b.startMs);
+}
+
+/**
+ * Marca as gravacoes que excedem o limite de simultaneas. Marca TODAS as
+ * envolvidas no excesso de proposito: o servico atende por ordem de disparo e
+ * nao da pra dizer, olhando a agenda, qual delas vai ficar de fora.
+ */
+function marcarConflitos(entries: AgendaEntry[], recordings: ScheduledRecording[]): AgendaEntry[] {
+    return entries.map(entry => {
+        if (entry.kind !== 'recording' || !entry.endIso) return entry;
+        const conflitos = conflitosDoAgendamento(
+            { id: entry.id, startIso: entry.startIso, endIso: entry.endIso },
+            recordings
+        );
+        return conflitos.length > 0 ? { ...entry, emConflito: true } : entry;
+    });
 }
 
 export type AgendaDayKey = 'today' | 'tomorrow' | string; // ISO date for later days

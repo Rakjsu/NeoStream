@@ -52,6 +52,56 @@ export function getDvrMaxConcurrent(): number {
     }
 }
 
+/** Janela que o ffmpeg fica de fato ligado: margem antes + folga depois. */
+export function janelaGravacao(rec: { startIso: string; endIso: string }): { ini: number; fim: number } | null {
+    const ini = Date.parse(rec.startIso);
+    const fim = Date.parse(rec.endIso);
+    if (!Number.isFinite(ini) || !Number.isFinite(fim) || fim <= ini) return null;
+    return { ini: ini - START_MARGIN_MS, fim: fim + END_PADDING_MS };
+}
+
+/**
+ * Agendamentos que disputam a vaga com o candidato — vazio quando ele cabe.
+ *
+ * Sem isto, agendar a 3a gravacao sobreposta (com limite 2) era aceito na cara
+ * do usuario e depois falhava SOZINHA: o `fire` via a fila cheia, re-tentava a
+ * cada 30s e desistia quando o programa acabava. Nenhum aviso, nenhum arquivo.
+ *
+ * A conta usa a janela REAL (com as margens): dois programas colados no mesmo
+ * canal se sobrepoem por 4 minutos que ninguem ve na grade.
+ */
+export function conflitosDoAgendamento(
+    candidato: { id?: string; startIso: string; endIso: string },
+    existentes: ScheduledRecording[],
+    limite: number = getDvrMaxConcurrent()
+): ScheduledRecording[] {
+    const alvo = janelaGravacao(candidato);
+    if (!alvo) return [];
+
+    const concorrentes = existentes
+        .filter(rec => rec.id !== candidato.id)
+        .map(rec => ({ rec, janela: janelaGravacao(rec) }))
+        .filter((item): item is { rec: ScheduledRecording; janela: { ini: number; fim: number } } =>
+            item.janela !== null && item.janela.ini < alvo.fim && item.janela.fim > alvo.ini);
+
+    if (concorrentes.length < limite) return [];
+
+    // O pico so pode acontecer no inicio da janela do candidato ou no inicio de
+    // uma das concorrentes: e onde alguem ENTRA no ar.
+    const instantes = [alvo.ini, ...concorrentes
+        .map(c => c.janela.ini)
+        .filter(ini => ini >= alvo.ini && ini < alvo.fim)];
+
+    let pico: ScheduledRecording[] = [];
+    for (const instante of instantes) {
+        const noAr = concorrentes
+            .filter(c => c.janela.ini <= instante && c.janela.fim > instante)
+            .map(c => c.rec);
+        if (noAr.length > pico.length) pico = noAr;
+    }
+    return pico.length >= limite ? pico : [];
+}
+
 /** Deterministic id for a (channel, program start) pair — djb2 hash, hex. */
 export function scheduleId(channelKey: string, startIso: string): string {
     const input = `${channelKey}|${startIso}`;
