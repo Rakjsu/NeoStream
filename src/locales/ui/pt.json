@@ -854,8 +854,9 @@
     "devicesTitle": "Aparelhos conectados",
     "devicesEmpty": "Nenhum aparelho conectado agora.",
     "webRemoteHttps": "Conexão criptografada (HTTPS)",
-    "webRemoteHttpsHint": "Usa um certificado próprio: o navegador do celular mostra um aviso de segurança uma vez, é só aceitar. Protege o tráfego na rede local. ⚠️ O APP NeoStream do celular não aceita esse certificado — com HTTPS ligado, enviar downloads pro PC e o pareamento por QR param de funcionar.",
-    "webRemoteNewPin": "Gerar novo PIN"
+    "webRemoteHttpsHint": "Usa um certificado próprio: o navegador do celular mostra um aviso de segurança uma vez, é só aceitar. Protege o tráfego na rede local.",
+    "webRemoteNewPin": "Gerar novo PIN",
+    "webRemoteHttpsAppWarn": "O APP NeoStream do celular não aceita esse certificado. Com HTTPS ligado, enviar downloads pro PC e o pareamento por QR param de funcionar — o navegador continua valendo."
   },
   "welcome": {
     "stepLanguageTitle": "Bem-vindo ao NeoStream",
