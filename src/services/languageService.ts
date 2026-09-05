@@ -22,6 +22,9 @@ export const AVAILABLE_LANGUAGES: LanguageOption[] = [
     { code: 'es', name: 'Español', flag: '🇪🇸' }
 ];
 
+/** Codigo BCP 47 pro atributo lang do <html> (o leitor de tela le daqui). */
+const LANG_HTML: Record<SupportedLanguage, string> = { pt: 'pt-BR', en: 'en', es: 'es' };
+
 type TranslationDictionary = Record<string, Record<string, string>>;
 
 // Translation dictionaries (pt is always available; en/es are filled in after lazy load)
@@ -44,6 +47,17 @@ class LanguageService {
         this.currentLanguage = this.loadLanguage();
         // If the persisted language isn't bundled yet, start loading it immediately
         this.ensureTranslationsLoaded(this.currentLanguage);
+        this.aplicarLangNoDocumento();
+    }
+
+    /**
+     * O `lang` do <html> e quem diz ao leitor de tela em que idioma pronunciar.
+     * Ele estava cravado em "en" no index.html, entao a interface em portugues
+     * era lida com fonemas ingleses — ilegivel na pratica.
+     */
+    private aplicarLangNoDocumento(): void {
+        if (typeof document === 'undefined') return;
+        document.documentElement.lang = LANG_HTML[this.currentLanguage];
     }
 
     private loadLanguage(): SupportedLanguage {
@@ -95,6 +109,8 @@ class LanguageService {
 
         // Lazy-load the dictionary if needed (notifies listeners again when ready)
         this.ensureTranslationsLoaded(lang);
+
+        this.aplicarLangNoDocumento();
 
         // Notify all listeners
         this.listeners.forEach(listener => listener());

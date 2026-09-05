@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../services/languageService';
+import { anunciar } from '../services/anunciador';
 
 export const PENDING_TUNE_KEY = 'neostream_pending_tune';
 const COUNTDOWN_S = 10;
@@ -37,6 +38,22 @@ export function ReminderAutoTuneToast() {
         if (!pending) return;
         const timer = window.setInterval(() => setSecondsLeft(prev => prev - 1), 1000);
         return () => window.clearInterval(timer);
+    }, [pending]);
+
+    // Este toast TROCA O CANAL sozinho em 10 segundos. Quem nao ve a tela
+    // precisa ouvir o aviso enquanto ainda da tempo de cancelar — dai
+    // 'assertive': ele interrompe o que o leitor estiver falando.
+    useEffect(() => {
+        if (!pending) return;
+        anunciar(
+            `${pending.title}. ${t('notifications', 'autoTuneIn')
+                .replace('{channel}', pending.channelName)
+                .replace('{s}', String(COUNTDOWN_S))}`,
+            'assertive'
+        );
+        // Só quando um lembrete NOVO chega: o contador muda a cada segundo e
+        // repetir o anúncio a cada tique deixaria o leitor tagarelando.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pending]);
 
     const tune = (target: PendingTune) => {
