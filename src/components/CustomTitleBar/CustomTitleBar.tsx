@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import './CustomTitleBar.css';
 import { useLanguage } from '../../services/languageService';
+import { animarSaida, restaurarJanela } from '../../utils/windowChrome';
 
 export function CustomTitleBar() {
     const [isMaximized, setIsMaximized] = useState(false);
@@ -25,47 +26,31 @@ export function CustomTitleBar() {
     }, []);
 
     const handleMinimize = () => {
-        // Add minimize animation
-        document.body.style.transition = 'opacity 0.15s ease, transform 0.15s ease';
-        document.body.style.opacity = '0';
-        document.body.style.transform = 'scale(0.95) translateY(20px)';
-
+        animarSaida(document.body.style, 'minimize');
         setTimeout(() => {
             window.ipcRenderer?.invoke('window:minimize');
             // Reset styles after minimize
-            setTimeout(() => {
-                document.body.style.opacity = '1';
-                document.body.style.transform = 'scale(1) translateY(0)';
-            }, 100);
+            setTimeout(() => restaurarJanela(document.body.style), 100);
         }, 150);
     };
 
     const handleMaximize = async () => {
-        // Add maximize/restore animation
-        document.body.style.transition = 'opacity 0.1s ease, transform 0.1s ease';
-        document.body.style.opacity = '0.8';
-        document.body.style.transform = 'scale(0.98)';
-
+        animarSaida(document.body.style, 'maximize');
         setTimeout(async () => {
             await window.ipcRenderer?.invoke('window:maximize');
             const result = await window.ipcRenderer?.invoke('window:is-maximized');
             setIsMaximized(result);
-
-            // Animate back
-            document.body.style.opacity = '1';
-            document.body.style.transform = 'scale(1)';
+            restaurarJanela(document.body.style);
         }, 100);
     };
 
     const handleClose = () => {
-        // Add close animation
-        document.body.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
-        document.body.style.opacity = '0';
-        document.body.style.transform = 'scale(0.9)';
-
-        setTimeout(() => {
-            window.ipcRenderer?.invoke('window:close');
-        }, 200);
+        // Sem animação de saída, de propósito. O renderer não sabe se o X vai
+        // encerrar, esconder na bandeja ou segurar (gravação em andamento) —
+        // quem decide é o main. Zerar a opacidade aqui deixava a janela cinza
+        // ao voltar da bandeja. E sem os 200 ms de espera de antes: eles davam
+        // tempo do foco mudar e o close ir para a janela errada (PiP).
+        window.ipcRenderer?.invoke('window:close');
     };
 
     return (

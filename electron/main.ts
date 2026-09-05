@@ -42,6 +42,19 @@ app.commandLine.appendSwitch('enable-zero-copy')
 app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,VaapiVideoEncoder') // Linux/Mac mostly, but good to have
 // Windows HEVC support relies on OS extensions, but we can try to force some flags if needed.
 
+// 🪟 Instância única — ANTES de qualquer setup*(). app.quit() é assíncrono e
+// não interrompe a avaliação do módulo (e `return` solto não existe em ESM):
+// com a checagem lá embaixo, a 2ª instância subia INTEIRA — DLNA, AirPlay,
+// Cast, WebRemote, DVR, tray, auto-updater — e ainda criava janela. Visto no
+// main.log do dono em 02/09/2026: três inicializações completas em 47 s,
+// disputando a porta 8974 e o SQLite do catálogo. Tem que ficar depois do
+// import de e2eUserData (o lock deriva do userData; o E2E redireciona por
+// execução). app.exit(0) encerra na hora: nada foi alocado, não há teardown.
+if (!app.requestSingleInstanceLock()) {
+    log.info('[Single] outra instância já está rodando — saindo antes de qualquer setup')
+    app.exit(0)
+}
+
 setupIpcHandlers()
 setupDLNAHandlers()
 setupAirPlayHandlers()
@@ -61,11 +74,9 @@ process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.
 
 let win: BrowserWindow | null
 
-// 🪟 Uma instância só: relançamentos (jump list / atalhos) chegam via
-// second-instance e roteiam na instância viva em vez de abrir outra janela.
-if (!app.requestSingleInstanceLock()) {
-    app.quit()
-}
+// 🪟 Relançamentos (jump list / atalhos / abrir o .exe com o app na bandeja)
+// chegam via second-instance e roteiam na instância viva. O lock em si é
+// adquirido lá em cima, antes de qualquer setup*().
 app.on('second-instance', (_event, argv) => {
     if (!win) return
     if (win.isMinimized()) win.restore()
@@ -109,6 +120,14 @@ function createWindow() {
     // Close button hides to the tray (scheduled recordings/reminders keep
     // running) unless the user disabled it or is quitting via the tray menu.
     attachCloseToTray(win)
+
+    // A janela pode voltar da bandeja com estilos de animação pendentes no
+    // renderer (opacity:0 = janela cinza). Ela reaparece pelo menu da bandeja,
+    // duplo clique no ícone, second-instance, clique na notificação e web
+    // remote — avisar no 'show' cobre todos de uma vez, inclusive os que
+    // alguém adicionar depois. Se já estiver visível, 'show' pode não disparar,
+    // mas aí o body também não está sujo.
+    win.on('show', () => { win?.webContents.send('window:shown') })
 
     // Test active push message to Renderer-process.
     win.webContents.on('did-finish-load', () => {
