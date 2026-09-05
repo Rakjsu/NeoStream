@@ -1144,7 +1144,9 @@
     "cancelReminder": "Cancel reminder",
     "exportIcs": "Export .ics",
     "exportIcsHint": "Downloads a calendar (.ics) with reminders and scheduled recordings.",
-    "cancelRecording": "Cancel recording"
+    "cancelRecording": "Cancel recording",
+    "conflict": "CONFLICT",
+    "conflictHint": "More overlapping recordings than the limit allows — one may not happen. Raise the limit or cancel one."
   },
   "sort": {
     "duration": "Duration",

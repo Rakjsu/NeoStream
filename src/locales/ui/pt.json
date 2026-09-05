@@ -1144,7 +1144,9 @@
     "cancelReminder": "Cancelar lembrete",
     "exportIcs": "Exportar .ics",
     "exportIcsHint": "Baixa um calendário (.ics) com os lembretes e gravações agendadas.",
-    "cancelRecording": "Cancelar gravação"
+    "cancelRecording": "Cancelar gravação",
+    "conflict": "CONFLITO",
+    "conflictHint": "Mais gravações ao mesmo tempo do que o limite permite — alguma pode não acontecer. Ajuste o limite ou cancele uma."
   },
   "sort": {
     "duration": "Duração",

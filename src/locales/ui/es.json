@@ -1144,7 +1144,9 @@
     "cancelReminder": "Cancelar recordatorio",
     "exportIcs": "Exportar .ics",
     "exportIcsHint": "Descarga un calendario (.ics) con recordatorios y grabaciones programadas.",
-    "cancelRecording": "Cancelar grabación"
+    "cancelRecording": "Cancelar grabación",
+    "conflict": "CONFLICTO",
+    "conflictHint": "Más grabaciones a la vez de las que permite el límite — alguna puede no ocurrir. Ajusta el límite o cancela una."
   },
   "sort": {
     "duration": "Duración",
