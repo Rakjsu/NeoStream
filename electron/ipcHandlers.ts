@@ -716,35 +716,6 @@ export function setupIpcHandlers() {
         }
     })
 
-    // Generic fetch URL handler (bypasses CORS for external URLs)
-    ipcMain.handle('fetch-url', async (_, url: string) => {
-        try {
-            const fetch = (await import('node-fetch')).default
-            log.info('[Fetch URL] Fetching:', url.substring(0, 100))
-            const response = await fetchWithRetry(async () => fetch(url, {
-                agent: await resolveProviderHttpsAgent(url),
-                signal: AbortSignal.timeout(20000),
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Accept': '*/*'
-                }
-            }))
-
-            if (!response.ok) {
-                log.info('[Fetch URL] Response failed:', response.status)
-                return { success: false, error: `HTTP ${response.status}` }
-            }
-
-            const text = await response.text()
-            registerApprovedProviderUrl(response.url || url)
-            log.info('[Fetch URL] Response length:', text.length)
-            return { success: true, data: text }
-        } catch (error: unknown) {
-            log.error('[Fetch URL] Error:', getErrorMessage(error))
-            return { success: false, error: getErrorMessage(error) }
-        }
-    })
-
     // EPG Cache System - Downloads EPG XML files on app start
     // Downloads fresh on every app restart, caches during session only
     ipcMain.handle('epg:get-cached', async (_, { url, cacheKey, forceRefresh = false }) => {
