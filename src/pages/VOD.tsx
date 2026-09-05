@@ -9,7 +9,6 @@ import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { fetchMovieDetails, searchMovieByName, type TMDBMovieDetails, getBackdropUrl } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
 import { queueService } from '../services/queueService';
-import { favoritesService } from '../services/favoritesService';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import { CategoryMenu } from '../components/CategoryMenu';
@@ -72,7 +71,6 @@ export function VOD() {
     const [tmdbData, setTmdbData] = useState<TMDBMovieDetails | null>(null);
     const [playingMovie, setPlayingMovie] = useState<VODStream | null>(null);
     const [pipResumeTime, setPipResumeTime] = useState<number | null>(null);
-    const [, setRefresh] = useState(0);
     const [visibleCount, setVisibleCount] = useState(0);
     const [itemsPerPage, setItemsPerPage] = useState(36);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -410,11 +408,6 @@ export function VOD() {
     // Os serviços devolvem a MESMA referência enquanto o localStorage não muda,
     // então indexar com useMemo sobre elas é correto por construção: identidade
     // nova = dado novo (não há como congelar valor velho na tela).
-    const favoriteEntries = favoritesService.getAll();
-    const favoriteMovieIds = useMemo(
-        () => new Set(favoriteEntries.filter(f => f.type === 'movie').map(f => f.id)),
-        [favoriteEntries]
-    );
     const watchLaterEntries = watchLaterService.getAll();
     const savedMovieIds = useMemo(
         () => new Set(watchLaterEntries.filter(i => i.type === 'movie').map(i => i.id)),
@@ -605,10 +598,6 @@ export function VOD() {
                                         : getProgress(stream.stream_id);
                                     const movieProgress = getMovieProgress(stream.stream_id);
                                     const isSaved = savedMovieIds.has(String(stream.stream_id));
-                                    const isFavorite = favoriteMovieIds.has(String(stream.stream_id));
-                                    const yearMatch = stream.release_date?.match(/(\d{4})/);
-                                    const year = yearMatch ? yearMatch[1] : undefined;
-                                    const genres = stream.genre?.split(',').map(g => g.trim()).filter(Boolean);
                                     const isNew = isRecentlyAdded(stream.added, nowMs);
 
                                     return (
@@ -621,37 +610,10 @@ export function VOD() {
                                                 type="movie"
                                                 id={stream.stream_id}
                                                 cover={fixImageUrl(stream.stream_icon) || stream.cover}
-                                                backdrop={stream.backdrop_path?.[0] ? `https://image.tmdb.org/t/p/w780${stream.backdrop_path[0]}` : undefined}
                                                 title={stream.name}
-                                                year={year}
-                                                rating={stream.rating}
-                                                genres={genres}
-                                                plot={stream.plot}
-                                                youtubeTrailer={stream.youtube_trailer}
-                                                isFavorite={isFavorite}
                                                 isNew={isNew}
                                                 qualityBadge={qualityBadgeOf(stream.name)}
-                                                onPlay={async () => {
-                                                    const url = await buildStreamUrl(stream);
-                                                    if (url) {
-                                                        setPlayingMovie(stream);
-                                                    }
-                                                }}
                                                 onMoreInfo={() => handleMovieClick(stream)}
-                                                onToggleFavorite={() => {
-                                                    if (isFavorite) {
-                                                        favoritesService.remove(String(stream.stream_id), 'movie');
-                                                    } else {
-                                                        favoritesService.add({
-                                                            id: String(stream.stream_id),
-                                                            type: 'movie',
-                                                            title: stream.name,
-                                                            poster: fixImageUrl(stream.stream_icon) || stream.cover,
-                                                            streamId: stream.stream_id
-                                                        });
-                                                    }
-                                                    setRefresh(r => r + 1);
-                                                }}
                                             >
                                                 {/* Saved Badge */}
                                                 {isSaved && (

@@ -88,7 +88,7 @@
     opacity: 1;
 }
 
-.play-icon {
+.info-icon {
     width: 60px;
     height: 60px;
     background: rgba(var(--ns-accent-rgb), 0.9);
@@ -103,7 +103,7 @@
     box-shadow: 0 8px 24px rgba(var(--ns-accent-rgb), 0.5);
 }
 
-.hover-preview-card:hover .play-icon {
+.hover-preview-card:hover .info-icon {
     transform: scale(1);
 }
 

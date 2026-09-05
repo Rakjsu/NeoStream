@@ -307,11 +307,6 @@ export function Series() {
     // mesmo motivo da VOD: cada card fazia getItem+JSON.parse do histórico
     // inteiro). Os serviços devolvem a MESMA referência enquanto o localStorage
     // não muda, então indexar com useMemo sobre elas não congela dado velho.
-    const favoriteEntries = favoritesService.getAll();
-    const favoriteSeriesIds = useMemo(
-        () => new Set(favoriteEntries.filter(f => f.type === 'series').map(f => f.id)),
-        [favoriteEntries]
-    );
     const watchLaterEntries = watchLaterService.getAll();
     const savedSeriesIds = useMemo(
         () => new Set(watchLaterEntries.filter(i => i.type === 'series').map(i => i.id)),
@@ -590,12 +585,8 @@ export function Series() {
                                 )}
                                 {filteredSeries.slice(windowStart, windowEnd).map((s, index) => {
                                     const isSaved = savedSeriesIds.has(String(s.series_id));
-                                    const isFavorite = favoriteSeriesIds.has(String(s.series_id));
                                     const hasProgress = seriesProgressIndex.get(String(s.series_id));
                                     const isCompleted = watchProgressService.isSeriesCompleted(String(s.series_id));
-                                    const yearMatch = s.release_date?.match(/(\d{4})/);
-                                    const year = yearMatch ? yearMatch[1] : undefined;
-                                    const genres = s.genre?.split(',').map(g => g.trim()).filter(Boolean);
                                     const isNew = isRecentlyAdded(s.last_modified, nowMs);
 
                                     return (
@@ -608,34 +599,10 @@ export function Series() {
                                                 type="series"
                                                 id={s.series_id}
                                                 cover={fixImageUrl(s.cover || s.stream_icon)}
-                                                backdrop={s.backdrop_path?.[0] ? `https://image.tmdb.org/t/p/w780${s.backdrop_path[0]}` : undefined}
                                                 title={s.name}
-                                                year={year}
-                                                rating={s.rating}
-                                                genres={genres}
-                                                plot={s.plot}
-                                                youtubeTrailer={s.youtube_trailer}
-                                                isFavorite={isFavorite}
                                                 isNew={isNew}
                                                 qualityBadge={qualityBadgeOf(s.name)}
-                                                onPlay={() => {
-                                                    handleSeriesClick(s);
-                                                }}
                                                 onMoreInfo={() => handleSeriesClick(s)}
-                                                onToggleFavorite={() => {
-                                                    if (isFavorite) {
-                                                        favoritesService.remove(String(s.series_id), 'series');
-                                                    } else {
-                                                        favoritesService.add({
-                                                            id: String(s.series_id),
-                                                            type: 'series',
-                                                            title: s.name,
-                                                            poster: fixImageUrl(s.cover || s.stream_icon),
-                                                            seriesId: s.series_id
-                                                        });
-                                                    }
-                                                    setRefresh(r => r + 1);
-                                                }}
                                             >
                                                 {/* New episodes badge */}
                                                 {updatedSeriesIds.has(String(s.series_id)) && (
