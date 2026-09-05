@@ -1232,6 +1232,8 @@
     "traktConnect": "Conectar (código en el sitio)",
     "traktWaiting": "Escribe en el sitio el código",
     "traktFail": "Falló — verifica el Client ID y el Secret.",
-    "traktHint": "El botón Conectar abre trakt.tv/activate — escribe allí el código mostrado aquí y autoriza."
+    "traktHint": "El botón Conectar abre trakt.tv/activate — escribe allí el código mostrado aquí y autoriza.",
+    "onboardingCta": "Configurar ahora",
+    "onboardingDismiss": "Ahora no"
   }
 }
