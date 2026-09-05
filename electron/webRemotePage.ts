@@ -497,7 +497,12 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
             if (msg.status !== 'ok' && msg.channelId && msg.channelId === lastTuneId) showToast(L.tuneFail, 'err');
             if (msg.channelId === lastTuneId) lastTuneId = '';
           }
-        } catch (e) {}
+        } catch (e) {
+          // Engolir aqui esconde JSON quebrado e erro de render: a tela
+          // simplesmente para de atualizar, sem rastro nenhum. O payload vai
+          // recortado pra um screenshot em dataUrl nao inundar o console.
+          console.error('[NeoStream] mensagem WS ignorada:', e, String(ev.data).slice(0, 200));
+        }
       };
     }
 
@@ -1039,7 +1044,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
       var html = '';
       for (var ci = 0; ci < srChannels.length; ci++) {
         var ch = srChannels[ci];
-        var clogo = ch.logo ? '<img src="' + esc(ch.logo) + '" onerror="this.style.display='none'" alt="">' : '<div class="ph">📺</div>';
+        var clogo = ch.logo ? '<img src="' + esc(ch.logo) + '" onerror="this.style.display=\\'none\\'" alt="">' : '<div class="ph">📺</div>';
         html += '<div class="chitem" data-srch="' + esc(ch.id) + '">' + clogo
           + '<div class="nm">' + esc(ch.name) + '</div>'
           + '<span class="chinfo" title="▶">📺</span></div>';
