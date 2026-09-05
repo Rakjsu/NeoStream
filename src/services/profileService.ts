@@ -2,17 +2,15 @@ import type { Profile, ProfilesData, CreateProfileData, UpdateProfileData } from
 import { syncTombstones, tombstoneItemKey } from './syncTombstones';
 import { logParentalEvent } from './parentalLogService';
 import { readJson } from './storageJsonCache';
+import { randomSaltHex, hashPinSalgado, hashPinLegado } from './pinCrypto';
 
 const STORAGE_KEY = 'neostream_profiles';
 const MAX_PROFILES = 5;
 
-// Simple SHA-256 hash (for demo - in production use a proper crypto library)
-async function hashPin(pin: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(pin);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+/** PIN novo: sorteia o sal e devolve o par pra gravar junto. */
+async function novoPinHash(pin: string): Promise<{ pin: string; pinSalt: string }> {
+    const pinSalt = randomSaltHex();
+    return { pin: await hashPinSalgado(pin, pinSalt), pinSalt };
 }
 
 // Get all data from storage
@@ -52,6 +50,26 @@ function purgeGuestData(): void {
 // Generate unique ID
 function generateId(): string {
     return Date.now().toString(36) + Math.random().toString(36).substring(2);
+}
+
+/**
+ * Reescreve um PIN legado no formato salgado. Roda no acerto do PIN — o único
+ * instante em que o app conhece o PIN em texto.
+ *
+ * Relê o storage DEPOIS do hash de propósito: o blob `neostream_profiles` tem
+ * outros escritores (o `sync:apply-remote` do App.tsx e o `saveProfile` do
+ * watchLater), e gravar um snapshot capturado antes do await desfaria a escrita
+ * deles em silêncio.
+ */
+async function ressalgar(profileId: string, pin: string): Promise<void> {
+    const pinSalt = randomSaltHex();
+    const salgado = await hashPinSalgado(pin, pinSalt);
+    const fresh = getStorageData();
+    const alvo = fresh.profiles.find(p => p.id === profileId);
+    if (!alvo) return;
+    alvo.pin = salgado;
+    alvo.pinSalt = pinSalt;
+    saveStorageData(fresh);
 }
 
 export const profileService = {
@@ -162,7 +180,7 @@ export const profileService = {
             id: generateId(),
             name: profileData.name.trim(),
             avatar: profileData.avatar,
-            pin: profileData.pin ? await hashPin(profileData.pin) : undefined,
+            ...(profileData.pin ? await novoPinHash(profileData.pin) : {}),
             isKids: profileData.isKids || false,
             accentColor: profileData.accentColor,
             watchLater: [],
@@ -202,11 +220,14 @@ export const profileService = {
 
         if (updates.pin !== undefined) {
             if (updates.pin === null) {
-                // Remove PIN
+                // Remove PIN — o sal vai junto, senão sobra sal órfão apontando
+                // pra um formato que não existe mais neste registro.
                 delete profile.pin;
+                delete profile.pinSalt;
             } else {
-                // Set or update PIN
-                profile.pin = await hashPin(updates.pin);
+                const novo = await novoPinHash(updates.pin);
+                profile.pin = novo.pin;
+                profile.pinSalt = novo.pinSalt;
             }
         }
 
@@ -259,15 +280,26 @@ export const profileService = {
 
     // Verify PIN
     async verifyPin(profileId: string, pin: string): Promise<boolean> {
-        const data = getStorageData();
-        const profile = data.profiles.find(p => p.id === profileId);
+        const profile = getStorageData().profiles.find(p => p.id === profileId);
         if (!profile) return false;
 
         // No PIN set
         if (!profile.pin) return true;
 
-        const hashedPin = await hashPin(pin);
-        const ok = hashedPin === profile.pin;
+        // O critério é "o hash salgado bateu?", NÃO "existe pinSalt?". Um perfil
+        // pode chegar aqui com sal presente e hash no formato antigo: ele nasce
+        // migrado numa máquina, viaja inteiro pelo sync, e uma build antiga na
+        // outra ponta regrava só o `pin`. Decidir pela presença do sal deixaria
+        // esse perfil TRANCADO pra sempre — e apagar o perfil também pede PIN.
+        let ok = profile.pinSalt
+            ? (await hashPinSalgado(pin, profile.pinSalt)) === profile.pin
+            : false;
+
+        if (!ok && (await hashPinLegado(pin)) === profile.pin) {
+            ok = true;
+            await ressalgar(profileId, pin);
+        }
+
         logParentalEvent(ok ? 'pin_ok' : 'pin_fail', `PIN do perfil ${profile.name}`);
         return ok;
     },
