@@ -26,3 +26,45 @@ describe('renderRemotePage (i18n da página do celular)', () => {
         expect(page).toContain('"noTvFound":"No se encontró ninguna TV en la red"')
     })
 })
+
+/**
+ * A página do celular é uma template string gigante que gera JS — e nada nunca
+ * COMPILOU esse JS. Foi assim que uma aspas sem escape (`display='none'`, no
+ * meio de sete irmãs escapadas corretamente) matou o `<script>` INTEIRO em
+ * produção: a página carregava, mostrava a marcação, e não fazia nada. Sem
+ * erro no build, sem teste vermelho, sem log.
+ */
+describe('renderRemotePage: o JS servido precisa compilar', () => {
+    /** O miolo do único par <script>/</script> da página. */
+    function scriptDa(pagina: string): string {
+        const ini = pagina.indexOf('<script>')
+        const fim = pagina.indexOf('</script>')
+        expect(ini).toBeGreaterThan(-1)
+        expect(fim).toBeGreaterThan(ini)
+        return pagina.slice(ini + '<script>'.length, fim)
+    }
+
+    // `new Function` compila sem executar: não precisa de DOM nem WebSocket.
+    it.each(['pt', 'en', 'es'])('o script servido em %s compila', (lang) => {
+        const src = scriptDa(renderRemotePage(lang))
+        expect(() => new Function(src)).not.toThrow()
+    })
+
+    it('nenhuma aspas de atributo escapa sem barra (foi assim que a página morreu)', () => {
+        // Dentro da template string do TS, `\'` é o que chega ao navegador
+        // como `\'`. Sem as barras, a aspas fecha a string do JS gerado.
+        expect(renderRemotePage()).not.toContain("display='none'")
+    })
+
+    it('mensagem de WS que estoura é reportada, não engolida', () => {
+        expect(renderRemotePage()).toContain("console.error('[NeoStream] mensagem WS ignorada:'")
+    })
+
+    it('a página servida não tem nenhum catch totalmente vazio', () => {
+        expect(renderRemotePage()).not.toMatch(/catch\s*\([^)]*\)\s*\{\s*\}/)
+    })
+
+    it('o payload logado sai recortado — um screenshot em dataUrl não inunda o console', () => {
+        expect(renderRemotePage()).toContain('String(ev.data).slice(0, 200)')
+    })
+})
