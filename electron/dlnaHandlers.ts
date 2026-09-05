@@ -46,6 +46,7 @@ import {
     type ProxyTokenEntry,
 } from './dlnaProxyGuard';
 import { getCertificateSettings } from './certificatePolicy';
+import { resolveFfmpegPath } from './ffmpegPath'
 
 const require = createRequire(import.meta.url);
 
@@ -154,17 +155,6 @@ function revokeDeviceTokens(deviceHost: string): void {
 /** Hosts já reconhecidos como do provedor (além do host da própria playlist). */
 function knownProviderHosts(): string[] {
     return getCertificateSettings().approvedProviderHosts
-}
-
-function resolveFfmpegPath(): string | null {
-    try {
-        const ffmpegPath = require('ffmpeg-static') as string | null;
-        if (!ffmpegPath) return null;
-        // Inside a packaged app the binary lives in app.asar.unpacked.
-        return ffmpegPath.replace('app.asar', 'app.asar.unpacked');
-    } catch {
-        return null;
-    }
 }
 
 function pruneProxyUrls(): void {

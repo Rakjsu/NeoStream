@@ -14,7 +14,6 @@ import http from 'node:http'
 import path from 'node:path'
 import fs from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { createRequire } from 'node:module'
 import log from './logger'
 import { isAppOwnOrigin } from './localServerGuard'
 import {
@@ -23,20 +22,7 @@ import {
     resolveTimeshiftFile,
     timeshiftContentType,
 } from './timeshiftBuffer'
-
-const requireRuntime = createRequire(import.meta.url)
-
-// Mesma resolução do DVR: o ffmpeg-static de verdade do node_modules,
-// fora do asar quando empacotado.
-function getFfmpegPath(): string | null {
-    try {
-        const ffmpegPath = requireRuntime('ffmpeg-static') as string | null
-        if (!ffmpegPath) return null
-        return ffmpegPath.replace('app.asar', 'app.asar.unpacked')
-    } catch {
-        return null
-    }
-}
+import { resolveFfmpegPath } from './ffmpegPath'
 
 interface TimeshiftSession {
     proc: ChildProcess
@@ -85,7 +71,7 @@ export function setupTimeshiftHandlers(): void {
             if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
                 return { success: false, error: 'URL inválida' }
             }
-            const ffmpeg = getFfmpegPath()
+            const ffmpeg = resolveFfmpegPath()
             if (!ffmpeg) return { success: false, error: 'ffmpeg indisponível' }
 
             stopSession()
