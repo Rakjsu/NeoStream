@@ -9,7 +9,6 @@
  * local URL. 'transcode:stop' (or app quit) kills ffmpeg and sweeps the dir.
  */
 
-import { createRequire } from 'module'
 import { app, ipcMain } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import http from 'node:http'
@@ -26,8 +25,7 @@ import {
     contentTypeFor,
     type TranscodeVariant
 } from './transcodeProtocol'
-
-const requireRuntime = createRequire(import.meta.url)
+import { resolveFfmpegPath } from './ffmpegPath'
 
 interface Session {
     proc: ChildProcess
@@ -40,18 +38,6 @@ let serverPort = 0
 
 function transcodeRoot(): string {
     return path.join(app.getPath('userData'), 'transcode')
-}
-
-function resolveFfmpegPath(): string | null {
-    try {
-        // Runtime require: a bare top-level require would get inlined by the
-        // bundler with a broken __dirname (dead transcode) — see #242.
-        const ffmpegPath = requireRuntime('ffmpeg-static') as string | null
-        if (!ffmpegPath) return null
-        return ffmpegPath.replace('app.asar', 'app.asar.unpacked')
-    } catch {
-        return null
-    }
 }
 
 /** Loopback file server scoped to the transcode root (lazy, one per app). */
