@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
     collectBackup, applyBackup, BACKUP_VERSION, BACKUP_APP,
-    encodePlaylistPassword, decodePlaylistPassword, sanitizeBackupPlaylists
+    encodePlaylistPassword, decodePlaylistPassword, sanitizeBackupPlaylists,
+    isBackupKey, isSyncKey
 } from './backupService';
 
 describe('backupService', () => {
@@ -216,5 +217,101 @@ describe('backup com senha (AES-GCM)', () => {
     it('texto sem prefixo passa direto (backup antigo sem senha)', async () => {
         const { decryptBackup } = await import('./backupService');
         expect(await decryptBackup('{"a":1}', 'qualquer')).toBe('{"a":1}');
+    });
+});
+
+/**
+ * Política de chaves v4: prefixo + denylist, no lugar da allowlist.
+ *
+ * A allowlist exigia editar o backupService a cada preferência nova e ninguém
+ * editava — regras de gravação, alertas de EPG, marcadores e limites do Kids
+ * nunca viajaram. O default agora é o contrário: chave `neostream_*` entra
+ * sozinha, e o que NÃO pode viajar precisa estar escrito na denylist.
+ *
+ * Estes testes protegem o novo default. Sem eles, a próxima chave volátil
+ * criada com o prefixo vaza para o arquivo de backup sem ninguém notar.
+ */
+describe('política de chaves do backup (v4)', () => {
+    beforeEach(() => localStorage.clear());
+
+    it('as chaves que nunca viajaram agora viajam', () => {
+        const antes = [
+            'recording_rules_v1',            // regras de gravação automática
+            'neostream_epg_keywords',        // alertas de EPG por palavra
+            'video_bookmarks_v1',            // marcadores de posição
+            'neostream_personal_marks',      // nota e tags do usuário
+            'neostream_kids_daily_limit_min',
+            'neostream_kids_allowed_hours',
+            'neostream_external_epg_url',    // XMLTV do próprio usuário
+        ];
+        antes.forEach(chave => expect(isBackupKey(chave)).toBe(true));
+    });
+
+    // (c) da regra: gatilho destrutivo. A faxina apaga gravação pela idade, e a
+    // lista de protegidas é LOCAL — deixar só o gatilho viajar apagaria
+    // gravação alheia na outra máquina.
+    it('o gatilho da faxina do DVR não viaja', () => {
+        expect(isBackupKey('neostream_dvr_max_age_days')).toBe(false);
+        expect(isBackupKey('neostream_dvr_protected')).toBe(false);
+    });
+
+    // (d) da regra: descreve o aparelho, não o usuário.
+    it('configuração de aparelho não viaja', () => {
+        expect(isBackupKey('neostream_tv_mode')).toBe(false);
+        expect(isBackupKey('neostream_screensaver_min')).toBe(false);
+        expect(isBackupKey('neostream_dl_max_concurrent')).toBe(false);
+    });
+
+    // (a) da regra: o ponteiro da playlist ativa é o que escopa favoritos e
+    // progresso (`__pl_<id>`). Importado de outra máquina, aponta para uma
+    // playlist que não existe aqui.
+    it('estado local desta máquina não viaja', () => {
+        expect(isBackupKey('neostream_active_playlist_id')).toBe(false);
+        expect(isBackupKey('neostream_error_log_v1')).toBe(false);
+        expect(isBackupKey('neostream_parental_log')).toBe(false);
+        expect(isBackupKey('neostream_catalog_last_refresh')).toBe(false);
+    });
+
+    it('ledger de "já avisei" não viaja, mas a configuração do aviso sim', () => {
+        expect(isBackupKey('neostream_epg_keyword_seen')).toBe(false);
+        expect(isBackupKey('neostream_epg_keywords')).toBe(true);
+    });
+
+    it('a denylist vence o prefixo largo, e o convidado vence os dois', () => {
+        expect(isBackupKey('neostream_zap_history_p1__pl_x')).toBe(false);
+        expect(isBackupKey('neostream_play_queue_p1__pl_x')).toBe(false);
+        expect(isBackupKey('neostream_profiles_guest')).toBe(false);
+        expect(isBackupKey('neostream_zap_history_guest__pl_x')).toBe(false);
+    });
+
+    it('cache e flag transitória continuam de fora (não têm o prefixo)', () => {
+        ['tmdb_cache_movies', 'contentLastFetch', 'parentalUnlocked', 'epg_test_results']
+            .forEach(chave => expect(isBackupKey(chave)).toBe(false));
+    });
+
+    // O sync lê qualquer arquivo da pasta compartilhada sem checar origem, e o
+    // app BAIXA a URL de XMLTV com prioridade sobre o EPG do provedor. No
+    // arquivo de backup, que o usuário importa conscientemente, ela é dado dele.
+    it('a URL de XMLTV entra no backup mas fica fora do sync automático', () => {
+        expect(isBackupKey('neostream_external_epg_url')).toBe(true);
+        expect(isSyncKey('neostream_external_epg_url')).toBe(false);
+        // O resto do que faz backup também sincroniza.
+        expect(isSyncKey('neostream_profiles')).toBe(true);
+        expect(isSyncKey('neostream_dvr_max_age_days')).toBe(false);
+    });
+
+    it('collectBackup leva o que a política deixa passar e para o resto', () => {
+        localStorage.setItem('neostream_epg_keywords', '["copa"]');
+        localStorage.setItem('recording_rules_v1', '[]');
+        localStorage.setItem('neostream_dvr_max_age_days', '7');
+        localStorage.setItem('neostream_tv_mode', '1');
+        localStorage.setItem('tmdb_cache_movies', '{}');
+
+        const chaves = Object.keys(collectBackup().data);
+        expect(chaves).toContain('neostream_epg_keywords');
+        expect(chaves).toContain('recording_rules_v1');
+        expect(chaves).not.toContain('neostream_dvr_max_age_days');
+        expect(chaves).not.toContain('neostream_tv_mode');
+        expect(chaves).not.toContain('tmdb_cache_movies');
     });
 });

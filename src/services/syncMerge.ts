@@ -11,7 +11,7 @@
 // (syncTombstones.ts): an item loses to a tombstone NEWER than its addedAt,
 // so a re-add after a deletion still survives.
 
-import { isBackupKey } from './backupService';
+import { isSyncKey } from './backupService';
 import { TOMBSTONES_KEY, pruneTombstones, type TombstoneMap } from './syncTombstones';
 
 export interface SyncMergeResult {
@@ -258,7 +258,7 @@ export function mergeSyncData(
     const processed = new Set<string>([TOMBSTONES_KEY]);
     for (const [key, remoteValue] of Object.entries(remote)) {
         if (key === TOMBSTONES_KEY) continue;
-        if (typeof remoteValue !== 'string' || !isBackupKey(key)) continue;
+        if (typeof remoteValue !== 'string' || !isSyncKey(key)) continue;
         processed.add(key);
 
         const localValue = local[key];
@@ -283,7 +283,7 @@ export function mergeSyncData(
     // Keys the remote doesn't carry but whose items the ledger condemns:
     // apply the deletions locally too.
     for (const key of Object.keys(tombstones)) {
-        if (processed.has(key) || local[key] === undefined || !isBackupKey(key)) continue;
+        if (processed.has(key) || local[key] === undefined || !isSyncKey(key)) continue;
         mergeOne(key, local[key], local[key]);
     }
 
