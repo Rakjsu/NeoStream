@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../services/languageService';
+import { novidadesDaRelease, pareceAutoGerada } from '../utils/releaseNotes';
 
 
 export function PostUpdateChangelog() {
@@ -21,8 +22,15 @@ export function PostUpdateChangelog() {
             });
         }
 
-        // Always update stored version
-        localStorage.setItem('lastAppVersion', currentVersion);
+        // NAO marca como visto aqui.
+        //
+        // O modal e one-shot: gravar a versao neste ponto queimava a unica
+        // chance de mostrar as novidades. Quem abrisse o app na janela entre a
+        // tag subir e o dono reescrever a release via o texto auto-gerado do
+        // GitHub — titulos de PR com `by @fulano in <url>` — e nunca mais via
+        // as notas de verdade. Quem marca agora e o efeito de busca, e so
+        // quando o texto ja e o definitivo.
+        if (!lastVersion) localStorage.setItem('lastAppVersion', currentVersion);
     }, []);
 
     const handleClose = () => {
@@ -37,21 +45,23 @@ export function PostUpdateChangelog() {
         fetch(`https://api.github.com/repos/Rakjsu/NeoStream/releases/tags/v${__APP_VERSION__}`)
             .then(res => (res.ok ? res.json() : null))
             .then((release: { body?: string } | null) => {
-                if (cancelled || !release?.body) return;
-                const lines = release.body
-                    .split('\n')
-                    .map(line => line
-                        .replace(/^#+\s*/, '')
-                        .replace(/^[-*]\s*/, '')
-                        .replace(/\*\*/g, '')
-                        .trim())
-                    .filter(line => line
-                        && !line.startsWith('🤖')
-                        && !/^full changelog/i.test(line)
-                        && !/^\[/.test(line));
-                if (lines.length > 0) setNotes(lines.slice(0, 16));
+                if (cancelled) return;
+                const corpo = release?.body ?? '';
+                if (corpo) {
+                    const itens = novidadesDaRelease(corpo);
+                    if (itens.length > 0) setNotes(itens);
+                }
+                // Só considera "visto" quando o texto já é o definitivo. Com o
+                // corpo ainda auto-gerado, a versão não é gravada e o modal
+                // volta na próxima abertura — quando a release já foi escrita.
+                if (!corpo || !pareceAutoGerada(corpo)) {
+                    localStorage.setItem('lastAppVersion', __APP_VERSION__);
+                }
             })
-            .catch(() => { /* offline: fallback já cobre */ });
+            .catch(() => {
+                // Offline: o fallback cobre a tela, mas não queima a chance de
+                // mostrar as novidades de verdade quando houver rede.
+            });
         return () => { cancelled = true; };
     }, [isVisible]);
 
