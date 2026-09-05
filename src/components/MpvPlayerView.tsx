@@ -21,6 +21,7 @@ import { watchProgressService } from '../services/watchProgressService';
 import { useLanguage } from '../services/languageService';
 import { profileService } from '../services/profileService';
 import { trackPrefKey, trackLang, choosePreferredTracks, type TrackPref } from '../utils/mpvTrackPrefs';
+import { subtitleSyncPrefs, subtitleSyncKey } from '../utils/subtitleSyncPrefs';
 import { autoFetchSubtitle, cleanupSubtitleUrl, SUBTITLE_LANGUAGE_OPTIONS } from '../services/subtitleService';
 
 /** Must match MPV_CONTROLS_HEIGHT in electron/mpvProtocol.ts. */
@@ -83,12 +84,23 @@ export function MpvPlayerView({
     const [subtitleTrackId, setSubtitleTrackId] = useState<number | null>(null);
     /** While the user drags the seek slider, show the drag value instead of polled time. */
     const [seekDrag, setSeekDrag] = useState<number | null>(null);
-    // Subtitle sync offset (display only; mpv holds the real sub-delay)
+    // Subtitle sync offset (display only; mpv holds the real sub-delay).
+    //
+    // Lembrado por conteudo, no MESMO espaco de chaves do player interno
+    // (utils/subtitleSyncPrefs): pra serie os dois recebem o mesmo seriesId do
+    // AsyncVideoPlayer, entao o ajuste feito num vale no outro. Pra filme os
+    // ids podem vir de fontes diferentes e a chave pode nao bater — nesse caso
+    // cada player lembra o seu, que ainda e melhor que esquecer.
     const [subDelay, setSubDelay] = useState(0);
+    const subSyncKey = subtitleSyncKey(seriesId ? 'series' : 'movie', seriesId ?? movieId);
     const nudgeSubDelay = useCallback((delta: number) => {
-        setSubDelay(prev => Math.round((prev + delta) * 2) / 2);
+        setSubDelay(prev => {
+            const proximo = Math.round((prev + delta) * 2) / 2;
+            subtitleSyncPrefs.set(subSyncKey, proximo);
+            return proximo;
+        });
         void mpvService.adjustSubtitleDelay(delta);
-    }, []);
+    }, [subSyncKey]);
 
     // Aspect override cycle: source → 16:9 → 4:3 → source…
     const ASPECTS: Array<{ value: -1 | '16:9' | '4:3'; label: string }> = [
@@ -278,6 +290,27 @@ export function MpvPlayerView({
             localStorage.setItem(key, JSON.stringify(all));
         } catch { /* best-effort */ }
     }, [contentKey]);
+
+    /**
+     * Reaplica a sincronia lembrada. O gatilho e `tracks.length > 0`, nao a
+     * fase de reproducao: fase e estado local do React e fica "playing" antes
+     * de o pipe do mpv ter entregue qualquer coisa — o delay iria pro vazio.
+     * Ter faixas na mao PROVA que o IPC ja respondeu.
+     *
+     * `adjustSubtitleDelay` e relativo, e o mpv nasce em zero a cada arquivo:
+     * mandar o valor salvo de uma vez chega no absoluto certo.
+     */
+    const syncAplicadaRef = useRef(false);
+    useEffect(() => {
+        if (syncAplicadaRef.current || tracks.length === 0 || !subSyncKey) return;
+        const salvo = subtitleSyncPrefs.get(subSyncKey);
+        syncAplicadaRef.current = true;
+        if (salvo === 0) return;
+        queueMicrotask(() => {
+            setSubDelay(salvo);
+            void mpvService.adjustSubtitleDelay(salvo);
+        });
+    }, [tracks.length, subSyncKey]);
 
     // Re-apply the remembered choice once the file's tracks show up.
     const prefsAppliedRef = useRef(false);
