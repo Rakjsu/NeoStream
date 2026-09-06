@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useLanguage } from '../services/languageService';
 import { listDecades, listGenres, type DurationBucket, type FilterableItem } from '../utils/catalogFilter';
+import { allTags } from '../services/personalMarksService';
 
 interface CatalogFiltersProps {
     items: FilterableItem[];
@@ -11,6 +12,14 @@ interface CatalogFiltersProps {
     /** ⏳ Item 37: filtro por duração (só o VOD passa — séries não usam). */
     duration?: DurationBucket | null;
     onDuration?: (bucket: DurationBucket | null) => void;
+    /**
+     * 🏷️ Tag pessoal. As tags eram só de escrita: dava pra marcar um filme de
+     * "Cult" na ficha e não havia lugar nenhum que filtrasse por isso.
+     */
+    tag?: string | null;
+    onTag?: (tag: string | null) => void;
+    /** Muda quando as marcas podem ter mudado (fechar a ficha) — refaz a lista. */
+    tagsTick?: number;
     /** Borda direita do select de década (o de gênero fica à esquerda dele). */
     right?: number;
     /** Flui numa toolbar flex em vez de flutuar com offsets absolutos. */
@@ -37,7 +46,7 @@ function selectStyle(right: number, inline: boolean) {
 }
 
 /** Filtros de década e gênero das grades de catálogo — par visual do SortSelect. */
-export function CatalogFilters({ items, decade, genre, onDecade, onGenre, duration = null, onDuration, right = 215, inline = false }: CatalogFiltersProps) {
+export function CatalogFilters({ items, decade, genre, onDecade, onGenre, duration = null, onDuration, tag = null, onTag, tagsTick = 0, right = 215, inline = false }: CatalogFiltersProps) {
     const { t } = useLanguage();
     const decades = useMemo(() => listDecades(items), [items]);
     const genres = useMemo(() => listGenres(items), [items]);
@@ -46,6 +55,10 @@ export function CatalogFilters({ items, decade, genre, onDecade, onGenre, durati
         () => !!onDuration && items.some(item => parseInt(String((item as { episode_run_time?: string | number }).episode_run_time ?? ''), 10) > 0),
         [items, onDuration]
     );
+    // As tags são do usuário, não do catálogo: mudam ao marcar na ficha, e é
+    // por isso que o tick entra nas dependências.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `tagsTick` força a releitura; as marcas vivem no localStorage, fora do React
+    const tags = useMemo(() => (onTag ? allTags() : []), [onTag, tagsTick]);
     return (
         <>
             {decades.length >= 2 && (
@@ -68,6 +81,17 @@ export function CatalogFilters({ items, decade, genre, onDecade, onGenre, durati
                 >
                     <option value="">{t('sort', 'allGenres')}</option>
                     {genres.map(item => <option key={item} value={item}>{item}</option>)}
+                </select>
+            )}
+            {onTag && tags.length > 0 && (
+                <select
+                    value={tag ?? ''}
+                    onChange={(e) => onTag(e.target.value || null)}
+                    title={t('sort', 'tag')}
+                    style={selectStyle(inline ? right : right + 384, inline)}
+                >
+                    <option value="">{t('sort', 'allTags')}</option>
+                    {tags.map(item => <option key={item} value={item}>🏷️ {item}</option>)}
                 </select>
             )}
             {hasDurations && onDuration && (

@@ -14,6 +14,7 @@ import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { ResumeModal } from '../components/ResumeModal';
 import { ContentDetailModal } from '../components/ContentDetailModal';
+import { idsComTag } from '../services/personalMarksService';
 import { profileService } from '../services/profileService';
 import { SeriesDetailPanel, type SeriesEpisode, type SeriesInfo } from '../components/SeriesDetailPanel';
 import { useSeriesMetadata } from '../hooks/useSeriesMetadata';
@@ -59,6 +60,10 @@ export function Series() {
     // 🔎 Filtros de década e gênero — aplicados antes da ordenação.
     const [decade, setDecade] = useState<number | null>(null);
     const [genreFilter, setGenreFilter] = useState<string | null>(null);
+    // 🏷️ Filtro por tag pessoal (mesmo par do VOD). O tick refaz a conta
+    // quando a ficha fecha — marcar na ficha reflete aqui sem trocar de tela.
+    const [tagFilter, setTagFilter] = useState<string | null>(null);
+    const [tagsTick, setTagsTick] = useState(0);
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [selectedSeries, setSelectedSeries] = useState<Series | null>(null);
     const [playingSeries, setPlayingSeries] = useState<Series | null>(null);
@@ -238,12 +243,18 @@ export function Series() {
     // (notably on every scroll frame — the windowed grid updates scrollTop state).
     const sortedSeries = useMemo(
         () => {
-            const base = (decade !== null || genreFilter)
+            const porFiltro = (decade !== null || genreFilter)
                 ? series.filter(item => matchesFilters(item, decade, genreFilter))
                 : series;
+            // Uma leitura de storage para a grade inteira, nao uma por card.
+            const comTag = tagFilter ? idsComTag(tagFilter) : null;
+            const base = comTag
+                ? porFiltro.filter(item => comTag.has(`series:${item.series_id}`))
+                : porFiltro;
             return sortBy === 'recent' ? base : [...base].sort((a, b) => compareCatalogItems(sortBy, a, b));
         },
-        [series, sortBy, decade, genreFilter]
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `tagsTick` força a releitura; as marcas vivem no localStorage, fora do React
+        [series, sortBy, decade, genreFilter, tagFilter, tagsTick]
     );
 
     // 🙈 Esconder assistidos: séries onde TODO episódio registrado está
@@ -514,7 +525,7 @@ export function Series() {
                     flexWrap: 'wrap', justifyContent: 'flex-end',
                     maxWidth: 'calc(100% - 330px)'
                 }}>
-                    <CatalogFilters items={series} decade={decade} genre={genreFilter} onDecade={setDecade} onGenre={setGenreFilter} inline />
+                    <CatalogFilters items={series} decade={decade} genre={genreFilter} onDecade={setDecade} onGenre={setGenreFilter} tag={tagFilter} onTag={setTagFilter} tagsTick={tagsTick} inline />
                     <button
                         onClick={() => {
                             const next = !hideWatched;
@@ -816,7 +827,7 @@ export function Series() {
             {selectedSeries && (
                 <ContentDetailModal
                     isOpen={!!selectedSeries}
-                    onClose={() => setSelectedSeries(null)}
+                    onClose={() => { setSelectedSeries(null); setTagsTick(tick => tick + 1); }}
                     contentId={String(selectedSeries.series_id)}
                     contentType="series"
                     contentData={{
