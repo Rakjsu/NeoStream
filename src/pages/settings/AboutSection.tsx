@@ -3,7 +3,7 @@ import { useLanguage } from '../../services/languageService';
 import { bootProfiler } from '../../services/bootProfiler';
 
 export function AboutSection() {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
 
     // Legal modals
     const [showTermsModal, setShowTermsModal] = useState(false);
@@ -158,14 +158,24 @@ export function AboutSection() {
                                     e.currentTarget.style.transform = 'scale(1)';
                                 }}
                             >
-                                ✕ Fechar
+                                ✕ {t('common', 'close')}
                             </button>
                         </div>
                         <div style={{ color: '#9ca3af', fontSize: '14px', lineHeight: 1.8, animation: 'fadeInUp 0.5s ease 0.2s both' }}>
+                            {language !== 'pt' && (
+                                <p style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)', fontSize: '13px' }}>
+                                    {t('about', 'legalPtOnly')}
+                                </p>
+                            )}
                             <p style={{ marginBottom: '16px', padding: '12px 16px', background: 'rgba(var(--ns-accent-rgb), 0.1)', borderRadius: '12px', border: '1px solid rgba(var(--ns-accent-rgb), 0.2)' }}>
                                 <strong style={{ color: 'var(--ns-accent)' }}>📅 Última atualização:</strong> <span style={{ color: 'white' }}>09 de Dezembro de 2025</span>
                             </p>
 
+                            {/* O texto legal fica em português nas três línguas, de
+                                propósito: traduzir termos de uso sem revisão jurídica
+                                cria três documentos que dizem coisas ligeiramente
+                                diferentes. O aviso acima diz isso a quem lê em outra
+                                língua, em vez de deixar a pessoa achar que é bug. */}
                             <h3 style={{ color: 'var(--ns-accent)', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>1. Aceitação dos Termos</h3>
                             <p>Ao utilizar o NeoStream, você concorda com estes Termos de Uso. O aplicativo é destinado exclusivamente para uso pessoal e não comercial.</p>
 
@@ -288,11 +298,16 @@ export function AboutSection() {
                                     e.currentTarget.style.transform = 'scale(1)';
                                 }}
                             >
-                                ✕ Fechar
+                                ✕ {t('common', 'close')}
                             </button>
                         </div>
                         <div style={{ color: '#9ca3af', fontSize: '14px', lineHeight: 1.8, animation: 'fadeInUp 0.5s ease 0.2s both' }}>
-                            <p style={{ marginBottom: '16px', padding: '12px 16px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+                            {language !== 'pt' && (
+                                <p style={{ marginBottom: '16px', padding: '10px 14px', borderRadius: '10px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.75)', fontSize: '13px' }}>
+                                    {t('about', 'legalPtOnly')}
+                                </p>
+                            )}
+<p style={{ marginBottom: '16px', padding: '12px 16px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: '12px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
                                 <strong style={{ color: '#10b981' }}>📅 Última atualização:</strong> <span style={{ color: 'white' }}>09 de Dezembro de 2025</span>
                             </p>
 

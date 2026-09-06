@@ -97,7 +97,7 @@ export function Login() {
 
     const handlePlaylistNameSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        const name = playlistName || 'Minha Playlist';
+        const name = playlistName || t('playlists', 'defaultName');
         localStorage.setItem('playlistName', name);
         // Persist the display name on the playlist saved by auth:login
         if (playlistId) {
