@@ -29,17 +29,44 @@ import { setupStorageManager } from './storageManager'
 import { setupAutoBackup } from './autoBackup'
 import { setupSyncFolder } from './syncFolder'
 import { setupYouTubeEmbedFix } from './youtubeEmbedFix'
+import Store from 'electron-store'
+import { gpuSwitchesFor, normalizeHwAccelMode, type HwAccelMode } from './gpuPolicy'
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Enable Hardware Acceleration and HEVC
-app.commandLine.appendSwitch('ignore-gpu-blacklist')
-app.commandLine.appendSwitch('enable-gpu-rasterization')
-app.commandLine.appendSwitch('enable-zero-copy')
-app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,VaapiVideoEncoder') // Linux/Mac mostly, but good to have
-// Windows HEVC support relies on OS extensions, but we can try to force some flags if needed.
+/**
+ * 🎮 Aceleração por hardware — tem que ser AQUI: `appendSwitch` e
+ * `disableHardwareAcceleration` só valem antes de o app ficar pronto.
+ *
+ * A preferência mora no mesmo `system-config` de closeToTray/openAtLogin
+ * (trayMode.ts). Lida com uma instância própria porque o setupTrayMode só roda
+ * no whenReady, tarde demais para isto — e o `system-config` é lido, nunca
+ * escrito, neste ponto.
+ *
+ * A autópsia dos quatro switches que viviam aqui está em gpuPolicy.ts. Resumo:
+ * três não existem no Chromium 152 e eram ignorados em silêncio.
+ */
+function aplicarPoliticaDeGpu(): HwAccelMode {
+    let mode: HwAccelMode
+    try {
+        const systemStore = new Store<{ system?: { hardwareAcceleration?: unknown } }>({ name: 'system-config' })
+        mode = normalizeHwAccelMode(systemStore.get('system')?.hardwareAcceleration)
+    } catch {
+        // Arquivo corrompido não pode impedir o app de abrir.
+        mode = normalizeHwAccelMode(undefined)
+    }
+    const policy = gpuSwitchesFor(mode)
+    if (policy.disableHardwareAcceleration) app.disableHardwareAcceleration()
+    for (const [nome, valor] of policy.switches) {
+        if (valor === undefined) app.commandLine.appendSwitch(nome)
+        else app.commandLine.appendSwitch(nome, valor)
+    }
+    log.info('[GPU] aceleração por hardware:', mode)
+    return mode
+}
+aplicarPoliticaDeGpu()
 
 // 🪟 Instância única — ANTES de qualquer setup*(). app.quit() é assíncrono e
 // não interrompe a avaliação do módulo (e `return` solto não existe em ESM):

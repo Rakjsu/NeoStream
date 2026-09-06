@@ -4,6 +4,7 @@ import Store from 'electron-store'
 import log from './logger'
 import { activeRecordingCount } from './dvrHandlers'
 import { closeAction } from './trayClosePolicy'
+import { DEFAULT_HW_ACCEL, normalizeHwAccelMode, type HwAccelMode } from './gpuPolicy'
 
 /**
  * Tray mode: closing the window hides the app to the system tray instead of
@@ -14,11 +15,17 @@ import { closeAction } from './trayClosePolicy'
 interface SystemConfig {
     closeToTray: boolean
     openAtLogin: boolean
+    /**
+     * Aceleração por hardware. Vive aqui, e não no localStorage, porque quem
+     * precisa dela é o processo principal ANTES de existir janela — o main.ts
+     * lê este mesmo arquivo no topo do boot. Ver electron/gpuPolicy.ts.
+     */
+    hardwareAcceleration: HwAccelMode
 }
 
 const store = new Store<{ system: SystemConfig }>({ name: 'system-config' })
 
-const DEFAULTS: SystemConfig = { closeToTray: true, openAtLogin: false }
+const DEFAULTS: SystemConfig = { closeToTray: true, openAtLogin: false, hardwareAcceleration: DEFAULT_HW_ACCEL }
 
 function getConfig(): SystemConfig {
     return { ...DEFAULTS, ...(store.get('system') as Partial<SystemConfig> | undefined) }
@@ -26,6 +33,9 @@ function getConfig(): SystemConfig {
 
 function setConfig(partial: Partial<SystemConfig>): SystemConfig {
     const next = { ...getConfig(), ...partial }
+    // O renderer é a única origem, mas quem lê isto no boot é o main antes de
+    // qualquer janela: lixo aqui viraria decisão de GPU no próximo start.
+    next.hardwareAcceleration = normalizeHwAccelMode(next.hardwareAcceleration)
     store.set('system', next)
     return next
 }
