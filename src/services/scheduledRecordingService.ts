@@ -21,8 +21,47 @@ export interface ScheduledRecording {
 
 const STORAGE_KEY_PREFIX = 'scheduled_recordings';
 
-/** Extra time recorded after the announced program end (credits, delays). */
+/** Margem inicial: liga 2min ANTES do início anunciado — PADRÃO. */
+export const START_MARGIN_MS = 2 * 60 * 1000;
+
+/**
+ * Minutos gravados a mais no fim (créditos, atraso do provedor) — PADRÃO.
+ * O valor efetivo vem de `folgaFinalMs()`, que lê a preferência do usuário.
+ */
 export const END_PADDING_MS = 2 * 60 * 1000;
+
+/** Teto de sanidade das margens: 30 min de cada lado já é muito. */
+export const MARGEM_MAXIMA_MIN = 30;
+
+/**
+ * Minutos gravados a mais, em ms, com o padrão quando não há preferência.
+ *
+ * Lê a string CRUA antes de converter: `Number(null)` é 0 e passa em qualquer
+ * checagem de finitude, então converter primeiro tornaria "nunca configurei"
+ * indistinguível de "configurei zero" — e todo mundo perderia as margens em
+ * silêncio, na primeira gravação depois da atualização.
+ */
+function margemConfigurada(chave: string, padraoMs: number): number {
+    try {
+        const bruto = localStorage.getItem(chave);
+        if (bruto === null || bruto.trim() === '') return padraoMs;
+        const minutos = Number(bruto);
+        if (!Number.isFinite(minutos) || minutos < 0) return padraoMs;
+        return Math.min(minutos, MARGEM_MAXIMA_MIN) * 60 * 1000;
+    } catch {
+        return padraoMs;
+    }
+}
+
+/** Folga no fim (ms). Zero é escolha válida e é respeitada. */
+export function folgaFinalMs(): number {
+    return margemConfigurada('neostream_dvr_end_padding_min', END_PADDING_MS);
+}
+
+/** Margem no início (ms). Zero é escolha válida e é respeitada. */
+export function margemInicialMs(): number {
+    return margemConfigurada('neostream_dvr_start_margin_min', START_MARGIN_MS);
+}
 
 /** Espera antes de re-tentar (fila de simultâneas e falha transitória no início). */
 export const RETRY_DELAY_MS = 30_000;
@@ -33,12 +72,9 @@ interface DvrActiveResponse {
     recordings?: Array<{ id: string; channelName?: string }>;
 }
 
-/** Margem inicial: liga 2min ANTES do início anunciado (relógio do provedor). */
-export const START_MARGIN_MS = 2 * 60 * 1000;
-
 /** Delay até ligar a gravação — início anunciado menos a margem (clamp 0). */
 export function startDelayMs(startIso: string, nowMs: number): number {
-    return Math.max(0, computeDelay(startIso, nowMs) - START_MARGIN_MS);
+    return Math.max(0, computeDelay(startIso, nowMs) - margemInicialMs());
 }
 
 /** Limite de gravações simultâneas (1–4; padrão 2) — excedente entra em fila. */
@@ -53,11 +89,18 @@ export function getDvrMaxConcurrent(): number {
 }
 
 /** Janela que o ffmpeg fica de fato ligado: margem antes + folga depois. */
-export function janelaGravacao(rec: { startIso: string; endIso: string }): { ini: number; fim: number } | null {
+export function janelaGravacao(
+    rec: { startIso: string; endIso: string },
+    margens?: { inicioMs: number; fimMs: number }
+): { ini: number; fim: number } | null {
     const ini = Date.parse(rec.startIso);
     const fim = Date.parse(rec.endIso);
     if (!Number.isFinite(ini) || !Number.isFinite(fim) || fim <= ini) return null;
-    return { ini: ini - START_MARGIN_MS, fim: fim + END_PADDING_MS };
+    // As margens chegam por parâmetro no caminho quente (o laço de conflito lê
+    // o storage UMA vez, não uma por par de agendamentos).
+    const inicioMs = margens?.inicioMs ?? margemInicialMs();
+    const fimMs = margens?.fimMs ?? folgaFinalMs();
+    return { ini: ini - inicioMs, fim: fim + fimMs };
 }
 
 /**
@@ -75,12 +118,14 @@ export function conflitosDoAgendamento(
     existentes: ScheduledRecording[],
     limite: number = getDvrMaxConcurrent()
 ): ScheduledRecording[] {
-    const alvo = janelaGravacao(candidato);
+    // Uma leitura de storage para o cálculo inteiro.
+    const margens = { inicioMs: margemInicialMs(), fimMs: folgaFinalMs() };
+    const alvo = janelaGravacao(candidato, margens);
     if (!alvo) return [];
 
     const concorrentes = existentes
         .filter(rec => rec.id !== candidato.id)
-        .map(rec => ({ rec, janela: janelaGravacao(rec) }))
+        .map(rec => ({ rec, janela: janelaGravacao(rec, margens) }))
         .filter((item): item is { rec: ScheduledRecording; janela: { ini: number; fim: number } } =>
             item.janela !== null && item.janela.ini < alvo.fim && item.janela.fim > alvo.ini);
 
@@ -318,7 +363,7 @@ class ScheduledRecordingService {
     private armStop(rec: ScheduledRecording): void {
         const existing = this.stopTimers.get(rec.id);
         if (existing) clearTimeout(existing);
-        const stopDelay = computeDelay(rec.endIso, Date.now()) + END_PADDING_MS;
+        const stopDelay = computeDelay(rec.endIso, Date.now()) + folgaFinalMs();
         this.stopTimers.set(rec.id, setTimeout(async () => {
             this.stopTimers.delete(rec.id);
             const recId = this.activeRecIds.get(rec.id);

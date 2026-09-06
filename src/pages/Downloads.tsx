@@ -6,6 +6,7 @@ import type { DownloadItem, StorageInfo } from '../services/downloadService';
 import { useLanguage } from '../services/languageService';
 import { getDvrMaxAgeDays, getProtectedRecordings, pickExpiredRecordings, recElapsedLabel, setDvrMaxAgeDays, toggleProtectedRecording } from '../services/dvrSweep';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
+import { getDvrMaxConcurrent, margemInicialMs, folgaFinalMs, MARGEM_MAXIMA_MIN } from '../services/scheduledRecordingService';
 
 // Type for grouped series
 type SeriesGroup = {
@@ -74,6 +75,11 @@ export function Downloads() {
     const [renameValue, setRenameValue] = useState('');
     // ⚙️ Config da fila de downloads (D66).
     const [maxConc, setMaxConc] = useState(() => downloadService.getMaxConcurrent());
+    // ⏺ Gravação agendada. Os três leem o storage direto: o serviço vive no
+    // renderer e lê a mesma chave a cada disparo, então não há o que sincronizar.
+    const [dvrMax, setDvrMax] = useState(() => getDvrMaxConcurrent());
+    const [margemInicio, setMargemInicio] = useState(() => Math.round(margemInicialMs() / 60000));
+    const [margemFim, setMargemFim] = useState(() => Math.round(folgaFinalMs() / 60000));
     const [nightOnly, setNightOnlyState] = useState(() => downloadService.isNightOnly());
     const [smartDl, setSmartDlState] = useState(() => downloadService.isSmartDownloads());
     // 🎞️/📤 conversão e exportação + 🖼️ thumbnails cacheadas por path.
@@ -609,6 +615,57 @@ export function Downloads() {
                                 <option value={3}>3</option>
                                 <option value={4}>4</option>
                             </select>
+                        </label>
+                        {/* ⏺ Gravação agendada: o limite de simultâneas e as
+                            margens não tinham NENHUM controle na interface — e o
+                            aviso de conflito da Agenda manda "ajustar o limite".
+                            Ficam aqui, ao lado do controle irmão de downloads. */}
+                        <label style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+                            ⏺ {t('downloads', 'dvrMaxConcurrent')}
+                            <select
+                                className="setting-select"
+                                value={dvrMax}
+                                onChange={(e) => {
+                                    const n = Number(e.target.value);
+                                    setDvrMax(n);
+                                    try { localStorage.setItem('neostream_dvr_max_concurrent', String(n)); } catch { /* quota */ }
+                                }}
+                            >
+                                <option value={1}>1</option>
+                                <option value={2}>2</option>
+                                <option value={3}>3</option>
+                                <option value={4}>4</option>
+                            </select>
+                        </label>
+                        <label style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }} title={t('downloads', 'dvrMarginsDesc')}>
+                            {t('downloads', 'dvrStartMargin')}
+                            <input
+                                type="number"
+                                min={0}
+                                max={MARGEM_MAXIMA_MIN}
+                                value={margemInicio}
+                                onChange={(e) => {
+                                    const n = Math.max(0, Math.min(MARGEM_MAXIMA_MIN, Number(e.target.value) || 0));
+                                    setMargemInicio(n);
+                                    try { localStorage.setItem('neostream_dvr_start_margin_min', String(n)); } catch { /* quota */ }
+                                }}
+                                style={{ width: 56, padding: '4px 6px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.3)', color: 'white' }}
+                            />
+                        </label>
+                        <label style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }} title={t('downloads', 'dvrMarginsDesc')}>
+                            {t('downloads', 'dvrEndPadding')}
+                            <input
+                                type="number"
+                                min={0}
+                                max={MARGEM_MAXIMA_MIN}
+                                value={margemFim}
+                                onChange={(e) => {
+                                    const n = Math.max(0, Math.min(MARGEM_MAXIMA_MIN, Number(e.target.value) || 0));
+                                    setMargemFim(n);
+                                    try { localStorage.setItem('neostream_dvr_end_padding_min', String(n)); } catch { /* quota */ }
+                                }}
+                                style={{ width: 56, padding: '4px 6px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.3)', color: 'white' }}
+                            />
                         </label>
                         <label style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }} title={t('downloads', 'nightOnlyDesc')}>
                             <input
