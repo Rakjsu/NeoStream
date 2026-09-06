@@ -18,7 +18,6 @@ import {
 import { useLanguage } from '../../services/languageService';
 import { profileService } from '../../services/profileService';
 import { playlistService } from '../../services/playlistService';
-import { WrappedOverlay } from '../../components/WrappedOverlay';
 import { getDailyGoalMinutes, goalProgressPct, setDailyGoalMinutes } from '../../services/watchLimitsService';
 
 const TYPE_COLORS = { movies: '#3b82f6', series: '#10b981', live: '#f59e0b' } as const;
@@ -28,16 +27,8 @@ export function StatsSection() {
     // Load usage stats
     const [usageStats] = useState<UsageStats | null>(() => usageStatsService.getStats());
     const [weeklyStats] = useState<DailyStats[]>(() => usageStatsService.getWeeklyStats());
-    const [showWrapped, setShowWrapped] = useState(false);
     const [dailyGoal, setDailyGoal] = useState(() => getDailyGoalMinutes());
     const { t, language } = useLanguage();
-
-    // The annual Wrapped notification opens the overlay via this event.
-    useEffect(() => {
-        const open = () => setShowWrapped(true);
-        window.addEventListener('neostream:open-wrapped', open);
-        return () => window.removeEventListener('neostream:open-wrapped', open);
-    }, []);
 
     const today = new Date().toISOString().split('T')[0];
     const todaySeconds = usageStats?.dailyStats.find(d => d.date === today)?.totalSeconds || 0;
@@ -201,7 +192,9 @@ export function StatsSection() {
                 <button
                     className="check-btn"
                     style={{ width: 'auto', padding: '10px 20px', marginLeft: 'auto' }}
-                    onClick={() => setShowWrapped(true)}
+                    // Mesmo caminho do aviso anual: quem monta a Retrospectiva
+                    // é o layout do painel (Dashboard.tsx), um dono só.
+                    onClick={() => window.dispatchEvent(new CustomEvent('neostream:open-wrapped'))}
                 >
                     <span>🎁</span>
                     <span>{t('wrapped', 'open')}</span>
@@ -217,7 +210,6 @@ export function StatsSection() {
                 </button>
             </div>
 
-            {showWrapped && <WrappedOverlay onClose={() => setShowWrapped(false)} />}
 
             <div className="settings-group">
                 {/* Main Stats Cards */}
