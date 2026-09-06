@@ -879,7 +879,9 @@
     "restoreWindow": "Restaurar ventana",
     "qrHandoffFailed": "No se pudo generar el QR de este contenido.",
     "streamRetry": "Intentar de nuevo",
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "openSubtitleFile": "Archivo del ordenador…",
+    "subtitleFileError": "No se pudo abrir ese archivo de subtítulos"
   },
   "home": {
     "dontRecommend": "No me recomiendes esto",

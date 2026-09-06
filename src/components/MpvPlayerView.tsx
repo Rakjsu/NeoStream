@@ -22,7 +22,7 @@ import { useLanguage } from '../services/languageService';
 import { profileService } from '../services/profileService';
 import { trackPrefKey, trackLang, choosePreferredTracks, type TrackPref } from '../utils/mpvTrackPrefs';
 import { subtitleSyncPrefs, subtitleSyncKey } from '../utils/subtitleSyncPrefs';
-import { autoFetchSubtitle, cleanupSubtitleUrl, SUBTITLE_LANGUAGE_OPTIONS } from '../services/subtitleService';
+import { autoFetchSubtitle, cleanupSubtitleUrl, openSubtitleFileFromDisk, SUBTITLE_LANGUAGE_OPTIONS } from '../services/subtitleService';
 
 /** Must match MPV_CONTROLS_HEIGHT in electron/mpvProtocol.ts. */
 const CONTROLS_HEIGHT = 96;
@@ -356,6 +356,28 @@ export function MpvPlayerView({
         savePref({ subLang: next ? trackLang(next) : 'off' });
     }, [tracks, subtitleTrackId, savePref]);
 
+    /**
+     * Legenda de um arquivo do computador, direto pro mpv.
+     *
+     * Sem restringir extensão e sem converter nada: aqui o mpv desenha .ass
+     * com estilo e resolve o codepage sozinho — só o caminho viaja.
+     */
+    const openSubtitleFromDisk = useCallback(async () => {
+        setShowSubSearch(false);
+        setSubSearchBusy(true);
+        try {
+            const arquivo = await openSubtitleFileFromDisk([], false);
+            if (!arquivo) return; // cancelou o diálogo: nada muda
+            const ok = await mpvService.addSubtitleFile(arquivo.path, arquivo.name);
+            setSubSearchMsg(ok ? `💬 ${arquivo.name}` : t('player', 'subtitleFileError'));
+        } catch {
+            setSubSearchMsg(t('player', 'subtitleFileError'));
+        } finally {
+            setSubSearchBusy(false);
+            setTimeout(() => setSubSearchMsg(null), 4000);
+        }
+    }, [t]);
+
     // Search an external subtitle for this content and hand it to mpv.
     const searchExternalSubtitle = useCallback(async (language: string, label: string) => {
         setShowSubSearch(false);
@@ -563,6 +585,12 @@ export function MpvPlayerView({
                                     </button>
                                     {showSubSearch && (
                                         <div className="mpv-view-subsearch">
+                                            <button
+                                                className="mpv-view-subsearch-option"
+                                                onClick={() => void openSubtitleFromDisk()}
+                                            >
+                                                📂 {t('player', 'openSubtitleFile')}
+                                            </button>
                                             {SUBTITLE_LANGUAGE_OPTIONS.map(opt => (
                                                 <button
                                                     key={opt.code}

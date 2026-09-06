@@ -48,6 +48,7 @@ import {
     formatMpvGeometry,
     parseIpcLine,
     serializeIpcCommand,
+    pareceLegendaNoDisco,
     type MpvStatus,
 } from './mpvProtocol'
 
@@ -184,6 +185,27 @@ function applyGeometryFromWindow(current: MpvSession) {
  * move/resize follow, minimize/hide mirror (window-minimized), close stops
  * playback. Listener removal happens in teardownSession via detachFollow.
  */
+/**
+ * Tira o mpv da frente enquanto um diálogo nativo está aberto e devolve a
+ * função que o traz de volta.
+ *
+ * O mpv é lançado com `--ontop` (mpvProtocol.ts) pra ficar acima do app
+ * mesmo quando os controles são clicados. Um `showOpenDialog` — com ou sem
+ * janela pai, porque no Windows uma janela dona não vence WS_EX_TOPMOST —
+ * nasceria ATRÁS do vídeo: o botão trava e não há nada na tela pra cancelar.
+ * Usa o mesmo `window-minimized` do espelho de minimizar/restaurar.
+ */
+export function esconderMpvParaDialogo(): () => void {
+    const atual = session
+    if (!atual) return () => { /* nada tocando no mpv */ }
+    sendCommand(['set_property', 'window-minimized', true])
+    return () => {
+        if (session !== atual) return
+        sendCommand(['set_property', 'window-minimized', false])
+        applyGeometryFromWindow(atual)
+    }
+}
+
 function attachWindowFollow(current: MpvSession, win: BrowserWindow) {
     const onMoveResize = () => {
         if (session === current) applyGeometryFromWindow(current)
@@ -471,10 +493,21 @@ export function setupMpvHandlers() {
         return { success: sendCommand(['add', 'sub-delay', delta]) }
     })
 
-    // External subtitle (searched/downloaded by the renderer as VTT text):
-    // write to a temp file and sub-add it selected. mpv reads VTT natively.
-    ipcMain.handle('mpv:add-subtitle', async (_event, payload: { content?: string; title?: string; lang?: string }) => {
+    // External subtitle: um CAMINHO do disco (o mpv abre .srt/.ass/.vtt
+    // nativamente e ainda resolve o codepage sozinho) ou o TEXTO já em VTT
+    // (busca do OpenSubtitles), que vai pra um temporário.
+    ipcMain.handle('mpv:add-subtitle', async (_event, payload: { content?: string; title?: string; lang?: string; path?: string }) => {
         try {
+            if (typeof payload?.path === 'string' && payload.path) {
+                if (!pareceLegendaNoDisco(payload.path) || !existsSync(payload.path)) {
+                    return { success: false, error: 'invalid subtitle path' }
+                }
+                const tituloDoArquivo = typeof payload.title === 'string' && payload.title ? payload.title : 'NeoStream'
+                const idiomaDoArquivo = typeof payload.lang === 'string' && payload.lang ? payload.lang : 'und'
+                const ok = sendCommand(['sub-add', payload.path, 'select', tituloDoArquivo, idiomaDoArquivo])
+                log.info('[MPV] sub-add (disco)', payload.path, '->', ok)
+                return { success: ok }
+            }
             if (typeof payload?.content !== 'string' || payload.content.length === 0) {
                 return { success: false, error: 'empty subtitle content' }
             }

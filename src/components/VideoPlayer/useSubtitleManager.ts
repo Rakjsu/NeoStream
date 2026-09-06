@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { autoFetchSubtitle, autoFetchForcedSubtitle, cleanupSubtitleUrl } from '../../services/subtitleService';
+import { autoFetchSubtitle, autoFetchForcedSubtitle, cleanupSubtitleUrl, diskSubtitleToVtt, openSubtitleFileFromDisk } from '../../services/subtitleService';
 import { useLanguage } from '../../services/languageService';
 
 export interface UseSubtitleManagerParams {
@@ -28,6 +28,9 @@ export function useSubtitleManager({
     const [vttContent, setVttContent] = useState<string | null>(null);
     const [subtitleWarning, setSubtitleWarning] = useState<string | null>(null);
     const [isForcedSubtitle, setIsForcedSubtitle] = useState(false); // Track if current subtitle is Forced type
+    // Nome do arquivo aberto do disco — separado do `subtitleLanguage`, que o
+    // menu e o tooltip do CC leem como CÓDIGO de idioma ('pt-BR', 'en').
+    const [diskSubtitleName, setDiskSubtitleName] = useState<string | null>(null);
     // Initialize session toggle from global config (enabled = setting is ON)
     const [forcedEnabledForSession, setForcedEnabledForSession] = useState(() => {
         try {
@@ -243,9 +246,38 @@ export function useSubtitleManager({
     };
 
     // Turn subtitles fully off (settings menu "Desligada").
+    /**
+     * Legenda de um arquivo do computador.
+     *
+     * Guarda o resultado num blob em `subtitleUrl`, como os outros caminhos
+     * fazem, por um motivo concreto: com `subtitleUrl` vazio, o próximo clique
+     * no CC cai em `if (!subtitleUrl && title)` e BAIXA uma legenda do
+     * OpenSubtitles por cima da que o usuário acabou de escolher.
+     */
+    const handleOpenSubtitleFile = async () => {
+        try {
+            const arquivo = await openSubtitleFileFromDisk();
+            if (!arquivo?.content) return; // cancelou o diálogo
+            const vtt = diskSubtitleToVtt(arquivo.content);
+            if (subtitleUrl) cleanupSubtitleUrl(subtitleUrl);
+            const blobUrl = URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }));
+            setSubtitleUrl(blobUrl);
+            setVttContent(vtt);
+            setSubtitleLanguage(null);
+            setDiskSubtitleName(arquivo.name);
+            setIsForcedSubtitle(false);
+            setSubtitlesEnabled(true);
+        } catch (error) {
+            console.error('Failed to open subtitle from disk:', error);
+            setSubtitleWarning(t('player', 'subtitleFileError'));
+            setTimeout(() => setSubtitleWarning(null), 4000);
+        }
+    };
+
     const handleSubtitlesOff = () => {
         setSubtitlesEnabled(false);
         setIsForcedSubtitle(false);
+        setDiskSubtitleName(null);
         if (subtitleUrl) {
             cleanupSubtitleUrl(subtitleUrl);
             setSubtitleUrl(null);
@@ -320,6 +352,8 @@ export function useSubtitleManager({
         handleSubtitleToggle,
         handleSubtitleLanguageSelect,
         handleSubtitlesOff,
+        handleOpenSubtitleFile,
+        diskSubtitleName,
         handleForcedSessionToggle
     };
 }

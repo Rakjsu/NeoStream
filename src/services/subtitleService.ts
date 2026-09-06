@@ -238,6 +238,45 @@ export function srtToVtt(srtContent: string): string {
     return vtt;
 }
 
+/** Extensões que a tela do player interno aceita (ele só desenha VTT). */
+export const DISK_SUBTITLE_EXTENSIONS = ['srt', 'vtt'] as const;
+
+/**
+ * Normaliza a legenda vinda do disco: VTT passa reto, SRT é convertido.
+ *
+ * O `trim()` também come o BOM que o Bloco de Notas escreve — sem ele o
+ * `startsWith('WEBVTT')` erra e o arquivo é tratado como SRT, virando lixo.
+ */
+export function diskSubtitleToVtt(content: string): string {
+    const limpo = content.replace(/^\uFEFF/, '').trim();
+    return limpo.startsWith('WEBVTT') ? limpo : srtToVtt(limpo);
+}
+
+/**
+ * Abre o diálogo do sistema e devolve a legenda escolhida (null = desistiu).
+ *
+ * `withContent` fica a cargo de quem chama: o player interno precisa do texto
+ * (desenha a legenda ele mesmo), o mpv só do caminho — e ler e decodificar
+ * megabytes que ninguém vai usar não é de graça.
+ *
+ * `extensions` vazio = todas as que o main aceita (é o que o mpv quer: ele
+ * desenha .ass com estilo).
+ */
+export async function openSubtitleFileFromDisk(
+    extensions: string[] = [...DISK_SUBTITLE_EXTENSIONS],
+    withContent = true
+): Promise<{ name: string; path: string; content?: string } | null> {
+    if (typeof window === 'undefined' || !window.ipcRenderer) return null;
+    try {
+        const result = await window.ipcRenderer.invoke('subtitle:open-file', { extensions, withContent }) as
+            { success?: boolean; name?: string; path?: string; content?: string };
+        if (!result?.success || !result.path || !result.name) return null;
+        return { name: result.name, path: result.path, content: result.content };
+    } catch {
+        return null;
+    }
+}
+
 /**
  * Fetch subtitle content and convert to VTT
  */

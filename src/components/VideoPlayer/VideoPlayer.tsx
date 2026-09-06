@@ -541,6 +541,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         handleSubtitleToggle,
         handleSubtitleLanguageSelect,
         handleSubtitlesOff,
+        handleOpenSubtitleFile,
+        diskSubtitleName,
         handleForcedSessionToggle
     } = useSubtitleManager({ title, tmdbId, imdbId, seasonNumber, episodeNumber, videoRef });
 
@@ -1733,6 +1735,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             subtitleLanguage={subtitleLanguage}
                             onSelectSubtitleLanguage={handleSubtitleLanguageSelect}
                             onDisableSubtitles={handleSubtitlesOff}
+                            onOpenSubtitleFile={hasWindowControls ? handleOpenSubtitleFile : undefined}
+                            diskSubtitleName={diskSubtitleName}
                             audioTracks={audioTracks}
                             onSelectAudioTrack={handleSelectAudioTrack}
                             aspectMode={aspectMode}
