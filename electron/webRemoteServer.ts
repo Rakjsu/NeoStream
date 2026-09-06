@@ -66,6 +66,7 @@ import {
 import { renderRemotePage, type RemoteAccent } from './webRemotePage'
 import {
     buildSetupDeepLink,
+    ehChaveTmdbPlausivel,
     renderSetupHandoffPage,
     isHandoffArmed,
     matchesHandoffToken,
@@ -809,6 +810,12 @@ let remoteLang = (store.get('webRemoteLang') as string | undefined) || 'pt'
 // the language above); persisted so the first load after a restart matches.
 let remoteAccent = (store.get('webRemoteAccent') as RemoteAccent | undefined) || null
 
+// Chave da TMDB espelhada do renderer, pro /setup levá-la ao celular.
+// NÃO é persistida, ao contrário do idioma e do acento logo acima: é
+// credencial do usuário, e a fonte da verdade continua sendo o localStorage
+// do renderer. Some quando o app fecha, e o renderer reenvia no próximo boot.
+let tmdbKeyEspelhada: string | null = null
+
 export function setupWebRemote(): void {
     ipcMain.on('app:language', (_e, raw: unknown) => {
         const code = String(raw ?? '').slice(0, 2)
@@ -816,6 +823,12 @@ export function setupWebRemote(): void {
             remoteLang = code
             store.set('webRemoteLang', code)
         }
+    })
+
+    ipcMain.on('app:tmdb-key', (_e, raw: unknown) => {
+        // Sem log do valor: o comentário do xtreamClient já estabelece a regra
+        // da casa — campo de credencial não vai pro main.log.
+        tmdbKeyEspelhada = ehChaveTmdbPlausivel(raw) ? raw : null
     })
 
     ipcMain.on('app:accent', (_e, raw: unknown) => {
@@ -1482,7 +1495,7 @@ function start(): Promise<void> {
             }
             setupHandoff = null // uso único: um handoff, uma exportação
             log.info(`[WebRemote] contas exportadas pelo /setup para ${ip}`)
-            const link = buildSetupDeepLink(exportPlaylistsForSetup(), getActivePlaylistIdPublic())
+            const link = buildSetupDeepLink(exportPlaylistsForSetup(), getActivePlaylistIdPublic(), tmdbKeyEspelhada)
             res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
             res.end(renderSetupHandoffPage(link, remoteLang))
             return

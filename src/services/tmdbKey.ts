@@ -32,6 +32,25 @@ export function setTmdbApiKey(key: string): void {
         if (trimmed) localStorage.setItem(STORAGE_KEY, trimmed);
         else localStorage.removeItem(STORAGE_KEY);
     } catch { /* storage indisponível */ }
+    espelharNoMain();
+}
+
+/**
+ * Espelha a chave no processo main, que é quem serve o /setup — a página que
+ * leva as contas pro celular. O app do celular já sabia aplicar a chave; o
+ * desktop é que nunca a mandava.
+ *
+ * Mesmo padrão do `app:accent` e do `app:language`: o renderer é dono do
+ * valor, o main guarda uma cópia em memória enquanto vive.
+ */
+export function espelharChaveTmdbNoMain(): void {
+    espelharNoMain();
+}
+
+function espelharNoMain(): void {
+    try {
+        window.ipcRenderer?.send('app:tmdb-key', getTmdbApiKey());
+    } catch { /* jsdom/testes sem preload */ }
 }
 
 export function hasTmdbApiKey(): boolean {
