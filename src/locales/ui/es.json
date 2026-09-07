@@ -917,7 +917,10 @@
     "movies": "Películas",
     "series": "Series",
     "exploreMovies": "Explorar Películas",
-    "exploreSeries": "Explorar Series"
+    "exploreSeries": "Explorar Series",
+    "copyFromOther": "Tienes favoritos en otra lista:",
+    "copyDone": "✓ {n} favorito(s) copiado(s) — {semPar} no están en este proveedor",
+    "copyAlreadyHere": "({n} ya estaban aquí.)"
   },
   "downloads": {
     "activeRecs": "Grabando ahora",
