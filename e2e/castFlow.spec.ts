@@ -5,10 +5,18 @@ import { launchApp, seedProfiles, startMockServer, type LaunchedApp } from './he
 /**
  * The phone-driven cast flow added in #180: `requestDevices` asks the app to
  * discover cast targets (Chromecast + DLNA + AirPlay) and pushes them back as a
- * `devices` message; casting a movie reports back a `castResult`. There are no
- * real cast devices in CI, so discovery returns an empty list and a cast reports
- * `no-device` — either way the full loop (server → media:control → bridge →
- * server → client) is exercised over a real WebSocket.
+ * `devices` message; casting a movie reports back a `castResult`. What this
+ * test proves is the full loop (server → media:control → bridge → server →
+ * client) over a real WebSocket.
+ *
+ * O QUE ELE NÃO PODE EXIGIR é o resultado do cast. A descoberta é SSDP/mDNS na
+ * rede de quem roda: no CI não há alvo nenhum e a resposta é `no-device`, mas
+ * numa casa com uma TV ligada o app acha o aparelho e responde `ok`. O teste
+ * cobrava `no-device` e por isso ficava vermelho fora do CI — e só quando a TV
+ * estava ligada, que é o pior tipo de teste instável.
+ *
+ * Efeito colateral que vale saber antes de rodar a suíte em casa: quando existe
+ * um alvo de verdade, esta linha MANDA um filme (do servidor mock) pra ele.
  */
 
 const GREETING = /Bom dia|Boa tarde|Boa noite/;
@@ -118,6 +126,9 @@ test('controle web: pede dispositivos e transmite, recebendo o resultado', async
     expect(Array.isArray(devices.items)).toBe(true);
     // The mock seeds VOD, so the catalog is non-empty and gives a movie to cast.
     expect(catalog.items.length).toBeGreaterThan(0);
-    // No Chromecast on the CI LAN → the cast reports 'no-device' (loop proven).
-    expect(castResult.status).toBe('no-device');
+    // Qualquer um dos três status prova o laço: a resposta voltou pelo mesmo
+    // caminho e já passou pela normalização do servidor
+    // (webRemoteServer.ts, 'web-remote:cast-result'), que só deixa passar
+    // estes três. Qual deles sai depende de haver aparelho na rede.
+    expect(['ok', 'no-device', 'error']).toContain(castResult.status);
 });
