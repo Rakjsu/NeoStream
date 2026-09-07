@@ -23,6 +23,7 @@ import {
     timeshiftContentType,
 } from './timeshiftBuffer'
 import { resolveFfmpegPath } from './ffmpegPath'
+import { getErrorMessage } from './errorMessage'
 
 interface TimeshiftSession {
     proc: ChildProcess
@@ -146,7 +147,7 @@ export function setupTimeshiftHandlers(): void {
             return { success: true, url: `http://127.0.0.1:${port}/${token}/buffer.m3u8` }
         } catch (error: unknown) {
             stopSession()
-            const message = error instanceof Error ? error.message : String(error)
+            const message = getErrorMessage(error)
             log.error('[Timeshift] start falhou:', message)
             return { success: false, error: message }
         }

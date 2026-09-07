@@ -11,6 +11,7 @@ import log from './logger'
 import { CastSession, type CastMediaInput, type CastMediaMeta } from './castClient'
 import { routeCastCommand } from './castRemoteRouting'
 import { registerCastSubtitleVtt, isLoopbackUrl, createLanProxyUrlFor } from './dlnaHandlers'
+import { getErrorMessage } from './errorMessage'
 
 interface CastDevice {
     id: string
@@ -161,7 +162,7 @@ export function setupCastHandlers(): void {
             return { success: true }
         } catch (error) {
             log.error('[Cast] play failed:', error)
-            return { success: false, error: error instanceof Error ? error.message : String(error) }
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -204,7 +205,7 @@ export function setupCastHandlers(): void {
             return { success: true, count: items.length }
         } catch (error) {
             log.error('[Cast] play-queue failed:', error)
-            return { success: false, error: error instanceof Error ? error.message : String(error) }
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -228,8 +229,11 @@ export function setupCastHandlers(): void {
             activeSession = session
             return { success: true, active: true, deviceId: device.id, deviceName: device.name, ...session.status }
         } catch (error) {
+            // NAO e o getErrorMessage: aqui o fallback e o proprio `error`, e o
+            // logger imprime o objeto inteiro. Trocar por String(error) daria
+            // "[object Object]" no log — menos informacao, nao mais.
             log.info('[Cast] nada pra retomar em', device.name, '-', error instanceof Error ? error.message : error)
-            return { success: false, error: error instanceof Error ? error.message : String(error) }
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
