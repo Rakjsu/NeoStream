@@ -3,6 +3,7 @@ import { type TMDBSeriesDetails } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
 import { favoritesService } from '../services/favoritesService';
 import { watchProgressService } from '../services/watchProgressService';
+import { useLanguage } from '../services/languageService';
 
 export interface SeriesEpisode {
     id: number | string;
@@ -56,6 +57,11 @@ export function SeriesDetailPanel({
     onClose,
     onRefresh
 }: SeriesDetailPanelProps) {
+    // Só o botão de Ver depois passa pelo i18n aqui: o resto do painel ainda
+    // está em português cravado (item 7, ainda aberto). O que este PR conserta é
+    // o NOME da lista, que neste botão era um quinto nome — "Minha Lista", o
+    // nome da página inteira, num botão que enche uma aba só.
+    const { t } = useLanguage();
     const seasonTabsRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
     const [dragStartX, setDragStartX] = useState(0);
@@ -254,7 +260,7 @@ export function SeriesDetailPanel({
                         <span className="btn-icon">
                             {watchLaterService.has(String(series.series_id), 'series') ? '✓' : '+'}
                         </span>
-                        <span>{watchLaterService.has(String(series.series_id), 'series') ? 'Salvo' : 'Minha Lista'}</span>
+                        <span>{watchLaterService.has(String(series.series_id), 'series') ? t('contentModal', 'saved') : t('contentModal', 'watchLater')}</span>
                     </button>
 
                     <button

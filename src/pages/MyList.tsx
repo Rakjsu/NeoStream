@@ -1,13 +1,12 @@
 // 📚 Item 27 + 🎞️ Item 30: "Minha lista" — Favoritos, Ver depois e a Fila
 // manual de reprodução numa página única com abas.
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Favorites } from './Favorites';
 import { WatchLater } from './WatchLater';
 import { queueService, type QueuedItem } from '../services/queueService';
 import { useLanguage } from '../services/languageService';
-
-const TAB_KEY = 'neostream_mylist_tab';
-type Tab = 'favorites' | 'watchLater' | 'queue';
+import { resolveMyListTab, MY_LIST_TAB_KEY, type MyListTab } from './myListTab';
 
 function QueuePanel() {
     const { t } = useLanguage();
@@ -53,13 +52,15 @@ function QueuePanel() {
 
 export function MyList() {
     const { t } = useLanguage();
-    const [tab, setTab] = useState<Tab>(() => {
-        const saved = localStorage.getItem(TAB_KEY);
-        return saved === 'watchLater' || saved === 'queue' ? saved : 'favorites';
-    });
+    // Deep-link: /dashboard/my-list?tab=watchLater — usado pelos atalhos da Home
+    // e pelas rotas legadas watch-later/favorites (App.tsx). A regra de quem
+    // vence mora em myListTab.ts, com teste.
+    const [searchParams] = useSearchParams();
+    const [tab, setTab] = useState<MyListTab>(() =>
+        resolveMyListTab(searchParams.get('tab'), localStorage.getItem(MY_LIST_TAB_KEY)));
 
-    const choose = (next: Tab) => {
-        localStorage.setItem(TAB_KEY, next);
+    const choose = (next: MyListTab) => {
+        localStorage.setItem(MY_LIST_TAB_KEY, next);
         setTab(next);
     };
 

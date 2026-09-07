@@ -1878,7 +1878,7 @@ export function Home() {
                             <div style={{ fontSize: '24px', marginBottom: '6px' }}>📺</div>
                             <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>{t('home', 'seriesCount')}</div>
                         </a>
-                        <a href="#/dashboard/watch-later" style={{
+                        <a href="#/dashboard/my-list?tab=watchLater" style={{
                             background: 'rgba(255, 255, 255, 0.05)',
                             borderRadius: '10px',
                             padding: '16px',
@@ -1893,7 +1893,7 @@ export function Home() {
                             <div style={{ fontSize: '24px', marginBottom: '6px' }}>🔖</div>
                             <div style={{ color: 'white', fontSize: '12px', fontWeight: '500' }}>{t('home', 'myList')}</div>
                         </a>
-                        <a href="#/dashboard/favorites" style={{
+                        <a href="#/dashboard/my-list?tab=favorites" style={{
                             background: 'rgba(255, 255, 255, 0.05)',
                             borderRadius: '10px',
                             padding: '16px',
