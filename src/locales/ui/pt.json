@@ -316,7 +316,8 @@
     "languageDesc": "Idioma da interface",
     "lastCheck": "Última verificação",
     "checkNow": "Verificar Atualizações Agora",
-    "checking": "Verificando..."
+    "checking": "Verificando...",
+    "newVersionTitle": "Nova Atualização Disponível!"
   },
   "backup": {
     "cloudUse": "Salvar na nuvem",
@@ -826,7 +827,8 @@
     "updateInstalled": "Atualização Instalada!",
     "whatsNew": "Novidades na",
     "gotIt": "Entendi, vamos lá!",
-    "fallback": "Esta versão chegou cheia de melhorias e correções — as notas completas estão na página de releases do NeoStream no GitHub."
+    "fallback": "Esta versão chegou cheia de melhorias e correções — as notas completas estão na página de releases do NeoStream no GitHub.",
+    "title": "Novidades desta versão"
   },
   "wrapped": {
     "open": "Retrospectiva",
@@ -848,7 +850,8 @@
     "close": "Fechar",
     "prev": "Anterior",
     "next": "Próximo",
-    "done": "Concluir"
+    "done": "Concluir",
+    "title": "Retrospectiva NeoStream"
   },
   "network": {
     "devicesDisconnect": "Desconectar",

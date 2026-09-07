@@ -294,7 +294,8 @@
     "updateInstalled": "¡Actualización Instalada!",
     "whatsNew": "Novedades en",
     "gotIt": "¡Entendido, vamos!",
-    "fallback": "Esta versión trae mejoras y correcciones — las notas completas están en la página de releases de NeoStream en GitHub."
+    "fallback": "Esta versión trae mejoras y correcciones — las notas completas están en la página de releases de NeoStream en GitHub.",
+    "title": "Novedades de esta versión"
   },
   "wrapped": {
     "open": "Retrospectiva",
@@ -316,7 +317,8 @@
     "close": "Cerrar",
     "prev": "Anterior",
     "next": "Siguiente",
-    "done": "Concluir"
+    "done": "Concluir",
+    "title": "Retrospectiva NeoStream"
   },
   "network": {
     "devicesDisconnect": "Desconectar",
@@ -411,7 +413,8 @@
     "languageDesc": "Idioma de la interfaz",
     "lastCheck": "Última verificación",
     "checkNow": "Verificar Actualizaciones Ahora",
-    "checking": "Verificando..."
+    "checking": "Verificando...",
+    "newVersionTitle": "¡Nueva Actualización Disponible!"
   },
   "playback": {
     "reminderAutoTune": "El recordatorio sintoniza solo",

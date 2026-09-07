@@ -328,7 +328,8 @@
     "updateInstalled": "Update Installed!",
     "whatsNew": "What's New in",
     "gotIt": "Got it, let's go!",
-    "fallback": "This version ships improvements and fixes — full notes live on the NeoStream releases page on GitHub."
+    "fallback": "This version ships improvements and fixes — full notes live on the NeoStream releases page on GitHub.",
+    "title": "What's new in this version"
   },
   "wrapped": {
     "open": "Wrapped",
@@ -350,7 +351,8 @@
     "close": "Close",
     "prev": "Previous",
     "next": "Next",
-    "done": "Done"
+    "done": "Done",
+    "title": "NeoStream Wrapped"
   },
   "network": {
     "devicesDisconnect": "Disconnect",
@@ -411,7 +413,8 @@
     "languageDesc": "Interface language",
     "lastCheck": "Last check",
     "checkNow": "Check for Updates Now",
-    "checking": "Checking..."
+    "checking": "Checking...",
+    "newVersionTitle": "New Update Available!"
   },
   "playback": {
     "reminderAutoTune": "Reminder auto-tunes",

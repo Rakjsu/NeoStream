@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify';
 import { updateService } from '../services/updateService';
 import type { UpdateInfo, DownloadProgress } from '../types/update';
 import { useDialogA11y } from '../hooks/useDialogA11y';
+import { useLanguage } from '../services/languageService';
 
 interface UpdateModalProps {
     isOpen: boolean;
@@ -11,7 +12,8 @@ interface UpdateModalProps {
 }
 
 export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
-    const { containerRef, dialogProps } = useDialogA11y({ aberto: isOpen, aoFechar: onClose });
+    const { t } = useLanguage();
+    const { containerRef, dialogProps } = useDialogA11y({ aberto: isOpen, aoFechar: onClose, rotulo: t('updates', 'newVersionTitle') });
     const [downloading, setDownloading] = useState(false);
     const [progress, setProgress] = useState<DownloadProgress | null>(null);
     const [downloaded, setDownloaded] = useState(false);
@@ -126,7 +128,7 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
                         gap: '12px'
                     }}>
                         <span>🎉</span>
-                        Nova Atualização Disponível!
+                        {t('updates', 'newVersionTitle')}
                     </h2>
                     <p style={{ color: '#94a3b8', fontSize: '14px' }}>
                         Uma nova versão do NeoStream IPTV está pronta para instalação

@@ -11,8 +11,11 @@ interface CreateProfileModalProps {
 const DEFAULT_EMOJIS = ['👤', '👨', '👩', '🧑', '👦', '👧', '🧒', '👨‍💼', '👩‍💼', '🧑‍🎓', '👨‍🎓', '👩‍🎓', '🧑‍💻', '👨‍💻', '👩‍💻', '🦸', '🦸‍♂️', '🦸‍♀️'];
 
 export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileModalProps) {
+    // `t` antes do diálogo: o rótulo dele é o nome acessível, lido no mesmo
+    // render em que o hook monta.
+    const { t } = useLanguage();
     // Dialogo de verdade. Este modal so existe quando esta na tela.
-    const { containerRef, dialogProps } = useDialogA11y({ aberto: true, aoFechar: onClose });
+    const { containerRef, dialogProps } = useDialogA11y({ aberto: true, aoFechar: onClose, rotulo: t('profile', 'createNewProfile') });
     const [name, setName] = useState('');
     const [selectedEmoji, setSelectedEmoji] = useState('👤');
     const [avatarImage, setAvatarImage] = useState<string | null>(null);
@@ -22,7 +25,6 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
     const [confirmPin, setConfirmPin] = useState('');
     const [error, setError] = useState('');
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const { t } = useLanguage();
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
