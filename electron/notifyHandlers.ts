@@ -1,6 +1,7 @@
 import { ipcMain, Notification } from 'electron'
 import type { BrowserWindow } from 'electron'
 import log from './logger'
+import { getErrorMessage } from './errorMessage'
 
 /**
  * Native notification bridge for the renderer (program reminders, etc.).
@@ -33,7 +34,7 @@ export function setupNotifyHandlers(getMainWindow: () => BrowserWindow | null) {
             notification.show()
             return { success: true }
         } catch (error: unknown) {
-            const message = error instanceof Error ? error.message : String(error)
+            const message = getErrorMessage(error)
             log.error('[Notify] Failed to show notification:', message)
             return { success: false, error: message }
         }

@@ -11,6 +11,7 @@ import axios from 'axios'
 import log from './logger'
 import { requestWithRetry } from './fetchRetry'
 import { resolveProviderHttpsAgent } from './certificatePolicy'
+import { getErrorMessage } from './errorMessage'
 import {
     STALKER_USER_AGENT,
     buildStalkerCookie,
@@ -162,7 +163,7 @@ export class StalkerClient {
             )
             if (resolved) return resolved
         } catch (error) {
-            log.warn('[Stalker] create_link falhou, usando cmd direto:', error instanceof Error ? error.message : String(error))
+            log.warn('[Stalker] create_link falhou, usando cmd direto:', getErrorMessage(error))
         }
         const direct = extractStreamUrl(cmd)
         if (!direct) throw new Error('Conteúdo sem URL reproduzível')
@@ -276,5 +277,5 @@ export async function resolvePortal(rawUrl: string, mac: string): Promise<{ load
             lastError = error
         }
     }
-    throw new Error(`Nenhum endpoint do portal respondeu ao handshake (${lastError instanceof Error ? lastError.message : String(lastError)})`)
+    throw new Error(`Nenhum endpoint do portal respondeu ao handshake (${getErrorMessage(lastError)})`)
 }

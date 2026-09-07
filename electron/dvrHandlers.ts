@@ -6,6 +6,7 @@ import fs from 'fs'
 import log from './logger'
 import { recordingFilename, buildRecordingArgs, parseFfmpegTime, buildMp4RemuxArgs, buildThumbnailArgs, mp4PathFor } from './dvrProtocol'
 import { resolveFfmpegPath } from './ffmpegPath'
+import { getErrorMessage } from './errorMessage'
 
 interface ActiveRecording {
     id: string
@@ -43,7 +44,7 @@ export function setupDvrHandlers() {
             const stats = await fs.promises.statfs(dir)
             return { success: true, freeBytes: stats.bavail * stats.bsize }
         } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : String(error) }
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -76,7 +77,7 @@ export function setupDvrHandlers() {
             log.info(`[DVR] Clip exported: ${file}`)
             return { success: true, file }
         } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : String(error) }
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -150,7 +151,7 @@ export function setupDvrHandlers() {
             await fs.promises.rename(current, target)
             return { success: true, path: target }
         } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : String(error) }
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -188,7 +189,7 @@ export function setupDvrHandlers() {
             log.info(`[DVR] Remux concluído: ${target}`)
             return { success: true, path: target }
         } catch (err) {
-            return { success: false, error: err instanceof Error ? err.message : String(err) }
+            return { success: false, error: getErrorMessage(err) }
         }
     })
 

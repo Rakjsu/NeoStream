@@ -16,6 +16,7 @@ import { createWriteStream } from 'node:fs'
 import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
+import { getErrorMessage } from './errorMessage'
 import {
     MPV_RELEASE_API_URL,
     buildExtractArgs,
@@ -86,7 +87,7 @@ async function fetchLatestRelease(fetchImpl: typeof fetch, signal?: AbortSignal)
         })
     } catch (error) {
         throwIfAborted(signal)
-        throw new InstallError('network', `release lookup failed: ${error instanceof Error ? error.message : String(error)}`)
+        throw new InstallError('network', `release lookup failed: ${getErrorMessage(error)}`)
     }
     if (!response.ok) {
         throw new InstallError('network', `release lookup failed: HTTP ${response.status}`)
@@ -114,7 +115,7 @@ async function downloadToFile(
         })
     } catch (error) {
         throwIfAborted(signal)
-        throw new InstallError('network', `download failed: ${error instanceof Error ? error.message : String(error)}`)
+        throw new InstallError('network', `download failed: ${getErrorMessage(error)}`)
     }
     if (!response.ok || !response.body) {
         throw new InstallError('download-failed', `download failed: HTTP ${response.status}`)
@@ -157,7 +158,7 @@ async function downloadToFile(
         try { reader.cancel() } catch { /* stream already done */ }
         throwIfAborted(signal)
         if (error instanceof InstallError) throw error
-        throw new InstallError('network', `download interrupted: ${error instanceof Error ? error.message : String(error)}`)
+        throw new InstallError('network', `download interrupted: ${getErrorMessage(error)}`)
     }
 }
 
@@ -189,7 +190,7 @@ function extractArchive(archivePath: string, destDir: string, signal?: AbortSign
         try {
             child = spawn(tarExecutable(), buildExtractArgs(archivePath, destDir), { windowsHide: true, stdio: 'ignore' })
         } catch (error) {
-            done(new InstallError('extract-failed', `tar spawn failed: ${error instanceof Error ? error.message : String(error)}`))
+            done(new InstallError('extract-failed', `tar spawn failed: ${getErrorMessage(error)}`))
             return
         }
 
@@ -261,7 +262,7 @@ export async function installMpv(options: MpvInstallOptions): Promise<MpvInstall
         try {
             await mkdir(installDir, { recursive: true })
         } catch (error) {
-            throw new InstallError('disk', `cannot create install dir: ${error instanceof Error ? error.message : String(error)}`)
+            throw new InstallError('disk', `cannot create install dir: ${getErrorMessage(error)}`)
         }
 
         const release = await fetchLatestRelease(fetchImpl, signal)
@@ -296,7 +297,7 @@ export async function installMpv(options: MpvInstallOptions): Promise<MpvInstall
             await rm(binDir, { recursive: true, force: true })
             await rename(tmpDir, binDir)
         } catch (error) {
-            throw new InstallError('disk', `cannot move install into place: ${error instanceof Error ? error.message : String(error)}`)
+            throw new InstallError('disk', `cannot move install into place: ${getErrorMessage(error)}`)
         }
 
         const exePath = path.join(binDir, path.relative(tmpDir, extractedExe))
@@ -307,7 +308,7 @@ export async function installMpv(options: MpvInstallOptions): Promise<MpvInstall
         }
     } catch (error) {
         const reason = error instanceof InstallError ? error.reason : 'download-failed'
-        const message = error instanceof Error ? error.message : String(error)
+        const message = getErrorMessage(error)
         await rm(tmpDir, { recursive: true, force: true }).catch(() => undefined)
         return { success: false, reason, message }
     } finally {

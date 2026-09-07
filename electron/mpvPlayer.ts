@@ -37,6 +37,7 @@ import store from './store'
 import log from './logger'
 import { installMpv } from './mpvDownloader'
 import { mpvDownloadSupported } from './mpvDownloaderProtocol'
+import { getErrorMessage } from './errorMessage'
 import {
     applyIpcMessage,
     buildMpvArgs,
@@ -146,7 +147,7 @@ function sendIpcLine(line: string): boolean {
         session.socket.write(line)
         return true
     } catch (error) {
-        log.warn(`[MPV] pipe write failed: ${error instanceof Error ? error.message : String(error)}`)
+        log.warn(`[MPV] pipe write failed: ${getErrorMessage(error)}`)
         return false
     }
 }
@@ -383,7 +384,7 @@ export async function launchMpv(
         log.info(`[MPV] launched ${mpvPath} (pipe ${pipeName})`)
         return { success: true }
     } catch (error) {
-        log.error(`[MPV] launch failed: ${error instanceof Error ? error.message : String(error)}`)
+        log.error(`[MPV] launch failed: ${getErrorMessage(error)}`)
         session = null
         return { success: false, reason: 'spawn-failed' }
     }
