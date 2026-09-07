@@ -266,7 +266,7 @@
     "empty": "No saved playlists",
     "add": "Add playlist",
     "addTitle": "New playlist",
-    "m3uHint": "Paste an M3U/M3U8 list URL — channels land in Live TV with groups as categories (phase 1: channels only)",
+    "m3uHint": "Paste the URL of an M3U/M3U8 playlist — or open an .m3u file from this computer. The channels show up in Live TV with the groups as categories (phase 1: channels only)",
     "stalkerHint": "Enter the portal URL (e.g. http://portal.tv/c/) and your account MAC (00:1A:79:...)",
     "toPhone": "Take to your phone",
     "toPhoneHint": "Scan with your phone camera: the page opens NeoStream Mobile and imports your accounts (replaces the app's).",
@@ -287,7 +287,8 @@
     "removeError": "Could not remove the playlist.",
     "rename": "Rename",
     "renameFailed": "Could not rename",
-    "defaultName": "My playlist"
+    "defaultName": "My playlist",
+    "m3uFromFile": "Open file…"
   },
   "notifications": {
     "autoTuneIn": "Switching to {channel} in {s}s…",
