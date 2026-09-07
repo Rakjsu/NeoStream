@@ -64,10 +64,11 @@ describe('espelho do idioma no main', () => {
 describe('t() cai na seção common', () => {
     it('a chave da própria seção continua ganhando', () => {
         languageService.setLanguage('pt');
-        // `downloads.resume` vale "Retomar"; `common.resume` vale "Continuar".
-        // Se a ordem invertesse, a fila de downloads mudaria de palavra.
-        expect(languageService.t('downloads', 'resume')).toBe('Retomar');
-        expect(languageService.t('common', 'resume')).toBe('Continuar');
+        // `guide.loading` vale "Carregando guia..."; `common.loading` vale
+        // "Carregando...". Se a ordem invertesse, o guia perderia a palavra
+        // específica dele.
+        expect(languageService.t('guide', 'loading')).toBe('Carregando guia...');
+        expect(languageService.t('common', 'loading')).toBe('Carregando...');
     });
 
     it('chave que só existe em common resolve a partir de qualquer seção', () => {
