@@ -7,6 +7,8 @@
 import { profileService } from './profileService';
 import { appNotificationService } from './episodeNotificationService';
 import { computeDelay } from './reminderService';
+import { espacoParaGravacao } from './dvrSweep';
+import { languageService } from './languageService';
 
 export interface ScheduledRecording {
     /** Deterministic id derived from channel + program start (see scheduleId). */
@@ -302,6 +304,25 @@ class ScheduledRecordingService {
         }
 
         try {
+            // 💾 Pré-voo de espaço. Só o REC manual perguntava — o agendado, que
+            // é o caminho que grava sozinho de madrugada, ia direto pro
+            // `dvr:start`. E disco cheio no meio não falha em silêncio: falha
+            // MENTINDO, porque o `dvr:stopped` sai sem campo `error` e os
+            // consumidores anunciam "Gravação concluída" pra um arquivo
+            // truncado.
+            const espaco = await this.conferirEspaco(rec);
+            if (espaco && !espaco.cabe) {
+                appNotificationService.addNotification({
+                    type: 'dvr_recording',
+                    title: languageService.t('notifications', 'dvrNoSpaceTitle'),
+                    message: `${rec.title} — ${languageService.t('notifications', 'dvrNoSpaceBody')} (${(espaco.faltamBytes / 1e9).toFixed(1)} GB)`
+                });
+                // Sem re-tentar: o disco não se esvazia sozinho às 3h da manhã,
+                // e insistir a cada 30s só enche a fila de notificação.
+                this.startTimers.delete(rec.id);
+                return;
+            }
+
             const urlResult = await window.ipcRenderer.invoke('streams:get-live-url', { streamId: rec.streamId });
             if (!urlResult?.success || !urlResult.url) throw new Error(urlResult?.error || 'sem URL');
 
@@ -360,6 +381,20 @@ class ScheduledRecordingService {
     }
 
     /** Agenda o encerramento no fim do programa (+ padding). Idempotente. */
+    /**
+     * Espaço livre contra o tamanho estimado da gravação. `null` quando não dá
+     * pra saber (main sem o canal, janela inválida) — e aí grava, porque
+     * recusar no escuro perderia a gravação por um palpite.
+     */
+    private async conferirEspaco(rec: ScheduledRecording) {
+        const livre = await window.ipcRenderer.invoke('dvr:disk-free')
+            .catch(() => null) as { success?: boolean; freeBytes?: number } | null;
+        if (!livre?.success || typeof livre.freeBytes !== 'number') return null;
+        const janela = janelaGravacao(rec);
+        if (!janela) return null;
+        return espacoParaGravacao(livre.freeBytes, janela.fim - janela.ini);
+    }
+
     private armStop(rec: ScheduledRecording): void {
         const existing = this.stopTimers.get(rec.id);
         if (existing) clearTimeout(existing);

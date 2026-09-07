@@ -315,7 +315,9 @@
     "wrappedAnnual": "Wrapped",
     "programReminderStarting": "{title} is starting on {channel}",
     "dvrFinishedTitle": "Recording finished",
-    "dvrFinishedBody": "{name} — {duration}"
+    "dvrFinishedBody": "{name} — {duration}",
+    "dvrNoSpaceTitle": "💾 Not enough space to record",
+    "dvrNoSpaceBody": "the recording was cancelled; free up disk space"
   },
   "changelog": {
     "updateInstalled": "Update Installed!",
