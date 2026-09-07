@@ -64,12 +64,24 @@ export function hasKnownPlaylistId(): boolean {
 }
 
 /**
+ * Build a localStorage key scoped to a profile and a playlist NAMED BY THE
+ * CALLER. Só o transferidor de favoritos usa isto — todo o resto do app fala
+ * da playlist ativa e chama `playlistScopedKey`. Existe para que o formato da
+ * chave tenha um dono só: quem lê a playlist de OUTRO provedor precisa montar
+ * exatamente a mesma string, e uma segunda cópia do formato acabaria
+ * divergindo.
+ */
+export function playlistScopedKeyFor(base: string, profileId: string, playlistId: string): string {
+    return `${base}_${profileId}__pl_${playlistId}`;
+}
+
+/**
  * Build a localStorage key scoped to both a profile and the active playlist:
  *   `${base}_${profileId}__pl_${activePlaylistId}`
  * The existing `${base}_${profileId}` form is kept as the migration source.
  */
 export function playlistScopedKey(base: string, profileId: string): string {
-    return `${base}_${profileId}__pl_${getActivePlaylistId()}`;
+    return playlistScopedKeyFor(base, profileId, getActivePlaylistId());
 }
 
 export const activePlaylistService = {
@@ -77,4 +89,5 @@ export const activePlaylistService = {
     getActivePlaylistId,
     hasKnownPlaylistId,
     playlistScopedKey,
+    playlistScopedKeyFor,
 };

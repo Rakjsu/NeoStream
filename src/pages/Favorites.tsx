@@ -1,6 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { favoritesService, type FavoriteItem } from '../services/favoritesService';
+import { playlistService, type PlaylistSummary } from '../services/playlistService';
+import { casarFavoritos, indicePorTitulo, type AlvoDoCatalogo } from '../services/favoritesTransfer';
+import { asList } from '../utils/catalogPayload';
 import { ContentDetailModal } from '../components/ContentDetailModal';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { ResumeModal } from '../components/ResumeModal';
@@ -59,9 +62,85 @@ export function Favorites() {
         duration: number;
     } | null>(null);
 
+    // ❤️ Copiar de outra lista: quem troca de provedor abre esta tela e acha o
+    // vazio, com os favoritos antigos intactos e inalcançáveis atrás da lista
+    // velha (os ids de stream não atravessam provedores — ver
+    // activePlaylistService.ts). O casamento por título vive em
+    // favoritesTransfer.ts, com teste.
+    const [origens, setOrigens] = useState<{ playlist: PlaylistSummary; total: number }[]>([]);
+    const [copiandoDe, setCopiandoDe] = useState<string | null>(null);
+    const [resumoCopia, setResumoCopia] = useState<string | null>(null);
+
     const loadItems = useCallback(() => {
         setItems(loadCatalogFavorites());
     }, []);
+
+    // Só quando a tela está vazia: é o único momento em que a oferta faz
+    // sentido, e evita um IPC em toda visita à aba cheia.
+    const telaVazia = items.length === 0;
+    useEffect(() => {
+        // Só sai — não zera. A lista de origens fica obsoleta depois da cópia,
+        // mas ela só é RENDERIZADA na tela vazia, e zerar aqui seria um
+        // setState síncrono dentro do efeito (um render a mais, por nada).
+        if (!telaVazia) return;
+        let vivo = true;
+        void (async () => {
+            const playlists = await playlistService.list().catch(() => [] as PlaylistSummary[]);
+            if (!vivo) return;
+            setOrigens(
+                playlists
+                    .filter(pl => !pl.active)
+                    .map(pl => ({ playlist: pl, total: favoritesService.getAllFromPlaylist(pl.id).length }))
+                    .filter(o => o.total > 0)
+            );
+        })();
+        return () => { vivo = false; };
+    }, [telaVazia]);
+
+    const copiarDaPlaylist = async (origem: PlaylistSummary) => {
+        setCopiandoDe(origem.id);
+        setResumoCopia(null);
+        try {
+            const favoritosAntigos = favoritesService.getAllFromPlaylist(origem.id);
+            // Os três catálogos do provedor ATIVO. Falha de um não derruba os
+            // outros: quem não veio simplesmente não casa, e o favorito sai na
+            // conta de "não encontrados" em vez de sumir sem explicação.
+            const buscar = async (canal: string): Promise<AlvoDoCatalogo[]> => {
+                const res = await window.ipcRenderer.invoke(canal).catch(() => null) as { success?: boolean; data?: unknown } | null;
+                if (!res?.success) return [];
+                return asList<Record<string, unknown>>(res.data).map(item => ({
+                    id: String(item.stream_id ?? item.series_id ?? ''),
+                    name: String(item.name ?? ''),
+                    poster: typeof item.stream_icon === 'string' ? item.stream_icon
+                        : typeof item.cover === 'string' ? item.cover : undefined,
+                })).filter(alvo => alvo.id && alvo.name);
+            };
+            const [filmes, series, canais] = await Promise.all([
+                buscar('streams:get-vod'),
+                buscar('streams:get-series'),
+                buscar('streams:get-live'),
+            ]);
+
+            const { copiar, semPar, jaEstavam } = casarFavoritos(
+                favoritosAntigos,
+                {
+                    movie: indicePorTitulo(filmes),
+                    series: indicePorTitulo(series),
+                    channel: indicePorTitulo(canais),
+                },
+                (id, type) => favoritesService.has(id, type),
+            );
+            const entraram = favoritesService.addMany(copiar);
+            loadItems();
+            setResumoCopia(
+                t('favoritesPage', 'copyDone')
+                    .replace('{n}', String(entraram))
+                    .replace('{faltaram}', String(semPar.length + jaEstavam.length))
+            );
+        } finally {
+            setCopiandoDe(null);
+        }
+    };
 
     const removeItem = useCallback((id: string, type: 'series' | 'movie') => {
         setRemovingId(`${type}-${id}`);
@@ -122,6 +201,33 @@ export function Favorites() {
                         <p className="empty-text">
                             {t('favoritesPage', 'emptyText')} <strong>{t('favoritesPage', 'emptyButton')}</strong>
                         </p>
+                        {origens.length > 0 && (
+                            <div style={{ margin: '4px 0 18px', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+                                <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, margin: 0 }}>
+                                    {t('favoritesPage', 'copyFromOther')}
+                                </p>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                                    {origens.map(({ playlist, total }) => (
+                                        <button
+                                            key={playlist.id}
+                                            className="suggestion-btn"
+                                            disabled={copiandoDe !== null}
+                                            onClick={() => void copiarDaPlaylist(playlist)}
+                                        >
+                                            <span>❤️</span>
+                                            <span>
+                                                {copiandoDe === playlist.id
+                                                    ? t('common', 'loading')
+                                                    : `${playlist.name} (${total})`}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {resumoCopia && (
+                            <p style={{ color: '#34d399', fontSize: 13, margin: '0 0 14px' }}>{resumoCopia}</p>
+                        )}
                         <div className="empty-suggestions">
                             <button
                                 className="suggestion-btn"
@@ -166,6 +272,15 @@ export function Favorites() {
                         </button>
                     )}
                 </header>
+
+                {/* O resumo da cópia PRECISA aparecer aqui também: quando ela dá
+                    certo a tela deixa de estar vazia no mesmo instante, e o
+                    aviso que só existisse no estado vazio sumiria junto — o
+                    usuário veria os favoritos voltarem sem saber quantos
+                    ficaram de fora. */}
+                {resumoCopia && (
+                    <p style={{ color: '#34d399', fontSize: 13, margin: '0 26px 10px' }}>{resumoCopia}</p>
+                )}
 
                 {/* Tabs */}
                 <div className="tabs-container">

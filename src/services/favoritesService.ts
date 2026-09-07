@@ -1,6 +1,6 @@
 // Favorites localStorage utility (adapted for profiles)
 import { profileService } from './profileService';
-import { playlistScopedKey, hasKnownPlaylistId } from './activePlaylistService';
+import { playlistScopedKey, playlistScopedKeyFor, hasKnownPlaylistId } from './activePlaylistService';
 import { syncTombstones, tombstoneItemKey } from './syncTombstones';
 import { readJson } from './storageJsonCache';
 
@@ -119,6 +119,49 @@ export const favoritesService = {
             syncTombstones.record(key, tombstoneItemKey(item.id, item.type));
         });
         this.saveProfileData({ ...profileData, favorites: [] });
+    },
+
+    /**
+     * ❤️ Favoritos gravados sob OUTRA playlist do mesmo perfil.
+     *
+     * O resto do serviço só fala da playlist ativa, e é assim que tem que ser.
+     * Isto existe para um caso só: o transferidor (`favoritesTransfer.ts`), que
+     * precisa LER a lista velha depois que o usuário trocou de provedor. Nada
+     * aqui grava — a gravação continua passando pelo caminho normal, na ativa.
+     */
+    getAllFromPlaylist(playlistId: string): FavoriteItem[] {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile || !playlistId) return [];
+        const data = readJson<FavoriteProfileData>(playlistScopedKeyFor(KEY_BASE, activeProfile.id, playlistId), {});
+        return Array.isArray(data.favorites) ? data.favorites : [];
+    },
+
+    /**
+     * Grava vários de uma vez na playlist ATIVA, pulando os que já existem.
+     * Devolve quantos entraram.
+     *
+     * Existe em vez de um laço de `add()` porque cada `add()` relê e regrava o
+     * localStorage inteiro: copiar 300 favoritos seriam 600 viagens ao
+     * storage, com a lista crescendo a cada uma. Aqui é uma leitura e uma
+     * escrita. O `addedAt` de cada item é preservado — o usuário favoritou
+     * aquilo numa data, e a troca de provedor não muda esse fato.
+     */
+    addMany(items: FavoriteItem[]): number {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile || items.length === 0) return 0;
+        const profileData = this.getProfileData();
+        const favorites = profileData.favorites || [];
+        const existentes = new Set(favorites.map(f => `${f.type}:${f.id}`));
+        let entraram = 0;
+        for (const item of items) {
+            const chave = `${item.type}:${item.id}`;
+            if (existentes.has(chave)) continue;
+            existentes.add(chave);
+            favorites.push(item);
+            entraram++;
+        }
+        if (entraram > 0) this.saveProfileData({ ...profileData, favorites });
+        return entraram;
     },
 
     // Get profile data from localStorage (per-profile per-playlist key)
