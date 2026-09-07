@@ -363,7 +363,7 @@ export function NetworkSection() {
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 12, opacity: 0.8 }}>
                                 🟢 {peerState?.casting ? `Transmitindo: ${peerState.castTitle || '…'}`
-                                    : peerState?.title ? `${peerState.playing ? '▶' : '⏸'} ${peerState.title}` : 'Conectado'}
+                                    : peerState?.title ? `${peerState.playing ? '▶' : '⏸'} ${peerState.title}` : t('cast', 'connected')}
                             </span>
                             {(['previous', 'togglePlay', 'stop', 'next', 'volumeDown', 'volumeUp'] as const).map(action => (
                                 <button

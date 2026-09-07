@@ -799,14 +799,14 @@ export function Series() {
                     <div className="modal-content">
                         <h2>Limpar Histórico?</h2>
                         <p>
-                            Tem certeza que deseja limpar todo o histórico de visualização de <strong>{selectedSeries.name}</strong>? Esta ação não pode ser desfeita.
+                            Tem certeza que deseja limpar todo o histórico de visualização de <strong>{selectedSeries.name}</strong>? {t('profile', 'actionCannotBeUndone')}
                         </p>
                         <div className="modal-buttons">
                             <button
                                 className="btn btn-secondary"
                                 onClick={() => setShowClearHistoryConfirm(false)}
                             >
-                                Cancelar
+                                {t('nav', 'cancel')}
                             </button>
                             <button
                                 className="btn btn-danger"

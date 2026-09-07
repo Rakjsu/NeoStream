@@ -901,7 +901,7 @@ export function ContentDetailModal({
                         {!loading && loadError && (
                             <div style={{ margin: 'auto', textAlign: 'center', color: 'rgba(255, 255, 255, 0.7)', fontSize: 13 }}>
                                 <p style={{ marginBottom: 12 }}>⚠️ Não foi possível carregar os episódios.</p>
-                                <button onClick={() => setRetryNonce(n => n + 1)} style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(var(--ns-accent-rgb), 0.6)', background: 'rgba(var(--ns-accent-rgb), 0.25)', color: 'white', cursor: 'pointer', fontWeight: 600 }}>Tentar novamente</button>
+                                <button onClick={() => setRetryNonce(n => n + 1)} style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid rgba(var(--ns-accent-rgb), 0.6)', background: 'rgba(var(--ns-accent-rgb), 0.25)', color: 'white', cursor: 'pointer', fontWeight: 600 }}>{t('common', 'retry')}</button>
                             </div>
                         )}
                     </div>
