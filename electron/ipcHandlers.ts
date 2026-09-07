@@ -7,6 +7,7 @@ import { fetchWithRetry, requestWithRetry } from './fetchRetry'
 import { readResponseTextWithLimit, M3U_MAX_BYTES, XMLTV_MAX_BYTES } from './httpLimits'
 import { ensureProviderEpgLoaded, getProviderUtcOffsetMinutes, resetProviderEpgState, setupProviderEpgHandlers } from './providerEpg'
 import { formatTimeshiftStart } from './timeshiftProtocol'
+import { getErrorMessage } from './errorMessage'
 import { addDocumentToIndex, emptyIndex, finalizeIndex, lookupChannel, type XmltvIndex } from './epgIndexProtocol'
 import {
     activatePlaylist,
@@ -161,9 +162,6 @@ async function catalogListHandler(
         return { success: false, error: getErrorMessage(error) }
     }
 }
-
-const getErrorMessage = (error: unknown): string =>
-    error instanceof Error ? error.message : String(error)
 
 type OpenSubtitlesBody = Record<string, unknown> & {
     authToken?: string

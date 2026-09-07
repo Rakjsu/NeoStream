@@ -8,6 +8,7 @@ import dgram from 'dgram';
 import http from 'http';
 import os from 'os';
 import { resolveProviderHttpsAgent } from './certificatePolicy';
+import { getErrorMessage } from './errorMessage';
 import log from './logger';
 import {
     DLNA_FEATURES,
@@ -79,9 +80,6 @@ interface CastSession {
     title: string
 }
 let castSession: CastSession | null = null;
-
-const getErrorMessage = (error: unknown): string =>
-    error instanceof Error ? error.message : String(error);
 
 const discoveredDevices: Map<string, DlnaDevice> = new Map();
 let manualDevices: DlnaDevice[] = [];

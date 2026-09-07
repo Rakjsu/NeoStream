@@ -19,9 +19,7 @@ import { promises as fs } from 'fs'
 import log from './logger'
 import { buildReportText, type ReportSystemInfo } from './diagnosticsProtocol'
 import { redactSecrets } from './logRedaction'
-
-const getErrorMessage = (error: unknown): string =>
-    error instanceof Error ? error.message : String(error)
+import { getErrorMessage } from './errorMessage'
 
 /** Read at most the last `maxBytes` of main.log (best effort). */
 async function readLogTail(maxBytes: number): Promise<string> {

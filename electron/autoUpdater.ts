@@ -5,6 +5,7 @@ import path from 'node:path';
 import store from './store';
 import log from './logger';
 import { checkUpdateArtifacts, checkUpdateFeedConfig, type PolicyVerdict } from './updatePolicy';
+import { getErrorMessage } from './errorMessage';
 
 interface UpdateConfig {
     checkFrequency: 'on-open' | '1-day' | '1-week' | '1-month';
@@ -18,9 +19,6 @@ const DEFAULT_CONFIG: UpdateConfig = {
     autoInstall: false,
     lastCheck: 0
 };
-
-const getErrorMessage = (error: unknown): string =>
-    error instanceof Error ? error.message : String(error);
 
 /** Release oficial — qualquer outro destino de feed é recusado. */
 const EXPECTED_FEED = { owner: 'Rakjsu', repo: 'NeoStream' };
