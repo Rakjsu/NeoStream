@@ -5,10 +5,18 @@ import { launchApp, seedProfiles, startMockServer, type LaunchedApp } from './he
 /**
  * The phone-driven cast flow added in #180: `requestDevices` asks the app to
  * discover cast targets (Chromecast + DLNA + AirPlay) and pushes them back as a
- * `devices` message; casting a movie reports back a `castResult`. There are no
- * real cast devices in CI, so discovery returns an empty list and a cast reports
- * `no-device` — either way the full loop (server → media:control → bridge →
- * server → client) is exercised over a real WebSocket.
+ * `devices` message; casting a movie reports back a `castResult`. What this
+ * test proves is the full loop (server → media:control → bridge → server →
+ * client) over a real WebSocket.
+ *
+ * O QUE ELE NÃO PODE EXIGIR é o resultado do cast. A descoberta é SSDP/mDNS na
+ * rede de quem roda: no CI não há alvo nenhum e a resposta é `no-device`, mas
+ * numa casa com uma TV ligada o app acha o aparelho e responde `ok`. O teste
+ * cobrava `no-device` e por isso ficava vermelho fora do CI — e só quando a TV
+ * estava ligada, que é o pior tipo de teste instável.
+ *
+ * Efeito colateral que vale saber antes de rodar a suíte em casa: quando existe
+ * um alvo de verdade, esta linha MANDA um filme (do servidor mock) pra ele.
  */
 
 const GREETING = /Bom dia|Boa tarde|Boa noite/;
@@ -54,7 +62,21 @@ function runCastFlow(port: number, pin: string): Promise<FlowResult> {
                 'Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n',
             );
         });
-        socket.setTimeout(10000, () => { socket.destroy(); reject(new Error('timeout')); });
+        // 30 s, e o número tem origem: com um alvo de cast DE VERDADE na rede,
+        // o `castResult` pode demorar até ~25 s para nascer —
+        // `castClient.ts:343` dá 10 s para o TLS connect e `LAUNCH_TIMEOUT_MS`
+        // (castClient.ts:54) dá mais 15 s para o receiver responder. O socket
+        // aqui fica OCIOSO esse tempo todo, desde o write do `castMovie`.
+        //
+        // Com os 10 s antigos, o pior caso do cast estourava o socket antes da
+        // resposta chegar e o teste falhava com Error('timeout') — de novo por
+        // causa da rede de quem roda, que é justamente o que este arquivo
+        // parou de aceitar. O caso mais provável não é a TV lenta: é a TV que
+        // apareceu no mDNS e depois foi desligada (a entrada só sai do Map no
+        // evento 'down'), aí o connect fica pendurado os 10 s inteiros.
+        //
+        // O teto do Playwright para o caso é 60 s, então 30 s cabe com folga.
+        socket.setTimeout(30000, () => { socket.destroy(); reject(new Error('timeout')); });
         let buf = Buffer.alloc(0);
         let upgraded = false;
         const got: Partial<FlowResult> = {};
@@ -118,6 +140,9 @@ test('controle web: pede dispositivos e transmite, recebendo o resultado', async
     expect(Array.isArray(devices.items)).toBe(true);
     // The mock seeds VOD, so the catalog is non-empty and gives a movie to cast.
     expect(catalog.items.length).toBeGreaterThan(0);
-    // No Chromecast on the CI LAN → the cast reports 'no-device' (loop proven).
-    expect(castResult.status).toBe('no-device');
+    // Qualquer um dos três status prova o laço: a resposta voltou pelo mesmo
+    // caminho e já passou pela normalização do servidor
+    // (webRemoteServer.ts, 'web-remote:cast-result'), que só deixa passar
+    // estes três. Qual deles sai depende de haver aparelho na rede.
+    expect(['ok', 'no-device', 'error']).toContain(castResult.status);
 });
