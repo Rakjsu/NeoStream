@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { srtToVtt, searchSubtitles } from './subtitleService';
+import { srtToVtt, searchSubtitles, diskSubtitleToVtt, openSubtitleFileFromDisk } from './subtitleService';
 
 describe('srtToVtt', () => {
     it('prefixa WEBVTT e troca vírgula por ponto nos timestamps', () => {
@@ -16,6 +16,45 @@ describe('srtToVtt', () => {
         expect(vtt).not.toContain('\r');
         expect(vtt).toContain('00:01:00.000 --> 00:01:02.000');
         expect(vtt).toContain('Sim, claro');
+    });
+});
+
+describe('legenda aberta do disco', () => {
+    it('VTT passa reto — inclusive com o BOM do Bloco de Notas', () => {
+        const vtt = 'WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nOi';
+        expect(diskSubtitleToVtt(vtt)).toBe(vtt);
+        // Sem comer o BOM, o startsWith('WEBVTT') erra e o arquivo é tratado
+        // como SRT — o cabeçalho vira legenda e o resto vira lixo.
+        expect(diskSubtitleToVtt('﻿' + vtt)).toBe(vtt);
+    });
+
+    it('SRT é convertido', () => {
+        const convertido = diskSubtitleToVtt('1\n00:00:01,500 --> 00:00:04,000\nOlá\n');
+        expect(convertido.startsWith('WEBVTT')).toBe(true);
+        expect(convertido).toContain('00:00:01.500 --> 00:00:04.000');
+    });
+
+    it('cancelar o diálogo devolve null — a legenda atual não muda', async () => {
+        const invoke = vi.fn(async () => ({ success: false, canceled: true }));
+        (window as unknown as { ipcRenderer: { invoke: typeof invoke } }).ipcRenderer = { invoke };
+        expect(await openSubtitleFileFromDisk()).toBeNull();
+    });
+
+    it('sucesso devolve nome, caminho e conteúdo — e pede só o que precisa', async () => {
+        const invoke = vi.fn(async () => ({ success: true, name: 'a.srt', path: 'C:/f/a.srt', content: '1' }));
+        (window as unknown as { ipcRenderer: { invoke: typeof invoke } }).ipcRenderer = { invoke };
+        expect(await openSubtitleFileFromDisk(['srt'], true))
+            .toEqual({ name: 'a.srt', path: 'C:/f/a.srt', content: '1' });
+        expect(invoke).toHaveBeenCalledWith('subtitle:open-file', { extensions: ['srt'], withContent: true });
+        // O mpv não quer o texto: ler até 5 MB pra jogar fora não é de graça.
+        await openSubtitleFileFromDisk([], false);
+        expect(invoke).toHaveBeenLastCalledWith('subtitle:open-file', { extensions: [], withContent: false });
+    });
+
+    it('main quebrado não derruba o player', async () => {
+        const invoke = vi.fn(async () => { throw new Error('boom'); });
+        (window as unknown as { ipcRenderer: { invoke: typeof invoke } }).ipcRenderer = { invoke };
+        expect(await openSubtitleFileFromDisk()).toBeNull();
     });
 });
 

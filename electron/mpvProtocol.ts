@@ -11,6 +11,26 @@
 
 export const MPV_WINDOW_TITLE = 'NeoStream MPV'
 
+/** Extensões de legenda que o mpv abre direto do disco, sem conversão nossa. */
+export const EXTENSOES_DE_LEGENDA = ['srt', 'vtt', 'ass', 'ssa'] as const
+
+/**
+ * O caminho tem cara de legenda local? PURO (não toca no disco).
+ *
+ * O handler `mpv:add-subtitle` passou a aceitar um CAMINHO vindo do renderer
+ * — é assim que o mpv desenha .ass com estilo e resolve o codepage sozinho,
+ * sem conversão no meio. Em troca, o main confere o que recebe: só caminho
+ * absoluto, local (nada de UNC `\\servidor\...`, que faria o mpv abrir uma
+ * conexão de rede) e com extensão de legenda. A existência é checada à parte,
+ * onde há acesso a disco.
+ */
+export function pareceLegendaNoDisco(caminho: unknown): boolean {
+    if (typeof caminho !== 'string' || caminho.length === 0) return false
+    if (caminho.startsWith('\\\\') || caminho.startsWith('//')) return false
+    if (!/^([a-zA-Z]:[\\/]|\/)/.test(caminho)) return false
+    return new RegExp(`\\.(${EXTENSOES_DE_LEGENDA.join('|')})$`, 'i').test(caminho)
+}
+
 // Matches the User-Agent the app already uses for provider requests
 // (see ipcHandlers.ts / downloadHandlers.ts).
 export const MPV_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'

@@ -786,7 +786,9 @@
     "restoreWindow": "Restaurar janela",
     "qrHandoffFailed": "Não foi possível gerar o QR deste conteúdo.",
     "streamRetry": "Tentar novamente",
-    "close": "Fechar"
+    "close": "Fechar",
+    "openSubtitleFile": "Arquivo do computador…",
+    "subtitleFileError": "Não deu pra abrir esse arquivo de legenda"
   },
   "notifications": {
     "autoTuneIn": "Trocando pra {channel} em {s}s…",

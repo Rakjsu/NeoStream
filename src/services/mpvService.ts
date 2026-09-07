@@ -132,6 +132,18 @@ class MpvService {
         return result.success === true;
     }
 
+    /**
+     * Legenda de um arquivo do disco. Manda o CAMINHO, não o texto: o mpv abre
+     * .ass com estilo e resolve o codepage sozinho — qualquer conversão nossa
+     * no meio só teria a perder.
+     */
+    async addSubtitleFile(filePath: string, title: string, lang = 'und'): Promise<boolean> {
+        const result = await window.ipcRenderer
+            .invoke('mpv:add-subtitle', { path: filePath, title, lang })
+            .catch(() => ({ success: false })) as { success: boolean };
+        return result.success === true;
+    }
+
     /** Polled status snapshot ({ running:false, ... } when nothing is playing). */
     async getStatus(): Promise<MpvStatus | null> {
         try {

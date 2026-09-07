@@ -17,6 +17,7 @@ import {
     MPV_USER_AGENT,
     MPV_WINDOW_TITLE,
     OBSERVED_PROPERTIES,
+    pareceLegendaNoDisco,
     parseIpcLine,
     parseTrackList,
     parseTrackSelection,
@@ -301,5 +302,29 @@ describe('track switching (aid/sid/track-list)', () => {
         expect(status.tracks).toHaveLength(2)
         expect(status.audioTrackId).toBe(1)
         expect(status.subtitleTrackId).toBeNull()
+    })
+})
+
+describe('pareceLegendaNoDisco', () => {
+    // O `mpv:add-subtitle` passou a aceitar um CAMINHO vindo do renderer. Este
+    // guarda é o que impede esse caminho de virar "abra qualquer coisa".
+    it('aceita caminho absoluto local com extensão de legenda', () => {
+        expect(pareceLegendaNoDisco('C:\\Filmes\\a.srt')).toBe(true)
+        expect(pareceLegendaNoDisco('C:/Filmes/a.ASS')).toBe(true)
+        expect(pareceLegendaNoDisco('/home/rak/a.vtt')).toBe(true)
+    })
+
+    it('recusa UNC — o mpv abriria uma conexão de rede', () => {
+        expect(pareceLegendaNoDisco('\\\\servidor\\share\\a.srt')).toBe(false)
+        expect(pareceLegendaNoDisco('//servidor/share/a.srt')).toBe(false)
+    })
+
+    it('recusa relativo, extensão de fora e lixo', () => {
+        expect(pareceLegendaNoDisco('legendas/a.srt')).toBe(false)
+        expect(pareceLegendaNoDisco('C:\\Windows\\System32\\config\\SAM')).toBe(false)
+        expect(pareceLegendaNoDisco('C:\\a.exe')).toBe(false)
+        expect(pareceLegendaNoDisco('')).toBe(false)
+        expect(pareceLegendaNoDisco(null)).toBe(false)
+        expect(pareceLegendaNoDisco(42)).toBe(false)
     })
 })

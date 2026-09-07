@@ -881,7 +881,9 @@
     "restoreWindow": "Restore window",
     "qrHandoffFailed": "Could not generate the QR for this content.",
     "streamRetry": "Try again",
-    "close": "Close"
+    "close": "Close",
+    "openSubtitleFile": "File from this computer…",
+    "subtitleFileError": "Couldn't open that subtitle file"
   },
   "home": {
     "dontRecommend": "Don't recommend this",

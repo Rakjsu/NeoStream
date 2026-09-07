@@ -34,6 +34,9 @@ export interface PlayerSettingsMenuProps<TSwitchContent extends SwitchableConten
     subtitleLanguage?: string | null;
     onSelectSubtitleLanguage?: (code: string) => void;
     onDisableSubtitles?: () => void;
+    /** Ausente fora do Electron: sem IPC não há diálogo de arquivo. */
+    onOpenSubtitleFile?: () => void;
+    diskSubtitleName?: string | null;
     /** HLS audio tracks (live streams with more than one). */
     audioTracks?: PlayerAudioTrack[];
     onSelectAudioTrack?: (id: number) => void;
@@ -76,6 +79,8 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
     subtitleLanguage,
     onSelectSubtitleLanguage,
     onDisableSubtitles,
+    onOpenSubtitleFile,
+    diskSubtitleName,
     audioTracks,
     onSelectAudioTrack,
     sleepTimerMinutes,
@@ -245,6 +250,18 @@ export function PlayerSettingsMenu<TSwitchContent extends SwitchableContent = Sw
                                 >
                                     {t('player', 'subtitlesOff')}
                                 </button>
+                                {onOpenSubtitleFile && (
+                                    <button
+                                        className={`settings-option ${diskSubtitleName && subtitlesEnabled ? 'active' : ''}`}
+                                        onClick={() => {
+                                            onOpenSubtitleFile();
+                                            setShowSettings(false);
+                                        }}
+                                        title={diskSubtitleName ?? undefined}
+                                    >
+                                        📂 {diskSubtitleName && subtitlesEnabled ? diskSubtitleName : t('player', 'openSubtitleFile')}
+                                    </button>
+                                )}
                                 {SUBTITLE_LANGUAGE_OPTIONS.map(opt => {
                                     const norm = (subtitleLanguage || '').toLowerCase();
                                     const isActive = !!subtitlesEnabled &&
