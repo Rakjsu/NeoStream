@@ -31,6 +31,7 @@ import { isUserInfoFresh } from './playlistsModel'
 import { cachedCatalogFetch, invalidatePlaylistCache, type CatalogKind } from './catalogCache'
 import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uToVodStreams, m3uCategories, m3uToSeries, m3uSeriesInfo, findM3uEpisodeUrl, pareceListaM3uNoDisco, EXTENSOES_DE_LISTA_M3U } from './m3uProtocol'
 import { lerCanaisM3uDoDisco } from './m3uDiskSource'
+import { decifrarBackupDoCelular } from './mobileBackupCrypto'
 import { cachedM3uDocument, resetM3uDocumentCache } from './m3uCache'
 import { normalizeMac, stalkerChannelsToLiveStreams, stalkerGenresToCategories, stalkerVodToStreams, stalkerVodCategories, stalkerSeriesToList, stalkerSeriesCategories, stalkerSeriesInfo, parseStalkerEpisodeId, STALKER_SENTINEL } from './stalkerProtocol'
 import { StalkerClient, resolvePortal } from './stalkerClient'
@@ -1429,6 +1430,30 @@ export function setupIpcHandlers() {
             log.error('[Backup] Load error:', getErrorMessage(error))
             return { success: false, error: getErrorMessage(error) }
         }
+    })
+
+    /**
+     * 🔗 Abrir o backup CIFRADO do celular (`NEOENC1:`) com a senha do usuário.
+     *
+     * Mora no main porque a cifra do celular deriva a chave com MD5, e a Web
+     * Crypto do renderer não faz MD5 — ver `mobileBackupCrypto.ts`. O renderer
+     * manda o texto que ele já tem em mãos (veio do `backup:load-file`) e a
+     * senha; volta o JSON claro, que o parser puro do `crossBackup.ts` lê como
+     * se o arquivo nunca tivesse sido cifrado.
+     *
+     * `ok: false` cobre senha errada e arquivo corrompido sem distinguir os
+     * dois — o CBC não autentica nada, então o main não TEM como saber a
+     * diferença, e fingir que sabe seria pior que a mensagem genérica.
+     */
+    ipcMain.handle('backup:decrypt-mobile', (_e, data: { text?: unknown; password?: unknown }) => {
+        const texto = typeof data?.text === 'string' ? data.text : ''
+        const senha = typeof data?.password === 'string' ? data.password : ''
+        // O texto vem de um arquivo que o próprio main leu, mas o canal é
+        // alcançável pelo renderer: um teto evita alimentar o base64 com algo
+        // absurdo. 8 MB é ordens de grandeza acima de qualquer backup real.
+        if (!texto || texto.length > 8 * 1024 * 1024) return { ok: false }
+        const json = decifrarBackupDoCelular(texto, senha)
+        return json ? { ok: true, json } : { ok: false }
     })
 
     // 🩺 Verificador de favoritos: sonda uma lista de URLs de stream (GET com
