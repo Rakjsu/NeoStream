@@ -1046,7 +1046,12 @@
     "exploreMovies": "Explorar Filmes",
     "exploreSeries": "Explorar Séries",
     "availableOffline": "está disponível offline!",
-    "failedTo": "Falha ao baixar"
+    "failedTo": "Falha ao baixar",
+    "dvrTitle": "⏺ Gravação agendada",
+    "dvrMaxConcurrent": "Gravações simultâneas",
+    "dvrStartMargin": "Começar antes (min)",
+    "dvrEndPadding": "Continuar depois (min)",
+    "dvrMarginsDesc": "O horário do guia costuma estar adiantado ou atrasado alguns minutos. Estas margens gravam um pouco antes e um pouco depois — e contam no aviso de conflito."
   },
   "history": {
     "title": "Histórico",

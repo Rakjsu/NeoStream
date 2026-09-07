@@ -1046,7 +1046,12 @@
     "exploreMovies": "Explorar Películas",
     "exploreSeries": "Explorar Series",
     "availableOffline": "¡está disponible sin conexión!",
-    "failedTo": "Error al descargar"
+    "failedTo": "Error al descargar",
+    "dvrTitle": "⏺ Grabación programada",
+    "dvrMaxConcurrent": "Grabaciones simultáneas",
+    "dvrStartMargin": "Empezar antes (min)",
+    "dvrEndPadding": "Seguir después (min)",
+    "dvrMarginsDesc": "La hora de la guía suele estar unos minutos desfasada. Estos márgenes graban un poco antes y un poco después — y cuentan en el aviso de conflicto."
   },
   "history": {
     "title": "Historial",

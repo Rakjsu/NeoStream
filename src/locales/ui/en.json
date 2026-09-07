@@ -1046,7 +1046,12 @@
     "exploreMovies": "Explore Movies",
     "exploreSeries": "Explore Series",
     "availableOffline": "is available offline!",
-    "failedTo": "Failed to download"
+    "failedTo": "Failed to download",
+    "dvrTitle": "⏺ Scheduled recording",
+    "dvrMaxConcurrent": "Simultaneous recordings",
+    "dvrStartMargin": "Start earlier (min)",
+    "dvrEndPadding": "Keep going after (min)",
+    "dvrMarginsDesc": "Guide times are often a few minutes off. These margins record a bit before and a bit after — and they count in the conflict warning."
   },
   "history": {
     "title": "History",
