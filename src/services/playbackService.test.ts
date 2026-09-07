@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { playbackService } from './playbackService';
+import { playbackService, apenasCamposConhecidos } from './playbackService';
 
 /**
  * O "buffer inteligente" media LATÊNCIA ATÉ A GOOGLE e apresentava como banda:
@@ -81,5 +81,38 @@ describe('playbackService: banda medida → buffer', () => {
         expect(playbackService.getBufferDescription()).not.toMatch(/analisando/i);
         playbackService.reportMeasuredBandwidth(30);
         expect(playbackService.getBufferDescription()).toContain('30.0 Mbps');
+    });
+});
+
+describe('apenasCamposConhecidos', () => {
+    const padrao = { bufferSize: 'intelligent', videoCodec: 'auto', mpvEnabled: false };
+
+    it('deixa entrar só o que o padrão declara', () => {
+        // O caso real: `audioCodec` e `quality` foram apagados do tipo, mas
+        // continuam gravados no perfil de quem já usou o app. Sem este filtro,
+        // o loadConfig os traria de volta e o próximo setConfig os regravaria —
+        // para sempre.
+        expect(apenasCamposConhecidos(
+            { bufferSize: '10', audioCodec: 'ac3', quality: '720p', videoCodec: 'h265' },
+            padrao,
+        )).toEqual({ bufferSize: '10', videoCodec: 'h265' });
+    });
+
+    it('campo ausente não vira undefined — o padrão tem que vencer', () => {
+        // Se `undefined` passasse, o spread `{...padrao, ...limpo}` apagaria o
+        // valor padrão em vez de mantê-lo.
+        const limpo = apenasCamposConhecidos({ bufferSize: undefined, videoCodec: 'h264' }, padrao);
+        expect('bufferSize' in limpo).toBe(false);
+        expect({ ...padrao, ...limpo }.bufferSize).toBe('intelligent');
+    });
+
+    it('lixo no lugar do objeto não derruba nada', () => {
+        for (const lixo of [null, undefined, 'texto', 42, true]) {
+            expect(apenasCamposConhecidos(lixo, padrao)).toEqual({});
+        }
+    });
+
+    it('array é objeto, mas não tem as chaves — sai vazio', () => {
+        expect(apenasCamposConhecidos([1, 2, 3], padrao)).toEqual({});
     });
 });
