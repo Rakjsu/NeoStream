@@ -136,24 +136,47 @@ class LanguageService {
         this.listeners.forEach(listener => listener());
     }
 
-    // Main translation function
+    /**
+     * Texto de uma chave, com três degraus de reserva.
+     *
+     * O terceiro degrau — a seção `common` — é novo, e existe porque o
+     * dicionário tinha 81 textos repetidos em 231 entradas: "Cancelar"
+     * aparecia em ONZE seções, "Fechar" em sete. Sem um lugar genérico onde
+     * cair, cada tela nova precisa da sua própria cópia de "Fechar", e o dia
+     * em que alguém troca a palavra deixa dez telas para trás.
+     *
+     * A ordem importa: **seção antes de idioma**. Quem lê em inglês prefere um
+     * "Close" genérico a um "Fechar" específico — o idioma certo com a palavra
+     * genérica engana menos que a palavra exata na língua errada.
+     *
+     * E é INERTE para o que já existe: os três degraus só são consultados
+     * depois que `sectionData[key]` erra, então nenhuma chave que hoje resolve
+     * muda de valor. Conferido nos 1017 pares literais `t('secao','chave')` do
+     * renderer.
+     */
     t(section: string, key: string): string {
         const langData = translations[this.currentLanguage];
-        const sectionData = langData?.[section];
-        const translation = sectionData?.[key];
-
+        const translation = langData?.[section]?.[key];
         if (translation) return translation;
 
-        // While a language is still loading, fall back silently to Portuguese
+        // 1º degrau: a palavra genérica, no idioma que a pessoa escolheu.
+        const generic = langData?.common?.[key];
+        if (generic) return generic;
+
+        // Enquanto o idioma ainda carrega, cai no português em silêncio.
         if (!langData) {
-            return translations.pt?.[section]?.[key] ?? key;
+            return translations.pt?.[section]?.[key] ?? translations.pt?.common?.[key] ?? key;
         }
 
-        // Fallback to Portuguese
+        // 2º degrau: a seção certa, em português.
         const fallback = translations.pt?.[section]?.[key];
         if (fallback) return fallback;
 
-        // Return key if not found
+        // 3º degrau: a palavra genérica em português.
+        const genericPt = translations.pt?.common?.[key];
+        if (genericPt) return genericPt;
+
+        // Sem nada: devolve a própria chave — e é isso que aparece na tela.
         console.warn(`Missing translation: ${section}.${key}`);
         return key;
     }

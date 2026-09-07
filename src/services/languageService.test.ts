@@ -54,3 +54,54 @@ describe('espelho do idioma no main', () => {
         expect(languageService.getLanguage()).toBe('pt');
     });
 });
+
+/**
+ * O dicionário tinha 81 textos repetidos em 231 entradas — "Cancelar" em ONZE
+ * seções, "Fechar" em sete. Sem um lugar genérico onde cair, cada tela nova
+ * precisa da sua própria cópia, e o dia em que alguém troca a palavra deixa
+ * dez telas para trás.
+ */
+describe('t() cai na seção common', () => {
+    it('a chave da própria seção continua ganhando', () => {
+        languageService.setLanguage('pt');
+        // `downloads.resume` vale "Retomar"; `common.resume` vale "Continuar".
+        // Se a ordem invertesse, a fila de downloads mudaria de palavra.
+        expect(languageService.t('downloads', 'resume')).toBe('Retomar');
+        expect(languageService.t('common', 'resume')).toBe('Continuar');
+    });
+
+    it('chave que só existe em common resolve a partir de qualquer seção', () => {
+        languageService.setLanguage('pt');
+        // Nenhuma dessas seções tem `close` — antes, isto devolvia a string
+        // "close" e era ISSO que aparecia na tela.
+        expect(languageService.t('agenda', 'close')).toBe('Fechar');
+        expect(languageService.t('secaoQueNaoExiste', 'close')).toBe('Fechar');
+    });
+
+    // en/es sao carregados sob demanda: sem esperar o import, o t() cai no
+    // portugues pelo degrau do "idioma ainda carregando" e o teste mediria
+    // outra coisa.
+    it('a seção genérica respeita o idioma escolhido', async () => {
+        const esperaCarregar = async () => {
+            for (let i = 0; i < 50 && languageService.t('common', 'close') === 'Fechar'; i++) {
+                await new Promise(resolve => setTimeout(resolve, 5));
+            }
+        };
+
+        languageService.setLanguage('en');
+        await esperaCarregar();
+        expect(languageService.t('agenda', 'close')).toBe('Close');
+
+        languageService.setLanguage('es');
+        for (let i = 0; i < 50 && languageService.t('common', 'close') !== 'Cerrar'; i++) {
+            await new Promise(resolve => setTimeout(resolve, 5));
+        }
+        expect(languageService.t('agenda', 'close')).toBe('Cerrar');
+
+        languageService.setLanguage('pt');
+    });
+
+    it('sem chave em lugar nenhum, ainda devolve a própria chave', () => {
+        expect(languageService.t('agenda', 'naoExisteEmLugarNenhum')).toBe('naoExisteEmLugarNenhum');
+    });
+});
