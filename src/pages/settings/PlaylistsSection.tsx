@@ -46,6 +46,14 @@ export function PlaylistsSection() {
     const [setupHandoff, setSetupHandoff] = useState<{ url: string; token: string } | null>(null);
     const [importingMobile, setImportingMobile] = useState(false);
     const [importMsg, setImportMsg] = useState('');
+    // 🔒 Backup do celular protegido por senha: o texto cifrado fica aqui
+    // enquanto a tela pede a senha. Antes disto o import simplesmente parava e
+    // mandava o usuário reexportar sem senha no celular — sendo que o celular
+    // EXIGE senha quando o backup leva conta de provedor, que é justamente o
+    // que este import quer.
+    const [backupCifrado, setBackupCifrado] = useState<string | null>(null);
+    const [senhaBackup, setSenhaBackup] = useState('');
+    const [decifrando, setDecifrando] = useState(false);
 
     const refresh = async () => {
         setLoading(true);
@@ -131,33 +139,68 @@ export function PlaylistsSection() {
         }
     };
 
+    /** Parse + gravação, comum ao arquivo aberto e ao arquivo decifrado. */
+    const importarContasDoBackup = async (json: string): Promise<void> => {
+        const parsed = parseMobileBackupAccounts(json);
+        if (parsed.error || parsed.accounts.length === 0) {
+            setError(t('playlists', 'importMobileInvalid'));
+            return;
+        }
+        const result = await window.ipcRenderer.invoke('playlists:import-mobile', { accounts: parsed.accounts }) as { success: boolean; imported?: number };
+        if (result.success) {
+            setImportMsg(t('playlists', 'importMobileDone').replace('{n}', String(result.imported ?? 0)));
+            setBackupCifrado(null);
+            setSenhaBackup('');
+            await refresh();
+        } else {
+            setError(t('playlists', 'importMobileInvalid'));
+        }
+    };
+
     const handleImportMobile = async () => {
         setError('');
         setImportMsg('');
+        setBackupCifrado(null);
+        setSenhaBackup('');
         setImportingMobile(true);
         try {
             const file = await window.ipcRenderer.invoke('backup:load-file') as { success: boolean; canceled?: boolean; json?: string };
             if (!file.success || !file.json) return;
-            const parsed = parseMobileBackupAccounts(file.json);
-            if (parsed.error === 'encrypted') {
-                setError(t('playlists', 'importMobileEncrypted'));
+            if (parseMobileBackupAccounts(file.json).error === 'encrypted') {
+                // Guarda o arquivo e pede a senha — o decifrar acontece no main
+                // (a cifra do celular usa MD5, que a Web Crypto não oferece).
+                setBackupCifrado(file.json);
                 return;
             }
-            if (parsed.error || parsed.accounts.length === 0) {
-                setError(t('playlists', 'importMobileInvalid'));
-                return;
-            }
-            const result = await window.ipcRenderer.invoke('playlists:import-mobile', { accounts: parsed.accounts }) as { success: boolean; imported?: number };
-            if (result.success) {
-                setImportMsg(t('playlists', 'importMobileDone').replace('{n}', String(result.imported ?? 0)));
-                await refresh();
-            } else {
-                setError(t('playlists', 'importMobileInvalid'));
-            }
+            await importarContasDoBackup(file.json);
         } catch {
             setError(t('playlists', 'importMobileInvalid'));
         } finally {
             setImportingMobile(false);
+        }
+    };
+
+    const handleDecifrarBackup = async () => {
+        if (!backupCifrado || !senhaBackup) return;
+        setError('');
+        setDecifrando(true);
+        try {
+            const res = await window.ipcRenderer.invoke('backup:decrypt-mobile', {
+                text: backupCifrado,
+                password: senhaBackup,
+            }) as { ok?: boolean; json?: string };
+            if (!res?.ok || !res.json) {
+                // Senha errada e arquivo corrompido chegam iguais aqui: o
+                // formato do celular (AES-CBC) não autentica a cifra, então
+                // nem o main sabe distinguir os dois.
+                setError(t('playlists', 'importMobileWrongPassword'));
+                return;
+            }
+            await importarContasDoBackup(res.json);
+        } catch {
+            setError(t('playlists', 'importMobileInvalid'));
+        } finally {
+            setDecifrando(false);
         }
     };
 
@@ -439,6 +482,39 @@ export function PlaylistsSection() {
                         📥 {importingMobile ? t('common', 'loading') : t('playlists', 'importMobile')}
                     </button>
                 </div>
+                {backupCifrado && (
+                    <form
+                        onSubmit={(e) => { e.preventDefault(); void handleDecifrarBackup(); }}
+                        style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 10 }}
+                    >
+                        <label htmlFor="senha-backup-celular" style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13 }}>
+                            🔒 {t('playlists', 'importMobilePasswordLabel')}
+                        </label>
+                        <input
+                            id="senha-backup-celular"
+                            type="password"
+                            autoFocus
+                            value={senhaBackup}
+                            onChange={(e) => setSenhaBackup(e.target.value)}
+                            placeholder={t('playlists', 'importMobilePasswordHint')}
+                            style={{
+                                padding: '8px 12px', borderRadius: 8, minWidth: 220,
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                background: 'rgba(255,255,255,0.06)', color: 'white', fontSize: 13,
+                            }}
+                        />
+                        <button type="submit" className="playlists-btn playlists-btn-primary" disabled={decifrando || !senhaBackup}>
+                            {decifrando ? t('common', 'loading') : t('playlists', 'importMobileUnlock')}
+                        </button>
+                        <button
+                            type="button"
+                            className="playlists-btn"
+                            onClick={() => { setBackupCifrado(null); setSenhaBackup(''); setError(''); }}
+                        >
+                            {t('common', 'cancel')}
+                        </button>
+                    </form>
+                )}
                 {importMsg && (
                     <p style={{ color: '#34d399', fontSize: 13, margin: '10px 2px 0' }}>{importMsg}</p>
                 )}
