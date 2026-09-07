@@ -58,14 +58,32 @@ describe('decifrarBackupDoCelular', () => {
     it('senha errada é null, nunca lixo', () => {
         // O CBC não autentica: a senha errada pode derrubar o padding, virar
         // bytes que não são UTF-8, ou virar UTF-8 sem sentido. Os três têm que
-        // sair como null. Vinte senhas erradas seguidas é bastante gente para
-        // um erro de padding "de sorte" aparecer, se a checagem final sumisse.
+        // sair como null.
         for (let i = 0; i < 20; i++) {
             expect(decifrarBackupDoCelular(VETOR_ASCII.texto, `errada${i}`)).toBeNull()
         }
         expect(decifrarBackupDoCelular(VETOR_ASCII.texto, '')).toBeNull()
         // Maiúscula conta.
         expect(decifrarBackupDoCelular(VETOR_ASCII.texto, 'ABC123')).toBeNull()
+    })
+
+    it('a senha errada que ATRAVESSA o padding também é null', () => {
+        // Este caso é o que prova a última linha de defesa — o
+        // `claro.startsWith('{')` — e ele precisa de uma senha ESCOLHIDA.
+        //
+        // O laço acima não prova nada sobre essa linha: com o vetor fixo e as
+        // senhas fixas o resultado é determinístico, e MEDINDO se vê que
+        // nenhuma das 22 chega lá — todas morrem antes, no
+        // `decipher.final()`, por padding PKCS#7 inválido. Apagar a guarda em
+        // produção deixaria o arquivo de teste inteiro verde.
+        //
+        // `errada175` é a primeira da série que fecha o padding por acaso
+        // (~1 em 256, o que bate com o byte final ter que valer 0x01). O que
+        // ela devolve é lixo binário, e é a checagem do `{` que o transforma
+        // em null em vez de deixar seguir para o parser como "backup
+        // inválido" — mensagem errada, que mandaria o usuário procurar
+        // problema no arquivo em vez de na senha.
+        expect(decifrarBackupDoCelular(VETOR_ASCII.texto, 'errada175')).toBeNull()
     })
 
     it('arquivo mexido é null', () => {
