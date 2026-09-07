@@ -39,7 +39,23 @@ function mainWindowVisible(): Promise<boolean> {
 test('fechar no X esconde na bandeja e a janela volta com a interface visível', async () => {
     const page = await launchWithTray();
 
-    await page.locator('.window-control-btn.close').click();
+    // `dispatchEvent`, e NÃO `.click()`. O clique de mouse de verdade pendura
+    // aqui — medido: 5 falhas em 10 execuções, sempre nesta linha, sempre com
+    // "performing click action" como último passo do log e 30 s de espera.
+    //
+    // A razão é o que o teste faz de propósito: este botão esconde a janela.
+    // `handleClose` chama `window:close`, o main faz `win.close()`, o
+    // `attachCloseToTray` dá `preventDefault()` e `hide()`. O Playwright, ao
+    // clicar de verdade, espera a confirmação do compositor depois de entregar
+    // o evento — e uma janela escondida não produz mais frame nenhum. A espera
+    // vai até o timeout.
+    //
+    // O `dispatchEvent` entrega o mesmo evento de clique ao mesmo botão e
+    // percorre a MESMA cadeia (onClick → invoke('window:close') → main →
+    // attachCloseToTray), que é o que este teste existe para provar. O que se
+    // abre mão é da simulação do mouse físico — hit-testing, hover, ordem de
+    // mousedown/mouseup — e nada disso é o assunto aqui.
+    await page.locator('.window-control-btn.close').dispatchEvent('click');
     await expect.poll(mainWindowVisible, { timeout: 5_000 }).toBe(false);
 
     // Volta pelo mesmo caminho que a bandeja/second-instance usam: show().
