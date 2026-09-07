@@ -1,5 +1,5 @@
 # Multi-OS release pipeline: push a v*.*.* tag and this builds Windows
-# (NSIS + portable), Linux (AppImage + deb) and macOS (dmg + zip), then
+# (NSIS + portable), Linux (AppImage) and macOS (dmg + zip, arm64), then
 # attaches everything — including the latest*.yml auto-update feeds — to
 # the GitHub release for that tag. Release notes come auto-generated
 # from the merged PRs (and can still be rewritten afterwards).
@@ -65,13 +65,15 @@ jobs:
           # gera — os três jobs da matrix tocam a mesma release e, cada um
           # gerando, o bloco "What's Changed" saía triplicado no body.
           generate_release_notes: ${{ runner.os == 'Linux' }}
+          # Sem `release/*.deb`: nenhum alvo do electron-builder gera .deb, e um
+          # glob que nunca casa é uma promessa que a página de release não
+          # cumpre. O Linux sai como AppImage, que é o que o README diz.
           files: |
             release/*.exe
             release/*.exe.blockmap
             release/*.dmg
             release/*.zip
             release/*.AppImage
-            release/*.deb
             release/latest*.yml
           draft: false
           prerelease: false

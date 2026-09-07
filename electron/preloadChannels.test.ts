@@ -85,3 +85,48 @@ describe('whitelists do preload cobrem tudo que o renderer usa', () => {
         expect(whitelist(preload, 'sendChannels').has('web-remote:progress')).toBe(true)
     })
 })
+
+/**
+ * 🔒 O sentido INVERSO: canal declarado que ninguém usa.
+ *
+ * A whitelist só protege enquanto for a lista do que o app precisa. Cada canal
+ * a mais é superfície aberta ao renderer de graça — foi assim que o `fetch-url`
+ * ficou lá: uma ponte de fetch arbitrário, com o agente HTTPS do provedor, que
+ * ainda registrava a URL respondida como "provedor aprovado", e que nenhuma
+ * tela chamava.
+ *
+ * O guarda de cima (usado-mas-não-declarado) nunca ia apontar isso: para ele,
+ * quanto mais canal declarado, melhor.
+ */
+describe('whitelists do preload não acumulam canal morto', () => {
+    const preload = fs.readFileSync(PRELOAD, 'utf-8')
+
+    /** Renderer + e2e: um canal pode ser exercitado só pelo teste de ponta. */
+    function consumidorTextos(): string {
+        const arquivos = rendererFiles(path.join(ROOT, 'src'))
+        const e2eDir = path.join(ROOT, 'e2e')
+        if (fs.existsSync(e2eDir)) arquivos.push(...rendererFiles(e2eDir))
+        return arquivos.map(f => fs.readFileSync(f, 'utf-8')).join('\n')
+    }
+
+    /**
+     * Canais que ficam declarados mesmo sem consumidor literal. Cada um precisa
+     * de um motivo — a lista existe para a exceção ser deliberada, não para
+     * virar depósito.
+     */
+    const COM_MOTIVO = new Map<string, string>([
+        // Montado por número de episódio: `pip:nextEpisodeResponse:${id}`.
+        // A forma dinâmica já está declarada em dynamicSendChannels.
+    ])
+
+    it.each(['invokeChannels', 'sendChannels', 'receiveChannels'])(
+        'todo canal de %s tem consumidor', (lista) => {
+            const texto = consumidorTextos()
+            const mortos = [...whitelist(preload, lista)].filter(canal =>
+                !COM_MOTIVO.has(canal)
+                && !texto.includes(`'${canal}'`)
+                && !texto.includes(`"${canal}"`)
+                && !texto.includes(`\`${canal}\``))
+            expect(mortos).toEqual([])
+        })
+})

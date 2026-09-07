@@ -14,6 +14,7 @@ import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { movieProgressService } from '../services/movieProgressService';
 import { ContentDetailModal } from '../components/ContentDetailModal';
+import { idsComTag } from '../services/personalMarksService';
 import { profileService } from '../services/profileService';
 import { downloadService } from '../services/downloadService';
 import { useContentFiltering } from '../hooks/useContentFiltering';
@@ -66,6 +67,10 @@ export function VOD() {
     const [decade, setDecade] = useState<number | null>(null);
     // ⏳ Item 37: filtro por duração (episode_run_time do provedor).
     const [durationFilter, setDurationFilter] = useState<DurationBucket | null>(null);
+    // 🏷️ Filtro por tag pessoal. O tick refaz a conta quando a ficha fecha —
+    // marcar "Cult" lá dentro tem que refletir aqui sem trocar de tela.
+    const [tagFilter, setTagFilter] = useState<string | null>(null);
+    const [tagsTick, setTagsTick] = useState(0);
     const [genreFilter, setGenreFilter] = useState<string | null>(null);
     const [selectedMovie, setSelectedMovie] = useState<VODStream | null>(null);
     const [tmdbData, setTmdbData] = useState<TMDBMovieDetails | null>(null);
@@ -238,12 +243,18 @@ export function VOD() {
             const filtered = (decade !== null || genreFilter)
                 ? streams.filter(item => matchesFilters(item, decade, genreFilter))
                 : streams;
-            const base = durationFilter
+            const porDuracao = durationFilter
                 ? filtered.filter(item => matchesDuration(item.episode_run_time, durationFilter))
                 : filtered;
+            // Uma leitura de storage para a grade inteira, não uma por card.
+            const comTag = tagFilter ? idsComTag(tagFilter) : null;
+            const base = comTag
+                ? porDuracao.filter(item => comTag.has(`movie:${item.stream_id}`))
+                : porDuracao;
             return sortBy === 'recent' ? base : [...base].sort((a, b) => compareCatalogItems(sortBy, a, b));
         },
-        [streams, sortBy, decade, genreFilter, durationFilter]
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `tagsTick` força a releitura; as marcas vivem no localStorage, fora do React
+        [streams, sortBy, decade, genreFilter, durationFilter, tagFilter, tagsTick]
     );
 
     // 🙈 Esconder assistidos: filmes com progresso >= 95% saem da grade.
@@ -542,7 +553,7 @@ export function VOD() {
                     flexWrap: 'wrap', justifyContent: 'flex-end',
                     maxWidth: 'calc(100% - 330px)'
                 }}>
-                    <CatalogFilters items={streams} decade={decade} genre={genreFilter} onDecade={setDecade} onGenre={setGenreFilter} duration={durationFilter} onDuration={setDurationFilter} inline />
+                    <CatalogFilters items={streams} decade={decade} genre={genreFilter} onDecade={setDecade} onGenre={setGenreFilter} duration={durationFilter} onDuration={setDurationFilter} tag={tagFilter} onTag={setTagFilter} tagsTick={tagsTick} inline />
                     <button
                         onClick={() => {
                             const next = !hideWatched;
@@ -753,7 +764,7 @@ export function VOD() {
             {selectedMovie && (
                 <ContentDetailModal
                     isOpen={!!selectedMovie}
-                    onClose={() => setSelectedMovie(null)}
+                    onClose={() => { setSelectedMovie(null); setTagsTick(tick => tick + 1); }}
                     contentId={String(selectedMovie.stream_id)}
                     contentType="movie"
                     contentData={{

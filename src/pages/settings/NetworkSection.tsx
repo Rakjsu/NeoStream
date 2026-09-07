@@ -11,6 +11,15 @@ export function NetworkSection() {
     const [webRemote, setWebRemote] = useState<{ enabled: boolean; https: boolean; url: string | null; pin: string | null }>({ enabled: false, https: false, url: null, pin: null });
     // 📟 Aparelhos conectados no controle web (polling leve enquanto ligado).
     const [remoteClients, setRemoteClients] = useState<{ id?: string; ip: string; name: string | null; role: string; connectedAt: number; appVersion?: string; outdated?: boolean }[]>([]);
+    /**
+     * O APP do celular já apareceu nesta sessão?
+     *
+     * Pegajoso de propósito. `remoteClients` espelha sockets VIVOS, e ligar o
+     * HTTPS derruba todos eles (o set-enabled faz stop()+start()). Se o app
+     * realmente não fala TLS, ele nunca reconecta — então uma condição baseada
+     * na lista de clientes esconderia o aviso exatamente depois de quebrar.
+     */
+    const [viuCelular, setViuCelular] = useState(false);
     // 🕓 Item 14: histórico de conexões do controle.
     const [connectionHistory, setConnectionHistory] = useState<{ name: string | null; ip: string; role: string; at: number; event: string }[]>([]);
     const { t } = useLanguage();
@@ -60,7 +69,13 @@ export function NetworkSection() {
                 .catch(() => undefined);
             const res = await window.ipcRenderer.invoke('web-remote:clients-list').catch(() => null) as
                 { success?: boolean; clients?: { ip: string; name: string | null; role: string; connectedAt: number; appVersion?: string; outdated?: boolean }[] } | null;
-            if (!cancelled && res?.success) setRemoteClients(res.clients ?? []);
+            if (!cancelled && res?.success) {
+                const clientes = res.clients ?? [];
+                setRemoteClients(clientes);
+                // Uma vez visto, fica visto: ligar o HTTPS derruba a conexao e,
+                // se o app nao falar TLS, ele nunca volta pra lista.
+                if (clientes.some(c => c.role === 'mobile')) setViuCelular(true);
+            }
         };
         void load();
         const id = setInterval(load, 5000);
@@ -295,6 +310,18 @@ export function NetworkSection() {
                                 🔒 {t('network', 'webRemoteHttps')}
                             </label>
                             <p style={{ marginTop: 4, fontSize: 11, opacity: 0.6 }}>{t('network', 'webRemoteHttpsHint')}</p>
+                            {/* O aviso de que o APP do celular para de funcionar
+                                era um rodapé de 11px a 60% de opacidade, do lado
+                                de um controle que quebra o pareamento. Com um
+                                celular em uso, ele vira caixa de alerta. */}
+                            <div
+                                className={viuCelular ? 'certificate-warning' : undefined}
+                                style={viuCelular
+                                    ? { marginTop: 10 }
+                                    : { marginTop: 4, fontSize: 11, opacity: 0.6 }}
+                            >
+                                ⚠️ {t('network', 'webRemoteHttpsAppWarn')}
+                            </div>
                         </div>
                     </div>
                 )}

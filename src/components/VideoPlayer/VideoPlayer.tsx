@@ -23,6 +23,7 @@ import { qrToSvg } from '../../utils/qrEncoder';
 import { SeekPreviewThumb } from './SeekPreviewThumb';
 import { useSleepTimer, formatSleepCountdown } from './useSleepTimer';
 import { aspectPrefs, aspectPrefKey } from '../../utils/aspectPrefs';
+import { subtitleSyncPrefs, subtitleSyncKey } from '../../utils/subtitleSyncPrefs';
 import { ForcedSubtitlesMenu } from './ForcedSubtitlesMenu';
 import { ChannelZapOverlay, type PlayerChannel } from './ChannelZapOverlay';
 import { useLanguage } from '../../services/languageService';
@@ -161,7 +162,10 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     // janela de ~30 min e o player passa a tocar do buffer (pause real).
     const [timeshiftUrl, setTimeshiftUrl] = useState<string | null>(null);
     const [timeshiftBusy, setTimeshiftBusy] = useState(false);
-    const hlsRef = useHls({ src: timeshiftUrl ?? src, videoRef, onStreamError: handleStreamError, reloadToken: streamReloadToken });
+    // reportBandwidth so aqui: este e o player PRINCIPAL. O mosaico de favoritos
+    // e o mini-player tambem usam o useHls, e a banda de uma miniatura nao pode
+    // definir o buffer da proxima reproducao de verdade.
+    const hlsRef = useHls({ src: timeshiftUrl ?? src, videoRef, onStreamError: handleStreamError, reloadToken: streamReloadToken, reportBandwidth: true });
 
     // Sleep timer: pauses playback when the countdown hits zero.
     const sleepTimer = useSleepTimer(useCallback(() => {
@@ -228,7 +232,23 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     const [castingDevice, setCastingDevice] = useState<{ id: string; name: string; type: 'dlna' | 'chromecast' } | null>(null);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     // Subtitle sync offset (seconds); adjusted from the gear menu in 0.5s steps.
+    // Lembrado por conteudo (utils/subtitleSyncPrefs): trocar de episodio faz o
+    // AsyncVideoPlayer voltar pra tela de carregamento e DESMONTAR este player,
+    // entao o ajuste ia embora a cada episodio. Mesmo padrao do aspectMode.
     const [subtitleOffset, setSubtitleOffset] = useState(0);
+    const subSyncKey = subtitleSyncKey(contentType, contentId);
+    useEffect(() => {
+        const salvo = subtitleSyncPrefs.get(subSyncKey);
+        queueMicrotask(() => setSubtitleOffset(salvo));
+    }, [subSyncKey]);
+    const ajustarSincronia = useCallback((delta: number) => {
+        setSubtitleOffset(anterior => {
+            // Passo de meio segundo, como o menu da engrenagem sempre usou.
+            const proximo = Math.round((anterior + delta) * 2) / 2;
+            subtitleSyncPrefs.set(subtitleSyncKey(contentType, contentId), proximo);
+            return proximo;
+        });
+    }, [contentType, contentId]);
     // Aspect ratio mode (gear menu): how the video fills the stage.
     // Default 'fill' (cover) = the player's historical rendering; 'original'
     // shows the full frame uncropped (letterbox for 4:3 content). The chosen
@@ -521,6 +541,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         handleSubtitleToggle,
         handleSubtitleLanguageSelect,
         handleSubtitlesOff,
+        handleOpenSubtitleFile,
+        diskSubtitleName,
         handleForcedSessionToggle
     } = useSubtitleManager({ title, tmdbId, imdbId, seasonNumber, episodeNumber, videoRef });
 
@@ -1713,12 +1735,14 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             subtitleLanguage={subtitleLanguage}
                             onSelectSubtitleLanguage={handleSubtitleLanguageSelect}
                             onDisableSubtitles={handleSubtitlesOff}
+                            onOpenSubtitleFile={hasWindowControls ? handleOpenSubtitleFile : undefined}
+                            diskSubtitleName={diskSubtitleName}
                             audioTracks={audioTracks}
                             onSelectAudioTrack={handleSelectAudioTrack}
                             aspectMode={aspectMode}
                             onSetAspectMode={chooseAspectMode}
                             subtitleOffset={contentType !== 'live' && subtitlesEnabled ? subtitleOffset : undefined}
-                            onAdjustSubtitleOffset={(delta) => setSubtitleOffset(prev => Math.round((prev + delta) * 2) / 2)}
+                            onAdjustSubtitleOffset={ajustarSincronia}
                             sleepTimerMinutes={sleepTimer.selectedMinutes}
                             onSetSleepTimer={(minutes) => minutes ? sleepTimer.start(minutes) : sleepTimer.cancel()}
                             volumeBoost={volumeBoost}

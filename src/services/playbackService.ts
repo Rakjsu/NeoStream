@@ -58,7 +58,6 @@ interface SpeedTestResult {
 class PlaybackService {
     private config: PlaybackConfig = getDefaultConfig();
     private lastSpeedTest: SpeedTestResult | null = null;
-    private speedTestInProgress = false;
 
     constructor() {
         this.loadConfig();
@@ -130,7 +129,8 @@ class PlaybackService {
      */
     async getBufferSeconds(): Promise<number> {
         if (this.config.bufferSize === 'intelligent') {
-            return await this.calculateIntelligentBuffer();
+            // Sem medida ainda: 15s ate o player informar a banda real.
+            return this.getCachedBufferSeconds() ?? 15;
         }
         return parseInt(this.config.bufferSize, 10);
     }
@@ -139,85 +139,25 @@ class PlaybackService {
      * Test connection speed and recommend buffer size
      * Returns buffer size in seconds
      */
-    private async calculateIntelligentBuffer(): Promise<number> {
-        // Use cached result if less than 5 minutes old
-        const cacheAge = this.lastSpeedTest
-            ? Date.now() - this.lastSpeedTest.timestamp
-            : Infinity;
-
-        if (this.lastSpeedTest && cacheAge < 5 * 60 * 1000) {
-            return this.lastSpeedTest.recommendedBufferSeconds;
-        }
-
-        // Avoid multiple concurrent tests
-        if (this.speedTestInProgress) {
-            return 15; // Default fallback during test
-        }
-
-        try {
-            this.speedTestInProgress = true;
-            const speedMbps = await this.measureConnectionSpeed();
-            const recommendedBufferSeconds = this.getBufferForSpeed(speedMbps);
-
-            this.lastSpeedTest = {
-                speedMbps,
-                recommendedBufferSeconds,
-                timestamp: Date.now()
-            };
-
-
-            return recommendedBufferSeconds;
-        } catch (error) {
-            console.error('Speed test failed:', error);
-            return 15; // Default fallback
-        } finally {
-            this.speedTestInProgress = false;
-        }
-    }
-
     /**
-     * Measure connection speed by downloading a small test file
+     * Banda REAL, informada pelo player quando o hls.js tem estimativa propria.
+     *
+     * O que existia aqui antes era um "teste de velocidade" que baixava o logo
+     * do google.com a cada 5 minutos, com um tamanho CHUTADO (10 KB, nao o
+     * tamanho real do arquivo) e cronometro disparado antes do laco. A conta
+     * dava latencia ate a Google apresentada como banda — o proprio comentario
+     * admitia ("Since this is a small file, estimate based on latency").
+     *
+     * Media do provedor de verdade e coisa que o hls.js ja faz, de graca,
+     * enquanto reproduz.
      */
-    private async measureConnectionSpeed(): Promise<number> {
-        // Use a reliable CDN for speed test (small image)
-        const testUrls = [
-            'https://www.google.com/images/branding/googlelogo/2x/googlelogo_color_92x30dp.png',
-            'https://www.cloudflare.com/favicon.ico'
-        ];
-
-        const testSize = 10000; // Approximate size in bytes
-        const startTime = performance.now();
-
-        try {
-            // Try multiple URLs in case one fails
-            for (const url of testUrls) {
-                try {
-                    const response = await fetch(url + '?t=' + Date.now(), {
-                        cache: 'no-store',
-                        mode: 'no-cors'
-                    });
-
-                    if (!response.ok && response.type !== 'opaque') continue;
-
-                    const endTime = performance.now();
-                    const durationSeconds = (endTime - startTime) / 1000;
-
-                    // Calculate speed in Mbps
-                    const speedMbps = (testSize * 8) / (durationSeconds * 1000000);
-
-                    // Since this is a small file, estimate based on latency
-                    // Scale up for more realistic bandwidth estimation
-                    return Math.max(speedMbps * 10, 1);
-                } catch {
-                    continue;
-                }
-            }
-
-            // If all tests fail, assume moderate connection
-            return 10;
-        } catch {
-            return 10; // Default to moderate speed
-        }
+    reportMeasuredBandwidth(mbps: number): void {
+        if (!Number.isFinite(mbps) || mbps <= 0) return;
+        this.lastSpeedTest = {
+            speedMbps: mbps,
+            recommendedBufferSeconds: this.getBufferForSpeed(mbps),
+            timestamp: Date.now(),
+        };
     }
 
     /**
@@ -246,18 +186,11 @@ class PlaybackService {
             if (this.lastSpeedTest) {
                 return `Adaptativo (${this.lastSpeedTest.recommendedBufferSeconds}s baseado em ${this.lastSpeedTest.speedMbps.toFixed(1)} Mbps)`;
             }
-            return 'Adaptativo (analisando conexão...)';
+            // Nao ha medida: dizer "analisando" seria mentira, ninguem esta
+            // analisando nada ate a reproducao comecar.
+            return 'Adaptativo (15s até a primeira medida)';
         }
         return `${this.config.bufferSize} segundos`;
-    }
-
-    /**
-     * Force a new speed test
-     */
-    async refreshSpeedTest(): Promise<SpeedTestResult | null> {
-        this.lastSpeedTest = null;
-        await this.calculateIntelligentBuffer();
-        return this.lastSpeedTest;
     }
 
     /**
@@ -271,10 +204,12 @@ class PlaybackService {
      * Get cached buffer seconds synchronously (for immediate use without speed test)
      */
     getCachedBufferSeconds(): number | null {
-        if (this.lastSpeedTest) {
-            return this.lastSpeedTest.recommendedBufferSeconds;
-        }
-        return null;
+        if (!this.lastSpeedTest) return null;
+        // TTL de 5 min: medida velha e de outra rede (o notebook mudou de
+        // Wi-Fi, o provedor caiu de qualidade). Antes o TTL existia num
+        // caminho que a producao nem percorria.
+        if (Date.now() - this.lastSpeedTest.timestamp > 5 * 60 * 1000) return null;
+        return this.lastSpeedTest.recommendedBufferSeconds;
     }
 }
 

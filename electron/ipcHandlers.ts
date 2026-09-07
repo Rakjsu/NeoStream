@@ -33,6 +33,20 @@ import { cachedM3uDocument, resetM3uDocumentCache } from './m3uCache'
 import { normalizeMac, stalkerChannelsToLiveStreams, stalkerGenresToCategories, stalkerVodToStreams, stalkerVodCategories, stalkerSeriesToList, stalkerSeriesCategories, stalkerSeriesInfo, parseStalkerEpisodeId, STALKER_SENTINEL } from './stalkerProtocol'
 import { StalkerClient, resolvePortal } from './stalkerClient'
 import log from './logger'
+import { EXTENSOES_DE_LEGENDA } from './mpvProtocol'
+// Import ESTÁTICO de propósito — e a versão dinâmica custou caro.
+//
+// Um `await import('./mpvPlayer')` aqui dentro faz o bundler partir o main:
+// o `electron/store.ts` sai do main.js e vira um pedaço separado
+// (`store-*.js`, 284 kB). O problema não é o tamanho, é a ORDEM: main.ts
+// importa './e2eUserData' primeiro de propósito, porque o store resolve
+// `app.getPath('userData')` no carregamento do módulo — mas a ordem dos
+// imports entre pedaços não é a ordem do código-fonte.
+//
+// Resultado: o store apontava para o userData errado e o app abria na tela de
+// boas-vindas, como se não houvesse conta cadastrada. 78 dos 100 testes e2e
+// falharam com "elemento não encontrado" e nada no log dizia o porquê.
+import { esconderMpvParaDialogo } from './mpvPlayer'
 // Store for window state (for custom maximize)
 let savedWindowBounds: Electron.Rectangle | null = null
 
@@ -716,35 +730,6 @@ export function setupIpcHandlers() {
         }
     })
 
-    // Generic fetch URL handler (bypasses CORS for external URLs)
-    ipcMain.handle('fetch-url', async (_, url: string) => {
-        try {
-            const fetch = (await import('node-fetch')).default
-            log.info('[Fetch URL] Fetching:', url.substring(0, 100))
-            const response = await fetchWithRetry(async () => fetch(url, {
-                agent: await resolveProviderHttpsAgent(url),
-                signal: AbortSignal.timeout(20000),
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Accept': '*/*'
-                }
-            }))
-
-            if (!response.ok) {
-                log.info('[Fetch URL] Response failed:', response.status)
-                return { success: false, error: `HTTP ${response.status}` }
-            }
-
-            const text = await response.text()
-            registerApprovedProviderUrl(response.url || url)
-            log.info('[Fetch URL] Response length:', text.length)
-            return { success: true, data: text }
-        } catch (error: unknown) {
-            log.error('[Fetch URL] Error:', getErrorMessage(error))
-            return { success: false, error: getErrorMessage(error) }
-        }
-    })
-
     // EPG Cache System - Downloads EPG XML files on app start
     // Downloads fresh on every app restart, caches during session only
     ipcMain.handle('epg:get-cached', async (_, { url, cacheKey, forceRefresh = false }) => {
@@ -1275,6 +1260,64 @@ export function setupIpcHandlers() {
             return { success: true, path: result.filePath }
         } catch (error: unknown) {
             return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
+    /**
+     * Legenda escolhida pelo usuário no disco.
+     *
+     * `withContent` só é lido quando quem pede precisa do TEXTO (player
+     * interno, que desenha a legenda ele mesmo). O caminho do mpv não pede
+     * conteúdo nenhum: mandar o arquivo direto pro mpv evita ler e decodificar
+     * megabytes à toa — e é o que faz o .ass sair estilizado.
+     */
+    ipcMain.handle('subtitle:open-file', async (_event, payload: { extensions?: string[]; withContent?: boolean }) => {
+        try {
+            const pedidas = Array.isArray(payload?.extensions)
+                ? payload.extensions.filter(ext => (EXTENSOES_DE_LEGENDA as readonly string[]).includes(ext))
+                : []
+            // Nunca montar o filtro do diálogo com string crua do renderer.
+            const extensions = pedidas.length > 0 ? pedidas : [...EXTENSOES_DE_LEGENDA]
+
+            // O mpv roda com --ontop: sem tirar o vídeo da frente, o diálogo
+            // nasce atrás dele e o usuário fica com um botão travado.
+            const devolverMpv = esconderMpvParaDialogo()
+            let result: Electron.OpenDialogReturnValue
+            try {
+                result = await dialog.showOpenDialog({
+                    title: 'Legenda',
+                    filters: [{ name: 'Legendas', extensions }],
+                    properties: ['openFile'],
+                })
+            } finally {
+                devolverMpv()
+            }
+            if (result.canceled || result.filePaths.length === 0) return { success: false, canceled: true }
+
+            const escolhido = result.filePaths[0]
+            const path = await import('path')
+            const name = path.basename(escolhido)
+            if (!payload?.withContent) return { success: true, name, path: escolhido }
+
+            const fs = await import('fs/promises')
+            const info = await fs.stat(escolhido)
+            // Legenda de verdade não passa disso; um .txt de 500 MB renomeado,
+            // sim — e entraria inteiro na memória e no estado do React.
+            if (info.size > 5 * 1024 * 1024) return { success: false, error: 'subtitle file too large' }
+            const bytes = await fs.readFile(escolhido)
+            // .srt brasileiro antigo costuma vir em windows-1252. Ler tudo como
+            // utf-8 viraria lixo nos acentos, e o defeito só apareceria em
+            // arquivo velho — passando batido em qualquer teste com UTF-8.
+            let content: string
+            try {
+                content = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+            } catch {
+                content = new TextDecoder('windows-1252').decode(bytes)
+            }
+            return { success: true, name, path: escolhido, content }
+        } catch (error) {
+            log.error('[Subtitle] open-file failed:', error)
+            return { success: false, error: String(error) }
         }
     })
 
