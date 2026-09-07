@@ -143,8 +143,21 @@ export const favoritesService = {
      * Existe em vez de um laço de `add()` porque cada `add()` relê e regrava o
      * localStorage inteiro: copiar 300 favoritos seriam 600 viagens ao
      * storage, com a lista crescendo a cada uma. Aqui é uma leitura e uma
-     * escrita. O `addedAt` de cada item é preservado — o usuário favoritou
-     * aquilo numa data, e a troca de provedor não muda esse fato.
+     * escrita.
+     *
+     * ⚠️ O `addedAt` é CARIMBADO AGORA, e não herdado do item de origem — por
+     * mais tentador que fosse preservar a data em que o usuário favoritou
+     * aquilo. O ledger de exclusões do sync decide por data:
+     * `syncMerge.isTombstoned` descarta o item quando NÃO vale
+     * `addedAt > deletedAt`, e o `unionById` aplica esse filtro **também ao
+     * lado local**. Um favorito copiado com data de janeiro, num id que o
+     * usuário removeu em agosto nesta mesma playlist, seria varrido do próprio
+     * disco no primeiro `sync:apply-remote` — a tela mostraria a cópia dando
+     * certo e ela sumiria sozinha depois.
+     *
+     * O `add()` normal nunca cai nisso porque carimba a data; é exatamente
+     * disso que depende o "um re-add depois de uma deleção sobrevive" que o
+     * `syncMerge` documenta. Copiar é um re-add como outro qualquer.
      */
     addMany(items: FavoriteItem[]): number {
         const activeProfile = profileService.getActiveProfile();
@@ -153,11 +166,12 @@ export const favoritesService = {
         const favorites = profileData.favorites || [];
         const existentes = new Set(favorites.map(f => `${f.type}:${f.id}`));
         let entraram = 0;
+        const agora = new Date().toISOString();
         for (const item of items) {
             const chave = `${item.type}:${item.id}`;
             if (existentes.has(chave)) continue;
             existentes.add(chave);
-            favorites.push(item);
+            favorites.push({ ...item, addedAt: agora });
             entraram++;
         }
         if (entraram > 0) this.saveProfileData({ ...profileData, favorites });

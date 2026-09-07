@@ -128,14 +128,13 @@ describe('favoritesService — leitura de outra playlist e gravação em lote', 
         expect(favoritesService.getAllFromPlaylist('plA')).toEqual([]);
     });
 
-    it('addMany grava em lote, preserva o addedAt e pula os repetidos', () => {
+    it('addMany grava em lote e pula os repetidos', () => {
         const antigo = '2020-05-05T10:00:00.000Z';
         const entraram = favoritesService.addMany([
             { ...fav('m1'), addedAt: antigo },
             { ...fav('m2'), addedAt: antigo },
         ]);
         expect(entraram).toBe(2);
-        expect(favoritesService.getAll().map(f => f.addedAt)).toEqual([antigo, antigo]);
 
         // m1 repetido + m3 novo: só o novo entra.
         expect(favoritesService.addMany([
@@ -143,6 +142,20 @@ describe('favoritesService — leitura de outra playlist e gravação em lote', 
             { ...fav('m3'), addedAt: antigo },
         ])).toBe(1);
         expect(favoritesService.getAll().map(f => f.id)).toEqual(['m1', 'm2', 'm3']);
+    });
+
+    it('addMany CARIMBA o addedAt — a data herdada faria o sync apagar a cópia', () => {
+        // O ledger de exclusões do sync decide por data: `isTombstoned`
+        // descarta o item quando não vale `addedAt > deletedAt`, e o
+        // `unionById` aplica isso também ao lado LOCAL. Um favorito copiado
+        // com data de 2020, num id que o usuário removeu este ano nesta
+        // playlist, sumiria do próprio disco no primeiro sync — depois de a
+        // tela ter dito que a cópia deu certo.
+        const antigo = '2020-05-05T10:00:00.000Z';
+        favoritesService.addMany([{ ...fav('m1'), addedAt: antigo }]);
+        const gravado = favoritesService.getAll()[0].addedAt;
+        expect(gravado).not.toBe(antigo);
+        expect(Date.parse(gravado)).toBeGreaterThan(Date.parse(antigo));
     });
 
     it('addMany não conta duas vezes um id repetido DENTRO do lote', () => {

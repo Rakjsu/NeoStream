@@ -132,10 +132,20 @@ export function Favorites() {
             );
             const entraram = favoritesService.addMany(copiar);
             loadItems();
+            // `semPar` e `jaEstavam` significam coisas OPOSTAS e não podem ser
+            // somados: semPar é o que este provedor não tem, jaEstavam é o que
+            // ele tem e já estava favoritado aqui. Juntá-los faria a frase
+            // dizer que títulos presentes "não estão neste provedor" — e como
+            // este resumo é o único retorno da operação, o usuário sairia
+            // refazendo à mão favoritos que já existem.
+            const jaEstava = jaEstavam.length > 0
+                ? ' ' + t('favoritesPage', 'copyAlreadyHere').replace('{n}', String(jaEstavam.length))
+                : '';
             setResumoCopia(
                 t('favoritesPage', 'copyDone')
                     .replace('{n}', String(entraram))
-                    .replace('{faltaram}', String(semPar.length + jaEstavam.length))
+                    .replace('{semPar}', String(semPar.length))
+                + jaEstava
             );
         } finally {
             setCopiandoDe(null);

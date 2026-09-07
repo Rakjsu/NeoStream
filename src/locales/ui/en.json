@@ -919,7 +919,8 @@
     "exploreMovies": "Explore Movies",
     "exploreSeries": "Explore Series",
     "copyFromOther": "You have favorites in another playlist:",
-    "copyDone": "✓ {n} favorite(s) copied — {faltaram} are not on this provider"
+    "copyDone": "✓ {n} favorite(s) copied — {semPar} are not on this provider",
+    "copyAlreadyHere": "({n} were already here.)"
   },
   "downloads": {
     "activeRecs": "Recording now",
