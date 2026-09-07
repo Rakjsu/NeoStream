@@ -288,7 +288,8 @@
     "rename": "Rename",
     "renameFailed": "Could not rename",
     "defaultName": "My playlist",
-    "m3uFromFile": "Open file…"
+    "m3uFromFile": "Open file…",
+    "connections": "{n} simultaneous connection(s)"
   },
   "notifications": {
     "autoTuneIn": "Switching to {channel} in {s}s…",
@@ -977,7 +978,8 @@
     "dvrMaxConcurrent": "Simultaneous recordings",
     "dvrStartMargin": "Start earlier (min)",
     "dvrEndPadding": "Keep going after (min)",
-    "dvrMarginsDesc": "Guide times are often a few minutes off. These margins record a bit before and a bit after — and they count in the conflict warning."
+    "dvrMarginsDesc": "Guide times are often a few minutes off. These margins record a bit before and a bit after — and they count in the conflict warning.",
+    "providerLimit": "⚠ your provider allows only {n} — the queue uses that limit"
   },
   "history": {
     "title": "History",
