@@ -825,7 +825,9 @@
     "wrappedAnnual": "Retrospectiva",
     "programReminderStarting": "{title} está começando em {channel}",
     "dvrFinishedTitle": "Gravação concluída",
-    "dvrFinishedBody": "{name} — {duration}"
+    "dvrFinishedBody": "{name} — {duration}",
+    "dvrNoSpaceTitle": "💾 Sem espaço para gravar",
+    "dvrNoSpaceBody": "a gravação foi cancelada; libere espaço no disco"
   },
   "changelog": {
     "updateInstalled": "Atualização Instalada!",

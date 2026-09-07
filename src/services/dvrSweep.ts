@@ -50,6 +50,57 @@ export function toggleProtectedRecording(filePath: string): Set<string> {
     return current;
 }
 
+/**
+ * Quanto uma gravação ocupa, por hora. A MESMA taxa que a estimativa do REC
+ * manual já mostra antes de gravar (~2 GB/h de TS), em GB decimal — se as duas
+ * divergirem, o app passa a dizer duas coisas diferentes sobre o mesmo disco.
+ */
+export const DVR_BYTES_POR_HORA = 2e9;
+
+/**
+ * Folga que tem que sobrar DEPOIS da gravação. É o mesmo 1 GB que o REC manual
+ * já exige pra deixar começar: disco no talo trava o sistema inteiro, não só o
+ * app.
+ */
+export const DVR_FOLGA_DISCO_BYTES = 1e9;
+
+export interface VeredictoDeEspaco {
+    cabe: boolean;
+    estimadoBytes: number;
+    /** Quanto falta pra caber (0 quando cabe) — é o que o aviso mostra. */
+    faltamBytes: number;
+}
+
+/**
+ * A gravação cabe no disco? PURO.
+ *
+ * Existe porque o agendado — o único caminho que grava sozinho, de madrugada,
+ * sem ninguém olhando — ia direto de `streams:get-live-url` pra `dvr:start`,
+ * sem perguntar nada. E quando o disco enche no meio, o app não fica só em
+ * silêncio: ele MENTE. O ffmpeg morre, o `dvr:stopped` sai sem campo `error`,
+ * e os dois consumidores anunciam "Gravação concluída" para um arquivo
+ * truncado.
+ *
+ * `duracaoMs` não positiva devolve `cabe: true`: sem saber quanto tempo a
+ * gravação leva, recusar seria chutar contra o usuário.
+ */
+export function espacoParaGravacao(
+    livreBytes: number,
+    duracaoMs: number,
+    folgaBytes: number = DVR_FOLGA_DISCO_BYTES
+): VeredictoDeEspaco {
+    if (!Number.isFinite(livreBytes) || !Number.isFinite(duracaoMs) || duracaoMs <= 0) {
+        return { cabe: true, estimadoBytes: 0, faltamBytes: 0 };
+    }
+    const estimadoBytes = Math.ceil((duracaoMs / 3_600_000) * DVR_BYTES_POR_HORA);
+    const precisa = estimadoBytes + folgaBytes;
+    return {
+        cabe: livreBytes >= precisa,
+        estimadoBytes,
+        faltamBytes: Math.max(0, precisa - livreBytes),
+    };
+}
+
 /** Gravações vencidas (mais velhas que o limite), fora ativas e protegidas (PURO). */
 export function pickExpiredRecordings<T extends RecordingFileInfo>(files: T[], maxAgeDays: number, nowMs: number, protectedPaths?: Set<string>): T[] {
     if (maxAgeDays <= 0) return [];
