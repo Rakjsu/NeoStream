@@ -5,6 +5,8 @@
  * controle web em /setup — o QR nas Configurações → Playlists aponta pra ela.
  */
 
+import { pareceListaM3uNoDisco } from './m3uProtocol'
+
 export interface SetupAccountSource {
     id: string
     name: string
@@ -43,6 +45,10 @@ export function buildSetupDeepLink(
 ): string {
     const accounts = playlists
         .filter(p => typeof p.url === 'string' && p.url.trim().length > 0)
+        // Lista aberta de um arquivo do PC nao serve no celular: o caminho
+        // aponta pro disco DESTA maquina. Mandar assim mesmo faria o app do
+        // celular cadastrar uma conta que nunca abre.
+        .filter(p => !pareceListaM3uNoDisco(p.url))
         .map(p => ({
             id: p.id,
             url: p.url,

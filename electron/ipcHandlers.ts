@@ -28,7 +28,8 @@ import type { PlaylistBackupEntry, MobileAccountEntry } from './playlistManager'
 import { isUserInfoFresh } from './playlistsModel'
 
 import { cachedCatalogFetch, invalidatePlaylistCache, type CatalogKind } from './catalogCache'
-import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uToVodStreams, m3uCategories, m3uToSeries, m3uSeriesInfo, findM3uEpisodeUrl } from './m3uProtocol'
+import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uToVodStreams, m3uCategories, m3uToSeries, m3uSeriesInfo, findM3uEpisodeUrl, pareceListaM3uNoDisco, EXTENSOES_DE_LISTA_M3U } from './m3uProtocol'
+import { lerCanaisM3uDoDisco } from './m3uDiskSource'
 import { cachedM3uDocument, resetM3uDocumentCache } from './m3uCache'
 import { normalizeMac, stalkerChannelsToLiveStreams, stalkerGenresToCategories, stalkerVodToStreams, stalkerVodCategories, stalkerSeriesToList, stalkerSeriesCategories, stalkerSeriesInfo, parseStalkerEpisodeId, STALKER_SENTINEL } from './stalkerProtocol'
 import { StalkerClient, resolvePortal } from './stalkerClient'
@@ -54,8 +55,34 @@ let savedWindowBounds: Electron.Rectangle | null = null
  * Shared SWR body for the six catalog endpoints: instant repeat visits from
  * the disk cache (15 min TTL) + stale fallback when the provider errors.
  */
+/**
+ * A lista de disco só é lida se ela ESTIVER CADASTRADA como playlist.
+ *
+ * Sem esta checagem, o roteador logo abaixo vira um leitor de arquivo
+ * alcançável pelo renderer: `playlists:import-mobile` aceita `url` como string
+ * qualquer, e bastaria cadastrar um caminho e trocar de playlist. É a mesma
+ * classe de ponte que o #405 removeu ao apagar o `fetch-url`.
+ *
+ * Cadastrar um caminho, por sua vez, só acontece por `playlists:add-m3u-file`,
+ * onde quem escolhe o arquivo é a pessoa, no diálogo do sistema.
+ */
+function listaDeDiscoCadastrada(caminho: string): boolean {
+    return listPublicPlaylists().some(p => p.type === 'm3u' && p.url === caminho)
+}
+
 /** Download + parse an M3U document (shared by add and the SWR fetcher). */
 async function fetchM3uChannels(url: string) {
+    // Arquivo do computador: mesmo parse, outro transporte.
+    if (pareceListaM3uNoDisco(url)) {
+        if (!listaDeDiscoCadastrada(url)) {
+            throw new Error('Esta lista não está cadastrada — abra-a por Configurações → Playlists')
+        }
+        const fs = await import('fs/promises')
+        return lerCanaisM3uDoDisco(url, {
+            stat: async (caminho) => ({ size: (await fs.stat(caminho)).size }),
+            readFile: (caminho) => fs.readFile(caminho),
+        })
+    }
     // One retry for transient failures — a momentary 502 on first boot (no
     // SWR cache yet) otherwise means an empty catalog.
     const response = await requestWithRetry(async () => axios.get(url, {
@@ -433,6 +460,11 @@ export function setupIpcHandlers() {
     // Add an M3U playlist (phase 1: live channels only).
     ipcMain.handle('playlists:add-m3u', async (_, { name, url }) => {
         try {
+            // O regex fica, mesmo com o app sabendo ler lista de arquivo: este
+            // handler recebe string do RENDERER, e aceitar caminho de disco aqui
+            // daria a um renderer comprometido um leitor de arquivo no processo
+            // principal. Arquivo entra só pelo `playlists:add-m3u-file`, onde
+            // quem escolhe é a pessoa, no diálogo do sistema.
             const m3uUrl = String(url ?? '').trim()
             if (!/^https?:\/\//.test(m3uUrl)) {
                 return { success: false, error: 'URL inválida' }
@@ -451,6 +483,63 @@ export function setupIpcHandlers() {
             resetProviderEpgState()
 
             return { success: true, playlistId: entry.id, channelCount: channels.length }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
+        }
+    })
+
+    /**
+     * Lista M3U de um arquivo do computador.
+     *
+     * O renderer NUNCA manda caminho: ele pede, o diálogo do sistema abre com o
+     * filtro de extensão que o próprio main define, e o caminho escolhido pela
+     * pessoa nasce aqui. Mesmo desenho do `subtitle:open-file`.
+     */
+    ipcMain.handle('playlists:add-m3u-file', async (_e, payload: { name?: string }) => {
+        try {
+            // O mpv roda com --ontop e engoliria o diálogo.
+            const devolverMpv = esconderMpvParaDialogo()
+            let result: Electron.OpenDialogReturnValue
+            try {
+                result = await dialog.showOpenDialog({
+                    title: 'Lista M3U',
+                    filters: [{ name: 'Listas M3U', extensions: [...EXTENSOES_DE_LISTA_M3U] }],
+                    properties: ['openFile'],
+                })
+            } finally {
+                devolverMpv()
+            }
+            if (result.canceled || result.filePaths.length === 0) return { success: false, canceled: true }
+
+            const escolhido = result.filePaths[0]
+            // Cinto e suspensório: dá pra digitar caminho à mão no diálogo.
+            if (!pareceListaM3uNoDisco(escolhido)) {
+                return { success: false, error: 'Escolha um arquivo .m3u ou .m3u8' }
+            }
+
+            const path = await import('path')
+            const nomeDoArquivo = path.basename(escolhido)
+            // Cadastra ANTES de ler: o leitor de disco só aceita caminho que já
+            // esteja na lista de playlists (ver listaDeDiscoCadastrada).
+            const entry = saveAndActivatePlaylist({
+                name: typeof payload?.name === 'string' && payload.name.trim() ? payload.name.trim() : nomeDoArquivo,
+                url: escolhido,
+                username: 'm3u',
+                password: 'm3u',
+                type: 'm3u'
+            })
+            let channelCount = 0
+            try {
+                channelCount = (await m3uDocument(escolhido, true)).channels.length
+            } catch (error) {
+                // Arquivo ilegível: desfaz o cadastro pra não deixar uma
+                // playlist ativa que nunca vai abrir.
+                removePlaylist(entry.id)
+                return { success: false, error: getErrorMessage(error) }
+            }
+            resetProviderEpgState()
+
+            return { success: true, playlistId: entry.id, channelCount, fileName: nomeDoArquivo }
         } catch (error: unknown) {
             return { success: false, error: getErrorMessage(error) }
         }
@@ -1437,11 +1526,26 @@ export function setupIpcHandlers() {
 
         if (activeEntry?.type === 'm3u') {
             const startedAt = Date.now()
-            const download = await probe('m3u_download', activeEntry.url)
+            // Lista de arquivo nao tem download: o `probe` e um GET, e reportaria
+            // um erro de rede sem sentido pra um caminho de disco. No lugar dele,
+            // o que de fato pode dar errado — o arquivo ainda estar la.
+            const doDisco = pareceListaM3uNoDisco(activeEntry.url)
+            const download = doDisco
+                ? await (async () => {
+                    try {
+                        const fs = await import('fs/promises')
+                        const info = await fs.stat(activeEntry.url)
+                        return { name: 'm3u_arquivo', ok: true, status: null, ms: Date.now() - startedAt, error: `${Math.round(info.size / 1024)} KB` }
+                    } catch {
+                        return { name: 'm3u_arquivo', ok: false, status: null, ms: Date.now() - startedAt, error: 'arquivo nao encontrado' }
+                    }
+                })()
+                : await probe('m3u_download', activeEntry.url)
             const parseResult = await fetchM3uChannels(activeEntry.url)
                 .then(channels => ({ name: 'm3u_parse', ok: channels.length > 0, status: null, ms: Date.now() - startedAt, error: undefined as string | undefined }))
                 .catch((error: unknown) => ({ name: 'm3u_parse', ok: false, status: null, ms: Date.now() - startedAt, error: getErrorMessage(error) as string | undefined }))
-            const speed = opts?.speedTest ? await measureSpeed(activeEntry.url) : null
+            // Medir Mbps de um arquivo local nao quer dizer nada.
+            const speed = opts?.speedTest && !doDisco ? await measureSpeed(activeEntry.url) : null
             return { success: true, results: [download, parseResult], speed }
         }
 

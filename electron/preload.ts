@@ -141,6 +141,7 @@ const invokeChannels = new Set([
     'pip:set-display',
     'playlists:add',
     'playlists:add-m3u',
+    'playlists:add-m3u-file',
     'playlists:get-active-id',
     'playlists:import-mobile',
     'playlists:list',

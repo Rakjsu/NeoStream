@@ -313,6 +313,42 @@ export function findM3uEpisodeUrl(seriesChannels: M3uChannel[], episodeId: numbe
     return channel && parseEpisodeTag(channel.name) ? channel.url : null
 }
 
+/** Extensoes que a lista aceita quando ela vem de um arquivo do computador. */
+export const EXTENSOES_DE_LISTA_M3U = ['m3u', 'm3u8'] as const
+
+/**
+ * O caminho tem cara de lista M3U guardada no disco? PURO (nao toca no disco).
+ *
+ * Espelha o `pareceLegendaNoDisco` do mpvProtocol, e pelos mesmos motivos:
+ * - **UNC recusado** (`\\servidor\...` ou `//servidor/...`): abrir isso faria o
+ *   processo principal iniciar uma conexao de rede achando que le um arquivo.
+ * - **Caminho relativo recusado**: dependeria do diretorio de trabalho do
+ *   processo, que ninguem controla.
+ * - **Extensao da allowlist**: o mesmo par que o dialogo do sistema oferece.
+ */
+export function pareceListaM3uNoDisco(caminho: unknown): boolean {
+    if (typeof caminho !== 'string' || caminho.length === 0) return false
+    if (caminho.startsWith('\\\\') || caminho.startsWith('//')) return false
+    if (!/^([a-zA-Z]:[\\/]|\/)/.test(caminho)) return false
+    return /\.(m3u|m3u8)$/i.test(caminho)
+}
+
+/**
+ * Bytes de uma lista -> texto.
+ *
+ * `.m3u` exportada de painel antigo costuma vir em windows-1252: ler tudo como
+ * utf-8 transformaria os acentos dos nomes de canal em lixo, e o defeito so
+ * apareceria em lista velha — passando batido em qualquer teste feito com
+ * UTF-8. Mesma armadilha ja resolvida no caminho das legendas.
+ */
+export function decodeM3uBytes(bytes: Uint8Array): string {
+    try {
+        return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+    } catch {
+        return new TextDecoder('windows-1252').decode(bytes)
+    }
+}
+
 /** Cheap sanity check that a fetched body is an M3U document. */
 export function looksLikeM3u(text: string): boolean {
     const head = text.replace(/^\uFEFF/, '').trimStart().slice(0, 200)

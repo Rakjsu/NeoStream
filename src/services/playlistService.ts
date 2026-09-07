@@ -38,6 +38,15 @@ export const playlistService = {
         return await window.ipcRenderer.invoke('playlists:add-m3u', input) as IpcResult & { channelCount?: number }
     },
 
+    /**
+     * Lista M3U de um arquivo do computador. Não recebe caminho: quem abre o
+     * diálogo do sistema é o processo principal, e o caminho escolhido nunca
+     * passa pelo renderer (`playlists:add-m3u-file`).
+     */
+    async addM3uFromFile(input: { name?: string } = {}): Promise<IpcResult & { channelCount?: number; canceled?: boolean; fileName?: string }> {
+        return await window.ipcRenderer.invoke('playlists:add-m3u-file', input) as IpcResult & { channelCount?: number; canceled?: boolean; fileName?: string }
+    },
+
     async addStalker(input: { name?: string; url: string; mac: string }): Promise<IpcResult & { channelCount?: number }> {
         return await window.ipcRenderer.invoke('playlists:add-stalker', input) as IpcResult & { channelCount?: number }
     },

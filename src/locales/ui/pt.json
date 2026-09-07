@@ -276,7 +276,7 @@
     "empty": "Nenhuma playlist salva",
     "add": "Adicionar playlist",
     "addTitle": "Nova playlist",
-    "m3uHint": "Cole a URL de uma lista M3U/M3U8 — os canais entram na TV ao Vivo com os grupos como categorias (fase 1: só canais)",
+    "m3uHint": "Cole a URL de uma lista M3U/M3U8 — ou abra um arquivo .m3u do computador. Os canais entram na TV ao Vivo com os grupos como categorias (fase 1: só canais)",
     "stalkerHint": "Informe a URL do portal (ex.: http://portal.tv/c/) e o MAC da sua conta (00:1A:79:...)",
     "toPhone": "Levar pro celular",
     "toPhoneHint": "Escaneie com a câmera do celular: a página abre o NeoStream Mobile e importa suas contas (substitui as do app).",
@@ -297,7 +297,8 @@
     "removeError": "Não foi possível remover a playlist.",
     "rename": "Renomear",
     "renameFailed": "Não deu pra renomear",
-    "defaultName": "Minha Playlist"
+    "defaultName": "Minha Playlist",
+    "m3uFromFile": "Abrir arquivo…"
   },
   "updates": {
     "title": "Atualizações Automáticas",

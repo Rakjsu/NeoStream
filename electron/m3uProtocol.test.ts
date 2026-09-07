@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseM3u, m3uCategories, m3uToLiveStreams, m3uToVodStreams, classifyM3uChannels, parseM3uHeader, looksLikeM3u, parseEpisodeTag, m3uToSeries, m3uSeriesInfo, findM3uEpisodeUrl } from './m3uProtocol'
+import { parseM3u, m3uCategories, m3uToLiveStreams, m3uToVodStreams, classifyM3uChannels, parseM3uHeader, looksLikeM3u, parseEpisodeTag, m3uToSeries, m3uSeriesInfo, findM3uEpisodeUrl, pareceListaM3uNoDisco, decodeM3uBytes } from './m3uProtocol'
 
 const SAMPLE = `#EXTM3U
 #EXTINF:-1 tvg-id="globo.br" tvg-logo="http://x/globo.png" group-title="Abertos",Globo SP
@@ -174,5 +174,43 @@ describe('series M3U (fase 3)', () => {
         const episode = info.episodes['1'][0] // Beta S01E01 (índice 2 na lista)
         expect(findM3uEpisodeUrl(seriesChannels, episode.id)).toBe('http://x/beta-s01e01.mkv')
         expect(findM3uEpisodeUrl(seriesChannels, 499999)).toBeNull()
+    })
+})
+
+describe('pareceListaM3uNoDisco', () => {
+    // Espelha o guarda das legendas: o caminho vem do dialogo do sistema, mas
+    // da pra digitar a mao nele.
+    it('aceita caminho absoluto local com extensao de lista', () => {
+        expect(pareceListaM3uNoDisco('C:\\Listas\\minha.m3u')).toBe(true)
+        expect(pareceListaM3uNoDisco('C:/Listas/minha.M3U8')).toBe(true)
+        expect(pareceListaM3uNoDisco('/home/rak/lista.m3u')).toBe(true)
+    })
+
+    it('recusa UNC — abrir isso seria conexao de rede, nao arquivo', () => {
+        expect(pareceListaM3uNoDisco('\\\\servidor\\share\\lista.m3u')).toBe(false)
+        expect(pareceListaM3uNoDisco('//servidor/share/lista.m3u')).toBe(false)
+    })
+
+    it('recusa relativo, extensao de fora, URL e lixo', () => {
+        expect(pareceListaM3uNoDisco('listas/minha.m3u')).toBe(false)
+        expect(pareceListaM3uNoDisco('C:\\Windows\\System32\\config\\SAM')).toBe(false)
+        expect(pareceListaM3uNoDisco('C:\\lista.txt')).toBe(false)
+        expect(pareceListaM3uNoDisco('http://provedor.tv/lista.m3u')).toBe(false)
+        expect(pareceListaM3uNoDisco('')).toBe(false)
+        expect(pareceListaM3uNoDisco(null)).toBe(false)
+        expect(pareceListaM3uNoDisco(42)).toBe(false)
+    })
+})
+
+describe('decodeM3uBytes', () => {
+    it('utf-8 passa reto', () => {
+        expect(decodeM3uBytes(new TextEncoder().encode('Globo São Paulo'))).toBe('Globo São Paulo')
+    })
+
+    // Lista exportada de painel antigo costuma vir em windows-1252; ler tudo
+    // como utf-8 viraria lixo nos acentos, e so em lista velha.
+    it('cai pra windows-1252 quando o utf-8 nao valida', () => {
+        const cp1252 = Uint8Array.from([...new TextEncoder().encode('Globo S'), 0xE3, ...new TextEncoder().encode('o Paulo')])
+        expect(decodeM3uBytes(cp1252)).toBe('Globo São Paulo')
     })
 })

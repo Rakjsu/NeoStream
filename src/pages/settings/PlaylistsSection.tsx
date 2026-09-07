@@ -161,6 +161,25 @@ export function PlaylistsSection() {
         }
     };
 
+    /**
+     * Abrir a lista de um arquivo do computador. Sai do fluxo do formulário de
+     * propósito: o campo de URL é `required`, e aqui não há URL nenhuma.
+     */
+    const handleAddFromFile = async () => {
+        setError('');
+        setAdding(true);
+        try {
+            const result = await playlistService.addM3uFromFile({ name: form.name.trim() || undefined });
+            if (result.success) {
+                playlistService.reloadIntoDashboard(true);
+            } else if (!result.canceled) {
+                setError(result.error || t('playlists', 'addError'));
+            }
+        } finally {
+            setAdding(false);
+        }
+    };
+
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -394,6 +413,16 @@ export function PlaylistsSection() {
                             >
                                 {t('common', 'close')}
                             </button>
+                            {addType === 'm3u' && (
+                                <button
+                                    type="button"
+                                    className="playlists-btn"
+                                    onClick={() => void handleAddFromFile()}
+                                    disabled={adding}
+                                >
+                                    📂 {t('playlists', 'm3uFromFile')}
+                                </button>
+                            )}
                             <button type="submit" className="playlists-btn playlists-btn-primary" disabled={adding}>
                                 {adding ? t('playlists', 'adding') : t('playlists', 'addConfirm')}
                             </button>

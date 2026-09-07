@@ -14,7 +14,7 @@ import { ipcMain } from 'electron'
 import store from './store'
 import axios from 'axios'
 import { findPlaylist, getActivePlaylistIdPublic } from './playlistManager'
-import { parseM3uHeader } from './m3uProtocol'
+import { parseM3uHeader, pareceListaM3uNoDisco, decodeM3uBytes } from './m3uProtocol'
 import { fetchWithRetry } from './fetchRetry'
 import log from './logger'
 import { resolveProviderHttpsAgent, registerApprovedProviderUrl } from './certificatePolicy'
@@ -237,14 +237,28 @@ function ensureXmltvIndex(): Promise<void> {
             }
 
             if (activeEntry?.type === 'm3u') {
-                const head = await axios.get(activeEntry.url, {
-                    timeout: 15000,
-                    responseType: 'text',
-                    transformResponse: [(d: unknown) => d],
-                    // first ~64KB is plenty for the header line
-                    headers: { Range: 'bytes=0-65535' },
-                    validateStatus: (code) => code === 200 || code === 206
-                }).then(r => String(r.data ?? '')).catch(() => '')
+                // Lista de arquivo: o `Range` do axios nao vale pra caminho de
+                // disco, e o `.catch(() => '')` fazia o EPG do provedor sumir
+                // sem explicacao. O `url-tvg` de dentro dela continua sendo uma
+                // URL http — o que e local e o ARQUIVO, nao o EPG.
+                const head = pareceListaM3uNoDisco(activeEntry.url)
+                    ? await (async () => {
+                        try {
+                            const fs = await import('fs/promises')
+                            const bytes = await fs.readFile(activeEntry.url)
+                            return decodeM3uBytes(bytes.subarray(0, 65536))
+                        } catch {
+                            return ''
+                        }
+                    })()
+                    : await axios.get(activeEntry.url, {
+                        timeout: 15000,
+                        responseType: 'text',
+                        transformResponse: [(d: unknown) => d],
+                        // first ~64KB is plenty for the header line
+                        headers: { Range: 'bytes=0-65535' },
+                        validateStatus: (code) => code === 200 || code === 206
+                    }).then(r => String(r.data ?? '')).catch(() => '')
                 const { urlTvg } = parseM3uHeader(head)
                 if (!urlTvg) {
                     if (stillCurrent()) xmltvAvailability = 'unavailable'

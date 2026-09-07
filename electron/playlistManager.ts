@@ -271,6 +271,11 @@ export function importMobileAccounts(entries: MobileAccountEntry[]): number {
     let imported = 0
     for (const entry of entries) {
         if (!entry?.url?.trim() || typeof entry.username !== 'string' || typeof entry.password !== 'string') continue
+        // Lista M3U vinda de FORA só entra por URL. Um backup de celular é um
+        // arquivo que o renderer entrega, e aceitar caminho de disco aqui
+        // abriria, pelo catálogo, um leitor de arquivo no processo principal.
+        // Arquivo local entra só pelo diálogo do sistema (playlists:add-m3u-file).
+        if (entry.type === 'm3u' && !/^https?:\/\//i.test(entry.url.trim())) continue
         const result = upsertPlaylist(playlists, {
             name: entry.name,
             url: entry.url,
