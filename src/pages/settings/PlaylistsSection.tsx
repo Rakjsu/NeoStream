@@ -3,6 +3,7 @@ import { useLanguage } from '../../services/languageService';
 import { playlistService, type PlaylistSummary } from '../../services/playlistService';
 import { parseMobileBackupAccounts } from '../../services/crossBackup';
 import { qrToSvg } from '../../utils/qrEncoder';
+import { lerMaxConexoes } from '../../utils/providerConnections';
 
 /**
  * Settings > Playlists: list saved Xtream playlists, add a new one,
@@ -44,6 +45,11 @@ export function PlaylistsSection() {
     // O QR carrega um token de uso único (não mais o PIN permanente): abrir
     // este painel é o que libera a exportação das contas no controle web.
     const [setupHandoff, setSetupHandoff] = useState<{ url: string; token: string } | null>(null);
+    // 🔌 Quantas conexões o provedor da lista ATIVA aceita. Vinha no
+    // `user_info` de todo login e ia só pro log — e é a informação que explica
+    // metade das reclamações de "o download morreu sozinho" (a maioria dos
+    // planos vende UMA conexão).
+    const [conexoesDoProvedor, setConexoesDoProvedor] = useState<number | null>(null);
     const [importingMobile, setImportingMobile] = useState(false);
     const [importMsg, setImportMsg] = useState('');
 
@@ -57,6 +63,21 @@ export function PlaylistsSection() {
             setLoading(false);
         }
     };
+
+    // O `user_info` da lista ativa (o mesmo canal com cache/TTL que o banner de
+    // expiração da Home usa — sem tráfego novo pro provedor). Só a ativa: é
+    // dela que temos as credenciais em mãos.
+    useEffect(() => {
+        let vivo = true;
+        void (async () => {
+            try {
+                const status = await window.ipcRenderer.invoke('auth:refresh-user-info') as
+                    { success?: boolean; user?: unknown };
+                if (vivo && status?.success) setConexoesDoProvedor(lerMaxConexoes(status.user));
+            } catch { /* provedor fora do ar: o card fica sem o dado */ }
+        })();
+        return () => { vivo = false; };
+    }, []);
 
     useEffect(() => {
         // Deferred: refresh flips loading state synchronously on entry.
@@ -292,6 +313,10 @@ export function PlaylistsSection() {
                                             : playlist.type === 'stalker'
                                                 ? <>Stalker · {hostOf(playlist.url)} · {playlist.username}</>
                                                 : <>{hostOf(playlist.url)} · {playlist.username}</>}
+                                        {/* Só na ativa: o `user_info` que temos em mãos é o dela. */}
+                                        {playlist.active && conexoesDoProvedor !== null && (
+                                            <> · 🔌 {t('playlists', 'connections').replace('{n}', String(conexoesDoProvedor))}</>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="playlists-item-actions">
