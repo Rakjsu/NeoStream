@@ -388,7 +388,9 @@
     "switchError": "No se pudo conectar a esta playlist.",
     "remove": "Eliminar",
     "confirmRemove": "¿Confirmar?",
-    "removeError": "No se pudo eliminar la playlist."
+    "removeError": "No se pudo eliminar la playlist.",
+    "rename": "Renombrar",
+    "renameFailed": "No se pudo renombrar"
   },
   "updates": {
     "title": "Actualizaciones Automáticas",

@@ -293,7 +293,9 @@
     "switchError": "Could not connect to this playlist.",
     "remove": "Remove",
     "confirmRemove": "Confirm?",
-    "removeError": "Could not remove the playlist."
+    "removeError": "Could not remove the playlist.",
+    "rename": "Rename",
+    "renameFailed": "Could not rename"
   },
   "notifications": {
     "autoTuneIn": "Switching to {channel} in {s}s…",
