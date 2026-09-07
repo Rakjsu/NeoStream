@@ -25,6 +25,9 @@ export function PlaybackSection() {
     const [groupVersions, setGroupVersions] = useState<boolean>(() => localStorage.getItem('neostream_group_versions') !== '0');
     const [screensaverMin, setScreensaverMin] = useState<number>(() => parseInt(localStorage.getItem(SCREENSAVER_MINUTES_KEY) || '0', 10) || 0);
     const [playbackConfig, setPlaybackConfig] = useState<PlaybackConfig>(playbackService.getConfig());
+    // null = ainda carregando, pro select não piscar num valor que não é o
+    // gravado. A preferência vive no processo principal (ver gpuPolicy.ts).
+    const [hwAccel, setHwAccel] = useState<'auto' | 'force' | 'off' | null>(null);
     // Multi-monitor: where the PiP window opens (list comes from the main process).
     const [pipDisplays, setPipDisplays] = useState<{ id: number; label: string; width: number; height: number; primary: boolean }[]>([]);
     const [pipDisplayId, setPipDisplayId] = useState<number | null>(null);
@@ -38,6 +41,17 @@ export function PlaybackSection() {
                 if (cancelled || !result?.success) return;
                 setPipDisplays(result.displays || []);
                 setPipDisplayId(result.selectedId ?? null);
+            })
+            .catch(() => undefined);
+        return () => { cancelled = true; };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        window.ipcRenderer.invoke('system:get-config')
+            .then((result: { success?: boolean; config?: { hardwareAcceleration?: 'auto' | 'force' | 'off' } }) => {
+                if (cancelled || !result?.success) return;
+                setHwAccel(result.config?.hardwareAcceleration ?? 'auto');
             })
             .catch(() => undefined);
         return () => { cancelled = true; };
@@ -249,6 +263,32 @@ export function PlaybackSection() {
                         <option value="30">30 {t('playback', 'seconds')}</option>
                     </select>
                     {saveAnimation === 'bufferSize' && <span className="save-indicator">{t('settings', 'saved')}</span>}
+                </div>
+
+                <div className="setting-item">
+                    <div className="setting-info">
+                        <label>{t('playback', 'hwAccel')}</label>
+                        <p>{t('playback', 'hwAccelDesc')}</p>
+                    </div>
+                    <select
+                        className="setting-select"
+                        value={hwAccel ?? 'auto'}
+                        disabled={hwAccel === null}
+                        onChange={(e) => {
+                            const mode = e.target.value as 'auto' | 'force' | 'off';
+                            setHwAccel(mode);
+                            // Só grava: switch de GPU não tem efeito em runtime,
+                            // e é por isso que a descrição fala em reiniciar.
+                            window.ipcRenderer.invoke('system:set-config', { hardwareAcceleration: mode })
+                                .catch(() => undefined);
+                            triggerSaveAnimation('hwAccel');
+                        }}
+                    >
+                        <option value="auto">{t('playback', 'hwAccelAuto')}</option>
+                        <option value="force">{t('playback', 'hwAccelForce')}</option>
+                        <option value="off">{t('playback', 'hwAccelOff')}</option>
+                    </select>
+                    {saveAnimation === 'hwAccel' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                 </div>
 
                 {pipDisplays.length > 1 && (

@@ -470,7 +470,12 @@
     "mpvDownloadCancel": "Cancelar",
     "mpvDownloadSuccess": "MPV instalado",
     "mpvDownloadError": "Error al descargar MPV. Verifica tu conexión.",
-    "mpvDownloadRetry": "Reintentar"
+    "mpvDownloadRetry": "Reintentar",
+    "hwAccel": "🎮 Aceleración por hardware",
+    "hwAccelDesc": "Apagarla resuelve pantalla negra y bloqueos en tarjetas gráficas problemáticas, a costa de más CPU. Solo vale después de reiniciar NeoStream.",
+    "hwAccelAuto": "Automática (recomendada)",
+    "hwAccelForce": "Forzar (ignora la lista de bloqueo)",
+    "hwAccelOff": "Apagada (solo software)"
   },
   "appearance": {
     "title": "Apariencia",

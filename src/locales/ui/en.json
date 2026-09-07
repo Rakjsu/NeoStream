@@ -470,7 +470,12 @@
     "mpvDownloadCancel": "Cancel",
     "mpvDownloadSuccess": "MPV installed",
     "mpvDownloadError": "MPV download failed. Check your connection.",
-    "mpvDownloadRetry": "Try again"
+    "mpvDownloadRetry": "Try again",
+    "hwAccel": "🎮 Hardware acceleration",
+    "hwAccelDesc": "Turning it off fixes black screens and freezes on troublesome graphics cards, at the cost of more CPU. Takes effect after you restart NeoStream.",
+    "hwAccelAuto": "Automatic (recommended)",
+    "hwAccelForce": "Force (ignore the blocklist)",
+    "hwAccelOff": "Off (software only)"
   },
   "appearance": {
     "title": "Appearance",
