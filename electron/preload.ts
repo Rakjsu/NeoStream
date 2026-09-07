@@ -182,6 +182,7 @@ const invokeChannels = new Set([
 const sendChannels = new Set([
     'log:renderer',
     'app:language',
+    'app:tmdb-key',
     'media:state',
     'pip:control',
     'pip:state',
