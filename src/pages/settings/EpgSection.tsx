@@ -191,8 +191,8 @@ export function EpgSection({
             <div className="section-header">
                 <div className="section-icon" style={{ background: 'linear-gradient(135deg, #06b6d4, #0891b2)' }}>📡</div>
                 <div>
-                    <h2>Teste de EPG</h2>
-                    <p>Verifique se seus canais têm guia de programação. O teste continua mesmo navegando.</p>
+                    <h2>{t('epg', 'testTitle')}</h2>
+                    <p>{t('epg', 'testDesc')}</p>
                 </div>
             </div>
 

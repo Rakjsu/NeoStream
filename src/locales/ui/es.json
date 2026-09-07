@@ -35,7 +35,8 @@
     "incorrectPin": "PIN incorrecto",
     "cancel": "Cancelar",
     "enter": "Entrar",
-    "logout": "Salir"
+    "logout": "Salir",
+    "network": "Red"
   },
   "window": {
     "minimize": "Minimizar",
@@ -333,7 +334,15 @@
     "webRemoteHttps": "Conexión cifrada (HTTPS)",
     "webRemoteHttpsHint": "Usa un certificado propio: el navegador del móvil avisa una vez y basta aceptarlo. Protege el tráfico en la red local.",
     "webRemoteNewPin": "Nuevo PIN",
-    "webRemoteHttpsAppWarn": "La APP NeoStream del móvil no acepta ese certificado. Con HTTPS activo, enviar descargas al PC y el emparejamiento por QR dejan de funcionar — el navegador sigue funcionando."
+    "webRemoteHttpsAppWarn": "La APP NeoStream del móvil no acepta ese certificado. Con HTTPS activo, enviar descargas al PC y el emparejamiento por QR dejan de funcionar — el navegador sigue funcionando.",
+    "certTitle": "Modo compatible con certificados inválidos",
+    "certDesc": "Cuando el proveedor presenta un certificado que no se puede verificar, la app pregunta una vez y solo continúa si lo autorizas. Vale solo para el servidor IPTV configurado y subdominios del mismo dominio. Apágalo para no aceptar nunca un certificado inválido.",
+    "certWarnTitle": "Atención:",
+    "certWarnBody": "ningún certificado inválido se acepta en silencio — la app pide tu confirmación por dominio antes de continuar. Esto nunca vale para TMDB, actualizaciones, GitHub u otros dominios externos.",
+    "certTrusted": "Certificado inválido autorizado por ti en:",
+    "certRevoke": "Revocar autorizaciones",
+    "peerTitle": "Controlar otro NeoStream",
+    "peerDesc": "Conéctate al control remoto de otro PC de la red (dirección y PIN se muestran en sus Ajustes) y maneja la reproducción desde aquí."
   },
   "welcome": {
     "stepLanguageTitle": "Bienvenido a NeoStream",
@@ -390,7 +399,8 @@
     "confirmRemove": "¿Confirmar?",
     "removeError": "No se pudo eliminar la playlist.",
     "rename": "Renombrar",
-    "renameFailed": "No se pudo renombrar"
+    "renameFailed": "No se pudo renombrar",
+    "defaultName": "Mi lista"
   },
   "updates": {
     "title": "Actualizaciones Automáticas",
@@ -665,7 +675,9 @@
     "failed": "Fallidos",
     "previous": "Anterior",
     "next": "Siguiente",
-    "page": "Página"
+    "page": "Página",
+    "testTitle": "Prueba de EPG",
+    "testDesc": "Comprueba si tus canales tienen guía de programación. La prueba sigue aunque navegues."
   },
   "stats": {
     "weekCompareTitle": "Esta semana",
@@ -764,7 +776,8 @@
     "termsOfUse": "Términos de Uso",
     "privacyPolicy": "Política de Privacidad",
     "support": "Soporte",
-    "version": "Versión"
+    "version": "Versión",
+    "legalPtOnly": "📄 Este documento solo está disponible en portugués."
   },
   "dashboard": {
     "live": "TV en Vivo",

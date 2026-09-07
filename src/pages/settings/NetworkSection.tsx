@@ -175,8 +175,8 @@ export function NetworkSection() {
             <div className="settings-group">
                 <div className="setting-item">
                     <div className="setting-info">
-                        <label>Modo compatível com certificados inválidos</label>
-                        <p>Quando o provedor apresenta um certificado que não pode ser verificado, o app pergunta uma vez e só continua se você autorizar. Vale apenas para o servidor IPTV configurado e subdomínios do mesmo domínio. Desligue para nunca aceitar certificado inválido.</p>
+                        <label>{t('network', 'certTitle')}</label>
+                        <p>{t('network', 'certDesc')}</p>
                     </div>
                     <label className="toggle-switch">
                         <input
@@ -193,13 +193,13 @@ export function NetworkSection() {
 
                 {allowInvalidProviderCertificates && (
                     <div className="certificate-warning">
-                        <strong>Atenção:</strong> nenhum certificado inválido é aceito em silêncio — o app pede sua confirmação por domínio antes de continuar. Isso nunca vale para TMDB, atualizações, GitHub ou outros domínios externos.
+                        <strong>{t('network', 'certWarnTitle')}</strong> {t('network', 'certWarnBody')}
                     </div>
                 )}
 
                 {trustedCertDomains.length > 0 && (
                     <div className="certificate-warning" style={{ borderColor: 'rgba(239, 68, 68, 0.4)', background: 'rgba(239, 68, 68, 0.12)' }}>
-                        <strong>Certificado inválido autorizado por você em:</strong>{' '}
+                        <strong>{t('network', 'certTrusted')}</strong>{' '}
                         {trustedCertDomains.join(', ')}
                         <div style={{ marginTop: 10 }}>
                             <button
@@ -208,7 +208,7 @@ export function NetworkSection() {
                                 onClick={() => void handleForgetTrustedCertDomains()}
                             >
                                 <span>🔒</span>
-                                <span>Revogar autorizações</span>
+                                <span>{t('network', 'certRevoke')}</span>
                             </button>
                         </div>
                     </div>
@@ -329,8 +329,8 @@ export function NetworkSection() {
                 {/* 🖥️ Item 38: este PC controla OUTRO NeoStream (mesmo protocolo do celular). */}
                 <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
                     <div className="setting-info">
-                        <label>🖥️ Controlar outro NeoStream</label>
-                        <p>Conecte no controle remoto de outro PC da rede (endereço e PIN mostrados nas Configurações dele) e comande a reprodução daqui.</p>
+                        <label>🖥️ {t('network', 'peerTitle')}</label>
+                        <p>{t('network', 'peerDesc')}</p>
                     </div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                         <input

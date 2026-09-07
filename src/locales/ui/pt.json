@@ -35,7 +35,8 @@
     "incorrectPin": "PIN incorreto",
     "cancel": "Cancelar",
     "enter": "Entrar",
-    "logout": "Sair"
+    "logout": "Sair",
+    "network": "Rede"
   },
   "window": {
     "minimize": "Minimizar",
@@ -295,7 +296,8 @@
     "confirmRemove": "Confirmar?",
     "removeError": "Não foi possível remover a playlist.",
     "rename": "Renomear",
-    "renameFailed": "Não deu pra renomear"
+    "renameFailed": "Não deu pra renomear",
+    "defaultName": "Minha Playlist"
   },
   "updates": {
     "title": "Atualizações Automáticas",
@@ -473,7 +475,9 @@
     "failed": "Falhos",
     "previous": "Anterior",
     "next": "Próximo",
-    "page": "Página"
+    "page": "Página",
+    "testTitle": "Teste de EPG",
+    "testDesc": "Verifique se seus canais têm guia de programação. O teste continua mesmo navegando."
   },
   "stats": {
     "weekCompareTitle": "Esta semana",
@@ -572,7 +576,8 @@
     "termsOfUse": "Termos de Uso",
     "privacyPolicy": "Política de Privacidade",
     "support": "Suporte",
-    "version": "Versão"
+    "version": "Versão",
+    "legalPtOnly": "📄 Este documento está disponível apenas em português."
   },
   "playback": {
     "reminderAutoTune": "Lembrete sintoniza sozinho",
@@ -865,7 +870,15 @@
     "webRemoteHttps": "Conexão criptografada (HTTPS)",
     "webRemoteHttpsHint": "Usa um certificado próprio: o navegador do celular mostra um aviso de segurança uma vez, é só aceitar. Protege o tráfego na rede local.",
     "webRemoteNewPin": "Gerar novo PIN",
-    "webRemoteHttpsAppWarn": "O APP NeoStream do celular não aceita esse certificado. Com HTTPS ligado, enviar downloads pro PC e o pareamento por QR param de funcionar — o navegador continua valendo."
+    "webRemoteHttpsAppWarn": "O APP NeoStream do celular não aceita esse certificado. Com HTTPS ligado, enviar downloads pro PC e o pareamento por QR param de funcionar — o navegador continua valendo.",
+    "certTitle": "Modo compatível com certificados inválidos",
+    "certDesc": "Quando o provedor apresenta um certificado que não pode ser verificado, o app pergunta uma vez e só continua se você autorizar. Vale apenas para o servidor IPTV configurado e subdomínios do mesmo domínio. Desligue para nunca aceitar certificado inválido.",
+    "certWarnTitle": "Atenção:",
+    "certWarnBody": "nenhum certificado inválido é aceito em silêncio — o app pede sua confirmação por domínio antes de continuar. Isso nunca vale para TMDB, atualizações, GitHub ou outros domínios externos.",
+    "certTrusted": "Certificado inválido autorizado por você em:",
+    "certRevoke": "Revogar autorizações",
+    "peerTitle": "Controlar outro NeoStream",
+    "peerDesc": "Conecte no controle remoto de outro PC da rede (endereço e PIN mostrados nas Configurações dele) e comande a reprodução daqui."
   },
   "welcome": {
     "stepLanguageTitle": "Bem-vindo ao NeoStream",

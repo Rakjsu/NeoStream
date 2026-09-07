@@ -35,7 +35,8 @@
     "incorrectPin": "Incorrect PIN",
     "cancel": "Cancel",
     "enter": "Enter",
-    "logout": "Logout"
+    "logout": "Logout",
+    "network": "Network"
   },
   "window": {
     "minimize": "Minimize",
@@ -295,7 +296,8 @@
     "confirmRemove": "Confirm?",
     "removeError": "Could not remove the playlist.",
     "rename": "Rename",
-    "renameFailed": "Could not rename"
+    "renameFailed": "Could not rename",
+    "defaultName": "My playlist"
   },
   "notifications": {
     "autoTuneIn": "Switching to {channel} in {s}s…",
@@ -367,7 +369,15 @@
     "webRemoteHttps": "Encrypted connection (HTTPS)",
     "webRemoteHttpsHint": "Uses a self-signed certificate: the phone browser warns once and you accept it. Protects traffic on the local network.",
     "webRemoteNewPin": "New PIN",
-    "webRemoteHttpsAppWarn": "The NeoStream phone APP does not accept this certificate. With HTTPS on, sending downloads to the PC and QR pairing stop working — the browser still works."
+    "webRemoteHttpsAppWarn": "The NeoStream phone APP does not accept this certificate. With HTTPS on, sending downloads to the PC and QR pairing stop working — the browser still works.",
+    "certTitle": "Compatibility mode for invalid certificates",
+    "certDesc": "When the provider presents a certificate that can't be verified, the app asks once and only continues if you allow it. It applies only to the configured IPTV server and subdomains of the same domain. Turn it off to never accept an invalid certificate.",
+    "certWarnTitle": "Heads up:",
+    "certWarnBody": "no invalid certificate is accepted silently — the app asks you to confirm per domain before continuing. This never applies to TMDB, updates, GitHub or any other external domain.",
+    "certTrusted": "Invalid certificate allowed by you on:",
+    "certRevoke": "Revoke permissions",
+    "peerTitle": "Control another NeoStream",
+    "peerDesc": "Connect to the web remote of another PC on your network (address and PIN are shown in that PC's Settings) and drive playback from here."
   },
   "welcome": {
     "stepLanguageTitle": "Welcome to NeoStream",
@@ -665,7 +675,9 @@
     "failed": "Failed",
     "previous": "Previous",
     "next": "Next",
-    "page": "Page"
+    "page": "Page",
+    "testTitle": "EPG test",
+    "testDesc": "Check whether your channels have a programme guide. The test keeps running while you browse."
   },
   "stats": {
     "weekCompareTitle": "This week",
@@ -764,7 +776,8 @@
     "termsOfUse": "Terms of Use",
     "privacyPolicy": "Privacy Policy",
     "support": "Support",
-    "version": "Version"
+    "version": "Version",
+    "legalPtOnly": "📄 This document is available in Portuguese only."
   },
   "dashboard": {
     "live": "Live TV",

@@ -45,9 +45,12 @@ export function Settings() {
         { id: 'updates', icon: '🔄', label: t('nav', 'updates'), color: '#10b981' },
         { id: 'playlists', icon: '📺', label: t('playlists', 'title'), color: '#6366f1' },
         { id: 'apis', icon: '🔑', label: t('apiKeys', 'navLabel'), color: '#eab308' },
-        { id: 'playback', icon: '⏯️', label: t('nav', 'playback') || 'Reprodução', color: '#3b82f6' },
-        { id: 'appearance', icon: '🎨', label: t('nav', 'appearance') || 'Aparência', color: 'var(--ns-accent)' },
-        { id: 'network', icon: '🔐', label: 'Rede', color: '#14b8a6' },
+        // Os `|| 'Reprodução'` que estavam aqui eram rede de segurança falsa:
+        // `t()` devolve o NOME DA CHAVE quando ela falta, e nome de chave é
+        // truthy — o fallback nunca dispararia.
+        { id: 'playback', icon: '⏯️', label: t('nav', 'playback'), color: '#3b82f6' },
+        { id: 'appearance', icon: '🎨', label: t('nav', 'appearance'), color: 'var(--ns-accent)' },
+        { id: 'network', icon: '🔐', label: t('nav', 'network'), color: '#14b8a6' },
         { id: 'epg', icon: '📡', label: 'EPG', color: '#06b6d4' },
         { id: 'search', icon: '🔍', label: t('searchConfig', 'title'), color: '#0ea5e9' },
         { id: 'stats', icon: '📊', label: t('nav', 'stats'), color: '#8b5cf6' },
