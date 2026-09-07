@@ -20,6 +20,7 @@ import {
     MPV_RELEASE_API_URL,
     buildExtractArgs,
     computeDownloadProgress,
+    mpvDownloadSupported,
     parseMpvVersionFromAssetName,
     pickMpvAsset,
     type MpvDownloadProgress,
@@ -41,6 +42,7 @@ export type MpvInstallFailureReason =
     | 'disk'
     | 'cancelled'
     | 'in-progress'
+    | 'unsupported-platform'
 
 export interface MpvInstallResult {
     success: boolean
@@ -244,6 +246,11 @@ export async function findMpvExe(dir: string, maxDepth: number = EXE_SEARCH_MAX_
  */
 export async function installMpv(options: MpvInstallOptions): Promise<MpvInstallResult> {
     const { installDir, signal, onProgress } = options
+    // Recusa ANTES de qualquer rede: o pacote e de Windows e o resto do
+    // caminho (tar.exe, mpv.exe) so existe la. Ver mpvDownloadSupported.
+    if (!mpvDownloadSupported(process.platform)) {
+        return { success: false, reason: 'unsupported-platform', message: `mpv auto-download is Windows-only (platform: ${process.platform})` }
+    }
     const fetchImpl = options.fetchImpl ?? fetch
     const tmpDir = path.join(installDir, 'extract-tmp')
     const binDir = path.join(installDir, 'bin')

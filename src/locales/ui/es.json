@@ -485,7 +485,8 @@
     "hwAccelDesc": "Apagarla resuelve pantalla negra y bloqueos en tarjetas gráficas problemáticas, a costa de más CPU. Solo vale después de reiniciar NeoStream.",
     "hwAccelAuto": "Automática (recomendada)",
     "hwAccelForce": "Forzar (ignora la lista de bloqueo)",
-    "hwAccelOff": "Apagada (solo software)"
+    "hwAccelOff": "Apagada (solo software)",
+    "mpvInstallHintUnix": "Instálalo con el gestor de paquetes de tu sistema (brew install mpv, apt install mpv) o descárgalo en mpv.io"
   },
   "appearance": {
     "title": "Apariencia",

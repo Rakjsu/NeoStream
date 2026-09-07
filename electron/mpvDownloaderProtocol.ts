@@ -14,6 +14,28 @@
  * repo ever publish one.
  */
 
+/**
+ * O download automatico so existe pra Windows. PURO.
+ *
+ * A fonte e o zhongfly/mpv-winbuild (builds Windows), o asset e um `.7z` que
+ * so o `tar.exe` do Windows (bsdtar) le sem ferramenta extra, e o binario
+ * procurado depois e `mpv.exe`. Nada disso serve em mac ou Linux — e os dois
+ * chegam a usuario de verdade: o `release.yml` publica dmg/zip e AppImage.
+ *
+ * Sem esta guarda:
+ * - no **Linux** o GNU tar nao le .7z, entao a pessoa baixa ~31 MB inteiros
+ *   pra receber "Falha ao baixar o MPV. Verifique sua conexao." — troca de
+ *   rede, tenta de novo, e queima outros 31 MB;
+ * - no **macOS** e pior, porque o bsdtar da Apple provavelmente EXTRAI o .7z:
+ *   a instalacao "da certo", o caminho de um `mpv.exe` fica gravado nas
+ *   preferencias na frente de um mpv de verdade instalado por brew, e o
+ *   `spawn` de um executavel de Windows falha DEPOIS de o player ja ter dito
+ *   que estava tocando — o filme fecha sozinho, sem cair no player interno.
+ */
+export function mpvDownloadSupported(platform: string): boolean {
+    return platform === 'win32'
+}
+
 export const MPV_RELEASE_API_URL = 'https://api.github.com/repos/zhongfly/mpv-winbuild/releases/latest'
 
 export interface MpvReleaseAsset {
