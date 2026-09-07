@@ -295,6 +295,8 @@
     "remove": "Remover",
     "confirmRemove": "Confirmar?",
     "removeError": "Não foi possível remover a playlist.",
+    "rename": "Renomear",
+    "renameFailed": "Não deu pra renomear",
     "defaultName": "Minha Playlist"
   },
   "updates": {
@@ -634,7 +636,12 @@
     "mpvDownloadCancel": "Cancelar",
     "mpvDownloadSuccess": "MPV instalado",
     "mpvDownloadError": "Falha ao baixar o MPV. Verifique sua conexão.",
-    "mpvDownloadRetry": "Tentar novamente"
+    "mpvDownloadRetry": "Tentar novamente",
+    "hwAccel": "🎮 Aceleração por hardware",
+    "hwAccelDesc": "Desligar resolve tela preta e travamento em placa de vídeo problemática, ao custo de mais CPU. Só vale depois de reiniciar o NeoStream.",
+    "hwAccelAuto": "Automático (recomendado)",
+    "hwAccelForce": "Forçar (ignora a lista de bloqueio)",
+    "hwAccelOff": "Desligada (só software)"
   },
   "appearance": {
     "title": "Aparência",
@@ -789,7 +796,9 @@
     "restoreWindow": "Restaurar janela",
     "qrHandoffFailed": "Não foi possível gerar o QR deste conteúdo.",
     "streamRetry": "Tentar novamente",
-    "close": "Fechar"
+    "close": "Fechar",
+    "openSubtitleFile": "Arquivo do computador…",
+    "subtitleFileError": "Não deu pra abrir esse arquivo de legenda"
   },
   "notifications": {
     "autoTuneIn": "Trocando pra {channel} em {s}s…",
@@ -1050,7 +1059,12 @@
     "exploreMovies": "Explorar Filmes",
     "exploreSeries": "Explorar Séries",
     "availableOffline": "está disponível offline!",
-    "failedTo": "Falha ao baixar"
+    "failedTo": "Falha ao baixar",
+    "dvrTitle": "⏺ Gravação agendada",
+    "dvrMaxConcurrent": "Gravações simultâneas",
+    "dvrStartMargin": "Começar antes (min)",
+    "dvrEndPadding": "Continuar depois (min)",
+    "dvrMarginsDesc": "O horário do guia costuma estar adiantado ou atrasado alguns minutos. Estas margens gravam um pouco antes e um pouco depois — e contam no aviso de conflito."
   },
   "history": {
     "title": "Histórico",
@@ -1176,7 +1190,9 @@
     "decade": "Década",
     "allDecades": "Todas as décadas",
     "genre": "Gênero",
-    "allGenres": "Todos os gêneros"
+    "allGenres": "Todos os gêneros",
+    "tag": "Tag pessoal",
+    "allTags": "Todas as tags"
   },
   "storage": {
     "title": "Armazenamento",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildSetupDeepLink, renderSetupHandoffPage, isHandoffArmed, matchesHandoffToken } from './setupPayload'
+import { buildSetupDeepLink, ehChaveTmdbPlausivel, renderSetupHandoffPage, isHandoffArmed, matchesHandoffToken } from './setupPayload'
 
 describe('buildSetupDeepLink (formato do NeoStream Mobile)', () => {
     it('gera neostream://setup?d=base64(JSON) com contas e activeId', () => {
@@ -72,5 +72,53 @@ describe('janela de exportação do /setup (uso único, prazo curto)', () => {
         expect(matchesHandoffToken(armado, 'a1b2', 500)).toBe(false)
         expect(matchesHandoffToken(armado, 'a1b2c3d4ff', 500)).toBe(false)
         expect(matchesHandoffToken(armado, '', 500)).toBe(false)
+    })
+})
+
+/** Decodifica o payload que viaja no deep link. */
+function payloadDe(link: string): Record<string, unknown> {
+    const b64 = decodeURIComponent(link.split('d=')[1])
+    return JSON.parse(Buffer.from(b64, 'base64').toString('utf8'))
+}
+
+describe('a chave da TMDB viaja no handoff', () => {
+    const conta = [{ id: 'a', name: 'A', url: 'http://p.tv', username: 'u', password: 'p' }]
+
+    // O app do celular ja lia este campo; o desktop e que nunca mandava, entao
+    // quem pareava as duas pontas caia num catalogo sem capa nem sinopse.
+    it('vai no payload quando ha chave', () => {
+        expect(payloadDe(buildSetupDeepLink(conta, 'a', 'abc123def456')).tmdbKey).toBe('abc123def456')
+    })
+
+    // String vazia sobrescreveria uma chave que ja esteja no celular.
+    it('ausente quando nao ha chave — e nao vazia', () => {
+        for (const nada of [undefined, null, '', '   ']) {
+            expect('tmdbKey' in payloadDe(buildSetupDeepLink(conta, 'a', nada))).toBe(false)
+        }
+    })
+
+    it('chave com formato estranho nao entra', () => {
+        expect('tmdbKey' in payloadDe(buildSetupDeepLink(conta, 'a', 'chave com espaco'))).toBe(false)
+        expect('tmdbKey' in payloadDe(buildSetupDeepLink(conta, 'a', 'a'.repeat(513)))).toBe(false)
+    })
+
+    it('sem a chave, o link continua identico ao de antes', () => {
+        expect(buildSetupDeepLink(conta, 'a')).toBe(buildSetupDeepLink(conta, 'a', null))
+    })
+})
+
+describe('ehChaveTmdbPlausivel', () => {
+    it('aceita a v3 (hex de 32) e a v4 (JWT com pontos e hifens)', () => {
+        expect(ehChaveTmdbPlausivel('0123456789abcdef0123456789abcdef')).toBe(true)
+        expect(ehChaveTmdbPlausivel('eyJhbGciOi.J9-abc_DEF.xyz')).toBe(true)
+    })
+
+    it('recusa vazio, espaco, tipo errado e tamanho absurdo', () => {
+        expect(ehChaveTmdbPlausivel('')).toBe(false)
+        expect(ehChaveTmdbPlausivel('   ')).toBe(false)
+        expect(ehChaveTmdbPlausivel('tem espaco')).toBe(false)
+        expect(ehChaveTmdbPlausivel(null)).toBe(false)
+        expect(ehChaveTmdbPlausivel(42)).toBe(false)
+        expect(ehChaveTmdbPlausivel('a'.repeat(513))).toBe(false)
     })
 })

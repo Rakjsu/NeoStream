@@ -150,6 +150,7 @@ const invokeChannels = new Set([
     'security:get-certificate-settings',
     'security:forget-trusted-certificate-domains',
     'shell:open-external',
+    'subtitle:open-file',
     'security:set-allow-invalid-provider-certificates',
     'storage:clear-cache',
     'storage:open-area',
@@ -181,6 +182,7 @@ const invokeChannels = new Set([
 const sendChannels = new Set([
     'log:renderer',
     'app:language',
+    'app:tmdb-key',
     'media:state',
     'pip:control',
     'pip:state',

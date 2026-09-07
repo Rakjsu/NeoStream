@@ -15,6 +15,21 @@ export function PlaylistsSection() {
     const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [busyId, setBusyId] = useState<string | null>(null);
+    // ✏️ Renomear: o canal `playlists:rename` existe, está na whitelist do
+    // preload e tem teste no main — só não havia como chegar nele pela tela.
+    const [renamingId, setRenamingId] = useState<string | null>(null);
+    const [renameDraft, setRenameDraft] = useState('');
+
+    const commitRename = async (id: string, nomeAtual: string) => {
+        const nome = renameDraft.trim();
+        setRenamingId(null);
+        if (!nome || nome === nomeAtual) return;
+        const res = await window.ipcRenderer.invoke('playlists:rename', { id, name: nome })
+            .catch(() => ({ success: false })) as { success?: boolean };
+        if (res?.success) await refresh();
+        else setError(t('playlists', 'renameFailed'));
+    };
+
     const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
     const [error, setError] = useState('');
 
@@ -218,7 +233,36 @@ export function PlaylistsSection() {
                             <div key={playlist.id} className={`playlists-item ${playlist.active ? 'active' : ''}`}>
                                 <div className="playlists-item-info">
                                     <div className="playlists-item-name">
-                                        {playlist.name}
+                                        {renamingId === playlist.id ? (
+                                            <input
+                                                autoFocus
+                                                value={renameDraft}
+                                                onChange={(e) => setRenameDraft(e.target.value)}
+                                                onBlur={() => void commitRename(playlist.id, playlist.name)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') e.currentTarget.blur();
+                                                    // Esc desiste: sem isto, sair da edição exigiria
+                                                    // apagar o texto de volta na mão.
+                                                    if (e.key === 'Escape') { setRenamingId(null); }
+                                                }}
+                                                style={{ flex: 1, minWidth: 0, padding: '4px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.3)', color: 'white', fontSize: 14 }}
+                                            />
+                                        ) : (
+                                            <>
+                                                {playlist.name}
+                                                <button
+                                                    className="playlists-btn"
+                                                    title={t('playlists', 'rename')}
+                                                    aria-label={t('playlists', 'rename')}
+                                                    onClick={() => { setRenamingId(playlist.id); setRenameDraft(playlist.name); }}
+                                                    style={{ padding: '2px 6px', fontSize: 12, opacity: 0.7 }}
+                                                >
+                                                    ✏️
+                                                </button>
+                                            </>
+                                        )}
+                                        {/* O badge fica FORA do ternário: entrar em modo de edição
+                                            na playlist ativa não pode sumir com ele. */}
                                         {playlist.active && (
                                             <span className="playlists-badge">{t('playlists', 'activeBadge')}</span>
                                         )}
@@ -235,7 +279,7 @@ export function PlaylistsSection() {
                                     {!playlist.active && (
                                         <button
                                             className="playlists-btn playlists-btn-primary"
-                                            disabled={busyId !== null}
+                                            disabled={busyId !== null || renamingId !== null}
                                             onClick={() => handleSwitch(playlist.id)}
                                         >
                                             {busyId === playlist.id ? t('playlists', 'switching') : t('playlists', 'switch')}
@@ -243,7 +287,7 @@ export function PlaylistsSection() {
                                     )}
                                     <button
                                         className="playlists-btn playlists-btn-danger"
-                                        disabled={busyId !== null}
+                                        disabled={busyId !== null || renamingId !== null}
                                         onClick={() => handleRemove(playlist.id)}
                                         onBlur={() => setConfirmRemoveId(null)}
                                     >

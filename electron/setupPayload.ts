@@ -14,7 +14,33 @@ export interface SetupAccountSource {
     type?: 'xtream' | 'm3u' | 'stalker'
 }
 
-export function buildSetupDeepLink(playlists: SetupAccountSource[], activeId: string | null): string {
+/**
+ * Formato aceito de chave da TMDB: v3 é hexadecimal de 32, v4 é um JWT longo
+ * (pontos, hífens e underscores). Vale como saneamento do que vai no link, não
+ * como validação — quem valida de verdade é a própria TMDB.
+ */
+export function ehChaveTmdbPlausivel(bruto: unknown): bruto is string {
+    return typeof bruto === 'string'
+        && bruto.length > 0
+        && bruto.length <= 512
+        && /^[A-Za-z0-9._-]+$/.test(bruto)
+}
+
+export function buildSetupDeepLink(
+    playlists: SetupAccountSource[],
+    activeId: string | null,
+    /**
+     * Chave da TMDB do usuário. O app do celular já sabia ler este campo
+     * (`setupLink.ts` o aceita desde sempre) — o desktop é que nunca mandava,
+     * então quem pareava as duas pontas caía num catálogo sem capa, sinopse
+     * nem nota, e precisava criar uma SEGUNDA chave à mão pra mesma pessoa.
+     *
+     * Não amplia a janela de exportação: o /setup já entrega usuário e senha
+     * de todas as playlists, e só com a tela de pareamento aberta e um token
+     * de uso único.
+     */
+    tmdbKey?: string | null,
+): string {
     const accounts = playlists
         .filter(p => typeof p.url === 'string' && p.url.trim().length > 0)
         .map(p => ({
@@ -25,7 +51,10 @@ export function buildSetupDeepLink(playlists: SetupAccountSource[], activeId: st
             type: p.type === 'm3u' || p.type === 'stalker' ? p.type : 'xtream',
             alias: p.name || undefined,
         }))
-    const payload = { accounts, activeId }
+    const payload: { accounts: unknown[]; activeId: string | null; tmdbKey?: string } = { accounts, activeId }
+    // Ausente e não vazio: o parser do celular só aplica o que vier como
+    // string, e uma string vazia sobrescreveria uma chave que já esteja lá.
+    if (ehChaveTmdbPlausivel(tmdbKey)) payload.tmdbKey = tmdbKey
     const b64 = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64')
     return `neostream://setup?d=${encodeURIComponent(b64)}`
 }

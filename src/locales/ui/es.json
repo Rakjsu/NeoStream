@@ -398,6 +398,8 @@
     "remove": "Eliminar",
     "confirmRemove": "¿Confirmar?",
     "removeError": "No se pudo eliminar la playlist.",
+    "rename": "Renombrar",
+    "renameFailed": "No se pudo renombrar",
     "defaultName": "Mi lista"
   },
   "updates": {
@@ -478,7 +480,12 @@
     "mpvDownloadCancel": "Cancelar",
     "mpvDownloadSuccess": "MPV instalado",
     "mpvDownloadError": "Error al descargar MPV. Verifica tu conexión.",
-    "mpvDownloadRetry": "Reintentar"
+    "mpvDownloadRetry": "Reintentar",
+    "hwAccel": "🎮 Aceleración por hardware",
+    "hwAccelDesc": "Apagarla resuelve pantalla negra y bloqueos en tarjetas gráficas problemáticas, a costa de más CPU. Solo vale después de reiniciar NeoStream.",
+    "hwAccelAuto": "Automática (recomendada)",
+    "hwAccelForce": "Forzar (ignora la lista de bloqueo)",
+    "hwAccelOff": "Apagada (solo software)"
   },
   "appearance": {
     "title": "Apariencia",
@@ -892,7 +899,9 @@
     "restoreWindow": "Restaurar ventana",
     "qrHandoffFailed": "No se pudo generar el QR de este contenido.",
     "streamRetry": "Intentar de nuevo",
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "openSubtitleFile": "Archivo del ordenador…",
+    "subtitleFileError": "No se pudo abrir ese archivo de subtítulos"
   },
   "home": {
     "dontRecommend": "No me recomiendes esto",
@@ -1050,7 +1059,12 @@
     "exploreMovies": "Explorar Películas",
     "exploreSeries": "Explorar Series",
     "availableOffline": "¡está disponible sin conexión!",
-    "failedTo": "Error al descargar"
+    "failedTo": "Error al descargar",
+    "dvrTitle": "⏺ Grabación programada",
+    "dvrMaxConcurrent": "Grabaciones simultáneas",
+    "dvrStartMargin": "Empezar antes (min)",
+    "dvrEndPadding": "Seguir después (min)",
+    "dvrMarginsDesc": "La hora de la guía suele estar unos minutos desfasada. Estos márgenes graban un poco antes y un poco después — y cuentan en el aviso de conflicto."
   },
   "history": {
     "title": "Historial",
@@ -1176,7 +1190,9 @@
     "decade": "Década",
     "allDecades": "Todas las décadas",
     "genre": "Género",
-    "allGenres": "Todos los géneros"
+    "allGenres": "Todos los géneros",
+    "tag": "Etiqueta personal",
+    "allTags": "Todas las etiquetas"
   },
   "storage": {
     "title": "Almacenamiento",

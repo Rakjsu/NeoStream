@@ -88,6 +88,23 @@ export function toggleTag(type: 'movie' | 'series', id: string, tag: string): st
     return tags;
 }
 
+/**
+ * Conteúdos marcados com esta tag, como chaves `type:id`.
+ *
+ * Uma leitura de storage para a grade inteira: quem filtra chama isto uma vez
+ * e depois só consulta o Set. Comparação sem diferenciar maiúsculas, igual ao
+ * `toggleTag` — quem escreveu "Cult" e "cult" marcou a mesma coisa.
+ */
+export function idsComTag(tag: string): Set<string> {
+    const alvo = tag.trim().toLowerCase();
+    const ids = new Set<string>();
+    if (!alvo) return ids;
+    for (const [chave, mark] of Object.entries(loadAll())) {
+        if ((mark.tags ?? []).some(existente => existente.toLowerCase() === alvo)) ids.add(chave);
+    }
+    return ids;
+}
+
 /** Todas as tags já usadas (únicas, alfabéticas) — alimenta o autocomplete. */
 export function allTags(): string[] {
     const seen = new Map<string, string>();

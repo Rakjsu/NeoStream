@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { CastQueueItem } from '../services/castQueue';
 import { watchProgressService } from '../services/watchProgressService';
+import { espelharChaveTmdbNoMain } from '../services/tmdbKey';
 import { getProtectedRecordings, toggleProtectedRecording } from '../services/dvrSweep';
 import { scheduledRecordingService } from '../services/scheduledRecordingService';
 import { movieProgressService } from '../services/movieProgressService';
@@ -162,6 +163,12 @@ interface CastTarget { deviceId: string; deviceType: CastTargetType }
 interface DiscoverResult { success: boolean; devices?: { id: string | number; name: string }[] }
 
 export function WebRemoteBridge() {
+    // A chave da TMDB tem que estar no main ANTES de alguem abrir o /setup —
+    // o espelho do `setTmdbApiKey` so dispara quando a chave muda, e quem ja
+    // tem uma configurada nunca mudaria nada. Aqui e o lugar: este e o
+    // componente que existe justamente pra servir o controle web.
+    useEffect(() => { espelharChaveTmdbNoMain(); }, []);
+
     // Last fetched movie list, so castMovie can look up the container.
     const moviesRef = useRef<Map<string, VodMovie>>(new Map());
     // Last fetched episodes (across a series' seasons), for castEpisode. Carries

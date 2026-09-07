@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { allTags, getMark, setRating, toggleTag, ratingSignals } from './personalMarksService';
+import { allTags, getMark, idsComTag, setRating, toggleTag, ratingSignals } from './personalMarksService';
 
 describe('personalMarksService (nota + tags pessoais)', () => {
     beforeEach(() => {
@@ -57,5 +57,44 @@ describe('personalMarksService (nota + tags pessoais)', () => {
             { type: 'movie', id: 'm4', rating: 4 },
         ]);
         expect(disliked).toEqual([{ type: 'series', id: 's1' }]);
+    });
+});
+
+describe('idsComTag (o filtro da grade)', () => {
+    beforeEach(() => localStorage.clear());
+
+    // As tags eram só de escrita: dava pra marcar "Cult" na ficha e não havia
+    // lugar nenhum que filtrasse por isso.
+    it('devolve as chaves type:id de quem tem a tag', () => {
+        toggleTag('movie', '1', 'Cult');
+        toggleTag('movie', '2', 'Ação');
+        toggleTag('series', '9', 'Cult');
+        expect([...idsComTag('Cult')].sort()).toEqual(['movie:1', 'series:9']);
+    });
+
+    // Mesma regra do toggleTag: quem escreveu "Cult" e "cult" marcou a mesma
+    // coisa, e o select mostra só uma das duas grafias.
+    it('não diferencia maiúsculas nem espaços em volta', () => {
+        toggleTag('movie', '3', 'Cult');
+        expect([...idsComTag('  cULt  ')]).toEqual(['movie:3']);
+    });
+
+    it('tag desconhecida e tag vazia devolvem conjunto vazio', () => {
+        toggleTag('movie', '4', 'Cult');
+        expect(idsComTag('nada disso').size).toBe(0);
+        expect(idsComTag('').size).toBe(0);
+        expect(idsComTag('   ').size).toBe(0);
+    });
+
+    it('item que perdeu a tag sai do conjunto', () => {
+        toggleTag('movie', '5', 'Cult');
+        expect(idsComTag('Cult').has('movie:5')).toBe(true);
+        toggleTag('movie', '5', 'Cult'); // toggle: tira
+        expect(idsComTag('Cult').has('movie:5')).toBe(false);
+    });
+
+    it('storage vazio não quebra', () => {
+        localStorage.clear();
+        expect(idsComTag('Cult').size).toBe(0);
     });
 });

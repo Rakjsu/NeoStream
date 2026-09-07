@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import Hls from 'hls.js';
 import { SortSelect } from '../components/SortSelect';
 import { usageStatsService } from '../services/usageStatsService';
 import { groupChannelVariants, qualityLabel } from '../services/channelVariantsService';
@@ -82,24 +83,6 @@ interface MiniPlayerExpandDetail {
     currentTime?: number;
 }
 
-interface HlsInstance {
-    loadSource: (url: string) => void;
-    attachMedia: (media: HTMLMediaElement) => void;
-    on: (event: string, callback: () => void) => void;
-}
-
-interface HlsConstructor {
-    new (config?: Record<string, unknown>): HlsInstance;
-    isSupported: () => boolean;
-    Events: {
-        MANIFEST_PARSED: string;
-    };
-}
-
-interface HlsWindow extends Window {
-    Hls?: HlsConstructor;
-}
-
 // Channel card approximate dimensions
 const CARD_WIDTH = 200; // min-width of grid column
 const CARD_HEIGHT = 80; // approximate card height with gap
@@ -118,6 +101,7 @@ export function LiveTV() {
     const [sortBy, setSortBy] = useState<CatalogSort>('recent');
     const [selectedChannel, setSelectedChannel] = useState<LiveStream | null>(null);
     const [playingChannel, setPlayingChannel] = useState<LiveStream | null>(null);
+    const previewVideoRef = useRef<HTMLVideoElement | null>(null);
     // ⏱️ Últimos canais zapeados (MRU) — alimenta os chips "Recentes" do overlay.
     const [zapRecent, setZapRecent] = useState<string[]>(() => zapHistoryService.getRecent());
     // Latest playlist + playing channel for the media:control zap handler,
@@ -784,6 +768,62 @@ export function LiveTV() {
         return result.url;
     }, [replayPlayback]);
 
+    /**
+     * Prévia do canal selecionado no painel lateral.
+     *
+     * Era um ref-callback que baixava `hls.js@latest` do jsdelivr em runtime —
+     * código remoto, sem versão fixa e sem SRI, num renderer cujo preload
+     * expõe `auth:get-credentials`. Agora o hls.js vem do próprio bundle
+     * (chunk `vendor-hls`), o que também é o que permite `script-src 'self'`.
+     *
+     * Duas coisas que o callback antigo não fazia e que passam a importar
+     * porque ele deixou de depender de um CDN alcançável (antes, sem rede, a
+     * promessa rejeitava e a prévia simplesmente não existia):
+     *
+     * 1. NÃO roda enquanto o player real está aberto. Zapear pelo controle
+     *    remoto, pelo botão aleatório ou pela tecla de mídia seta os DOIS
+     *    canais (`setSelectedChannel` + `setPlayingChannel`), e dois <video>
+     *    na mesma fonte ao vivo é exatamente a armadilha do PR #344 — o
+     *    provedor entrega uma conexão só e o player de verdade fica sem stream.
+     * 2. Destrói a instância na saída. Sem isso cada troca de canal vazava um
+     *    Hls, um worker e uma conexão com o provedor.
+     */
+    useEffect(() => {
+        const videoEl = previewVideoRef.current;
+        if (!videoEl || !selectedChannel || playingChannel) return;
+        let cancelado = false;
+        let hls: Hls | null = null;
+        void (async () => {
+            try {
+                const url = await buildLiveStreamUrl(selectedChannel);
+                if (cancelado) return;
+                if (url.includes('.m3u8') && Hls.isSupported()) {
+                    hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+                    hls.on(Hls.Events.ERROR, (_evt, data) => {
+                        // Prévia é enfeite: erro fatal encerra em vez de ficar
+                        // reconectando em segundo plano atrás do painel.
+                        if (data.fatal) { hls?.destroy(); hls = null; }
+                    });
+                    hls.loadSource(url);
+                    hls.attachMedia(videoEl);
+                    hls.on(Hls.Events.MANIFEST_PARSED, () => { void videoEl.play().catch(() => { }); });
+                    return;
+                }
+                if (url.includes('.m3u8') && !videoEl.canPlayType('application/vnd.apple.mpegurl')) return;
+                videoEl.src = url;
+                await videoEl.play();
+            } catch (error) {
+                console.error('Preview load error:', error);
+            }
+        })();
+        return () => {
+            cancelado = true;
+            hls?.destroy();
+            videoEl.removeAttribute('src');
+            videoEl.load();
+        };
+    }, [selectedChannel, playingChannel, buildLiveStreamUrl]);
+
     const checkFavorites = async () => {
         setFavCheckBusy(true);
         setFavCheckMsg('');
@@ -1387,49 +1427,11 @@ export function LiveTV() {
                                     <video
                                         id="preview-video"
                                         key={selectedChannel.stream_id}
+                                        ref={previewVideoRef}
                                         autoPlay
                                         muted
                                         playsInline
                                         style={{ width: '100%', height: '100%', objectFit: 'cover', background: 'transparent' }}
-                                        ref={(videoEl) => {
-                                            if (videoEl) {
-                                                const loadVideo = async () => {
-                                                    try {
-                                                        const url = await buildLiveStreamUrl(selectedChannel);
-                                                        const hlsWindow = window as HlsWindow;
-                                                        if (url.includes('.m3u8') && !hlsWindow.Hls) {
-                                                            await new Promise((resolve, reject) => {
-                                                                const script = document.createElement('script');
-                                                                script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
-                                                                script.onload = () => resolve(true);
-                                                                script.onerror = () => reject(new Error('Failed to load hls.js'));
-                                                                document.head.appendChild(script);
-                                                            });
-                                                        }
-                                                        if (url.includes('.m3u8')) {
-                                                            const Hls = hlsWindow.Hls;
-                                                            if (Hls && Hls.isSupported()) {
-                                                                const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
-                                                                hls.loadSource(url);
-                                                                hls.attachMedia(videoEl);
-                                                                hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                                                                    videoEl.play().catch(() => { });
-                                                                });
-                                                            } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-                                                                videoEl.src = url;
-                                                                await videoEl.play();
-                                                            }
-                                                        } else {
-                                                            videoEl.src = url;
-                                                            await videoEl.play();
-                                                        }
-                                                    } catch (error) {
-                                                        console.error('Preview load error:', error);
-                                                    }
-                                                };
-                                                loadVideo();
-                                            }
-                                        }}
                                     />
                                     {/* Live Badge */}
                                     <div style={{

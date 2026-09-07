@@ -295,6 +295,8 @@
     "remove": "Remove",
     "confirmRemove": "Confirm?",
     "removeError": "Could not remove the playlist.",
+    "rename": "Rename",
+    "renameFailed": "Could not rename",
     "defaultName": "My playlist"
   },
   "notifications": {
@@ -478,7 +480,12 @@
     "mpvDownloadCancel": "Cancel",
     "mpvDownloadSuccess": "MPV installed",
     "mpvDownloadError": "MPV download failed. Check your connection.",
-    "mpvDownloadRetry": "Try again"
+    "mpvDownloadRetry": "Try again",
+    "hwAccel": "🎮 Hardware acceleration",
+    "hwAccelDesc": "Turning it off fixes black screens and freezes on troublesome graphics cards, at the cost of more CPU. Takes effect after you restart NeoStream.",
+    "hwAccelAuto": "Automatic (recommended)",
+    "hwAccelForce": "Force (ignore the blocklist)",
+    "hwAccelOff": "Off (software only)"
   },
   "appearance": {
     "title": "Appearance",
@@ -892,7 +899,9 @@
     "restoreWindow": "Restore window",
     "qrHandoffFailed": "Could not generate the QR for this content.",
     "streamRetry": "Try again",
-    "close": "Close"
+    "close": "Close",
+    "openSubtitleFile": "File from this computer…",
+    "subtitleFileError": "Couldn't open that subtitle file"
   },
   "home": {
     "dontRecommend": "Don't recommend this",
@@ -1050,7 +1059,12 @@
     "exploreMovies": "Explore Movies",
     "exploreSeries": "Explore Series",
     "availableOffline": "is available offline!",
-    "failedTo": "Failed to download"
+    "failedTo": "Failed to download",
+    "dvrTitle": "⏺ Scheduled recording",
+    "dvrMaxConcurrent": "Simultaneous recordings",
+    "dvrStartMargin": "Start earlier (min)",
+    "dvrEndPadding": "Keep going after (min)",
+    "dvrMarginsDesc": "Guide times are often a few minutes off. These margins record a bit before and a bit after — and they count in the conflict warning."
   },
   "history": {
     "title": "History",
@@ -1176,7 +1190,9 @@
     "decade": "Decade",
     "allDecades": "All decades",
     "genre": "Genre",
-    "allGenres": "All genres"
+    "allGenres": "All genres",
+    "tag": "Personal tag",
+    "allTags": "All tags"
   },
   "storage": {
     "title": "Storage",
