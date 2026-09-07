@@ -48,6 +48,7 @@ class LanguageService {
         // If the persisted language isn't bundled yet, start loading it immediately
         this.ensureTranslationsLoaded(this.currentLanguage);
         this.aplicarLangNoDocumento();
+        this.espelharIdiomaNoMain();
     }
 
     /**
@@ -58,6 +59,24 @@ class LanguageService {
     private aplicarLangNoDocumento(): void {
         if (typeof document === 'undefined') return;
         document.documentElement.lang = LANG_HTML[this.currentLanguage];
+    }
+
+    /**
+     * Espelha o idioma no processo main, pra pagina do controle web (e o
+     * /setup) sairem no mesmo idioma do app.
+     *
+     * Isto existia — mas dentro do `src/i18n.ts`, uma pilha do i18next que
+     * NENHUM arquivo importava. O canal `app:language` estava na whitelist do
+     * preload e o main escutava (webRemoteServer), so que ninguem mandava:
+     * quem usa o app em ingles ou espanhol via a pagina do celular em
+     * portugues, pra sempre.
+     *
+     * Mesmo padrao do `app:accent` do themeService.
+     */
+    private espelharIdiomaNoMain(): void {
+        try {
+            window.ipcRenderer?.send('app:language', this.currentLanguage);
+        } catch { /* jsdom/testes sem preload */ }
     }
 
     private loadLanguage(): SupportedLanguage {
@@ -111,6 +130,7 @@ class LanguageService {
         this.ensureTranslationsLoaded(lang);
 
         this.aplicarLangNoDocumento();
+        this.espelharIdiomaNoMain();
 
         // Notify all listeners
         this.listeners.forEach(listener => listener());
