@@ -188,7 +188,7 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
                 {lastCheckDate && (
                     <div className="last-check">
                         <span className="check-icon">🕐</span>
-                        <span>Última verificação: <strong>{lastCheckDate}</strong></span>
+                        <span>{t('updates', 'lastCheck')}: <strong>{lastCheckDate}</strong></span>
                     </div>
                 )}
 
@@ -201,12 +201,12 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
                     {checking ? (
                         <>
                             <span className="spinner"></span>
-                            <span>Verificando...</span>
+                            <span>{t('updates', 'checking')}</span>
                         </>
                     ) : (
                         <>
                             <span>🔍</span>
-                            <span>Verificar Atualizações Agora</span>
+                            <span>{t('updates', 'checkNow')}</span>
                         </>
                     )}
                 </button>

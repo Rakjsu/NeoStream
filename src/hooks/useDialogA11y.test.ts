@@ -74,3 +74,31 @@ describe('ehFocavelDeVerdade', () => {
         expect(ehFocavelDeVerdade(document.getElementById('b') as HTMLElement)).toBe(true);
     });
 });
+
+/**
+ * O `rotulo` vira o `aria-label` do diálogo — é ele que o leitor de tela
+ * anuncia ao abrir. Se a chave de i18n não existir, o `t()` devolve a CHAVE
+ * CRUA (languageService.ts, com um console.warn que ninguém lê): o leitor
+ * anuncia a palavra "title", e nada na tela denuncia isso.
+ *
+ * Foi exatamente o que aconteceu com estes dois: `changelog.title` e
+ * `wrapped.title` foram usados aqui antes de existirem no dicionário.
+ */
+describe('os rótulos dos diálogos existem nos três idiomas', () => {
+    const ROTULOS: Array<[string, string, string]> = [
+        // seção, chave, arquivo que usa
+        ['changelog', 'title', 'src/components/PostUpdateChangelog.tsx'],
+        ['wrapped', 'title', 'src/components/WrappedOverlay.tsx'],
+        ['updates', 'newVersionTitle', 'src/components/UpdateModal.tsx'],
+        ['profile', 'createNewProfile', 'src/components/CreateProfileModal.tsx'],
+    ];
+
+    it.each(['pt', 'en', 'es'])('%s tem texto de verdade, não a chave crua', async (idioma) => {
+        const dicionario = (await import(`../locales/ui/${idioma}.json`)).default as Record<string, Record<string, string>>;
+        for (const [secao, chave, arquivo] of ROTULOS) {
+            const valor = dicionario[secao]?.[chave];
+            expect(valor, `${idioma}: falta ${secao}.${chave} (usada em ${arquivo})`).toBeTruthy();
+            expect(valor).not.toBe(chave);
+        }
+    });
+});

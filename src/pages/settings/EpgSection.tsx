@@ -294,10 +294,10 @@ export function EpgSection({
                         {/* Countries Row */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px' }}>
                             {[
-                                { code: 'BR', flag: '🇧🇷', count: playlistChannelCounts.BR, color: '#22c55e', label: 'Brasil' },
-                                { code: 'ARG', flag: '🇦🇷', count: playlistChannelCounts.ARG, color: '#60a5fa', label: 'Argentina' },
-                                { code: 'US', flag: '🇺🇸', count: playlistChannelCounts.US, color: '#f59e0b', label: 'EUA' },
-                                { code: 'PT', flag: '🇵🇹', count: playlistChannelCounts.PT, color: '#ef4444', label: 'Portugal' }
+                                { code: 'BR', flag: '🇧🇷', count: playlistChannelCounts.BR, color: '#22c55e', label: t('epg', 'filterBR') },
+                                { code: 'ARG', flag: '🇦🇷', count: playlistChannelCounts.ARG, color: '#60a5fa', label: t('epg', 'filterARG') },
+                                { code: 'US', flag: '🇺🇸', count: playlistChannelCounts.US, color: '#f59e0b', label: t('epg', 'filterUS') },
+                                { code: 'PT', flag: '🇵🇹', count: playlistChannelCounts.PT, color: '#ef4444', label: t('epg', 'filterPT') }
                             ].map(({ code, flag, count, color, label }) => (
                                 <div key={code} className="setting-item epg-grid-item" style={{
                                     padding: '12px 8px',
@@ -494,10 +494,10 @@ export function EpgSection({
                         {/* Country Counts Grid */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '10px', marginBottom: '20px' }}>
                             {[
-                                { code: 'BR', flag: '🇧🇷', label: 'Brasil', color: '#22c55e' },
-                                { code: 'ARG', flag: '🇦🇷', label: 'Argentina', color: '#60a5fa' },
-                                { code: 'US', flag: '🇺🇸', label: 'EUA', color: '#f59e0b' },
-                                { code: 'PT', flag: '🇵🇹', label: 'Portugal', color: '#ef4444' }
+                                { code: 'BR', flag: '🇧🇷', label: t('epg', 'filterBR'), color: '#22c55e' },
+                                { code: 'ARG', flag: '🇦🇷', label: t('epg', 'filterARG'), color: '#60a5fa' },
+                                { code: 'US', flag: '🇺🇸', label: t('epg', 'filterUS'), color: '#f59e0b' },
+                                { code: 'PT', flag: '🇵🇹', label: t('epg', 'filterPT'), color: '#ef4444' }
                             ].map(({ code, flag, label, color }) => {
                                 const count = [...epgTestResults.working, ...epgTestResults.notWorking]
                                     .filter(c => c.country === code).length;
@@ -545,13 +545,13 @@ export function EpgSection({
                                                 color: epgResultsFilter === filter ? '#a5b4fc' : 'rgba(255,255,255,0.6)'
                                             }}
                                         >
-                                            {filter === 'all' ? '📺 Todos' : filter === 'working' ? '✅' : '❌'}
+                                            {filter === 'all' ? `📺 ${t('epg', 'filterAll')}` : filter === 'working' ? '✅' : '❌'}
                                         </button>
                                     ))}
                                 </div>
                                 <input
                                     type="text"
-                                    placeholder="🔍 Buscar canal..."
+                                    placeholder={`🔍 ${t('epg', 'searchChannel')}`}
                                     value={epgSearchTerm}
                                     onChange={(e) => { setEpgSearchTerm(e.target.value); setEpgCurrentPage(1); }}
                                     className="setting-select"
@@ -563,7 +563,7 @@ export function EpgSection({
                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                 {(['all', 'BR', 'ARG', 'US', 'PT'] as const).map((country) => {
                                     const icons: Record<string, string> = { all: '🌍', BR: '🇧🇷', ARG: '🇦🇷', US: '🇺🇸', PT: '🇵🇹' };
-                                    const labels: Record<string, string> = { all: 'Todos', BR: 'BR', ARG: 'ARG', US: 'US', PT: 'PT' };
+                                    const labels: Record<string, string> = { all: t('epg', 'filterCountryAll'), BR: 'BR', ARG: 'ARG', US: 'US', PT: 'PT' };
                                     return (
                                         <button
                                             key={country}

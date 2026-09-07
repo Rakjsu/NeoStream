@@ -467,7 +467,7 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads, 
                                                             e.stopPropagation();
                                                             handleMarkAsRead(notification.id);
                                                         }}
-                                                        title="Marcar como lida"
+                                                        title={t('notifications', 'markAsRead')}
                                                         className="notif-action-btn"
                                                     >
                                                         <Check size={14} color="rgba(255,255,255,0.7)" />

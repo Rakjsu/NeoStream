@@ -1947,8 +1947,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                                     document.exitFullscreen();
                                 }
                             }}
-                            title={state.fullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
-                            aria-label={state.fullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
+                            title={state.fullscreen ? t('player', 'exitFullscreen') : t('player', 'fullscreen')}
+                            aria-label={state.fullscreen ? t('player', 'exitFullscreen') : t('player', 'fullscreen')}
                         >
                             {state.fullscreen ? <Minimize size="1em" /> : <Maximize size="1em" />}
                         </button>

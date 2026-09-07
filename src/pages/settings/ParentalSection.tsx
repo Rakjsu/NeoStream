@@ -613,7 +613,7 @@ export function ParentalSection() {
                                     e.currentTarget.style.color = '#9ca3af';
                                 }}
                             >
-                                Cancelar
+                                {t('parental', 'cancel')}
                             </button>
                             <button
                                 type="button"
@@ -644,7 +644,7 @@ export function ParentalSection() {
                                     ? '🔓 Desbloquear'
                                     : pinStep === 'enter'
                                         ? 'Continuar →'
-                                        : '✓ Confirmar'}
+                                        : `✓ ${t('parental', 'confirm')}`}
                             </button>
                         </div>
                     </div>
