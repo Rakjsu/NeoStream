@@ -89,6 +89,23 @@ const CHAVES_DINAMICAS: Record<string, RegExp[]> = {
  * O preço da estrita é não cobrir chave que só aparece dentro de ternário — a
  * frouxa cobre essas pelo outro lado.
  */
+/**
+ * Tira as linhas de comentario antes de varrer.
+ *
+ * Sem isto, um `t('secao','chave')` escrito num JSDoc para EXPLICAR o formato
+ * conta como uso de verdade — e foi o que aconteceu: o comentario do proprio
+ * `languageService.t` acusou uma chave inventada chamada `secao.chave`.
+ *
+ * Corta so por linha (`//`, `*`, `/*`), nunca no meio: procurar `//` dentro da
+ * linha apagaria metade de toda URL `http://` que aparece em string.
+ */
+function semComentarios(fonte: string): string {
+    return fonte
+        .split('\n')
+        .filter(linha => !/^\s*(\/\/|\*|\/\*)/.test(linha))
+        .join('\n')
+}
+
 function chavesUsadas(): { frouxa: Map<string, Set<string>>; estrita: Map<string, Set<string>> } {
     const frouxa = new Map<string, Set<string>>()
     const estrita = new Map<string, Set<string>>()
@@ -99,7 +116,7 @@ function chavesUsadas(): { frouxa: Map<string, Set<string>>; estrita: Map<string
         return alvo
     }
     for (const arquivo of arquivosDoRenderer(SRC)) {
-        const fonte = fs.readFileSync(arquivo, 'utf-8')
+        const fonte = semComentarios(fs.readFileSync(arquivo, 'utf-8'))
         for (const achado of fonte.matchAll(chamada)) {
             const secao = achado[1]
             const resto = achado[2]
