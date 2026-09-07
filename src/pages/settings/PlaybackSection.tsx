@@ -62,6 +62,11 @@ export function PlaybackSection() {
     const [mpvDetecting, setMpvDetecting] = useState(false);
     const [mpvResolvedPath, setMpvResolvedPath] = useState<string | null | undefined>(undefined);
     const [mpvDownload, setMpvDownload] = useState<MpvDownloadState>({ phase: 'idle' });
+    // null = ainda nao sabemos (ou o IPC falhou). Tri-state de proposito: o
+    // botao so aparece com `true` (lado seguro) e a dica de Unix so aparece
+    // com `false` — senao uma falha de IPC no Windows mandaria a pessoa
+    // rodar `brew install`.
+    const [mpvDownloadSupported, setMpvDownloadSupported] = useState<boolean | null>(null);
 
     const handlePlaybackConfigChange = <K extends keyof PlaybackConfig>(key: K, value: PlaybackConfig[K]) => {
         const newConfig = { ...playbackConfig, [key]: value };
@@ -75,10 +80,11 @@ export function PlaybackSection() {
     // EXPERIMENTAL — show the current configured/resolved mpv path on mount
     useEffect(() => {
         let cancelled = false;
-        mpvService.getAvailability().then(({ path, configuredPath }) => {
+        mpvService.getAvailability().then(({ path, configuredPath, downloadSupported }) => {
             if (cancelled) return;
             setMpvResolvedPath(path);
             if (configuredPath) setMpvPathInput(configuredPath);
+            setMpvDownloadSupported(downloadSupported);
         });
         return () => {
             cancelled = true;
@@ -109,6 +115,12 @@ export function PlaybackSection() {
                 setMpvPathInput(result.path);
                 setMpvDownload({ phase: 'success', path: result.path });
             } else if (result.reason === 'cancelled') {
+                setMpvDownload({ phase: 'idle' });
+            } else if (result.reason === 'unsupported-platform') {
+                // Chega aqui se a tela for mais velha que o main. Some o botao
+                // em vez de mostrar "verifique sua conexao" pra quem nunca
+                // teve chance de baixar nada.
+                setMpvDownloadSupported(false);
                 setMpvDownload({ phase: 'idle' });
             } else {
                 setMpvDownload({ phase: 'error' });
@@ -450,7 +462,7 @@ export function PlaybackSection() {
                                     </span>
                                 ) : (
                                     <span style={{ color: '#ef4444' }}>
-                                        ✕ {t('playback', 'mpvNotFound') || 'mpv não encontrado'} — {t('playback', 'mpvInstallHint') || 'Instale com scoop install mpv, choco install mpv ou baixe em mpv.io'}
+                                        ✕ {t('playback', 'mpvNotFound')} — {mpvDownloadSupported === false ? t('playback', 'mpvInstallHintUnix') : t('playback', 'mpvInstallHint')}
                                     </span>
                                 )}
                             </p>
@@ -477,7 +489,7 @@ export function PlaybackSection() {
                         </div>
 
                         {/* EXPERIMENTAL — one-click MPV download (mpv not found, or download in progress) */}
-                        {(mpvResolvedPath === null || mpvDownload.phase !== 'idle') && (
+                        {mpvDownloadSupported === true && (mpvResolvedPath === null || mpvDownload.phase !== 'idle') && (
                             <div style={{ width: '100%' }}>
                                 {(mpvDownload.phase === 'idle' || mpvDownload.phase === 'error') && (
                                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>

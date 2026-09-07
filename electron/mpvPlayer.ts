@@ -8,7 +8,7 @@
  * surface exposed to the renderer.
  *
  * Channels:
- *   mpv:available      -> { path: string | null, configuredPath: string | null }
+ *   mpv:available      -> { path, configuredPath, downloadSupported } (o download automatico e so Windows)
  *   mpv:play           -> { success, reason? }   ({ url, title?, start? })
  *   mpv:pause / mpv:resume / mpv:stop -> { success }
  *   mpv:seek           -> { success }            ({ seconds })
@@ -36,6 +36,7 @@ import path from 'node:path'
 import store from './store'
 import log from './logger'
 import { installMpv } from './mpvDownloader'
+import { mpvDownloadSupported } from './mpvDownloaderProtocol'
 import {
     applyIpcMessage,
     buildMpvArgs,
@@ -413,7 +414,10 @@ function getStatusSnapshot(): MpvStatus {
 export function setupMpvHandlers() {
     ipcMain.handle('mpv:available', async () => {
         const path = await resolveMpvPath(true)
-        return { path, configuredPath: getConfiguredPath() }
+        // `downloadSupported` viaja junto porque o renderer nao tem como saber
+        // a plataforma: o preload nao expoe `process.platform` e nao havia
+        // canal pra isso. Este handler ja e chamado na montagem da tela.
+        return { path, configuredPath: getConfiguredPath(), downloadSupported: mpvDownloadSupported(process.platform) }
     })
 
     ipcMain.handle('mpv:play', async (event, payload: { url?: string; title?: string; start?: number }) => {

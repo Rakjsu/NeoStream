@@ -476,7 +476,8 @@
     "hwAccelDesc": "Turning it off fixes black screens and freezes on troublesome graphics cards, at the cost of more CPU. Takes effect after you restart NeoStream.",
     "hwAccelAuto": "Automatic (recommended)",
     "hwAccelForce": "Force (ignore the blocklist)",
-    "hwAccelOff": "Off (software only)"
+    "hwAccelOff": "Off (software only)",
+    "mpvInstallHintUnix": "Install it with your system's package manager (brew install mpv, apt install mpv) or download it at mpv.io"
   },
   "appearance": {
     "title": "Appearance",

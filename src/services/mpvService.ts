@@ -30,6 +30,12 @@ export interface MpvStatus {
 export interface MpvAvailability {
     path: string | null;
     configuredPath: string | null;
+    /**
+     * O download automatico do mpv so existe pra Windows (o pacote e um .7z de
+     * build Windows e o binario procurado e `mpv.exe`). O renderer nao tem
+     * como saber a plataforma sozinho — vem do main junto com o resto.
+     */
+    downloadSupported: boolean;
 }
 
 export interface MpvPlayResult {
@@ -58,10 +64,13 @@ class MpvService {
             return {
                 path: result?.path ?? null,
                 configuredPath: result?.configuredPath ?? null,
+                // `=== true` de proposito: main antigo (sem o campo) e falha de
+                // IPC caem no lado seguro, que e esconder o botao de download.
+                downloadSupported: result?.downloadSupported === true,
             };
         } catch (error) {
             console.warn('[MPV] availability check failed:', error);
-            return { path: null, configuredPath: null };
+            return { path: null, configuredPath: null, downloadSupported: false };
         }
     }
 

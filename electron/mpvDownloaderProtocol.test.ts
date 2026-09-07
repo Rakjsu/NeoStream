@@ -11,6 +11,7 @@ import { describe, it, expect } from 'vitest'
 import {
     MPV_RELEASE_API_URL,
     buildExtractArgs,
+    mpvDownloadSupported,
     computeDownloadProgress,
     parseMpvVersionFromAssetName,
     pickMpvAsset,
@@ -118,5 +119,18 @@ describe('buildExtractArgs', () => {
 describe('MPV_RELEASE_API_URL', () => {
     it('points at the zhongfly/mpv-winbuild latest release endpoint', () => {
         expect(MPV_RELEASE_API_URL).toBe('https://api.github.com/repos/zhongfly/mpv-winbuild/releases/latest')
+    })
+})
+
+describe('mpvDownloadSupported', () => {
+    // O download automatico e 100% Windows: o pacote vem do zhongfly/mpv-winbuild
+    // como .7z, quem extrai e o tar.exe (bsdtar) do Windows, e o binario
+    // procurado depois e mpv.exe.
+    it('so o Windows', () => {
+        expect(mpvDownloadSupported('win32')).toBe(true)
+        expect(mpvDownloadSupported('darwin')).toBe(false)
+        expect(mpvDownloadSupported('linux')).toBe(false)
+        expect(mpvDownloadSupported('freebsd')).toBe(false)
+        expect(mpvDownloadSupported('')).toBe(false)
     })
 })

@@ -592,7 +592,8 @@
     "hwAccelDesc": "Desligar resolve tela preta e travamento em placa de vídeo problemática, ao custo de mais CPU. Só vale depois de reiniciar o NeoStream.",
     "hwAccelAuto": "Automático (recomendado)",
     "hwAccelForce": "Forçar (ignora a lista de bloqueio)",
-    "hwAccelOff": "Desligada (só software)"
+    "hwAccelOff": "Desligada (só software)",
+    "mpvInstallHintUnix": "Instale com o gerenciador de pacotes do seu sistema (brew install mpv, apt install mpv) ou baixe em mpv.io"
   },
   "appearance": {
     "title": "Aparência",
