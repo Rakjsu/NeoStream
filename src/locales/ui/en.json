@@ -1172,7 +1172,9 @@
     "decade": "Decade",
     "allDecades": "All decades",
     "genre": "Genre",
-    "allGenres": "All genres"
+    "allGenres": "All genres",
+    "tag": "Personal tag",
+    "allTags": "All tags"
   },
   "storage": {
     "title": "Storage",

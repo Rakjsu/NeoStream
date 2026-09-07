@@ -1172,7 +1172,9 @@
     "decade": "Década",
     "allDecades": "Todas as décadas",
     "genre": "Gênero",
-    "allGenres": "Todos os gêneros"
+    "allGenres": "Todos os gêneros",
+    "tag": "Tag pessoal",
+    "allTags": "Todas as tags"
   },
   "storage": {
     "title": "Armazenamento",

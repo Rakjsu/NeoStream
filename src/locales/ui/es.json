@@ -1172,7 +1172,9 @@
     "decade": "Década",
     "allDecades": "Todas las décadas",
     "genre": "Género",
-    "allGenres": "Todos los géneros"
+    "allGenres": "Todos los géneros",
+    "tag": "Etiqueta personal",
+    "allTags": "Todas las etiquetas"
   },
   "storage": {
     "title": "Almacenamiento",
