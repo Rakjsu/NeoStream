@@ -3,6 +3,7 @@ import { X, ChevronRight, ChevronLeft } from 'lucide-react';
 import { buildWrapped, type WrappedData, type WrappedPersona } from '../services/wrappedHelpers';
 import { usageStatsService } from '../services/usageStatsService';
 import { useLanguage } from '../services/languageService';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 // NeoStream Wrapped: a slide-based retrospective of the profile's watching,
 // opened from the stats dashboard. Pure data via buildWrapped(); this
@@ -89,10 +90,18 @@ export function WrappedOverlay({ onClose }: { onClose: () => void }) {
 
     const isLast = slide === slides.length - 1;
 
+    // Dialogo de verdade: papel, trava de foco, Esc e devolucao do foco. Este
+    // overlay so existe quando esta na tela, entao `aberto` e sempre true.
+    const { containerRef, dialogProps } = useDialogA11y({
+        aberto: true,
+        aoFechar: onClose,
+        rotulo: t('wrapped', 'title'),
+    });
+
     return (
         <div className="wrapped-backdrop" onClick={onClose}>
             <style>{wrappedStyles}</style>
-            <div className="wrapped-card" onClick={(e) => e.stopPropagation()}>
+            <div className="wrapped-card" onClick={(e) => e.stopPropagation()} ref={containerRef} {...dialogProps}>
                 <button className="wrapped-close" onClick={onClose} aria-label={t('wrapped', 'close')}>
                     <X size={18} />
                 </button>

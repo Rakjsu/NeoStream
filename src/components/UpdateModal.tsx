@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import DOMPurify from 'dompurify';
 import { updateService } from '../services/updateService';
 import type { UpdateInfo, DownloadProgress } from '../types/update';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 interface UpdateModalProps {
     isOpen: boolean;
@@ -10,6 +11,7 @@ interface UpdateModalProps {
 }
 
 export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
+    const { containerRef, dialogProps } = useDialogA11y({ aberto: isOpen, aoFechar: onClose });
     const [downloading, setDownloading] = useState(false);
     const [progress, setProgress] = useState<DownloadProgress | null>(null);
     const [downloaded, setDownloaded] = useState(false);
@@ -89,6 +91,8 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
 
             {/* Modal */}
             <div
+                ref={containerRef}
+                {...dialogProps}
                 style={{
                     position: 'fixed',
                     top: '50%',

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../services/languageService';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 import { novidadesDaRelease, pareceAutoGerada } from '../utils/releaseNotes';
 
 
@@ -36,6 +37,13 @@ export function PostUpdateChangelog() {
     const handleClose = () => {
         setIsVisible(false);
     };
+
+    // Diálogo de verdade: papel, trava de foco, Esc e devolução do foco.
+    const { containerRef, dialogProps } = useDialogA11y({
+        aberto: isVisible,
+        aoFechar: handleClose,
+        rotulo: t('changelog', 'title'),
+    });
 
     // As novidades REAIS vêm das release notes da versão instalada (GitHub).
     // Sem rede (ou release sem notas), fica o fallback genérico com o link.
@@ -75,7 +83,7 @@ export function PostUpdateChangelog() {
             <div className="changelog-backdrop" onClick={handleClose} />
 
             {/* Modal */}
-            <div className="changelog-modal">
+            <div className="changelog-modal" ref={containerRef} {...dialogProps}>
                 {/* Header */}
                 <div className="changelog-header">
                     <div className="changelog-icon">🎉</div>

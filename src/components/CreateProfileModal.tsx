@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { profileService } from '../services/profileService';
 import { useLanguage } from '../services/languageService';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 interface CreateProfileModalProps {
     onClose: () => void;
@@ -10,6 +11,8 @@ interface CreateProfileModalProps {
 const DEFAULT_EMOJIS = ['👤', '👨', '👩', '🧑', '👦', '👧', '🧒', '👨‍💼', '👩‍💼', '🧑‍🎓', '👨‍🎓', '👩‍🎓', '🧑‍💻', '👨‍💻', '👩‍💻', '🦸', '🦸‍♂️', '🦸‍♀️'];
 
 export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileModalProps) {
+    // Dialogo de verdade. Este modal so existe quando esta na tela.
+    const { containerRef, dialogProps } = useDialogA11y({ aberto: true, aoFechar: onClose });
     const [name, setName] = useState('');
     const [selectedEmoji, setSelectedEmoji] = useState('👤');
     const [avatarImage, setAvatarImage] = useState<string | null>(null);
@@ -100,6 +103,8 @@ export function CreateProfileModal({ onClose, onProfileCreated }: CreateProfileM
         >
             <div
                 onClick={(e) => e.stopPropagation()}
+                ref={containerRef}
+                {...dialogProps}
                 style={{
                     backgroundColor: '#1e293b',
                     borderRadius: '16px',
