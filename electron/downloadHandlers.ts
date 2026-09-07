@@ -6,6 +6,7 @@ import http from 'http'
 import log from './logger'
 import { setTaskbarProgress } from './winIntegration'
 import { resolveDownloadFile, resolveSeriesFolder, sanitizeDownloadName } from './downloadPaths'
+import { getErrorMessage } from './errorMessage';
 
 interface ActiveDownload {
     id: string;
@@ -23,9 +24,6 @@ const activeDownloads: Map<string, ActiveDownload> = new Map();
 
 // Number of parallel connections for faster downloads
 const PARALLEL_CONNECTIONS = 4;
-
-const getErrorMessage = (error: unknown): string =>
-    error instanceof Error ? error.message : String(error);
 
 function getDownloadsPath(): string {
     const userDataPath = app.getPath('userData');

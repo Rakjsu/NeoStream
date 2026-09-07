@@ -15,6 +15,7 @@ import { Bonjour, type Browser, type Service } from 'bonjour-service';
 import log from './logger'
 import { planAirplayCommand, parseScrub, type AirplayStatusRaw } from './airplayRemoteRouting';
 import { isLoopbackUrl, createLanProxyUrlFor } from './dlnaHandlers'
+import { getErrorMessage } from './errorMessage';
 
 interface AirPlayDevice {
     id: string
@@ -26,9 +27,6 @@ interface AirPlayDevice {
 }
 
 const AIRPLAY_DEFAULT_PORT = 7000;
-
-const getErrorMessage = (error: unknown): string =>
-    error instanceof Error ? error.message : String(error);
 
 let bonjour: Bonjour | null = null;
 let airplayBrowser: Browser | null = null;
