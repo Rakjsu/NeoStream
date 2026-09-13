@@ -15,6 +15,7 @@ import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import log from './logger'
 import { openCatalogStore, type CatalogStore } from './catalogDb'
+import { getErrorMessage } from './errorMessage'
 
 export const CATALOG_CACHE_TTL_MS = 15 * 60 * 1000
 
@@ -241,7 +242,7 @@ async function runCatalogFetch(
     } catch (error) {
         if (cached) {
             log.warn(`[CatalogCache] provider fetch failed for ${kind} — serving stale cache:`,
-                error instanceof Error ? error.message : String(error))
+                getErrorMessage(error))
             return { data: cached.data, fromCache: true }
         }
         throw error

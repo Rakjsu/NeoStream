@@ -28,6 +28,7 @@ import {
     searchEpgIndex,
 } from './providerEpgProtocol'
 import type { ProviderEpgProgram } from './providerEpgProtocol'
+import { getErrorMessage } from './errorMessage'
 
 const XMLTV_CACHE_KEY_PREFIX = 'provider-xmltv'
 const XMLTV_CACHE_TTL_MS = 24 * 60 * 60 * 1000
@@ -160,7 +161,7 @@ async function fetchXmltvWithCache(url: string): Promise<string | null> {
         }
         return data
     } catch (error) {
-        log.warn('[Provider EPG] xmltv download error:', error instanceof Error ? error.message : String(error))
+        log.warn('[Provider EPG] xmltv download error:', getErrorMessage(error))
         return await readStaleCache(fs, cacheFile)
     }
 }
@@ -217,7 +218,7 @@ function ensureXmltvIndex(): Promise<void> {
                     const [channels, epg] = await Promise.all([stalker.getAllChannels(), stalker.getEpgInfo(24)])
                     syntheticXml = buildXmltvFromStalkerEpg(channels, epg)
                 } catch (error) {
-                    log.info('[Provider EPG] Stalker portal EPG unavailable:', error instanceof Error ? error.message : String(error))
+                    log.info('[Provider EPG] Stalker portal EPG unavailable:', getErrorMessage(error))
                 }
                 if (!syntheticXml || !looksLikeXmltv(syntheticXml)) {
                     if (stillCurrent()) xmltvAvailability = 'unavailable'
@@ -294,7 +295,7 @@ function ensureXmltvIndex(): Promise<void> {
                 'programs in', Date.now() - parseStart, 'ms')
         } catch (error) {
             if (stillCurrent()) xmltvAvailability = 'unavailable'
-            log.error('[Provider EPG] xmltv probe error:', error instanceof Error ? error.message : String(error))
+            log.error('[Provider EPG] xmltv probe error:', getErrorMessage(error))
         }
     })().finally(() => {
         // Só solta a própria promessa: um reset no meio já zerou xmltvLoading e
@@ -347,7 +348,7 @@ async function fetchSimpleDataTable(streamId: number, channelId: string): Promis
         simpleTableCache.set(streamId, { at: Date.now(), programs })
         return programs
     } catch (error) {
-        log.warn('[Provider EPG] get_simple_data_table error:', error instanceof Error ? error.message : String(error))
+        log.warn('[Provider EPG] get_simple_data_table error:', getErrorMessage(error))
         simpleTableAvailable = false
         return []
     }
@@ -360,7 +361,7 @@ export function setupProviderEpgHandlers() {
             await ensureXmltvIndex()
             return { success: true, available: xmltvAvailability === 'ready' }
         } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : String(error) }
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -375,7 +376,7 @@ export function setupProviderEpgHandlers() {
             }
             return { success: true, programs: searchEpgIndex(xmltvIndex, query, Date.now()) }
         } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : String(error) }
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -405,7 +406,7 @@ export function setupProviderEpgHandlers() {
 
             return { success: true, programs: [], source: 'none' }
         } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : String(error) }
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 }
