@@ -228,7 +228,7 @@
     "continueSeason": "Continue S",
     "episode": "E",
     "saved": "Saved",
-    "watchLater": "Watch Later",
+    "watchLater": "Watch later",
     "downloaded": "Downloaded",
     "download": "Download",
     "downloadTooltip": "Download to watch offline",
@@ -274,7 +274,6 @@
     "importMobile": "Import phone backup",
     "importMobileDone": "✓ {n} account(s) imported from the phone backup",
     "importMobileInvalid": "That file does not look like a NeoStream Mobile backup",
-    "importMobileEncrypted": "Password-protected backup — export without a password on the phone to import it here",
     "namePlaceholder": "Playlist name (optional)",
     "addConfirm": "Add",
     "adding": "Validating...",
@@ -289,7 +288,11 @@
     "renameFailed": "Could not rename",
     "defaultName": "My playlist",
     "m3uFromFile": "Open file…",
-    "connections": "{n} simultaneous connection(s)"
+    "connections": "{n} simultaneous connection(s)",
+    "importMobilePasswordLabel": "Backup password:",
+    "importMobilePasswordHint": "the one you typed on the phone",
+    "importMobileUnlock": "Open backup",
+    "importMobileWrongPassword": "Wrong password — or the file is damaged"
   },
   "notifications": {
     "autoTuneIn": "Switching to {channel} in {s}s…",
@@ -746,7 +749,8 @@
     "phoneNoAnswer": "📱 Sent, but the phone did not answer",
     "phoneLocked": "🔒 The phone app is locked — unlock it to play",
     "phoneBlocked": "🚸 Blocked by the phone's parental control",
-    "phoneNotFound": "Content not found on the phone's account"
+    "phoneNotFound": "Content not found on the phone's account",
+    "cancel": "Cancel"
   },
   "player": {
     "qrHandoff": "Continue on phone",
@@ -844,7 +848,7 @@
     "expiryDismiss": "Dismiss for 24h",
     "rouletteTitle": "Taste roulette",
     "rouletteSpin": "Spin",
-    "departuresWarn": "{count} title(s) from your Watch Later left the catalog: {names}",
+    "departuresWarn": "{count} title(s) from your Watch later list left the catalog: {names}",
     "goodAfternoon": "Good afternoon",
     "goodEvening": "Good evening",
     "continueWatching": "Continue Watching",
@@ -869,7 +873,7 @@
     "seriesCount": "Series",
     "quickAccess": "Quick Access",
     "liveTV": "Live TV",
-    "myList": "My List",
+    "myList": "Watch later",
     "favorites": "Favorites",
     "downloaded": "Downloaded",
     "settings": "Settings",
@@ -889,10 +893,10 @@
     "castNoUrls": "Could not resolve the movies",
     "castQueued": "{n} movies queued on {device}",
     "castError": "Failed to cast the queue",
-    "title": "My List",
-    "emptyTitle": "Your list is empty",
-    "emptyText": "Add movies and series to watch later by clicking the",
-    "emptyButton": "+ My List",
+    "title": "Watch later",
+    "emptyTitle": "Nothing in Watch later yet",
+    "emptyText": "Save movies and series from their page, with the",
+    "emptyButton": "+ Watch later",
     "itemsSaved": "items saved",
     "itemSaved": "item saved",
     "clearAll": "Clear All",
@@ -901,7 +905,7 @@
     "series": "Series",
     "noMovies": "No movies saved",
     "noSeries": "No series saved",
-    "removeFromList": "Remove from list",
+    "removeFromList": "Remove from Watch later",
     "movie": "Movie",
     "serie": "Series",
     "exploreMovies": "Explore Movies",
@@ -918,7 +922,10 @@
     "movies": "Movies",
     "series": "Series",
     "exploreMovies": "Explore Movies",
-    "exploreSeries": "Explore Series"
+    "exploreSeries": "Explore Series",
+    "copyFromOther": "You have favorites in another playlist:",
+    "copyDone": "✓ {n} favorite(s) copied — {semPar} are not on this provider",
+    "copyAlreadyHere": "({n} were already here.)"
   },
   "downloads": {
     "activeRecs": "Recording now",

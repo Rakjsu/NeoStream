@@ -228,7 +228,7 @@
     "continueSeason": "Continuar T",
     "episode": "E",
     "saved": "Salvo",
-    "watchLater": "Assistir Depois",
+    "watchLater": "Ver depois",
     "downloaded": "Baixado",
     "download": "Baixar",
     "downloadTooltip": "Baixar para assistir offline",
@@ -274,7 +274,6 @@
     "importMobile": "Importar backup do celular",
     "importMobileDone": "✓ {n} conta(s) importada(s) do backup do celular",
     "importMobileInvalid": "Esse arquivo não parece um backup do NeoStream Mobile",
-    "importMobileEncrypted": "Backup protegido por senha — exporte sem senha no celular pra importar aqui",
     "namePlaceholder": "Nome da playlist (opcional)",
     "addConfirm": "Adicionar",
     "adding": "Validando...",
@@ -289,7 +288,11 @@
     "renameFailed": "Não deu pra renomear",
     "defaultName": "Minha Playlist",
     "m3uFromFile": "Abrir arquivo…",
-    "connections": "{n} conexão(ões) simultânea(s)"
+    "connections": "{n} conexão(ões) simultânea(s)",
+    "importMobilePasswordLabel": "Senha do backup:",
+    "importMobilePasswordHint": "a que você digitou no celular",
+    "importMobileUnlock": "Abrir backup",
+    "importMobileWrongPassword": "Senha incorreta — ou o arquivo está danificado"
   },
   "updates": {
     "title": "Atualizações Automáticas",
@@ -641,7 +644,8 @@
     "phoneNoAnswer": "📱 Enviado, mas o celular não respondeu",
     "phoneLocked": "🔒 App do celular trancado — destrave pra tocar",
     "phoneBlocked": "🚸 Bloqueado pelo controle parental do celular",
-    "phoneNotFound": "Conteúdo não encontrado na conta do celular"
+    "phoneNotFound": "Conteúdo não encontrado na conta do celular",
+    "cancel": "Cancelar"
   },
   "player": {
     "qrHandoff": "Continuar no celular",
@@ -869,7 +873,7 @@
     "seriesCount": "Séries",
     "quickAccess": "Acesso Rápido",
     "liveTV": "TV ao Vivo",
-    "myList": "Minha Lista",
+    "myList": "Ver depois",
     "favorites": "Favoritos",
     "downloaded": "Baixados",
     "settings": "Configurações",
@@ -889,10 +893,10 @@
     "castNoUrls": "Não foi possível resolver os filmes",
     "castQueued": "{n} filmes na fila do {device}",
     "castError": "Falha ao transmitir a fila",
-    "title": "Minha Lista",
-    "emptyTitle": "Sua lista está vazia",
-    "emptyText": "Adicione filmes e séries para assistir depois clicando no botão",
-    "emptyButton": "+ Minha Lista",
+    "title": "Ver depois",
+    "emptyTitle": "Nada em Ver depois ainda",
+    "emptyText": "Guarde filmes e séries pela ficha, no botão",
+    "emptyButton": "+ Ver depois",
     "itemsSaved": "itens salvos",
     "itemSaved": "item salvo",
     "clearAll": "Limpar Tudo",
@@ -901,7 +905,7 @@
     "series": "Séries",
     "noMovies": "Nenhum filme salvo",
     "noSeries": "Nenhuma série salva",
-    "removeFromList": "Remover da lista",
+    "removeFromList": "Tirar de Ver depois",
     "movie": "Filme",
     "serie": "Série",
     "exploreMovies": "Explorar Filmes",
@@ -918,7 +922,10 @@
     "movies": "Filmes",
     "series": "Séries",
     "exploreMovies": "Explorar Filmes",
-    "exploreSeries": "Explorar Séries"
+    "exploreSeries": "Explorar Séries",
+    "copyFromOther": "Você tem favoritos em outra lista:",
+    "copyDone": "✓ {n} favorito(s) copiado(s) — {semPar} não estão neste provedor",
+    "copyAlreadyHere": "({n} já estavam aqui.)"
   },
   "downloads": {
     "activeRecs": "Gravando agora",

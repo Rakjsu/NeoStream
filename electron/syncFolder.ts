@@ -16,6 +16,7 @@ import fs from 'node:fs'
 import fsp from 'node:fs/promises'
 import Store from 'electron-store'
 import log from './logger'
+import { getErrorMessage } from './errorMessage'
 
 interface SyncFolderConfig {
     enabled: boolean
@@ -186,7 +187,7 @@ export function setupSyncFolder(getWin: () => BrowserWindow | null) {
             return { success: true, path: filePath, config: next }
         } catch (error) {
             log.error('[Sync] save failed:', error)
-            return { success: false, error: error instanceof Error ? error.message : String(error) }
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 

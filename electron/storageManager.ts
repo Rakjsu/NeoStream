@@ -10,6 +10,7 @@ import path from 'node:path'
 import fsp from 'node:fs/promises'
 import log from './logger'
 import { recordingsDir } from './dvrHandlers'
+import { getErrorMessage } from './errorMessage'
 
 export type StorageArea = 'downloads' | 'recordings' | 'catalogCache' | 'epgCache'
 
@@ -51,7 +52,7 @@ export function setupStorageManager() {
             })))
             return { success: true, areas: sizes }
         } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : String(error) }
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
@@ -65,7 +66,7 @@ export function setupStorageManager() {
             log.info('[Storage] cleared', area)
             return { success: true }
         } catch (error) {
-            return { success: false, error: error instanceof Error ? error.message : String(error) }
+            return { success: false, error: getErrorMessage(error) }
         }
     })
 
