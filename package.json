@@ -121,14 +121,19 @@
         }
       ],
       "icon": "build/icons/icon.icns",
-      "category": "public.app-category.entertainment"
+      "category": "public.app-category.entertainment",
+      "artifactName": "NeoStream-IPTV-${version}-${arch}-mac.${ext}"
+    },
+    "dmg": {
+      "artifactName": "NeoStream-IPTV-${version}-${arch}.${ext}"
     },
     "linux": {
       "target": [
         "AppImage"
       ],
       "icon": "build/icons",
-      "category": "AudioVideo"
+      "category": "AudioVideo",
+      "artifactName": "NeoStream-IPTV-${version}.${ext}"
     },
     "portable": {
       "artifactName": "NeoStream-IPTV-Portable-${version}.${ext}"
