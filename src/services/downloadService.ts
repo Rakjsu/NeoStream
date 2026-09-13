@@ -4,6 +4,7 @@
  */
 
 import { appNotificationService } from './episodeNotificationService';
+import { lerMaxConexoes, limiteEfetivoDeDownloads } from '../utils/providerConnections';
 
 export interface DownloadItem {
     id: string;
@@ -73,6 +74,13 @@ class DownloadService {
     private queue: string[] = [];
     private isProcessing: boolean = false;
     private maxConcurrent: number = 2;
+    /**
+     * 🔌 Teto declarado pelo provedor (`user_info.max_connections`).
+     * `undefined` = ainda não perguntamos; `null` = perguntamos e ele não
+     * declara nada utilizável.
+     */
+    private limiteDoProvedor: number | null | undefined = undefined;
+    private perguntandoOLimite: Promise<void> | null = null;
     private nightOnly: boolean = false;
     private speedMarks: Map<string, { bytes: number; ts: number }> = new Map();
     private activeDownloads: number = 0;
@@ -342,9 +350,57 @@ class DownloadService {
         return item;
     }
 
+    /**
+     * Pergunta ao main quantas conexões o provedor aceita — UMA vez por sessão.
+     *
+     * O `auth:refresh-user-info` já tem cache com TTL do lado de lá e é o mesmo
+     * canal que o banner de expiração da Home usa, então isto não acrescenta
+     * tráfego novo ao provedor. Falha de rede deixa `null`: sem resposta, o
+     * limite é o que o usuário escolheu — nunca zero.
+     */
+    private async descobrirLimiteDoProvedor(): Promise<void> {
+        if (this.limiteDoProvedor !== undefined) return;
+        if (this.perguntandoOLimite) return this.perguntandoOLimite;
+        this.perguntandoOLimite = (async () => {
+            try {
+                const status = await window.ipcRenderer.invoke('auth:refresh-user-info') as
+                    { success?: boolean; user?: unknown };
+                this.limiteDoProvedor = status?.success ? lerMaxConexoes(status.user) : null;
+            } catch {
+                this.limiteDoProvedor = null;
+            } finally {
+                this.perguntandoOLimite = null;
+            }
+        })();
+        return this.perguntandoOLimite;
+    }
+
+    /** O que a fila REALMENTE usa: o menor entre a escolha e o teto do provedor. */
+    getEffectiveMaxConcurrent(): number {
+        return limiteEfetivoDeDownloads(this.maxConcurrent, this.limiteDoProvedor ?? null);
+    }
+
+    /** O teto do provedor, para a tela explicar por que a escolha não vale. */
+    getProviderMaxConnections(): number | null | undefined {
+        return this.limiteDoProvedor;
+    }
+
+    /**
+     * Versão pública para a tela: garante a resposta e devolve o teto. A fila
+     * também chama isto sozinha antes de processar — a tela só antecipa, para
+     * poder explicar o limite antes do primeiro download.
+     */
+    async ensureProviderMaxConnections(): Promise<number | null> {
+        await this.descobrirLimiteDoProvedor();
+        return this.limiteDoProvedor ?? null;
+    }
+
     // Process download queue
     private async processQueue(): Promise<void> {
-        if (this.isProcessing || this.activeDownloads >= this.maxConcurrent) {
+        // Antes de qualquer decisão de paralelismo: o provedor tem voto. A
+        // primeira passagem espera a resposta; as seguintes leem da memória.
+        await this.descobrirLimiteDoProvedor();
+        if (this.isProcessing || this.activeDownloads >= this.getEffectiveMaxConcurrent()) {
             return;
         }
 

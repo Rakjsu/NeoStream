@@ -75,6 +75,16 @@ export function Downloads() {
     const [renameValue, setRenameValue] = useState('');
     // ⚙️ Config da fila de downloads (D66).
     const [maxConc, setMaxConc] = useState(() => downloadService.getMaxConcurrent());
+    // 🔌 Teto do provedor: a fila já o respeita sozinha (downloadService), mas
+    // sem dizer nada a escolha de "4 simultâneos" ficaria na tela valendo 1, e
+    // o usuário culparia o app. `null` = provedor não declara; `undefined` =
+    // ainda perguntando.
+    const [limiteProvedor, setLimiteProvedor] = useState<number | null | undefined>(undefined);
+    useEffect(() => {
+        let vivo = true;
+        void downloadService.ensureProviderMaxConnections().then(n => { if (vivo) setLimiteProvedor(n); });
+        return () => { vivo = false; };
+    }, []);
     // ⏺ Gravação agendada. Os três leem o storage direto: o serviço vive no
     // renderer e lê a mesma chave a cada disparo, então não há o que sincronizar.
     const [dvrMax, setDvrMax] = useState(() => getDvrMaxConcurrent());
@@ -616,6 +626,11 @@ export function Downloads() {
                                 <option value={4}>4</option>
                             </select>
                         </label>
+                        {typeof limiteProvedor === 'number' && limiteProvedor < maxConc && (
+                            <span style={{ color: '#fbbf24', fontSize: 12 }}>
+                                {t('downloads', 'providerLimit').replace('{n}', String(limiteProvedor))}
+                            </span>
+                        )}
                         {/* ⏺ Gravação agendada: o limite de simultâneas e as
                             margens não tinham NENHUM controle na interface — e o
                             aviso de conflito da Agenda manda "ajustar o limite".

@@ -288,6 +288,7 @@
     "renameFailed": "Não deu pra renomear",
     "defaultName": "Minha Playlist",
     "m3uFromFile": "Abrir arquivo…",
+    "connections": "{n} conexão(ões) simultânea(s)",
     "importMobilePasswordLabel": "Senha do backup:",
     "importMobilePasswordHint": "a que você digitou no celular",
     "importMobileUnlock": "Abrir backup",
@@ -984,7 +985,8 @@
     "dvrMaxConcurrent": "Gravações simultâneas",
     "dvrStartMargin": "Começar antes (min)",
     "dvrEndPadding": "Continuar depois (min)",
-    "dvrMarginsDesc": "O horário do guia costuma estar adiantado ou atrasado alguns minutos. Estas margens gravam um pouco antes e um pouco depois — e contam no aviso de conflito."
+    "dvrMarginsDesc": "O horário do guia costuma estar adiantado ou atrasado alguns minutos. Estas margens gravam um pouco antes e um pouco depois — e contam no aviso de conflito.",
+    "providerLimit": "⚠ seu provedor aceita só {n} — a fila usa esse limite"
   },
   "history": {
     "title": "Histórico",
