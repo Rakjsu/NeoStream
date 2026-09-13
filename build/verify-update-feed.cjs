@@ -64,6 +64,31 @@ function resolveFileName(url, releaseFiles) {
     return releaseFiles.find(f => normalizeName(f) === target) ?? null
 }
 
+/**
+ * O nome do arquivo sobrevive ao upload do GitHub?
+ *
+ * Este guarda nasceu conferindo a pasta `release/` local, e o `normalizeName`
+ * acima existe porque ali o arquivo do mac tem ESPAÇO e o feed tem hífen. O
+ * que ninguém conferia era o passo seguinte: o GitHub, ao receber um asset com
+ * espaço no nome, troca o espaço por PONTO. Aí o feed pede
+ * `NeoStream-IPTV-4.48.0-arm64.dmg`, a release publica
+ * `NeoStream.IPTV-4.48.0-arm64.dmg`, e o electron-updater baixa um 404.
+ *
+ * Medido na v4.48.0 e na v4.47.1: as duas saíram assim, e o Windows só escapou
+ * porque o `nsis`/`portable` têm `artifactName` sem espaço. A correção de raiz
+ * foi dar `artifactName` a `mac`, `dmg` e `linux` também — este guarda existe
+ * para que o dia em que alguém tirar isso não passe batido de novo.
+ *
+ * Regra: o nome no disco tem que ser EXATAMENTE o do feed. Sem tolerância,
+ * porque a tolerância é justamente o que escondeu o problema.
+ */
+function verificaNomePublicavel(url, real) {
+    if (url === real) return null
+    return `nome do feed difere do arquivo: feed="${url}" disco="${real}". `
+        + 'Depois do upload o GitHub substitui espaço por ponto e o updater busca um 404. '
+        + 'Defina `artifactName` sem espaço para este alvo no package.json (o nsis já faz isso).'
+}
+
 function main() {
     if (!fs.existsSync(RELEASE_DIR)) {
         console.error(`[verify-update-feed] pasta não encontrada: ${RELEASE_DIR}`)
@@ -90,6 +115,11 @@ function main() {
                 console.error(`[verify-update-feed] ${feed}: arquivo ausente → ${entry.url}`)
                 problems++
                 continue
+            }
+            const nomeRuim = verificaNomePublicavel(entry.url, resolved)
+            if (nomeRuim) {
+                console.error(`[verify-update-feed] ${feed}: ${nomeRuim}`)
+                problems++
             }
             const target = path.join(RELEASE_DIR, resolved)
             const actualSize = fs.statSync(target).size
