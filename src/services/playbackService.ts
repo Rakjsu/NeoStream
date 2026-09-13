@@ -1,7 +1,7 @@
 /**
  * Playback Configuration Service
- * Handles buffer settings, codec preferences, and quality settings
- * Settings are stored per user profile
+ * Handles buffer settings, codec preferences and subtitle/player options.
+ * Settings are stored per user profile.
  */
 
 import { profileService } from './profileService';
@@ -9,9 +9,12 @@ import { languageService } from './languageService';
 
 export interface PlaybackConfig {
     bufferSize: 'intelligent' | '5' | '10' | '15' | '30';
-    audioCodec: 'auto' | 'aac' | 'ac3' | 'eac3';
+    // Não há `audioCodec` nem `quality` aqui: eram campos gravados, com valor
+    // padrão e tudo, que NINGUÉM lia — nem tela para escolher existia. O codec
+    // que o app de fato respeita é o de vídeo (`useHls.ts`), e a qualidade
+    // preferida mora em outro lugar, com outros valores
+    // (`profileService.setPreferredQuality`: 4k/fhd/hd/sd/auto).
     videoCodec: 'auto' | 'h264' | 'h265' | 'vp9';
-    quality: 'auto' | '1080p' | '720p' | '480p';
     autoPlayNextEpisode: boolean;
     subtitleLanguage: 'pt-br' | 'pt' | 'en' | 'es';
     subtitleLanguageUserSet?: boolean; // True if user manually changed subtitle language
@@ -33,12 +36,29 @@ function getDefaultSubtitleLanguage(): 'pt-br' | 'pt' | 'en' | 'es' {
     }
 }
 
+/**
+ * Fica só com as chaves que o padrão declara.
+ *
+ * Sem isto, campo aposentado nunca vai embora: o `loadConfig` espalhava o JSON
+ * salvo inteiro por cima do padrão, então `audioCodec` e `quality` — apagados
+ * deste arquivo — continuariam sendo lidos do disco e regravados a cada
+ * `setConfig`, para sempre, no perfil de quem já usou o app. A regra vale para
+ * o próximo campo que sair também.
+ */
+export function apenasCamposConhecidos<T extends object>(salvo: unknown, padrao: T): Partial<T> {
+    if (!salvo || typeof salvo !== 'object') return {};
+    const limpo: Partial<T> = {};
+    for (const chave of Object.keys(padrao) as (keyof T)[]) {
+        const valor = (salvo as Record<string, unknown>)[chave as string];
+        if (valor !== undefined) limpo[chave] = valor as T[keyof T];
+    }
+    return limpo;
+}
+
 function getDefaultConfig(): PlaybackConfig {
     return {
         bufferSize: 'intelligent',
-        audioCodec: 'auto',
         videoCodec: 'auto',
-        quality: 'auto',
         autoPlayNextEpisode: true,
         subtitleLanguage: getDefaultSubtitleLanguage(),
         subtitleLanguageUserSet: false,
@@ -85,7 +105,7 @@ class PlaybackService {
                     parsed.subtitleLanguage = getDefaultSubtitleLanguage();
                 }
 
-                this.config = { ...defaultConfig, ...parsed };
+                this.config = { ...defaultConfig, ...apenasCamposConhecidos(parsed, defaultConfig) };
             } else {
                 this.config = getDefaultConfig();
             }
