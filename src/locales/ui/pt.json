@@ -274,7 +274,6 @@
     "importMobile": "Importar backup do celular",
     "importMobileDone": "✓ {n} conta(s) importada(s) do backup do celular",
     "importMobileInvalid": "Esse arquivo não parece um backup do NeoStream Mobile",
-    "importMobileEncrypted": "Backup protegido por senha — exporte sem senha no celular pra importar aqui",
     "namePlaceholder": "Nome da playlist (opcional)",
     "addConfirm": "Adicionar",
     "adding": "Validando...",
@@ -288,7 +287,11 @@
     "rename": "Renomear",
     "renameFailed": "Não deu pra renomear",
     "defaultName": "Minha Playlist",
-    "m3uFromFile": "Abrir arquivo…"
+    "m3uFromFile": "Abrir arquivo…",
+    "importMobilePasswordLabel": "Senha do backup:",
+    "importMobilePasswordHint": "a que você digitou no celular",
+    "importMobileUnlock": "Abrir backup",
+    "importMobileWrongPassword": "Senha incorreta — ou o arquivo está danificado"
   },
   "updates": {
     "title": "Atualizações Automáticas",
@@ -640,7 +643,8 @@
     "phoneNoAnswer": "📱 Enviado, mas o celular não respondeu",
     "phoneLocked": "🔒 App do celular trancado — destrave pra tocar",
     "phoneBlocked": "🚸 Bloqueado pelo controle parental do celular",
-    "phoneNotFound": "Conteúdo não encontrado na conta do celular"
+    "phoneNotFound": "Conteúdo não encontrado na conta do celular",
+    "cancel": "Cancelar"
   },
   "player": {
     "qrHandoff": "Continuar no celular",

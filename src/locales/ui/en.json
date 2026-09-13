@@ -274,7 +274,6 @@
     "importMobile": "Import phone backup",
     "importMobileDone": "✓ {n} account(s) imported from the phone backup",
     "importMobileInvalid": "That file does not look like a NeoStream Mobile backup",
-    "importMobileEncrypted": "Password-protected backup — export without a password on the phone to import it here",
     "namePlaceholder": "Playlist name (optional)",
     "addConfirm": "Add",
     "adding": "Validating...",
@@ -288,7 +287,11 @@
     "rename": "Rename",
     "renameFailed": "Could not rename",
     "defaultName": "My playlist",
-    "m3uFromFile": "Open file…"
+    "m3uFromFile": "Open file…",
+    "importMobilePasswordLabel": "Backup password:",
+    "importMobilePasswordHint": "the one you typed on the phone",
+    "importMobileUnlock": "Open backup",
+    "importMobileWrongPassword": "Wrong password — or the file is damaged"
   },
   "notifications": {
     "autoTuneIn": "Switching to {channel} in {s}s…",
@@ -745,7 +748,8 @@
     "phoneNoAnswer": "📱 Sent, but the phone did not answer",
     "phoneLocked": "🔒 The phone app is locked — unlock it to play",
     "phoneBlocked": "🚸 Blocked by the phone's parental control",
-    "phoneNotFound": "Content not found on the phone's account"
+    "phoneNotFound": "Content not found on the phone's account",
+    "cancel": "Cancel"
   },
   "player": {
     "qrHandoff": "Continue on phone",
