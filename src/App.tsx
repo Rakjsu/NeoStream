@@ -361,10 +361,14 @@ function App() {
               <Route path="guide" element={<RouteBoundary name="EpgGuide"><EpgGuide /></RouteBoundary>} />
               <Route path="vod" element={<RouteBoundary name="VOD"><VOD /></RouteBoundary>} />
               <Route path="series" element={<RouteBoundary name="Series"><Series /></RouteBoundary>} />
-              {/* 📚 Item 27: Ver depois + Favoritos viraram "Minha lista" (abas). */}
+              {/* 📚 Item 27: Ver depois + Favoritos viraram "Minha lista" (abas).
+                  As duas rotas antigas continuam valendo (link salvo, atalho do
+                  usuário), mas precisam dizer QUAL aba abrir: sem o ?tab= elas
+                  caíam na aba que estivesse salva, e o link de Ver depois abria
+                  Favoritos. */}
               <Route path="my-list" element={<RouteBoundary name="MyList"><MyList /></RouteBoundary>} />
-              <Route path="watch-later" element={<Navigate to="/dashboard/my-list" replace />} />
-              <Route path="favorites" element={<Navigate to="/dashboard/my-list" replace />} />
+              <Route path="watch-later" element={<Navigate to="/dashboard/my-list?tab=watchLater" replace />} />
+              <Route path="favorites" element={<Navigate to="/dashboard/my-list?tab=favorites" replace />} />
               <Route path="downloads" element={<RouteBoundary name="Downloads"><Downloads /></RouteBoundary>} />
               <Route path="history" element={<RouteBoundary name="History"><History /></RouteBoundary>} />
               <Route path="settings" element={<RouteBoundary name="Settings"><Settings /></RouteBoundary>} />
