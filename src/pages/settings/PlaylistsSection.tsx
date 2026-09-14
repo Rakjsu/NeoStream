@@ -6,9 +6,10 @@ import { qrToSvg } from '../../utils/qrEncoder';
 import { lerMaxConexoes } from '../../utils/providerConnections';
 
 /**
- * Settings > Playlists: list saved Xtream playlists, add a new one,
- * switch between them and remove. Switching/adding reloads the renderer
- * into the dashboard so every page refetches from the new provider.
+ * Settings > Playlists: list saved playlists, add a new one, edit, switch
+ * between them and remove. Switching/adding (and editing the active one's
+ * credentials) reloads the renderer into the dashboard so every page
+ * refetches from the new provider.
  */
 export function PlaylistsSection() {
     const { t } = useLanguage();
@@ -39,6 +40,10 @@ export function PlaylistsSection() {
     const [adding, setAdding] = useState(false);
     const [form, setForm] = useState({ name: '', url: '', username: '', password: '', mac: '' });
     const [addType, setAddType] = useState<'xtream' | 'm3u' | 'stalker'>('xtream');
+    // ✏️ Editar: o MESMO formulário de adicionar, pré-preenchido. A gravação é
+    // por id no main (`playlists:update`) — favoritos e progresso são guardados
+    // por id de playlist, e "remover + adicionar de novo" os perdia.
+    const [editingId, setEditingId] = useState<string | null>(null);
 
     // 🔗 Ecossistema: QR pro celular + importação do backup do mobile
     const [showQr, setShowQr] = useState(false);
@@ -244,8 +249,69 @@ export function PlaylistsSection() {
         }
     };
 
+    const closeForm = () => {
+        setShowAddForm(false);
+        setEditingId(null);
+        setForm({ name: '', url: '', username: '', password: '', mac: '' });
+    };
+
+    const startEdit = (playlist: PlaylistSummary) => {
+        setError('');
+        setAddType(playlist.type);
+        setForm({
+            name: playlist.name,
+            url: playlist.url,
+            username: playlist.type === 'xtream' ? playlist.username : '',
+            // A senha não chega ao renderer (de propósito): vazio = manter.
+            password: '',
+            mac: playlist.type === 'stalker' ? playlist.username : ''
+        });
+        setEditingId(playlist.id);
+        setShowAddForm(true);
+    };
+
+    /**
+     * M3U de ARQUIVO não tem o que editar aqui: o main só lê caminho que a
+     * pessoa escolheu no diálogo do sistema, nunca uma string do formulário.
+     * Trocar o arquivo é "Abrir arquivo…" de novo; renomear inline continua.
+     */
+    const podeEditar = (playlist: PlaylistSummary) =>
+        playlist.type !== 'm3u' || /^https?:\/\//i.test(playlist.url);
+
+    const handleEdit = async (id: string) => {
+        setError('');
+        setAdding(true);
+        try {
+            const result = await playlistService.update(id, addType === 'm3u'
+                ? { name: form.name.trim(), url: form.url.trim() }
+                : addType === 'stalker'
+                    ? { name: form.name.trim(), url: form.url.trim(), mac: form.mac.trim() }
+                    : { name: form.name.trim(), url: form.url.trim(), username: form.username.trim(), password: form.password });
+            if (!result.success) {
+                setError(result.error || t('playlists', 'editError'));
+                return;
+            }
+            if (result.reloadRequired) {
+                // A ativa trocou de credencial: todo o app refaz o catálogo.
+                // Sem o convite da TMDB — a lista não é nova.
+                playlistService.reloadIntoDashboard(false);
+                return;
+            }
+            closeForm();
+            await refresh();
+        } catch {
+            setError(t('playlists', 'editError'));
+        } finally {
+            setAdding(false);
+        }
+    };
+
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (editingId) {
+            await handleEdit(editingId);
+            return;
+        }
         setError('');
         setAdding(true);
         try {
@@ -372,6 +438,15 @@ export function PlaylistsSection() {
                                             {busyId === playlist.id ? t('playlists', 'switching') : t('playlists', 'switch')}
                                         </button>
                                     )}
+                                    {podeEditar(playlist) && (
+                                        <button
+                                            className="playlists-btn"
+                                            disabled={busyId !== null || renamingId !== null}
+                                            onClick={() => startEdit(playlist)}
+                                        >
+                                            {t('playlists', 'edit')}
+                                        </button>
+                                    )}
                                     <button
                                         className="playlists-btn playlists-btn-danger"
                                         disabled={busyId !== null || renamingId !== null}
@@ -394,8 +469,9 @@ export function PlaylistsSection() {
                     </button>
                 ) : (
                     <form className="playlists-add-form" onSubmit={handleAdd}>
-                        <h3>{t('playlists', 'addTitle')}</h3>
-                        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                        <h3>{editingId ? t('playlists', 'editTitle') : t('playlists', 'addTitle')}</h3>
+                        {/* O tipo é da entrada: editar não troca Xtream por M3U. */}
+                        {!editingId && <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                             {(['xtream', 'm3u', 'stalker'] as const).map(kind => (
                                 <button
                                     key={kind}
@@ -416,13 +492,18 @@ export function PlaylistsSection() {
                                     {kind === 'xtream' ? 'Xtream Codes' : kind === 'm3u' ? 'M3U' : 'Stalker/MAC'}
                                 </button>
                             ))}
-                        </div>
-                        {addType === 'm3u' && (
+                        </div>}
+                        {editingId && (
+                            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '0 0 10px' }}>
+                                {t('playlists', 'editHint')}
+                            </p>
+                        )}
+                        {!editingId && addType === 'm3u' && (
                             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '0 0 10px' }}>
                                 {t('playlists', 'm3uHint')}
                             </p>
                         )}
-                        {addType === 'stalker' && (
+                        {!editingId && addType === 'stalker' && (
                             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, margin: '0 0 10px' }}>
                                 {t('playlists', 'stalkerHint')}
                             </p>
@@ -464,8 +545,8 @@ export function PlaylistsSection() {
                                 />
                                 <input
                                     type="password"
-                                    required
-                                    placeholder={t('login', 'password')}
+                                    required={!editingId}
+                                    placeholder={editingId ? t('playlists', 'passwordKeepHint') : t('login', 'password')}
                                     value={form.password}
                                     onChange={(e) => setForm({ ...form, password: e.target.value })}
                                     disabled={adding}
@@ -476,12 +557,12 @@ export function PlaylistsSection() {
                             <button
                                 type="button"
                                 className="playlists-btn"
-                                onClick={() => setShowAddForm(false)}
+                                onClick={() => (editingId ? closeForm() : setShowAddForm(false))}
                                 disabled={adding}
                             >
                                 {t('common', 'close')}
                             </button>
-                            {addType === 'm3u' && (
+                            {!editingId && addType === 'm3u' && (
                                 <button
                                     type="button"
                                     className="playlists-btn"
@@ -492,7 +573,9 @@ export function PlaylistsSection() {
                                 </button>
                             )}
                             <button type="submit" className="playlists-btn playlists-btn-primary" disabled={adding}>
-                                {adding ? t('playlists', 'adding') : t('playlists', 'addConfirm')}
+                                {adding
+                                    ? t('playlists', 'adding')
+                                    : editingId ? t('playlists', 'saveEdit') : t('playlists', 'addConfirm')}
                             </button>
                         </div>
                     </form>

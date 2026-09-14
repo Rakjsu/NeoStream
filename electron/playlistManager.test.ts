@@ -22,6 +22,7 @@ import {
     activatePlaylist,
     removePlaylist,
     renameStoredPlaylist,
+    updateStoredPlaylist,
     deactivatePlaylists,
     getActivePlaylistIdPublic,
     exportPlaylistsForBackup,
@@ -147,6 +148,80 @@ describe('rename / deactivate', () => {
         expect(getActivePlaylistIdPublic()).toBeNull()
         expect(auth()).toEqual({})
         expect(playlists()).toHaveLength(1)
+    })
+})
+
+describe('updateStoredPlaylist (edição por id)', () => {
+    beforeEach(() => { store.set('removedPlaylists', {}) })
+
+    it('editar a ATIVA re-espelha o auth — e o id não muda', () => {
+        const a = saveAndActivatePlaylist({ url: 'http://a.tv', username: 'u', password: 'p1' })
+        const r = updateStoredPlaylist(a.id, { url: 'http://a2.tv', password: 'p2' })
+        expect(r).toMatchObject({ updated: true, isActive: true, identityChanged: true, credentialsChanged: true })
+        expect(auth()).toMatchObject({ url: 'http://a2.tv', username: 'u', password: 'p2' })
+        expect(playlists().map(p => p.id)).toEqual([a.id])
+    })
+
+    it('editar uma NÃO ativa não toca o auth nem a ativa', () => {
+        const a = saveAndActivatePlaylist({ url: 'http://a.tv', username: 'u', password: 'p' })
+        const b = saveAndActivatePlaylist({ url: 'http://b.tv', username: 'v', password: 'q' })
+        activatePlaylist(a.id)
+        const r = updateStoredPlaylist(b.id, { password: 'q2' })
+        expect(r).toMatchObject({ updated: true, isActive: false, identityChanged: false, credentialsChanged: true })
+        expect(auth().password).toBe('p')
+        expect(getActivePlaylistIdPublic()).toBe(a.id)
+        expect(playlists().find(p => p.id === b.id)?.password).toBe('q2')
+    })
+
+    it('mudar a url grava o tombstone da identidade ANTIGA e limpa o da nova', () => {
+        // Para o sync, editar A→B é "remover A + adicionar B".
+        store.set('removedPlaylists', { [removedPlaylistKey('http://novo.tv', 'u')]: Date.now() })
+        const a = saveAndActivatePlaylist({ url: 'http://a.tv', username: 'u', password: 'p' })
+        updateStoredPlaylist(a.id, { url: 'http://novo.tv' })
+        const ledger = getRemovedPlaylists()
+        expect(ledger[removedPlaylistKey('http://a.tv', 'u')]).toBeTypeOf('number')
+        expect(ledger[removedPlaylistKey('http://novo.tv', 'u')]).toBeUndefined()
+    })
+
+    it('só a senha: sem tombstone, carimbo novo — e o backup com carimbo velho NÃO reverte', () => {
+        const a = saveAndActivatePlaylist({ url: 'http://a.tv', username: 'u', password: 'p1' })
+        const antes = playlists()[0].credentialsUpdatedAt ?? 0
+        updateStoredPlaylist(a.id, { password: 'p2' })
+        expect(getRemovedPlaylists()).toEqual({})
+        const carimbo = playlists()[0].credentialsUpdatedAt ?? 0
+        expect(carimbo).toBeGreaterThanOrEqual(antes)
+        expect(importPlaylistsFromBackup([
+            { name: 'X', url: 'http://a.tv', username: 'u', password: 'p1', credentialsUpdatedAt: carimbo - 1 },
+        ])).toBe(0)
+        expect(playlists()[0].password).toBe('p2')
+    })
+
+    it('depois de A→B, o backup trazendo A não a ressuscita como duplicata', () => {
+        const a = saveAndActivatePlaylist({ url: 'http://a.tv', username: 'u', password: 'p' })
+        updateStoredPlaylist(a.id, { url: 'http://b.tv' })
+        expect(importPlaylistsFromBackup([{ name: 'A', url: 'http://a.tv', username: 'u', password: 'p' }])).toBe(0)
+        expect(playlists().map(p => p.url)).toEqual(['http://b.tv'])
+    })
+
+    it('editar de volta B→A limpa o tombstone de A', () => {
+        const a = saveAndActivatePlaylist({ url: 'http://a.tv', username: 'u', password: 'p' })
+        updateStoredPlaylist(a.id, { url: 'http://b.tv' })
+        updateStoredPlaylist(a.id, { url: 'http://a.tv' })
+        const ledger = getRemovedPlaylists()
+        expect(ledger[removedPlaylistKey('http://a.tv', 'u')]).toBeUndefined()
+        expect(ledger[removedPlaylistKey('http://b.tv', 'u')]).toBeTypeOf('number')
+    })
+
+    it('duplicate e not-found não escrevem nada', () => {
+        const a = saveAndActivatePlaylist({ url: 'http://a.tv', username: 'u', password: 'p' })
+        saveAndActivatePlaylist({ url: 'http://b.tv', username: 'v', password: 'q' })
+        const antes = playlists()
+        expect(updateStoredPlaylist(a.id, { url: 'http://b.tv', username: 'v' }))
+            .toMatchObject({ updated: false, reason: 'duplicate' })
+        expect(updateStoredPlaylist('pl_fantasma', { name: 'X' }))
+            .toMatchObject({ updated: false, reason: 'not-found' })
+        expect(playlists()).toBe(antes)
+        expect(getRemovedPlaylists()).toEqual({})
     })
 })
 

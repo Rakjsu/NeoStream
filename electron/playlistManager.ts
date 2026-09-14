@@ -12,9 +12,10 @@ import {
     removePlaylistById,
     renamePlaylist,
     toPublicPlaylist,
+    updatePlaylist,
     upsertPlaylist,
 } from './playlistsModel'
-import type { PlaylistEntry, PublicPlaylist, UpsertInput } from './playlistsModel'
+import type { PlaylistEntry, PlaylistPatch, PublicPlaylist, UpdateReason, UpsertInput } from './playlistsModel'
 
 function getPlaylists(): PlaylistEntry[] {
     const playlists = store.get('playlists')
@@ -201,6 +202,57 @@ export function renameStoredPlaylist(id: string, name: string): boolean {
     if (updated === playlists) return false
     store.set('playlists', updated)
     return true
+}
+
+export interface UpdatePlaylistOutcome {
+    updated: boolean
+    reason?: UpdateReason
+    entry: PlaylistEntry | null
+    /** A editada é a ativa — o chamador precisa recarregar o renderer. */
+    isActive: boolean
+    /** url ou username mudaram: a playlist trocou de identidade para o sync. */
+    identityChanged: boolean
+    /** url, username ou senha mudaram: caches por id apontam pro provedor velho. */
+    credentialsChanged: boolean
+}
+
+/**
+ * Edita uma playlist salva mantendo o id (credenciais já validadas pelo
+ * chamador). Relê o store na hora de gravar: entre a validação no provedor e
+ * esta escrita o sync pode ter mexido na lista.
+ */
+export function updateStoredPlaylist(id: string, patch: PlaylistPatch): UpdatePlaylistOutcome {
+    const playlists = getPlaylists()
+    const antes = playlists.find(p => p.id === id)
+    const result = updatePlaylist(playlists, id, patch)
+    if (result.reason || !result.entry || !antes) {
+        return {
+            updated: false,
+            reason: result.reason ?? 'not-found',
+            entry: null,
+            isActive: false,
+            identityChanged: false,
+            credentialsChanged: false
+        }
+    }
+    const depois = result.entry
+    const identityChanged = depois.url !== antes.url || depois.username !== antes.username
+    const credentialsChanged = identityChanged || depois.password !== antes.password
+
+    // Para o sync, editar A→B é "remover A + adicionar B": sem o tombstone de A,
+    // o backup da outra máquina traria A de volta como duplicata da editada.
+    // A chave sai da entrada ANTIGA, antes de gravar. E B sai do ledger, senão
+    // uma playlist editada de volta para uma identidade apagada ficaria
+    // bloqueada pro sync por 30 dias.
+    if (identityChanged) {
+        recordRemovedPlaylist(antes)
+        clearRemovedPlaylist(depois.url, depois.username)
+    }
+    store.set('playlists', result.playlists)
+
+    const isActive = getActivePlaylistId() === id
+    if (isActive) mirrorAuth(depois)
+    return { updated: true, entry: depois, isActive, identityChanged, credentialsChanged }
 }
 
 /** Logout: clear the active playlist + auth mirror, keep saved playlists. */

@@ -24,9 +24,11 @@ import {
     renameStoredPlaylist,
     saveAndActivatePlaylist,
     importMobileAccounts,
+    updateStoredPlaylist,
 } from './playlistManager'
 import type { PlaylistBackupEntry, MobileAccountEntry } from './playlistManager'
-import { isUserInfoFresh } from './playlistsModel'
+import { diffPlaylistPatch, isUserInfoFresh } from './playlistsModel'
+import type { PlaylistPatch } from './playlistsModel'
 
 import { cachedCatalogFetch, invalidatePlaylistCache, type CatalogKind } from './catalogCache'
 import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uToVodStreams, m3uCategories, m3uToSeries, m3uSeriesInfo, findM3uEpisodeUrl, pareceListaM3uNoDisco, EXTENSOES_DE_LISTA_M3U } from './m3uProtocol'
@@ -656,6 +658,107 @@ export function setupIpcHandlers() {
         return renamed
             ? { success: true }
             : { success: false, error: 'Playlist not found or invalid name' }
+    })
+
+    /**
+     * ✏️ Editar URL / usuário / senha / MAC de uma playlist salva — POR ID.
+     *
+     * Não passa pelo `playlists:add`: o upsert casa por (url, username) e
+     * criaria outra entrada com id novo, deixando favoritos e progresso (que
+     * o renderer guarda por id de playlist) órfãos atrás da entrada velha.
+     *
+     * Valida com as credenciais NOVAS antes de gravar, do mesmo jeito que o
+     * add de cada tipo. Só o nome mudou → não vai à rede. Senha vazia = manter.
+     *
+     * Quem decide se o renderer recarrega é este handler (`reloadRequired`):
+     * o renderer não enxerga a senha, então não sabe se ela mudou.
+     */
+    ipcMain.handle('playlists:update', async (_, { id, name, url, username, password, mac }) => {
+        try {
+            const target = findPlaylist(String(id))
+            if (!target) {
+                return { success: false, error: 'Playlist não encontrada' }
+            }
+            const type = target.type ?? 'xtream'
+
+            const patch: PlaylistPatch = { name: typeof name === 'string' ? name : undefined }
+            const novaUrl = String(url ?? '').trim()
+            if (type === 'm3u') {
+                // Mesmo portão do add-m3u: string vinda do renderer nunca vira
+                // caminho de disco (seria um leitor de arquivo no main). Uma
+                // lista de arquivo pode virar lista por URL; nunca outro caminho.
+                if (novaUrl && !/^https?:\/\//.test(novaUrl)) {
+                    return { success: false, error: 'URL inválida' }
+                }
+                patch.url = novaUrl || undefined
+            } else if (type === 'stalker') {
+                const macBruto = String(mac ?? '').trim()
+                const normalizedMac = macBruto ? normalizeMac(macBruto) : target.username
+                if (!normalizedMac) {
+                    return { success: false, error: 'MAC inválido (esperado AA:BB:CC:DD:EE:FF)' }
+                }
+                patch.url = novaUrl || undefined
+                patch.username = normalizedMac
+            } else {
+                patch.url = novaUrl || undefined
+                patch.username = String(username ?? '').trim() || undefined
+                patch.password = typeof password === 'string' && password ? password : undefined
+            }
+
+            const diff = diffPlaylistPatch(target, patch)
+            const credencialMudou = diff.urlChanged || diff.usernameChanged || diff.passwordChanged
+            if (!diff.nameChanged && !credencialMudou) {
+                return { success: true, changed: false }
+            }
+
+            if (credencialMudou) {
+                const urlAlvo = patch.url ?? target.url
+                if (type === 'm3u') {
+                    // O documento residente é da URL antiga: solta antes de
+                    // baixar, pra que o download da validação já fique
+                    // residente pro catálogo que carrega em seguida.
+                    resetM3uDocumentCache()
+                    await m3uDocument(urlAlvo, true)
+                } else if (type === 'stalker') {
+                    // Como no add: o usuário cola o host pelado e o portal
+                    // resolvido é o que fica gravado. Re-resolver a URL atual
+                    // é idempotente (o load.php gravado é o primeiro candidato).
+                    const { loadUrl } = await resolvePortal(urlAlvo, patch.username ?? target.username)
+                    patch.url = loadUrl
+                } else {
+                    const client = new XtreamClient(urlAlvo, patch.username ?? target.username, patch.password ?? target.password)
+                    const data = await client.authenticate()
+                    patch.userInfo = data.user_info
+                }
+            }
+
+            const outcome = updateStoredPlaylist(target.id, patch)
+            if (!outcome.updated) {
+                if (outcome.reason === 'duplicate') {
+                    return { success: false, error: 'Já existe uma playlist com esta URL e usuário' }
+                }
+                if (outcome.reason === 'unchanged') {
+                    return { success: true, changed: false }
+                }
+                return { success: false, error: 'Playlist não encontrada' }
+            }
+
+            // O cache de catálogo é por ID e serve do disco por 15 min sem ir à
+            // rede — com o id preservado, o renderer receberia o catálogo do
+            // provedor VELHO depois do reload. Mesmos três resets do remove/switch.
+            if (outcome.credentialsChanged) {
+                invalidatePlaylistCache(target.id)
+                if (outcome.isActive) resetProviderEpgState()
+            }
+
+            return {
+                success: true,
+                changed: true,
+                reloadRequired: outcome.isActive && outcome.credentialsChanged
+            }
+        } catch (error: unknown) {
+            return { success: false, error: getErrorMessage(error) }
+        }
     })
 
     ipcMain.handle('auth:check', () => {

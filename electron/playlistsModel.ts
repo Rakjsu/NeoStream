@@ -234,3 +234,102 @@ export function renamePlaylist(playlists: PlaylistEntry[], id: string, name: str
     if (!trimmed || !playlists.some(p => p.id === id)) return playlists
     return playlists.map(p => (p.id === id ? { ...p, name: trimmed } : p))
 }
+
+/**
+ * ✏️ Editar uma playlist depois de cadastrada — POR ID.
+ *
+ * O `upsertPlaylist` casa por (url, username). Servir-se dele para "editar"
+ * criaria OUTRA entrada com id novo sempre que a URL ou o usuário mudasse — e
+ * favoritos, progresso e ocultos são guardados por id de playlist no renderer
+ * (`neostream_profile_<perfil>__pl_<id>`). O usuário que corrigisse um domínio
+ * abriria os Favoritos e encontraria o vazio. Por isso a edição preserva o id
+ * e só troca o que foi pedido.
+ *
+ * Campo vazio/ausente no patch = manter o atual (inclusive a senha: o renderer
+ * não a enxerga, então o formulário manda vazio para "não mexer").
+ */
+export interface PlaylistPatch {
+    name?: string
+    url?: string
+    username?: string
+    password?: string
+    /** userInfo recém-confirmado com o provedor (carimba `userInfoAt`). */
+    userInfo?: unknown
+}
+
+export interface PlaylistPatchDiff {
+    nameChanged: boolean
+    urlChanged: boolean
+    usernameChanged: boolean
+    passwordChanged: boolean
+}
+
+/** Valores efetivos do patch (trim + "vazio = manter"). */
+function resolvePatch(entry: PlaylistEntry, patch: PlaylistPatch) {
+    const name = patch.name?.trim() || entry.name
+    const url = patch.url?.trim() || entry.url
+    const username = patch.username?.trim() || entry.username
+    const password = patch.password || entry.password
+    return { name, url, username, password }
+}
+
+export function diffPlaylistPatch(entry: PlaylistEntry, patch: PlaylistPatch): PlaylistPatchDiff {
+    const alvo = resolvePatch(entry, patch)
+    return {
+        nameChanged: alvo.name !== entry.name,
+        urlChanged: alvo.url !== entry.url,
+        usernameChanged: alvo.username !== entry.username,
+        passwordChanged: alvo.password !== entry.password
+    }
+}
+
+export type UpdateReason = 'not-found' | 'duplicate' | 'unchanged'
+
+export interface UpdateResult {
+    /** O MESMO array de entrada sempre que `reason` vier (convenção do rename). */
+    playlists: PlaylistEntry[]
+    entry: PlaylistEntry | null
+    reason?: UpdateReason
+}
+
+export function updatePlaylist(
+    playlists: PlaylistEntry[],
+    id: string,
+    patch: PlaylistPatch,
+    now: number = Date.now()
+): UpdateResult {
+    const atual = playlists.find(p => p.id === id)
+    if (!atual) return { playlists, entry: null, reason: 'not-found' }
+
+    const alvo = resolvePatch(atual, patch)
+    const diff = diffPlaylistPatch(atual, patch)
+    const credencialMudou = diff.urlChanged || diff.usernameChanged || diff.passwordChanged
+    if (!diff.nameChanged && !credencialMudou && patch.userInfo === undefined) {
+        return { playlists, entry: atual, reason: 'unchanged' }
+    }
+
+    // Duas entradas com a mesma (url, username) quebrariam todo `find` por
+    // identidade (import do backup, migração do auth legado, leitor de lista
+    // em disco, chave do ledger de apagadas). O upsert nunca cria isso porque
+    // funde; aqui, como o id manda, a colisão tem que ser recusada.
+    if ((diff.urlChanged || diff.usernameChanged) &&
+        playlists.some(p => p.id !== id && p.url === alvo.url && p.username === alvo.username)) {
+        return { playlists, entry: null, reason: 'duplicate' }
+    }
+
+    const editada: PlaylistEntry = {
+        ...atual,
+        name: alvo.name,
+        url: alvo.url,
+        username: alvo.username,
+        password: alvo.password,
+        // É o carimbo que faz o sync entre máquinas aceitar a credencial mais
+        // nova em vez de reverter a correção (LWW no importPlaylistsFromBackup).
+        credentialsUpdatedAt: credencialMudou ? now : atual.credentialsUpdatedAt,
+        ...(patch.userInfo !== undefined ? { userInfo: patch.userInfo, userInfoAt: now } : {})
+    }
+    return {
+        playlists: playlists.map(p => (p.id === id ? editada : p)),
+        entry: editada
+    }
+}

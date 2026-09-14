@@ -63,6 +63,16 @@ export const playlistService = {
         return await window.ipcRenderer.invoke('playlists:rename', { id, name }) as IpcResult
     },
 
+    /**
+     * Editar URL / usuário / senha / MAC mantendo o ID (favoritos e progresso
+     * são guardados por id de playlist — re-adicionar os perderia). Senha
+     * vazia = manter a atual. `reloadRequired` vem do main: só ele sabe se a
+     * playlist editada é a ativa E se a credencial mudou de verdade.
+     */
+    async update(id: string, input: { name?: string; url?: string; username?: string; password?: string; mac?: string }): Promise<IpcResult & { changed?: boolean; reloadRequired?: boolean }> {
+        return await window.ipcRenderer.invoke('playlists:update', { id, ...input }) as IpcResult & { changed?: boolean; reloadRequired?: boolean }
+    },
+
     /** Drop localStorage caches that are derived from the active provider. */
     clearProviderCaches(): void {
         try {
