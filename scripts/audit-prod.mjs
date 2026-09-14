@@ -16,16 +16,12 @@ const ALLOWLIST = {
     'GHSA-qwww-vcr4-c8h2':
         'react-router RSC Mode CSRF — app é SPA Electron, não usa React Server Components.',
 
-    // js-yaml "quadratic CPU em !!omap": chega por electron-updater, que usa
-    // pra ler o latest.yml do feed. É DoS (CPU), não execução de código, e o
-    // YAML vem por https do GitHub Releases do próprio projeto. Para explorar
-    // seria preciso quebrar o TLS do github.com ou ter escrita no repositório
-    // — cenários em que queimar CPU é o menor dos problemas. O app ainda
-    // aplica `checkUpdateArtifacts` (electron/updatePolicy.ts) antes de
-    // aceitar o feed. O fix não foi retroportado pro 4.x e o electron-updater
-    // (já na última, 6.8.9) fixa o 4.x. Reavaliar quando ele adotar o 5.x.
-    'GHSA-5p4m-2wfm-xmqj':
-        'js-yaml CPU quadrática — feed de update vem por https do próprio repo; impacto é DoS, sem caminho de execução.',
+    // js-yaml (via electron-updater, que lê o latest.yml do feed) já esteve
+    // aqui por GHSA-5p4m-2wfm-xmqj, quando o fix "não tinha sido retroportado
+    // pro 4.x". Foi: 4.3.1 fecha esse e 4.3.2 fecha o GHSA-2883-xcg3-v3hh que
+    // apareceu depois — e como electron-updater aceita ^4.1.0, o lock passou a
+    // apontar pro 4.3.2. Uma exceção com motivo falso é pior que nenhuma: se
+    // o pacote regredir, o gate tem que barrar.
 };
 
 function runAudit() {
