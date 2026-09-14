@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useLanguage } from '../services/languageService';
 import { updateService } from '../services/updateService';
 import { SHOW_UP_TO_DATE_MODAL_EVENT } from './updateNotificationBus';
 import type { UpdateInfo, DownloadProgress } from '../types/update';
 
 export function UpdateNotification() {
+    const { t } = useLanguage();
     const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
     const [isVisible, setIsVisible] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -12,6 +14,18 @@ export function UpdateNotification() {
     const [error, setError] = useState<string | null>(null);
     const [isUpToDate, setIsUpToDate] = useState(false);
     const [currentVersion, setCurrentVersion] = useState<string>('');
+    // 🍎 macOS sem assinatura da Apple não instala sozinho (ver
+    // electron/macUpdateSupport.ts): aqui o aviso vira "baixar no site".
+    const [instalaSozinho, setInstalaSozinho] = useState(true);
+    const [abriuNoSite, setAbriuNoSite] = useState(false);
+
+    useEffect(() => {
+        let vivo = true;
+        void updateService.autoInstallSupport().then(({ supported }) => {
+            if (vivo) setInstalaSozinho(supported);
+        });
+        return () => { vivo = false; };
+    }, []);
 
     useEffect(() => {
         // Listen for manual trigger to show "up to date" modal
@@ -68,7 +82,12 @@ export function UpdateNotification() {
     const handleDownload = async () => {
         setIsDownloading(true);
         setError(null);
-        await updateService.downloadUpdate();
+        const resultado = await updateService.downloadUpdate();
+        if (resultado.manual) {
+            // Não houve download: o main abriu a página da release no navegador.
+            setAbriuNoSite(true);
+            setIsDownloading(false);
+        }
     };
 
     const handleInstall = async () => {
@@ -185,6 +204,15 @@ export function UpdateNotification() {
                             <span className="success-icon">✓</span>
                             <span>Download concluído! Reinicie para instalar.</span>
                         </div>
+                    ) : abriuNoSite ? (
+                        <div className="download-complete">
+                            <span className="success-icon">✓</span>
+                            <span>{t('updates', 'releasePageOpened')}</span>
+                        </div>
+                    ) : !instalaSozinho ? (
+                        <p className="update-description">
+                            {t('updates', 'manualDownloadHint')}
+                        </p>
                     ) : (
                         <p className="update-description">
                             Uma nova versão do NeoStream está disponível.
@@ -208,8 +236,8 @@ export function UpdateNotification() {
                     ) : (
                         <>
                             <button className="btn-primary" onClick={handleDownload}>
-                                <span>📥</span>
-                                Baixar Agora
+                                <span>{instalaSozinho ? '📥' : '🌐'}</span>
+                                {instalaSozinho ? 'Baixar Agora' : t('updates', 'openReleasePage')}
                             </button>
                             <button className="btn-secondary" onClick={handleClose}>
                                 <span>⏰</span>

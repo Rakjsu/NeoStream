@@ -425,6 +425,9 @@
     "lastCheck": "Last check",
     "checkNow": "Check for Updates Now",
     "checking": "Checking...",
+    "manualDownloadHint": "On macOS the app isn't signed by Apple yet, so the update can't install itself: we'll open the release page for you to download the .dmg.",
+    "openReleasePage": "Download from the site",
+    "releasePageOpened": "We opened the new version page in your browser. Download the .dmg and drag NeoStream into your Applications folder.",
     "newVersionTitle": "New Update Available!"
   },
   "playback": {

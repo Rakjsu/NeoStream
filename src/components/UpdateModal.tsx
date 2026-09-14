@@ -18,6 +18,20 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
     const [progress, setProgress] = useState<DownloadProgress | null>(null);
     const [downloaded, setDownloaded] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    // 🍎 macOS sem assinatura da Apple: o app não instala sozinho. Saber disso
+    // ANTES do clique é o que troca o botão por "baixar no site", em vez de
+    // deixar a pessoa esperar um download que nunca vira instalação.
+    const [instalaSozinho, setInstalaSozinho] = useState(true);
+    const [abriuNoSite, setAbriuNoSite] = useState(false);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        let vivo = true;
+        void updateService.autoInstallSupport().then(({ supported }) => {
+            if (vivo) setInstalaSozinho(supported);
+        });
+        return () => { vivo = false; };
+    }, [isOpen]);
 
     useEffect(() => {
         // Listen for download progress
@@ -52,6 +66,13 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
 
         const result = await updateService.downloadUpdate();
 
+        if (result.manual) {
+            // O main abriu a página da release no navegador — não há progresso
+            // para mostrar, e sim uma instrução.
+            setAbriuNoSite(true);
+            setDownloading(false);
+            return;
+        }
         if (!result.success) {
             setError(result.error || 'Erro ao baixar atualização');
             setDownloading(false);
@@ -131,7 +152,9 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
                         {t('updates', 'newVersionTitle')}
                     </h2>
                     <p style={{ color: '#94a3b8', fontSize: '14px' }}>
-                        Uma nova versão do NeoStream IPTV está pronta para instalação
+                        {instalaSozinho
+                            ? 'Uma nova versão do NeoStream IPTV está pronta para instalação'
+                            : t('updates', 'manualDownloadHint')}
                     </p>
                 </div>
 
@@ -240,6 +263,21 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
                     </div>
                 )}
 
+                {/* Download manual (macOS sem assinatura): o navegador já abriu */}
+                {abriuNoSite && (
+                    <div style={{
+                        padding: '12px 16px',
+                        background: 'rgba(52, 211, 153, 0.1)',
+                        border: '1px solid rgba(52, 211, 153, 0.3)',
+                        borderRadius: '8px',
+                        marginBottom: '24px'
+                    }}>
+                        <p style={{ color: '#34d399', fontSize: '14px' }}>
+                            ✓ {t('updates', 'releasePageOpened')}
+                        </p>
+                    </div>
+                )}
+
                 {/* Error Message */}
                 {error && (
                     <div style={{
@@ -342,7 +380,11 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
                             e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.3)';
                         }}
                     >
-                        {downloaded ? '🚀 Instalar e Reiniciar' : '⬇️ Baixar Agora'}
+                        {downloaded
+                            ? '🚀 Instalar e Reiniciar'
+                            : !instalaSozinho
+                                ? `🌐 ${t('updates', 'openReleasePage')}`
+                                : '⬇️ Baixar Agora'}
                     </button>
                 </div>
             </div>

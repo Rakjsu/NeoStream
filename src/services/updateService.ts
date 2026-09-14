@@ -1,4 +1,4 @@
-import type { UpdateInfo, UpdateConfig, DownloadProgress, UpdateCheckResult } from '../types/update';
+import type { UpdateInfo, UpdateConfig, DownloadProgress, UpdateCheckResult, AutoInstallSupport } from '../types/update';
 
 /**
  * Service for managing application updates in the renderer process
@@ -22,9 +22,27 @@ export const updateService = {
     },
 
     /**
-     * Download the available update
+     * O app baixa e instala sozinho aqui? (no macOS sem assinatura, não)
+     *
+     * Em caso de erro devolve `supported: true`: o fluxo normal continua o
+     * padrão, e o main recusa o download inútil de qualquer forma.
      */
-    downloadUpdate: async (): Promise<{ success: boolean; error?: string }> => {
+    autoInstallSupport: async (): Promise<AutoInstallSupport> => {
+        try {
+            return await window.ipcRenderer.invoke('update:auto-install-supported');
+        } catch (error) {
+            console.error('Failed to read auto-install support:', error);
+            return { supported: true, releaseUrl: '' };
+        }
+    },
+
+    /**
+     * Download the available update.
+     *
+     * `manual: true` = não houve download: o main abriu a página da release
+     * no navegador porque esta máquina não instala sozinha.
+     */
+    downloadUpdate: async (): Promise<{ success: boolean; error?: string; manual?: boolean; url?: string }> => {
         try {
             return await window.ipcRenderer.invoke('update:download');
         } catch (error) {
