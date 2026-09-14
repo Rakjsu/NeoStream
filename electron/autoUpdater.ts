@@ -1,10 +1,11 @@
 import { autoUpdater } from 'electron-updater';
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import store from './store';
 import log from './logger';
 import { checkUpdateArtifacts, checkUpdateFeedConfig, type PolicyVerdict } from './updatePolicy';
+import { instalaAtualizacaoSozinho, urlDaRelease } from './macUpdateSupport';
 import { getErrorMessage } from './errorMessage';
 
 interface UpdateConfig {
@@ -93,8 +94,23 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
         log.error('[update] feed de atualização não confiável:', feedVerdict.reason);
     }
 
+    // 🍎 macOS sem assinatura da Apple: o Squirrel.Mac recusa aplicar a
+    // atualização, então baixar 167 MB só gasta a banda de quem esperou. Aqui
+    // o app passa a AVISAR e abrir a página da release (ver macUpdateSupport).
+    const instalaSozinho = instalaAtualizacaoSozinho({
+        plataforma: process.platform,
+        empacotado: app.isPackaged,
+        appPath: app.getAppPath(),
+        existe: (caminho) => fs.existsSync(caminho)
+    });
+    if (!instalaSozinho) {
+        log.info('[update] app sem assinatura no macOS: atualização vira aviso + download manual');
+    }
+
     // Vira true quando o feed da versão anunciada passou na checagem de sha512.
     let artifactsTrusted = false;
+    // Versão que o feed anunciou — é a página de release que o mac vai abrir.
+    let versaoAnunciada: string | null = null;
     // Vira true só quando um download verificado terminou NESTE processo.
     let downloadedThisSession = false;
 
@@ -133,10 +149,17 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
             return;
         }
 
+        versaoAnunciada = info.version;
         mainWindow.webContents.send('update:available', info);
 
         // Auto-download if configured
         if (config.autoInstall) {
+            // No mac não assinado nem o "instalar automaticamente" baixa: a
+            // instalação não aconteceria, e o download rodaria toda vez.
+            if (!instalaSozinho) {
+                log.info('[update] auto-download ignorado: no macOS sem assinatura a instalação não se aplica');
+                return;
+            }
             log.info('Auto-downloading update...');
             autoUpdater.downloadUpdate();
         }
@@ -214,9 +237,27 @@ export function initializeAutoUpdater(mainWindow: BrowserWindow) {
         }
     });
 
+    /**
+     * A tela pergunta uma vez, ao abrir, se o download em app faz sentido
+     * aqui. É o que troca o botão "Baixar agora" por "Baixar no site" ANTES
+     * do clique — em vez de deixar a pessoa clicar e não acontecer nada.
+     */
+    ipcMain.handle('update:auto-install-supported', () => ({
+        supported: instalaSozinho,
+        releaseUrl: urlDaRelease(EXPECTED_FEED, versaoAnunciada)
+    }));
+
     ipcMain.handle('update:download', async () => {
         try {
             if (!feedVerdict.ok) return { success: false, error: feedVerdict.reason };
+            // O guarda vale mesmo se a tela não tiver perguntado: uma versão
+            // antiga do renderer não consegue disparar um download inútil.
+            if (!instalaSozinho) {
+                const url = urlDaRelease(EXPECTED_FEED, versaoAnunciada);
+                log.info('[update] download manual no macOS:', url);
+                void shell.openExternal(url);
+                return { success: true, manual: true, url };
+            }
             if (!artifactsTrusted) {
                 return { success: false, error: 'Nenhuma atualização com sha512 publicado foi anunciada' };
             }

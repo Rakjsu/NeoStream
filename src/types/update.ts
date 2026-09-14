@@ -26,6 +26,16 @@ export interface DownloadProgress {
     bytesPerSecond: number;
 }
 
+/**
+ * Se o app consegue baixar e instalar sozinho nesta máquina. No macOS sem
+ * assinatura da Apple ele não consegue (o Squirrel.Mac recusa), e a tela
+ * troca o botão por "baixar no site" em vez de fingir que vai instalar.
+ */
+export interface AutoInstallSupport {
+    supported: boolean;
+    releaseUrl: string;
+}
+
 export interface UpdateCheckResult {
     updateAvailable: boolean;
     currentVersion: string;

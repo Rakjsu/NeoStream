@@ -320,6 +320,9 @@
     "lastCheck": "Última verificação",
     "checkNow": "Verificar Atualizações Agora",
     "checking": "Verificando...",
+    "manualDownloadHint": "No macOS o app ainda não é assinado pela Apple, então a atualização não se instala sozinha: abrimos a página da versão para você baixar o .dmg.",
+    "openReleasePage": "Baixar no site",
+    "releasePageOpened": "Abrimos a página da nova versão no navegador. Baixe o .dmg e arraste o NeoStream para a pasta Aplicativos.",
     "newVersionTitle": "Nova Atualização Disponível!"
   },
   "backup": {

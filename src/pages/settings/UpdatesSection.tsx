@@ -17,6 +17,10 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
         lastCheck: 0
     });
     const [lastCheckDate, setLastCheckDate] = useState<string>('');
+    // 🍎 macOS sem assinatura da Apple: o app não instala sozinho, então
+    // "instalar automaticamente" seria uma promessa vazia — o interruptor sai
+    // do ar com a explicação no lugar (ver electron/macUpdateSupport.ts).
+    const [instalaSozinho, setInstalaSozinho] = useState(true);
     // System behavior (tray + autostart) lives in the MAIN process store.
     const [systemConfig, setSystemConfig] = useState<{ closeToTray: boolean; openAtLogin: boolean }>({ closeToTray: true, openAtLogin: false });
     const { language, setLanguage, t, languages } = useLanguage();
@@ -35,6 +39,7 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
     useEffect(() => {
         // Deferred: loadUpdateConfig sets state synchronously after the await resolves early.
         queueMicrotask(() => { void loadUpdateConfig(); });
+        void updateService.autoInstallSupport().then(({ supported }) => setInstalaSozinho(supported));
         window.ipcRenderer.invoke('system:get-config').then(result => {
             if (result?.success && result.config) setSystemConfig(result.config);
         }).catch(() => { /* main handler absent in old builds */ });
@@ -107,12 +112,13 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
                 <div className="setting-item">
                     <div className="setting-info">
                         <label>{t('updates', 'autoInstall')}</label>
-                        <p>{t('updates', 'autoInstallDesc')}</p>
+                        <p>{instalaSozinho ? t('updates', 'autoInstallDesc') : t('updates', 'manualDownloadHint')}</p>
                     </div>
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
-                            checked={updateConfig.autoInstall}
+                            checked={instalaSozinho && updateConfig.autoInstall}
+                            disabled={!instalaSozinho}
                             onChange={(e) => handleUpdateConfigChange('autoInstall', e.target.checked)}
                         />
                         <span className="toggle-slider"></span>
