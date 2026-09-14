@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import {
     derivePlaylistName,
+    diffPlaylistPatch,
     migrateAuthToPlaylists,
     removePlaylistById,
     renamePlaylist,
     toPublicPlaylist,
+    updatePlaylist,
     upsertPlaylist,
 } from './playlistsModel'
 import type { PlaylistEntry } from './playlistsModel'
@@ -167,6 +169,92 @@ describe('renamePlaylist', () => {
     it('ignores empty names', () => {
         const playlists = [entry()]
         expect(renamePlaylist(playlists, 'pl_a', '   ')).toBe(playlists)
+    })
+})
+
+describe('updatePlaylist (edição por id)', () => {
+    const dois = () => [
+        entry({ type: 'xtream' }),
+        entry({ id: 'pl_b', name: 'Playlist B', url: 'http://b.example.com', username: 'bob', password: 'secret-b', addedAt: 2000 })
+    ]
+
+    it('troca url/usuário/senha mantendo id, addedAt e type — e carimba credentialsUpdatedAt', () => {
+        // O ponto da função: favoritos e progresso são guardados por id de
+        // playlist no renderer. Um "remover + adicionar" os perderia.
+        const { playlists, entry: editada, reason } = updatePlaylist(
+            [entry({ type: 'xtream', credentialsUpdatedAt: 5 })],
+            'pl_a',
+            { url: ' http://novo.example.com ', username: ' alice2 ', password: 'nova' },
+            999
+        )
+        expect(reason).toBeUndefined()
+        expect(editada).toMatchObject({
+            id: 'pl_a', addedAt: 1000, type: 'xtream',
+            url: 'http://novo.example.com', username: 'alice2', password: 'nova',
+            credentialsUpdatedAt: 999
+        })
+        expect(playlists[0]).toBe(editada)
+    })
+
+    it('senha vazia mantém a atual; com o resto igual é "unchanged" e devolve o MESMO array', () => {
+        const lista = [entry()]
+        const r = updatePlaylist(lista, 'pl_a', { url: 'http://a.example.com:8080', username: 'alice', password: '' })
+        expect(r.reason).toBe('unchanged')
+        expect(r.playlists).toBe(lista)
+    })
+
+    it('só o nome: trimado, sem mexer no carimbo nem na senha', () => {
+        const r = updatePlaylist([entry({ credentialsUpdatedAt: 5 })], 'pl_a', { name: '  Casa  ' }, 999)
+        expect(r.reason).toBeUndefined()
+        expect(r.entry).toMatchObject({ name: 'Casa', credentialsUpdatedAt: 5, password: 'secret-a' })
+    })
+
+    it('nome vazio mantém o atual', () => {
+        const r = updatePlaylist([entry()], 'pl_a', { name: '   ', password: 'nova' })
+        expect(r.entry?.name).toBe('Playlist A')
+    })
+
+    it('id desconhecido: mesmo array e not-found', () => {
+        const lista = [entry()]
+        const r = updatePlaylist(lista, 'pl_zzz', { name: 'X' })
+        expect(r).toMatchObject({ reason: 'not-found', entry: null })
+        expect(r.playlists).toBe(lista)
+    })
+
+    it('recusa assumir a identidade (url+usuário) de OUTRA entrada', () => {
+        // Duas entradas com a mesma chave quebrariam todo find por identidade
+        // (import do backup, migração do auth, ledger de apagadas).
+        const lista = dois()
+        const r = updatePlaylist(lista, 'pl_a', { url: 'http://b.example.com', username: 'bob' })
+        expect(r.reason).toBe('duplicate')
+        expect(r.playlists).toBe(lista)
+    })
+
+    it('a própria identidade não conta como colisão', () => {
+        const r = updatePlaylist(dois(), 'pl_a', { url: 'http://a.example.com:8080', username: 'alice', password: 'outra' })
+        expect(r.reason).toBeUndefined()
+        expect(r.entry?.password).toBe('outra')
+    })
+
+    it('userInfo no patch grava userInfo e carimba userInfoAt', () => {
+        const r = updatePlaylist([entry()], 'pl_a', { password: 'nova', userInfo: { status: 'Active' } }, 777)
+        expect(r.entry).toMatchObject({ userInfo: { status: 'Active' }, userInfoAt: 777 })
+    })
+
+    it('as entradas não editadas mantêm a referência', () => {
+        const lista = dois()
+        const r = updatePlaylist(lista, 'pl_a', { password: 'nova' })
+        expect(r.playlists).not.toBe(lista)
+        expect(r.playlists[1]).toBe(lista[1])
+    })
+})
+
+describe('diffPlaylistPatch', () => {
+    it('trim e "vazio = manter"', () => {
+        expect(diffPlaylistPatch(entry(), { name: ' Playlist A ', url: '', username: undefined, password: '' }))
+            .toEqual({ nameChanged: false, urlChanged: false, usernameChanged: false, passwordChanged: false })
+        expect(diffPlaylistPatch(entry(), { url: ' http://x ', password: 'p2' }))
+            .toEqual({ nameChanged: false, urlChanged: true, usernameChanged: false, passwordChanged: true })
     })
 })
 
