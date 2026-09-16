@@ -2,6 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Tv, Film, PlaySquare, Settings, LogOut, Home, Users, Heart, Check, Download, History, Search, CalendarRange } from 'lucide-react';
 import { GLOBAL_SEARCH_OPEN_EVENT } from './GlobalSearch';
 import { profileService } from '../services/profileService';
+import { limparSessao } from '../services/chavesDeSessao';
 import { useState, useEffect } from 'react';
 import { UpdateNotificationBadge } from './UpdateNotificationBadge';
 import { UpdateModal } from './UpdateModal';
@@ -17,6 +18,7 @@ export function Sidebar() {
     const location = useLocation();
     const [activeProfile, setActiveProfile] = useState(() => profileService.getActiveProfile());
     const [showUpdateModal, setShowUpdateModal] = useState(false);
+    const [confirmandoSaida, setConfirmandoSaida] = useState(false);
     const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
     const [showProfilePopup, setShowProfilePopup] = useState(false);
@@ -99,8 +101,21 @@ export function Sidebar() {
         { icon: Settings, label: t('nav', 'settings'), path: '/dashboard/settings', emoji: '⚙️', gradient: 'linear-gradient(135deg, #6b7280, #4b5563)' },
     ];
 
+    // 🚪 Sair da conta solta a SESSÃO — não esquece o usuário. Era
+    // `localStorage.clear()`: levava junto perfis, favoritos, progresso,
+    // histórico, tags, marcadores, atalhos e aparência, de todos os perfis e
+    // de todas as listas (enquanto o main, no `auth:logout`, preserva as
+    // playlists de propósito). Ver services/chavesDeSessao.ts.
     const handleLogout = async () => {
-        localStorage.clear();
+        if (!confirmandoSaida) {
+            // Dois toques: o primeiro arma, o segundo sai. Mesmo padrão do
+            // "Remover" da tela de Playlists — um clique sem volta numa ação
+            // que muda tudo de lugar é armadilha.
+            setConfirmandoSaida(true);
+            return;
+        }
+        setConfirmandoSaida(false);
+        limparSessao(localStorage);
         profileService.clearActiveProfile();
         await window.ipcRenderer.invoke('auth:logout');
         navigate('/welcome');
@@ -286,17 +301,20 @@ export function Sidebar() {
 
                     {/* Logout */}
                     <button
-                        className="logout-btn"
+                        className={`logout-btn${confirmandoSaida ? ' armado' : ''}`}
                         onClick={handleLogout}
                         onMouseEnter={() => setHoveredItem('logout')}
                         onMouseLeave={() => setHoveredItem(null)}
-                        title={t('nav', 'logout')}
+                        onBlur={() => setConfirmandoSaida(false)}
+                        title={confirmandoSaida ? t('nav', 'logoutConfirm') : t('nav', 'logout')}
                     >
                         <LogOut className="logout-icon" />
                         {/* Logout Tooltip */}
                         <div className={`tooltip danger ${hoveredItem === 'logout' ? 'visible' : ''}`}>
-                            <span className="tooltip-emoji">🚪</span>
-                            <span className="tooltip-label">{t('nav', 'logout')}</span>
+                            <span className="tooltip-emoji">{confirmandoSaida ? '❓' : '🚪'}</span>
+                            <span className="tooltip-label">
+                                {confirmandoSaida ? t('nav', 'logoutConfirm') : t('nav', 'logout')}
+                            </span>
                         </div>
                     </button>
                 </div>
@@ -782,6 +800,11 @@ const sidebarStyles = `
     border-radius: 12px;
     cursor: pointer;
     transition: all 0.3s ease;
+}
+
+.logout-btn.armado {
+    background: rgba(239, 68, 68, 0.28);
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.9);
 }
 
 .logout-btn:hover {

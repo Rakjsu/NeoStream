@@ -34,6 +34,7 @@
     "cancel": "Cancel",
     "enter": "Enter",
     "logout": "Logout",
+    "logoutConfirm": "Confirm sign out? (your playlists and data stay saved)",
     "network": "Network"
   },
   "window": {

@@ -34,6 +34,7 @@
     "cancel": "Cancelar",
     "enter": "Entrar",
     "logout": "Sair",
+    "logoutConfirm": "Confirmar saída? (a lista e seus dados continuam salvos)",
     "network": "Rede"
   },
   "window": {
