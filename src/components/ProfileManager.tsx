@@ -4,6 +4,7 @@ import type { Profile } from '../types/profile';
 import { CreateProfileModal } from './CreateProfileModal';
 import { X, Edit2, Trash2, Plus, Lock, Check } from 'lucide-react';
 import { useLanguage } from '../services/languageService';
+import { bloqueioParaApagar, chaveDoBloqueio, exigePinParaMexer } from '../services/protecaoDePerfil';
 
 interface ProfileManagerProps {
     onClose: () => void;
@@ -36,24 +37,20 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
     const avatarOptions = ['👤', '👨', '👩', '🧒', '👴', '👵', '🐱', '🐶', '🦊', '🐼', '🎮', '🎬', '🎧', '🎸', '⚽', '🏀'];
 
     const handleDeleteProfile = (profile: Profile) => {
-        if (profile.id === activeProfile?.id) {
-            alert(t('profile', 'cannotDeleteActive'));
-            return;
-        }
-
-        if (profiles.length <= 1) {
-            alert(t('profile', 'cannotDeleteLast'));
-            return;
-        }
-
-        // Kids profile cannot be deleted
-        if (profile.isKids) {
-            alert(t('profile', 'cannotDeleteKids'));
+        // Regras compartilhadas com a tela de boot (protecaoDePerfil.ts): eram
+        // duas cópias, e a de lá tinha só um dos quatro testes.
+        const bloqueio = bloqueioParaApagar({
+            perfil: profile,
+            ativoId: activeProfile?.id ?? null,
+            total: profiles.length
+        });
+        if (bloqueio) {
+            alert(t('profile', chaveDoBloqueio(bloqueio)));
             return;
         }
 
         // Check if profile has PIN - require verification
-        if (profile.pin) {
+        if (exigePinParaMexer(profile)) {
             setPendingDelete(profile);
             setDeletePinInput('');
             setDeletePinError('');

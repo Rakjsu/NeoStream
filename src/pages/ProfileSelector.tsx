@@ -5,6 +5,7 @@ import { ProfileCard } from '../components/ProfileCard';
 import { CreateProfileModal } from '../components/CreateProfileModal';
 import { useLanguage } from '../services/languageService';
 import { ACCENT_PRESETS } from '../services/themeService';
+import { bloqueioParaApagar, chaveDoBloqueio, exigePinParaMexer } from '../services/protecaoDePerfil';
 
 interface ProfileSelectorProps {
     onProfileSelected: () => void;
@@ -21,6 +22,11 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
     const [isManaging, setIsManaging] = useState(false);
     const [editingProfile, setEditingProfile] = useState<Profile | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState<Profile | null>(null);
+    // Para que serve o PIN que está sendo pedido. Estado explícito: o mesmo
+    // modal atende entrar, apagar e editar, e um propósito esquecido de uma
+    // abertura anterior faria o PIN certo executar a ação errada.
+    const [pinPara, setPinPara] = useState<'entrar' | 'apagar' | 'editar'>('entrar');
+    const [edicaoPendente, setEdicaoPendente] = useState<{ profile: Profile; name: string; avatar: string } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const { t } = useLanguage();
 
@@ -51,28 +57,43 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
         }
 
         if (profileService.hasPin(profile.id)) {
-            setSelectedProfileForPin(profile);
-            setShowPinModal(true);
-            setPinInput('');
-            setPinError('');
+            pedirPin(profile, 'entrar');
         } else {
             profileService.setActiveProfile(profile.id);
             onProfileSelected();
         }
     };
 
+    const pedirPin = (profile: Profile, para: 'entrar' | 'apagar' | 'editar') => {
+        setSelectedProfileForPin(profile);
+        setPinPara(para);
+        setShowPinModal(true);
+        setPinInput('');
+        setPinError('');
+    };
+
     const handlePinSubmit = async () => {
         if (!selectedProfileForPin) return;
 
         const isValid = await profileService.verifyPin(selectedProfileForPin.id, pinInput);
-        if (isValid) {
-            profileService.setActiveProfile(selectedProfileForPin.id);
-            setShowPinModal(false);
-            onProfileSelected();
-        } else {
+        if (!isValid) {
             setPinError(t('nav', 'incorrectPin') + '. ' + t('profile', 'tryAgain') + '.');
             setPinInput('');
+            return;
         }
+
+        setShowPinModal(false);
+        if (pinPara === 'apagar') {
+            setShowDeleteConfirm(selectedProfileForPin);
+            return;
+        }
+        if (pinPara === 'editar') {
+            if (edicaoPendente) aplicarEdicao(edicaoPendente);
+            setEdicaoPendente(null);
+            return;
+        }
+        profileService.setActiveProfile(selectedProfileForPin.id);
+        onProfileSelected();
     };
 
     const handleAddProfile = () => {
@@ -84,8 +105,19 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
     };
 
     const handleDeleteProfile = (profile: Profile) => {
-        if (profiles.length <= 1) {
-            alert(t('profile', 'needOneProfile'));
+        // As MESMAS regras do gerenciador de dentro do app (protecaoDePerfil.ts):
+        // esta tela é a que a criança vê, e só checava "sobrou mais de um?".
+        const bloqueio = bloqueioParaApagar({
+            perfil: profile,
+            ativoId: profileService.getActiveProfile()?.id ?? null,
+            total: profiles.length
+        });
+        if (bloqueio) {
+            alert(t('profile', chaveDoBloqueio(bloqueio)));
+            return;
+        }
+        if (exigePinParaMexer(profile)) {
+            pedirPin(profile, 'apagar');
             return;
         }
         setShowDeleteConfirm(profile);
@@ -99,10 +131,21 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
         }
     };
 
-    const handleEditProfile = (profile: Profile, newName: string, newAvatar: string) => {
-        profileService.updateProfile(profile.id, { name: newName, avatar: newAvatar });
+    const aplicarEdicao = ({ profile, name, avatar }: { profile: Profile; name: string; avatar: string }) => {
+        void profileService.updateProfile(profile.id, { name, avatar });
         loadProfiles();
         setEditingProfile(null);
+    };
+
+    const handleEditProfile = (profile: Profile, newName: string, newAvatar: string) => {
+        // Trocar nome e avatar de um perfil protegido é mexer no perfil de
+        // outra pessoa — e, ao contrário de apagar, sem nada que avise depois.
+        if (exigePinParaMexer(profile)) {
+            setEdicaoPendente({ profile, name: newName, avatar: newAvatar });
+            pedirPin(profile, 'editar');
+            return;
+        }
+        aplicarEdicao({ profile, name: newName, avatar: newAvatar });
     };
 
     return (
@@ -288,6 +331,11 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                                             title={preset.id}
                                             onClick={() => {
                                                 const next = isActive ? '' : preset.id;
+                                                if (exigePinParaMexer(editingProfile)) {
+                                                    // Sem PIN, a cor do perfil do outro mudava na hora.
+                                                    alert(t('profile', 'protectedProfile'));
+                                                    return;
+                                                }
                                                 void profileService.updateProfile(editingProfile.id, { accentColor: next });
                                                 setEditingProfile({ ...editingProfile, accentColor: next });
                                                 loadProfiles();
@@ -332,6 +380,9 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                         <div className="pin-modal-header">
                             <div className="pin-profile-icon">🔐</div>
                             <h2>{t('profile', 'enterPin')}</h2>
+                            {pinPara !== 'entrar' && (
+                                <p>{t('profile', pinPara === 'apagar' ? 'pinToDelete' : 'pinToEdit')}</p>
+                            )}
                             <p>{t('profile', 'protectedProfile')}: <strong>{selectedProfileForPin.name}</strong></p>
                         </div>
 

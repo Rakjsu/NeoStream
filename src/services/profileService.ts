@@ -290,7 +290,9 @@ export const profileService = {
         // pode chegar aqui com sal presente e hash no formato antigo: ele nasce
         // migrado numa máquina, viaja inteiro pelo sync, e uma build antiga na
         // outra ponta regrava só o `pin`. Decidir pela presença do sal deixaria
-        // esse perfil TRANCADO pra sempre — e apagar o perfil também pede PIN.
+        // esse perfil TRANCADO pra sempre — e apagar ou editar o perfil também
+        // pede PIN, nas duas telas de gerenciar (ver protecaoDePerfil.ts; até
+        // 09/2026 a tela de boot não pedia nada).
         let ok = profile.pinSalt
             ? (await hashPinSalgado(pin, profile.pinSalt)) === profile.pin
             : false;
