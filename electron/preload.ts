@@ -170,6 +170,7 @@ const invokeChannels = new Set([
     'streams:get-timeshift-url',
     'streams:get-vod',
     'streams:get-vod-url',
+    'update:auto-install-supported',
     'update:check-now',
     'update:download',
     'update:get-config',
