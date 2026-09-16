@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { LazyImage } from './LazyImage';
+import { profileService } from '../services/profileService';
+import { parentalService } from '../services/parentalService';
+import { indexedDBCache } from '../services/indexedDBCache';
+import {
+    isCategoryNameBlocked,
+    isItemVisibleUnderGate,
+    shouldBlockAdultCategories,
+    toCategoryIds,
+    type ContentGateState
+} from '../services/contentGate';
 
 export const SCREENSAVER_MINUTES_KEY = 'neostream_screensaver_min';
 
@@ -8,10 +18,22 @@ interface ShowcasePoster {
     icon: string;
 }
 
+interface VodDaVitrine {
+    name: string;
+    stream_icon?: string;
+    category_id?: unknown;
+}
+
 /**
  * 🖼️ Modo vitrine (screensaver): após N minutos sem input (configurável em
  * Reprodução, desligado por padrão), cobre o app com capas do catálogo em
  * rotação + relógio. Qualquer input sai. Nunca ativa com vídeo em reprodução.
+ *
+ * As capas passam pelo MESMO gate das grades (contentGate). Sem ele, a vitrine
+ * era a maior superfície do app fora do controle parental: ela é montada no
+ * Dashboard, ou seja, em toda tela, e quando dispara ocupa a tela inteira com
+ * 30 pôsteres tirados do catálogo cru — inclusive das categorias que o gate
+ * esconde, e inclusive no perfil infantil.
  */
 export function ShowcaseScreensaver() {
     const [active, setActive] = useState(false);
@@ -57,22 +79,54 @@ export function ShowcaseScreensaver() {
     useEffect(() => {
         if (!active) return;
         let cancelled = false;
-        window.ipcRenderer.invoke('streams:get-vod', {})
-            .then((result: { success?: boolean; data?: { name: string; stream_icon?: string }[] }) => {
-                if (cancelled || !result?.success || !Array.isArray(result.data)) return;
-                const withCover = result.data.filter(m => m.stream_icon);
-                // Amostra espalhada (sem Math.random em render paths — aqui é efeito, ok usar)
-                const sampled: ShowcasePoster[] = [];
-                const step = Math.max(1, Math.floor(withCover.length / 30));
-                for (let i = 0; i < withCover.length && sampled.length < 30; i += step) {
-                    const start = Math.min(withCover.length - 1, i + Math.floor(Math.random() * step));
-                    const movie = withCover[start];
-                    sampled.push({ name: movie.name, icon: movie.stream_icon! });
+        void (async () => {
+            const isKidsProfile = profileService.getActiveProfile()?.isKids === true;
+            const parentalConfig = parentalService.getConfig();
+            const estado: ContentGateState = {
+                isKidsProfile,
+                parentalEnabled: parentalConfig.enabled,
+                blockAdultCategories: parentalConfig.blockAdultCategories,
+                sessionUnlocked: parentalService.isSessionUnlocked()
+            };
+
+            const [result, categorias, ocultos, notas] = await Promise.all([
+                window.ipcRenderer.invoke('streams:get-vod', {}) as Promise<{ success?: boolean; data?: VodDaVitrine[] }>,
+                shouldBlockAdultCategories(estado)
+                    ? window.ipcRenderer.invoke('categories:get-vod') as Promise<{ success?: boolean; data?: { category_id: string; category_name: string }[] }>
+                    : Promise.resolve({ success: true, data: [] }),
+                isKidsProfile ? indexedDBCache.getHiddenItems('movie') : Promise.resolve([] as string[]),
+                indexedDBCache.getAllCachedMovies()
+            ]);
+            if (cancelled || !result?.success || !Array.isArray(result.data)) return;
+
+            const bloqueadas = new Set<string>();
+            if (Array.isArray(categorias?.data)) {
+                for (const cat of categorias.data) {
+                    if (isCategoryNameBlocked(cat.category_name)) bloqueadas.add(String(cat.category_id));
                 }
-                setPosters(sampled);
-                setIndex(0);
-            })
-            .catch(() => { /* vitrine segue só com o relógio */ });
+            }
+            const ocultosSet = new Set(ocultos);
+
+            const withCover = result.data.filter(m => m.stream_icon && isItemVisibleUnderGate({
+                categoryIds: toCategoryIds(m.category_id),
+                name: m.name,
+                blockedCategoryIds: bloqueadas,
+                hiddenNames: ocultosSet,
+                cachedRatings: notas,
+                isRatingBlocked: rating => parentalService.isContentBlocked(rating),
+                state: estado
+            }));
+            // Amostra espalhada (sem Math.random em render paths — aqui é efeito, ok usar)
+            const sampled: ShowcasePoster[] = [];
+            const step = Math.max(1, Math.floor(withCover.length / 30));
+            for (let i = 0; i < withCover.length && sampled.length < 30; i += step) {
+                const start = Math.min(withCover.length - 1, i + Math.floor(Math.random() * step));
+                const movie = withCover[start];
+                sampled.push({ name: movie.name, icon: movie.stream_icon! });
+            }
+            setPosters(sampled);
+            setIndex(0);
+        })().catch(() => { /* vitrine segue só com o relógio */ });
 
         const tick = () => setClock(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
         tick();
