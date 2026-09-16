@@ -5,6 +5,7 @@ import { profileService } from '../services/profileService';
 import { useState, useEffect } from 'react';
 import { UpdateNotificationBadge } from './UpdateNotificationBadge';
 import { UpdateModal } from './UpdateModal';
+import { pedirAberturaDeFicha } from '../services/abrirFicha';
 import { ProfileManager } from './ProfileManager';
 import { updateService } from '../services/updateService';
 import { NotificationsPanel } from './NotificationsPanel';
@@ -243,7 +244,9 @@ export function Sidebar() {
                     {/* Episode Notifications */}
                     <NotificationsPanel
                         onNavigateToSeries={(seriesId) => {
-                            navigate(`/dashboard/series?id=${seriesId}`);
+                            // `?id=` não era lido por ninguém: a página de
+                            // Séries abre a ficha pelo canal do abrirFicha.
+                            navigate(pedirAberturaDeFicha('series', seriesId));
                         }}
                         onNavigateToDownloads={() => {
                             navigate('/dashboard/downloads');

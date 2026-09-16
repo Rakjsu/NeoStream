@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GLOBAL_SEARCH_OPEN_KEY, GLOBAL_SEARCH_EVENT } from './GlobalSearch';
+import { pedirAberturaDeFicha } from '../services/abrirFicha';
 import { normalizeTitle } from '../services/personSearchHelpers';
 import { searchSeriesByName, searchMovieByName, fetchMovieTrailer, fetchSeriesTrailer, fetchCollection, fetchSimilarByTmdbId, fetchCastByTmdbId, fetchPersonFilmography, type TMDBSeriesDetails, type TMDBMovieDetails, type TMDBCollection, type TMDBSimilarItem, type TMDBCastMember } from '../services/tmdb';
 import { allTags, getMark, setRating, toggleTag } from '../services/personalMarksService';
@@ -140,12 +140,8 @@ export function ContentDetailModal({
     // Abre a ficha de outro item do catálogo: fecha este modal e reusa o canal
     // da busca global (a página de destino consome o open-id e abre o modal).
     const openCatalogItem = (kind: 'vod' | 'series', catalogId: string) => {
-        try {
-            sessionStorage.setItem(GLOBAL_SEARCH_OPEN_KEY, JSON.stringify({ kind, id: catalogId }));
-        } catch { /* sem storage: só fecha */ }
         onClose();
-        navigate(kind === 'vod' ? '/dashboard/vod' : '/dashboard/series');
-        window.dispatchEvent(new Event(GLOBAL_SEARCH_EVENT));
+        navigate(pedirAberturaDeFicha(kind, catalogId));
     };
     const [tagInput, setTagInput] = useState('');
     const [selectedSeason, setSelectedSeason] = useState(1);
