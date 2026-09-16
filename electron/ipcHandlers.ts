@@ -31,6 +31,7 @@ import { diffPlaylistPatch, isUserInfoFresh } from './playlistsModel'
 import type { PlaylistPatch } from './playlistsModel'
 
 import { cachedCatalogFetch, invalidatePlaylistCache, type CatalogKind } from './catalogCache'
+import { contagensDoCatalogo } from './catalogCounts'
 import { parseM3u, looksLikeM3u, m3uToLiveStreams, m3uToVodStreams, m3uCategories, m3uToSeries, m3uSeriesInfo, findM3uEpisodeUrl, pareceListaM3uNoDisco, EXTENSOES_DE_LISTA_M3U } from './m3uProtocol'
 import { lerCanaisM3uDoDisco } from './m3uDiskSource'
 import { decifrarBackupDoCelular } from './mobileBackupCrypto'
@@ -821,29 +822,24 @@ export function setupIpcHandlers() {
     })
 
     // Get content counts
+    /**
+     * Quantos canais/filmes/séries a lista tem (cartões da Home e resumo do
+     * cadastro).
+     *
+     * Passa pelos MESMOS três `catalogListHandler` dos `streams:get-*`, em vez
+     * de falar direto com o XtreamClient: é o que dá a contagem certa em M3U e
+     * Stalker (o espelho `auth` dessas listas não é credencial Xtream) e o que
+     * faz a contagem aquecer o cache que o dashboard vai ler em seguida, em vez
+     * de baixar o catálogo inteiro uma segunda vez. Ver catalogCounts.ts.
+     */
     ipcMain.handle('content:get-counts', async () => {
         try {
-            const auth = store.get('auth')
-            if (!auth.url || !auth.username || !auth.password) {
-                return { success: false, error: 'Not authenticated' }
-            }
-
-            const client = new XtreamClient(auth.url, auth.username, auth.password)
-
-            const [liveStreams, vodStreams, series] = await Promise.all([
-                client.getLiveStreams().catch(() => []),
-                client.getVODStreams().catch(() => []),
-                client.getSeries().catch(() => [])
+            const [live, vod, series] = await Promise.all([
+                catalogListHandler('live', 'getLiveStreams'),
+                catalogListHandler('vod', 'getVODStreams'),
+                catalogListHandler('series', 'getSeries')
             ])
-
-            return {
-                success: true,
-                counts: {
-                    live: Array.isArray(liveStreams) ? liveStreams.length : 0,
-                    vod: Array.isArray(vodStreams) ? vodStreams.length : 0,
-                    series: Array.isArray(series) ? series.length : 0
-                }
-            }
+            return contagensDoCatalogo(live, vod, series)
         } catch (error: unknown) {
             return { success: false, error: getErrorMessage(error) }
         }
