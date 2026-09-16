@@ -109,3 +109,34 @@ export function isLiveCategoryVisible(categoryId: string, gate: {
     if (allowed && allowed.size > 0 && !allowed.has(categoryId)) return false;
     return true;
 }
+
+/**
+ * Um canal ao vivo pode aparecer para ESTE perfil?
+ *
+ * Junta as três guardas que a TV ao vivo aplicava soltas: a blacklist de
+ * categoria do parental, a whitelist de categoria do perfil infantil e a
+ * whitelist POR CANAL (os marcados com 👶). Existe porque a categoria ⭐
+ * Canais favoritos passava por cima das três: o filtro da grade tinha um
+ * `return` antecipado para os favoritos, então um canal adulto favoritado
+ * antes de ligar o parental continuava aparecendo — e tocava sem pedir PIN.
+ * A mesma lista ainda era o que ia para o guia do celular.
+ */
+export interface CanalDoPortao {
+    streamId: string;
+    categoryId: string;
+}
+
+export interface PortaoDeCanais {
+    blockedCategoryIds: ReadonlySet<string>;
+    /** null = sem whitelist de categoria (perfil adulto). */
+    allowedCategoryIds: ReadonlySet<string> | null;
+    /** null ou vazia = sem whitelist por canal. */
+    kidsAllowedChannelIds: ReadonlySet<string> | null;
+}
+
+export function isLiveChannelVisible(canal: CanalDoPortao, gate: PortaoDeCanais): boolean {
+    if (!isLiveCategoryVisible(canal.categoryId, gate)) return false;
+    const porCanal = gate.kidsAllowedChannelIds;
+    if (porCanal && porCanal.size > 0 && !porCanal.has(canal.streamId)) return false;
+    return true;
+}

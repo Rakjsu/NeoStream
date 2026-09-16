@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
 import { SortSelect } from '../components/SortSelect';
 import { usageStatsService } from '../services/usageStatsService';
+import { isLiveChannelVisible } from '../services/contentGate';
 import { groupChannelVariants, qualityLabel } from '../services/channelVariantsService';
 import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { CategoryMenu } from '../components/CategoryMenu';
@@ -559,29 +560,25 @@ export function LiveTV() {
         // 🙈 normal esconde os ocultos; "ver ocultos" mostra somente eles
         if (showHidden !== hiddenIds.has(String(stream.stream_id))) return false;
         if (onlyWithEpg && !stream.epg_channel_id) return false;
-        if (selectedCategory === 'FAVORITES') {
-            return matchesSearch && favoriteChannelIds.has(String(stream.stream_id));
-        }
+        // ⭐ Favoritos é uma CATEGORIA como as outras — e não um atalho que
+        // pula as guardas. O `return` antecipado que havia aqui deixava um
+        // canal adulto favoritado antes de ligar o parental aparecer e tocar
+        // sem PIN, e mandava essa lista sem filtro para o guia do celular.
+        const matchesCategory = selectedCategory === 'FAVORITES'
+            ? favoriteChannelIds.has(String(stream.stream_id))
+            : (!selectedCategory || selectedCategory === 'all' || stream.category_id === selectedCategory);
 
-        const matchesCategory = !selectedCategory || selectedCategory === 'all' || stream.category_id === selectedCategory;
-
-        // Parental Control: block channels from adult categories
-        if (blockedCategoryIds.has(stream.category_id)) {
-            return false;
-        }
-
-        // Kids profile: only allow channels from infantis categories
-        if (isKidsProfile && allowedCategoryIds.size > 0) {
-            if (!allowedCategoryIds.has(stream.category_id)) {
-                return false;
+        // Parental (blacklist de categoria) + perfil infantil (whitelist de
+        // categoria e whitelist por canal) — as três no contentGate.
+        const visivel = isLiveChannelVisible(
+            { streamId: String(stream.stream_id), categoryId: stream.category_id },
+            {
+                blockedCategoryIds,
+                allowedCategoryIds: isKidsProfile ? allowedCategoryIds : null,
+                kidsAllowedChannelIds: isKidsProfile ? kidsAllowedChannelIds : null
             }
-        }
-
-        // 👶 Whitelist por canal dos perfis kids: quando existir, só os canais
-        // marcados (👶 pelo perfil adulto) aparecem no perfil infantil.
-        if (isKidsProfile && kidsAllowedChannelIds.size > 0 && !kidsAllowedChannelIds.has(String(stream.stream_id))) {
-            return false;
-        }
+        );
+        if (!visivel) return false;
 
         return matchesSearch && matchesCategory;
     }), [variantsResult, searchQuery, selectedCategory, favoriteChannelIds, blockedCategoryIds, isKidsProfile, allowedCategoryIds, kidsAllowedChannelIds, onlyWithEpg, hiddenIds, showHidden]);
