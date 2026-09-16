@@ -706,8 +706,11 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                         )}
                     </button>
 
-                    {/* Favorite channels - Special Category (Live only) */}
-                    {type === 'live' && (
+                    {/* Favorite channels - Special Category (Live only).
+                        Escondido no perfil infantil: ⭐ é uma lista montada pelo
+                        adulto, e oferecê-la à criança convida a furar a
+                        whitelist que o adulto acabou de definir. */}
+                    {type === 'live' && !isKidsProfile && (
                         <button
                             onClick={() => {
                                 onSelectCategory('FAVORITES');

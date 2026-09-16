@@ -10,6 +10,7 @@ import {
     shouldBlockAdultCategories,
     toCategoryIds,
     type ContentGateState,
+    isLiveChannelVisible,
 } from './contentGate'
 
 const state = (over: Partial<ContentGateState> = {}): ContentGateState => ({
@@ -168,5 +169,56 @@ describe('toCategoryIds', () => {
 
     it('id numérico casa com o conjunto bloqueado (que é de strings)', () => {
         expect(visible({ categoryIds: toCategoryIds(66), blockedCategoryIds: new Set(['66']) })).toBe(false)
+    })
+})
+
+describe('isLiveChannelVisible (o portão de um canal ao vivo)', () => {
+    const portao = (over: Partial<Parameters<typeof isLiveChannelVisible>[1]> = {}) => ({
+        blockedCategoryIds: new Set<string>(),
+        allowedCategoryIds: null,
+        kidsAllowedChannelIds: null,
+        ...over,
+    })
+
+    it('canal comum, sem parental nem perfil infantil: aparece', () => {
+        expect(isLiveChannelVisible({ streamId: '10', categoryId: '3' }, portao())).toBe(true)
+    })
+
+    it('categoria bloqueada pelo parental não aparece — NEM se for favorito', () => {
+        // Era o furo: a categoria ⭐ tinha return antecipado e pulava esta guarda,
+        // então um canal adulto favoritado antes de ligar o parental tocava sem PIN.
+        expect(isLiveChannelVisible(
+            { streamId: '10', categoryId: 'adulto' },
+            portao({ blockedCategoryIds: new Set(['adulto']) })
+        )).toBe(false)
+    })
+
+    it('perfil infantil: fora da whitelist de categoria não aparece', () => {
+        expect(isLiveChannelVisible(
+            { streamId: '10', categoryId: '9' },
+            portao({ allowedCategoryIds: new Set(['infantis']) })
+        )).toBe(false)
+    })
+
+    it('perfil infantil: whitelist POR CANAL manda dentro da categoria liberada', () => {
+        const gate = portao({
+            allowedCategoryIds: new Set(['infantis']),
+            kidsAllowedChannelIds: new Set(['10']),
+        })
+        expect(isLiveChannelVisible({ streamId: '10', categoryId: 'infantis' }, gate)).toBe(true)
+        // O canal que o adulto TIROU do 👶 some, mesmo favoritado pelo perfil kids.
+        expect(isLiveChannelVisible({ streamId: '11', categoryId: 'infantis' }, gate)).toBe(false)
+    })
+
+    it('whitelist vazia não filtra nada (conta sem categoria infantil fica com canais)', () => {
+        const gate = portao({ allowedCategoryIds: new Set(), kidsAllowedChannelIds: new Set() })
+        expect(isLiveChannelVisible({ streamId: '10', categoryId: '3' }, gate)).toBe(true)
+    })
+
+    it('bloqueio do parental vence a whitelist por canal', () => {
+        expect(isLiveChannelVisible(
+            { streamId: '10', categoryId: 'adulto' },
+            portao({ blockedCategoryIds: new Set(['adulto']), kidsAllowedChannelIds: new Set(['10']) })
+        )).toBe(false)
     })
 })
