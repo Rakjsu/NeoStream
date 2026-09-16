@@ -3,6 +3,7 @@ import { SortSelect } from '../components/SortSelect';
 import { CatalogFilters } from '../components/CatalogFilters';
 import { fuzzyIncludes, matchesFilters, qualityBadgeOf, matchesDuration, type DurationBucket } from '../utils/catalogFilter';
 import { getMovieBaseName, getVersionTag, groupByBaseName } from '../services/movieVersionService';
+import { proximoDaFila } from '../services/proximoDaFila';
 import { fetchTraktWatchedMovies } from '../services/traktService';
 import { normalizeTitle } from '../services/personSearchHelpers';
 import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
@@ -223,17 +224,15 @@ export function VOD() {
     // playing) — the end-of-movie countdown offers it as "A seguir".
     const getNextQueuedMovie = (currentId: string): VODStream | null => {
         // 🎞️ Item 30: a fila MANUAL vem primeiro; o Ver depois segue de fallback.
-        const manual = queueService.next(currentId);
-        if (manual) {
-            const found = streams.find(s => String(s.stream_id) === manual.id);
-            if (found) return found;
-        }
-        for (const queued of watchLaterService.getAll()) {
-            if (queued.type !== 'movie' || queued.id === currentId) continue;
-            const found = streams.find(s => String(s.stream_id) === queued.id);
-            if (found && isItemVisible(found)) return found;
-        }
-        return null;
+        // O gate de parental/infantil vale nos DOIS caminhos (proximoDaFila.ts):
+        // entrar na fila — pela ficha ou pelo celular — não é passe livre.
+        return proximoDaFila(
+            currentId,
+            queueService.next(currentId),
+            watchLaterService.getAll(),
+            id => streams.find(s => String(s.stream_id) === id),
+            isItemVisible
+        );
     };
 
     // Memoized so a big catalog isn't re-sorted/re-filtered on every render —
