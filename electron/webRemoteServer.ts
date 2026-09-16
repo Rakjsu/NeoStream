@@ -62,6 +62,8 @@ import {
     MIN_MOBILE_APP_VERSION,
     type MobileHello,
     type PushAckStatus,
+    sanitizarStatusDeGravacao,
+    sanitizarArquivoDeGravacao,
 } from './webRemoteProtocol'
 import { renderRemotePage, type RemoteAccent } from './webRemotePage'
 import {
@@ -1156,9 +1158,17 @@ export function setupWebRemote(): void {
     })
 
     // Result of a recording started from the phone's guide (REC button).
+    //
+    // A lista de status aceitos é o contrato com a página do celular, que já
+    // tem os ramos de 'renamed', 'protected' e 'unprotected' escritos (com os
+    // textos recRenamed/recProtected/recUnprotected). Enquanto os três não
+    // estavam aqui, viravam 'error' no relay e a página caía no
+    // `else showToast(L.recFail)`: renomear um arquivo com sucesso respondia
+    // "Falha ao iniciar a gravação", e a recusa de apagar um arquivo travado
+    // aparecia com a mesma frase, em vez de dizer que está protegido.
     ipcMain.on('web-remote:record-result', (_e, raw: unknown) => {
         const obj = (raw ?? {}) as Record<string, unknown>
-        const status = obj.status === 'ok' || obj.status === 'stopped' || obj.status === 'deleted' || obj.status === 'cancelled' ? obj.status : 'error'
+        const status = sanitizarStatusDeGravacao(obj.status)
         const name = typeof obj.name === 'string' ? obj.name.slice(0, 160) : ''
         const id = typeof obj.id === 'string' ? obj.id.slice(0, 60) : ''
         broadcast(JSON.stringify({ type: 'recordResult', status, name, id }))
@@ -1178,13 +1188,7 @@ export function setupWebRemote(): void {
             }
         }).filter((c) => c.id && c.channelName)
         const rawFiles = Array.isArray(obj.files) ? obj.files : []
-        const files = rawFiles.slice(0, 10).map((c) => {
-            const it = (c ?? {}) as Record<string, unknown>
-            return {
-                name: typeof it.name === 'string' ? it.name.slice(0, 200) : '',
-                sizeMb: typeof it.sizeMb === 'number' && Number.isFinite(it.sizeMb) ? Math.max(0, Math.round(it.sizeMb)) : 0,
-            }
-        }).filter((c) => c.name)
+        const files = rawFiles.slice(0, 10).map(sanitizarArquivoDeGravacao).filter((c) => c.name)
         // Future recordings scheduled from the EPG (this app or the phone's ⏺).
         const rawScheduled = Array.isArray(obj.scheduled) ? obj.scheduled : []
         const scheduled = rawScheduled.slice(0, 20).map((c) => {
