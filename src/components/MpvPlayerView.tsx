@@ -22,7 +22,8 @@ import { useLanguage } from '../services/languageService';
 import { profileService } from '../services/profileService';
 import { trackPrefKey, trackLang, choosePreferredTracks, type TrackPref } from '../utils/mpvTrackPrefs';
 import { subtitleSyncPrefs, subtitleSyncKey } from '../utils/subtitleSyncPrefs';
-import { autoFetchSubtitle, cleanupSubtitleUrl, openSubtitleFileFromDisk, SUBTITLE_LANGUAGE_OPTIONS } from '../services/subtitleService';
+import { autoFetchSubtitle, cleanupSubtitleUrl, motivoDeNaoTerLegenda, openSubtitleFileFromDisk, SUBTITLE_LANGUAGE_OPTIONS } from '../services/subtitleService';
+import { chaveDaMensagem } from '../services/motivoDeLegenda';
 
 /** Must match MPV_CONTROLS_HEIGHT in electron/mpvProtocol.ts. */
 const CONTROLS_HEIGHT = 96;
@@ -395,7 +396,8 @@ export function MpvPlayerView({
                 setSubSearchMsg(ok ? `💬 ${label}` : t('player', 'errorLoadingSubtitles'));
                 cleanupSubtitleUrl(result.url);
             } else {
-                setSubSearchMsg(t('player', 'noSubtitlesFound'));
+                // Mesmo motivo do player interno: sem chave, nada foi buscado.
+                setSubSearchMsg(t('player', chaveDaMensagem(await motivoDeNaoTerLegenda())));
             }
         } catch {
             setSubSearchMsg(t('player', 'errorLoadingSubtitles'));

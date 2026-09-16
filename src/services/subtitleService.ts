@@ -3,9 +3,20 @@
  * Fetches subtitles from OpenSubtitles API via IPC (bypasses CORS)
  */
 
+import { classificarFalhaDeLegenda, type MotivoDeLegenda } from './motivoDeLegenda';
+
 // JWT token cache
 let cachedToken: string | null = null;
 let tokenExpiry: number = 0;
+
+/**
+ * Último status HTTP que a API do OpenSubtitles devolveu numa FALHA.
+ *
+ * Guardado porque o motivo da falha morria no console: quem pergunta depois
+ * ("por que não veio legenda?") precisa saber se foi a cota do dia ou se o
+ * título realmente não tem — ver motivoDeLegenda.ts.
+ */
+let ultimoStatusDeFalha: number | null = null;
 
 interface SubtitleResult {
     id: string;
@@ -97,6 +108,7 @@ async function getAuthToken(): Promise<string | null> {
 
         if (!result.success) {
             console.error('OpenSubtitles login failed:', result.status, result.error);
+            ultimoStatusDeFalha = result.status ?? null;
             return null;
         }
 
@@ -113,6 +125,27 @@ async function getAuthToken(): Promise<string | null> {
         console.error('Error logging in to OpenSubtitles:', error);
         return null;
     }
+}
+
+/**
+ * Por que a busca não trouxe legenda — para a tela parar de dizer "nenhuma
+ * legenda encontrada" quando o que falta é a chave do usuário.
+ *
+ * Lê a configuração do main na hora (é a causa mais comum e a única que a
+ * pessoa resolve sozinha) e combina com o último status de falha registrado.
+ */
+export async function motivoDeNaoTerLegenda(): Promise<MotivoDeLegenda> {
+    let temCredencial: boolean;
+    try {
+        const cfg = await window.ipcRenderer?.invoke('opensubtitles:get-config') as
+            { apiKey?: string; username?: string; password?: string } | undefined;
+        temCredencial = !!(cfg?.apiKey && cfg?.username && cfg?.password);
+    } catch {
+        // Sem IPC (fora do Electron) não dá para afirmar que falta credencial:
+        // cair em 'provedor' é mais honesto do que mandar configurar a chave.
+        return 'provedor';
+    }
+    return classificarFalhaDeLegenda({ temCredencial, status: ultimoStatusDeFalha });
 }
 
 /** Languages offered in the player's subtitle menu. */
@@ -134,6 +167,7 @@ export async function searchSubtitles(params: SubtitleSearchParams): Promise<Sub
             console.error('Failed to get OpenSubtitles auth token');
             return [];
         }
+        ultimoStatusDeFalha = null;
 
         const searchParams = new URLSearchParams();
 
@@ -152,6 +186,7 @@ export async function searchSubtitles(params: SubtitleSearchParams): Promise<Sub
 
         if (!result.success) {
             console.error('OpenSubtitles search failed:', result.status, result.error);
+            ultimoStatusDeFalha = result.status ?? null;
             return [];
         }
 

@@ -68,6 +68,9 @@ const CHAVES_DINAMICAS: Record<string, RegExp[]> = {
     // ContentDetailModal.tsx e LiveTV.tsx: t('common', mobilePushMessageKey(r))
     // — o mapa de respostas do celular vive em utils/mobilePushResult.ts.
     common: [/^(sentToPhone|noPhoneConnected|phone(SentNoAck|NoAnswer|Locked|Blocked|NotFound))$/],
+    // useSubtitleManager.ts e MpvPlayerView.tsx: t('player', chaveDaMensagem(motivo))
+    // — o mapa motivo → chave vive em services/motivoDeLegenda.ts.
+    player: [/^subtitle(NoKey|Quota|ProviderDown)$/],
     // DvrNotifyBridge.tsx: wrapper de 1 argumento sobre a seção.
     notifications: [/^dvrFinished/],
     // weeklySummary.ts: wrapper de 1 argumento sobre a seção.

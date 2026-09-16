@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { autoFetchSubtitle, autoFetchForcedSubtitle, cleanupSubtitleUrl, diskSubtitleToVtt, openSubtitleFileFromDisk } from '../../services/subtitleService';
+import { autoFetchSubtitle, autoFetchForcedSubtitle, cleanupSubtitleUrl, diskSubtitleToVtt, motivoDeNaoTerLegenda, openSubtitleFileFromDisk } from '../../services/subtitleService';
+import { chaveDaMensagem } from '../../services/motivoDeLegenda';
 import { useLanguage } from '../../services/languageService';
 
 export interface UseSubtitleManagerParams {
@@ -194,8 +195,10 @@ export function useSubtitleManager({
                             setTimeout(() => setSubtitleWarning(null), 5000);
                         }
                     } else {
-                        setSubtitleWarning(t('player', 'noSubtitlesFound'));
-                        setTimeout(() => setSubtitleWarning(null), 4000);
+                        // Pode não ser "esse filme não tem legenda": sem chave
+                        // do OpenSubtitles nada é sequer buscado.
+                        setSubtitleWarning(t('player', chaveDaMensagem(await motivoDeNaoTerLegenda())));
+                        setTimeout(() => setSubtitleWarning(null), 6000);
                     }
                 } catch (error) {
                     console.error('Error fetching subtitles:', error);
@@ -235,8 +238,13 @@ export function useSubtitleManager({
                 setVttContent(result.vttContent);
                 setSubtitlesEnabled(true);
             } else {
-                setSubtitleWarning(`${t('player', 'noSubtitlesFound')} (${lang.toUpperCase()})`);
-                setTimeout(() => setSubtitleWarning(null), 4000);
+                const motivo = await motivoDeNaoTerLegenda();
+                // O idioma só entra na frase quando a busca de fato aconteceu —
+                // "(PT-BR)" ao lado de "configure a chave" confundiria.
+                setSubtitleWarning(motivo === 'nada-encontrado'
+                    ? `${t('player', 'noSubtitlesFound')} (${lang.toUpperCase()})`
+                    : t('player', chaveDaMensagem(motivo)));
+                setTimeout(() => setSubtitleWarning(null), 6000);
             }
         } catch (error) {
             console.error('Error fetching subtitles for language:', error);
