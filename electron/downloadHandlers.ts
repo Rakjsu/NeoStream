@@ -4,6 +4,7 @@ import fs from 'fs'
 import https from 'https'
 import http from 'http'
 import log from './logger'
+import { juntarPartes } from './juntarPartes'
 import { setTaskbarProgress } from './winIntegration'
 import { resolveDownloadFile, resolveSeriesFolder, sanitizeDownloadName } from './downloadPaths'
 import { getErrorMessage } from './errorMessage';
@@ -357,25 +358,16 @@ export function setupDownloadHandlers() {
             progressInterval = null;
             parallelEntry.progressInterval = null;
 
-            // Merge chunks (streamed to avoid loading whole parts into memory)
+            // Merge chunks (streamed to avoid loading whole parts into memory).
+            // O erro de I/O daqui — disco cheio é o caso comum, porque a junção
+            // precisa de ~1,25x o tamanho do filme livre — vira REJEIÇÃO e cai
+            // no catch abaixo, em vez de subir como exceção assíncrona e abrir
+            // o diálogo de crash do Electron. Ver juntarPartes.ts.
             log.info('[Download] Merging chunks...');
-            const writeStream = fs.createWriteStream(filePath);
-
-            for (let i = 0; i < PARALLEL_CONNECTIONS; i++) {
-                const partPath = `${filePath}.part${i}`;
-                if (fs.existsSync(partPath)) {
-                    await new Promise<void>((resolve, reject) => {
-                        const readStream = fs.createReadStream(partPath);
-                        readStream.on('error', reject);
-                        readStream.on('end', () => {
-                            fs.unlinkSync(partPath);
-                            resolve();
-                        });
-                        readStream.pipe(writeStream, { end: false });
-                    });
-                }
-            }
-            await new Promise<void>((resolve) => writeStream.end(resolve));
+            await juntarPartes(
+                filePath,
+                Array.from({ length: PARALLEL_CONNECTIONS }, (_, i) => `${filePath}.part${i}`)
+            );
             activeDownloads.delete(id);
 
             // 🔎 Integridade: o arquivo final precisa bater com o content-length.
