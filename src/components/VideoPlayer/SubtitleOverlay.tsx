@@ -6,12 +6,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DEFAULT_SUBTITLE_STYLE, subtitleCss, type SubtitleStyle } from '../../utils/subtitleStyle';
-
-interface SubtitleCue {
-    startTime: number;  // in seconds
-    endTime: number;    // in seconds
-    text: string;
-}
+import { lerCuesDoVtt } from './legendaVtt';
 
 interface SubtitleOverlayProps {
     vttContent: string | null;
@@ -21,76 +16,6 @@ interface SubtitleOverlayProps {
     offsetSeconds?: number;
     /** Estilo (tamanho/fundo/cor) escolhido no menu ⚙️ do player. */
     styleConfig?: SubtitleStyle;
-}
-
-/**
- * Parse VTT timestamp to seconds
- * Format: HH:MM:SS.mmm or MM:SS.mmm
- */
-function parseTimestamp(timestamp: string): number {
-    const parts = timestamp.split(':');
-    if (parts.length === 3) {
-        // HH:MM:SS.mmm
-        const hours = parseInt(parts[0], 10);
-        const minutes = parseInt(parts[1], 10);
-        const seconds = parseFloat(parts[2]);
-        return hours * 3600 + minutes * 60 + seconds;
-    } else if (parts.length === 2) {
-        // MM:SS.mmm
-        const minutes = parseInt(parts[0], 10);
-        const seconds = parseFloat(parts[1]);
-        return minutes * 60 + seconds;
-    }
-    return 0;
-}
-
-/**
- * Parse VTT content into array of cues
- */
-function parseVTT(vttContent: string): SubtitleCue[] {
-    const cues: SubtitleCue[] = [];
-    const lines = vttContent.split('\n');
-
-    let i = 0;
-    // Skip header
-    while (i < lines.length && !lines[i].includes('-->')) {
-        i++;
-    }
-
-    while (i < lines.length) {
-        const line = lines[i].trim();
-
-        // Look for timestamp line (contains -->)
-        if (line.includes('-->')) {
-            const [startStr, endStr] = line.split('-->').map(s => s.trim().split(' ')[0]);
-            const startTime = parseTimestamp(startStr);
-            const endTime = parseTimestamp(endStr);
-
-            // Collect text lines until empty line or next cue
-            const textLines: string[] = [];
-            i++;
-            while (i < lines.length && lines[i].trim() !== '' && !lines[i].includes('-->')) {
-                const textLine = lines[i].trim();
-                // Skip cue numbers
-                if (!/^\d+$/.test(textLine)) {
-                    textLines.push(textLine);
-                }
-                i++;
-            }
-
-            if (textLines.length > 0) {
-                cues.push({
-                    startTime,
-                    endTime,
-                    text: textLines.join('\n')
-                });
-            }
-        } else {
-            i++;
-        }
-    }
-
-    return cues;
 }
 
 export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
@@ -105,7 +30,7 @@ export const SubtitleOverlay: React.FC<SubtitleOverlayProps> = ({
     // Parse VTT content once when it changes
     const cues = useMemo(() => {
         if (!vttContent) return [];
-        const parsed = parseVTT(vttContent);
+        const parsed = lerCuesDoVtt(vttContent);
                 return parsed;
     }, [vttContent]);
 
