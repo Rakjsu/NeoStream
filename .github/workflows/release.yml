@@ -14,7 +14,38 @@ permissions:
   contents: write
 
 jobs:
+  # 🚦 Portão antes de qualquer artefato subir.
+  #
+  # A tag é empurrada à mão, e isso é um evento SEPARADO do push da main: dá
+  # para tagar um commit cuja CI ainda está correndo — ou que está vermelha —
+  # e a release sai PUBLICADA para todo mundo (`draft: false`), não como
+  # rascunho. Dentro do `npm run build` o único gate de qualidade é o `tsc -b`,
+  # que nem enxerga o processo principal.
+  #
+  # Job separado, e não um passo dentro da matriz, de propósito: com os três
+  # sistemas empacotando em paralelo, um teste vermelho no Linux ainda deixaria
+  # os artefatos de Windows e mac subirem. Aqui nada sobe se a suíte cair.
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci || (sleep 15 && npm ci) || (sleep 60 && npm ci)
+
+      - name: Typecheck
+        run: npx tsc -b
+
+      - name: Unit tests
+        run: npx vitest run
+
   release:
+    needs: verificar
     runs-on: ${{ matrix.os }}
 
     strategy:
