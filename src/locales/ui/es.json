@@ -728,6 +728,7 @@
     "confirmPin": "Confirma tu PIN",
     "verifyPin": "Ingresa el PIN para desactivar",
     "pinError4Digits": "Ingresa 4 dígitos",
+    "pinCurrentToChange": "Ingresa el PIN actual para poder cambiarlo",
     "pinIncorrect": "PIN incorrecto",
     "pinMismatch": "Los PINs no coinciden",
     "confirm": "Confirmar",

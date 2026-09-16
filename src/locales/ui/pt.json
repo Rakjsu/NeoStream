@@ -525,6 +525,7 @@
     "confirmPin": "Confirme seu PIN",
     "verifyPin": "Digite o PIN para desativar",
     "pinError4Digits": "Digite 4 dígitos",
+    "pinCurrentToChange": "Digite o PIN atual para poder trocá-lo",
     "pinIncorrect": "PIN incorreto",
     "pinMismatch": "Os PINs não coincidem",
     "confirm": "Confirmar",
