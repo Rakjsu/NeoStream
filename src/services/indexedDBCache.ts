@@ -183,6 +183,46 @@ export const indexedDBCache = {
         }
     },
 
+    /**
+     * Desfaz um "ocultar".
+     *
+     * A store só sabia esconder. Um título escondido por engano — e sem chave
+     * da TMDB isso acontecia a cada clique, porque "sem resposta" era tratado
+     * como "não é infantil" — ficava fora do catálogo para sempre, em TODOS os
+     * perfis (a store é global), e pôr a chave depois não desfazia nada.
+     */
+    async unhideItem(type: 'movie' | 'series', name: string): Promise<void> {
+        try {
+            const db = await openDB();
+            const id = `${type}_${normalizeName(name)}`;
+
+            return new Promise((resolve) => {
+                const tx = db.transaction(HIDDEN_ITEMS_STORE, 'readwrite');
+                tx.objectStore(HIDDEN_ITEMS_STORE).delete(id);
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+            });
+        } catch {
+            // Silently fail
+        }
+    },
+
+    /** Limpa a lista de ocultos inteira (a tela do controle parental oferece). */
+    async clearHiddenItems(): Promise<void> {
+        try {
+            const db = await openDB();
+
+            return new Promise((resolve) => {
+                const tx = db.transaction(HIDDEN_ITEMS_STORE, 'readwrite');
+                tx.objectStore(HIDDEN_ITEMS_STORE).clear();
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+            });
+        } catch {
+            // Silently fail
+        }
+    },
+
     async isItemHidden(type: 'movie' | 'series', name: string): Promise<boolean> {
         try {
             const db = await openDB();

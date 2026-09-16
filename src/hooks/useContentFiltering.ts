@@ -171,8 +171,12 @@ export function useContentFiltering<T>({
                             tmdbResult.certification || null,
                             tmdbResult.genres?.map(g => g.name) || []
                         );
-                        // If not kids-friendly, hide it for future Kids sessions
-                        if (!isKidsFriendly(tmdbResult.certification)) {
+                        // Esconder é PERMANENTE e global (não há tela para
+                        // revisar por perfil), então só vale quando a TMDB de
+                        // fato classificou o título. Sem certificação — chave
+                        // vazia, título desconhecido, API fora — o item pode
+                        // ser bloqueado na hora, nunca apagado para sempre.
+                        if (tmdbResult.certification && !isKidsFriendly(tmdbResult.certification)) {
                             await indexedDBCache.hideItem(contentType, name);
                         }
                     }
@@ -213,8 +217,15 @@ export function useContentFiltering<T>({
                     onAllowed(item);
                 } else {
                     setBlockMessage(`"${name}" não está disponível para este perfil`);
-                    await indexedDBCache.hideItem(contentType, name);
-                    setHiddenItems(prev => new Set(prev).add(normalizedName));
+                    // Mesma regra: sem classificação, bloqueia agora e pronto.
+                    // Gravar o oculto aqui era o que apagava o catálogo do
+                    // perfil infantil clique a clique quando faltava a chave
+                    // da TMDB — e sem volta, porque a store é global e não
+                    // havia como desfazer.
+                    if (certification) {
+                        await indexedDBCache.hideItem(contentType, name);
+                        setHiddenItems(prev => new Set(prev).add(normalizedName));
+                    }
                     setTimeout(() => setBlockMessage(null), 3000);
                 }
                 return;

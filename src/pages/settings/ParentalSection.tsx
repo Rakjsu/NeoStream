@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { parentalService } from '../../services/parentalService';
 import type { ParentalConfig } from '../../services/parentalService';
 import {
@@ -10,6 +10,8 @@ import {
 } from '../../services/watchLimitsService';
 import { profileService } from '../../services/profileService';
 import { listParentalLog, clearParentalLog, type ParentalLogEntry } from '../../services/parentalLogService';
+import { indexedDBCache } from '../../services/indexedDBCache';
+import { hasTmdbApiKey } from '../../services/tmdbKey';
 import { kidsWeeklyUsage } from '../../services/statsDashboardHelpers';
 import { useLanguage } from '../../services/languageService';
 import { useSaveAnimation } from './useSaveAnimation';
@@ -32,6 +34,24 @@ export function ParentalSection() {
     const [profileLimits, setProfileLimits] = useState<Record<string, number>>(() =>
         Object.fromEntries(profileService.getAllProfiles().map(p => [p.id, getProfileDailyLimitMinutes(p.id)])));
     const [logEntries, setLogEntries] = useState<ParentalLogEntry[]>(() => listParentalLog().slice(0, 30));
+    // 🙈 Títulos que o filtro infantil escondeu do catálogo. A lista é global
+    // (vale para todos os perfis) e, até agora, não tinha saída nenhuma.
+    const [ocultos, setOcultos] = useState<number | null>(null);
+    const temChaveTmdb = hasTmdbApiKey();
+
+    const contarOcultos = async () => {
+        const [filmes, series] = await Promise.all([
+            indexedDBCache.getHiddenItems('movie'),
+            indexedDBCache.getHiddenItems('series')
+        ]);
+        setOcultos(filmes.length + series.length);
+    };
+
+    useEffect(() => {
+        // Deferred: contarOcultos resolve o estado depois do await (mesmo
+        // padrão das outras seções de Configurações).
+        queueMicrotask(() => { void contarOcultos(); });
+    }, []);
 
     // PIN Modal states
     const [showPinModal, setShowPinModal] = useState(false);
@@ -367,6 +387,30 @@ export function ParentalSection() {
                                 ))}
                             </div>
                         </div>
+                    </div>
+
+                    {/* 🙈 Títulos escondidos pelo filtro infantil */}
+                    <div className="setting-item" style={{ alignItems: 'flex-start' }}>
+                        <div className="setting-info">
+                            <label>🙈 {t('parental', 'hiddenTitles')}</label>
+                            <p>{t('parental', 'hiddenTitlesDesc').replace('{n}', String(ocultos ?? 0))}</p>
+                            {!temChaveTmdb && (
+                                <p style={{ color: '#fbbf24', fontSize: 12, marginTop: 8 }}>
+                                    ⚠️ {t('parental', 'noTmdbKeyWarning')}
+                                </p>
+                            )}
+                        </div>
+                        <button
+                            className="check-btn"
+                            style={{ width: 'auto', padding: '10px 16px' }}
+                            title={t('parental', 'showHiddenAgain')}
+                            disabled={!ocultos}
+                            onClick={() => {
+                                void indexedDBCache.clearHiddenItems().then(contarOcultos);
+                            }}
+                        >
+                            👁 {t('parental', 'showHiddenAgain')}
+                        </button>
                     </div>
 
                     {/* 📜 Log parental (verificações de PIN) */}
