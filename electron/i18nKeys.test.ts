@@ -63,6 +63,9 @@ const CHAVES_DINAMICAS: Record<string, RegExp[]> = {
     appearance: [/^rail_/, /^color[A-Z]/, /^background(Default|Amoled)$/],
     // WrappedOverlay.tsx: t('wrapped', `persona_${persona}`) (wrappedHelpers.ts).
     wrapped: [/^persona_/],
+    // ProfileSelector.tsx e ProfileManager.tsx: t('profile', chaveDoBloqueio(b))
+    // — quem pode apagar um perfil vive em services/protecaoDePerfil.ts.
+    profile: [/^cannotDelete(Active|Last|Kids)$/],
     // ApiKeysSection.tsx: `osStep${n}` e `step${n}` do passo a passo.
     apiKeys: [/^(os)?[Ss]tep\d$/],
     // ContentDetailModal.tsx e LiveTV.tsx: t('common', mobilePushMessageKey(r))
