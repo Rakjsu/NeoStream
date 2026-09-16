@@ -731,6 +731,7 @@
     "confirmPin": "Confirm your PIN",
     "verifyPin": "Enter PIN to disable",
     "pinError4Digits": "Enter 4 digits",
+    "pinCurrentToChange": "Enter your current PIN to change it",
     "pinIncorrect": "Incorrect PIN",
     "pinMismatch": "PINs do not match",
     "confirm": "Confirm",

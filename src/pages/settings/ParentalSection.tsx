@@ -13,6 +13,7 @@ import { listParentalLog, clearParentalLog, type ParentalLogEntry } from '../../
 import { kidsWeeklyUsage } from '../../services/statsDashboardHelpers';
 import { useLanguage } from '../../services/languageService';
 import { useSaveAnimation } from './useSaveAnimation';
+import { depoisDeVerificar, modoAoTrocarPin, pedeePinAtual, type ModoDoPin } from './pinParental';
 
 export function ParentalSection() {
     const [parentalConfig, setParentalConfig] = useState<ParentalConfig>(parentalService.getConfig());
@@ -38,7 +39,10 @@ export function ParentalSection() {
     const [pinConfirm, setPinConfirm] = useState(['', '', '', '']);
     const [pinStep, setPinStep] = useState<'enter' | 'confirm'>('enter');
     const [pinError, setPinError] = useState('');
-    const [pinMode, setPinMode] = useState<'set' | 'verify'>('set'); // 'set' for new PIN, 'verify' for disabling
+    // 'set' define, 'verify' confere para DESLIGAR, 'trocar' confere para
+    // poder definir outro. Estado pegajoso: quem abre o modal escolhe o modo
+    // explicitamente, sempre — ver pinParental.ts.
+    const [pinMode, setPinMode] = useState<ModoDoPin>('set');
 
     const handleParentalConfigChange = <K extends keyof ParentalConfig>(key: K, value: ParentalConfig[K]) => {
         // When trying to disable parental control, require PIN verification
@@ -72,21 +76,30 @@ export function ParentalSection() {
             return;
         }
 
-        // Verification mode - check if PIN is correct to disable parental control
-        if (pinMode === 'verify') {
-            if (await parentalService.verifyPin(pin)) {
-                // PIN is correct - disable parental control
-                setParentalConfig(prev => ({ ...prev, enabled: false }));
-                parentalService.setConfig({ enabled: false });
-                setShowPinModal(false);
-                resetPinModal();
-
-                // Show save animation
-                triggerSaveAnimation('parental_enabled');
-            } else {
+        // Conferência do PIN atual — para desligar o parental ou para trocá-lo.
+        if (pedeePinAtual(pinMode)) {
+            const destino = depoisDeVerificar(pinMode, await parentalService.verifyPin(pin));
+            if (destino === 'pin-incorreto') {
                 setPinError(t('parental', 'pinIncorrect'));
                 setPinInput(['', '', '', '']);
+                return;
             }
+            if (destino === 'definir-novo-pin') {
+                // Acertou o atual: agora sim segue para definir o novo.
+                setPinMode('set');
+                setPinStep('enter');
+                setPinInput(['', '', '', '']);
+                setPinConfirm(['', '', '', '']);
+                setPinError('');
+                return;
+            }
+            setParentalConfig(prev => ({ ...prev, enabled: false }));
+            parentalService.setConfig({ enabled: false });
+            setShowPinModal(false);
+            resetPinModal();
+
+            // Show save animation
+            triggerSaveAnimation('parental_enabled');
             return;
         }
 
@@ -179,6 +192,9 @@ export function ParentalSection() {
                             className="setting-btn"
                             onClick={() => {
                                 resetPinModal();
+                                // Sem isto o modal abria definindo por cima do
+                                // PIN antigo, sem conferir o atual.
+                                setPinMode(modoAoTrocarPin(parentalService.hasPin()));
                                 setShowPinModal(true);
                             }}
                             disabled={!parentalConfig.enabled}
@@ -453,7 +469,7 @@ export function ParentalSection() {
                                 display: 'block',
                                 marginBottom: '16px',
                                 animation: 'pinBounce 0.6s ease'
-                            }}>{pinMode === 'verify' ? '🔓' : '🔐'}</span>
+                            }}>{pedeePinAtual(pinMode) ? '🔓' : '🔐'}</span>
                             <h2 style={{
                                 color: 'white',
                                 fontSize: '26px',
@@ -464,18 +480,20 @@ export function ParentalSection() {
                                 WebkitTextFillColor: 'transparent',
                                 backgroundClip: 'text'
                             }}>
-                                {pinMode === 'verify'
+                                {pedeePinAtual(pinMode)
                                     ? t('parental', 'verifyPin')
                                     : pinStep === 'enter'
                                         ? t('parental', 'setPin') + ' PIN'
                                         : t('parental', 'confirmPin')}
                             </h2>
                             <p style={{ color: '#9ca3af', fontSize: '15px', margin: 0 }}>
-                                {pinMode === 'verify'
-                                    ? t('parental', 'verifyPin')
-                                    : pinStep === 'enter'
-                                        ? t('parental', 'enterPin')
-                                        : t('parental', 'confirmPin')}
+                                {pinMode === 'trocar'
+                                    ? t('parental', 'pinCurrentToChange')
+                                    : pinMode === 'verify'
+                                        ? t('parental', 'verifyPin')
+                                        : pinStep === 'enter'
+                                            ? t('parental', 'enterPin')
+                                            : t('parental', 'confirmPin')}
                             </p>
                         </div>
 
@@ -642,7 +660,7 @@ export function ParentalSection() {
                             >
                                 {pinMode === 'verify'
                                     ? '🔓 Desbloquear'
-                                    : pinStep === 'enter'
+                                    : pinMode === 'trocar' || pinStep === 'enter'
                                         ? 'Continuar →'
                                         : `✓ ${t('parental', 'confirm')}`}
                             </button>
