@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import Hls from 'hls.js';
 import { playbackService } from '../services/playbackService';
+import { cargaDeFonteDireta } from './cargaDeFonteDireta';
 
 interface UseHlsOptions {
     src: string;
@@ -35,6 +36,10 @@ export function useHls({ src, videoRef, onStreamError, reloadToken = 0, reportBa
     const hlsRef = useRef<Hls | null>(null);
     const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const hasStartedPlaying = useRef(false);
+    // Último `reloadToken` que este efeito já aplicou. É o que separa "o
+    // usuário pediu de novo" de "o efeito re-rodou por outro motivo" — ver
+    // cargaDeFonteDireta.ts.
+    const tokenAplicado = useRef(reloadToken);
     // Use ref for callback to avoid re-running useEffect when callback changes
     const onStreamErrorRef = useRef(onStreamError);
 
@@ -58,6 +63,8 @@ export function useHls({ src, videoRef, onStreamError, reloadToken = 0, reportBa
         // Mark this element as being initialized NOW
         srcInitTimes.set(video, Date.now());
         hasStartedPlaying.current = false;
+        const tokenMudou = reloadToken !== tokenAplicado.current;
+        tokenAplicado.current = reloadToken;
 
         // Get buffer settings synchronously
         const config = playbackService.getConfig();
@@ -249,9 +256,19 @@ export function useHls({ src, videoRef, onStreamError, reloadToken = 0, reportBa
         } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
             video.src = src;
         } else {
-            // Only set src if it's different to avoid reloading and resetting position
-            if (video.src !== src) {
+            // Fonte direta (o VOD comum). Trocar o src já carrega; com a MESMA
+            // fonte, só `load()` refaz o pedido — sem ele o botão "Tentar
+            // novamente" não fazia absolutamente nada aqui.
+            const acao = cargaDeFonteDireta({
+                srcAtual: video.src,
+                srcNovo: src,
+                tokenMudou,
+                temErro: video.error !== null
+            });
+            if (acao === 'trocar') {
                 video.src = src;
+            } else if (acao === 'recarregar') {
+                video.load();
             }
         }
 
