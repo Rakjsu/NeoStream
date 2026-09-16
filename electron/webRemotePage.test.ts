@@ -56,6 +56,35 @@ describe('renderRemotePage: o JS servido precisa compilar', () => {
         expect(renderRemotePage()).not.toContain("display='none'")
     })
 
+    /**
+     * O handler de clique da aba 🎬 Filmes recebe `ev` e usava `e.target` numa
+     * das cinco linhas (#334, junto com o botão 🎉 da fila da festa). Em JS não
+     * estrito isso é ReferenceError NA PRIMEIRA LINHA útil: transmitir um
+     * filme, pôr na fila e selecionar para a fila múltipla ficaram todos
+     * inalcançáveis, e a aba só "não fazia nada" — sem erro visível para quem
+     * está com o celular na mão. As abas irmãs (séries, episódios, coleções,
+     * recomendados, buscas) sempre usaram `ev`.
+     *
+     * `new Function` não pega: é sintaticamente válido. Este guarda pega.
+     */
+    it.each(['pt', 'en', 'es'])('nenhum handler usa `e.target` no lugar de `ev.target` (%s)', (lang) => {
+        const src = scriptDa(renderRemotePage(lang))
+        // (?<![\w$.]) evita casar `ev.target`, `ie.target` ou `this.e.target`.
+        const bares = src.match(/(?<![\w$.])e\.target/g) ?? []
+        expect(bares).toEqual([])
+    })
+
+    it('a aba Filmes trata a fila da festa ANTES do transmitir', () => {
+        // Os dois botões têm a classe `chinfo`: com a ordem trocada, o ramo do
+        // 📡 engole o toque no 🎉 com `mid` nulo e o clique morre num return.
+        const src = scriptDa(renderRemotePage())
+        const festa = src.indexOf("data-party")
+        const transmitir = src.indexOf("data-cast")
+        expect(festa).toBeGreaterThan(-1)
+        expect(transmitir).toBeGreaterThan(-1)
+        expect(src.indexOf('if (partyBtn)')).toBeLessThan(src.indexOf('if (castBtn)'))
+    })
+
     it('mensagem de WS que estoura é reportada, não engolida', () => {
         expect(renderRemotePage()).toContain("console.error('[NeoStream] mensagem WS ignorada:'")
     })

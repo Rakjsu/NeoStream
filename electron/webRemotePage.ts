@@ -730,7 +730,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
       if (!ev.target.closest) return;
       // 📡 casts just that movie; tapping the rest of the row toggles selection.
       var castBtn = ev.target.closest('.chinfo');
-      var partyBtn = e.target.closest('[data-party]');
+      var partyBtn = ev.target.closest('[data-party]');
       if (partyBtn) { var pid = partyBtn.getAttribute('data-party'); if (pid) { sendCmd('partyAdd', null, null, pid); partyBtn.textContent = '✓'; } return; }
       if (castBtn) { var mid = castBtn.getAttribute('data-cast'); if (mid) sendCmd('castMovie', null, null, mid); return; }
       var row = ev.target.closest('.chitem');
