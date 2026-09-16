@@ -1341,7 +1341,13 @@ export function LiveTV() {
                 type="live"
                 isKidsProfile={isKidsProfile}
             />
-            <div ref={scrollContainerRef} style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflowY: 'auto', paddingTop: '40px' }}>
+            {/* Sem `ref` aqui de propósito: o scroller da grade é o div de
+                baixo (`.livetv-scroll-container`). Quando os dois carregavam o
+                MESMO ref, o pai sobrescrevia o filho — a ordem de anexo do
+                React é de baixo para cima — e a virtualização passava a ouvir
+                um container que quase nunca rola. Ver o comentário do
+                `useWindowedGrid`. */}
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflowY: 'auto', paddingTop: '40px' }}>
                 {selectedChannel && (
                     <div style={{
                         padding: '24px 20px 24px 60px',
