@@ -10,6 +10,7 @@ import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { ProfileSelector } from './pages/ProfileSelector';
 import { UpdateNotification } from './components/UpdateNotification';
+import { pedirAberturaDeFicha } from './services/abrirFicha';
 import { PostUpdateChangelog } from './components/PostUpdateChangelog';
 import { WebRemoteBridge } from './components/WebRemoteBridge';
 import { ReminderAutoTuneToast } from './components/ReminderAutoTuneToast';
@@ -86,7 +87,8 @@ function WindowShownBridge() {
 // Wrapper component to use navigate hook inside App
 function EpisodeToastWithNavigation() {
   const navigate = useNavigate();
-  return <EpisodeToast onNavigateToSeries={(seriesId) => navigate(`/dashboard/series?id=${seriesId}`)} />;
+  // Mesmo canal do painel de avisos: a página de Séries não lê `?id=`.
+  return <EpisodeToast onNavigateToSeries={(seriesId) => navigate(pedirAberturaDeFicha('series', seriesId))} />;
 }
 
 // Wraps a route element in an error boundary that auto-resets on navigation
