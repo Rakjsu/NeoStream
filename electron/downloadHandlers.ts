@@ -50,6 +50,27 @@ function getFileSizeSync(filePath: string): number {
     }
 }
 
+/**
+ * Uma varredura por rajada.
+ *
+ * `getFolderSize` é recursão SÍNCRONA no event loop do processo principal — o
+ * mesmo que está lendo os sockets dos downloads. O renderer pedia isso a cada
+ * evento de progresso; a tela já deixou de pedir (Downloads.tsx), e esta é a
+ * rede de segurança para o próximo chamador que não souber disso.
+ *
+ * TTL curto de propósito: é para engolir rajada, não para servir número velho.
+ */
+const TTL_ESPACO_MS = 1000;
+let espacoEmCache: { usado: number; ts: number } | null = null;
+
+function usoEmDisco(folderPath: string): number {
+    const agora = Date.now();
+    if (espacoEmCache && agora - espacoEmCache.ts < TTL_ESPACO_MS) return espacoEmCache.usado;
+    const usado = getFolderSize(folderPath);
+    espacoEmCache = { usado, ts: agora };
+    return usado;
+}
+
 function getFolderSize(folderPath: string): number {
     let totalSize = 0;
     try {
@@ -506,7 +527,7 @@ export function setupDownloadHandlers() {
     ipcMain.handle('download:get-storage-info', async () => {
         try {
             const downloadsPath = getDownloadsPath();
-            const used = getFolderSize(downloadsPath);
+            const used = usoEmDisco(downloadsPath);
 
             // Get real disk space using fs.statfs (Node.js 18.15+)
             let total = 100 * 1024 * 1024 * 1024; // Default fallback

@@ -252,3 +252,54 @@ describe('download:start — limpeza do intervalo de progresso', () => {
         expectNoZombieTimer()
     })
 })
+
+/**
+ * 💽 `download:get-storage-info` varre a pasta inteira de downloads, síncrono,
+ * no event loop do main — o mesmo que está lendo os sockets. A página pedia
+ * isso a cada evento de progresso (um por chunk de socket no caminho de
+ * conexão única). A tela já deixou de pedir; aqui fica a rede de segurança
+ * para o próximo chamador que não souber disso.
+ */
+describe('download:get-storage-info — uma varredura por rajada', () => {
+    beforeEach(() => {
+        // Date precisa ser falso: o TTL do cache é medido com Date.now().
+        vi.useFakeTimers({ toFake: ['Date'] })
+        state.handlers.clear()
+        state.userData = fs.mkdtempSync(path.join(os.tmpdir(), 'neostream-esp-'))
+        const raiz = path.join(state.userData, 'downloads')
+        fs.mkdirSync(path.join(raiz, 'series', 'S', 'Temporada 1'), { recursive: true })
+        fs.mkdirSync(path.join(raiz, 'movies'), { recursive: true })
+        fs.writeFileSync(path.join(raiz, 'movies', 'a.mp4'), Buffer.alloc(100))
+        fs.writeFileSync(path.join(raiz, 'series', 'S', 'Temporada 1', 'Ep1.mp4'), Buffer.alloc(200))
+        setupDownloadHandlers()
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
+        vi.restoreAllMocks()
+        fs.rmSync(state.userData, { recursive: true, force: true })
+    })
+
+    const espaco = async () => (await invoke('download:get-storage-info', {})) as { used: number }
+
+    it('vinte pedidos na mesma janela custam UMA varredura', async () => {
+        const espiao = vi.spyOn(fs, 'readdirSync')
+        expect((await espaco()).used).toBe(300)
+        const umaVarredura = espiao.mock.calls.length
+        expect(umaVarredura).toBeGreaterThan(1) // desceu nas subpastas mesmo
+
+        for (let i = 0; i < 20; i++) await espaco()
+
+        expect(espiao.mock.calls.length).toBe(umaVarredura)
+    })
+
+    it('passado o TTL, o número anda — o cache não mente pra sempre', async () => {
+        expect((await espaco()).used).toBe(300)
+
+        fs.rmSync(path.join(state.userData, 'downloads', 'series', 'S', 'Temporada 1', 'Ep1.mp4'))
+        expect((await espaco()).used).toBe(300) // ainda na janela
+
+        vi.advanceTimersByTime(1500)
+        expect((await espaco()).used).toBe(100)
+    })
+})
