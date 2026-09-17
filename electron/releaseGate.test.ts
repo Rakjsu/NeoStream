@@ -17,8 +17,20 @@ import path from 'node:path'
  */
 const WORKFLOW = path.join(__dirname, '..', '.github', 'workflows', 'release.yml')
 
+/**
+ * Lê o workflow normalizando a quebra de linha.
+ *
+ * O repositório entrega CRLF no Windows, que é justamente onde o CI roda: um
+ * padrão com quebra de linha cravada passa na máquina de quem escreveu (onde o
+ * arquivo foi salvo com LF) e quebra no CI. Foi exatamente o que aconteceu com
+ * este guarda quando ele nasceu.
+ */
+function lerWorkflow(): string {
+    return fs.readFileSync(WORKFLOW, 'utf-8').split('\r\n').join('\n')
+}
+
 describe('release.yml: portão antes de publicar', () => {
-    const fonte = fs.readFileSync(WORKFLOW, 'utf-8')
+    const fonte = lerWorkflow()
 
     it('existe um job de verificação que roda a suíte', () => {
         expect(fonte).toMatch(/^ {2}verificar:$/m)
