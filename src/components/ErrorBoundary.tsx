@@ -1,10 +1,18 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { languageService } from '../services/languageService';
+import { reportRendererError } from '../services/rendererErrorReport';
 
 /**
  * Per-page error boundary. A render crash in one page shows a themed fallback
  * (keeping the sidebar/layout intact) instead of taking down the whole app.
- * React swallows the thrown error before window.onerror, so we log it here in
- * componentDidCatch — the renderer error forwarder picks it up into main.log.
+ *
+ * O React engole o erro ANTES do `window.onerror`, então o relato tem que
+ * partir daqui, explicitamente: o `componentDidCatch` chama o
+ * `reportRendererError`. Antes ele só fazia `console.error` — e o comentário
+ * afirmava que a ponte do renderer levava dali pro main.log, o que nunca foi
+ * verdade (a ponte só escuta `error` e `unhandledrejection`, e ninguém
+ * sobrescreve o console). A única classe de erro que já tem tela de aviso era
+ * justamente a que não aparecia em relatório nenhum.
  *
  * Auto-resets when `resetKey` changes (pass the route pathname) so navigating
  * away from a crashed page clears the error without a manual retry.
@@ -36,8 +44,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     }
 
     componentDidCatch(error: Error, info: ErrorInfo) {
-        // Forwarded to main.log by the renderer error bridge.
         console.error(`[ErrorBoundary:${this.props.name}]`, error, info.componentStack);
+        // Explícito: o console não é ponte pra lugar nenhum.
+        reportRendererError(
+            `[ErrorBoundary:${this.props.name}] ${error.message}`,
+            error.stack || info.componentStack || undefined,
+        );
     }
 
     private handleRetry = () => this.setState({ error: null });
@@ -50,23 +62,26 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     render() {
         if (!this.state.error) return this.props.children;
 
+        // Componente de classe: sem hook. O `languageService.t` é o mesmo
+        // caminho que o DvrNotifyBridge e o episodeNotificationService já usam
+        // fora de React. A tela de crash não precisa reagir à troca de idioma.
+        const t = (key: string) => languageService.t('errorBoundary', key);
+
         return (
             <>
                 <style>{errorBoundaryStyles}</style>
                 <div className="eb-screen">
                     <div className="eb-card">
                         <div className="eb-icon">⚠️</div>
-                        <h2 className="eb-title">Algo deu errado nesta tela</h2>
-                        <p className="eb-msg">
-                            Tente novamente. Se persistir, volte ao início — o resto do app continua funcionando.
-                        </p>
+                        <h2 className="eb-title">{t('title')}</h2>
+                        <p className="eb-msg">{t('hint')}</p>
                         <p className="eb-detail">{this.state.error.message}</p>
                         <div className="eb-actions">
                             <button className="eb-btn eb-btn-primary" onClick={this.handleRetry}>
-                                Tentar novamente
+                                {t('retry')}
                             </button>
                             <button className="eb-btn" onClick={this.handleHome}>
-                                Voltar ao início
+                                {t('home')}
                             </button>
                         </div>
                     </div>

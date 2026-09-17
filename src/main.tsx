@@ -3,7 +3,7 @@ import './index.css'
 import App from './App.tsx'
 import { themeService } from './services/themeService'
 import { bootProfiler } from './services/bootProfiler'
-import { diagnosticsService } from './services/diagnosticsService'
+import { reportRendererError } from './services/rendererErrorReport'
 
 // Apply the persisted theme (CSS custom properties on <html>) before the
 // first render so themed surfaces never flash the default palette.
@@ -14,28 +14,9 @@ bootProfiler.mark('rendererStart')
 
 // Forward uncaught renderer errors to the main process so they land in
 // main.log — packaged-app bug reports were blind to the UI side.
-// Throttled so an error loop can't flood the log file.
-const REPORT_LIMIT = 20
-let reportedErrors = 0
-
-function reportRendererError(message: string, stack?: string, level: 'error' | 'warn' = 'error') {
-  // Always record into the in-memory diagnostics ring buffer (cheap, never
-  // persisted; only included in an export when the opt-in is enabled).
-  try {
-    diagnosticsService.record({ time: new Date().toISOString(), level, message })
-  } catch {
-    // Buffer unavailable — ignore.
-  }
-
-  if (reportedErrors >= REPORT_LIMIT) return
-  reportedErrors += 1
-  try {
-    window.ipcRenderer?.send('log:renderer', { level, message, stack })
-  } catch {
-    // Preload bridge unavailable (e.g. tests) — nothing to do.
-  }
-}
-
+// A função vive em `services/rendererErrorReport` porque o ErrorBoundary
+// também precisa dela: o React engole o erro de render antes destes dois
+// ouvintes, então o crash de tela não passava por aqui.
 window.addEventListener('error', (event) => {
   reportRendererError(event.message, event.error?.stack)
 })

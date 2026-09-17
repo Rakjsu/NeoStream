@@ -78,6 +78,9 @@ const CHAVES_DINAMICAS: Record<string, RegExp[]> = {
     notifications: [/^dvrFinished/],
     // weeklySummary.ts: wrapper de 1 argumento sobre a seção.
     stats: [/^weekly/],
+    // ErrorBoundary.tsx: componente de CLASSE, sem hook — wrapper de 1
+    // argumento sobre `languageService.t('errorBoundary', chave)`.
+    errorBoundary: [/^(title|hint|retry|home)$/],
 }
 
 /**
