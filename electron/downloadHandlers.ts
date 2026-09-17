@@ -84,8 +84,23 @@ function showDownloadNotification(name: string, filePath: string): void {
     }
 }
 
-// Download a single chunk with Range header
-function downloadChunk(url: string, start: number, end: number, tempPath: string, register?: (req: http.ClientRequest) => void): Promise<number> {
+/**
+ * Download a single chunk with Range header.
+ *
+ * `onBytes` recebe cada pedaço que CHEGA. Sem ele, o download paralelo só
+ * somava quando um `.partN` inteiro terminava: como as quatro conexões
+ * dividem a mesma banda e acabam quase juntas, a tela ficava sem barra
+ * nenhuma (ela só é desenhada com `progress > 0`) e sem "MB/s" durante quase
+ * todo o download, e então saltava em degraus de ~25%.
+ */
+function downloadChunk(
+    url: string,
+    start: number,
+    end: number,
+    tempPath: string,
+    register?: (req: http.ClientRequest) => void,
+    onBytes?: (bytes: number) => void
+): Promise<number> {
     return new Promise((resolve, reject) => {
         // ⏯ Resume real: aproveita o que o .partN já tem — o Range recomeça
         // do offset e o stream faz append; chunk completo nem vai pra rede.
@@ -118,7 +133,7 @@ function downloadChunk(url: string, start: number, end: number, tempPath: string
             if (response.statusCode === 301 || response.statusCode === 302) {
                 const redirectUrl = response.headers.location;
                 if (redirectUrl) {
-                    downloadChunk(redirectUrl, start, end, tempPath, register).then(resolve).catch(reject);
+                    downloadChunk(redirectUrl, start, end, tempPath, register, onBytes).then(resolve).catch(reject);
                     return;
                 }
             }
@@ -139,6 +154,7 @@ function downloadChunk(url: string, start: number, end: number, tempPath: string
 
             response.on('data', (chunk) => {
                 downloaded += chunk.length;
+                onBytes?.(chunk.length);
             });
 
             response.pipe(writeStream);
@@ -332,7 +348,16 @@ export function setupDownloadHandlers() {
                 });
             }
 
-            let totalDownloaded = 0;
+            // Bytes que já estavam no disco de uma tentativa anterior: sem
+            // isto, retomar um download de 80% mostraria a barra voltando a 0.
+            let totalDownloaded = chunks.reduce((soma, chunk) => {
+                try {
+                    const parcial = fs.statSync(`${filePath}.part${chunk.index}`).size;
+                    return soma + Math.min(parcial, chunk.end - chunk.start + 1);
+                } catch {
+                    return soma;
+                }
+            }, 0);
             progressInterval = setInterval(() => {
                 const progress = Math.round((totalDownloaded / totalBytes) * 100);
                 BrowserWindow.getAllWindows().forEach(win => {
@@ -348,8 +373,17 @@ export function setupDownloadHandlers() {
             entry = parallelEntry;
             activeDownloads.set(id, parallelEntry);
             const downloadPromises = chunks.map(chunk =>
-                downloadChunk(url, chunk.start, chunk.end, `${filePath}.part${chunk.index}`, req => parallelEntry.requests?.push(req))
-                    .then(bytes => { totalDownloaded += bytes; return bytes; })
+                downloadChunk(
+                    url,
+                    chunk.start,
+                    chunk.end,
+                    `${filePath}.part${chunk.index}`,
+                    req => parallelEntry.requests?.push(req),
+                    // Cada pedaço que chega conta na hora — é isto que faz a
+                    // barra andar e o "MB/s" (delta de downloadedBytes no
+                    // renderer) existir.
+                    bytes => { totalDownloaded += bytes; }
+                )
             );
 
             await Promise.all(downloadPromises);
