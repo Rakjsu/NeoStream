@@ -14,7 +14,7 @@ beforeEach(() => {
 
 afterEach(() => {
     store?.close()
-    fs.rmSync(dir, { recursive: true, force: true })
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 })
 })
 
 const dbPath = () => path.join(dir, 'catalog.db')

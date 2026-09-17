@@ -54,7 +54,7 @@ describe('diagnostics:export-log', () => {
     })
 
     afterEach(() => {
-        fs.rmSync(state.logsDir, { recursive: true, force: true })
+        fs.rmSync(state.logsDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 })
     })
 
     it('redige as credenciais em vez de copiar o log cru', async () => {
@@ -94,7 +94,7 @@ describe('diagnostics:export-report', () => {
     })
 
     afterEach(() => {
-        fs.rmSync(state.logsDir, { recursive: true, force: true })
+        fs.rmSync(state.logsDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 })
     })
 
     it('continua redigindo o trecho do log embutido no relatório', async () => {

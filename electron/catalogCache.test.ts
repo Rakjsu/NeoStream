@@ -40,7 +40,7 @@ describe('cachedCatalogFetch (stale-while-revalidate por playlist+kind, backend 
         closeCatalogStore()
         // Best-effort: um módulo resetado no teste pode segurar o handle do DB.
         try {
-            fs.rmSync(state.dir, { recursive: true, force: true })
+            fs.rmSync(state.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 })
         } catch { /* dir temporário fica pro SO limpar */ }
     })
 
