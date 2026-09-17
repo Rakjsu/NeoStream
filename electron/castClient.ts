@@ -44,6 +44,7 @@ import {
     extractRunningAppId,
     extractSessionId,
     extractMediaSessionId,
+    motivoDeRecusaDoCast,
     CAST_MEDIA_APP_ID,
     type CastMessage,
     type QueueItemStatus,
@@ -100,6 +101,8 @@ export class CastSession {
     // Consecutive IDLE/FINISHED statuses — playback (or the whole queue) ended
     // naturally. A few confirmations avoid closing on item-to-item transitions.
     private finishedStatuses = 0
+    /** Avisados quando o primeiro MEDIA_STATUS chega — ou quando a TV recusa. */
+    private loadListeners = new Set<(erro: Error | null) => void>()
     private mediaMeta: CastMediaMeta | null = null
     // Queue casts: one meta per item, aligned with the QUEUE_LOAD order, so the
     // status echoes the identity of whichever episode is CURRENTLY playing.
@@ -234,7 +237,21 @@ export class CastSession {
             this.notifyReceiverStatus(message)
             return
         }
+        if (message.namespace === NS_MEDIA) {
+            // A TV recusou a mídia (codec que ela não decodifica, URL que não
+            // abre, pedido inválido). Sem isto o app dizia "Transmitindo na TV"
+            // para sempre — ver motivoDeRecusaDoCast.
+            const recusa = motivoDeRecusaDoCast(payload)
+            if (recusa) {
+                log.error('[Cast]', this.deviceName, 'recusou a mídia:', recusa)
+                this.notificarCarga(new Error(`A TV recusou este vídeo (${recusa})`))
+                this.close()
+                return
+            }
+        }
         if (message.namespace === NS_MEDIA && payload.type === 'MEDIA_STATUS') {
+            // Chegou status: a mídia entrou. Solta quem espera pelo LOAD.
+            this.notificarCarga(null)
             const id = extractMediaSessionId(payload)
             if (id !== null) this.mediaSessionId = id
             const statusList = payload.status
@@ -302,6 +319,7 @@ export class CastSession {
             this.send(this.transportId!, NS_MEDIA, loadMediaPayload(this.requestId++, media, this.currentTime ?? 0))
         }
         log.info('[Cast] LOAD enviado para', this.deviceName, '(', media.live ? 'LIVE' : 'BUFFERED', ')')
+        await this.esperarCarga()
     }
 
     /** Connect, launch the receiver and QUEUE_LOAD a list of items. */
@@ -330,6 +348,7 @@ export class CastSession {
             }))
             this.send(this.transportId!, NS_MEDIA, queueLoadPayload(this.requestId++, resumeItems, resumeIdx))
         }
+        await this.esperarCarga()
         log.info('[Cast] QUEUE_LOAD enviado para', this.deviceName, `(${items.length} itens)`)
     }
 
@@ -453,6 +472,38 @@ export class CastSession {
         this.reconnecting = false
         this.closed = true
         log.warn('[Cast] desistindo da reconexão de', this.deviceName)
+    }
+
+    /** Solta quem espera pelo LOAD: `null` = entrou, Error = a TV recusou. */
+    private notificarCarga(erro: Error | null): void {
+        if (this.loadListeners.size === 0) return
+        for (const ouvinte of [...this.loadListeners]) ouvinte(erro)
+        this.loadListeners.clear()
+    }
+
+    /**
+     * Espera o primeiro sinal do LOAD: um MEDIA_STATUS (entrou) ou a recusa.
+     *
+     * No silêncio, RESOLVE — não rejeita. Uma TV lenta que demora mais que o
+     * tempo de espera continua com a sessão de pé, exatamente como hoje; o que
+     * muda é só o caso em que ela DIZ que recusou. Falhar no silêncio trocaria
+     * um defeito visível por um pior: derrubar cast que estava funcionando.
+     */
+    private esperarCarga(): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
+            const ouvinte = (erro: Error | null) => {
+                clearTimeout(timer)
+                this.loadListeners.delete(ouvinte)
+                if (erro) reject(erro)
+                else resolve()
+            }
+            const timer = setTimeout(() => {
+                this.loadListeners.delete(ouvinte)
+                log.warn('[Cast]', this.deviceName, 'não respondeu ao LOAD a tempo — seguindo assim mesmo')
+                resolve()
+            }, LAUNCH_TIMEOUT_MS)
+            this.loadListeners.add(ouvinte)
+        })
     }
 
     /** Wait for a RECEIVER_STATUS that satisfies `accept`, capturing transportId. */

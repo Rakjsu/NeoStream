@@ -462,3 +462,42 @@ export function extractMediaSessionId(mediaStatusJson: unknown): number | null {
     }
     return null
 }
+
+/**
+ * 📺 A TV recusou o vídeo?
+ *
+ * O `handleMessage` só olhava `MEDIA_STATUS`: `LOAD_FAILED`, `LOAD_CANCELLED` e
+ * `INVALID_REQUEST` eram jogados fora sem uma linha de log. Com uma mídia que o
+ * Chromecast não decodifica (MKV é o caso comum), o modal fechava dizendo
+ * sucesso, a pílula "Transmitindo na TV" aparecia — e não saía mais: o fim
+ * natural da sessão exige `idleReason: 'FINISHED'`, e um LOAD recusado devolve
+ * `'ERROR'`. Só reiniciar o app tirava a barra.
+ *
+ * Devolve o motivo em texto quando o payload é uma recusa, e `null` quando não
+ * é — inclusive para o `MEDIA_STATUS` normal, que é a esmagadora maioria.
+ */
+export function motivoDeRecusaDoCast(payload: unknown): string | null {
+    if (payload === null || typeof payload !== 'object') return null
+    const p = payload as Record<string, unknown>
+    const tipo = typeof p.type === 'string' ? p.type : ''
+
+    if (tipo === 'LOAD_FAILED' || tipo === 'LOAD_CANCELLED' || tipo === 'INVALID_REQUEST') {
+        const detalhe = typeof p.reason === 'string' && p.reason ? p.reason
+            : typeof p.detailedErrorCode === 'number' ? `código ${p.detailedErrorCode}`
+                : ''
+        return detalhe ? `${tipo} (${detalhe})` : tipo
+    }
+
+    // A recusa também chega como status: IDLE com idleReason ERROR. Sem isto, a
+    // sessão fica viva esperando um FINISHED que nunca vem.
+    if (tipo === 'MEDIA_STATUS') {
+        const lista = p.status
+        if (!Array.isArray(lista)) return null
+        for (const entrada of lista) {
+            if (entrada === null || typeof entrada !== 'object') continue
+            const st = entrada as { playerState?: unknown; idleReason?: unknown }
+            if (st.playerState === 'IDLE' && st.idleReason === 'ERROR') return 'IDLE (ERROR)'
+        }
+    }
+    return null
+}
