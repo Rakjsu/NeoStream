@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '../../services/languageService';
-import { collectBackup, applyBackup, decryptBackup, encodePlaylistPassword, encryptBackup, decodePlaylistPassword, isEncryptedBackup, type BackupPlaylist } from '../../services/backupService';
+import { collectBackup, applyBackup, decryptBackup, encryptBackup, isEncryptedBackup, toBackupPlaylist, toPlaylistImport, type BackupPlaylist, type MainPlaylistPayload } from '../../services/backupService';
 import { useSaveAnimation } from './useSaveAnimation';
 
 interface BackupFileResult {
@@ -99,15 +99,10 @@ export function BackupSection() {
             try {
                 const exported = await window.ipcRenderer.invoke('backup:export-playlists') as {
                     success: boolean;
-                    playlists?: { name: string; url: string; username: string; password: string }[];
+                    playlists?: MainPlaylistPayload[];
                 };
                 if (exported.success && exported.playlists) {
-                    playlists = exported.playlists.map(p => ({
-                        name: p.name,
-                        url: p.url,
-                        username: p.username,
-                        passwordB64: encodePlaylistPassword(p.password)
-                    }));
+                    playlists = exported.playlists.map(toBackupPlaylist);
                 }
             } catch { /* main handler absent in old builds — export without playlists */ }
 
@@ -181,12 +176,7 @@ export function BackupSection() {
             if (report.playlists.length > 0) {
                 try {
                     await window.ipcRenderer.invoke('backup:import-playlists', {
-                        playlists: report.playlists.map(p => ({
-                            name: p.name,
-                            url: p.url,
-                            username: p.username,
-                            password: decodePlaylistPassword(p.passwordB64)
-                        }))
+                        playlists: report.playlists.map(toPlaylistImport)
                     });
                 } catch (error) {
                     console.error('[Backup] Playlist import failed:', error);

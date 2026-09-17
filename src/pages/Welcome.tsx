@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Tv, Plus, Settings, Sparkles, X, Globe, Link2, Archive, ArrowLeft } from 'lucide-react';
 import { useLanguage, languageService } from '../services/languageService';
 import { playlistService } from '../services/playlistService';
-import { applyBackup, decodePlaylistPassword } from '../services/backupService';
+import { applyBackup, toPlaylistImport } from '../services/backupService';
 
 // First-run onboarding: step 1 picks the language, step 2 offers the three
 // ways in (Xtream account, M3U list, restore a backup). The page only renders
@@ -67,12 +67,7 @@ export function Welcome() {
             const report = applyBackup(JSON.parse(result.json));
             if (report.playlists.length > 0) {
                 await window.ipcRenderer.invoke('backup:import-playlists', {
-                    playlists: report.playlists.map(p => ({
-                        name: p.name,
-                        url: p.url,
-                        username: p.username,
-                        password: decodePlaylistPassword(p.passwordB64)
-                    }))
+                    playlists: report.playlists.map(toPlaylistImport)
                 }).catch(() => undefined);
             }
             // v3: the backup carries the OpenSubtitles credentials too.

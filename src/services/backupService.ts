@@ -32,12 +32,30 @@
 export const BACKUP_VERSION = 3;
 export const BACKUP_APP = 'neostream';
 
+/** O trio que o main sabe rotear; qualquer outra coisa no arquivo é lixo. */
+export type PlaylistKind = 'xtream' | 'm3u' | 'stalker';
+
 export interface BackupPlaylist {
     name: string;
     url: string;
     username: string;
     /** base64(password) — see header note. */
     passwordB64: string;
+    /**
+     * v2+, opcional: sem ele a lista M3U e o portal Stalker renasciam sem tipo
+     * na outra máquina e o main os tratava como Xtream — voltavam do backup e
+     * nunca mais abriam. Ausente em arquivos escritos por builds antigas.
+     */
+    type?: PlaylistKind;
+}
+
+/** O formato que `backup:export-playlists` devolve e `backup:import-playlists` aceita. */
+export interface MainPlaylistPayload {
+    name: string;
+    url: string;
+    username: string;
+    password: string;
+    type?: PlaylistKind;
 }
 
 export interface BackupOpenSubtitles {
@@ -188,6 +206,10 @@ export function decodePlaylistPassword(passwordB64: string): string {
     return decodeURIComponent(escape(atob(passwordB64)));
 }
 
+export function isPlaylistKind(value: unknown): value is PlaylistKind {
+    return value === 'xtream' || value === 'm3u' || value === 'stalker';
+}
+
 /** Validates and normalizes the optional v2 playlists array from a parsed file. */
 export function sanitizeBackupPlaylists(raw: unknown): BackupPlaylist[] {
     if (!Array.isArray(raw)) return [];
@@ -206,10 +228,43 @@ export function sanitizeBackupPlaylists(raw: unknown): BackupPlaylist[] {
             name: typeof p.name === 'string' ? p.name : '',
             url: p.url,
             username: p.username,
-            passwordB64: p.passwordB64
+            passwordB64: p.passwordB64,
+            // Tipo desconhecido no arquivo cai fora aqui: o main não pode
+            // receber do renderer um valor que ele não sabe rotear.
+            ...(isPlaylistKind(p.type) ? { type: p.type } : {})
         });
     }
     return result;
+}
+
+/**
+ * Os dois mapeadores do payload de playlist, num lugar só.
+ *
+ * Os três chamadores (App.tsx no auto-backup e no sync, BackupSection.tsx na
+ * exportação e na restauração, Welcome.tsx na instalação nova) copiavam campo
+ * a campo, e foi assim que o `type` ficou de fora das CINCO cópias de uma vez:
+ * o TypeScript não liga o main ao renderer (tsconfig.node × tsconfig.app, e
+ * `src/` não importa nada de `electron/`), então campo esquecido aqui não
+ * acusa em lugar nenhum. Chamador novo usa estes dois e nasce completo.
+ */
+export function toBackupPlaylist(p: MainPlaylistPayload): BackupPlaylist {
+    return {
+        name: p.name,
+        url: p.url,
+        username: p.username,
+        passwordB64: encodePlaylistPassword(p.password),
+        ...(isPlaylistKind(p.type) ? { type: p.type } : {})
+    };
+}
+
+export function toPlaylistImport(p: BackupPlaylist): MainPlaylistPayload {
+    return {
+        name: p.name,
+        url: p.url,
+        username: p.username,
+        password: decodePlaylistPassword(p.passwordB64),
+        ...(isPlaylistKind(p.type) ? { type: p.type } : {})
+    };
 }
 
 /** Validates the optional v3 OpenSubtitles block; null when absent/corrupted. */
