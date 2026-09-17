@@ -15,9 +15,56 @@ interface ActiveRecording {
     startedAt: number
     seconds: number
     proc: ChildProcessWithoutNullStreams
+    graceTimer?: ReturnType<typeof setTimeout>
 }
 
 const active = new Map<string, ActiveRecording>()
+
+// O 'exit' avisa que o processo morreu; o 'close' só chega quando os pipes dele
+// fecham. No Windows um filho do Chromium nascido na mesma janela de tempo pode
+// herdar o handle do pipe de stderr do ffmpeg — aí o 'close' NUNCA vem e a
+// entrada ficaria "gravando" pra sempre. O grace dá esse tempo pro 'close'
+// chegar (o caminho normal) e finaliza de qualquer jeito se ele faltar.
+const EXIT_CLOSE_GRACE_MS = 8000
+
+/**
+ * Pede pro ffmpeg finalizar ('q' no stdin) sem derrubar o main process.
+ * Um pipe já fechado pode lançar na hora OU emitir EPIPE depois — e o EPIPE
+ * assíncrono vira "Uncaught Exception" se o stream não tiver ouvinte de
+ * 'error' (o try/catch não alcança). Daí o ouvinte mudo no spawn + os guards.
+ */
+function askFfmpegToFinish(rec: ActiveRecording) {
+    const stdin = rec.proc.stdin
+    if (!stdin || stdin.destroyed || stdin.writableEnded) return
+    try { stdin.write('q') } catch { /* pipe já fechado */ }
+}
+
+// Gravações que acabaram sozinhas há pouco (provedor caiu, stream terminou). O
+// ⏹ do painel/celular chega com o id da última listagem que ele viu; sem esta
+// memória curta a resposta seria "Gravação não encontrada" — um erro na cara
+// do usuário para algo que já está exatamente como ele pediu.
+const finished = new Map<string, { file: string; seconds: number }>()
+const FINISHED_MEMORY = 30
+
+function rememberFinished(rec: ActiveRecording) {
+    finished.set(rec.id, { file: rec.file, seconds: rec.seconds })
+    while (finished.size > FINISHED_MEMORY) {
+        const oldest = finished.keys().next().value
+        if (oldest === undefined) break
+        finished.delete(oldest)
+    }
+}
+
+/** Tira a gravação do mapa e avisa o renderer — uma vez só (idempotente). */
+function finalizeRecording(rec: ActiveRecording, code: number | null, extra?: { error?: string }) {
+    if (rec.graceTimer) {
+        clearTimeout(rec.graceTimer)
+        rec.graceTimer = undefined
+    }
+    if (!active.delete(rec.id)) return
+    rememberFinished(rec)
+    broadcast('dvr:stopped', { id: rec.id, file: rec.file, seconds: rec.seconds, code, ...extra })
+}
 
 /** How many recordings are running right now (drives the tray hold-on-close). */
 export function activeRecordingCount(): number {
@@ -108,6 +155,13 @@ export function setupDvrHandlers() {
                 try { fs.appendFileSync(path.join(e2eDir, 'dvr-pids.txt'), `${proc.pid}\n`) } catch { /* best-effort */ }
             }
 
+            // Sem este ouvinte, um EPIPE assíncrono no stdin (o ffmpeg morreu
+            // entre o guard e o write) sobe como exceção não tratada e o
+            // Electron abre o diálogo de erro do main process.
+            proc.stdin.on('error', (err) => {
+                log.warn(`[DVR] stdin de ${id} indisponível:`, err)
+            })
+
             proc.stderr.on('data', (chunk: Buffer) => {
                 const secs = parseFfmpegTime(chunk.toString())
                 if (secs !== null && active.has(id)) {
@@ -117,17 +171,23 @@ export function setupDvrHandlers() {
             })
 
             proc.on('close', (code) => {
-                const wasActive = active.delete(id)
                 log.info(`[DVR] Recording ${id} closed (code ${code})`)
-                if (wasActive) {
-                    broadcast('dvr:stopped', { id, file: rec.file, seconds: rec.seconds, code })
-                }
+                finalizeRecording(rec, code)
+            })
+
+            // Rede de segurança do 'close' que pode não vir: o 'exit' sempre
+            // dispara quando o processo morre (ver EXIT_CLOSE_GRACE_MS).
+            proc.on('exit', (code) => {
+                if (!active.has(id) || rec.graceTimer) return
+                rec.graceTimer = setTimeout(() => {
+                    log.warn(`[DVR] Recording ${id} exited (code ${code}) but 'close' never fired — finalizing after grace`)
+                    finalizeRecording(rec, code)
+                }, EXIT_CLOSE_GRACE_MS)
             })
 
             proc.on('error', (err) => {
                 log.error(`[DVR] ffmpeg error for ${id}:`, err)
-                active.delete(id)
-                broadcast('dvr:stopped', { id, file: rec.file, seconds: rec.seconds, error: String(err) })
+                finalizeRecording(rec, null, { error: String(err) })
             })
 
             return { success: true, id, file }
@@ -249,11 +309,22 @@ export function setupDvrHandlers() {
 
     ipcMain.handle('dvr:stop', async (_e, data: { id: string }) => {
         const rec = active.get(data?.id)
-        if (!rec) return { success: false, error: 'Gravação não encontrada' }
-        try {
-            // Ask ffmpeg to finalize cleanly; force-kill if it lingers.
-            rec.proc.stdin.write('q')
-        } catch { /* stdin may already be closed */ }
+        if (!rec) {
+            // Terminou sozinha entre a listagem e o toque no ⏹: o pedido já
+            // está atendido, então é sucesso — não erro na cara do usuário.
+            const done = finished.get(data?.id)
+            if (done) return { success: true, file: done.file, alreadyStopped: true }
+            return { success: false, error: 'Gravação não encontrada' }
+        }
+        // Processo já morreu (esperando o 'close' ou o grace): parar o que já
+        // parou é trivialmente verdade. Finaliza agora, em vez de escrever num
+        // stdin morto e deixar o celular ver um erro.
+        if (rec.proc.exitCode !== null || rec.proc.signalCode !== null) {
+            finalizeRecording(rec, rec.proc.exitCode)
+            return { success: true, file: rec.file }
+        }
+        // Ask ffmpeg to finalize cleanly; force-kill if it lingers.
+        askFfmpegToFinish(rec)
         setTimeout(() => {
             if (active.has(rec.id)) {
                 try { rec.proc.kill('SIGKILL') } catch { /* already gone */ }
@@ -351,7 +422,7 @@ export function setupDvrHandlers() {
         // o segundo before-quit (do app.quit() abaixo) passa direto.
         active.clear()
         for (const rec of pending) {
-            try { rec.proc.stdin.write('q') } catch { /* stdin já fechado */ }
+            askFfmpegToFinish(rec)
         }
         let remaining = pending.length
         let resumed = false

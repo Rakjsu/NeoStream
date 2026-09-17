@@ -13,9 +13,10 @@ import path from 'node:path'
  * arquivo continua com o selo GRAVANDO e com ✏️/🎞️/📤/🗑 travados por
  * `disabled={rec.recording}`, até alguém fechar e reabrir o painel.
  *
- * O main já avisa: `broadcast('dvr:stopped', ...)` nos dois desfechos do
- * ffmpeg (close e error), canal já liberado no preload (`receiveChannels`) e
- * já consumido pelo DvrNotifyBridge. Faltava a página assinar.
+ * O main já avisa: `broadcast('dvr:stopped', ...)` em todos os desfechos do
+ * ffmpeg (close, exit-sem-close e error), hoje centralizados no
+ * `finalizeRecording`; canal já liberado no preload (`receiveChannels`) e já
+ * consumido pelo DvrNotifyBridge. Faltava a página assinar.
  *
  * O guarda é estrutural porque o repositório não tem `@testing-library/react`
  * (não há um único `*.test.tsx` na árvore), então não dá pra montar a página
@@ -42,12 +43,27 @@ describe('gravação que termina sozinha perde o selo GRAVANDO', () => {
         expect((texto.match(/disabled=\{rec\.recording/g) ?? []).length).toBeGreaterThanOrEqual(3)
     })
 
-    it('o main de fato avisa o fim da gravação nos DOIS desfechos do ffmpeg', () => {
+    it('o main de fato avisa o fim da gravação em TODOS os desfechos do ffmpeg', () => {
         // O conserto do renderer só existe porque este broadcast existe. Se
         // alguém trocar o nome do canal ou remover um dos ramos, o listener
         // da página cala sem avisar.
+        //
+        // O aviso é UM só desde o grace pós-'exit' (mora no `finalizeRecording`,
+        // que é idempotente de propósito); os desfechos do processo é que são
+        // três. Quem não passar pelo helper deixa a entrada órfã no mapa — o
+        // comportamento está coberto em `dvrHandlers.test.ts`, aqui fica a
+        // ponta estrutural: nenhum dos três ramos pode sumir.
         const main = fonte(DVR_HANDLERS)
-        expect((main.match(/broadcast\('dvr:stopped'/g) ?? []).length).toBeGreaterThanOrEqual(2)
+        const inicio = main.indexOf("ipcMain.handle('dvr:start'")
+        const fim = main.indexOf("ipcMain.handle('dvr:rename-file'")
+        expect(inicio).toBeGreaterThan(-1)
+        expect(fim).toBeGreaterThan(inicio)
+        const gravar = main.slice(inicio, fim)
+        for (const evento of ["proc.on('close'", "proc.on('exit'", "proc.on('error'"]) {
+            expect(gravar.includes(evento), `dvr:start não trata ${evento})`).toBe(true)
+        }
+        expect((gravar.match(/finalizeRecording\(/g) ?? []).length).toBeGreaterThanOrEqual(3)
+        expect((main.match(/broadcast\('dvr:stopped'/g) ?? []).length).toBeGreaterThanOrEqual(1)
         // ...e o canal está liberado para o renderer (senão o `on` lança).
         expect(fonte(PRELOAD).includes("'dvr:stopped',")).toBe(true)
     })
