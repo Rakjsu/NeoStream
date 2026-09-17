@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { pedirAberturaDeFicha } from '../services/abrirFicha';
 import { normalizeTitle } from '../services/personSearchHelpers';
@@ -207,6 +207,24 @@ export function ContentDetailModal({
     };
 
     // Fetch series info for episodes
+    /**
+     * Toca o que está selecionado, preferindo o arquivo já baixado.
+     *
+     * Fica numa função só porque há DUAS portas para a mesma ação — o botão
+     * azul e o Enter do teclado — e só uma delas resolvia o arquivo local. A
+     * outra tocava o stream do provedor com a ficha dizendo "Offline".
+     */
+    const tocarSelecionado = useCallback(() => {
+        const localPath = contentType === 'movie'
+            ? downloadService.getOfflineFilePath(contentData.name, 'movie')
+            : downloadService.getOfflineEpisodePath(contentData.name, selectedSeason, selectedEpisode);
+        onPlay(
+            contentType === 'series' ? selectedSeason : undefined,
+            contentType === 'series' ? selectedEpisode : undefined,
+            localPath || undefined
+        );
+    }, [contentType, contentData.name, selectedSeason, selectedEpisode, onPlay]);
+
     useEffect(() => {
         if (!isOpen || contentType !== 'series') return;
 
@@ -402,12 +420,12 @@ export function ContentDetailModal({
                 const prevEp = eps[Math.max(idx - 1, 0)];
                 if (prevEp) setSelectedEpisode(Number(prevEp.episode_num));
             } else if (e.key === 'Enter') {
-                onPlay(selectedSeason, selectedEpisode);
+                tocarSelecionado();
             }
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, [isOpen, contentType, seriesInfo, selectedSeason, selectedEpisode, onPlay]);
+    }, [isOpen, contentType, seriesInfo, selectedSeason, selectedEpisode, tocarSelecionado]);
 
     // Close when clicking outside
     const handleBackdropClick = (e: React.MouseEvent) => {
@@ -1041,23 +1059,7 @@ export function ContentDetailModal({
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                         {/* Play Button */}
                         <button
-                            onClick={() => {
-                                // Check for offline content
-                                let offlineUrl: string | undefined;
-                                if (contentType === 'movie') {
-                                    const localPath = downloadService.getOfflineFilePath(contentData.name, 'movie');
-                                    if (localPath) offlineUrl = localPath;
-                                } else {
-                                    const localPath = downloadService.getOfflineEpisodePath(contentData.name, selectedSeason, selectedEpisode);
-                                    if (localPath) offlineUrl = localPath;
-                                }
-
-                                onPlay(
-                                    contentType === 'series' ? selectedSeason : undefined,
-                                    contentType === 'series' ? selectedEpisode : undefined,
-                                    offlineUrl
-                                );
-                            }}
+                            onClick={tocarSelecionado}
                             style={{
                                 flex: 1,
                                 minWidth: 200,

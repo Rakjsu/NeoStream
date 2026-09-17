@@ -67,6 +67,8 @@ export function Series() {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [selectedSeries, setSelectedSeries] = useState<Series | null>(null);
     const [playingSeries, setPlayingSeries] = useState<Series | null>(null);
+    // Caminho do episodio baixado, quando a ficha resolveu um (ver handlePlaySeries).
+    const [offlineEpisodeUrl, setOfflineEpisodeUrl] = useState<string | null>(null);
     const [pipResumeTime, setPipResumeTime] = useState<number | null>(null);
     const [selectedSeason, setSelectedSeason] = useState<number>(1);
     const [selectedEpisode, setSelectedEpisode] = useState<number>(1);
@@ -354,7 +356,18 @@ export function Series() {
     // Season/episode entram por parâmetro: quem chama pode ter acabado de fazer
     // setSelectedSeason/Episode no mesmo tick, e o state ainda seria o antigo —
     // o prompt de retomada acabava mostrando o progresso de outro episódio.
-    const handlePlaySeries = (seriesItem: Series, season = selectedSeason, episode = selectedEpisode) => {
+    const handlePlaySeries = (
+        seriesItem: Series,
+        season = selectedSeason,
+        episode = selectedEpisode,
+        offlineUrl?: string
+    ) => {
+        // 📥 O caminho do arquivo baixado chega da ficha e precisa sobreviver
+        // até o buildSeriesStreamUrl: a ficha já resolvia o arquivo, pintava o
+        // botão de ciano e escrevia "Offline T1 E1" — e a página jogava o
+        // terceiro parâmetro fora, tocando o stream do provedor. Quem baixou o
+        // episódio para ver sem internet via exatamente o oposto do prometido.
+        setOfflineEpisodeUrl(offlineUrl ?? null);
         // Check for existing progress
         const progress = watchProgressService.getEpisodeProgress(
             String(seriesItem.series_id),
@@ -377,6 +390,9 @@ export function Series() {
 
     const buildSeriesStreamUrl = async (seriesItem: Series): Promise<string> => {
         void seriesItem;
+        // Arquivo no disco vence o provedor — mesmo desenho do VOD.tsx, que já
+        // devolve `movie.offlineUrl` antes de pedir a URL do stream.
+        if (offlineEpisodeUrl) return offlineEpisodeUrl;
         try {
             const episodes = seriesInfo?.episodes?.[selectedSeason];
             const episode = episodes?.find((ep) => Number(ep.episode_num) === selectedEpisode);
@@ -836,12 +852,12 @@ export function Series() {
                         rating: selectedSeries.rating,
                         youtube_trailer: selectedSeries.youtube_trailer
                     }}
-                    onPlay={(season, episode) => {
+                    onPlay={(season, episode, offlineUrl) => {
                         const nextSeason = season || 1;
                         const nextEpisode = episode || 1;
                         setSelectedSeason(nextSeason);
                         setSelectedEpisode(nextEpisode);
-                        handlePlaySeries(selectedSeries, nextSeason, nextEpisode);
+                        handlePlaySeries(selectedSeries, nextSeason, nextEpisode, offlineUrl);
                     }}
                 />
             )}
