@@ -105,10 +105,22 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-      - name: Upload Playwright report on failure
-        if: failure()
+      # O relatório HTML importa MAIS quando o job passa: com `retries: 1` o
+      # teste que é moeda falha, repete, passa — e só o HTML guarda o
+      # error-context da tentativa perdida. Com `if: failure()` esse era
+      # justamente o único caso sem artefato (foi assim que o trayRestore
+      # sobreviveu semanas se passando por "flaky").
+      - name: Upload Playwright report
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
+          # Tem que ser a mesma pasta do reporter html do playwright.config.ts:
+          # é esse par que faz o relatório chegar ao artefato (electron/
+          # rastroDoE2eInstavel.test.ts amarra as duas pontas).
           path: playwright-report/
           retention-days: 7
+          # Rodando sempre, o passo também pega o job que morreu antes do
+          # Playwright (npm ci, vite build): sem isto o upload vazio vira aviso
+          # amarelo — mesmo motivo dos dois passos acima.
+          if-no-files-found: ignore
