@@ -5,9 +5,12 @@ import { epgService } from '../services/epgService';
 import { scanEpgForKeywords } from '../services/epgKeywordAlertService';
 import { profileService } from '../services/profileService';
 import { parentalService } from '../services/parentalService';
+import { favoritesService } from '../services/favoritesService';
 import { useLanguage } from '../services/languageService';
 import {
     categoryHue,
+    FAVORITES_CATEGORY,
+    guideCategoryStreams,
     getGuideWindow,
     listGuideDays,
     windowForDay,
@@ -152,6 +155,12 @@ export function EpgGuide() {
     const scrollRef = useRef<HTMLDivElement>(null);
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const { t } = useLanguage();
+
+    // ⭐ Favoritos como categoria, igual à TV ao vivo. Instantâneo da
+    // montagem: a rota é lazy (App.tsx:363) e a grade não favorita nada.
+    const [favoriteChannelIds] = useState<Set<string>>(
+        () => new Set(favoritesService.getAll().filter(f => f.type === 'channel').map(f => f.id))
+    );
 
     // Pageable window (◀/▶ shift it by 2h; "Hoje/Agora" resets to default).
     const [guideWindow, setGuideWindow] = useState(() => getGuideWindow());
@@ -300,8 +309,8 @@ export function EpgGuide() {
     }, [epgByChannel]);
 
     const categoryStreams = useMemo(
-        () => streams.filter(s => s.category_id === selectedCategory),
-        [streams, selectedCategory]
+        () => guideCategoryStreams(streams, selectedCategory, favoriteChannelIds),
+        [streams, selectedCategory, favoriteChannelIds]
     );
     // O filtro de gênero é o ÚNICO recorte que depende do EPG carregado. Sem
     // ele a lista é devolvida com a MESMA identidade, para que um canal que
@@ -581,6 +590,11 @@ export function EpgGuide() {
                         maxWidth: '320px'
                     }}
                 >
+                    {/* ⭐ some no perfil infantil pelo mesmo motivo do
+                        CategoryMenu.tsx:710-713: a lista é do adulto. */}
+                    {!isKidsProfile && favoriteChannelIds.size > 0 && (
+                        <option value={FAVORITES_CATEGORY}>⭐ {t('categories', 'favoriteChannels')}</option>
+                    )}
                     {categories.map(cat => (
                         <option key={cat.category_id} value={cat.category_id}>
                             {cat.category_name}

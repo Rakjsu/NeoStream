@@ -232,6 +232,35 @@ export function categoryHue(key: string): number {
     return hash % 360;
 }
 
+/**
+ * ⭐ Sentinela da categoria Favoritos — o MESMO texto que a TV ao vivo já usa
+ * (`CategoryMenu.tsx:716` emite, `LiveTV.tsx:567` compara). Provedor nenhum
+ * devolve um `category_id` com esse valor, então ele nunca colide com uma
+ * categoria de verdade.
+ */
+export const FAVORITES_CATEGORY = 'FAVORITES';
+
+/**
+ * Canais da categoria escolhida na grade.
+ *
+ * ⚠️ Em ⭐ o recorte é uma INTERSEÇÃO com `streams`, nunca a lista de
+ * favoritos: `streams` chega da página já peneirado pelas categorias
+ * permitidas (parental / perfil infantil, EpgGuide.tsx:255-268). Montar a
+ * grade a partir do `favoritesService` cru faria reaparecer no guia um canal
+ * adulto favoritado ANTES de o usuário ligar o controle parental — o mesmo
+ * bug que o comentário de `LiveTV.tsx:561-566` descreve como já corrigido lá.
+ */
+export function guideCategoryStreams<T extends { stream_id: number; category_id: string }>(
+    streams: T[],
+    selectedCategory: string,
+    favoriteChannelIds: Set<string>
+): T[] {
+    if (selectedCategory === FAVORITES_CATEGORY) {
+        return streams.filter(s => favoriteChannelIds.has(String(s.stream_id)));
+    }
+    return streams.filter(s => s.category_id === selectedCategory);
+}
+
 const DAY_OPTION_HOUR = 8;
 
 /**
