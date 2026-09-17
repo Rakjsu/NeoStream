@@ -117,3 +117,77 @@ describe('watchProgressService — saveVideoTime ignora duração inválida', ()
         expect(watchProgressService.getEpisodeProgress('s9', 2, 1)?.currentTime).toBe(600);
     });
 });
+
+/**
+ * 🏆 "Séries Finalizadas" é item de menu e selo de card — e `isSeriesCompleted`
+ * devolvia `false` cravado, então a categoria abria sempre vazia, o ✓ nunca
+ * desenhava e a barra de progresso continuava aparecendo em série terminada.
+ *
+ * O total vem do vigia de novos episódios, na MESMA chave por (perfil,
+ * playlist) do progresso — aqui o mock compõe `${base}_${perfil}__pl_${playlist}`.
+ */
+describe('watchProgressService — série concluída', () => {
+    const gravarTotal = (total: number, playlist = 'plA') => {
+        localStorage.setItem(
+            `series_episode_data_p1__pl_${playlist}`,
+            JSON.stringify({ s1: { lastKnownEpisodes: total } })
+        );
+    };
+
+    beforeEach(() => {
+        localStorage.clear();
+        activeId = 'p1';
+        playlistId = 'plA';
+    });
+
+    it('vista até o fim, a série conta como concluída', () => {
+        gravarTotal(3);
+        watchProgressService.markEpisodeWatched('s1', 1, 1);
+        watchProgressService.markEpisodeWatched('s1', 1, 2);
+        watchProgressService.markEpisodeWatched('s1', 1, 3);
+
+        expect(watchProgressService.isSeriesCompleted('s1')).toBe(true);
+    });
+
+    it('amostra parcial não vira série concluída', () => {
+        // A armadilha de "todo episódio REGISTRADO está completo": com 1 de 10
+        // vistos, a série sumiria do "Continuar assistindo" e ganharia o ✓.
+        gravarTotal(10);
+        watchProgressService.markEpisodeWatched('s1', 1, 1);
+
+        expect(watchProgressService.isSeriesCompleted('s1')).toBe(false);
+    });
+
+    it('sem total conhecido, não arrisca', () => {
+        // M3U e Stalker nunca ganham total; e mesmo no Xtream a primeira
+        // varredura só acontece alguns segundos depois de abrir o app.
+        watchProgressService.markEpisodeWatched('s1', 1, 1);
+        expect(watchProgressService.isSeriesCompleted('s1')).toBe(false);
+
+        gravarTotal(0);
+        expect(watchProgressService.isSeriesCompleted('s1')).toBe(false);
+    });
+
+    it('o total de uma playlist não vale para a outra', () => {
+        // `series_id` do Xtream é um inteiro por provedor e colide entre
+        // playlists. Com a chave só por perfil, o total da A marcaria a série
+        // de mesmo id da B como concluída — falso positivo, pior que o bug.
+        gravarTotal(3, 'plA');
+
+        playlistId = 'plB';
+        watchProgressService.markEpisodeWatched('s1', 1, 1);
+        watchProgressService.markEpisodeWatched('s1', 1, 2);
+        watchProgressService.markEpisodeWatched('s1', 1, 3);
+
+        expect(watchProgressService.isSeriesCompleted('s1')).toBe(false);
+    });
+
+    it('episódio deixado pela metade não conta como concluído', () => {
+        gravarTotal(3);
+        watchProgressService.markEpisodeWatched('s1', 1, 1);
+        watchProgressService.markEpisodeWatched('s1', 1, 2);
+        watchProgressService.saveVideoTime('s1', 1, 3, 600, 1200);
+
+        expect(watchProgressService.isSeriesCompleted('s1')).toBe(false);
+    });
+});

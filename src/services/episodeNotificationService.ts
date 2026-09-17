@@ -2,6 +2,7 @@
 // Centralized notification system for all app notifications
 
 import { profileService } from './profileService';
+import { playlistScopedKey } from './activePlaylistService';
 import { favoritesService } from './favoritesService';
 import { watchProgressService } from './watchProgressService';
 import { languageService } from './languageService';
@@ -69,10 +70,25 @@ class AppNotificationService {
         return `${suffix}_${activeProfile.id}`;
     }
 
+    /**
+     * Chave dos TOTAIS do provedor — por (perfil, PLAYLIST), como o progresso.
+     *
+     * O `series_id` do Xtream é um inteiro por provedor e colide entre
+     * playlists: com a chave só por perfil, o total da playlist A ficava
+     * valendo para a série de mesmo id da playlist B. Isso já fabricava
+     * "📺 Novos Episódios" ao trocar de playlist, e passaria a marcar série
+     * como concluída sem ela estar.
+     */
+    private getSeriesDataKey(): string {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return `${this.SERIES_DATA_KEY_PREFIX}_default`;
+        return playlistScopedKey(this.SERIES_DATA_KEY_PREFIX, activeProfile.id);
+    }
+
     // Get stored series data
     private getSeriesData(): Map<string, SeriesEpisodeData> {
         try {
-            const key = this.getStorageKey(this.SERIES_DATA_KEY_PREFIX);
+            const key = this.getSeriesDataKey();
             const data = localStorage.getItem(key);
             if (!data) return new Map();
             const parsed = JSON.parse(data);
@@ -84,7 +100,7 @@ class AppNotificationService {
 
     // Save series data
     private saveSeriesData(data: Map<string, SeriesEpisodeData>): void {
-        const key = this.getStorageKey(this.SERIES_DATA_KEY_PREFIX);
+        const key = this.getSeriesDataKey();
         const obj = Object.fromEntries(data);
         localStorage.setItem(key, JSON.stringify(obj));
     }
