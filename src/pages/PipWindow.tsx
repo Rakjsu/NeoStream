@@ -12,6 +12,7 @@ import { movieProgressService } from '../services/movieProgressService';
 import { watchProgressService } from '../services/watchProgressService';
 import { useLanguage } from '../services/languageService';
 import { playbackService } from '../services/playbackService';
+import { shouldSampleProgress } from '../utils/progressSampling';
 
 interface PipChannel {
     id: string | number;
@@ -53,6 +54,7 @@ export function PipWindow() {
     const { videoRef } = useVideoPlayer();
     const { t } = useLanguage();
     const hideControlsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastSavedProgressRef = useRef<number | null>(null);
 
     // Auto-hide controls after 3 seconds of inactivity
     const resetHideTimeout = useCallback(() => {
@@ -429,7 +431,7 @@ export function PipWindow() {
     }, [handleSeek, handleSetVolume, handleToggleMute, handleTogglePlay, videoRef]);
 
     // Save progress to localStorage
-    const saveProgress = () => {
+    const saveProgress = useCallback(() => {
         if (!content || !videoRef.current) return;
         const time = videoRef.current.currentTime;
         const dur = videoRef.current.duration || 0;
@@ -451,7 +453,29 @@ export function PipWindow() {
                 dur
             );
         }
-    };
+    }, [content, videoRef]);
+
+    // 💾 O ✕ e o ⧉ da barra interna não são as únicas saídas — e são justamente
+    // as que o title bar do app cobre. O X do CustomTitleBar, Alt+F4, fechar
+    // pela taskbar e sair do app matam a janela sem passar por handleClose, e o
+    // currentTime que o main vinha recebendo em 'pip:state' morre com ela.
+    // Grava em janelas de 5 s durante a reprodução, como AsyncVideoPlayer já
+    // faz (MpvPlayerView faz o mesmo com throttle por tempo); é o
+    // shouldSampleProgress que evita as ~4 gravações por segundo que o
+    // 'timeupdate' bruto causaria.
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        const amostrar = () => {
+            if (!shouldSampleProgress(video.currentTime, lastSavedProgressRef.current)) return;
+            lastSavedProgressRef.current = video.currentTime;
+            saveProgress();
+        };
+
+        video.addEventListener('timeupdate', amostrar);
+        return () => video.removeEventListener('timeupdate', amostrar);
+    }, [saveProgress, videoRef]);
 
     const handleClose = () => {
         saveProgress();
