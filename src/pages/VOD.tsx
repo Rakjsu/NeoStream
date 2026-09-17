@@ -285,37 +285,48 @@ export function VOD() {
         return groupByBaseName(sortedStreams);
     }, [groupVersions, sortedStreams]);
 
-    const filteredStreams = useMemo(() => sortedStreams.filter(stream => {
-        const matchesSearch = fuzzyIncludes(stream.name, searchQuery);
-        if (hideWatched && selectedCategory !== 'WATCHED' && traktWatchedTitles.size > 0 && traktWatchedTitles.has(normalizeTitle(stream.name))) {
-            return false;
-        }
-        if (hideWatched && selectedCategory !== 'WATCHED' && watchedIds.has(stream.stream_id.toString())) {
-            return false;
-        }
+    const filteredStreams = useMemo(() => {
+        // 🗂️ O histórico é lido UMA vez por avaliação do filtro, não uma vez por
+        // card: `getMoviesInProgress()`/`getWatchedMovies()` varrem o histórico
+        // inteiro (getItem + filter + map) e rodavam DENTRO do callback, que
+        // roda por item — escolher "Continuar assistindo"/"Assistidos" custava
+        // O(catálogo × histórico), com `.includes()` linear por cima.
+        const moviesInProgress = selectedCategory === 'CONTINUE_WATCHING'
+            ? new Set(movieProgressService.getMoviesInProgress())
+            : null;
+        const watchedMovies = selectedCategory === 'WATCHED'
+            ? new Set(movieProgressService.getWatchedMovies())
+            : null;
+        return sortedStreams.filter(stream => {
+            const matchesSearch = fuzzyIncludes(stream.name, searchQuery);
+            if (hideWatched && selectedCategory !== 'WATCHED' && traktWatchedTitles.size > 0 && traktWatchedTitles.has(normalizeTitle(stream.name))) {
+                return false;
+            }
+            if (hideWatched && selectedCategory !== 'WATCHED' && watchedIds.has(stream.stream_id.toString())) {
+                return false;
+            }
 
-        // Kids profile + Parental Control gating (categories, cached ratings, hidden items)
-        if (!isItemVisible(stream)) {
-            return false;
-        }
+            // Kids profile + Parental Control gating (categories, cached ratings, hidden items)
+            if (!isItemVisible(stream)) {
+                return false;
+            }
 
-        if (selectedCategory === 'CONTINUE_WATCHING') {
-            const moviesInProgress = movieProgressService.getMoviesInProgress();
-            return matchesSearch && moviesInProgress.includes(stream.stream_id.toString());
-        }
+            if (moviesInProgress) {
+                return matchesSearch && moviesInProgress.has(stream.stream_id.toString());
+            }
 
-        if (selectedCategory === 'WATCHED') {
-            const watchedMovies = movieProgressService.getWatchedMovies();
-            return matchesSearch && watchedMovies.includes(stream.stream_id.toString());
-        }
+            if (watchedMovies) {
+                return matchesSearch && watchedMovies.has(stream.stream_id.toString());
+            }
 
-        const matchesCategory = !selectedCategory || selectedCategory === '' || selectedCategory === 'all' || stream.category_id === selectedCategory;
-        return matchesSearch && matchesCategory;
+            const matchesCategory = !selectedCategory || selectedCategory === '' || selectedCategory === 'all' || stream.category_id === selectedCategory;
+            return matchesSearch && matchesCategory;
+        });
     // isItemVisible reads parental/kids state that only changes via a profile/
     // settings switch (which reloads streams / remounts this page), so it doesn't
     // need to be a dep — keeping it out is what makes scrolling cheap.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }), [sortedStreams, searchQuery, selectedCategory, hideWatched, watchedIds, traktWatchedTitles]);
+    }, [sortedStreams, searchQuery, selectedCategory, hideWatched, watchedIds, traktWatchedTitles]);
 
     // Windowed rendering: only ~3 screens of cards stay mounted while the
     // scrollbar reflects the full list (spacer rows keep the geometry).
