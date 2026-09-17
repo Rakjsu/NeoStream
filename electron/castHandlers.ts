@@ -123,6 +123,15 @@ export function setupCastHandlers(): void {
     })
 
     ipcMain.handle('cast:play', async (_e, payload: { deviceId?: string; url?: string; title?: string; contentType?: string; live?: boolean; subtitleVtt?: string; startPosition?: number; meta?: CastMediaMeta }) => {
+        // Declarada FORA do try para que o catch consiga fecha-la: o
+        // `connectTransport()` ja abriu o socket TLS e ja armou o heartbeat de
+        // 5 s ANTES do passo que falha (o LAUNCH estoura em 15 s). Sem o
+        // close(), cada tentativa frustrada fica presa num dos poucos slots de
+        // conexao do Chromecast, e depois de algumas a TV recusa o app. Quando
+        // a falha vem do LOAD recusado, pior: ai o `reloadMedia` ja esta
+        // armado, entao o socket abandonado ainda dispara `attemptReconnect()`
+        // ao cair — sessao fantasma voltando sem ninguem no comando.
+        let session: CastSession | null = null
         try {
             const device = devices.get(String(payload?.deviceId ?? ''))
             if (!device) return { success: false, error: 'Dispositivo não encontrado' }
@@ -145,7 +154,7 @@ export function setupCastHandlers(): void {
             }
 
             stopActiveSession()
-            const session = new CastSession(device.host, device.name)
+            session = new CastSession(device.host, device.name)
             const media: CastMediaInput = {
                 url,
                 title: String(payload?.title ?? 'NeoStream'),
@@ -161,12 +170,16 @@ export function setupCastHandlers(): void {
             activeSession = session
             return { success: true }
         } catch (error) {
+            session?.close() // idempotente: mata heartbeat + socket da tentativa
             log.error('[Cast] play failed:', error)
             return { success: false, error: getErrorMessage(error) }
         }
     })
 
     ipcMain.handle('cast:play-queue', async (_e, payload: { deviceId?: string; items?: { url?: string; title?: string; contentType?: string; subtitleVtt?: string; subtitleLanguage?: string; startTime?: number; meta?: CastMediaMeta }[] }) => {
+        // Mesmo motivo do cast:play: o QUEUE_LOAD tambem vem depois do
+        // transporte estar de pe, entao o catch precisa alcancar a sessao.
+        let session: CastSession | null = null
         try {
             const device = devices.get(String(payload?.deviceId ?? ''))
             if (!device) return { success: false, error: 'Dispositivo não encontrado' }
@@ -199,11 +212,12 @@ export function setupCastHandlers(): void {
             if (items.length === 0) return { success: false, error: 'Fila vazia' }
 
             stopActiveSession()
-            const session = new CastSession(device.host, device.name)
+            session = new CastSession(device.host, device.name)
             await session.startQueue(items)
             activeSession = session
             return { success: true, count: items.length }
         } catch (error) {
+            session?.close() // idempotente: mata heartbeat + socket da tentativa
             log.error('[Cast] play-queue failed:', error)
             return { success: false, error: getErrorMessage(error) }
         }
@@ -223,12 +237,16 @@ export function setupCastHandlers(): void {
         }
         const device = opts?.deviceId ? devices.get(String(opts.deviceId)) : [...devices.values()][0]
         if (!device) return { success: false, error: 'Nenhum dispositivo' }
+        // O caminho mais frequente dos tres: o indicador global chama
+        // cast:reconnect em toda montagem e quase nunca ha algo tocando.
+        let session: CastSession | null = null
         try {
-            const session = new CastSession(device.host, device.name)
+            session = new CastSession(device.host, device.name)
             await session.attach()
             activeSession = session
             return { success: true, active: true, deviceId: device.id, deviceName: device.name, ...session.status }
         } catch (error) {
+            session?.close() // idempotente: mata heartbeat + socket da tentativa
             // NAO e o getErrorMessage: aqui o fallback e o proprio `error`, e o
             // logger imprime o objeto inteiro. Trocar por String(error) daria
             // "[object Object]" no log — menos informacao, nao mais.
