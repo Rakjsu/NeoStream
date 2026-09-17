@@ -4,9 +4,10 @@
  * The backup PAYLOAD lives in the renderer (localStorage + playlists), so the
  * flow is a round trip: the hourly clock decides a backup is due → main asks
  * the renderer ('backup:auto-collect') → the renderer builds the same payload
- * as the manual export and hands it back ('backup:auto-save') → main writes
- * `neostream-backup-YYYY-MM-DD.json` into the chosen folder and prunes old
- * files (keeps the newest KEEP_FILES).
+ * as the manual export and hands it back ('backup:auto-save') → main strips
+ * the credentials (`semCredenciais` — this file is written unattended, often
+ * into a cloud-synced folder) and writes `neostream-backup-YYYY-MM-DD.json`
+ * into the chosen folder, pruning old files (keeps the newest KEEP_FILES).
  */
 
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
@@ -32,6 +33,14 @@ const CHECK_EVERY_MS = 60 * 60 * 1000
 const BOOT_DELAY_MS = 20 * 1000
 const KEEP_FILES = 8
 const FILE_PREFIX = 'neostream-backup-'
+
+/**
+ * Chave de `data` cujo próprio NOME diz que ela guarda segredo
+ * (`neostream_tmdb_api_key`, `neostream_trakt_token`, `neostream_trakt_creds`).
+ * Regra pelo nome, e não lista fechada, para que a chave secreta de amanhã já
+ * nasça de fora do backup desatendido em vez de esperar alguém se lembrar.
+ */
+const CHAVE_DE_SEGREDO = /(^|_)(token|creds|secret|api_key|password|senha)(_|$)/i
 
 function getConfig(): AutoBackupConfig {
     return { ...DEFAULTS, ...(store.get('autoBackup') as Partial<AutoBackupConfig> | undefined) }
@@ -63,6 +72,55 @@ export function detectCloudDirs(): { provider: string; path: string }[] {
     return candidates.filter(c => {
         try { return fs.existsSync(c.path) } catch { return false }
     })
+}
+
+/**
+ * 🔒 O backup que sai SOZINHO não leva credencial.
+ *
+ * O payload que o renderer entrega é o mesmo do export manual: `playlists[]`
+ * com `passwordB64`, o bloco `openSubtitles` e, dentro de `data`, as chaves de
+ * API do usuário (TMDB e Trakt — esta com o clientSecret e o par de tokens
+ * OAuth). Base64 é ofuscação, não cifra: o cabeçalho do `backupService.ts` diz
+ * isso com todas as letras. No export manual a troca é justa — a pessoa
+ * escolhe a pasta na hora e pode cifrar o arquivo inteiro com senha
+ * (`encryptBackup`, prefixo NEOENC2). Aqui não há nem uma coisa nem outra: o
+ * agendador grava sem ninguém na frente da tela, e o atalho "salvar na nuvem"
+ * (`backup:cloud-use`) aponta a pasta pro OneDrive/Dropbox/Drive e LIGA o
+ * agendamento no mesmo clique. Daí em diante o segredo sai da máquina em 8
+ * cópias rotativas, para todo aparelho logado naquela conta.
+ *
+ * Como não dá pra pedir senha a quem não está na frente da tela, o que não
+ * pode vazar não viaja. O resto (perfis, favoritos, progresso, estatísticas,
+ * preferências) continua inteiro, e o export manual continua levando tudo.
+ *
+ * O corte fica no main, e não no coletor do renderer, de propósito: é o único
+ * ponto onde o arquivo de fato nasce, então um chamador futuro do canal não
+ * reintroduz o vazamento sem passar por aqui. E o mesmo coletor serve o
+ * `sync:save`, que PRECISA levar a credencial (é o que ele existe para fazer).
+ *
+ * `null` = payload que não sabemos ler; o que não se entende não vira arquivo
+ * numa pasta sincronizada.
+ */
+export function semCredenciais(json: string): string | null {
+    let payload: unknown
+    try {
+        payload = JSON.parse(json)
+    } catch {
+        return null
+    }
+    if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) return null
+    const resto = { ...(payload as Record<string, unknown>) }
+    delete resto.playlists
+    delete resto.openSubtitles
+    const data: unknown = resto.data
+    if (data !== null && typeof data === 'object' && !Array.isArray(data)) {
+        const semSegredo: Record<string, unknown> = {}
+        for (const [chave, valor] of Object.entries(data as Record<string, unknown>)) {
+            if (!CHAVE_DE_SEGREDO.test(chave)) semSegredo[chave] = valor
+        }
+        resto.data = semSegredo
+    }
+    return JSON.stringify(resto, null, 2)
 }
 
 async function pruneOldBackups(dirPath: string): Promise<void> {
@@ -119,10 +177,12 @@ export function setupAutoBackup(getWin: () => BrowserWindow | null) {
         try {
             const config = getConfig()
             if (!config.dirPath) return { success: false, error: 'no dirPath' }
+            const seguro = semCredenciais(json)
+            if (seguro === null) return { success: false, error: 'unreadable payload' }
             await fsp.mkdir(config.dirPath, { recursive: true })
             const date = new Date().toISOString().slice(0, 10)
             const filePath = path.join(config.dirPath, `${FILE_PREFIX}${date}.json`)
-            await fsp.writeFile(filePath, json, 'utf-8')
+            await fsp.writeFile(filePath, seguro, 'utf-8')
             setConfig({ lastBackupAt: Date.now() })
             await pruneOldBackups(config.dirPath)
             log.info('[AutoBackup] saved', filePath)

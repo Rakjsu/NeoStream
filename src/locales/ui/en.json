@@ -552,7 +552,7 @@
     "syncStarted": "Sync started",
     "syncApplied": "Synced: {n} items from other machines",
     "autoTitle": "Weekly automatic backup",
-    "autoDesc": "Saves a full backup weekly to the chosen folder (keeps the 8 newest; works with the app in the tray)",
+    "autoDesc": "Saves a copy weekly to the chosen folder, without provider passwords or API keys — those only travel in the manual export (keeps the 8 newest; works with the app in the tray)",
     "autoLast": "last",
     "importDesc": "Restores data from a backup file created by NeoStream",
     "importButton": "Import Backup",
