@@ -11,6 +11,8 @@
  *   - poll mpv:status every 500ms → play/pause state, seek bar, volume, fs
  *   - persist watch progress: movies via movieProgressService, series
  *     episodes via watchProgressService (same write APIs as VideoPlayer)
+ *   - count watch time in usageStatsService with the SAME identity as the
+ *     internal player (Stats screen, profile daily limit, Wrapped)
  *   - keyboard shortcuts while the app window is focused
  *   - fall back to the internal player when mpv is missing/fails
  */
@@ -20,6 +22,7 @@ import { movieProgressService } from '../services/movieProgressService';
 import { watchProgressService } from '../services/watchProgressService';
 import { useLanguage } from '../services/languageService';
 import { profileService } from '../services/profileService';
+import { usageStatsService } from '../services/usageStatsService';
 import { trackPrefKey, trackLang, choosePreferredTracks, type TrackPref } from '../utils/mpvTrackPrefs';
 import { subtitleSyncPrefs, subtitleSyncKey } from '../utils/subtitleSyncPrefs';
 import { autoFetchSubtitle, cleanupSubtitleUrl, motivoDeNaoTerLegenda, openSubtitleFileFromDisk, SUBTITLE_LANGUAGE_OPTIONS } from '../services/subtitleService';
@@ -48,6 +51,14 @@ interface MpvPlayerViewProps {
     onClose: () => void;
     /** mpv unavailable / failed to launch — caller falls back to the internal player. */
     onFallback: (reason: string) => void;
+    /**
+     * Identidade nas Estatisticas. Vem pronta do AsyncVideoPlayer, que monta a
+     * MESMA para os dois motores: se o mpv usasse outra chave, o mesmo titulo
+     * viraria duas linhas na Retrospectiva e o "mais assistido" repartiria o
+     * tempo entre as duas.
+     */
+    contentId?: string;
+    contentType: 'movie' | 'series' | 'live';
 }
 
 function formatTime(seconds: number | null): string {
@@ -71,7 +82,9 @@ export function MpvPlayerView({
     episodeNumber,
     isLive,
     onClose,
-    onFallback
+    onFallback,
+    contentId,
+    contentType
 }: MpvPlayerViewProps) {
     const { t } = useLanguage();
     const [phase, setPhase] = useState<'starting' | 'playing'>('starting');
@@ -239,6 +252,19 @@ export function MpvPlayerView({
         // Intentionally mount-only: one view instance == one mpv launch.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Estatisticas: o mpv e um player como o interno, e sem esta sessao quem
+    // liga o motor MPV some da tela de Estatisticas, da meta diaria do perfil
+    // (ela le o total do DIA) e da Retrospectiva. So conta enquanto esta de
+    // fato tocando: antes de o mpv subir o filme ainda pode cair no player
+    // interno pelo fallback, e tempo parado no pause nao e tempo assistido —
+    // o player interno ja encerra a sessao no evento 'pause'.
+    const contandoTempo = phase === 'playing' && !paused;
+    useEffect(() => {
+        if (!contandoTempo || !contentId || !title) return;
+        usageStatsService.startSession(contentId, contentType, title);
+        return () => { usageStatsService.endSession(); };
+    }, [contandoTempo, contentId, contentType, title]);
 
     const togglePause = useCallback(() => {
         const next = !latestRef.current.paused;
