@@ -6,6 +6,7 @@ import { randomSaltHex, hashPinSalgado, hashPinLegado } from './pinCrypto';
 
 const STORAGE_KEY = 'neostream_profiles';
 const MAX_PROFILES = 5;
+const GUEST_SESSION_KEY = 'neostream_guest_session';
 
 /** PIN novo: sorteia o sal e devolve o par pra gravar junto. */
 async function novoPinHash(pin: string): Promise<{ pin: string; pinSalt: string }> {
@@ -45,6 +46,37 @@ function purgeGuestData(): void {
         if (key && pattern.test(key)) doomed.push(key);
     }
     doomed.forEach(key => localStorage.removeItem(key));
+}
+
+/**
+ * Marca "a sessão de convidado nasceu NESTE carregamento do app".
+ *
+ * `sessionStorage` morre junto com a janela mas sobrevive ao
+ * `window.location.reload()` que o app dá por dentro (trocar de playlist,
+ * entrar) — que é exatamente a semântica que falta aqui. Mesmo padrão do
+ * `parentalService.unlockSession`.
+ */
+function marcarSessaoConvidado(): void {
+    try { sessionStorage.setItem(GUEST_SESSION_KEY, '1'); } catch { /* storage indisponível */ }
+}
+
+/** Falso também quando o storage não responde: nunca purgar no escuro. */
+function sessaoConvidadoOrfa(): boolean {
+    try { return sessionStorage.getItem(GUEST_SESSION_KEY) !== '1'; } catch { return false; }
+}
+
+/**
+ * O PiP e o multi-view abrem uma BrowserWindow que carrega o MESMO
+ * `index.html`: rodam o boot inteiro do App num browsing context novo, de
+ * `sessionStorage` VAZIO, com o app vivo. Sem esta guarda, abrir o PiP no meio
+ * de uma sessão de convidado seria lido como "app reaberto" e apagaria os
+ * dados dele na cara da pessoa.
+ *
+ * Janela nova que carregue o `index.html` = mais uma linha nesta lista.
+ */
+function janelaSecundaria(): boolean {
+    const hash = window.location.hash;
+    return hash.startsWith('#/pip') || hash.startsWith('#/multiview');
 }
 
 // Generate unique ID
@@ -146,6 +178,7 @@ export const profileService = {
         data.profiles = [...data.profiles.filter(p => p.id !== GUEST_PROFILE_ID), guest];
         data.activeProfileId = GUEST_PROFILE_ID;
         saveStorageData(data);
+        marcarSessaoConvidado();
         return guest;
     },
 
@@ -382,6 +415,20 @@ export const profileService = {
 
     // Initialize (call on app start)
     initialize(): void {
+        // A sessão de convidado só vale enquanto o app está aberto: um boot sem
+        // a marca = app reaberto, então encerra e purga, que é o que o botão
+        // promete ("Entrar como convidado (sem histórico)"). Antes reabrir o
+        // app caía DENTRO da sessão antiga, com o histórico dela intacto.
+        //
+        // Vem ANTES do migrateExistingData de propósito: se o convidado era a
+        // única entrada, o ramo `profiles.length === 0` recria o kids-default
+        // em vez de deixar a tela de perfis vazia.
+        if (!janelaSecundaria()
+            && getStorageData().activeProfileId === GUEST_PROFILE_ID
+            && sessaoConvidadoOrfa()) {
+            this.clearActiveProfile();
+        }
+
         this.migrateExistingData();
 
         // Create default Kids profile if no profiles exist
