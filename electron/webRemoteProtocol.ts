@@ -759,3 +759,47 @@ export const WS_MAX_BUFFER_BYTES = MAX_FRAME_BYTES + 100_000
 export function isClientBufferOverflow(bufferedBytes: number, maxBytes: number = WS_MAX_BUFFER_BYTES): boolean {
     return bufferedBytes > maxBytes
 }
+
+/**
+ * 📼 O que o celular pode ouvir sobre gravações.
+ *
+ * A página do celular já tinha os ramos de 'renamed', 'protected' e
+ * 'unprotected' escritos — com textos próprios —, mas o relay do servidor só
+ * aceitava 'ok' | 'stopped' | 'deleted' | 'cancelled' e transformava todo o
+ * resto em 'error'. Resultado: renomear um arquivo COM SUCESSO respondia
+ * "Falha ao iniciar a gravação", e a recusa de apagar um arquivo travado
+ * aparecia com a mesma frase, em vez de dizer que ele está protegido.
+ */
+export const STATUS_DE_GRAVACAO = [
+    'ok',
+    'stopped',
+    'deleted',
+    'cancelled',
+    'renamed',
+    'protected',
+    'unprotected',
+] as const
+
+export type StatusDeGravacao = typeof STATUS_DE_GRAVACAO[number] | 'error'
+
+export function sanitizarStatusDeGravacao(valor: unknown): StatusDeGravacao {
+    return typeof valor === 'string' && (STATUS_DE_GRAVACAO as readonly string[]).includes(valor)
+        ? valor as StatusDeGravacao
+        : 'error'
+}
+
+export interface ArquivoDeGravacao {
+    name: string
+    sizeMb: number
+    /** A página desenha 🔐/🔓 a partir daqui. */
+    locked: boolean
+}
+
+export function sanitizarArquivoDeGravacao(bruto: unknown): ArquivoDeGravacao {
+    const it = (bruto ?? {}) as Record<string, unknown>
+    return {
+        name: typeof it.name === 'string' ? it.name.slice(0, 200) : '',
+        sizeMb: typeof it.sizeMb === 'number' && Number.isFinite(it.sizeMb) ? Math.max(0, Math.round(it.sizeMb)) : 0,
+        locked: it.locked === true,
+    }
+}
