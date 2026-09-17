@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { epgService } from './epgService';
 
 interface EPGProgram {
@@ -72,5 +72,49 @@ describe('programa atual / próximo / a seguir', () => {
         const half = epgService.getProgress(prog('meio', -1_800_000, 1_800_000));
         expect(half).toBeGreaterThanOrEqual(49);
         expect(half).toBeLessThanOrEqual(51);
+    });
+});
+
+describe('XMLTV do próprio usuário', () => {
+    const URL_DO_USUARIO = 'http://exemplo.test/guia.xml';
+    let pedidos: { canal: string; carga: Record<string, unknown> }[] = [];
+
+    beforeEach(() => {
+        pedidos = [];
+        localStorage.setItem('neostream_external_epg_url', URL_DO_USUARIO);
+        (window as unknown as { ipcRenderer: unknown }).ipcRenderer = {
+            invoke: (canal: string, carga: Record<string, unknown>) => {
+                pedidos.push({ canal, carga });
+                return Promise.resolve({ success: true, programs: [prog('do-usuario', -60_000, 3_600_000)] });
+            },
+        };
+    });
+
+    afterEach(() => {
+        localStorage.removeItem('neostream_external_epg_url');
+        delete (window as unknown as { ipcRenderer?: unknown }).ipcRenderer;
+    });
+
+    it('o pedido leva o tvg-id, não só o nome sujo do provedor', async () => {
+        // O índice do main tenta o id PRIMEIRO e só cai pro nome quando ele
+        // falta. Sem o id, casar dependia do <display-name> do arquivo bater,
+        // depois de normalizado, com "PT: SIC HD [FHD]" — e a tela vende este
+        // arquivo como "prioridade máxima": a pessoa colava a URL, não via
+        // erro nenhum, e a correção simplesmente não acontecia.
+        const programas = await epgService.fetchChannelEPG('sic.pt', 'PT: SIC HD [FHD]');
+
+        const pedido = pedidos.find(p => p.canal === 'epg:channel-programs');
+        expect(pedido?.carga).toMatchObject({
+            grupo: 'user-external',
+            epgChannelId: 'sic.pt',
+            channelName: 'PT: SIC HD [FHD]',
+        });
+        expect(programas.map(p => p.id)).toEqual(['do-usuario']);
+    });
+
+    it('sem URL configurada não há pedido nenhum', async () => {
+        localStorage.removeItem('neostream_external_epg_url');
+        expect(await epgService.fetchFromUserXmltv('Canal', 'canal.id')).toEqual([]);
+        expect(pedidos).toEqual([]);
     });
 });
