@@ -587,11 +587,16 @@ export function MpvPlayerView({
                                     </button>
                                     {showSubSearch && (
                                         <div className="mpv-view-subsearch">
+                                            {/* Só o ícone: o painel é uma LINHA dentro da faixa de
+                                                96px e o rótulo inteiro o fazia passar da borda
+                                                esquerda da janela (medido: 1200px de janela, com os
+                                                botões de sync visíveis). O texto vive no title. */}
                                             <button
                                                 className="mpv-view-subsearch-option"
                                                 onClick={() => void openSubtitleFromDisk()}
+                                                title={t('player', 'openSubtitleFile')}
                                             >
-                                                📂 {t('player', 'openSubtitleFile')}
+                                                📂
                                             </button>
                                             {SUBTITLE_LANGUAGE_OPTIONS.map(opt => (
                                                 <button
@@ -688,18 +693,21 @@ export function MpvPlayerView({
 }
 
 const viewStyles = `
+    /* A janela do mpv é --ontop e cobre TUDO acima da faixa de controles, então
+       este painel não pode subir: ele abre na horizontal, ao lado do botão,
+       dentro dos 96px — mesmo princípio dos botões de ciclo (linha 272). */
     .mpv-view-subsearch {
         position: absolute;
-        bottom: calc(100% + 8px);
-        right: 0;
+        right: calc(100% + 8px);
+        bottom: 50%;
+        transform: translateY(50%);
         display: flex;
-        flex-direction: column;
+        align-items: center;
         gap: 2px;
         background: rgba(10, 10, 14, 0.95);
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 10px;
         padding: 6px;
-        min-width: 170px;
         z-index: 10;
     }
 
@@ -709,6 +717,7 @@ const viewStyles = `
         color: rgba(255, 255, 255, 0.85);
         font-size: 13px;
         text-align: left;
+        white-space: nowrap;
         padding: 7px 10px;
         border-radius: 6px;
         cursor: pointer;
