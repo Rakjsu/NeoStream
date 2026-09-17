@@ -19,6 +19,11 @@ export interface EpgTestProgress {
     currentChannel: string;
 }
 
+/** O que o `streams:get-live` entrega e o teste precisa: o nome, o id do
+ *  stream e o tvg-id. Sem os dois ultimos o EPG do provedor nem e consultado
+ *  (epgService.fetchFromProvider). */
+type TestChannel = { name: string; stream_id: number; epg_channel_id?: string };
+
 type TestMode = 'full' | 'continue' | 'retryFailed';
 type TestStatus = 'idle' | 'running' | 'paused' | 'completed';
 
@@ -199,14 +204,14 @@ class EpgTestService {
                 return;
             }
 
-            const allChannels = result.data as { name: string; stream_id: number }[];
+            const allChannels = result.data as TestChannel[];
             const total = allChannels.length;
 
             // Initialize based on mode
             let working: EpgTestResult['working'] = [];
             let notWorking: EpgTestResult['notWorking'] = [];
             let scannedChannels: string[] = [];
-            let channelsToTest: { name: string; stream_id: number }[] = [];
+            let channelsToTest: TestChannel[] = [];
             let startIndex = 0;
 
             if (mode === 'full') {
@@ -294,7 +299,7 @@ class EpgTestService {
                 }
 
                 try {
-                    const programs = await epgService.fetchChannelEPG('', channel.name);
+                    const programs = await epgService.fetchChannelEPG(channel.epg_channel_id || '', channel.name, channel.stream_id);
                     if (programs.length > 0) {
                         // Remove if exists (for full rescan)
                         working = working.filter(w => w.channel !== channel.name);
