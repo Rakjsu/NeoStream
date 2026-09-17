@@ -373,6 +373,32 @@ export async function searchSeriesByName(seriesName: string, year?: string): Pro
 }
 
 /**
+ * 🎯 A ficha tem que abrir o título que o PROVEDOR apontou.
+ *
+ * O `tmdb_id` que vem na lista vale mais que o `results[0]` de uma busca por
+ * nome — nome de provedor tem "4K", "[DUB]" e o ano grudado, e a busca erra.
+ * Era assim que a mesma tela mostrava o fundo de um filme (que já vinha por
+ * id) e a sinopse de outro. Sem id — M3U e Stalker não mandam — cai na busca,
+ * como sempre.
+ */
+export async function resolveMovieDetails(tmdbId: string | undefined, name: string, year?: string): Promise<TMDBMovieDetails | null> {
+    if (tmdbId) {
+        const byId = await fetchMovieDetails(tmdbId);
+        if (byId) return byId;
+    }
+    return searchMovieByName(name, year);
+}
+
+/** Par de `resolveMovieDetails` para séries. */
+export async function resolveSeriesDetails(tmdbId: string | undefined, name: string, year?: string): Promise<TMDBSeriesDetails | null> {
+    if (tmdbId) {
+        const byId = await fetchSeriesDetails(tmdbId);
+        if (byId) return byId;
+    }
+    return searchSeriesByName(name, year);
+}
+
+/**
  * Fetch movie trailer from TMDB
  * @param movieName - Movie name to search
  * @param year - Optional release year

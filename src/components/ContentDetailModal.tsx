@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { pedirAberturaDeFicha } from '../services/abrirFicha';
 import { normalizeTitle } from '../services/personSearchHelpers';
-import { searchSeriesByName, searchMovieByName, fetchMovieTrailer, fetchSeriesTrailer, fetchCollection, fetchSimilarByTmdbId, fetchCastByTmdbId, fetchPersonFilmography, type TMDBSeriesDetails, type TMDBMovieDetails, type TMDBCollection, type TMDBSimilarItem, type TMDBCastMember } from '../services/tmdb';
+import { resolveSeriesDetails, resolveMovieDetails, fetchMovieTrailer, fetchSeriesTrailer, fetchCollection, fetchSimilarByTmdbId, fetchCastByTmdbId, fetchPersonFilmography, type TMDBSeriesDetails, type TMDBMovieDetails, type TMDBCollection, type TMDBSimilarItem, type TMDBCastMember } from '../services/tmdb';
 import { allTags, getMark, setRating, toggleTag } from '../services/personalMarksService';
 import { watchProgressService } from '../services/watchProgressService';
 import { movieProgressService } from '../services/movieProgressService';
@@ -35,6 +35,8 @@ interface ContentDetailModalProps {
         release_date?: string;
         container_extension?: string;
         youtube_trailer?: string;
+        /** 🎯 id TMDB do provedor: abre a ficha certa em vez do results[0] da busca. */
+        tmdb_id?: string;
     };
     onPlay: (season?: number, episode?: number, offlineUrl?: string) => void;
     /** 🎞️ Item 45: versões do mesmo filme (4K/FHD/HD/legendado) pros chips. */
@@ -307,15 +309,15 @@ export function ContentDetailModal({
         const year = yearMatch ? yearMatch[1] : undefined;
 
         if (contentType === 'series') {
-            searchSeriesByName(contentData.name, year)
+            resolveSeriesDetails(contentData.tmdb_id, contentData.name, year)
                 .then(data => setTmdbData(data))
                 .catch(() => setTmdbData(null));
         } else {
-            searchMovieByName(contentData.name, year)
+            resolveMovieDetails(contentData.tmdb_id, contentData.name, year)
                 .then(data => setTmdbData(data))
                 .catch(() => setTmdbData(null));
         }
-    }, [isOpen, contentData.name, contentType]);
+    }, [isOpen, contentData.name, contentData.tmdb_id, contentType]);
 
     // 🎬 Coleção + similares: dependem do id TMDB resolvido pela busca acima.
     useEffect(() => {

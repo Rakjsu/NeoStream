@@ -850,7 +850,8 @@ export function Series() {
                         name: selectedSeries.name,
                         cover: selectedSeries.cover || selectedSeries.stream_icon,
                         rating: selectedSeries.rating,
-                        youtube_trailer: selectedSeries.youtube_trailer
+                        youtube_trailer: selectedSeries.youtube_trailer,
+                        tmdb_id: selectedSeries.tmdb_id
                     }}
                     onPlay={(season, episode, offlineUrl) => {
                         const nextSeason = season || 1;

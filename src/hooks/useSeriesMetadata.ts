@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { type TMDBSeriesDetails, fetchEpisodeDetails, searchSeriesByName } from '../services/tmdb';
+import { type TMDBSeriesDetails, fetchEpisodeDetails, resolveSeriesDetails } from '../services/tmdb';
 
 interface SeriesMetadataSource {
     name: string;
@@ -45,7 +45,9 @@ export function useSeriesMetadata(selectedSeries: SeriesMetadataSource | null, s
         setLoadingTmdb(true);
         setTmdbData(null);
 
-        searchSeriesByName(selectedSeries.name, year)
+        // O mesmo id que a linha abaixo já usa pros títulos de episódio: sem
+        // ele, a sinopse podia ser de uma série e os episódios de outra.
+        resolveSeriesDetails(selectedSeries.tmdb_id, selectedSeries.name, year)
             .then(data => { setTmdbData(data); setLoadingTmdb(false); })
             .catch(() => setLoadingTmdb(false));
     }, [selectedSeries]);
