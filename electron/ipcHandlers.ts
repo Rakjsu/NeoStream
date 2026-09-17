@@ -252,8 +252,23 @@ function getOpenSubtitlesConfig(): OpenSubtitlesConfig {
  */
 interface IndexEntry { chave: string; index: XmltvIndex }
 const xmltvIndexes = new Map<string, IndexEntry>()
-/** Grupos vivos: o do país corrente e o XMLTV do usuário. */
-const XMLTV_INDEX_MAX = 2
+/**
+ * Teto de grupos vivos = TODOS os que o renderer sabe pedir.
+ *
+ * O teto nasceu em 2 porque a conta era "o país corrente + o XMLTV do
+ * usuário". Não existe "país corrente": o grupo é escolhido POR CANAL pelo
+ * nome, e o `user-external` é consultado ANTES de todo canal quando a pessoa
+ * configurou um XMLTV. Sobrava 1 slot para os quatro países, então uma grade
+ * misturada despejava o grupo do vizinho a cada linha — o mesmo 100% de miss
+ * que o comentário acima diz ter sido consertado, só que por falta de slot em
+ * vez de por FIFO.
+ *
+ * Os grupos são os literais de `fetchIndexedChannel` em
+ * `src/services/epgService.ts`: user-external, portugal, argentina, usa,
+ * brazil. Quem acrescentar um país lá tem que subir este número —
+ * `electron/tetoDoIndiceXmltv.test.ts` cobra.
+ */
+const XMLTV_INDEX_MAX = 5
 /** Builds em voo, para 4 canais simultâneos não construírem o mesmo 4 vezes. */
 const xmltvBuilding = new Map<string, Promise<XmltvIndex | null>>()
 
