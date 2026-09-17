@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { CastQueueItem } from '../services/castQueue';
 import { watchProgressService } from '../services/watchProgressService';
 import { espelharChaveTmdbNoMain } from '../services/tmdbKey';
-import { getProtectedRecordings, toggleProtectedRecording } from '../services/dvrSweep';
+import { getProtectedRecordings, renameProtectedRecording, toggleProtectedRecording } from '../services/dvrSweep';
 import { scheduledRecordingService } from '../services/scheduledRecordingService';
 import { movieProgressService } from '../services/movieProgressService';
 import { usageStatsService } from '../services/usageStatsService';
@@ -694,8 +694,13 @@ export function WebRemoteBridge() {
             const file = (filesRes?.files ?? []).find(f => f.name === name && !f.recording);
             const res = file && newName.trim()
                 ? await window.ipcRenderer.invoke('dvr:rename-file', { path: file.path, name: newName.trim() })
-                    .catch(() => null) as { success: boolean } | null
+                    .catch(() => null) as { success: boolean; path?: string } | null
                 : null;
+            // 🔐 Mesmo motivo do confirmRename do desktop: a marca de protegida
+            // é por CAMINHO, e o rename cria um caminho novo. Renomear pelo
+            // celular desligava a proteção — inclusive a que faz o 🗑 do
+            // próprio celular recusar o arquivo.
+            if (file && res?.success && res.path) renameProtectedRecording(file.path, res.path);
             window.ipcRenderer.send('web-remote:record-result', { status: res?.success ? 'renamed' : 'error', name });
             void pushRecordings();
         };

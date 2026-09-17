@@ -51,6 +51,27 @@ export function toggleProtectedRecording(filePath: string): Set<string> {
 }
 
 /**
+ * 🔐 A proteção segue o arquivo quando ele muda de nome.
+ *
+ * A marca é guardada por CAMINHO COMPLETO e o `dvr:rename-file` move a
+ * gravação pra um caminho NOVO: sem migrar a entrada, o 🔐 fica apontando pro
+ * nome antigo, que já não existe, e o arquivo renomeado volta a ser candidato
+ * da auto-faxina — que roda sozinha ao abrir a página de Gravações. Remove o
+ * antigo em vez de só somar o novo, senão fica um caminho fantasma pra sempre
+ * no localStorage. Não estava protegido, continua não protegido.
+ */
+export function renameProtectedRecording(oldPath: string, newPath: string): Set<string> {
+    const current = getProtectedRecordings();
+    if (!current.has(oldPath)) return current;
+    current.delete(oldPath);
+    current.add(newPath);
+    try {
+        localStorage.setItem(PROTECTED_KEY, JSON.stringify([...current]));
+    } catch { /* storage indisponível */ }
+    return current;
+}
+
+/**
  * Quanto uma gravação ocupa, por hora. A MESMA taxa que a estimativa do REC
  * manual já mostra antes de gravar (~2 GB/h de TS), em GB decimal — se as duas
  * divergirem, o app passa a dizer duas coisas diferentes sobre o mesmo disco.

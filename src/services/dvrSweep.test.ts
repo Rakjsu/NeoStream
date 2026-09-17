@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { pickExpiredRecordings, recElapsedLabel, espacoParaGravacao, DVR_BYTES_POR_HORA, DVR_FOLGA_DISCO_BYTES } from './dvrSweep';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { pickExpiredRecordings, recElapsedLabel, espacoParaGravacao, getProtectedRecordings, renameProtectedRecording, toggleProtectedRecording, DVR_BYTES_POR_HORA, DVR_FOLGA_DISCO_BYTES } from './dvrSweep';
 
 describe('pickExpiredRecordings (auto-faxina do DVR)', () => {
     const nowMs = 1_800_000_000_000;
@@ -79,5 +79,30 @@ describe('espacoParaGravacao', () => {
 
     it('folga customizada é respeitada', () => {
         expect(espacoParaGravacao(DVR_BYTES_POR_HORA, UMA_HORA, 0).cabe).toBe(true);
+    });
+});
+
+describe('renameProtectedRecording (o 🔐 segue o arquivo renomeado)', () => {
+    const velho = 'C:/rec/jogo.ts';
+    const novo = 'C:/rec/final da copa.ts';
+
+    beforeEach(() => localStorage.clear());
+
+    it('a gravação renomeada continua fora da faxina', () => {
+        toggleProtectedRecording(velho);
+        const protegidas = renameProtectedRecording(velho, novo);
+        const arquivos = [{ path: novo, mtimeMs: 1 }];
+        expect(pickExpiredRecordings(arquivos, 30, 1_800_000_000_000, protegidas)).toEqual([]);
+    });
+
+    it('o caminho antigo sai do storage — nada de fantasma', () => {
+        toggleProtectedRecording(velho);
+        renameProtectedRecording(velho, novo);
+        expect([...getProtectedRecordings()]).toEqual([novo]);
+    });
+
+    it('renomear o que não estava protegido não protege nada', () => {
+        renameProtectedRecording(velho, novo);
+        expect(getProtectedRecordings().size).toBe(0);
     });
 });

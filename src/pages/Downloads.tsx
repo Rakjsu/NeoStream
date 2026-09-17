@@ -4,7 +4,7 @@ import { Download, Trash2, Play, FolderOpen, HardDrive, Film, Tv, AlertTriangle,
 import { downloadService, resumoDaSerie } from '../services/downloadService';
 import type { DownloadItem, StorageInfo } from '../services/downloadService';
 import { useLanguage } from '../services/languageService';
-import { getDvrMaxAgeDays, getProtectedRecordings, pickExpiredRecordings, recElapsedLabel, setDvrMaxAgeDays, toggleProtectedRecording } from '../services/dvrSweep';
+import { getDvrMaxAgeDays, getProtectedRecordings, pickExpiredRecordings, recElapsedLabel, renameProtectedRecording, setDvrMaxAgeDays, toggleProtectedRecording } from '../services/dvrSweep';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { getDvrMaxConcurrent, margemInicialMs, folgaFinalMs, MARGEM_MAXIMA_MIN } from '../services/scheduledRecordingService';
 
@@ -173,11 +173,17 @@ export function Downloads() {
         return () => { cancelled = true; };
     }, [recordings]);
 
+    // 🔐 Renomear move a gravação pra um caminho NOVO, e a marca de protegida
+    // é guardada por CAMINHO: sem migrar a entrada, renomear desligava a
+    // proteção em silêncio e a auto-faxina (logo ali no loadRecordings) levava
+    // justamente o arquivo que a pessoa marcou pra guardar. O state anda junto
+    // porque é dele que sai o 🔐 da lista.
     const confirmRename = async () => {
         if (!renamingPath) return;
-        const result = await window.ipcRenderer.invoke('dvr:rename-file', { path: renamingPath, name: renameValue }) as { success: boolean; error?: string };
+        const result = await window.ipcRenderer.invoke('dvr:rename-file', { path: renamingPath, name: renameValue }) as { success: boolean; path?: string; error?: string };
         setRenamingPath(null);
         if (result?.success) {
+            if (result.path) setProtectedRecs(new Set(renameProtectedRecording(renamingPath, result.path)));
             void loadRecordings();
             return;
         }
