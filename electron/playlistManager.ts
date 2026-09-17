@@ -283,11 +283,6 @@ export function exportPlaylistsForBackup(): PlaylistBackupEntry[] {
     }))
 }
 
-/**
- * Import playlists from a backup WITHOUT activating or validating against the
- * provider (the machine may be offline during a restore). Existing entries
- * (same url+username) keep their password unless the backup differs.
- */
 /** Entries with passwords + type for the phone hand-off deep link (main-only). */
 export interface SetupExportEntry {
     id: string
@@ -318,8 +313,32 @@ export interface MobileAccountEntry {
     type?: 'xtream' | 'm3u' | 'stalker'
 }
 
+/**
+ * Guarda comum aos dois imports de fora (arquivo do celular e backup de outra
+ * máquina). Duas regressões moram aqui:
+ *  - sem o ledger, o arquivo reimportava a playlist apagada de propósito em
+ *    TODO ciclo, e a ressurreição se propagava de volta (permanente);
+ *  - sem comparar o carimbo, o upsert sobrescrevia a senha sempre — a senha
+ *    corrigida aqui voltava pra velha a cada ciclo (flip-flop entre as
+ *    máquinas), quebrando o switch e exportando credencial errada.
+ * Arquivo sem carimbo (legado, e todo backup de celular) nunca vence o local.
+ */
+function importeBloqueado(
+    playlists: PlaylistEntry[],
+    removidas: Record<string, number>,
+    entry: { url: string; username: string; password: string; credentialsUpdatedAt?: number }
+): boolean {
+    if (removidas[removedPlaylistKey(entry.url, entry.username)]) return true
+    const local = playlists.find(p => p.url === entry.url && p.username === entry.username)
+    if (!local) return false
+    const remoteAt = entry.credentialsUpdatedAt ?? 0
+    const localAt = local.credentialsUpdatedAt ?? 0
+    return remoteAt <= localAt || local.password === entry.password
+}
+
 export function importMobileAccounts(entries: MobileAccountEntry[]): number {
     let playlists = getPlaylists()
+    const removidas = getRemovedPlaylists()
     let imported = 0
     for (const entry of entries) {
         if (!entry?.url?.trim() || typeof entry.username !== 'string' || typeof entry.password !== 'string') continue
@@ -328,6 +347,7 @@ export function importMobileAccounts(entries: MobileAccountEntry[]): number {
         // abriria, pelo catálogo, um leitor de arquivo no processo principal.
         // Arquivo local entra só pelo diálogo do sistema (playlists:add-m3u-file).
         if (entry.type === 'm3u' && !/^https?:\/\//i.test(entry.url.trim())) continue
+        if (importeBloqueado(playlists, removidas, entry)) continue
         const result = upsertPlaylist(playlists, {
             name: entry.name,
             url: entry.url,
@@ -345,25 +365,18 @@ export function importMobileAccounts(entries: MobileAccountEntry[]): number {
     return imported
 }
 
+/**
+ * Import playlists from a backup WITHOUT activating or validating against the
+ * provider (the machine may be offline during a restore). Existing entries
+ * (same url+username) keep their password unless the backup is provably newer.
+ */
 export function importPlaylistsFromBackup(entries: PlaylistBackupEntry[]): number {
     let playlists = getPlaylists()
     const removidas = getRemovedPlaylists()
     let imported = 0
     for (const entry of entries) {
         if (!entry?.url?.trim() || !entry?.username?.trim() || typeof entry.password !== 'string') continue
-        // Apagada de propósito nesta máquina → o arquivo da outra máquina não
-        // pode trazê-la de volta (era ressurreição permanente e auto-propagante).
-        if (removidas[removedPlaylistKey(entry.url, entry.username)]) continue
-        // Já existe aqui: só aceita a credencial remota se ela for comprovada-
-        // mente MAIS NOVA. Antes o upsert sobrescrevia sempre — a senha
-        // corrigida aqui voltava pra velha a cada ciclo (flip-flop entre as
-        // máquinas), quebrando o switch e exportando credencial errada.
-        const local = playlists.find(p => p.url === entry.url && p.username === entry.username)
-        if (local) {
-            const remoteAt = entry.credentialsUpdatedAt ?? 0
-            const localAt = local.credentialsUpdatedAt ?? 0
-            if (remoteAt <= localAt || local.password === entry.password) continue
-        }
+        if (importeBloqueado(playlists, removidas, entry)) continue
         const result = upsertPlaylist(playlists, {
             name: entry.name,
             url: entry.url,
