@@ -20,10 +20,13 @@ export interface SeriesProgress {
     lastWatchedEpisode: number;
     lastWatchedAt: number;
     episodeCount: number; // Total episodes watched
+    completedCount: number; // Quantos desses chegaram ao fim
 }
 
 class WatchProgressService {
     private STORAGE_KEY_PREFIX = 'series_watch_progress';
+    /** Escrita pelo episodeNotificationService — total de episódios do provedor. */
+    private TOTAIS_KEY_PREFIX = 'series_episode_data';
 
     // Get storage key for current profile (per-profile per-playlist)
     private getStorageKey(): string {
@@ -81,11 +84,13 @@ class WatchProgressService {
                         lastWatchedSeason: ep.seasonNumber,
                         lastWatchedEpisode: ep.episodeNumber,
                         lastWatchedAt: ep.watchedAt,
-                        episodeCount: 1
+                        episodeCount: 1,
+                        completedCount: ep.completed ? 1 : 0
                     });
                     continue;
                 }
                 current.episodeCount++;
+                if (ep.completed) current.completedCount++;
                 if (ep.watchedAt > current.lastWatchedAt) {
                     current.lastWatchedSeason = ep.seasonNumber;
                     current.lastWatchedEpisode = ep.episodeNumber;
@@ -358,15 +363,30 @@ class WatchProgressService {
         this.saveProgress(filtered);
     }
 
-    // Check if a series is completed
-    // NOTE: Without knowing the total number of episodes, we cannot reliably determine
-    // if a series is completed. This function now returns false to prevent premature
-    // "completed" marking. Use getSeriesProgress with total episode count instead.
-    isSeriesCompleted(_seriesId: string): boolean {
-        void _seriesId;
-        // Always return false - we cannot determine completion without total episode count
-        // The UI should use a different method that receives the total episode count
-        return false;
+    /**
+     * Série concluída = todo episódio que o PROVEDOR tem foi visto até o fim.
+     *
+     * Devolvia `false` cravado, e com isso três coisas nunca aconteciam: a
+     * categoria "🏆 Séries Finalizadas" do menu abria sempre vazia, o selo ✓ do
+     * card nunca desenhava e a barra de progresso continuava aparecendo em
+     * série terminada.
+     *
+     * O total vem de quem já o persiste: o vigia de novos episódios
+     * (`episodeNotificationService`), na mesma chave por (perfil, playlist) do
+     * progresso. Sem total conhecido, `false` — "todo episódio REGISTRADO está
+     * completo" marcaria como concluída uma série com 1 de 10 vistos.
+     */
+    isSeriesCompleted(seriesId: string): boolean {
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return false;
+
+        const totais = readJson<Record<string, { lastKnownEpisodes?: number }>>(
+            playlistScopedKey(this.TOTAIS_KEY_PREFIX, activeProfile.id), {}
+        );
+        const total = totais[seriesId]?.lastKnownEpisodes ?? 0;
+        if (!(total > 0)) return false;
+
+        return (this.getSeriesProgressIndex().get(seriesId)?.completedCount ?? 0) >= total;
     }
 
     // Clear progress for a series
