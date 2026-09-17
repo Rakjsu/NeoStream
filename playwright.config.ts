@@ -12,12 +12,18 @@ export default defineConfig({
     workers: 1,
     fullyParallel: false,
     retries: 1,
+    // `.only` esquecido num spec faz o Playwright rodar UM teste e sair zero: a
+    // suíte some e o job fica verde. No CI isso é erro; na máquina de quem está
+    // depurando, `.only` continua sendo a ferramenta certa.
+    forbidOnly: !!process.env.CI,
     // First-load IPC (content fetch over the mock server) can take a moment
     timeout: 60_000,
     expect: { timeout: 15_000 },
-    // No CI o html também é gerado: o ci.yml sobe playwright-report/ quando o
-    // job falha — sem este reporter o passo de upload nunca achava nada (foi o
-    // que deixou a investigação do remoteRecord sem error-context/stdout).
+    // No CI o html também é gerado: o ci.yml sobe playwright-report/ SEMPRE,
+    // inclusive quando o job termina verde — que é justamente onde mora o teste
+    // que só passou na repetição (retries: 1). Sem este reporter o passo de
+    // upload não acha nada (foi o que deixou a investigação do remoteRecord sem
+    // error-context/stdout).
     reporter: process.env.CI
         ? [['list'], ['github'], ['html', { open: 'never' }]]
         : [['list'], ['html', { open: 'never' }]],
