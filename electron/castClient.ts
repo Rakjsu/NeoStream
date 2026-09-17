@@ -40,9 +40,7 @@ import {
     extractCurrentItemId,
     extractAudioTracks,
     extractActiveTrackIds,
-    extractTransportId,
-    extractRunningAppId,
-    extractSessionId,
+    findApp,
     extractMediaSessionId,
     motivoDeRecusaDoCast,
     CAST_MEDIA_APP_ID,
@@ -506,18 +504,21 @@ export class CastSession {
         })
     }
 
-    /** Wait for a RECEIVER_STATUS that satisfies `accept`, capturing transportId. */
-    private waitForReceiver(accept: (payload: unknown, transportId: string) => boolean, errorMsg: string): Promise<void> {
+    /** Espera o RECEIVER_STATUS que traz o RECEPTOR DE MÍDIA, capturando transportId. */
+    private waitForReceiver(errorMsg: string): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             const timer = setTimeout(() => { this.receiverStatusListeners.delete(onData); reject(new Error(errorMsg)) }, LAUNCH_TIMEOUT_MS)
             const onData = (message: CastMessage) => {
                 let payload: unknown
                 try { payload = JSON.parse(message.payloadUtf8) } catch { return }
                 if ((payload as { type?: string }).type !== 'RECEIVER_STATUS') return
-                const transportId = extractTransportId(payload)
-                if (!transportId || !accept(payload, transportId)) return
-                this.transportId = transportId
-                this.sessionId = extractSessionId(payload)
+                // Só o CC1AD845, e o par vindo da MESMA entrada: a TV manda
+                // RECEIVER_STATUS espontâneo (troca de app, mexida no volume) e
+                // o transportId do app errado levava o LOAD embora.
+                const app = findApp(payload, CAST_MEDIA_APP_ID)
+                if (!app) return
+                this.transportId = app.transportId
+                this.sessionId = app.sessionId
                 clearTimeout(timer)
                 this.receiverStatusListeners.delete(onData)
                 resolve()
@@ -529,7 +530,7 @@ export class CastSession {
     /** TLS connect + heartbeat + LAUNCH; resolves once transportId is known. */
     private async connectAndLaunch(): Promise<void> {
         await this.connectTransport()
-        const launched = this.waitForReceiver(() => true, 'o dispositivo não abriu o receptor de mídia')
+        const launched = this.waitForReceiver('o dispositivo não abriu o receptor de mídia')
         this.send(CAST_RECEIVER_ID, NS_RECEIVER, launchPayload(this.requestId++))
         await launched
     }
@@ -542,10 +543,7 @@ export class CastSession {
      */
     async attach(): Promise<void> {
         await this.connectTransport()
-        const attached = this.waitForReceiver(
-            (payload) => extractRunningAppId(payload) === CAST_MEDIA_APP_ID,
-            'nenhuma sessão de mídia ativa no dispositivo',
-        )
+        const attached = this.waitForReceiver('nenhuma sessão de mídia ativa no dispositivo')
         this.send(CAST_RECEIVER_ID, NS_RECEIVER, getReceiverStatusPayload(this.requestId++))
         await attached
         // Join the running app's virtual connection and pull its media status.
