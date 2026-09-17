@@ -34,7 +34,7 @@ import {
     vttToSrt,
     rewritePlaylistUris,
 } from './dlnaProtocol';
-import { planDlnaCommand, clampVolume, stepVolume, muteTarget, type DlnaStatusRaw } from './dlnaRemoteRouting';
+import { planDlnaCommand, planDlnaStop, clampVolume, stepVolume, muteTarget, type DlnaStatusRaw } from './dlnaRemoteRouting';
 import { isAllowedHost } from './localServerGuard';
 import {
     MAX_PROXY_REDIRECTS,
@@ -1158,20 +1158,35 @@ export function setupDLNAHandlers() {
                 device = discoveredDevices.get(deviceId);
             }
 
-            if (!device) {
+            const plan = planDlnaStop(castSession, device, deviceId);
+            if (!plan) {
                 throw new Error('Device not found');
             }
 
-            const location = device.location || `http://${device.host}:${device.port || 9197}/dmr`;
-            const controlUrl = await getServiceControlUrl(location, AVTRANSPORT_SERVICE);
-            await sendAvTransportAction(controlUrl, 'Stop', '<InstanceID>0</InstanceID>');
+            // Calculado ANTES do finally: lá dentro o castSession já é null.
+            const tokenHost = plan.from === 'session'
+                ? getHostFromLocation(castSession?.location) || ''
+                : device?.host || '';
 
-            castSession = null;
-            for (const ffmpeg of activeTranscodes) {
-                try { ffmpeg.kill('SIGKILL') } catch { /* already dead */ }
+            try {
+                const controlUrl = plan.from === 'session'
+                    ? plan.controlUrl
+                    : await getServiceControlUrl(plan.location, AVTRANSPORT_SERVICE);
+                await sendAvTransportAction(controlUrl, 'Stop', '<InstanceID>0</InstanceID>');
+            } finally {
+                // Encerramento local mesmo com o SOAP falhando: a interface
+                // fecha o controle de qualquer jeito (o handleStop ignora o
+                // resultado), então sem isto sobrariam ffmpeg vivos e tokens
+                // de acesso válidos. O `finally` é INTERNO de propósito — no
+                // caminho "sem alvo" ele mataria o remux de um Chromecast ou
+                // AirPlay, que compartilham o mesmo proxy de LAN.
+                castSession = null;
+                for (const ffmpeg of activeTranscodes) {
+                    try { ffmpeg.kill('SIGKILL') } catch { /* already dead */ }
+                }
+                activeTranscodes.clear();
+                revokeDeviceTokens(tokenHost);
             }
-            activeTranscodes.clear();
-            revokeDeviceTokens(device.host);
 
             return { success: true };
         } catch (error: unknown) {

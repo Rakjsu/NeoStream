@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { planDlnaCommand, clampVolume, stepVolume, muteTarget, dlnaStateFields } from './dlnaRemoteRouting'
+import { planDlnaCommand, clampVolume, stepVolume, muteTarget, dlnaStateFields, planDlnaStop } from './dlnaRemoteRouting'
 
 describe('planDlnaCommand (controle web → sessão DLNA)', () => {
     it('mapeia as ações de transporte', () => {
@@ -55,5 +55,41 @@ describe('helpers de volume', () => {
         expect(muteTarget(70, 30)).toEqual({ level: 0, preMute: 70 })   // muta e lembra
         expect(muteTarget(0, 70)).toEqual({ level: 70, preMute: 70 })   // restaura
         expect(muteTarget(0, 0)).toEqual({ level: 30, preMute: 0 })     // sem memória: padrão são
+    })
+})
+
+describe('planDlnaStop (o Parar não pode depender da última varredura)', () => {
+    const sessao = {
+        deviceId: 'discovered-uuid:tv::urn-MediaRenderer',
+        avTransportUrl: 'http://192.168.0.10:9197/upnp/control/AVTransport1',
+    }
+
+    it('varredura limpou o mapa e a TV não respondeu — o Stop sai pela sessão', () => {
+        // É o caso real: abrir a janela "Transmitir" dispara uma varredura, a
+        // primeira linha dela LIMPA o mapa de descobertos, e a TV ocupada
+        // tocando pode não responder ao M-SEARCH. O Parar caía em
+        // "Device not found" com o vídeo tocando na sala.
+        expect(planDlnaStop(sessao, undefined, sessao.deviceId))
+            .toEqual({ from: 'session', controlUrl: sessao.avTransportUrl })
+    })
+
+    it('com sessão viva, a URL dela vence a do aparelho', () => {
+        // E de quebra pula o fetch da descrição, que é outra coisa que falha
+        // com a TV ocupada.
+        expect(planDlnaStop(sessao, { host: '192.168.0.10', location: 'http://192.168.0.10:7676/dmr' }, sessao.deviceId))
+            .toEqual({ from: 'session', controlUrl: sessao.avTransportUrl })
+    })
+
+    it('sessão de OUTRO aparelho não é alvo', () => {
+        // Um Parar mirado na TV-B não pode derrubar a sessão da TV-A.
+        expect(planDlnaStop(sessao, { host: '192.168.0.20', location: 'http://192.168.0.20:7676/dmr' }, 'discovered-outra-tv'))
+            .toEqual({ from: 'device', location: 'http://192.168.0.20:7676/dmr' })
+        expect(planDlnaStop(null, { host: '192.168.0.10' }, 'x'))
+            .toEqual({ from: 'device', location: 'http://192.168.0.10:9197/dmr' })
+    })
+
+    it('sem sessão e sem aparelho não há alvo — só aí o erro é honesto', () => {
+        expect(planDlnaStop(null, undefined, 'x')).toBeNull()
+        expect(planDlnaStop(sessao, undefined, 'discovered-outra-tv')).toBeNull()
     })
 })
