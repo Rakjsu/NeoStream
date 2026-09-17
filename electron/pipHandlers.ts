@@ -114,7 +114,11 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
 
         const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL'];
 
-        pipWindow = new BrowserWindow({
+        // 👻 A janela vai numa constante e SÓ DEPOIS na referência do
+        // módulo: tudo que é registrado abaixo ('moved', 'closed') precisa
+        // falar DESTA janela, e não de "a janela atual do PiP" — que, quando
+        // o evento chega, já pode ser outra.
+        const janela = new BrowserWindow({
             width: 400,
             height: 250,
             minWidth: 320,
@@ -139,10 +143,12 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
             },
         });
 
+        pipWindow = janela;
+
         // Position in bottom-right corner of the configured display (falls
         // back to the primary when the saved monitor is gone).
         const area = pickPipDisplay().workArea;
-        pipWindow.setPosition(area.x + area.width - 420, area.y + area.height - 280);
+        janela.setPosition(area.x + area.width - 420, area.y + area.height - 280);
 
         // 📐 Reabre onde o usuário deixou: bounds salvos ao mover/redimensionar,
         // desde que o ponto ainda caia num monitor conectado.
@@ -150,29 +156,40 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
         const boundsVisible = savedBounds && screen.getAllDisplays().some(d =>
             savedBounds.x >= d.bounds.x - 8 && savedBounds.x < d.bounds.x + d.bounds.width &&
             savedBounds.y >= d.bounds.y - 8 && savedBounds.y < d.bounds.y + d.bounds.height);
-        if (savedBounds && boundsVisible) pipWindow.setBounds(savedBounds);
+        if (savedBounds && boundsVisible) janela.setBounds(savedBounds);
         const persistBounds = () => {
-            if (pipWindow && !pipWindow.isDestroyed()) pipStore.set('pipBounds', pipWindow.getBounds());
+            if (!janela.isDestroyed()) pipStore.set('pipBounds', janela.getBounds());
         };
-        pipWindow.on('moved', persistBounds);
-        pipWindow.on('resized', persistBounds);
+        janela.on('moved', persistBounds);
+        janela.on('resized', persistBounds);
 
         // Load PiP page with content data encoded in URL
         const encodedContent = encodeURIComponent(JSON.stringify(content));
         if (VITE_DEV_SERVER_URL) {
-            pipWindow.loadURL(`${VITE_DEV_SERVER_URL}#/pip?data=${encodedContent}`);
+            janela.loadURL(`${VITE_DEV_SERVER_URL}#/pip?data=${encodedContent}`);
         } else {
-            pipWindow.loadFile(path.join(process.env.DIST || '', 'index.html'), {
+            janela.loadFile(path.join(process.env.DIST || '', 'index.html'), {
                 hash: `/pip?data=${encodedContent}`
             });
         }
 
         // Forward state updates from PiP to main window
-        pipWindow.webContents.on('did-finish-load', () => {
+        janela.webContents.on('did-finish-load', () => {
             log.info('PiP window loaded');
         });
 
-        pipWindow.on('closed', () => {
+        janela.on('closed', () => {
+            // 'closed' chega DEPOIS do close() — tempo de sobra pra este mesmo
+            // handler ter aberto a janela seguinte (destacar uma segunda
+            // célula do multi-view, mandar outro conteúdo pro PiP). Se quem
+            // morreu não é mais a janela atual, zerar a referência apagaria o
+            // ponteiro pra janela NOVA: ela continuaria na tela, sem moldura,
+            // sempre no topo, e 'pip:close' (o ✕ dela), 'pip:expand' e o F9
+            // virariam no-ops — um fantasma que só o gerenciador de tarefas
+            // fecha. E avisar 'pip:closed' faria o app se achar sem PiP
+            // enquanto um toca na cara do usuário.
+            if (pipWindow && pipWindow !== janela) return;
+
             pipWindow = null;
             // Notify main window that PiP was closed
             if (mainWindow && !mainWindow.isDestroyed()) {
