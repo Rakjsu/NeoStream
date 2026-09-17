@@ -52,7 +52,7 @@ describe('dvr:rename-file', () => {
     })
 
     afterEach(() => {
-        fs.rmSync(state.videos, { recursive: true, force: true })
+        fs.rmSync(state.videos, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 })
     })
 
     it('o mesmo nome de volta é sucesso, e o arquivo continua lá', async () => {

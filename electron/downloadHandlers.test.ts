@@ -172,7 +172,7 @@ describe('download:start — limpeza do intervalo de progresso', () => {
 
     afterEach(() => {
         vi.useRealTimers()
-        fs.rmSync(state.userData, { recursive: true, force: true })
+        fs.rmSync(state.userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 })
     })
 
     it('caminho feliz continua baixando, mesclando e sem deixar timer', async () => {
@@ -288,7 +288,7 @@ describe('download:get-storage-info — uma varredura por rajada', () => {
     afterEach(() => {
         vi.useRealTimers()
         vi.restoreAllMocks()
-        fs.rmSync(state.userData, { recursive: true, force: true })
+        fs.rmSync(state.userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 })
     })
 
     const espaco = async () => (await invoke('download:get-storage-info', {})) as { used: number }
