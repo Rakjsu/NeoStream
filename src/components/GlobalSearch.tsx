@@ -8,6 +8,7 @@ import { parentalService } from '../services/parentalService';
 import { isCategoryNameBlocked } from '../hooks/useContentFiltering';
 import {
     rankItems,
+    normalizeForSearch,
     getRecentSearches,
     addRecentSearch,
     clearRecentSearches
@@ -45,6 +46,13 @@ interface SearchItem {
     categoryIds: string[];
     /** Live channels only: xmltv id, used to join EPG program results. */
     epgChannelId?: string;
+    /**
+     * Nome já normalizado pra busca (minúsculo, sem acentos). Calculado UMA vez,
+     * quando o cache de sessão é montado: sem ele cada busca re-normalizaria o
+     * catálogo inteiro — três listas, dezenas de milhares de títulos, a cada
+     * pausa de digitação.
+     */
+    normalizedName: string;
 }
 
 /** One EPG program hit (global search), already joined to its channel. */
@@ -111,6 +119,7 @@ function mapItems(data: unknown, kind: SectionKind): SearchItem[] {
         items.push({
             id,
             name: raw.name,
+            normalizedName: normalizeForSearch(raw.name),
             icon: raw.stream_icon || raw.cover || '',
             kind,
             categoryIds: Array.isArray(raw.category_id)
@@ -226,7 +235,9 @@ function isItemAllowed(item: SearchItem, gate: GateConfig): boolean {
  * MAX_PER_CATEGORY after scoring. See src/utils/searchRank.ts.
  */
 function matchItems(items: SearchItem[], query: string): SearchItem[] {
-    return rankItems(items, query, item => item.name, MAX_PER_CATEGORY);
+    // O nome normalizado já vem pronto do cache de sessão (mapItems): a busca
+    // só paga a normalização da query.
+    return rankItems(items, query, item => item.name, MAX_PER_CATEGORY, item => item.normalizedName);
 }
 
 interface ResultGroup {
