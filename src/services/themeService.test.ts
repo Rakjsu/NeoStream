@@ -171,3 +171,56 @@ describe('CSS variable application', () => {
         expect(calls).toBe(1)
     })
 })
+
+/**
+ * 🎨 A cor do perfil é uma CAMADA por cima da escolha do dono.
+ *
+ * Trocar de perfil chamava `setTheme` e reescrevia o `neostream_theme`: a cor
+ * escolhida em Configurações → Aparência sumia sem aviso, e um perfil SEM cor
+ * não restaurava nada — ficava a cor do último perfil colorido que passou.
+ */
+describe('cor do perfil (camada)', () => {
+    it('setProfileAccent pinta sem gravar em neostream_theme, e o null devolve a cor do dono', () => {
+        themeService.setTheme({ accent: 'azul' })
+        themeService.setProfileAccent('verde')
+        const root = document.documentElement
+        expect(root.style.getPropertyValue('--ns-accent')).toBe('#22c55e')
+        expect(root.getAttribute('data-theme')).toBe('default-verde')
+        expect((JSON.parse(localStorage.getItem('neostream_theme')!) as Theme).accent).toBe('azul')
+
+        themeService.setProfileAccent(null)
+        expect(root.style.getPropertyValue('--ns-accent')).toBe('#3b82f6')
+        expect(localStorage.getItem('neostream_theme_profile_accent')).toBeNull()
+    })
+
+    it('getTheme devolve o que está na tela (a Aparência marca o preset por ele)', () => {
+        themeService.setTheme({ accent: 'azul' })
+        themeService.setProfileAccent('verde')
+        expect(themeService.getTheme().accent).toBe('verde')
+    })
+
+    it('escolher a cor em Aparência derruba a camada do perfil', () => {
+        themeService.setProfileAccent('verde')
+        themeService.setTheme({ accent: 'rosa' })
+        expect(document.documentElement.style.getPropertyValue('--ns-accent')).toBe('#ec4899')
+        expect(localStorage.getItem('neostream_theme_profile_accent')).toBeNull()
+    })
+
+    it('mudar só o fundo preserva a camada', () => {
+        themeService.setTheme({ accent: 'azul' })
+        themeService.setProfileAccent('verde')
+        themeService.setTheme({ background: 'amoled' })
+        expect(document.documentElement.style.getPropertyValue('--ns-accent')).toBe('#22c55e')
+        expect(document.documentElement.getAttribute('data-theme')).toBe('amoled-verde')
+    })
+
+    it('avisa os assinantes (a Aparência fica aberta enquanto a sidebar troca de perfil)', () => {
+        let calls = 0
+        const unsub = themeService.subscribe(() => { calls += 1 })
+        themeService.setProfileAccent('verde')
+        expect(calls).toBe(1)
+        unsub()
+        themeService.setProfileAccent(null)
+        expect(calls).toBe(1)
+    })
+})

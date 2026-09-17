@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { profileService, GUEST_PROFILE_ID } from './profileService';
+import { themeService } from './themeService';
 
 // PINs usam crypto.subtle (SHA-256) — disponível no Node/jsdom do vitest.
 
@@ -27,6 +28,25 @@ describe('profileService', () => {
     });
 
     describe('setActiveProfile / deleteProfile', () => {
+        // A cor do perfil é uma CAMADA: pinta o app enquanto ele está ativo e
+        // sai quando ele sai — sem reescrever a cor escolhida em Aparência.
+        it('a cor do perfil não engole a escolhida em Aparência, e sai ao trocar', async () => {
+            const dono = await profileService.createProfile({ name: 'Dono', avatar: 'x' });
+            const filho = await profileService.createProfile({ name: 'Filho', avatar: 'y', accentColor: 'verde' });
+            themeService.setTheme({ accent: 'azul' }); // o dono escolhe em Aparência
+
+            profileService.setActiveProfile(filho!.id);
+            await new Promise(r => setTimeout(r, 0)); // setActiveProfile usa import() dinâmico
+            expect(document.documentElement.style.getPropertyValue('--ns-accent')).toBe('#22c55e');
+            const preferencia = JSON.parse(localStorage.getItem('neostream_theme')!) as { accent: string };
+            expect(preferencia.accent).toBe('azul'); // a escolha do dono continua gravada
+
+            profileService.setActiveProfile(dono!.id); // perfil SEM cor
+            await new Promise(r => setTimeout(r, 0));
+            expect(document.documentElement.style.getPropertyValue('--ns-accent')).toBe('#3b82f6');
+            expect(themeService.getTheme().accent).toBe('azul');
+        });
+
         it('troca o perfil ativo e atualiza lastUsed', async () => {
             const a = await profileService.createProfile({ name: 'A', avatar: 'x' });
             const b = await profileService.createProfile({ name: 'B', avatar: 'x' });

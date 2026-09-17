@@ -9,6 +9,19 @@ import { useState, useEffect } from 'react';
 
 const STORAGE_KEY = 'neostream_theme';
 
+/**
+ * Cor do PERFIL ativo — camada por cima da escolha do dono, em chave própria.
+ *
+ * Trocar de perfil não pode reescrever o `neostream_theme`: a cor escolhida em
+ * Configurações → Aparência sumia sem aviso, e um perfil SEM cor não
+ * restaurava nada — ficava a cor do último perfil colorido que passou por ali.
+ *
+ * Fica de fora do backup e do sync (ver `backupService`): é estado DESTA
+ * máquina, como o perfil ativo. Adotada noutra máquina, pintaria o app com a
+ * cor de um perfil que não está em uso lá.
+ */
+const PROFILE_ACCENT_KEY = 'neostream_theme_profile_accent';
+
 export type BackgroundVariant = 'default' | 'amoled';
 export type AccentId = 'roxo' | 'azul' | 'verde' | 'vermelho' | 'laranja' | 'rosa';
 
@@ -128,25 +141,45 @@ export function parseStoredTheme(raw: string | null): Theme {
 }
 
 class ThemeService {
+    /** Preferência do dono (Configurações → Aparência). Só ele escreve aqui. */
     private theme: Theme;
+    /** Cor do perfil ativo, quando ele tem uma. Vence o accent da preferência. */
+    private profileAccent: AccentId | null = null;
     private listeners: Set<() => void> = new Set();
 
     constructor() {
         let raw: string | null = null;
+        let camada: string | null = null;
         try {
             raw = localStorage.getItem(STORAGE_KEY);
+            camada = localStorage.getItem(PROFILE_ACCENT_KEY);
         } catch {
             // localStorage unavailable (tests/SSR) — fall back to default
         }
         this.theme = parseStoredTheme(raw);
+        this.profileAccent = ACCENT_PRESETS.some(p => p.id === camada) ? camada as AccentId : null;
     }
 
+    /**
+     * O tema que está NA TELA: a cor do perfil ativo por cima da preferência.
+     */
+    private effectiveTheme(): Theme {
+        return this.profileAccent ? { ...this.theme, accent: this.profileAccent } : this.theme;
+    }
+
+    /**
+     * De propósito devolve o tema EFETIVO: a tela de Aparência marca o preset
+     * por `theme.accent`, e devolver a preferência enquanto a camada pinta o
+     * app deixaria o ✓ num roxo que ninguém está vendo.
+     */
     getTheme(): Theme {
-        return { ...this.theme };
+        return { ...this.effectiveTheme() };
     }
 
     setTheme(partial: Partial<Theme>): void {
         this.theme = { ...this.theme, ...partial };
+        // Escolher a cor em Aparência vale na hora: derruba a camada do perfil.
+        if (partial.accent !== undefined) this.writeProfileAccent(null);
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(this.theme));
         } catch {
@@ -156,17 +189,42 @@ class ThemeService {
         this.listeners.forEach(listener => listener());
     }
 
+    /**
+     * Cor do perfil que acabou de assumir (`null` = perfil sem cor).
+     *
+     * Aplica por cima sem tocar no `neostream_theme`, e o `null` restaura a
+     * cor do dono.
+     */
+    setProfileAccent(accent: AccentId | null): void {
+        this.writeProfileAccent(accent);
+        this.apply();
+        // A troca de perfil cabe na sidebar COM a Aparência aberta: sem avisar
+        // os assinantes, o ✓ do seletor ficaria no preset antigo.
+        this.listeners.forEach(listener => listener());
+    }
+
+    private writeProfileAccent(accent: AccentId | null): void {
+        this.profileAccent = accent;
+        try {
+            if (accent) localStorage.setItem(PROFILE_ACCENT_KEY, accent);
+            else localStorage.removeItem(PROFILE_ACCENT_KEY);
+        } catch {
+            // best effort persistence
+        }
+    }
+
     /** Set the --ns-* variables + data-theme attribute on <html>. */
     apply(): void {
         if (typeof document === 'undefined') return;
         const root = document.documentElement;
-        const vars = cssVariablesFor(this.theme);
+        const theme = this.effectiveTheme();
+        const vars = cssVariablesFor(theme);
         for (const [name, value] of Object.entries(vars)) {
             root.style.setProperty(name, value);
         }
-        root.setAttribute('data-theme', `${this.theme.background}-${this.theme.accent}`);
-        root.setAttribute('data-contrast', this.theme.contrast ? '1' : '0');
-        root.setAttribute('data-motion', this.theme.reducedMotion ? 'reduced' : 'normal');
+        root.setAttribute('data-theme', `${theme.background}-${theme.accent}`);
+        root.setAttribute('data-contrast', theme.contrast ? '1' : '0');
+        root.setAttribute('data-motion', theme.reducedMotion ? 'reduced' : 'normal');
         // Mirror the accent into the main process so the phone web-remote
         // page is served with the same color (no-op outside Electron).
         try {
