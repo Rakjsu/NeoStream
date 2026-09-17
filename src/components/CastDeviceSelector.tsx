@@ -93,7 +93,11 @@ export function CastDeviceSelector({
     const [deviceName, setDeviceName] = useState('');
     const [deviceIP, setDeviceIP] = useState('');
     const [devicePort, setDevicePort] = useState('9197');
-    const [casting, setCasting] = useState(false);
+    // Nome do aparelho escolhido enquanto o cast não respondeu (null = ocioso).
+    // Era só um booleano, e o único efeito dele na tela era apagar a lista;
+    // guardando o NOME dá pra dizer em QUEM o app está tentando conectar.
+    const [castingDevice, setCastingDevice] = useState<string | null>(null);
+    const casting = castingDevice !== null;
     const [castError, setCastError] = useState<string | null>(null);
     const [subBusy, setSubBusy] = useState(false);
     const [subMsg, setSubMsg] = useState<string | null>(null);
@@ -120,7 +124,7 @@ export function CastDeviceSelector({
     }, [videoTitle, tmdbId, imdbId, t]);
 
     const handleCast = useCallback(async (device: DLNADevice) => {
-        setCasting(true);
+        setCastingDevice(device.name);
         setCastError(null);
 
         const success = await castToDevice(device);
@@ -138,11 +142,11 @@ export function CastDeviceSelector({
         } else {
             setCastError(dlnaError || t('cast', 'failedToTransmit'));
         }
-        setCasting(false);
+        setCastingDevice(null);
     }, [castToDevice, dlnaError, onClose, onDeviceSelected, t]);
 
     const handleChromecast = useCallback(async (device: ChromecastDevice) => {
-        setCasting(true);
+        setCastingDevice(device.name);
         setCastError(null);
         let success: boolean;
         if (isQueue) {
@@ -174,7 +178,7 @@ export function CastDeviceSelector({
                 } else {
                     setCastError(t('cast', 'failedToTransmit'));
                 }
-                setCasting(false);
+                setCastingDevice(null);
                 return;
             }
             const items = resolved.map((it, idx) => idx === 0
@@ -205,14 +209,14 @@ export function CastDeviceSelector({
         } else {
             setCastError(t('cast', 'failedToTransmit'));
         }
-        setCasting(false);
+        setCastingDevice(null);
     }, [isQueue, queue, tailQueue, tailQueuePromise, contentType, startPosition, effectiveVtt, castToChromecast, onClose, onDeviceSelected, t]);
 
     // Irmao dos dois de cima. O AirPlay era o unico que chamava o hook cru na
     // lista, entao escolher uma Apple TV nao mexia em `casting`, nao fechava a
     // janela, nao avisava do erro e nao pausava o filme no PC.
     const handleAirplay = useCallback(async (device: AirPlayDevice) => {
-        setCasting(true);
+        setCastingDevice(device.name);
         setCastError(null);
 
         const success = await castToAirPlayDevice(device);
@@ -229,7 +233,7 @@ export function CastDeviceSelector({
         } else {
             setCastError(t('cast', 'failedToTransmit'));
         }
-        setCasting(false);
+        setCastingDevice(null);
     }, [castToAirPlayDevice, onClose, onDeviceSelected, t]);
 
     // Auto-discover on mount
@@ -403,6 +407,18 @@ export function CastDeviceSelector({
                                 <div className="cast-error">
                                     <span>⚠️</span>
                                     <span>{castError || dlnaError}</span>
+                                </div>
+                            )}
+
+                            {/* Conectar demora por desenho: o LAUNCH do Chromecast espera
+                                até 15 s (castClient LAUNCH_TIMEOUT_MS) e cada ação SOAP do
+                                DLNA 10 s — e num episódio de série a fila da temporada pode
+                                somar mais 10 s ANTES disso. Até aqui o único sinal era a
+                                lista apagada, que se lê como app travado. */}
+                            {castingDevice !== null && (
+                                <div className="cast-connecting scanning" role="status" aria-live="polite">
+                                    <span className="scan-icon">⏳</span>
+                                    <span>{t('cast', 'connecting')} <strong>{castingDevice}</strong></span>
                                 </div>
                             )}
 
@@ -734,6 +750,20 @@ const castStyles = `
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-5px); }
     75% { transform: translateX(5px); }
+}
+
+/* Conectando (irmão do .cast-error, com o acento no lugar do vermelho) */
+.cast-connecting {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: rgba(var(--ns-accent-rgb), 0.12);
+    border: 1px solid rgba(var(--ns-accent-rgb), 0.3);
+    border-radius: 10px;
+    color: #e5e7eb;
+    font-size: 14px;
+    margin-bottom: 16px;
 }
 
 /* Device List */
