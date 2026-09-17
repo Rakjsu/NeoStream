@@ -24,8 +24,12 @@ const h = await vi.hoisted(async () => {
     const { Readable } = await import('node:stream')
 
     const state = {
-        /** ok = 206 com os bytes; chunk-error = provedor devolve 500; hang = nunca responde. */
-        mode: 'ok' as 'ok' | 'chunk-error' | 'hang',
+        /**
+         * ok = 206 com os bytes; chunk-error = provedor devolve 500;
+         * hang = nunca responde; parcial = manda metade e fica aberto (é o
+         * estado em que um download real passa a maior parte do tempo).
+         */
+        mode: 'ok' as 'ok' | 'chunk-error' | 'hang' | 'parcial',
         totalBytes: 400,
         requests: [] as { options: FakeOptions; destroyed: boolean }[],
         handlers: new Map<string, IpcHandler>(),
@@ -64,6 +68,22 @@ const h = await vi.hoisted(async () => {
         const range = /bytes=(\d+)-(\d+)/.exec(String(req.options.headers?.Range ?? ''))
         const start = Number(range?.[1] ?? 0)
         const end = Number(range?.[2] ?? 0)
+
+        // 'parcial': entrega metade do pedaço e NÃO fecha o stream — é assim
+        // que um download de verdade passa quase todo o tempo, e é o estado em
+        // que a barra ficava parada em 0%.
+        if (state.mode === 'parcial') {
+            const aberto = new Readable({ read() { /* empurrado abaixo */ } }) as unknown as {
+                statusCode: number
+                headers: Record<string, string>
+                push: (chunk: Buffer | null) => void
+            }
+            aberto.statusCode = 206
+            aberto.headers = {}
+            req.cb(aberto)
+            aberto.push(Buffer.alloc(Math.floor((end - start + 1) / 2), 0x41))
+            return
+        }
         const response = Readable.from([Buffer.alloc(end - start + 1, 0x41)]) as unknown as {
             statusCode: number
             headers: Record<string, string>
@@ -162,6 +182,31 @@ describe('download:start — limpeza do intervalo de progresso', () => {
         expect(result.size).toBe(400)
         expect(fs.statSync(result.filePath!).size).toBe(400)
         expect(state.sends.some(s => (s.payload as { progress: number }).progress === 100)).toBe(true)
+        expectNoZombieTimer()
+    })
+
+    it('a barra anda com os bytes que CHEGAM, não só quando um pedaço termina', async () => {
+        // O contador só somava no `.then` de um chunk concluído. Como as quatro
+        // conexões dividem a mesma banda e terminam quase juntas, a tela ficava
+        // sem barra (ela só aparece com progress > 0) e sem MB/s durante quase
+        // todo o download, e depois saltava em degraus de ~25%.
+        state.mode = 'parcial'
+
+        const running = start('dl-progresso')
+        await waitForChunkRequests()
+        // setImmediate é REAL aqui (não está na lista do useFakeTimers): é o
+        // que deixa o stream entregar o 'data' antes de o intervalo disparar.
+        for (let i = 0; i < 5; i++) await new Promise(r => setImmediate(r))
+        vi.advanceTimersByTime(500)
+
+        const andando = state.sends.filter(s => {
+            const p = s.payload as { progress: number; downloadedBytes: number }
+            return s.channel === 'download:progress' && p.downloadedBytes > 0 && p.progress < 100
+        })
+        expect(andando.length).toBeGreaterThan(0)
+
+        await invoke('download:cancel', { id: 'dl-progresso' })
+        await running
         expectNoZombieTimer()
     })
 
