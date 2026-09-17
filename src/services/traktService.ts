@@ -147,30 +147,95 @@ export function splitTitleYear(title: string): { clean: string; year?: number } 
     return { clean, year };
 }
 
-async function traktGet(path: string, clientId: string, access: string): Promise<unknown> {
-    const response = await fetch(`${API}${path}`, {
+/**
+ * 🔄 Troca o refresh guardado na conexão por um access novo. O access do Trakt
+ * vence (~3 meses) e, sem isto, todo /sync passava a dar 401 em silêncio — os
+ * chamadores engolem o erro no catch e a tela continuava dizendo "✓ Conectado".
+ * Devolve o access novo, ou null se não deu.
+ */
+async function renovarTokenTrakt(): Promise<string | null> {
+    const token = getToken();
+    const { clientId, clientSecret } = getTraktCreds();
+    if (!token?.refresh || !clientId || !clientSecret) return null;
+    try {
+        const response = await fetch(`${API}/oauth/token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                refresh_token: token.refresh,
+                client_id: clientId,
+                client_secret: clientSecret,
+                redirect_uri: 'urn:ietf:wg:oauth:2.0:oob', // device code: o Trakt exige o campo
+                grant_type: 'refresh_token',
+            }),
+        });
+        if (!response.ok) {
+            // SÓ o 401 quer dizer "este refresh não vale mais" — aí a conexão
+            // morreu de fato e apagá-la é o que faz a tela parar de mentir.
+            //
+            // Qualquer outro código mantém a conexão: 429 é o "slow down"
+            // documentado do OAuth do Trakt (e a regra da casa, em
+            // electron/fetchRetry.ts, trata 429 como TRANSITÓRIO), 5xx é o Trakt
+            // fora do ar, e 400 é o que volta se o corpo desta requisição
+            // estiver errado. Esse último importa: o formato do corpo veio da
+            // documentação, não de uma medição contra o Trakt real — com uma
+            // regra mais larga, um erro MEU aqui deslogaria o usuário, e
+            // reconectar é device code na mão, no site.
+            if (response.status === 401) disconnectTrakt();
+            return null;
+        }
+        const data = await response.json() as { access_token?: string; refresh_token?: string };
+        if (!data.access_token) return null;
+        localStorage.setItem(TOKEN_KEY, JSON.stringify({
+            access: data.access_token,
+            refresh: data.refresh_token ?? token.refresh,
+        }));
+        return data.access_token;
+    } catch {
+        return null; // offline: não desconecta, a próxima chamada tenta de novo
+    }
+}
+
+// Uma renovação por vez: chamadas em paralelo (o Promise.all da watchlist)
+// dariam 401 juntas e a segunda gastaria um refresh_token já usado — o Trakt
+// recusaria e a conexão seria apagada por engano.
+let renovacaoEmVoo: Promise<string | null> | null = null;
+function renovarTokenTraktUmaVez(): Promise<string | null> {
+    if (!renovacaoEmVoo) {
+        renovacaoEmVoo = renovarTokenTrakt().finally(() => { renovacaoEmVoo = null; });
+    }
+    return renovacaoEmVoo;
+}
+
+/** Chamada ao Trakt com UMA repetição no 401 (access vencido → renova → repete). */
+async function traktFetch(path: string, clientId: string, access: string, init?: RequestInit): Promise<Response> {
+    const chamar = (bearer: string) => fetch(`${API}${path}`, {
+        ...init,
         headers: {
             'Content-Type': 'application/json',
             'trakt-api-version': '2',
             'trakt-api-key': clientId,
-            Authorization: `Bearer ${access}`,
+            Authorization: `Bearer ${bearer}`,
         },
     });
+    // O `access` que o chamador leu pode estar vencido enquanto o gravado já foi
+    // renovado por outra chamada da mesma rajada — `syncTraktMovieWatched` lê o
+    // token UMA vez e faz duas idas seguidas com o mesmo valor. Usar sempre o que
+    // está gravado AGORA evita queimar um refresh_token por requisição.
+    const response = await chamar(getToken()?.access ?? access);
+    if (response.status !== 401) return response;
+    const novo = await renovarTokenTraktUmaVez();
+    return novo ? chamar(novo) : response;
+}
+
+async function traktGet(path: string, clientId: string, access: string): Promise<unknown> {
+    const response = await traktFetch(path, clientId, access);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
 }
 
 async function traktPost(path: string, body: unknown, clientId: string, access: string): Promise<void> {
-    const response = await fetch(`${API}${path}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'trakt-api-version': '2',
-            'trakt-api-key': clientId,
-            Authorization: `Bearer ${access}`,
-        },
-        body: JSON.stringify(body),
-    });
+    const response = await traktFetch(path, clientId, access, { method: 'POST', body: JSON.stringify(body) });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 }
 
