@@ -649,7 +649,14 @@ export function setupDownloadHandlers() {
                 // rename (atômico no mesmo volume). Escrevendo direto no
                 // destino, uma conexão que caía no meio deixava lá um .jpg
                 // pela metade que o atalho acima passava a servir para sempre.
-                const tempPath = `${filePath}.tmp`;
+                // Sufixo ÚNICO por tentativa. Com `${filePath}.tmp` fixo, duas
+                // tentativas da MESMA capa disputam o mesmo arquivo: a grade
+                // pede a capa de novo assim que a primeira falha, e a limpeza
+                // da primeira ainda está pendurada no 'close' do stream dela
+                // — ela apaga o temporário da SEGUNDA, que então morre no
+                // rename com ENOENT. Dois pedidos simultâneos é pior: os dois
+                // escrevem no mesmo arquivo e o rename publica a mistura.
+                const tempPath = `${filePath}.${process.pid}-${Math.random().toString(36).slice(2, 8)}.tmp`;
                 let escrita: fs.WriteStream | null = null;
                 let encerrado = false;
 
