@@ -148,6 +148,34 @@ describe('cache de capa: nada de arquivo pela metade', () => {
         expect(fs.statSync(path.join(capas(), '42.jpg')).size).toBe(h.IMAGEM.length)
     })
 
+    it('a limpeza da tentativa que falhou nao leva junto o temporario da seguinte', async () => {
+        // A grade pede a capa de novo assim que a primeira tentativa falha, e
+        // a limpeza da primeira ainda esta pendurada no 'close' do stream
+        // dela. Com um `.tmp` de nome FIXO ela apagava o arquivo da SEGUNDA,
+        // que morria no rename com ENOENT -- a capa nunca mais entrava.
+        h.state.modo = 'metade'
+        await cachear('42')
+
+        h.state.modo = 'inteiro'
+        const segunda = await cachear('42')
+        expect(segunda.success, segunda.error).toBe(true)
+
+        // E nenhum temporario sobra depois que as duas assentam.
+        await esperar(() => arquivosDeCapa().every(nome => !nome.endsWith('.tmp')), 'sobrou .tmp no disco')
+        expect(fs.statSync(path.join(capas(), '42.jpg')).size).toBe(h.IMAGEM.length)
+    })
+
+    it('dois pedidos SIMULTANEOS da mesma capa nao escrevem no mesmo arquivo', async () => {
+        // Dois cards do mesmo item, ou um re-render: com o `.tmp` fixo os dois
+        // downloads escreviam no MESMO arquivo e o rename publicava a mistura.
+        const [a, b] = await Promise.all([cachear('42'), cachear('42')])
+
+        expect(a.success && b.success, `${a.error ?? ''} ${b.error ?? ''}`).toBe(true)
+        await esperar(() => arquivosDeCapa().every(nome => !nome.endsWith('.tmp')), 'sobrou .tmp no disco')
+        // O tamanho denuncia a mistura: dois corpos no mesmo arquivo dobram.
+        expect(fs.statSync(path.join(capas(), '42.jpg')).size).toBe(h.IMAGEM.length)
+    })
+
     it('arquivo de 0 byte ja no disco nao conta como cache', async () => {
         // Sobra de uma versao anterior do app: o arquivo nascia junto com os
         // cabecalhos, entao 0 byte e o estado mais comum do lixo.
