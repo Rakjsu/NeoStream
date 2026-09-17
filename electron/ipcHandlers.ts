@@ -274,6 +274,61 @@ const xmltvBuilding = new Map<string, Promise<XmltvIndex | null>>()
 
 const EPG_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
+/** Resposta do `epg:get-cached` — a MESMA para todos que pegam carona. */
+type EpgCacheResult =
+    | { success: true; data: string; fromCache: boolean; stale?: boolean }
+    | { success: false; error: string }
+
+/**
+ * Downloads de EPG em voo, por (arquivo, url, modo) — irmão do
+ * `xmltvBuilding` acima e do `inFlight` de `catalogCache`/`m3uCache`.
+ *
+ * Sem ele, a PRIMEIRA abertura do Guia com lista americana baixava os mesmos
+ * 10 XMLTV até quatro vezes cada: `fetchIndexedChannel` pede um
+ * `epg:get-cached` por arquivo faltante, por canal, e o guia resolve quatro
+ * canais ao mesmo tempo (`MAX_CONCURRENT_EPG`). Eram 40 downloads e 40
+ * gravações no MESMO arquivo — inclusive por cima de quem estivesse lendo.
+ *
+ * A url entra na chave porque o cache é invalidado quando ela muda
+ * (`epgFileStatus`): dois pedidos do mesmo `cacheKey` com urls diferentes são
+ * downloads diferentes e não podem virar um só.
+ *
+ * O `forceRefresh` entra na chave, ao contrário do que `catalogCache` e
+ * `m3uCache` fazem, e a diferença é de propósito: lá a promessa em voo é
+ * SEMPRE uma ida ao provedor, então um pedido forçado ganha o mesmo dado
+ * pegando carona; aqui ela pode terminar servindo o arquivo do disco, e um
+ * refresh forçado que recebesse isso não teria forçado nada. Hoje o único
+ * chamador de produção manda sempre `false`, então na prática é de graça.
+ */
+const epgBaixando = new Map<string, Promise<EpgCacheResult>>()
+
+/**
+ * `rename` com retentativa curta.
+ *
+ * No Windows, renomear POR CIMA de um destino que outro handle tem aberto
+ * volta EPERM/EACCES/EBUSY — e o destino aqui é justamente o `.xml` que
+ * `getGroupIndex` lê (e que o antivírus abre assim que ele aparece). Sem a
+ * espera, um leitor no meio do caminho derrubaria o download inteiro.
+ */
+async function renomearComRetentativa(
+    fsp: typeof import('fs/promises'),
+    origem: string,
+    destino: string,
+    tentativas = 5,
+): Promise<void> {
+    for (let i = 1; ; i++) {
+        try {
+            await fsp.rename(origem, destino)
+            return
+        } catch (erro: unknown) {
+            const codigo = (erro as NodeJS.ErrnoException)?.code
+            const espera = codigo === 'EPERM' || codigo === 'EACCES' || codigo === 'EBUSY'
+            if (!espera || i >= tentativas) throw erro
+            await new Promise(resolve => setTimeout(resolve, 20 * i))
+        }
+    }
+}
+
 /** Arquivo + meta de um cacheKey. `null` quando não existe ou está vencido. */
 async function epgFileStatus(cacheKey: string, url: string): Promise<{ file: string; stamp: string } | null> {
     // Chave torta não tem arquivo — e não pode virar caminho (epgCacheGuard.ts).
@@ -294,6 +349,131 @@ async function epgFileStatus(cacheKey: string, url: string): Promise<{ file: str
         return { file, stamp: `${stat.mtimeMs}` }
     } catch {
         return null
+    }
+}
+
+/**
+ * O download de um XMLTV para `epg_cache/<cacheKey>.xml`.
+ *
+ * Corpo do `epg:get-cached`, extraído para o handler poder ser uma casca
+ * fina sobre o mapa de downloads em voo (`epgBaixando`). A lógica — TTL,
+ * fallback para cache velho, teto de bytes — é a mesma de sempre.
+ */
+async function baixarEpgParaCache(url: string, cacheKey: string, forceRefresh: boolean): Promise<EpgCacheResult> {
+    try {
+        const fs = await import('fs/promises')
+        const path = await import('path')
+        const { app } = await import('electron')
+
+        // Get app data directory for cache storage
+        const cacheDir = path.join(app.getPath('userData'), 'epg_cache')
+        const cacheFile = path.join(cacheDir, `${cacheKey}.xml`)
+        const metaFile = path.join(cacheDir, `${cacheKey}.meta.json`)
+
+        // Ensure cache directory exists
+        await fs.mkdir(cacheDir, { recursive: true })
+
+        // Check if we have valid cache (downloaded within last 24 hours)
+        // Files are cached for 24 hours to avoid unnecessary re-downloads
+        const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
+
+        let cacheValid = false
+        if (!forceRefresh) {
+            try {
+                const metaContent = await fs.readFile(metaFile, 'utf-8')
+                const meta = JSON.parse(metaContent)
+                const cacheAge = Date.now() - meta.timestamp
+
+                if (cacheAge < CACHE_TTL_MS) {
+                    // Cache is still valid (within 24 hours)
+                    log.info('[EPG Cache] Cache valid, age:', Math.round(cacheAge / 3600000), 'hours')
+                    cacheValid = true
+                } else {
+                    log.info('[EPG Cache] Cache old, downloading fresh (age:', Math.round(cacheAge / 60000), 'min)')
+                }
+            } catch {
+                log.info('[EPG Cache] No cache found, will download fresh')
+            }
+        } else {
+            log.info('[EPG Cache] Force refresh requested')
+        }
+
+        // If cache is valid (within 24 hours), return cached data
+        if (cacheValid) {
+            try {
+                const data = await fs.readFile(cacheFile, 'utf-8')
+                log.info('[EPG Cache] Returning cached data, length:', data.length)
+                return { success: true, data, fromCache: true }
+            } catch {
+                log.info('[EPG Cache] Cache file read failed, will download fresh')
+            }
+        }
+
+        // Download fresh data
+        log.info('[EPG Cache] Downloading from:', url)
+        const fetch = (await import('node-fetch')).default
+        const response = await fetchWithRetry(async () => fetch(url, {
+            agent: await resolveProviderHttpsAgent(url),
+            // Generous: EPG XML files are big; a failure falls back to stale cache.
+            signal: AbortSignal.timeout(60000),
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'application/xml, text/xml, */*'
+            }
+        }))
+
+        if (!response.ok) {
+            log.error('[EPG Cache] Download failed:', response.status)
+
+            // Try to return stale cache if download fails
+            try {
+                const data = await fs.readFile(cacheFile, 'utf-8')
+                log.info('[EPG Cache] Returning stale cache due to download failure')
+                return { success: true, data, fromCache: true, stale: true }
+            } catch {
+                return { success: false, error: `Download failed: HTTP ${response.status}` }
+            }
+        }
+
+        const data = await readResponseTextWithLimit(response, XMLTV_MAX_BYTES)
+        registerApprovedProviderUrl(response.url || url)
+        log.info('[EPG Cache] Downloaded data, length:', data.length)
+
+        // 💾 Grava em temporário e RENOMEIA — os dois arquivos.
+        //
+        // Escrever direto no destino deixa o `.xml` pela metade quando a
+        // gravação morre no meio (disco cheio, app fechado) e por cima de
+        // quem estiver lendo. O sufixo aleatório é para dois pedidos do mesmo
+        // cacheKey com urls diferentes não disputarem o mesmo temporário.
+        const sufixoTmp = `${process.pid}-${Math.random().toString(36).slice(2, 8)}.tmp`
+        const tmpFile = `${cacheFile}.${sufixoTmp}`
+        const tmpMeta = `${metaFile}.${sufixoTmp}`
+        try {
+            await fs.writeFile(tmpFile, data, 'utf-8')
+            await fs.writeFile(tmpMeta, JSON.stringify({
+                timestamp: Date.now(),
+                url: url,
+                size: data.length
+            }), 'utf-8')
+            // O `.xml` primeiro DE PROPÓSITO: uma queda entre os dois renames
+            // deixa guia novo com meta velho, e aí `epgFileStatus` devolve
+            // null e o arquivo é rebaixado (lado seguro). Na ordem inversa o
+            // meta novo apontaria para o XML velho e o app serviria grade
+            // vencida como fresca.
+            await renomearComRetentativa(fs, tmpFile, cacheFile)
+            await renomearComRetentativa(fs, tmpMeta, metaFile)
+        } catch (erroDaGravacao: unknown) {
+            await fs.rm(tmpFile, { force: true }).catch(() => undefined)
+            await fs.rm(tmpMeta, { force: true }).catch(() => undefined)
+            throw erroDaGravacao
+        }
+
+        log.info('[EPG Cache] Saved to cache:', cacheFile)
+        return { success: true, data, fromCache: false }
+
+    } catch (error: unknown) {
+        log.error('[EPG Cache] Error:', getErrorMessage(error))
+        return { success: false, error: getErrorMessage(error) }
     }
 }
 
@@ -937,104 +1117,24 @@ export function setupIpcHandlers() {
 
     // EPG Cache System - Downloads EPG XML files on app start
     // Downloads fresh on every app restart, caches during session only
-    ipcMain.handle('epg:get-cached', async (_, { url, cacheKey, forceRefresh = false }) => {
-        // 🧱 Antes do try: o cacheKey vira NOME DE ARQUIVO logo abaixo, e
+    ipcMain.handle('epg:get-cached', async (_, { url, cacheKey, forceRefresh = false }): Promise<EpgCacheResult> => {
+        // 🧱 Antes de tudo: o cacheKey vira NOME DE ARQUIVO lá dentro, e
         // `path.join` normaliza sem confinar — ver epgCacheGuard.ts.
         if (!cacheKeyValido(cacheKey)) return { success: false, error: 'cacheKey inválido' }
-        try {
-            const fs = await import('fs/promises')
-            const path = await import('path')
-            const { app } = await import('electron')
 
-            // Get app data directory for cache storage
-            const cacheDir = path.join(app.getPath('userData'), 'epg_cache')
-            const cacheFile = path.join(cacheDir, `${cacheKey}.xml`)
-            const metaFile = path.join(cacheDir, `${cacheKey}.meta.json`)
+        // 🔁 Um download por (arquivo, url, modo): quem chega no meio pega
+        // carona na MESMA promessa em vez de abrir outra conexão e gravar por
+        // cima. Ver `epgBaixando`.
+        const emVooChave = `${cacheKey}\n${String(url)}\n${forceRefresh ? 1 : 0}`
+        const emVoo = epgBaixando.get(emVooChave)
+        if (emVoo) return emVoo
 
-            // Ensure cache directory exists
-            await fs.mkdir(cacheDir, { recursive: true })
-
-            // Check if we have valid cache (downloaded within last 24 hours)
-            // Files are cached for 24 hours to avoid unnecessary re-downloads
-            const CACHE_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
-
-            let cacheValid = false
-            if (!forceRefresh) {
-                try {
-                    const metaContent = await fs.readFile(metaFile, 'utf-8')
-                    const meta = JSON.parse(metaContent)
-                    const cacheAge = Date.now() - meta.timestamp
-
-                    if (cacheAge < CACHE_TTL_MS) {
-                        // Cache is still valid (within 24 hours)
-                        log.info('[EPG Cache] Cache valid, age:', Math.round(cacheAge / 3600000), 'hours')
-                        cacheValid = true
-                    } else {
-                        log.info('[EPG Cache] Cache old, downloading fresh (age:', Math.round(cacheAge / 60000), 'min)')
-                    }
-                } catch {
-                    log.info('[EPG Cache] No cache found, will download fresh')
-                }
-            } else {
-                log.info('[EPG Cache] Force refresh requested')
-            }
-
-            // If cache is valid (within 24 hours), return cached data
-            if (cacheValid) {
-                try {
-                    const data = await fs.readFile(cacheFile, 'utf-8')
-                    log.info('[EPG Cache] Returning cached data, length:', data.length)
-                    return { success: true, data, fromCache: true }
-                } catch {
-                    log.info('[EPG Cache] Cache file read failed, will download fresh')
-                }
-            }
-
-            // Download fresh data
-            log.info('[EPG Cache] Downloading from:', url)
-            const fetch = (await import('node-fetch')).default
-            const response = await fetchWithRetry(async () => fetch(url, {
-                agent: await resolveProviderHttpsAgent(url),
-                // Generous: EPG XML files are big; a failure falls back to stale cache.
-                signal: AbortSignal.timeout(60000),
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Accept': 'application/xml, text/xml, */*'
-                }
-            }))
-
-            if (!response.ok) {
-                log.error('[EPG Cache] Download failed:', response.status)
-
-                // Try to return stale cache if download fails
-                try {
-                    const data = await fs.readFile(cacheFile, 'utf-8')
-                    log.info('[EPG Cache] Returning stale cache due to download failure')
-                    return { success: true, data, fromCache: true, stale: true }
-                } catch {
-                    return { success: false, error: `Download failed: HTTP ${response.status}` }
-                }
-            }
-
-            const data = await readResponseTextWithLimit(response, XMLTV_MAX_BYTES)
-            registerApprovedProviderUrl(response.url || url)
-            log.info('[EPG Cache] Downloaded data, length:', data.length)
-
-            // Save to cache
-            await fs.writeFile(cacheFile, data, 'utf-8')
-            await fs.writeFile(metaFile, JSON.stringify({
-                timestamp: Date.now(),
-                url: url,
-                size: data.length
-            }), 'utf-8')
-
-            log.info('[EPG Cache] Saved to cache:', cacheFile)
-            return { success: true, data, fromCache: false }
-
-        } catch (error: unknown) {
-            log.error('[EPG Cache] Error:', getErrorMessage(error))
-            return { success: false, error: getErrorMessage(error) }
-        }
+        const trabalho = baixarEpgParaCache(String(url), cacheKey, Boolean(forceRefresh))
+            .finally(() => {
+                if (epgBaixando.get(emVooChave) === trabalho) epgBaixando.delete(emVooChave)
+            })
+        epgBaixando.set(emVooChave, trabalho)
+        return trabalho
     })
 
     /**
