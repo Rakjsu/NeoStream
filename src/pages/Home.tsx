@@ -56,7 +56,10 @@ interface ContinueWatchingItem {
     name: string;
     cover: string;
     progress?: SeriesProgress;
-    movieProgress?: { currentTime: number; duration: number; progress: number };
+    // `watchedAt` é o epoch em ms da última vez que o filme rodou — o par do
+    // `lastWatchedAt` da série. É o que ordena a fileira; `currentTime` é só
+    // posição no vídeo e nunca serve de data.
+    movieProgress?: { currentTime: number; duration: number; progress: number; watchedAt: number };
     hasNewEpisode?: boolean;
 }
 
@@ -419,16 +422,21 @@ export function Home() {
                     movieProgress: {
                         currentTime: progress.currentTime,
                         duration: progress.duration,
-                        progress: progress.progress
+                        progress: progress.progress,
+                        watchedAt: progress.watchedAt
                     }
                 });
             }
         });
 
-        // Sort by most recently watched
+        // Sort by most recently watched — os dois lados em epoch de ms.
+        // O filme entrava com `currentTime` (SEGUNDOS vistos, 0–10.000) contra
+        // o `lastWatchedAt` da série (~1,7e12): toda série em andamento vencia
+        // todo filme, e entre filmes a ordem virava "quem está mais perto do
+        // fim". A mesma lista alimenta o "Retomar ao abrir" logo abaixo.
         items.sort((a, b) => {
-            const aTime = a.progress?.lastWatchedAt || a.movieProgress?.currentTime || 0;
-            const bTime = b.progress?.lastWatchedAt || b.movieProgress?.currentTime || 0;
+            const aTime = a.progress?.lastWatchedAt ?? a.movieProgress?.watchedAt ?? 0;
+            const bTime = b.progress?.lastWatchedAt ?? b.movieProgress?.watchedAt ?? 0;
             return bTime - aTime;
         });
 
