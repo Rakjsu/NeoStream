@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { pedirAberturaDeFicha } from '../services/abrirFicha';
 import { normalizeTitle } from '../services/personSearchHelpers';
+import { getCatalogTitleIndex, type CatalogTitleIndex } from '../services/catalogTitleIndex';
 import { resolveSeriesDetails, resolveMovieDetails, fetchMovieTrailer, fetchSeriesTrailer, fetchCollection, fetchSimilarByTmdbId, fetchCastByTmdbId, fetchPersonFilmography, type TMDBSeriesDetails, type TMDBMovieDetails, type TMDBCollection, type TMDBSimilarItem, type TMDBCastMember } from '../services/tmdb';
 import { allTags, getMark, setRating, toggleTag } from '../services/personalMarksService';
 import { watchProgressService } from '../services/watchProgressService';
@@ -89,36 +90,19 @@ export function ContentDetailModal({
     const [filmography, setFilmography] = useState<{ name: string; items: TMDBSimilarItem[] } | null>(null);
     // 🔗 Índice do catálogo (título normalizado → id) pra cruzar Parecidos e
     // filmografia: só aparece o que EXISTE no app, e clicável abre a ficha.
-    const [catalogIndex, setCatalogIndex] = useState<{ vod: Map<string, string>; series: Map<string, string> } | null>(null);
+    const [catalogIndex, setCatalogIndex] = useState<CatalogTitleIndex | null>(null);
     const navigate = useNavigate();
 
-    // Carrega o índice quando as seções TMDB aparecem (listas vêm do cache
-    // SWR do main — barato). Uma vez por montagem do modal.
+    // Carrega o índice quando as seções TMDB aparecem. O índice é cache de
+    // MÓDULO (catalogTitleIndex): o modal é remontado a cada ficha aberta, e
+    // montá-lo aqui fazia o catálogo INTEIRO atravessar o IPC toda vez.
     useEffect(() => {
         if (!isOpen || catalogIndex) return;
         if (similar.length === 0 && !filmography) return;
         let cancelled = false;
-        void (async () => {
-            const [vodRes, seriesRes] = await Promise.all([
-                window.ipcRenderer.invoke('streams:get-vod').catch(() => null),
-                window.ipcRenderer.invoke('streams:get-series').catch(() => null),
-            ]) as [
-                { success?: boolean; data?: { stream_id: number | string; name: string }[] } | null,
-                { success?: boolean; data?: { series_id: number | string; name: string }[] } | null,
-            ];
-            if (cancelled) return;
-            const vod = new Map<string, string>();
-            for (const movie of vodRes?.data ?? []) {
-                const key = normalizeTitle(movie.name);
-                if (key && !vod.has(key)) vod.set(key, String(movie.stream_id));
-            }
-            const seriesIdx = new Map<string, string>();
-            for (const show of seriesRes?.data ?? []) {
-                const key = normalizeTitle(show.name);
-                if (key && !seriesIdx.has(key)) seriesIdx.set(key, String(show.series_id));
-            }
-            setCatalogIndex({ vod, series: seriesIdx });
-        })();
+        void getCatalogTitleIndex()
+            .then(index => { if (!cancelled) setCatalogIndex(index); })
+            .catch(() => { /* sem índice os rails TMDB só não ficam clicáveis */ });
         return () => { cancelled = true; };
     }, [isOpen, catalogIndex, similar.length, filmography]);
 
