@@ -168,34 +168,49 @@ export function Downloads() {
         if (result?.success) void loadRecordings();
     };
 
-    const loadData = useCallback(async () => {
+    // As listas saem da memória do serviço: de graça, pode correr a cada
+    // progresso.
+    const loadData = useCallback(() => {
         setDownloads(downloadService.getDownloads());
         setGroupedData(downloadService.getDownloadsGrouped());
-        const storage = await downloadService.getStorageInfo();
-        setStorageInfo(storage);
+    }, []);
+
+    // 💽 O espaço em disco NÃO: ele custa um IPC que varre a pasta inteira de
+    // downloads (readdirSync + statSync por entrada, recursivo) no event loop
+    // do processo principal — o mesmo que está lendo os sockets do download.
+    // Estava amarrado ao evento de progresso, que sai 4 vezes por segundo no
+    // caminho paralelo e UMA VEZ POR CHUNK DE SOCKET no caminho de conexão
+    // única (~80/s a 5 MB/s). O app varria a árvore de arquivos 80 vezes por
+    // segundo pra redesenhar uma barrinha, com o custo caindo justamente em
+    // quem está baixando.
+    const loadStorage = useCallback(async () => {
+        setStorageInfo(await downloadService.getStorageInfo());
     }, []);
 
     useEffect(() => {
         queueMicrotask(() => {
-            void loadData();
+            loadData();
+            void loadStorage();
         });
 
         // Subscribe to download events
         const handleUpdate = () => loadData();
-        downloadService.on('added', handleUpdate);
+        // Só quando o disco muda de tamanho de um jeito que a pessoa liga.
+        const handleDiskChange = () => { loadData(); void loadStorage(); };
+        downloadService.on('added', handleDiskChange);
         downloadService.on('progress', handleUpdate);
-        downloadService.on('completed', handleUpdate);
-        downloadService.on('deleted', handleUpdate);
-        downloadService.on('cancelled', handleUpdate);
+        downloadService.on('completed', handleDiskChange);
+        downloadService.on('deleted', handleDiskChange);
+        downloadService.on('cancelled', handleDiskChange);
 
         return () => {
-            downloadService.off('added', handleUpdate);
+            downloadService.off('added', handleDiskChange);
             downloadService.off('progress', handleUpdate);
-            downloadService.off('completed', handleUpdate);
-            downloadService.off('deleted', handleUpdate);
-            downloadService.off('cancelled', handleUpdate);
+            downloadService.off('completed', handleDiskChange);
+            downloadService.off('deleted', handleDiskChange);
+            downloadService.off('cancelled', handleDiskChange);
         };
-    }, [loadData]);
+    }, [loadData, loadStorage]);
 
     const selectedSeriesName = seriesModal.series?.seriesName;
 
