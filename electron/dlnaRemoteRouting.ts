@@ -45,6 +45,57 @@ export function clampVolume(level: number): number {
     return Math.max(0, Math.min(100, Math.round(level)))
 }
 
+// ------------------------------------------------------ Alvo do dlna:stop ----
+
+/** O que o Parar precisa saber da sessão viva. */
+export interface DlnaStopSession {
+    deviceId: string
+    avTransportUrl: string
+}
+
+/** O que o Parar precisa saber do aparelho da lista (descoberto ou manual). */
+export interface DlnaStopDevice {
+    host: string
+    port?: number
+    location?: string
+}
+
+export type DlnaStopPlan =
+    | { from: 'session'; controlUrl: string }
+    | { from: 'device'; location: string }
+
+/**
+ * De onde sai o Stop.
+ *
+ * A sessão viva DAQUELE aparelho vence, porque o cast sobrevive à lista de
+ * descobertos: o `dlna:discover` LIMPA o mapa na primeira linha e passa
+ * segundos varrendo, e a TV ocupada tocando pode nem responder ao M-SEARCH.
+ * Como cada abertura da janela "Transmitir" dispara uma varredura, era comum
+ * o Parar cair em "Device not found" com o vídeo tocando na sala.
+ *
+ * Só cai no aparelho quando não há sessão PARA AQUELE ID — casar o id importa:
+ * um Parar mirado na TV-B não pode derrubar a sessão da TV-A. Mesma regra do
+ * `airplay:stop`, que já documenta que "a cast can outlive the mDNS record".
+ *
+ * `null` = não há alvo nenhum; aí o "Device not found" é honesto.
+ */
+export function planDlnaStop(
+    session: DlnaStopSession | null | undefined,
+    device: DlnaStopDevice | null | undefined,
+    deviceId: string
+): DlnaStopPlan | null {
+    if (session && session.deviceId === deviceId && session.avTransportUrl) {
+        return { from: 'session', controlUrl: session.avTransportUrl }
+    }
+    if (device) {
+        return {
+            from: 'device',
+            location: device.location || `http://${device.host}:${device.port || 9197}/dmr`
+        }
+    }
+    return null
+}
+
 /** Next volume after a ± step. */
 export function stepVolume(current: number, delta: number): number {
     return clampVolume(current + delta)
