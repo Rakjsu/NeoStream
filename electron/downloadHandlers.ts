@@ -633,8 +633,11 @@ export function setupDownloadHandlers() {
             const fileName = `${sanitizeFilename(id)}${ext}`;
             const filePath = path.join(coversPath, fileName);
 
-            // If already cached, return existing path
-            if (fs.existsSync(filePath)) {
+            // Atalho de cache. Tamanho 0 é SOBRA de uma queda de rede (o
+            // arquivo nascia junto com os cabeçalhos), não capa: sem esta
+            // conta o lixo era servido como capa boa para sempre — não há TTL,
+            // revalidação nem botão na interface para limpar a pasta.
+            if (getFileSizeSync(filePath) > 0) {
                 return { success: true, localPath: `file:///${filePath.replace(/\\/g, '/')}` };
             }
 
@@ -642,47 +645,81 @@ export function setupDownloadHandlers() {
             return new Promise((resolve) => {
                 const protocol = url.startsWith('https') ? https : http;
 
+                // O corpo vai para um .tmp e só vira capa no 'finish', com
+                // rename (atômico no mesmo volume). Escrevendo direto no
+                // destino, uma conexão que caía no meio deixava lá um .jpg
+                // pela metade que o atalho acima passava a servir para sempre.
+                const tempPath = `${filePath}.tmp`;
+                let escrita: fs.WriteStream | null = null;
+                let encerrado = false;
+
+                const limparTmp = () => {
+                    try { fs.unlinkSync(tempPath); } catch { /* nem chegou a existir */ }
+                };
+
+                const falhar = (error: string) => {
+                    if (encerrado) return;
+                    encerrado = true;
+                    // No Windows não se apaga arquivo com handle aberto: a
+                    // sobra só sai depois do 'close' do stream.
+                    if (escrita && !escrita.closed) {
+                        escrita.once('close', limparTmp);
+                        escrita.destroy();
+                    } else {
+                        limparTmp();
+                    }
+                    resolve({ success: false, error });
+                };
+
+                const gravar = (response: http.IncomingMessage) => {
+                    const writeStream = fs.createWriteStream(tempPath);
+                    escrita = writeStream;
+                    // Sem listener de 'error' no writeStream, um erro de disco
+                    // (ENOSPC/EACCES) vira 'error' NÃO tratado de stream e
+                    // derruba o main com o diálogo de crash — o ramo do
+                    // redirect abaixo não tinha nenhum.
+                    writeStream.on('error', (err) => { response.destroy(); falhar(err.message); });
+                    response.on('error', (err) => falhar(err.message));
+                    writeStream.on('finish', () => {
+                        if (encerrado) return;
+                        encerrado = true;
+                        try {
+                            fs.renameSync(tempPath, filePath);
+                        } catch (err: unknown) {
+                            limparTmp();
+                            resolve({ success: false, error: getErrorMessage(err) });
+                            return;
+                        }
+                        resolve({ success: true, localPath: `file:///${filePath.replace(/\\/g, '/')}` });
+                    });
+                    response.pipe(writeStream);
+                };
+
                 const request = protocol.get(url, (response) => {
                     // Handle redirects
                     if (response.statusCode === 301 || response.statusCode === 302) {
                         const redirectUrl = response.headers.location;
                         if (redirectUrl) {
                             const redirectProtocol = redirectUrl.startsWith('https') ? https : http;
-                            redirectProtocol.get(redirectUrl, (redirectRes) => {
-                                const writeStream = fs.createWriteStream(filePath);
-                                redirectRes.pipe(writeStream);
-                                writeStream.on('finish', () => {
-                                    resolve({ success: true, localPath: `file:///${filePath.replace(/\\/g, '/')}` });
-                                });
-                            }).on('error', () => {
-                                resolve({ success: false, error: 'Redirect download failed' });
-                            });
+                            redirectProtocol.get(redirectUrl, (redirectRes) => gravar(redirectRes))
+                                .on('error', () => falhar('Redirect download failed'));
                             return;
                         }
                     }
 
                     if (response.statusCode !== 200) {
-                        resolve({ success: false, error: `HTTP ${response.statusCode}` });
+                        falhar(`HTTP ${response.statusCode}`);
                         return;
                     }
 
-                    const writeStream = fs.createWriteStream(filePath);
-                    response.pipe(writeStream);
-                    writeStream.on('finish', () => {
-                        resolve({ success: true, localPath: `file:///${filePath.replace(/\\/g, '/')}` });
-                    });
-                    writeStream.on('error', (err) => {
-                        resolve({ success: false, error: err.message });
-                    });
+                    gravar(response);
                 });
 
-                request.on('error', (err) => {
-                    resolve({ success: false, error: err.message });
-                });
+                request.on('error', (err) => falhar(err.message));
 
                 request.setTimeout(30000, () => {
                     request.destroy();
-                    resolve({ success: false, error: 'Timeout' });
+                    falhar('Timeout');
                 });
             });
         } catch (error: unknown) {
