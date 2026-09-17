@@ -41,5 +41,9 @@ describe('sortedSeasonKeys', () => {
     it('returns [] for missing episodes map', () => {
         expect(sortedSeasonKeys(undefined)).toEqual([]);
         expect(sortedSeasonKeys(null)).toEqual([]);
+        // Payload de "deu certo, mas sem temporada" — é exatamente o que o
+        // M3U e o Stalker devolvem quando o series_id não casa, e é o
+        // predicado da guarda do ContentDetailModal.
+        expect(sortedSeasonKeys({})).toEqual([]);
     });
 });
