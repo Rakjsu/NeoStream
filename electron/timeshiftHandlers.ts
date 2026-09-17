@@ -40,16 +40,40 @@ function bufferDir(): string {
     return path.join(app.getPath('userData'), 'timeshift')
 }
 
-function stopSession(): void {
+/**
+ * Apaga a pasta do buffer (~30 min de MPEG-TS, até ~1 GB).
+ *
+ * maxRetries/retryDelay não são enfeite: no Windows o handle do segmento que
+ * o ffmpeg tinha aberto só cai quando o processo morre de fato, e `kill()`
+ * volta antes disso — sem as tentativas o rmSync bate em EBUSY/EPERM
+ * justamente no caminho do quit, que é onde esta faxina mais importa.
+ */
+function apagarBuffer(dir: string): void {
+    try {
+        fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 })
+    } catch { /* fica pro próximo start (ou pro boot seguinte) */ }
+}
+
+/**
+ * `agora = true` apaga o buffer sem o segundo de folga. É o caminho do quit:
+ * `teardownTimeshift` roda no `before-quit` e o processo principal morre MUITO
+ * antes de um segundo, levando o timer junto — a janela inteira de ~30 min de
+ * MPEG-TS ficava em `userData/timeshift` até o próximo ⏪. Fora do quit a
+ * espera continua valendo: o app segue vivo e o ffmpeg ainda está soltando os
+ * handles dos segmentos.
+ */
+function stopSession(agora = false): void {
     const current = session
     session = null
     if (!current) return
     try { current.proc.kill() } catch { /* já morreu */ }
     try { current.server.close() } catch { /* já fechado */ }
+    if (agora) {
+        apagarBuffer(current.dir)
+        return
+    }
     // Limpeza atrasada: o ffmpeg solta os handles dos segmentos ao morrer.
-    setTimeout(() => {
-        try { fs.rmSync(current.dir, { recursive: true, force: true }) } catch { /* fica pro próximo start */ }
-    }, 1000)
+    setTimeout(() => apagarBuffer(current.dir), 1000)
 }
 
 /** Espera a playlist ganhar >= 2 segmentos (buffer tocável), com teto. */
@@ -67,6 +91,14 @@ async function waitForBuffer(playlistPath: string, timeoutMs: number): Promise<b
 }
 
 export function setupTimeshiftHandlers(): void {
+    // Rede de segurança do boot: aqui não existe sessão viva, então o que
+    // estiver na pasta é resíduo de um fechamento que não deu tempo de limpar
+    // (queda, kill pela bandeja/instalador, rmSync barrado pelo antivírus).
+    // Sem isto o disco só voltaria na próxima vez que o usuário ligasse o ⏪.
+    // O try é do `bufferDir()`: isto roda no corpo do main, antes do
+    // whenReady, e uma exceção aqui abortaria a inicialização inteira.
+    try { apagarBuffer(bufferDir()) } catch { /* sem userData: nada a apagar */ }
+
     ipcMain.handle('timeshift:start', async (_, { url }: { url: string }) => {
         try {
             if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
@@ -194,5 +226,5 @@ export function setupTimeshiftHandlers(): void {
 
 /** Derruba a sessão no quit (ffmpeg não pode sobreviver ao app). */
 export function teardownTimeshift(): void {
-    stopSession()
+    stopSession(true)
 }
