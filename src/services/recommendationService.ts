@@ -85,8 +85,13 @@ const GENERIC_TOKENS = new Set([
     'the', 'an', 'of', 'el', 'la', 'los', 'las', 'y', 'and'
 ]);
 
+/** Useful tokens of an ALREADY normalized title — lets callers reuse the normalization. */
+function tokensFromNormalized(normalized: string): string[] {
+    return normalized.split(' ').filter(tk => tk.length > 0 && !GENERIC_TOKENS.has(tk));
+}
+
 function titleTokens(name: string): string[] {
-    return normalizeTitle(name).split(' ').filter(tk => tk.length > 0 && !GENERIC_TOKENS.has(tk));
+    return tokensFromNormalized(normalizeTitle(name));
 }
 
 /**
@@ -95,8 +100,11 @@ function titleTokens(name: string): string[] {
  * "Matrix" / "Matrix Reloaded".
  */
 export function sharesFranchisePrefix(a: string, b: string): boolean {
-    const ta = titleTokens(a);
-    const tb = titleTokens(b);
+    return sharesFranchiseTokens(titleTokens(a), titleTokens(b));
+}
+
+/** Same rule as `sharesFranchisePrefix`, over tokens that are already computed. */
+function sharesFranchiseTokens(ta: string[], tb: string[]): boolean {
     if (ta.length === 0 || tb.length === 0) return false;
 
     let shared = 0;
@@ -153,6 +161,18 @@ export interface ScoredCandidate {
 }
 
 /**
+ * Tokenize the seed titles once per build.
+ *
+ * Without this, the candidate title AND every seed title went through
+ * `normalizeTitle` (NFD + six regexes) once per candidate×seed PAIR: with the
+ * 10 seeds of `MAX_SEEDS` and a 40k catalogue that is ~800k normalizations,
+ * ~1.5 s of synchronous freeze while the Home page builds its rows.
+ */
+function seedTitleTokens(seeds: RecSeed[]): string[][] {
+    return seeds.map(s => titleTokens(s.name));
+}
+
+/**
  * Score one candidate against all seeds.
  * score = Σ per-seed [ 2*genreOverlap + 1*categoryMatch + 2.5*franchise ] * weight(recency)
  */
@@ -160,12 +180,28 @@ export function scoreCandidate(
     candidate: { name: string; category_id?: string; genre?: string },
     seeds: RecSeed[]
 ): ScoredCandidate | null {
+    return scoreCandidateWithTokens(candidate, seeds, titleTokens(candidate.name), seedTitleTokens(seeds));
+}
+
+/**
+ * Same scoring as `scoreCandidate`, with the title tokens supplied by the
+ * caller. `seedTokens[i]` MUST be the tokens of `seeds[i]`; both arrays are
+ * built side by side by the single caller, `buildRecommendations`. Kept
+ * module-private exactly so no outside caller can desync them.
+ */
+function scoreCandidateWithTokens(
+    candidate: { name: string; category_id?: string; genre?: string },
+    seeds: RecSeed[],
+    candidateTokens: string[],
+    seedTokens: string[][]
+): ScoredCandidate | null {
     const candidateGenres = splitGenres(candidate.genre);
     let total = 0;
     let best = 0;
     let becauseOf = '';
 
-    for (const seed of seeds) {
+    for (let i = 0; i < seeds.length; i++) {
+        const seed = seeds[i];
         const w = seedWeight(seed.recencyRank);
         let contribution = 0;
 
@@ -173,7 +209,7 @@ export function scoreCandidate(
         if (seed.categoryId && candidate.category_id && seed.categoryId === candidate.category_id) {
             contribution += 1 * w;
         }
-        if (sharesFranchisePrefix(candidate.name, seed.name)) {
+        if (sharesFranchiseTokens(candidateTokens, seedTokens[i])) {
             contribution += 2.5 * w;
         }
 
@@ -252,13 +288,17 @@ export function buildRecommendations(input: BuildInput): Recommendation[] {
     if (seeds.length === 0) return [];
 
     const seedTitles = new Set(seeds.map(s => normalizeTitle(s.name)));
+    // The seeds are the SAME for every candidate: tokenize them once.
+    const seedTokens = seedTitleTokens(seeds);
     const scored: Recommendation[] = [];
 
     const consider = (kind: 'vod' | 'series', item: RecMovie | RecSeries, id: string, excludedIds: Set<string>) => {
         if (excludedIds.has(id)) return;
         const normalized = normalizeTitle(item.name);
         if (normalized.length === 0 || excludeTitles.has(normalized) || seedTitles.has(normalized)) return;
-        const result = scoreCandidate(item, seeds);
+        // Reuses the `normalized` above: without it the same title was
+        // normalized again inside, once per seed.
+        const result = scoreCandidateWithTokens(item, seeds, tokensFromNormalized(normalized), seedTokens);
         if (result) {
             // Gentle habit multiplier: up to +60% for genres the user actually
             // watches on this weekday / time of day. Never demotes below base.
