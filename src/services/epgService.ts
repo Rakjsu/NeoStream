@@ -169,10 +169,26 @@ export const epgService = {
         }
     },
 
-    async fetchFromUserXmltv(channelName: string): Promise<EPGProgram[]> {
+    /**
+     * O XMLTV que o próprio usuário configurou.
+     *
+     * O `epgChannelId` (o tvg-id do canal) vai junto de propósito: o
+     * `lookupChannel` do main tenta o id PRIMEIRO e só cai para o nome quando
+     * ele falta. Sem o id, a correção dependia de o `<display-name>` do
+     * arquivo bater, depois de normalizado, com o nome sujo que o provedor
+     * manda ("PT: SIC HD [FHD]") — e a tela vende esse XMLTV como "prioridade
+     * máxima". A pessoa colava a URL, não via erro nenhum, e a correção
+     * simplesmente não acontecia. É a mesma armadilha que o app de celular
+     * pagou no #102.
+     */
+    async fetchFromUserXmltv(channelName: string, epgChannelId?: string): Promise<EPGProgram[]> {
         const url = this.getUserEpgUrl();
         if (!url) return [];
-        return this.fetchIndexedChannel('user-external', [{ url, cacheKey: 'user-external' }], { channelName });
+        return this.fetchIndexedChannel(
+            'user-external',
+            [{ url, cacheKey: 'user-external' }],
+            { channelName, epgChannelId }
+        );
     },
 
     // Main function to fetch EPG for a channel
@@ -180,7 +196,7 @@ export const epgService = {
         // MÁXIMA prioridade: o XMLTV que o PRÓPRIO usuário configurou —
         // só vence quando tem programação atual/futura pro canal.
         if (channelName) {
-            const userPrograms = await this.fetchFromUserXmltv(channelName);
+            const userPrograms = await this.fetchFromUserXmltv(channelName, epgChannelId);
             if (userPrograms.some(p => new Date(p.end).getTime() > Date.now())) {
                 return userPrograms;
             }
