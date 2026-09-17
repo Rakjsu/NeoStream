@@ -1013,7 +1013,13 @@ export function CategoryMenu({ onSelectCategory, selectedCategory, type = 'serie
                                 alignItems: 'center',
                                 gap: '12px',
                                 opacity: 0,
-                                animation: `itemFadeIn 0.4s ease ${index * 0.03}s forwards`,
+                                // Teto no escalonamento: o item nasce com opacity 0, então o
+                                // atraso é tempo de tela em branco. Sem o Math.min, o 300º
+                                // item só aparecia 9 s depois de abrir o menu — e o painel
+                                // sai de `display: none`, o que CANCELA e reinicia a
+                                // animação, cobrando a espera a cada abertura. Mesmo remédio
+                                // (e mesmo número) do #372 em Favoritos.
+                                animation: `itemFadeIn 0.4s ease ${Math.min(index, 12) * 0.03}s forwards`,
                             }}
                             onMouseEnter={(e) => {
                                 if (selectedCategory !== category.category_id) {
