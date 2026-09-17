@@ -28,6 +28,8 @@ const store = new Store<{ autoBackup: AutoBackupConfig }>({ name: 'auto-backup' 
 
 const DEFAULTS: AutoBackupConfig = { enabled: false, dirPath: '', intervalDays: 7, lastBackupAt: 0 }
 const CHECK_EVERY_MS = 60 * 60 * 1000
+/** Mesmo fôlego de boot do syncFolder.ts, pelo mesmo motivo. */
+const BOOT_DELAY_MS = 20 * 1000
 const KEEP_FILES = 8
 const FILE_PREFIX = 'neostream-backup-'
 
@@ -132,13 +134,27 @@ export function setupAutoBackup(getWin: () => BrowserWindow | null) {
     })
 
     // Hourly clock: when due, ask the renderer to collect the payload.
-    setInterval(() => {
+    const checkDue = () => {
         if (!isBackupDue(getConfig(), Date.now())) return
         const win = getWin()
         if (win && !win.isDestroyed()) {
             win.webContents.send('backup:auto-collect')
         }
-    }, CHECK_EVERY_MS)
+    }
+
+    // ⏰ O primeiro tique do intervalo só chega uma hora depois. Quem abre o
+    // app pra ver um episódio e fecha — que é a sessão típica — nunca chegava
+    // lá: o backup automático estava ligado, com prazo vencido, e nunca
+    // acontecia. É o mesmo par "disparo no boot + cadência" do syncFolder, e
+    // os 20 s existem pra não competir com o boot: o coletor do renderer varre
+    // o localStorage inteiro, exporta as playlists e lê a config do
+    // OpenSubtitles.
+    //
+    // `getWin()` continua sendo chamado DENTRO do checkDue, e não capturado
+    // aqui: no macOS o `activate` recria a janela, e uma referência presa
+    // apontaria pra webContents morta.
+    setTimeout(checkDue, BOOT_DELAY_MS)
+    setInterval(checkDue, CHECK_EVERY_MS)
 
     log.info('[AutoBackup] initialized')
 }
