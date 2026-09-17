@@ -240,6 +240,20 @@ export function ContentDetailModal({
             if ((result as { success: boolean }).success) {
                 Promise.resolve((result as { info: SeriesInfo }).info)
                     .then((data: SeriesInfo) => {
+                        // 📺 O provedor responde "deu certo" sem nenhuma temporada:
+                        // série não casada no parse da M3U (os `series_id` são
+                        // posicionais, então uma série nova no meio desloca todo
+                        // mundo e o id guardado em Favoritos/Assistir Depois cai
+                        // no vazio), Stalker sem temporadas, ou painel que manda
+                        // erro em HTTP 200. Sem isto a coluna fica em branco pra
+                        // sempre: a lista pede `seasons.length > 0` e o aviso com
+                        // "Tentar de novo" pede `loadError` — nenhum dos dois casa.
+                        if (sortedSeasonKeys(data?.episodes).length === 0) {
+                            setSeriesInfo(null);
+                            setLoadError(true);
+                            setLoading(false);
+                            return;
+                        }
                         setSeriesInfo(data);
 
                         // Check for existing progress
@@ -298,6 +312,12 @@ export function ContentDetailModal({
                 setLoadError(true);
                 setLoading(false);
             }
+        }).catch(() => {
+            // O `.catch` de cima pendura no `.then(data)` — só pega exceção do
+            // corpo dele. Se o próprio `invoke` rejeitar, sem este a rejeição
+            // fica solta e o "Carregando episódios..." não sai mais da coluna.
+            setLoadError(true);
+            setLoading(false);
         });
     }, [isOpen, contentId, contentType, retryNonce]);
 
