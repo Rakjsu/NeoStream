@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { alvoDoEscape } from './escapeDoPlayer';
 import { FRAME_STEP_SEC } from './playerExtras';
 import { keymapService } from '../../services/keymapService';
 
@@ -7,6 +8,14 @@ interface PlayerKeyboardControls {
     seek: (time: number) => void;
     setVolume: (volume: number) => void;
     toggleMute: () => void;
+}
+
+/** Sobreposições que o Escape fecha ANTES de derrubar o filme. */
+export interface SobreposicoesDoPlayer {
+    ajustes: boolean;
+    marcadores: boolean;
+    qr: boolean;
+    fechar: (alvo: 'ajustes' | 'marcadores' | 'qr') => void;
 }
 
 export interface UseKeyboardShortcutsParams {
@@ -29,6 +38,8 @@ export interface UseKeyboardShortcutsParams {
     onScreenshot?: () => void;
     onCycleVideoFilter?: () => void;
     onToggleNormalize?: () => void;
+    /** Sem isto, o Escape continua derrubando o player com o menu aberto. */
+    sobreposicoes?: SobreposicoesDoPlayer;
 }
 
 // Keyboard shortcuts — the latest handler lives in a ref so a single
@@ -50,7 +61,8 @@ export function useKeyboardShortcuts({
     onToggleBookmarks,
     onScreenshot,
     onCycleVideoFilter,
-    onToggleNormalize
+    onToggleNormalize,
+    sobreposicoes
 }: UseKeyboardShortcutsParams) {
     const handleKeyDownRef = useRef<(e: KeyboardEvent) => void>(() => { });
     // Intentional render-time ref update (same as the original inline code in
@@ -89,13 +101,22 @@ export function useKeyboardShortcuts({
                 e.preventDefault();
                 controls.setVolume(Math.max(0, volume - 0.1));
                 return;
-            case 'escape':
-                if (document.fullscreenElement) {
-                    document.exitFullscreen();
-                } else if (onClose) {
-                    onClose();
-                }
+            case 'escape': {
+                // Ordem de prioridade em vez de "fullscreen ou tchau": ver
+                // escapeDoPlayer.ts. Antes, Esc com o menu da engrenagem
+                // aberto fechava o FILME.
+                const alvo = alvoDoEscape({
+                    ajustes: sobreposicoes?.ajustes ?? false,
+                    marcadores: sobreposicoes?.marcadores ?? false,
+                    qr: sobreposicoes?.qr ?? false,
+                    fullscreen: Boolean(document.fullscreenElement),
+                    podeFechar: Boolean(onClose),
+                });
+                if (alvo === 'fullscreen') document.exitFullscreen();
+                else if (alvo === 'fechar') onClose?.();
+                else if (alvo !== 'nada') sobreposicoes?.fechar(alvo);
                 return;
+            }
         }
 
         // Demais ações resolvidas pelo keymap (letras personalizáveis no "?").

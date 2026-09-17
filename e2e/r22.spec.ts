@@ -75,7 +75,12 @@ test('proporção lembrada: escolher Original persiste pro mesmo canal', async (
     await page.getByRole('button', { name: 'Original', exact: true }).click();
     await expect(page.locator('.video-fullwidth')).toHaveCSS('object-fit', 'contain');
 
-    // Close the player, reopen the same channel: mode restored from prefs.
+    // Fecha o player e reabre o mesmo canal: o modo volta das preferências.
+    // São DOIS Escape de propósito: escolher uma opção não fecha o menu da
+    // engrenagem, e o primeiro Escape agora fecha o menu — antes ele derrubava
+    // o filme inteiro por baixo do menu aberto (escapeDoPlayer.ts).
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.settings-menu')).toHaveCount(0);
     await page.keyboard.press('Escape');
     await page.getByText('Globo São Paulo HD').first().click();
     await page.getByRole('button', { name: /Assistir Agora/ }).click();

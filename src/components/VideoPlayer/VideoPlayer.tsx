@@ -1010,7 +1010,18 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
             : undefined,
         onScreenshot: () => { void captureFrame(); },
         onCycleVideoFilter: cycleVideoFilter,
-        onToggleNormalize: toggleNormalize
+        onToggleNormalize: toggleNormalize,
+        // Esc fecha o que estiver na frente antes de pensar em fechar o filme.
+        sobreposicoes: {
+            ajustes: showSettings,
+            marcadores: bookmarkPanel !== null,
+            qr: showHandoffQr,
+            fechar: alvo => {
+                if (alvo === 'ajustes') setShowSettings(false);
+                else if (alvo === 'marcadores') setBookmarkPanel(null);
+                else setShowHandoffQr(false);
+            }
+        }
     });
 
     // Progress bar hover preview
