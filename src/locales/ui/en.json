@@ -984,6 +984,8 @@
     "exportDone": "📤 Recording exported",
     "deleteConfirm": "Are you sure you want to delete",
     "deleteConfirmText": "This file will be permanently removed.",
+    "deleteSeriesConfirmText": "The whole series and every downloaded episode will be permanently removed.",
+    "episodesCount": "episodes",
     "cancel": "Cancel",
     "delete": "Delete",
     "resumeDownload": "Resume Download",

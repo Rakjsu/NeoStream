@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AgendaPanel } from '../components/AgendaPanel';
 import { Download, Trash2, Play, FolderOpen, HardDrive, Film, Tv, AlertTriangle, X, RefreshCw } from 'lucide-react';
-import { downloadService } from '../services/downloadService';
+import { downloadService, resumoDaSerie } from '../services/downloadService';
 import type { DownloadItem, StorageInfo } from '../services/downloadService';
 import { useLanguage } from '../services/languageService';
 import { getDvrMaxAgeDays, getProtectedRecordings, pickExpiredRecordings, recElapsedLabel, setDvrMaxAgeDays, toggleProtectedRecording } from '../services/dvrSweep';
@@ -40,9 +40,13 @@ export function Downloads() {
     const { t } = useLanguage();
 
     // Delete confirmation modal state
-    const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; item: DownloadItem | null }>({
+    // 🗑️ O mesmo modal serve ao filme e à SÉRIE: apagar série é recursivo
+    // (todos os episódios + a pasta) e era feito num clique, sem perguntar
+    // nada, enquanto o filme sozinho — que apaga um arquivo só — perguntava.
+    const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; item: DownloadItem | null; series: SeriesGroup | null }>({
         isOpen: false,
-        item: null
+        item: null,
+        series: null
     });
 
     // Series detail modal state
@@ -218,18 +222,24 @@ export function Downloads() {
     }, [groupedData, seriesModal.isOpen, selectedSeriesName]);
 
     const handleDeleteClick = (item: DownloadItem) => {
-        setDeleteModal({ isOpen: true, item });
+        setDeleteModal({ isOpen: true, item, series: null });
+    };
+
+    const handleDeleteSeriesClick = (series: SeriesGroup) => {
+        setDeleteModal({ isOpen: true, item: null, series });
     };
 
     const handleDeleteConfirm = async () => {
         if (deleteModal.item) {
             await downloadService.deleteDownload(deleteModal.item.id);
+        } else if (deleteModal.series) {
+            await downloadService.deleteSeries(deleteModal.series.seriesName);
         }
-        setDeleteModal({ isOpen: false, item: null });
+        setDeleteModal({ isOpen: false, item: null, series: null });
     };
 
     const handleDeleteCancel = () => {
-        setDeleteModal({ isOpen: false, item: null });
+        setDeleteModal({ isOpen: false, item: null, series: null });
     };
 
     const handleCardClick = (item: DownloadItem) => {
@@ -304,6 +314,12 @@ export function Downloads() {
         ? Math.round((storageInfo.used / storageInfo.total) * 100)
         : 0;
 
+    // Nome, contagem e tamanho do que o OK vai apagar — o filme traz 0
+    // episódios, e é isso que separa os dois textos do modal.
+    const alvoDaExclusao = deleteModal.item
+        ? { nome: deleteModal.item.name, episodios: 0, bytes: deleteModal.item.size }
+        : deleteModal.series ? resumoDaSerie(deleteModal.series) : null;
+
     return (
         <>
             <style>{downloadsStyles}</style>
@@ -311,7 +327,7 @@ export function Downloads() {
                 <div className="downloads-backdrop" />
 
                 {/* Delete Confirmation Modal */}
-                {deleteModal.isOpen && deleteModal.item && (
+                {deleteModal.isOpen && alvoDaExclusao && (
                     <>
                         <div className="delete-modal-overlay" onClick={handleDeleteCancel} />
                         <div className="delete-modal">
@@ -323,11 +339,17 @@ export function Downloads() {
                             </div>
                             <h3>{t('downloads', 'deleteConfirm')}?</h3>
                             <p>
-                                {t('downloads', 'deleteConfirm')} <strong>"{deleteModal.item.name}"</strong>?
-                                {t('downloads', 'deleteConfirmText')}
+                                {t('downloads', 'deleteConfirm')} <strong>"{alvoDaExclusao.nome}"</strong>?
+                                {/* O texto ramifica pelo ALVO, não pela contagem: série sem
+                                    episódio no disco continua sendo uma série, e chamá-la de
+                                    "arquivo" é justamente a mentira que este item conserta. */}
+                                {deleteModal.series
+                                    ? t('downloads', 'deleteSeriesConfirmText')
+                                    : t('downloads', 'deleteConfirmText')}
                             </p>
                             <div className="delete-modal-size">
-                                📦 {downloadService.formatBytes(deleteModal.item.size)}
+                                📦 {downloadService.formatBytes(alvoDaExclusao.bytes)}
+                                {alvoDaExclusao.episodios > 0 && ` · ${alvoDaExclusao.episodios} ${t('downloads', 'episodesCount')}`}
                             </div>
                             <div className="delete-modal-buttons">
                                 <button className="cancel-btn" onClick={handleDeleteCancel}>
@@ -885,8 +907,7 @@ export function Downloads() {
                                             className="delete-btn-corner"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                // Delete all episodes and series folder
-                                                downloadService.deleteSeries(series.seriesName);
+                                                handleDeleteSeriesClick(series);
                                             }}
                                             title={t('downloads', 'removeSeries')}
                                         >
