@@ -16,6 +16,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { mpvService } from '../services/mpvService';
+import { playbackService } from '../services/playbackService';
 import { movieProgressService } from '../services/movieProgressService';
 import { watchProgressService } from '../services/watchProgressService';
 import { useLanguage } from '../services/languageService';
@@ -44,6 +45,15 @@ interface MpvPlayerViewProps {
     seasonNumber?: number;
     episodeNumber?: number;
     isLive: boolean;
+    /**
+     * Fim do arquivo com próximo disponível: o mpv não sabe o que é "próximo
+     * episódio" (nem "próximo filme da fila") — quem troca é o pai, que muda o
+     * episódio e faz o AsyncVideoPlayer remontar esta view com a nova URL.
+     * Sem estas duas props a série simplesmente PARA quando o motor externo
+     * está ligado.
+     */
+    onNextEpisode?: () => void;
+    canGoNext?: boolean;
     /** User stopped playback (or mpv exited) — close the player UI. */
     onClose: () => void;
     /** mpv unavailable / failed to launch — caller falls back to the internal player. */
@@ -70,6 +80,8 @@ export function MpvPlayerView({
     seasonNumber,
     episodeNumber,
     isLive,
+    onNextEpisode,
+    canGoNext,
     onClose,
     onFallback
 }: MpvPlayerViewProps) {
@@ -135,6 +147,17 @@ export function MpvPlayerView({
         fullscreen: false,
     });
 
+    /**
+     * O efeito do polling é de montagem única (uma view == um mpv), então ele
+     * congelaria o `canGoNext` do PRIMEIRO render — e no Home.tsx esse valor
+     * nasce falso e só vira verdadeiro quando a lista de episódios termina de
+     * carregar. Por isso o fim do arquivo consulta um ref, não a closure.
+     */
+    const proximoRef = useRef<{ avancar?: () => void; pode: boolean }>({ avancar: onNextEpisode, pode: canGoNext === true });
+    useEffect(() => {
+        proximoRef.current = { avancar: onNextEpisode, pode: canGoNext === true };
+    });
+
     const isSeries = Boolean(seriesId) && seasonNumber !== undefined && episodeNumber !== undefined;
 
     const persistProgress = useCallback((time: number | null, total: number | null, force = false) => {
@@ -179,6 +202,29 @@ export function MpvPlayerView({
                             persistProgress(latest.duration, latest.duration, true);
                         } else {
                             persistProgress(latest.timePos, latest.duration, true);
+                        }
+                        // Terminou de verdade e há próximo: avança em vez de
+                        // fechar, no mesmo portão do player interno (a
+                        // preferência `autoPlayNextEpisode` do perfil).
+                        //
+                        // "Terminou" NÃO pode ser o `eofReached`: (a) o main
+                        // descarta a sessão no 'exit' do processo
+                        // (teardownSession zera `session`, e o snapshot volta a
+                        // `createInitialStatus(false)`), então o flag só chega
+                        // se o poll de 500 ms cair na fresta entre o end-file e
+                        // a saída do mpv — avançar só ali seria sorteio; e (b)
+                        // o main marca `eofReached` em QUALQUER end-file, que
+                        // o mpv também emite quando o usuário fecha a janela ou
+                        // quando o stream cai, e aí avançar pularia o episódio
+                        // no meio. O critério é o mesmo que o
+                        // watchProgressService usa pra dar o episódio por
+                        // concluído: 90% do arquivo.
+                        const chegouAoFim = latest.duration !== null && latest.duration > 0
+                            && latest.timePos !== null && latest.timePos >= latest.duration * 0.9;
+                        const { avancar, pode } = proximoRef.current;
+                        if (chegouAoFim && pode && avancar && playbackService.getConfig().autoPlayNextEpisode) {
+                            avancar();
+                            return;
                         }
                         onClose();
                     }
