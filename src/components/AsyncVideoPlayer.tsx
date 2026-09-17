@@ -457,6 +457,12 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
                 seasonNumber={mpvIsSeries ? seasonNumber : undefined}
                 episodeNumber={mpvIsSeries ? episodeNumber : undefined}
                 isLive={contentType === 'live'}
+                // Sem estas duas o MPV não tem como continuar a série (nem a
+                // fila de filmes do VOD): quem sabe o que é "próximo" é sempre
+                // o pai — o MpvPlayerView só consegue avisar que o arquivo
+                // terminou.
+                onNextEpisode={onNextEpisode}
+                canGoNext={canGoNext}
                 onClose={onClose}
                 onFallback={() => setMpvFailed(true)}
             />
