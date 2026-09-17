@@ -441,6 +441,14 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
         );
     }
 
+    // 📊 Identidade nas Estatísticas, montada UMA vez e entregue aos DOIS
+    // motores. O MPV já gravava progresso igual ao player interno, mas não
+    // abria sessão nenhuma; ao passar a abrir, a chave TEM que ser a mesma —
+    // senão o mesmo título vira duas linhas na Retrospectiva e o "mais
+    // assistido" reparte o tempo entre as duas.
+    const statsContentId = contentId || seriesId || (movie.stream_id?.toString() || movie.id?.toString());
+    const statsContentType = contentType || (seriesId ? 'series' : 'movie');
+
     // EXPERIMENTAL — MPV phase 2: hand the stream to the pseudo-embedded MPV
     // window and render the in-app controls bar instead of the internal player.
     if (useMpv) {
@@ -465,6 +473,8 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
                 canGoNext={canGoNext}
                 onClose={onClose}
                 onFallback={() => setMpvFailed(true)}
+                contentId={statsContentId}
+                contentType={statsContentType}
             />
         );
     }
@@ -502,8 +512,8 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
                         canGoNext={canGoNext}
                         canGoPrevious={canGoPrevious}
                         resumeTime={resumeTime}
-                        contentId={contentId || seriesId || (movie.stream_id?.toString() || movie.id?.toString())}
-                        contentType={contentType || (seriesId ? 'series' : 'movie')}
+                        contentId={statsContentId}
+                        contentType={statsContentType}
                         seasonNumber={seasonNumber}
                         episodeNumber={episodeNumber}
                         movieVersions={
