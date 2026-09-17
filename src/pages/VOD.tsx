@@ -771,7 +771,10 @@ export function VOD() {
                         cover: selectedMovie.stream_icon,
                         rating: selectedMovie.rating,
                         container_extension: selectedMovie.container_extension,
-                        youtube_trailer: selectedMovie.youtube_trailer
+                        youtube_trailer: selectedMovie.youtube_trailer,
+                        // O id que o fundo da tela já usa — sem ele, a ficha
+                        // resolvia a sinopse por busca de nome e podia abrir outro filme.
+                        tmdb_id: selectedMovie.tmdb_id
                     }}
                     versions={versionsByBase
                         ? (versionsByBase.get(getMovieBaseName(selectedMovie.name)) ?? [])
