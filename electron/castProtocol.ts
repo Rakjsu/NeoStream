@@ -408,8 +408,18 @@ export function seekPayload(requestId: number, mediaSessionId: number, currentTi
     return JSON.stringify({ type: 'SEEK', requestId, mediaSessionId, currentTime })
 }
 
-/** transportId of the running media-receiver app in a RECEIVER_STATUS, or null. */
-export function extractTransportId(receiverStatusJson: unknown): string | null {
+/**
+ * A entrada de `applications` do app pedido — transportId e sessionId da MESMA
+ * app.
+ *
+ * Varrer campo a campo misturava entradas: num RECEIVER_STATUS que lista a
+ * tela ociosa (ou o app anterior) ANTES do receptor de mídia, o transportId
+ * saía de uma app e o sessionId de outra. Tela ociosa nunca é sessão de mídia.
+ */
+export function findApp(
+    receiverStatusJson: unknown,
+    appId: string,
+): { transportId: string; sessionId: string | null } | null {
     if (receiverStatusJson === null || typeof receiverStatusJson !== 'object') return null
     const status = (receiverStatusJson as { status?: { applications?: unknown } }).status
     const apps = status?.applications
@@ -417,35 +427,12 @@ export function extractTransportId(receiverStatusJson: unknown): string | null {
     for (const app of apps) {
         if (app === null || typeof app !== 'object') continue
         const a = app as Record<string, unknown>
-        if (typeof a.transportId === 'string' && a.transportId) return a.transportId
-    }
-    return null
-}
-
-/** appId of the running app in a RECEIVER_STATUS, or null (nothing running). */
-export function extractRunningAppId(receiverStatusJson: unknown): string | null {
-    if (receiverStatusJson === null || typeof receiverStatusJson !== 'object') return null
-    const status = (receiverStatusJson as { status?: { applications?: unknown } }).status
-    const apps = status?.applications
-    if (!Array.isArray(apps)) return null
-    for (const app of apps) {
-        if (app === null || typeof app !== 'object') continue
-        const id = (app as { appId?: unknown }).appId
-        if (typeof id === 'string' && id) return id
-    }
-    return null
-}
-
-/** sessionId of the running app (needed to STOP it), or null. */
-export function extractSessionId(receiverStatusJson: unknown): string | null {
-    if (receiverStatusJson === null || typeof receiverStatusJson !== 'object') return null
-    const status = (receiverStatusJson as { status?: { applications?: unknown } }).status
-    const apps = status?.applications
-    if (!Array.isArray(apps)) return null
-    for (const app of apps) {
-        if (app === null || typeof app !== 'object') continue
-        const a = app as Record<string, unknown>
-        if (typeof a.sessionId === 'string' && a.sessionId) return a.sessionId
+        if (a.appId !== appId || a.isIdleScreen === true) continue
+        if (typeof a.transportId !== 'string' || !a.transportId) continue
+        return {
+            transportId: a.transportId,
+            sessionId: typeof a.sessionId === 'string' && a.sessionId ? a.sessionId : null,
+        }
     }
     return null
 }

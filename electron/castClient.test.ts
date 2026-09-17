@@ -36,7 +36,7 @@ const tlsFake = await vi.hoisted(async () => {
 vi.mock('node:tls', () => ({ default: { connect: tlsFake.connect } }))
 
 import { CastSession, type CastMediaMeta } from './castClient'
-import { extractFrames, NS_MEDIA, type CastMessage } from './castProtocol'
+import { extractFrames, NS_MEDIA, NS_RECEIVER, type CastMessage } from './castProtocol'
 
 /**
  * Grey-box harness: a CastSession with a fake socket injected in place of the
@@ -81,6 +81,16 @@ function fakeSession() {
             payloadUtf8: JSON.stringify({ type: 'MEDIA_STATUS', status: [statusEntry] }),
         })
     }
+    /** RECEIVER_STATUS vindo do receiver-0, como a TV manda. */
+    const feedReceiver = (applications: Record<string, unknown>[]) => {
+        s.handleMessage({
+            sourceId: 'receiver-0',
+            destinationId: 'sender-neostream',
+            namespace: NS_RECEIVER,
+            payloadUtf8: JSON.stringify({ type: 'RECEIVER_STATUS', status: { applications } }),
+        })
+    }
+
     /** Decode everything the session sent so far (framed castv2 messages). */
     const sentPayloads = () => {
         const glued = new Uint8Array(written.reduce((n, b) => n + b.length, 0))
@@ -88,7 +98,7 @@ function fakeSession() {
         for (const b of written) { glued.set(b, at); at += b.length }
         return extractFrames(glued).messages.map(m => JSON.parse(m.payloadUtf8) as Record<string, unknown>)
     }
-    return { session, s, feed, sentPayloads }
+    return { session, s, feed, feedReceiver, sentPayloads }
 }
 
 const QUEUE_ITEMS = [
@@ -384,6 +394,36 @@ describe('reconexão não deixa socket nem heartbeat órfãos', () => {
 
         session.close()
         expect(vi.getTimerCount()).toBe(0)
+        vi.useRealTimers()
+    })
+})
+
+describe('connectAndLaunch (LAUNCH do receptor de mídia)', () => {
+    it('ignora o RECEIVER_STATUS de outro app e espera o receptor de mídia', async () => {
+        vi.useFakeTimers()
+        const { session, s, feedReceiver } = fakeSession()
+        s.transportId = null
+        const launched = (session as unknown as { connectAndLaunch: () => Promise<void> }).connectAndLaunch()
+        // `advanceTimersByTimeAsync(0)` e não `Promise.resolve()`: o
+        // connectTransport tem um await próprio, então um tique de microtask
+        // devolve o controle ANTES de o ouvinte existir — e aí os dois
+        // feedReceiver caem no vazio e o teste passa pelo motivo errado.
+        await vi.advanceTimersByTimeAsync(0)
+
+        // Espontâneo durante a troca de app (ou mexida no volume): não é o nosso.
+        feedReceiver([{ appId: 'CA5E8412', transportId: 'netflix-3', sessionId: 'n1' }])
+        expect(s.transportId).toBeNull()
+
+        // Tela ociosa na frente do receptor: o par tem que sair do CC1AD845.
+        feedReceiver([
+            { appId: 'E8C28D3C', transportId: 'backdrop-9', sessionId: 'sess-backdrop', isIdleScreen: true },
+            { appId: 'CC1AD845', transportId: 'web-5', sessionId: 'sess-1' },
+        ])
+        await launched
+
+        expect(s.transportId).toBe('web-5')
+        expect((session as unknown as { sessionId: string | null }).sessionId).toBe('sess-1')
+        session.close()
         vi.useRealTimers()
     })
 })

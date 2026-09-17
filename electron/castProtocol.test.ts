@@ -16,12 +16,11 @@ import {
     extractCurrentItemId,
     getMediaStatusPayload,
     getReceiverStatusPayload,
-    extractRunningAppId,
     setVolumePayload,
     extractMediaTimes,
     mediaCommandPayload,
-    extractTransportId,
-    extractSessionId,
+    findApp,
+    CAST_MEDIA_APP_ID,
     extractMediaSessionId,
     NS_CONNECTION,
     NS_MEDIA,
@@ -92,14 +91,33 @@ describe('payloads e extração de status', () => {
             type: 'RECEIVER_STATUS',
             status: { applications: [{ appId: 'CC1AD845', transportId: 'transport-7', sessionId: 'sess-1' }] },
         }
-        expect(extractTransportId(receiverStatus)).toBe('transport-7')
-        expect(extractSessionId(receiverStatus)).toBe('sess-1')
+        expect(findApp(receiverStatus, CAST_MEDIA_APP_ID)).toEqual({ transportId: 'transport-7', sessionId: 'sess-1' })
         expect(extractMediaSessionId({ type: 'MEDIA_STATUS', status: [{ mediaSessionId: 42 }] })).toBe(42)
     })
 
+    it('pareia transportId e sessionId da MESMA app e ignora a tela ociosa', () => {
+        // RECEIVER_STATUS de um Chromecast trocando de app: a tela ociosa
+        // (Backdrop) ainda aparece NA FRENTE do receptor de mídia. Varrendo
+        // campo a campo, o transportId saía de uma app e o sessionId de outra.
+        const trocandoDeApp = {
+            type: 'RECEIVER_STATUS',
+            status: {
+                applications: [
+                    { appId: 'E8C28D3C', transportId: 'backdrop-9', sessionId: 'sess-backdrop', isIdleScreen: true },
+                    { appId: CAST_MEDIA_APP_ID, transportId: 'web-5', sessionId: 'sess-1' },
+                ],
+            },
+        }
+        expect(findApp(trocandoDeApp, CAST_MEDIA_APP_ID)).toEqual({ transportId: 'web-5', sessionId: 'sess-1' })
+        // Só outro app rodando → nada pra adotar (e nada pro LOAD).
+        expect(findApp({ status: { applications: [{ appId: 'CA5E8412', transportId: 'netflix-3' }] } }, CAST_MEDIA_APP_ID)).toBeNull()
+        // Entrada do nosso app ainda sem transporte → não serve.
+        expect(findApp({ status: { applications: [{ appId: CAST_MEDIA_APP_ID }] } }, CAST_MEDIA_APP_ID)).toBeNull()
+    })
+
     it('shapes inesperados viram null', () => {
-        expect(extractTransportId({})).toBeNull()
-        expect(extractSessionId(null)).toBeNull()
+        expect(findApp({}, CAST_MEDIA_APP_ID)).toBeNull()
+        expect(findApp(null, CAST_MEDIA_APP_ID)).toBeNull()
         expect(extractMediaSessionId({ status: 'x' })).toBeNull()
     })
 })
@@ -141,14 +159,14 @@ describe('fase 2: status, volume e legendas', () => {
         expect(extractMediaTimes({ status: [] })).toBeNull();
     });
 
-    it('getReceiverStatusPayload e extractRunningAppId (reconexão)', () => {
+    it('getReceiverStatusPayload e findApp (reconexão)', () => {
         expect(JSON.parse(getReceiverStatusPayload(4))).toEqual({ type: 'GET_STATUS', requestId: 4 });
-        // Receptor de mídia rodando → devolve o appId (CC1AD845).
-        expect(extractRunningAppId({ status: { applications: [{ appId: 'CC1AD845', transportId: 'web-5' }] } }))
-            .toBe('CC1AD845');
+        // Receptor de mídia rodando → devolve o transporte dele.
+        expect(findApp({ status: { applications: [{ appId: CAST_MEDIA_APP_ID, transportId: 'web-5' }] } }, CAST_MEDIA_APP_ID))
+            .toEqual({ transportId: 'web-5', sessionId: null });
         // Nada rodando → null (nada pra retomar).
-        expect(extractRunningAppId({ status: { applications: [] } })).toBeNull();
-        expect(extractRunningAppId({})).toBeNull();
+        expect(findApp({ status: { applications: [] } }, CAST_MEDIA_APP_ID)).toBeNull();
+        expect(findApp({}, CAST_MEDIA_APP_ID)).toBeNull();
     });
 });
 
