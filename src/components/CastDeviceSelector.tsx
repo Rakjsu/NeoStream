@@ -79,7 +79,13 @@ export function CastDeviceSelector({
             ? { startPosition, contentId, contentType, season: seasonNumber, episode: episodeNumber }
             : undefined
     ), [isQueue, contentId, contentType, seasonNumber, episodeNumber, startPosition]);
-    const chromecast = useChromecast(primaryUrl, primaryTitle, /\.m3u8(\?|$)/.test(primaryUrl), effectiveVtt, castContext);
+    // "Ao vivo" não dá pra deduzir da extensão: playlist M3U manda o
+    // direct_source cru (.ts, ou sem extensão), portal Stalker devolve o link
+    // do create-link e o timeshift no formato (b) é um .php com query. Sem
+    // olhar o contentType da tela, o canal ia como BUFFERED — a TV desenhava
+    // barra de progresso falsa (o LOAD usa live ? 'LIVE' : 'BUFFERED') e ainda
+    // recebia o currentTime do player local como posição inicial.
+    const chromecast = useChromecast(primaryUrl, primaryTitle, contentType === 'live' || /\.m3u8(\?|$)/.test(primaryUrl), effectiveVtt, castContext);
     const { devices: dlnaDevices, discoverDevices, castToDevice, addDevice, error: dlnaError, isDiscovering } = dlna;
     const { devices: airplayDevices, castToDevice: castToAirPlayDevice } = airplay;
     const { devices: chromecastDevices, castToDevice: castToChromecast } = chromecast;
