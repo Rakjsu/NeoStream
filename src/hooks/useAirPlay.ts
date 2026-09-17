@@ -64,7 +64,11 @@ export function useAirPlay(videoUrl: string, videoTitle: string) {
         };
     }, [discoverDevices]);
 
-    const castToDevice = async (device: AirPlayDevice) => {
+    // Devolve o sucesso ao chamador, como `useChromecast.castToDevice`. O
+    // `airplay:cast` NUNCA rejeita (o handler do main devolve
+    // `{ success: false }`), entao sem este retorno a falha era silencio
+    // absoluto: quem chamava nao tinha como saber que nada aconteceu.
+    const castToDevice = async (device: AirPlayDevice): Promise<boolean> => {
         try {
             const result = await window.ipcRenderer.invoke('airplay:cast', {
                 deviceId: device.id,
@@ -75,9 +79,11 @@ export function useAirPlay(videoUrl: string, videoTitle: string) {
             if (result.success) {
                 setIsCasting(true);
                 setCurrentDevice(device);
-                            }
+            }
+            return !!result.success;
         } catch (error) {
             console.error('❌ AirPlay cast error:', error);
+            return false;
         }
     };
 
