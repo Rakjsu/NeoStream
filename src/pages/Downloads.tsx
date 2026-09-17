@@ -161,7 +161,15 @@ export function Downloads() {
         if (!renamingPath) return;
         const result = await window.ipcRenderer.invoke('dvr:rename-file', { path: renamingPath, name: renameValue }) as { success: boolean; error?: string };
         setRenamingPath(null);
-        if (result?.success) void loadRecordings();
+        if (result?.success) {
+            void loadRecordings();
+            return;
+        }
+        // O main sabe o porquê ("já existe uma gravação com esse nome",
+        // "arquivo fora da pasta") e esse texto morria aqui: a linha sumia da
+        // tela e voltava com o nome velho, sem uma palavra.
+        setDvrMsg(result?.error || t('downloads', 'renameFail'));
+        setTimeout(() => setDvrMsg(''), 6000);
     };
 
     const loadData = useCallback(async () => {
@@ -575,11 +583,13 @@ export function Downloads() {
                                         )}
                                         <button
                                             onClick={async () => {
-                                                const result = await window.ipcRenderer.invoke('dvr:export-file', { path: rec.path }) as { success: boolean; canceled?: boolean };
-                                                if (result?.success) {
-                                                    setDvrMsg(t('downloads', 'exportDone'));
-                                                    setTimeout(() => setDvrMsg(''), 6000);
-                                                }
+                                                const result = await window.ipcRenderer.invoke('dvr:export-file', { path: rec.path }) as { success: boolean; canceled?: boolean; error?: string };
+                                                // Fechar o diálogo de "salvar como" não é falha.
+                                                if (result?.canceled) return;
+                                                setDvrMsg(result?.success
+                                                    ? t('downloads', 'exportDone')
+                                                    : (result?.error || t('downloads', 'exportFail')));
+                                                setTimeout(() => setDvrMsg(''), 6000);
                                             }}
                                             disabled={rec.recording}
                                             title={t('downloads', 'exportRec')}
@@ -590,8 +600,15 @@ export function Downloads() {
                                         <button
                                             onClick={async () => {
                                                 if (rec.recording) return;
-                                                await window.ipcRenderer.invoke('dvr:delete-file', { path: rec.path });
+                                                const result = await window.ipcRenderer.invoke('dvr:delete-file', { path: rec.path }) as { success: boolean; error?: string };
                                                 loadRecordings();
+                                                // "Gravação em andamento", "caminho fora da pasta",
+                                                // arquivo travado pelo antivírus: hoje a lista só
+                                                // recarregava e a gravação continuava lá.
+                                                if (!result?.success) {
+                                                    setDvrMsg(result?.error || t('downloads', 'deleteFail'));
+                                                    setTimeout(() => setDvrMsg(''), 6000);
+                                                }
                                             }}
                                             disabled={rec.recording}
                                             title={t('downloads', 'delete')}

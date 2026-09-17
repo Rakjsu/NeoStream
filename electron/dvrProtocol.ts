@@ -79,6 +79,37 @@ export function buildThumbnailArgs(inFile: string, outFile: string, atSeconds = 
     ];
 }
 
+/**
+ * Nome final de arquivo de um rename de gravação (`''` = nome inválido).
+ *
+ * É a mesma faxina do `recordingFilename` — e é ela que faz o alvo cair em
+ * cima do próprio arquivo: quem só abre o campo ✏️ e clica fora manda o nome
+ * de volta igual, porque o campo confirma no `onBlur`.
+ */
+export function renameTargetName(rawName: string, currentFile: string): string {
+    const safe = String(rawName || '')
+        .replace(/[<>:"/\\|?*]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 120);
+    if (!safe) return '';
+    const ext = currentFile.toLowerCase().endsWith('.mp4') ? '.mp4' : '.ts';
+    return safe.toLowerCase().endsWith(ext) ? safe : `${safe}${ext}`;
+}
+
+/**
+ * Os dois caminhos são o MESMO arquivo?
+ *
+ * No Windows — e só nele — a caixa não conta: `jogo.ts` e `Jogo.ts` são o
+ * mesmo arquivo, então trocar só a caixa não pode ser recusado com "já existe
+ * uma gravação com esse nome". Em sistema sensível à caixa são dois arquivos
+ * de verdade, e comparar sem caixa ali faria o rename passar POR CIMA do
+ * vizinho.
+ */
+export function isSameRecordingFile(a: string, b: string, platform: string = process.platform): boolean {
+    return platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+}
+
 /** Destination .mp4 path next to a .ts recording. */
 export function mp4PathFor(tsPath: string): string {
     return tsPath.replace(/\.ts$/i, '') + '.mp4';
