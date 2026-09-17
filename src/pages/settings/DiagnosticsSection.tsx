@@ -149,8 +149,12 @@ export function DiagnosticsSection() {
     };
 
     const handleExportLog = async () => {
+        setErrorMessage(null);
+        setSuccessMessage(null);
         const result = await window.ipcRenderer.invoke('diagnostics:export-log') as { success: boolean; canceled?: boolean };
-        if (!result.success && !result.canceled) alert(t('diagnostics', 'exportLogFail'));
+        // Mesmo aviso in-app do "abrir logs" logo abaixo. O dialogo nativo do
+        // Chromium abria fora do tema e PARAVA o JS do renderer ate clicarem OK.
+        if (!result.success && !result.canceled) setErrorMessage(t('diagnostics', 'exportLogFail'));
     };
 
     const handleOpenLogs = async () => {

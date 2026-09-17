@@ -28,6 +28,10 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
     const [pinPara, setPinPara] = useState<'entrar' | 'apagar' | 'editar'>('entrar');
     const [edicaoPendente, setEdicaoPendente] = useState<{ profile: Profile; name: string; avatar: string } | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    // Aviso in-app das recusas desta tela (limite de perfis, bloqueio de
+    // exclusao, cor de perfil protegido). Eram dialogos nativos do Chromium:
+    // abrem fora do tema e PARAM o JS do renderer ate clicarem OK.
+    const [aviso, setAviso] = useState('');
     const { t } = useLanguage();
 
     const loadProfiles = useCallback(() => {
@@ -98,7 +102,9 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
 
     const handleAddProfile = () => {
         if (profiles.length >= 5) {
-            alert(t('profile', 'profileCreationError'));
+            // Cinto e suspensorio: o cartao "+" ja some em 5 perfis, entao
+            // hoje ninguem chega aqui — mas a recusa avisa se aquilo mudar.
+            setAviso(t('profile', 'profileCreationError'));
             return;
         }
         setShowCreateModal(true);
@@ -113,7 +119,7 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
             total: profiles.length
         });
         if (bloqueio) {
-            alert(t('profile', chaveDoBloqueio(bloqueio)));
+            setAviso(t('profile', chaveDoBloqueio(bloqueio)));
             return;
         }
         if (exigePinParaMexer(profile)) {
@@ -333,7 +339,7 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                                                 const next = isActive ? '' : preset.id;
                                                 if (exigePinParaMexer(editingProfile)) {
                                                     // Sem PIN, a cor do perfil do outro mudava na hora.
-                                                    alert(t('profile', 'protectedProfile'));
+                                                    setAviso(t('profile', 'protectedProfile'));
                                                     return;
                                                 }
                                                 void profileService.updateProfile(editingProfile.id, { accentColor: next });
@@ -450,6 +456,16 @@ export function ProfileSelector({ onProfileSelected }: ProfileSelectorProps) {
                         setShowCreateModal(false);
                     }}
                 />
+            )}
+
+            {/* Por ultimo e acima do overlay dos modais (1000): a recusa da cor
+                sai de DENTRO do modal de edicao. Fecha no clique, como o OK do
+                dialogo nativo que ele substituiu. */}
+            {aviso && (
+                <div className="profile-aviso" role="alert" onClick={() => setAviso('')}>
+                    <span aria-hidden="true">⚠️</span>
+                    <span>{aviso}</span>
+                </div>
             )}
         </>
     );
@@ -1084,5 +1100,26 @@ const profileSelectorStyles = `
 .avatar-option.selected {
     border-color: var(--ns-accent);
     background: rgba(var(--ns-accent-rgb), 0.2);
+}
+
+.profile-aviso {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: min(520px, 90vw);
+    padding: 14px 18px;
+    border-radius: 12px;
+    background: rgba(239, 68, 68, 0.16);
+    border: 1px solid rgba(239, 68, 68, 0.45);
+    backdrop-filter: blur(8px);
+    color: #fecaca;
+    font-size: 15px;
+    cursor: pointer;
+    z-index: 1100;
+    animation: fadeIn 0.3s ease;
 }
 `;

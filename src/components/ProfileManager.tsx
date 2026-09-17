@@ -31,6 +31,11 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
     const [deletePinInput, setDeletePinInput] = useState('');
     const [deletePinError, setDeletePinError] = useState('');
 
+    // Aviso in-app das recusas de exclusao (perfil ativo, ultimo, infantil).
+    // Era um dialogo nativo do Chromium: numa janela sem moldura ele abre fora
+    // do tema e PARA o JS do renderer ate alguem clicar OK.
+    const [aviso, setAviso] = useState('');
+
     const activeProfile = profileService.getActiveProfile();
     const { t } = useLanguage();
 
@@ -45,7 +50,7 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
             total: profiles.length
         });
         if (bloqueio) {
-            alert(t('profile', chaveDoBloqueio(bloqueio)));
+            setAviso(t('profile', chaveDoBloqueio(bloqueio)));
             return;
         }
 
@@ -685,6 +690,19 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Fica por ultimo no fragmento e com z-index acima dos modais
+                (10002): a recusa pode sair de dentro de um deles. Fecha no
+                clique, como o OK do dialogo nativo que ele substituiu. */}
+            {aviso && (
+                <div className="pm-aviso" role="alert" onClick={() => setAviso('')}>
+                    <span aria-hidden="true">⚠️</span>
+                    <span>{aviso}</span>
+                    <button className="pm-aviso-ok" aria-label={t('common', 'close')} onClick={() => setAviso('')}>
+                        <X size={16} />
+                    </button>
                 </div>
             )}
         </>
@@ -1487,4 +1505,35 @@ const profileManagerStyles = `
                 grid - template - columns: repeat(6, 1fr);
     }
 }
+
+    .pm-aviso {
+        position: fixed;
+        top: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        max-width: min(520px, 90vw);
+        padding: 14px 18px;
+        border-radius: 12px;
+        background: rgba(239, 68, 68, 0.16);
+        border: 1px solid rgba(239, 68, 68, 0.45);
+        backdrop-filter: blur(8px);
+        color: #fecaca;
+        font-size: 15px;
+        cursor: pointer;
+        z-index: 10003;
+        animation: pmPinFadeIn 0.3s ease;
+    }
+
+    .pm-aviso-ok {
+        display: flex;
+        align-items: center;
+        background: transparent;
+        border: none;
+        color: inherit;
+        cursor: pointer;
+        padding: 0;
+    }
             `;
