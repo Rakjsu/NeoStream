@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
 import { SortSelect } from '../components/SortSelect';
 import { usageStatsService } from '../services/usageStatsService';
-import { isLiveChannelVisible } from '../services/contentGate';
+import { isLiveChannelVisible, shouldBlockAdultCategories } from '../services/contentGate';
 import { groupChannelVariants, qualityLabel } from '../services/channelVariantsService';
 import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { CategoryMenu } from '../components/CategoryMenu';
@@ -475,6 +475,23 @@ export function LiveTV() {
     };
 
     const fetchCategories = useCallback(async () => {
+        // 🚪 Falha FECHADA. Sem as categorias, `allowedCategoryIds` e
+        // `blockedCategoryIds` ficam vazios — e conjunto vazio não filtra
+        // nada, por desenho (contentGate.ts, com teste próprio). Com o
+        // parental valendo ou no perfil infantil, uma falha desta chamada
+        // abria a grade INTEIRA, categoria adulta inclusa, sem um aviso; e a
+        // mesma lista ia pro guia do celular, que resolve o canal só contra
+        // ela. Adulto sem parental não perde a TV por uma falha que, pra ele,
+        // é cosmética (quem monta o menu de categorias é outro componente).
+        const gateValendo = () => {
+            const cfg = parentalService.getConfig();
+            return shouldBlockAdultCategories({
+                isKidsProfile,
+                parentalEnabled: cfg.enabled,
+                blockAdultCategories: cfg.blockAdultCategories,
+                sessionUnlocked: parentalService.isSessionUnlocked(),
+            });
+        };
         try {
             const result = await window.ipcRenderer.invoke('categories:get-live');
             if (result.success) {
@@ -506,9 +523,12 @@ export function LiveTV() {
                 } else {
                     setBlockedCategoryIds(new Set());
                 }
+            } else if (gateValendo()) {
+                setError(result.error || 'Failed to load categories');
             }
         } catch (err) {
             console.error('Failed to load categories:', err);
+            if (gateValendo()) setError(err instanceof Error ? err.message : 'Failed to load categories');
         }
     }, [isKidsProfile]);
 
@@ -555,7 +575,12 @@ export function LiveTV() {
     const [favCheckMsg, setFavCheckMsg] = useState('');
     const [deadIds, setDeadIds] = useState<Set<string>>(new Set());
 
-    const filteredStreams = useMemo(() => variantsResult.groups.filter(stream => {
+    // Em erro a página não publica lista NENHUMA. O `return` da tela de erro
+    // esconde a grade, mas hook não para em return: o efeito do guia continua
+    // rodando e mandando esta lista pro celular, que resolve o canal só contra
+    // ela — sem isto, o celular sintoniza canal adulto no desktop com a tela
+    // de erro no ar.
+    const filteredStreams = useMemo(() => (error ? [] : variantsResult.groups.filter(stream => {
         const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
         // 🙈 normal esconde os ocultos; "ver ocultos" mostra somente eles
         if (showHidden !== hiddenIds.has(String(stream.stream_id))) return false;
@@ -581,7 +606,7 @@ export function LiveTV() {
         if (!visivel) return false;
 
         return matchesSearch && matchesCategory;
-    }), [variantsResult, searchQuery, selectedCategory, favoriteChannelIds, blockedCategoryIds, isKidsProfile, allowedCategoryIds, kidsAllowedChannelIds, onlyWithEpg, hiddenIds, showHidden]);
+    })), [error, variantsResult, searchQuery, selectedCategory, favoriteChannelIds, blockedCategoryIds, isKidsProfile, allowedCategoryIds, kidsAllowedChannelIds, onlyWithEpg, hiddenIds, showHidden]);
 
     // Keep the zap ref current for the media:control handler (written in an
     // effect — refs must not be mutated during render).
@@ -1108,9 +1133,12 @@ export function LiveTV() {
                         border: '1px solid rgba(239, 68, 68, 0.2)'
                     }}>{error === 'Not authenticated' ? t('login', 'notAuthenticated') : error}</p>
 
-                    {/* Retry Button */}
+                    {/* Retry Button — refaz as DUAS buscas, nesta ordem:
+                        `fetchStreams` limpa o `error` na entrada e o
+                        `fetchCategories` só escreve depois do await, então
+                        invertido o erro de categorias seria apagado. */}
                     <button
-                        onClick={fetchStreams}
+                        onClick={() => { void fetchStreams(); void fetchCategories(); }}
                         style={{
                             display: 'inline-flex',
                             alignItems: 'center',
