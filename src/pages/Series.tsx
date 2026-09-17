@@ -278,33 +278,41 @@ export function Series() {
         return ids;
     }, [hideWatched]);
 
-    const filteredSeries = useMemo(() => sortedSeries.filter(s => {
-        const matchesSearch = fuzzyIncludes(s.name, searchQuery);
-        if (hideWatched && watchedSeriesIds.has(String(s.series_id))) {
-            return false;
-        }
+    const filteredSeries = useMemo(() => {
+        // 🗂️ Mesmo motivo da VOD: `getContinueWatching()` varre o histórico de
+        // episódios inteiro e montava um Map novo DENTRO do callback do
+        // `.filter()`, que roda por item — "Continuar assistindo" custava
+        // O(catálogo × histórico).
+        const emProgresso = selectedCategory === 'CONTINUE_WATCHING'
+            ? watchProgressService.getContinueWatching()
+            : null;
+        return sortedSeries.filter(s => {
+            const matchesSearch = fuzzyIncludes(s.name, searchQuery);
+            if (hideWatched && watchedSeriesIds.has(String(s.series_id))) {
+                return false;
+            }
 
-        // Kids profile + Parental Control filtering
-        if (!isItemVisible(s)) {
-            return false;
-        }
+            // Kids profile + Parental Control filtering
+            if (!isItemVisible(s)) {
+                return false;
+            }
 
-        if (selectedCategory === 'CONTINUE_WATCHING') {
-            const progressMap = watchProgressService.getContinueWatching();
-            return matchesSearch && progressMap.has(String(s.series_id));
-        }
+            if (emProgresso) {
+                return matchesSearch && emProgresso.has(String(s.series_id));
+            }
 
-        if (selectedCategory === 'COMPLETED') {
-            return matchesSearch && watchProgressService.isSeriesCompleted(String(s.series_id));
-        }
+            if (selectedCategory === 'COMPLETED') {
+                return matchesSearch && watchProgressService.isSeriesCompleted(String(s.series_id));
+            }
 
-        const categories = Array.isArray(s.category_id) ? s.category_id : [s.category_id];
-        const matchesCategory = !selectedCategory || selectedCategory === '' || selectedCategory === 'all' || categories.includes(selectedCategory);
-        return matchesSearch && matchesCategory;
+            const categories = Array.isArray(s.category_id) ? s.category_id : [s.category_id];
+            const matchesCategory = !selectedCategory || selectedCategory === '' || selectedCategory === 'all' || categories.includes(selectedCategory);
+            return matchesSearch && matchesCategory;
+        });
     // isItemVisible reads parental/kids state that only changes via a profile/
     // settings switch (which reloads the library), so it's intentionally omitted.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }), [sortedSeries, searchQuery, selectedCategory, hideWatched, watchedSeriesIds]);
+    }, [sortedSeries, searchQuery, selectedCategory, hideWatched, watchedSeriesIds]);
 
     // Windowed rendering (same mechanism as VOD): spacer rows keep the
     // scrollbar honest while only ~3 screens of cards stay mounted.
