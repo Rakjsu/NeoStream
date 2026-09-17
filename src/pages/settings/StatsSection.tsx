@@ -16,6 +16,7 @@ import {
     yearHeatmap
 } from '../../services/statsDashboardHelpers';
 import { useLanguage } from '../../services/languageService';
+import { diaLocal } from '../../utils/diaLocal';
 import { profileService } from '../../services/profileService';
 import { playlistService } from '../../services/playlistService';
 import { getDailyGoalMinutes, goalProgressPct, setDailyGoalMinutes } from '../../services/watchLimitsService';
@@ -30,7 +31,7 @@ export function StatsSection() {
     const [dailyGoal, setDailyGoal] = useState(() => getDailyGoalMinutes());
     const { t, language } = useLanguage();
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = diaLocal(new Date());
     const todaySeconds = usageStats?.dailyStats.find(d => d.date === today)?.totalSeconds || 0;
     const goalPct = goalProgressPct(todaySeconds, dailyGoal);
     const monthlyStats = fillLastNDays(usageStats?.dailyStats || [], 30, today);
@@ -363,7 +364,7 @@ export function StatsSection() {
                     <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '80px' }}>
                         {weeklyStats.map((day, i) => {
                             const height = Math.max(8, (day.totalSeconds / getMaxWeeklySeconds()) * 70);
-                            const isToday = day.date === new Date().toISOString().split('T')[0];
+                            const isToday = day.date === diaLocal(new Date());
                             return (
                                 <div key={i} style={{ flex: 1, textAlign: 'center' }}>
                                     <div

@@ -5,6 +5,7 @@
  */
 
 import type { WatchSession, DailyStats } from './usageStatsService';
+import { diaLocal } from '../utils/diaLocal';
 
 export interface RankedItem {
     name: string;
@@ -55,7 +56,7 @@ export function fillLastNDays(dailyStats: DailyStats[], n: number, today: string
     for (let i = n - 1; i >= 0; i--) {
         const date = new Date(base);
         date.setDate(base.getDate() - i);
-        const dateStr = date.toISOString().split('T')[0];
+        const dateStr = diaLocal(date);
         result.push(byDate.get(dateStr) || { date: dateStr, totalSeconds: 0, movies: 0, series: 0, live: 0 });
     }
     return result;
@@ -201,12 +202,6 @@ export function heatLevel(seconds: number): number {
     return 4;
 }
 
-function localIso(date: Date): string {
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${date.getFullYear()}-${month}-${day}`;
-}
-
 /**
  * Heatmap anual estilo GitHub: colunas = semanas (dom→sáb), a última
  * terminando na semana de hoje. Dias sem registro entram com 0 — a grade
@@ -223,7 +218,7 @@ export function yearHeatmap(dailyStats: DailyStats[], todayIso: string, weeks = 
         for (let day = 0; day < 7; day++) {
             const date = new Date(end);
             date.setDate(end.getDate() - week * 7 - (6 - day));
-            const iso = localIso(date);
+            const iso = diaLocal(date);
             if (iso > todayIso) {
                 column.push({ date: iso, seconds: 0, level: -1 });
                 continue;

@@ -111,3 +111,63 @@ describe('usageStatsService', () => {
         expect(usageStatsService.getMostWatchedType()).toBe('series');
     });
 });
+
+describe('o dia é o do calendário local, não o de Greenwich', () => {
+    // O vitest.config.ts fixa TZ=America/Sao_Paulo (UTC−3): é o fuso do dono
+    // do app, e o defeito só existe fora de Greenwich.
+    beforeEach(() => {
+        localStorage.clear();
+        vi.useFakeTimers({ toFake: ['Date'] });
+    });
+    afterEach(() => {
+        usageStatsService.endSession();
+        vi.useRealTimers();
+    });
+
+    it('sábado 22h e domingo 20h são DOIS dias: a sequência anda', () => {
+        // Carimbando em UTC, as duas noites caíam em 2026-07-05: um balde só
+        // de estatística e `updateStreak` saindo no `lastWatchDate === today`.
+        // Quem assiste toda noite via a sequência travada em 1.
+        vi.setSystemTime(new Date('2026-07-05T01:00:00Z')); // sáb 04/07, 22h em SP
+        usageStatsService.startSession('m1', 'movie', 'F');
+        vi.setSystemTime(new Date('2026-07-05T01:01:00Z'));
+        usageStatsService.endSession();
+
+        vi.setSystemTime(new Date('2026-07-05T23:00:00Z')); // dom 05/07, 20h em SP
+        usageStatsService.startSession('m1', 'movie', 'F');
+        vi.setSystemTime(new Date('2026-07-05T23:01:00Z'));
+        usageStatsService.endSession();
+
+        const stats = readStats();
+        expect(stats.dailyStats.map(d => d.date)).toEqual(['2026-07-04', '2026-07-05']);
+        expect(stats.watchStreak).toBe(2);
+    });
+
+    it('sexta 19h e sábado 22h são consecutivos: a sequência não zera', () => {
+        // O outro lado do mesmo erro: o "ontem" calculado em UTC não casava
+        // com o dia gravado, e duas noites seguidas viravam streak 1.
+        vi.setSystemTime(new Date('2026-07-03T22:00:00Z')); // sex 03/07, 19h em SP
+        usageStatsService.startSession('m1', 'movie', 'F');
+        vi.setSystemTime(new Date('2026-07-03T22:01:00Z'));
+        usageStatsService.endSession();
+        expect(readStats().lastWatchDate).toBe('2026-07-03');
+
+        vi.setSystemTime(new Date('2026-07-05T01:00:00Z')); // sáb 04/07, 22h em SP
+        usageStatsService.startSession('m1', 'movie', 'F');
+        vi.setSystemTime(new Date('2026-07-05T01:01:00Z'));
+        usageStatsService.endSession();
+
+        expect(readStats().lastWatchDate).toBe('2026-07-04');
+        expect(readStats().watchStreak).toBe(2);
+    });
+
+    it('a semana do painel fecha no dia local', () => {
+        vi.setSystemTime(new Date('2026-07-05T01:00:00Z')); // sáb 04/07, 22h em SP
+        usageStatsService.startSession('l1', 'live', 'Canal');
+        vi.setSystemTime(new Date('2026-07-05T01:01:00Z'));
+        usageStatsService.endSession();
+
+        const semana = usageStatsService.getWeeklyStats();
+        expect(semana[6]).toMatchObject({ date: '2026-07-04', live: 60 });
+    });
+});
