@@ -182,3 +182,43 @@ describe('movieProgressService — legacy migration', () => {
         expect(localStorage.getItem('movie_watch_progress')).toBeNull();
     });
 });
+
+// Espião do Trakt: a guarda de duração tem que impedir o ENVIO, não só a
+// gravação — Infinity >= 85 dispararia o sync de "visto", que não tem desfazer.
+const traktCalls: string[] = [];
+vi.mock('./traktService', () => ({
+    syncTraktMovieWatched: (title: string) => { traktCalls.push(title); return Promise.resolve(false); }
+}));
+
+describe('movieProgressService — amostra sem duração válida', () => {
+    beforeEach(() => { localStorage.clear(); activeId = 'p1'; playlistId = 'plA'; traktCalls.length = 0; });
+
+    it('duração 0 não grava progresso nem manda o filme pro Trakt', () => {
+        movieProgressService.saveMovieTime('m1', 'Filme 1', 10, 0);
+        expect(movieProgressService.getMoviePositionById('m1')).toBeNull();
+        expect(movieProgressService.getWatchedMovies()).toEqual([]);
+        expect(traktCalls).toEqual([]);
+    });
+
+    it('duração NaN não cria entrada de histórico', () => {
+        movieProgressService.saveMovieTime('m2', 'Filme 2', 10, Number.NaN);
+        expect(movieProgressService.getHistory()).toEqual([]);
+        expect(traktCalls).toEqual([]);
+    });
+
+    // Infinity é o ÚNICO caso em que a guarda muda o que o app faz hoje: as cinco
+    // telas e a entrada remota testam `duration > 0`, que Infinity passa. Uma
+    // transmissão ao vivo cai no ramo de FILME do AsyncVideoPlayer (não há
+    // filtro de contentType lá) e gravava uma entrada de filme com
+    // `duration: Infinity` / `progress: 0` no histórico. Deixa de gravar.
+    it('duração Infinity (ao vivo) não vira entrada de filme', () => {
+        movieProgressService.saveMovieTime('m4', 'Canal ao vivo', 900, Number.POSITIVE_INFINITY);
+        expect(movieProgressService.getHistory()).toEqual([]);
+    });
+
+    it('amostra com duração válida continua gravando e sincronizando', () => {
+        movieProgressService.saveMovieTime('m3', 'Filme 3', 90, 100);
+        expect(movieProgressService.getMoviePositionById('m3')?.currentTime).toBe(90);
+        expect(traktCalls).toEqual(['Filme 3']);
+    });
+});

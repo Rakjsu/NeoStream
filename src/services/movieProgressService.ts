@@ -130,6 +130,16 @@ class MovieProgressService {
         duration: number,
         watchedAt: number = Date.now()
     ): void {
+        // Mesma guarda do irmão de séries (watchProgressService.saveVideoTime):
+        // sem duração válida o percentual é lixo. Com `duration` 0 e
+        // `currentTime` > 0 ele vira Infinity, e Infinity >= 95/85 grava o filme
+        // como VISTO e ainda dispara o "visto" no Trakt, que não tem desfazer.
+        // Nenhuma tela manda 0 hoje, mas TODAS deixam passar Infinity (testam
+        // `duration > 0`): era assim que uma transmissão ao vivo — que cai no
+        // ramo de FILME do AsyncVideoPlayer — criava entrada de filme com
+        // `duration: Infinity` e `progress: 0` no histórico.
+        if (!Number.isFinite(duration) || duration <= 0) return;
+
         const activeProfile = profileService.getActiveProfile();
         if (!activeProfile) return;
 
