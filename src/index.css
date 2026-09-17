@@ -116,6 +116,10 @@ html[data-motion='reduced'] *,
 html[data-motion='reduced'] *::before,
 html[data-motion='reduced'] *::after {
     animation-duration: 0.001s !important;
+    /* Sem cortar o laço, as animações `infinite` não param: dão ~1000 voltas
+       por segundo amostradas a 60 fps e o interruptor vira estroboscópio.
+       `paused` não serve — congelaria no quadro em que a pessoa ligou. */
+    animation-iteration-count: 1 !important;
     animation-delay: 0s !important;
     transition-duration: 0.001s !important;
     scroll-behavior: auto !important;
