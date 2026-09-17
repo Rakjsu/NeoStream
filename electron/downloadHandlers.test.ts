@@ -194,16 +194,27 @@ describe('download:start — limpeza do intervalo de progresso', () => {
 
         const running = start('dl-progresso')
         await waitForChunkRequests()
-        // setImmediate é REAL aqui (não está na lista do useFakeTimers): é o
-        // que deixa o stream entregar o 'data' antes de o intervalo disparar.
-        for (let i = 0; i < 5; i++) await new Promise(r => setImmediate(r))
-        vi.advanceTimersByTime(500)
 
-        const andando = state.sends.filter(s => {
+        // Quantos avisos de progresso já saíram com bytes na conta.
+        const andando = () => state.sends.filter(s => {
             const p = s.payload as { progress: number; downloadedBytes: number }
             return s.channel === 'download:progress' && p.downloadedBytes > 0 && p.progress < 100
-        })
-        expect(andando.length).toBeGreaterThan(0)
+        }).length
+
+        // Espera por CONDIÇÃO, não por um número fixo de tiques. O caminho do
+        // Readable até o `response.on('data')` passa por nextTick, setImmediate
+        // e pelo open assíncrono do arquivo de saída — quantas voltas isso leva
+        // depende da carga da máquina, e um `for` de 5 tiques passava na minha
+        // e falhava na suíte cheia. (setImmediate é REAL aqui: não está na
+        // lista do useFakeTimers.)
+        for (let volta = 0; volta < 100 && andando() === 0; volta++) {
+            await new Promise(r => setImmediate(r))
+            vi.advanceTimersByTime(500)
+        }
+
+        // Sem o repasse por chunk recebido, o modo 'parcial' nunca fecha um
+        // pedaço: nenhum aviso teria bytes e o laço acima esgota.
+        expect(andando()).toBeGreaterThan(0)
 
         await invoke('download:cancel', { id: 'dl-progresso' })
         await running
