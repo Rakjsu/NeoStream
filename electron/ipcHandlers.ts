@@ -9,6 +9,7 @@ import { ensureProviderEpgLoaded, getProviderUtcOffsetMinutes, resetProviderEpgS
 import { formatTimeshiftStart } from './timeshiftProtocol'
 import { getErrorMessage } from './errorMessage'
 import { addDocumentToIndex, emptyIndex, finalizeIndex, lookupChannel, type XmltvIndex } from './epgIndexProtocol'
+import { cacheKeyValido } from './epgCacheGuard'
 import {
     activatePlaylist,
     deactivatePlaylists,
@@ -260,6 +261,8 @@ const EPG_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 
 /** Arquivo + meta de um cacheKey. `null` quando não existe ou está vencido. */
 async function epgFileStatus(cacheKey: string, url: string): Promise<{ file: string; stamp: string } | null> {
+    // Chave torta não tem arquivo — e não pode virar caminho (epgCacheGuard.ts).
+    if (!cacheKeyValido(cacheKey)) return null
     const fs = await import('fs/promises')
     const path = await import('path')
     const { app } = await import('electron')
@@ -920,6 +923,9 @@ export function setupIpcHandlers() {
     // EPG Cache System - Downloads EPG XML files on app start
     // Downloads fresh on every app restart, caches during session only
     ipcMain.handle('epg:get-cached', async (_, { url, cacheKey, forceRefresh = false }) => {
+        // 🧱 Antes do try: o cacheKey vira NOME DE ARQUIVO logo abaixo, e
+        // `path.join` normaliza sem confinar — ver epgCacheGuard.ts.
+        if (!cacheKeyValido(cacheKey)) return { success: false, error: 'cacheKey inválido' }
         try {
             const fs = await import('fs/promises')
             const path = await import('path')
@@ -1072,6 +1078,9 @@ export function setupIpcHandlers() {
 
     // Get EPG cache info (for UI display)
     ipcMain.handle('epg:get-cache-info', async (_, cacheKey: string) => {
+        // Hoje inalcançável (fora da allowlist do preload, sem chamador), mas
+        // o padrão vale para todo caminho que interpola o cacheKey.
+        if (!cacheKeyValido(cacheKey)) return { success: false, error: 'cacheKey inválido' }
         try {
             const fs = await import('fs/promises')
             const path = await import('path')
