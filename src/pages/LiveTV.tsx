@@ -4,6 +4,7 @@ import { SortSelect } from '../components/SortSelect';
 import { usageStatsService } from '../services/usageStatsService';
 import { isLiveChannelVisible, shouldBlockAdultCategories } from '../services/contentGate';
 import { groupChannelVariants, qualityLabel } from '../services/channelVariantsService';
+import { fuzzyIncludes } from '../utils/catalogFilter';
 import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
@@ -581,7 +582,12 @@ export function LiveTV() {
     // ela — sem isto, o celular sintoniza canal adulto no desktop com a tela
     // de erro no ar.
     const filteredStreams = useMemo(() => (error ? [] : variantsResult.groups.filter(stream => {
-        const matchesSearch = stream.name.toLowerCase().includes(searchQuery.toLowerCase());
+        // 🔎 Mesma busca de Filmes e Séries: sem acento e com os tokens em
+        // qualquer ordem. Com `includes` literal, "sao" não achava
+        // "SÃO PAULO" na grade — mas achava no Ctrl+K e no overlay de zapping
+        // do player, que já normalizam acento. Três buscas, duas respostas pro
+        // mesmo nome.
+        const matchesSearch = fuzzyIncludes(stream.name, searchQuery);
         // 🙈 normal esconde os ocultos; "ver ocultos" mostra somente eles
         if (showHidden !== hiddenIds.has(String(stream.stream_id))) return false;
         if (onlyWithEpg && !stream.epg_channel_id) return false;

@@ -17,6 +17,25 @@ describe('fuzzyIncludes (busca fuzzy do catálogo)', () => {
     it('normalizeSearchText achata tudo pra [a-z0-9 ]', () => {
         expect(normalizeSearchText('É.T.! — O Extraterrestre')).toBe('e t o extraterrestre');
     });
+
+    // 🔤 A query some inteira no `[^a-z0-9]`: sem a saída literal ela viraria
+    // "casa tudo" e o catálogo inteiro apareceria no lugar do canal buscado.
+    it('busca fora do alfabeto latino não vira "casa tudo"', () => {
+        expect(fuzzyIncludes('RU: ТНТ HD', 'ТНТ')).toBe(true);
+        expect(fuzzyIncludes('BR: Globo SP', 'ТНТ')).toBe(false);
+        expect(fuzzyIncludes('GR: ΣΚΑΪ', 'ΣΚΑΪ')).toBe(true);
+        expect(fuzzyIncludes('BR: Globo SP', 'ΣΚΑΪ')).toBe(false);
+    });
+
+    // O memo da última query é estado de módulo: alternar entre buscas não
+    // pode deixar o resultado da anterior grudado.
+    it('alternar buscas não reaproveita o resultado da anterior', () => {
+        expect(fuzzyIncludes('Coração Valente', 'coracao')).toBe(true);
+        expect(fuzzyIncludes('Coração Valente', 'matrix')).toBe(false);
+        expect(fuzzyIncludes('Coração Valente', 'coracao')).toBe(true);
+        expect(fuzzyIncludes('Coração Valente', '')).toBe(true);
+        expect(fuzzyIncludes('Coração Valente', 'valente coracao')).toBe(true);
+    });
 });
 
 describe('qualityBadgeOf (selo 4K/FHD/HD)', () => {
