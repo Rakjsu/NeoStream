@@ -45,6 +45,46 @@ function stripQuotes(s) {
     return s.replace(/^['"]|['"]$/g, '')
 }
 
+/** O `version:` do topo do latest*.yml — é ele que o updater compara. */
+function parseFeedVersion(text) {
+    const match = text.match(/^version:\s*(.+?)\s*$/m)
+    return match ? stripQuotes(match[1]) : null
+}
+
+/**
+ * A tag, o package.json e o feed falam da MESMA versão?
+ *
+ * O bump da versão é um commit manual separado ("chore(release): prepare
+ * v4.49.0"). Se a tag `v4.50.0` for empurrada de um commit ainda em 4.49.0, o
+ * electron-builder gera os três `latest*.yml` com `version: 4.49.0` — e o
+ * updater de quem já está em 4.49.0 compara, conclui "já estou atualizado" e
+ * NUNCA oferece a nova versão. Para 100% dos usuários a release simplesmente
+ * não existe.
+ *
+ * Não é invisível de todo: os artefatos saem com o número velho no nome
+ * (`NeoStream-IPTV-4.49.0-arm64.dmg` sob a tag v4.50.0), então a divergência
+ * fica na página da release para quem olhar. O que falta é alguém olhar — e
+ * esse alguém é este script, que já roda nos três sistemas.
+ *
+ * Devolve a mensagem do problema, ou null.
+ */
+function conferirVersao(feedVersion, pkgVersion, refName) {
+    if (!feedVersion) {
+        return 'o feed não declara `version:` — o updater não tem o que comparar.'
+    }
+    if (feedVersion !== pkgVersion) {
+        return `versão do feed (${feedVersion}) difere da do package.json (${pkgVersion}).`
+    }
+    // Fora do CI não há tag; localmente basta o par feed↔package.json.
+    const tag = String(refName || '').replace(/^v/, '')
+    if (tag && tag !== pkgVersion) {
+        return `a tag (${refName}) não bate com a versão publicada (${pkgVersion}). `
+            + 'O bump do package.json é um commit separado: a tag saiu de um commit velho, '
+            + 'e o updater de quem já está nessa versão nunca vai oferecer a nova.'
+    }
+    return null
+}
+
 function sha512Base64(filePath) {
     return crypto.createHash('sha512').update(fs.readFileSync(filePath)).digest('base64')
 }
@@ -101,9 +141,19 @@ function main() {
         process.exit(1)
     }
 
+    const pkgVersion = JSON.parse(
+        fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8')
+    ).version
+
     let problems = 0
     for (const feed of feeds) {
-        const entries = parseFeed(fs.readFileSync(path.join(RELEASE_DIR, feed), 'utf-8'))
+        const texto = fs.readFileSync(path.join(RELEASE_DIR, feed), 'utf-8')
+        const versaoRuim = conferirVersao(parseFeedVersion(texto), pkgVersion, process.env.GITHUB_REF_NAME)
+        if (versaoRuim) {
+            console.error(`[verify-update-feed] ${feed}: ${versaoRuim}`)
+            problems++
+        }
+        const entries = parseFeed(texto)
         if (entries.length === 0) {
             console.error(`[verify-update-feed] ${feed}: sem entradas em files:`)
             problems++
@@ -147,4 +197,4 @@ function main() {
 // Run when invoked directly (CI); stay importable for tests.
 if (require.main === module) main()
 
-module.exports = { parseFeed, normalizeName, resolveFileName }
+module.exports = { parseFeed, parseFeedVersion, conferirVersao, normalizeName, resolveFileName }
