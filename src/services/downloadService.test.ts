@@ -6,7 +6,7 @@ vi.mock('./episodeNotificationService', () => ({
     appNotificationService: { addDownloadNotification: vi.fn() },
 }));
 
-import { downloadService } from './downloadService';
+import { downloadService, resumoDaSerie } from './downloadService';
 import { appNotificationService } from './episodeNotificationService';
 
 /**
@@ -142,5 +142,42 @@ describe('downloadService: listener de progresso', () => {
         await vi.waitFor(() => expect(off).toHaveBeenCalled());
 
         expect(handlerDe(off)).toBe(handlerDe(on));
+    });
+});
+
+/**
+ * O número que o modal de exclusão mostra. A pessoa decide apagar uma árvore
+ * de dezenas de GB olhando só pra ele.
+ */
+describe('resumoDaSerie', () => {
+    const episodio = (id: string, size: number) => ({
+        id, name: id, size,
+    } as unknown as Parameters<typeof resumoDaSerie>[0]['seasons'][0]['episodes'][0]);
+
+    it('soma as DUAS temporadas, não só a primeira', () => {
+        // Pegar `seasons[0]` mostraria um terço do tamanho, e a confirmação
+        // seria dada em cima de um número errado.
+        const resumo = resumoDaSerie({
+            seriesName: 'Dark',
+            seasons: [
+                { episodes: [episodio('t1e1', 100), episodio('t1e2', 200)] },
+                { episodes: [episodio('t2e1', 700)] },
+            ],
+        });
+        expect(resumo).toEqual({ nome: 'Dark', episodios: 3, bytes: 1000 });
+    });
+
+    it('episódio sem tamanho não vira NaN', () => {
+        // "NaN B" no modal é convite pra confirmar às cegas.
+        const resumo = resumoDaSerie({
+            seriesName: 'Dark',
+            seasons: [{ episodes: [episodio('t1e1', 100), episodio('t1e2', undefined as unknown as number)] }],
+        });
+        expect(resumo.bytes).toBe(100);
+        expect(Number.isNaN(resumo.bytes)).toBe(false);
+    });
+
+    it('série sem episódio no disco dá zero, não quebra', () => {
+        expect(resumoDaSerie({ seriesName: 'Vazia', seasons: [] })).toEqual({ nome: 'Vazia', episodios: 0, bytes: 0 });
     });
 });

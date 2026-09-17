@@ -6,6 +6,24 @@
 import { appNotificationService } from './episodeNotificationService';
 import { lerMaxConexoes, limiteEfetivoDeDownloads } from '../utils/providerConnections';
 
+/** O que a série ocupa — alimenta o modal de confirmação da exclusão. */
+export function resumoDaSerie(serie: { seriesName: string; seasons: { episodes: DownloadItem[] }[] }): {
+    nome: string;
+    episodios: number;
+    bytes: number;
+} {
+    // flatMap nas temporadas: pegar só `seasons[0]` mostraria um terço do
+    // tamanho, e a pessoa aprovaria a exclusão vendo o número errado.
+    const episodios = serie.seasons.flatMap(temporada => temporada.episodes);
+    return {
+        nome: serie.seriesName,
+        episodios: episodios.length,
+        // `size` ausente viraria NaN no total, e "NaN B" no modal é um
+        // convite pra confirmar às cegas.
+        bytes: episodios.reduce((soma, item) => soma + (item.size || 0), 0),
+    };
+}
+
 export interface DownloadItem {
     id: string;
     name: string;

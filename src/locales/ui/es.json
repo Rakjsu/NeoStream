@@ -984,6 +984,8 @@
     "exportDone": "📤 Grabación exportada",
     "deleteConfirm": "¿Estás seguro de que deseas eliminar",
     "deleteConfirmText": "Este archivo se eliminará permanentemente.",
+    "deleteSeriesConfirmText": "La serie completa y todos los episodios descargados se eliminarán permanentemente.",
+    "episodesCount": "episodios",
     "cancel": "Cancelar",
     "delete": "Eliminar",
     "resumeDownload": "Reanudar Descarga",
