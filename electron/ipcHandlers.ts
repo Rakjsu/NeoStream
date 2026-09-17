@@ -10,6 +10,7 @@ import { formatTimeshiftStart } from './timeshiftProtocol'
 import { getErrorMessage } from './errorMessage'
 import { addDocumentToIndex, emptyIndex, finalizeIndex, lookupChannel, type XmltvIndex } from './epgIndexProtocol'
 import { cacheKeyValido } from './epgCacheGuard'
+import { resolverUrlOpenSubtitles } from './openSubtitlesEndpoint'
 import {
     activatePlaylist,
     deactivatePlaylists,
@@ -1466,6 +1467,14 @@ export function setupIpcHandlers() {
 
     // OpenSubtitles API proxy (bypass CORS)
     ipcMain.handle('opensubtitles:request', async (_, { endpoint, method, body }: { endpoint: string; method?: string; body?: OpenSubtitlesBody }) => {
+        // Destino primeiro, credencial depois: o host é fixo e o caminho vem
+        // de uma lista fechada. Antes havia um ramo de URL absoluta — sem um
+        // chamador sequer — que mandava o `Api-Key`/`Bearer` do usuário para
+        // onde o renderer quisesse (ver openSubtitlesEndpoint.ts).
+        const url = resolverUrlOpenSubtitles(endpoint)
+        if (!url) {
+            return { success: false, error: 'OpenSubtitles endpoint is not allowed' }
+        }
         try {
             const creds = getOpenSubtitlesConfig()
             if (!creds.apiKey) {
@@ -1476,7 +1485,6 @@ export function setupIpcHandlers() {
             }
 
             const fetch = (await import('node-fetch')).default
-            const baseUrl = 'https://api.opensubtitles.com/api/v1'
             const requestBody = endpoint === '/login'
                 ? {
                     ...body,
@@ -1507,7 +1515,6 @@ export function setupIpcHandlers() {
                 options.body = JSON.stringify(requestBody)
             }
 
-            const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`
             log.info(`[OpenSubtitles] ${method} ${endpoint}`)
 
             const response = await fetch(url, options)
