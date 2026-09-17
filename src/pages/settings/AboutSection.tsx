@@ -314,7 +314,7 @@ export function AboutSection() {
                             <h3 style={{ color: '#10b981', fontSize: '16px', marginTop: '24px', marginBottom: '12px' }}>1. Dados que Coletamos</h3>
                             <p>O NeoStream coleta e armazena <strong style={{ color: 'white' }}>localmente no seu dispositivo</strong>:</p>
                             <ul style={{ marginLeft: '20px', marginTop: '8px' }}>
-                                <li>Credenciais de conexão IPTV (criptografadas)</li>
+                                <li>Credenciais de conexão IPTV (sem criptografia própria — protegidas pelo seu usuário do sistema operacional)</li>
                                 <li>Preferências de configuração</li>
                                 <li>Histórico de reprodução e progresso</li>
                                 <li>Configurações de controle parental</li>
