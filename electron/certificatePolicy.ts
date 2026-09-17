@@ -29,8 +29,19 @@ type CertificateVerdict = 'valid' | 'invalid' | 'unknown'
 
 /** Veredicto por host:porta, válido só para a sessão do app. */
 const verdictCache = new Map<string, { verdict: CertificateVerdict; at: number }>()
-/** Domínios recusados pelo dono nesta sessão — não perguntar de novo agora. */
-const deniedDomains = new Set<string>()
+/**
+ * Uma recusa vale por uma JANELA CURTA, não pela sessão inteira.
+ *
+ * "Cancelar" é o botão padrão do diálogo — e o do Esc e o do Enter. Um clique
+ * errado, ou um Enter dado no teclado por reflexo, deixava o provedor sem
+ * catálogo até fechar o app: a única saída era desligar e religar o modo
+ * compatível em Configurações → Rede, um caminho que ninguém adivinha (a
+ * própria mensagem de erro mandava "reativar" um interruptor que já está
+ * ligado).
+ */
+const DENIED_DOMAIN_TTL_MS = 10 * 60_000
+/** Domínios recusados pelo dono — quando foi, pra não perguntar de novo agora. */
+const deniedDomains = new Map<string, number>()
 /** Uma pergunta por domínio de cada vez, mesmo com requisições em paralelo. */
 const pendingPrompts = new Map<string, Promise<boolean>>()
 /** Idem para o probe: uma tela de capas quebrada dispara dezenas de erros
@@ -299,7 +310,9 @@ async function ensureCertificateDecision(url: string, candidateProviderUrl?: str
     if (isTrustedForInvalidCertificate(hostname)) return true
 
     const scope = getTrustScope(hostname)
-    if (!scope || deniedDomains.has(scope)) return false
+    if (!scope) return false
+    const deniedAt = deniedDomains.get(scope)
+    if (deniedAt !== undefined && Date.now() - deniedAt < DENIED_DOMAIN_TTL_MS) return false
     // Antes do app pronto não há janela para ancorar o diálogo; a próxima
     // requisição (já com janela) faz a pergunta.
     if (typeof app.isReady !== 'function' || !app.isReady()) return false
@@ -311,7 +324,7 @@ async function ensureCertificateDecision(url: string, candidateProviderUrl?: str
 
     const accepted = await promptForCertificateTrust(hostname, scope)
     if (!accepted) {
-        deniedDomains.add(scope)
+        deniedDomains.set(scope, Date.now())
         log.warn('[Certificate Policy] Certificado inválido recusado pelo usuário:', scope)
         return false
     }
@@ -373,7 +386,7 @@ export function isTlsCertificateError(error: unknown): boolean {
 }
 
 export function getInvalidCertificateGuidance(): string {
-    return 'Certificado invalido do provedor. O app pergunta uma vez por provedor antes de aceitar; se voce recusou ou o modo compativel esta desligado, reative em Configuracoes > Rede e certificados e tente de novo.'
+    return 'Certificado invalido do provedor. O app pergunta antes de aceitar e guarda a recusa por alguns minutos; se voce recusou, tente de novo daqui a pouco. Se o modo compativel estiver desligado, ligue em Configuracoes > Rede e certificados.'
 }
 
 function logCertificateCompatibility(url: string, error: string, source: string) {

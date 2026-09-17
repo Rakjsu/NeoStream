@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import https from 'https'
 
 // Store em memória: só o que o certificatePolicy lê (settings + auth mirror).
@@ -13,14 +13,44 @@ vi.mock('./store', () => {
     }
 })
 vi.mock('./logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
-// `isReady: false` mantém o probe TLS e o diálogo fora do teste unitário — o
-// que sobra é exatamente a política: sem consentimento salvo, não há bypass.
+// `ready: false` por padrão mantém o probe TLS e o diálogo fora dos testes
+// unitários — o que sobra é exatamente a política: sem consentimento salvo,
+// não há bypass. O bloco do fim do arquivo liga o `ready` pra exercitar a
+// pergunta de verdade.
+const electronState = vi.hoisted(() => ({
+    ready: false,
+    showMessageBox: vi.fn(async () => ({ response: 0 })),
+}))
 vi.mock('electron', () => ({
-    app: { on: vi.fn(), whenReady: () => new Promise(() => undefined), isReady: () => false },
+    app: { on: vi.fn(), whenReady: () => new Promise(() => undefined), isReady: () => electronState.ready },
     session: {},
-    dialog: { showMessageBox: vi.fn() },
+    dialog: { showMessageBox: electronState.showMessageBox },
     BrowserWindow: { getFocusedWindow: () => null, getAllWindows: () => [] },
 }))
+
+// TLS falso: o probe roda de verdade, sem rede. Atenção: o módulo importa
+// `'tls'` cru, não `'node:tls'`. E o `vi.hoisted` assíncrono é obrigatório —
+// `vi.mock` é içado acima dos imports, então um `EventEmitter` importado no
+// topo estouraria "Cannot access before initialization".
+const tlsFake = await vi.hoisted(async () => {
+    const { EventEmitter } = await import('node:events')
+    const state = { verdict: 'invalid' as 'invalid' | 'valid' }
+    class FakeTlsSocket extends EventEmitter {
+        destroy() { /* o probe sempre destrói o socket */ }
+    }
+    return {
+        state,
+        connect: () => {
+            const socket = new FakeTlsSocket()
+            setImmediate(() => {
+                if (state.verdict === 'valid') socket.emit('secureConnect')
+                else socket.emit('error', Object.assign(new Error('expirado'), { code: 'CERT_HAS_EXPIRED' }))
+            })
+            return socket
+        },
+    }
+})
+vi.mock('tls', () => ({ default: { connect: tlsFake.connect } }))
 
 import store from './store'
 import {
@@ -32,6 +62,7 @@ import {
     resolveProviderHttpsAgent,
     canAllowInvalidCertificateForUrl,
     isTlsCertificateError,
+    getInvalidCertificateGuidance,
 } from './certificatePolicy'
 
 beforeEach(() => {
@@ -171,5 +202,82 @@ describe('isTlsCertificateError (classificador de erro de certificado)', () => {
         expect(isTlsCertificateError({ code: 'ECONNREFUSED', message: 'connect ECONNREFUSED' })).toBe(false)
         expect(isTlsCertificateError(new Error('timeout of 15000ms exceeded'))).toBe(false)
         expect(isTlsCertificateError(undefined)).toBe(false)
+    })
+})
+
+/**
+ * 🔐 Recusar o aviso de certificado não pode derrubar o provedor.
+ *
+ * "Cancelar" é o botão padrão do diálogo — e o do Esc e o do Enter. A recusa
+ * era lembrada pela sessão INTEIRA do app, e a única saída era desligar e
+ * religar o modo compatível em Configurações → Rede: um caminho que ninguém
+ * adivinha, ainda mais com a mensagem de erro mandando "reativar" um
+ * interruptor que já está ligado.
+ */
+describe('recusa de certificado é temporária, não permanente', () => {
+    beforeEach(() => {
+        // `deniedDomains`/`verdictCache` são estado de módulo, e o beforeEach
+        // global só limpa o store: esta é a zeragem pela API pública.
+        forgetTrustedCertificateDomains()
+        store.set('settings', {})
+        electronState.ready = true
+        electronState.showMessageBox.mockClear()
+        tlsFake.state.verdict = 'invalid'
+        vi.useFakeTimers({ toFake: ['Date'] })
+    })
+
+    afterEach(() => {
+        vi.useRealTimers()
+        electronState.ready = false
+        forgetTrustedCertificateDomains()
+    })
+
+    it('recusar não deixa o provedor fora do ar: passada a janela, o app volta a perguntar', async () => {
+        electronState.showMessageBox.mockResolvedValue({ response: 0 }) // Cancelar
+        await expect(resolveProviderHttpsAgent('https://provider.example.com/1.ts')).resolves.toBeUndefined()
+        expect(electronState.showMessageBox).toHaveBeenCalledTimes(1)
+
+        electronState.showMessageBox.mockResolvedValue({ response: 1 }) // mudou de ideia
+        vi.setSystemTime(Date.now() + 11 * 60_000)
+        await expect(resolveProviderHttpsAgent('https://provider.example.com/1.ts'))
+            .resolves.toBeInstanceOf(https.Agent)
+        expect(electronState.showMessageBox).toHaveBeenCalledTimes(2)
+    })
+
+    it('dentro da janela, recusar não vira pergunta em laço', async () => {
+        electronState.showMessageBox.mockResolvedValue({ response: 0 })
+        await expect(resolveProviderHttpsAgent('https://provider.example.com/1.ts')).resolves.toBeUndefined()
+        vi.setSystemTime(Date.now() + 30_000)
+        await expect(resolveProviderHttpsAgent('https://provider.example.com/2.ts')).resolves.toBeUndefined()
+        expect(electronState.showMessageBox).toHaveBeenCalledTimes(1)
+    })
+
+    it('🔒 aceitar continua exigindo o sim explícito, e só ele libera o agent', async () => {
+        electronState.showMessageBox.mockResolvedValue({ response: 1 })
+        await expect(resolveProviderHttpsAgent('https://provider.example.com/1.ts'))
+            .resolves.toBeInstanceOf(https.Agent)
+        expect(getCertificateSettings().trustedInvalidCertDomains).toEqual(['example.com'])
+    })
+
+    it('🔒 certificado VÁLIDO não pergunta nada e não ganha bypass', async () => {
+        tlsFake.state.verdict = 'valid'
+        await expect(resolveProviderHttpsAgent('https://provider.example.com/1.ts')).resolves.toBeUndefined()
+        expect(electronState.showMessageBox).not.toHaveBeenCalled()
+    })
+
+    it('desligar e religar o modo compatível também limpa a recusa (saída que já existia)', async () => {
+        electronState.showMessageBox.mockResolvedValue({ response: 0 })
+        await expect(resolveProviderHttpsAgent('https://provider.example.com/1.ts')).resolves.toBeUndefined()
+
+        setAllowInvalidProviderCertificates(false)
+        setAllowInvalidProviderCertificates(true)
+
+        electronState.showMessageBox.mockResolvedValue({ response: 1 })
+        await expect(resolveProviderHttpsAgent('https://provider.example.com/1.ts'))
+            .resolves.toBeInstanceOf(https.Agent)
+    })
+
+    it('a mensagem de erro descreve uma saída que existe', () => {
+        expect(getInvalidCertificateGuidance()).toContain('tente de novo daqui a pouco')
     })
 })
