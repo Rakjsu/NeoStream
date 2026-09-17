@@ -30,7 +30,7 @@
 
 import { app, ipcMain, BrowserWindow, net as electronNet, screen } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, rmSync } from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
 import store from './store'
@@ -74,6 +74,62 @@ interface MpvSession {
 let session: MpvSession | null = null
 let instanceCounter = 0
 let resolvedPathCache: string | null | undefined // undefined = not probed yet
+
+/** Prefixo dos temporarios de legenda: o nome e a varredura leem daqui. */
+const PREFIXO_LEGENDA_TEMP = 'neostream-sub-'
+
+/**
+ * Os .vtt que `mpv:add-subtitle` grava no %TEMP% (o mpv so aceita legenda
+ * externa por CAMINHO em disco). Ninguem mais no app conhece esses arquivos:
+ * sem esta lista eles ficam no disco do usuario para sempre, um por clique em
+ * "buscar legenda".
+ */
+const legendasTemporarias: string[] = []
+
+/**
+ * Apaga os .vtt criados para o mpv. So no fim da reproducao (ou na saida do
+ * app): apagar logo depois do `sub-add` arriscaria sumir com o arquivo que o
+ * mpv ainda rele num `sub-reload`.
+ *
+ * Sincrono de proposito — o 'will-quit' do Electron nao espera promessa
+ * nenhuma terminar. O que FALHAR volta pra lista: no Windows o mpv ainda
+ * segura o arquivo nos milissegundos entre o `quit` e a morte do processo, e
+ * quem pega esse resto e a tentativa seguinte — o proximo teardown, a saida do
+ * app, ou a varredura da proxima execucao.
+ */
+function apagarLegendasTemporarias(): void {
+    for (const caminho of legendasTemporarias.splice(0)) {
+        try {
+            rmSync(caminho, { force: true })
+        } catch {
+            legendasTemporarias.push(caminho)
+        }
+    }
+}
+
+/**
+ * Varre o %TEMP% atras de legendas de execucoes ANTERIORES: o app fechado com
+ * o mpv ainda vivo (o `rmSync` acima perde a corrida contra o handle), um
+ * crash, um kill — e tudo o que ja se acumulou ate hoje.
+ *
+ * Apagar TUDO o que casa com o prefixo e seguro porque `setupMpvHandlers` so
+ * roda depois do lock de instancia unica: nenhum outro NeoStream pode estar
+ * usando esses arquivos. Assincrona e solta porque o %TEMP% do usuario pode ter
+ * milhares de entradas e isto e caminho de inicializacao.
+ */
+async function varrerLegendasDeExecucoesAnteriores(): Promise<void> {
+    try {
+        const fs = await import('node:fs/promises')
+        const pasta = app.getPath('temp')
+        for (const nome of await fs.readdir(pasta)) {
+            if (nome.startsWith(PREFIXO_LEGENDA_TEMP) && nome.endsWith('.vtt')) {
+                await fs.rm(path.join(pasta, nome), { force: true }).catch(() => undefined)
+            }
+        }
+    } catch {
+        // %TEMP% ilegivel nao e motivo pra atrapalhar o setup do mpv.
+    }
+}
 
 const getConfiguredPath = (): string | null => {
     const value = store.get('settings')?.mpvPath
@@ -322,6 +378,8 @@ function teardownSession(killProcess: boolean) {
     if (killProcess && current.child.exitCode === null && !current.child.killed) {
         try { current.child.kill() } catch { /* noop */ }
     }
+    // A reproducao acabou: as legendas buscadas pra ela nao servem mais.
+    apagarLegendasTemporarias()
 }
 
 export async function launchMpv(
@@ -413,6 +471,8 @@ function getStatusSnapshot(): MpvStatus {
 }
 
 export function setupMpvHandlers() {
+    void varrerLegendasDeExecucoesAnteriores()
+
     ipcMain.handle('mpv:available', async () => {
         const path = await resolveMpvPath(true)
         // `downloadSupported` viaja junto porque o renderer nao tem como saber
@@ -517,8 +577,9 @@ export function setupMpvHandlers() {
                 return { success: false, error: 'empty subtitle content' }
             }
             const fs = await import('node:fs/promises')
-            const filePath = path.join(app.getPath('temp'), `neostream-sub-${Date.now()}.vtt`)
+            const filePath = path.join(app.getPath('temp'), `${PREFIXO_LEGENDA_TEMP}${Date.now()}.vtt`)
             await fs.writeFile(filePath, payload.content, 'utf-8')
+            legendasTemporarias.push(filePath)
             const title = typeof payload.title === 'string' && payload.title ? payload.title : 'NeoStream'
             const lang = typeof payload.lang === 'string' && payload.lang ? payload.lang : 'und'
             const success = sendCommand(['sub-add', filePath, 'select', title, lang])
@@ -599,5 +660,8 @@ export function setupMpvHandlers() {
 
     app.on('will-quit', () => {
         stopMpv()
+        // De novo aqui: sem sessao viva o stopMpv sai antes do teardown, e a
+        // legenda buscada com o mpv ja fechado ficaria no %TEMP%.
+        apagarLegendasTemporarias()
     })
 }
