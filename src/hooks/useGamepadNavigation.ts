@@ -90,9 +90,61 @@ function focusEl(el: HTMLElement) {
     el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+/**
+ * Dono do handle do requestAnimationFrame: o laço nasce PARADO e só vive
+ * enquanto houver controle ligado.
+ *
+ * Antes, o laço era armado na montagem do `App` e nunca mais soltava: o
+ * callback rodava a cada quadro só pra se reagendar (ele se reagenda ANTES de
+ * qualquer checagem), e 11 vezes por segundo ainda pagava o
+ * `navigator.getGamepads()` pra descobrir que não há controle nenhum. Isso em
+ * TODA janela — a principal, o multi-view e o PiP montam o mesmo `App` —, e a
+ * janela do PiP nasce `alwaysOnTop`, então é justamente aquela cujo laço o
+ * Chromium nunca congela por estar escondida.
+ *
+ * Detalhe que torna a varredura de antes inútil por construção: no Chromium o
+ * `navigator.getGamepads()` só devolve um pad depois do primeiro botão
+ * apertado — que é exatamente quando o `gamepadconnected` dispara.
+ *
+ * A fonte de verdade é a VARREDURA, não o evento: um pad já exposto ao
+ * documento na montagem (remonte, HMR) também acende o laço, senão o modo sofá
+ * morreria em silêncio — num recurso que não dá pra testar sem um controle na
+ * mão.
+ */
+export function lacoSoComControle(tick: (now: number) => void): () => void {
+    let raf = 0; // handle de rAF é sempre >= 1, então 0 significa "parado"
+    const frame = (now: number) => {
+        raf = requestAnimationFrame(frame);
+        tick(now);
+    };
+    const temControle = () => Array.from(navigator.getGamepads?.() ?? []).some(p => p?.connected);
+    const varrer = () => {
+        if (temControle()) {
+            if (!raf) raf = requestAnimationFrame(frame);
+        } else if (raf) {
+            cancelAnimationFrame(raf);
+            raf = 0;
+        }
+    };
+
+    window.addEventListener('gamepadconnected', varrer);
+    window.addEventListener('gamepaddisconnected', varrer);
+    // O Chromium esconde os pads de uma janela sem foco: ao voltar o foco, o
+    // que era "nenhum controle" pode virar "tem controle".
+    window.addEventListener('focus', varrer);
+    varrer();
+
+    return () => {
+        window.removeEventListener('gamepadconnected', varrer);
+        window.removeEventListener('gamepaddisconnected', varrer);
+        window.removeEventListener('focus', varrer);
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0;
+    };
+}
+
 export function useGamepadNavigation() {
     useEffect(() => {
-        let raf = 0;
         let lastPoll = 0;
         // Per-input timestamps for edge/repeat detection.
         const lastFire: Record<string, number> = {};
@@ -115,7 +167,7 @@ export function useGamepadNavigation() {
         };
 
         const poll = (now: number) => {
-            raf = requestAnimationFrame(poll);
+            // Quem reagenda é o `frame` do lacoSoComControle.
             if (now - lastPoll < POLL_MS) return;
             lastPoll = now;
 
@@ -159,7 +211,6 @@ export function useGamepadNavigation() {
             if (b(9)) fire('start', now, () => sendKey(' ')); else release('start');
         };
 
-        raf = requestAnimationFrame(poll);
-        return () => cancelAnimationFrame(raf);
+        return lacoSoComControle(poll);
     }, []);
 }
