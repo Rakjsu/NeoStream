@@ -4,7 +4,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
 import path from 'path'
 import fs from 'fs'
 import log from './logger'
-import { recordingFilename, buildRecordingArgs, parseFfmpegTime, buildMp4RemuxArgs, buildThumbnailArgs, mp4PathFor } from './dvrProtocol'
+import { recordingFilename, buildRecordingArgs, parseFfmpegTime, buildMp4RemuxArgs, buildThumbnailArgs, mp4PathFor, renameTargetName, isSameRecordingFile } from './dvrProtocol'
 import { resolveFfmpegPath } from './ffmpegPath'
 import { getErrorMessage } from './errorMessage'
 
@@ -143,10 +143,20 @@ export function setupDvrHandlers() {
             const dir = path.resolve(recordingsDir())
             const current = path.resolve(String(data?.path || ''))
             if (!current.startsWith(dir)) return { success: false, error: 'arquivo fora da pasta de gravações' }
-            const safe = String(data?.name || '').replace(/[<>:"/\\|?*]/g, '').replace(/\s+/g, ' ').trim().slice(0, 120)
+            const safe = renameTargetName(String(data?.name || ''), current)
             if (!safe) return { success: false, error: 'nome vazio' }
-            const ext = current.toLowerCase().endsWith('.mp4') ? '.mp4' : '.ts'
-            const target = path.join(dir, safe.toLowerCase().endsWith(ext) ? safe : `${safe}${ext}`)
+            const target = path.join(dir, safe)
+            // Renomear para o MESMO nome não é erro — e é o caminho mais
+            // comum: o campo ✏️ confirma no `onBlur`, então abrir e clicar
+            // fora já manda o nome de volta igual. Sem isto, o `existsSync`
+            // abaixo acha o PRÓPRIO arquivo e recusa com "já existe uma
+            // gravação com esse nome" — no desktop e no celular, que chama o
+            // mesmo canal.
+            if (isSameRecordingFile(target, current)) {
+                // Só a caixa mudou (Windows): ainda é um rename de verdade.
+                if (target !== current) await fs.promises.rename(current, target)
+                return { success: true, path: target }
+            }
             if (fs.existsSync(target)) return { success: false, error: 'já existe uma gravação com esse nome' }
             await fs.promises.rename(current, target)
             return { success: true, path: target }

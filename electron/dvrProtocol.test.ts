@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { recordingFilename, buildRecordingArgs, parseFfmpegTime, formatRecDuration, buildMp4RemuxArgs, buildThumbnailArgs, mp4PathFor } from './dvrProtocol'
+import { recordingFilename, buildRecordingArgs, parseFfmpegTime, formatRecDuration, buildMp4RemuxArgs, buildThumbnailArgs, mp4PathFor, renameTargetName, isSameRecordingFile } from './dvrProtocol'
 
 describe('recordingFilename', () => {
     it('keeps the channel name and stamps date/time', () => {
@@ -70,5 +70,42 @@ describe('remux e thumbnail (D60)', () => {
     it('mp4PathFor troca só a extensão final .ts', () => {
         expect(mp4PathFor('C:/rec/Globo - 2026.ts')).toBe('C:/rec/Globo - 2026.mp4')
         expect(mp4PathFor('C:/rec/arquivo.ts.ts')).toBe('C:/rec/arquivo.ts.mp4')
+    })
+})
+
+describe('renameTargetName + isSameRecordingFile', () => {
+    it('o nome de volta igual produz o MESMO arquivo', () => {
+        expect(renameTargetName('Jogo', 'C:/rec/Jogo.ts')).toBe('Jogo.ts')
+        expect(renameTargetName('Jogo', 'C:/rec/Jogo.mp4')).toBe('Jogo.mp4')
+    })
+
+    it('espaço nas pontas e espaço duplicado não criam nome novo', () => {
+        expect(renameTargetName('  Final  da   Copa  ', 'C:/rec/Final da Copa.ts')).toBe('Final da Copa.ts')
+    })
+
+    it('rename de verdade preserva a extensão do arquivo atual', () => {
+        expect(renameTargetName('Final', 'C:/rec/Jogo.mp4')).toBe('Final.mp4')
+    })
+
+    it('tira o que o Windows não aceita em nome de arquivo', () => {
+        expect(renameTargetName('Jogo: Brasil/Itália?', 'C:/rec/x.ts')).toBe('Jogo BrasilItália.ts')
+    })
+
+    it('nome que vira vazio devolve vazio (o handler recusa)', () => {
+        expect(renameTargetName('   ', 'C:/rec/x.ts')).toBe('')
+        expect(renameTargetName('???', 'C:/rec/x.ts')).toBe('')
+    })
+
+    it('no Windows, trocar só a caixa é o MESMO arquivo', () => {
+        // O CI roda em Linux, então a plataforma entra por parâmetro: sem
+        // isto, metade da regra nunca seria exercitada.
+        expect(isSameRecordingFile('C:/rec/Jogo.ts', 'C:/rec/jogo.ts', 'win32')).toBe(true)
+        expect(isSameRecordingFile('C:/rec/Jogo.ts', 'C:/rec/Final.ts', 'win32')).toBe(false)
+    })
+
+    it('em sistema sensível à caixa, são arquivos diferentes', () => {
+        // Comparar sem caixa aqui faria o rename passar POR CIMA do vizinho.
+        expect(isSameRecordingFile('/rec/Jogo.ts', '/rec/jogo.ts', 'linux')).toBe(false)
+        expect(isSameRecordingFile('/rec/Jogo.ts', '/rec/Jogo.ts', 'linux')).toBe(true)
     })
 })
