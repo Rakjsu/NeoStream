@@ -27,6 +27,7 @@ import {
     getActivePlaylistIdPublic,
     exportPlaylistsForBackup,
     importPlaylistsFromBackup,
+    importMobileAccounts,
     getRemovedPlaylists,
     removedPlaylistKey,
 } from './playlistManager'
@@ -308,6 +309,49 @@ describe('backup (export/import sem ativar nem validar)', () => {
     it('lote todo inválido → 0 e nenhuma escrita', () => {
         expect(importPlaylistsFromBackup([{ name: '', url: '', username: '', password: '' }])).toBe(0)
         expect(playlists()).toHaveLength(0)
+    })
+})
+
+describe('importMobileAccounts (contas do celular)', () => {
+    // 🔒 O arquivo do celular NUNCA traz credentialsUpdatedAt (crossBackup.ts),
+    // então a senha corrigida AQUI não pode ser derrubada por ele.
+    it('não derruba a senha corrigida aqui', () => {
+        const p1 = saveAndActivatePlaylist({ url: 'http://prov.tv', username: 'u', password: 'senha-boa' })
+        const imported = importMobileAccounts([
+            { name: 'X', url: 'http://prov.tv', username: 'u', password: 'senha-velha', type: 'xtream' },
+        ])
+        expect(imported).toBe(0)
+        expect(playlists().find(p => p.id === p1.id)?.password).toBe('senha-boa')
+    })
+
+    // 🔒 Mesmo ledger de deleções que o import de backup já respeita.
+    it('playlist apagada aqui não volta pelo arquivo do celular', () => {
+        const p1 = saveAndActivatePlaylist({ name: 'X', url: 'http://x.tv', username: 'u', password: 'p' })
+        saveAndActivatePlaylist({ name: 'Outra', url: 'http://outra.tv', username: 'u2', password: 'p2' })
+        removePlaylist(p1.id)
+
+        expect(importMobileAccounts([{ url: 'http://x.tv', username: 'u', password: 'p', type: 'xtream' }])).toBe(0)
+        expect(playlists().some(p => p.url === 'http://x.tv')).toBe(false)
+    })
+
+    // 🔒 Conta já salva como Stalker (senha sentinela) não pode ser rebaixada
+    // para 'xtream' pelo arquivo do celular — o roteamento do player quebra.
+    it('não rebaixa o type de uma conta já salva', () => {
+        saveAndActivatePlaylist({ name: 'Portal', url: 'http://portal.tv', username: 'AA:BB:CC:DD:EE:FF', password: '__stalker__', type: 'stalker' })
+        importMobileAccounts([
+            { url: 'http://portal.tv', username: 'AA:BB:CC:DD:EE:FF', password: 'seja-o-que-for' },
+        ])
+        const salva = playlists().find(p => p.url === 'http://portal.tv')
+        expect(salva?.type).toBe('stalker')
+        expect(salva?.password).toBe('__stalker__')
+    })
+
+    it('conta nova do celular entra normalmente, com o type preservado', () => {
+        expect(importMobileAccounts([
+            { name: 'Nova', url: 'http://nova.tv', username: 'x', password: 'y', type: 'stalker' },
+        ])).toBe(1)
+        expect(playlists()).toHaveLength(1)
+        expect(playlists()[0].type).toBe('stalker')
     })
 })
 
