@@ -552,7 +552,7 @@
     "syncStarted": "Sincronización iniciada",
     "syncApplied": "Sincronizado: {n} elementos de otros equipos",
     "autoTitle": "Copia automática semanal",
-    "autoDesc": "Guarda una copia completa por semana en la carpeta elegida (conserva las 8 más recientes; funciona con la app en la bandeja)",
+    "autoDesc": "Guarda una copia por semana en la carpeta elegida, sin las contraseñas de los proveedores ni las claves de API — esas solo salen en la exportación manual (conserva las 8 más recientes; funciona con la app en la bandeja)",
     "autoLast": "última",
     "importDesc": "Restaura los datos de un archivo de copia creado por NeoStream",
     "importButton": "Importar Copia",
