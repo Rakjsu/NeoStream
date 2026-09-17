@@ -456,7 +456,11 @@ async function ensureProxyServer(): Promise<number> {
                     '-c', 'copy',
                     '-f', 'mpegts',
                     'pipe:1'
-                ], { stdio: ['ignore', 'pipe', 'pipe'] })
+                    // windowsHide: sem ele, cada GET da TV pisca uma janela de
+                    // console preta por cima do que estiver na tela do PC — e é
+                    // um GET por faixa de áudio/legenda que a TV experimenta.
+                    // Todos os outros spawns do projeto já passam isto.
+                ], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
                 activeTranscodes.add(ffmpeg)
 
                 ffmpeg.stdout.pipe(response)
@@ -472,6 +476,21 @@ async function ensureProxyServer(): Promise<number> {
                 ffmpeg.on('exit', () => {
                     activeTranscodes.delete(ffmpeg)
                     response.end()
+                })
+                // 🧯 'error' do ChildProcess é ASSÍNCRONO e não tem nada a ver
+                // com o try/catch daqui: ele avisa que o spawn em si falhou
+                // (binário sumido ou movido pelo antivírus, EACCES, caminho
+                // errado fora do asar — exatamente a classe de falha que o
+                // resolveFfmpegPath já teve). EventEmitter que emite 'error'
+                // sem ouvinte LANÇA: no processo principal isso é
+                // uncaughtException, ou seja, a TV pedir um remux derrubava o
+                // app inteiro — reprodução, DVR e downloads junto. E, sem o
+                // destroy, a TV ficaria pendurada num 200 que nunca recebe um
+                // byte.
+                ffmpeg.on('error', (err) => {
+                    log.error('[DLNA] falha ao iniciar o remux:', err)
+                    cleanup()
+                    if (!response.writableEnded) response.destroy()
                 })
                 return
             }

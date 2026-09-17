@@ -88,6 +88,18 @@ export function setupTimeshiftHandlers(): void {
             proc.stderr?.on('data', (chunk: Buffer) => {
                 stderrTail = (stderrTail + chunk.toString()).slice(-500)
             })
+            // 🧯 'error' do ChildProcess é ASSÍNCRONO: ele não passa pelo
+            // try/catch daqui e avisa que o spawn em si falhou (binário sumido
+            // ou movido pelo antivírus, EACCES, instalação pela metade).
+            // EventEmitter que emite 'error' sem ouvinte LANÇA — ligar o
+            // timeshift nessa máquina derrubava o processo principal inteiro,
+            // levando junto reprodução, DVR e downloads.
+            const falhaDoSpawn: { erro: Error | null } = { erro: null }
+            proc.on('error', (err) => {
+                falhaDoSpawn.erro = err instanceof Error ? err : new Error(String(err))
+                log.error('[Timeshift] ffmpeg não iniciou:', falhaDoSpawn.erro.message)
+                if (session?.proc === proc) stopSession()
+            })
             proc.on('exit', (code) => {
                 if (session?.proc === proc) {
                     log.warn(`[Timeshift] ffmpeg saiu (code ${code}): ${stderrTail}`)
@@ -133,6 +145,14 @@ export function setupTimeshiftHandlers(): void {
             })
             const address = server.address()
             const port = typeof address === 'object' && address ? address.port : 0
+
+            if (falhaDoSpawn.erro) {
+                // O spawn morreu enquanto o servidor subia: publicar a sessão
+                // com o ffmpeg morto só adiaria o mesmo erro por 15 s, com uma
+                // mensagem pior ("buffer não encheu a tempo").
+                try { server.close() } catch { /* nem chegou a subir */ }
+                return { success: false, error: getErrorMessage(falhaDoSpawn.erro) }
+            }
 
             session = { proc, server, dir, port, token }
 
