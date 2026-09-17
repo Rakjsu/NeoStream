@@ -27,7 +27,9 @@ interface VodDaVitrine {
 /**
  * 🖼️ Modo vitrine (screensaver): após N minutos sem input (configurável em
  * Reprodução, desligado por padrão), cobre o app com capas do catálogo em
- * rotação + relógio. Qualquer input sai. Nunca ativa com vídeo em reprodução.
+ * rotação + relógio. Qualquer input sai. Nunca ativa com reprodução em curso —
+ * e "reprodução" NÃO é só `<video>`: o motor MPV toca numa janela nativa colada
+ * sobre o app e marca presença no DOM só com `.mpv-view-backdrop`.
  *
  * As capas passam pelo MESMO gate das grades (contentGate). Sem ele, a vitrine
  * era a maior superfície do app fora do controle parental: ela é montada no
@@ -54,8 +56,8 @@ export function ShowcaseScreensaver() {
             const minutes = parseInt(localStorage.getItem(SCREENSAVER_MINUTES_KEY) || '0', 10);
             if (!minutes || minutes <= 0) return;
             timerRef.current = setTimeout(() => {
-                // Vídeo tocando (player, PiP embutido, multi-view) = nunca ativar.
-                if (document.querySelector('video')) {
+                // Reprodução em curso = nunca ativar.
+                if (document.querySelector('video, .mpv-view-backdrop')) {
                     arm();
                     return;
                 }
