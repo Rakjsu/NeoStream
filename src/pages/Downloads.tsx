@@ -144,6 +144,18 @@ export function Downloads() {
         });
     }, [loadRecordings, showRecordings]);
 
+    // ⏺ A lista é uma FOTOGRAFIA do `dvr:list-files`: o campo `recording` vale
+    // só no instante da consulta. Quando a gravação termina sozinha — fim do
+    // agendamento, provedor caiu, ⏹ dado em outra janela — o painel "🔴 ao
+    // vivo" esvazia pelo poll, mas a linha do arquivo fica com o selo GRAVANDO
+    // e com os quatro botões travados até alguém fechar e reabrir o painel.
+    // O main já avisa: é o mesmo `dvr:stopped` que o DvrNotifyBridge escuta.
+    useEffect(() => {
+        const aoTerminar = () => { void loadRecordings(); };
+        window.ipcRenderer.on('dvr:stopped', aoTerminar);
+        return () => window.ipcRenderer.off('dvr:stopped', aoTerminar);
+    }, [loadRecordings]);
+
     // 🖼️ Thumbnails das gravações (frame ~30s, gerado e cacheado no main).
     useEffect(() => {
         let cancelled = false;
