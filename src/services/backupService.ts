@@ -103,6 +103,10 @@ const VOLATILE_KEYS = [
     'neostream_active_playlist_id',   // e o `__pl_<id>` que escopa favoritos e progresso;
                                       // importar o de outra maquina aponta o escopo pra
                                       // uma playlist que nao existe aqui
+    'neostream_theme_profile_accent', // cor do perfil ATIVO AQUI (themeService); adotada
+                                      // noutra maquina, pintaria o app com a cor de um
+                                      // perfil que nao esta em uso la. A preferencia
+                                      // (neostream_theme) viaja normalmente
     'neostream_tmdb_onboarding',      // flag transitoria de onboarding
     'neostream_tmdb_ignore_env',      // gancho de E2E
     'neostream_boot_profile_v1',      // marcas de tempo do boot desta maquina

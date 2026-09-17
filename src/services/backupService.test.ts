@@ -57,6 +57,9 @@ describe('backupService', () => {
             localStorage.setItem('contentLastFetch', '12345');
             localStorage.setItem('shouldAutoPlayNextEpisode', 'true');
             localStorage.setItem('parentalUnlocked', 'true');
+            // Cor do perfil ativo AQUI: adotada noutra maquina, pintaria o app
+            // com a cor de um perfil que nao esta em uso la.
+            localStorage.setItem('neostream_theme_profile_accent', 'verde');
             localStorage.setItem('neostream_profiles', '{"profiles":[]}');
 
             const backup = collectBackup();

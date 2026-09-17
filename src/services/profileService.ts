@@ -102,14 +102,16 @@ export const profileService = {
         profile.lastUsed = new Date().toISOString();
         saveStorageData(data);
 
-        // Profile-personalized accent: switching profiles re-themes the app.
-        if (profile.accentColor) {
-            void import('./themeService').then(({ themeService, ACCENT_PRESETS }) => {
-                if (ACCENT_PRESETS.some(p => p.id === profile.accentColor)) {
-                    themeService.setTheme({ accent: profile.accentColor as typeof ACCENT_PRESETS[number]['id'] });
-                }
-            });
-        }
+        // Profile-personalized accent: switching profiles re-themes the app —
+        // como CAMADA. Chamar `setTheme` aqui reescrevia a cor que o dono
+        // escolheu em Aparência, e o perfil SEM cor não restaurava nada: ficava
+        // a cor do último perfil colorido que passou por aqui. E dá pra
+        // acontecer sem ninguém clicar em nada — o modo infantil por horário
+        // troca de perfil sozinho no boot.
+        void import('./themeService').then(({ themeService, ACCENT_PRESETS }) => {
+            const preset = ACCENT_PRESETS.find(p => p.id === profile.accentColor);
+            themeService.setProfileAccent(preset ? preset.id : null);
+        });
         return true;
     },
 
