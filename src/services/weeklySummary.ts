@@ -5,6 +5,7 @@
 import { usageStatsService } from './usageStatsService';
 import { weekOverWeek, aggregateTopContent } from './statsDashboardHelpers';
 import { languageService } from './languageService';
+import { diaLocal } from '../utils/diaLocal';
 
 const SEEN_KEY = 'neostream_weekly_summary_week';
 
@@ -35,7 +36,7 @@ export const weeklySummaryService = {
         }
 
         const stats = usageStatsService.getStats();
-        const today = now.toISOString().split('T')[0];
+        const today = diaLocal(now);
         const week = weekOverWeek(stats.dailyStats, today);
         if (!shouldNotifyWeekly(now, last, week.currentSeconds)) return null;
 

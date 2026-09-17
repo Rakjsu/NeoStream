@@ -27,6 +27,7 @@ import { subtitleSyncPrefs, subtitleSyncKey } from '../../utils/subtitleSyncPref
 import { ForcedSubtitlesMenu } from './ForcedSubtitlesMenu';
 import { ChannelZapOverlay, type PlayerChannel } from './ChannelZapOverlay';
 import { useLanguage } from '../../services/languageService';
+import { diaLocal } from '../../utils/diaLocal';
 import './VideoPlayer.css';
 
 import type { MovieVersion } from '../../services/movieVersionService';
@@ -741,7 +742,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
             // limite próprio herda o global do parental.
             const limitMinutes = effectiveDailyLimitMinutes(profile.id, !!profile.isKids);
             if (limitMinutes > 0) {
-                const today = new Date().toISOString().split('T')[0];
+                const today = diaLocal(new Date());
                 const todaySeconds = usageStatsService.getStats().dailyStats.find(d => d.date === today)?.totalSeconds || 0;
                 if (isLimitExceeded(todaySeconds, limitMinutes)) {
                     setKidsLimitReached(true);

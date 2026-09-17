@@ -16,6 +16,7 @@ import { parentalService } from '../services/parentalService';
 import { profileService } from '../services/profileService';
 import { indexedDBCache } from '../services/indexedDBCache';
 import { asList } from '../utils/catalogPayload';
+import { diaLocal } from '../utils/diaLocal';
 import {
     isCategoryNameBlocked,
     isCategoryNameKidsAllowed,
@@ -746,7 +747,7 @@ export function WebRemoteBridge() {
         // 📊 Stats rápidas pro controle web (hoje / últimos 7 dias / streak).
         const pushStats = () => {
             const stats = usageStatsService.getStats();
-            const today = new Date().toISOString().split('T')[0];
+            const today = diaLocal(new Date());
             const todaySeconds = stats.dailyStats.find(d => d.date === today)?.totalSeconds || 0;
             const cutoff = Date.now() - 7 * 86400_000;
             const weekSeconds = stats.dailyStats

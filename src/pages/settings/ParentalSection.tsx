@@ -13,6 +13,7 @@ import { listParentalLog, clearParentalLog, type ParentalLogEntry } from '../../
 import { indexedDBCache } from '../../services/indexedDBCache';
 import { hasTmdbApiKey } from '../../services/tmdbKey';
 import { kidsWeeklyUsage } from '../../services/statsDashboardHelpers';
+import { diaLocal } from '../../utils/diaLocal';
 import { useLanguage } from '../../services/languageService';
 import { useSaveAnimation } from './useSaveAnimation';
 import { depoisDeVerificar, modoAoTrocarPin, pedeePinAtual, type ModoDoPin } from './pinParental';
@@ -380,7 +381,7 @@ export function ParentalSection() {
                             <label>👶 {t('parental', 'kidsReportTitle')}</label>
                             <p>{t('parental', 'kidsReportDesc')}</p>
                             <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                {kidsWeeklyUsage(profileService.getAllProfiles(), key => localStorage.getItem(key), new Date().toISOString().split('T')[0]).map(row => (
+                                {kidsWeeklyUsage(profileService.getAllProfiles(), key => localStorage.getItem(key), diaLocal(new Date())).map(row => (
                                     <div key={row.id} style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>
                                         {row.name}: <b>{Math.floor(row.weekSeconds / 3600)}h {Math.floor((row.weekSeconds % 3600) / 60)}min</b>
                                     </div>

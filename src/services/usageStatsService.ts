@@ -6,6 +6,7 @@
 import { profileService } from './profileService';
 import { hourBucketOf, type HourBucket } from './habitProfile';
 import { getActivePlaylistId } from './activePlaylistService';
+import { diaLocal, mesLocal } from '../utils/diaLocal';
 
 export interface WatchSession {
     contentId: string;
@@ -67,14 +68,14 @@ class UsageStatsService {
         return `${this.STORAGE_KEY_PREFIX}_${activeProfile.id}`;
     }
 
-    // Get today's date as YYYY-MM-DD
+    // O dia do calendário de quem assiste, não o de Greenwich — ver
+    // utils/diaLocal.ts. Em UTC−3, tudo depois das 21h caía no dia seguinte.
     private getToday(): string {
-        return new Date().toISOString().split('T')[0];
+        return diaLocal(new Date());
     }
 
-    // Get current month as YYYY-MM
     private getCurrentMonth(): string {
-        return new Date().toISOString().slice(0, 7);
+        return mesLocal(new Date());
     }
 
     // Load stats from storage
@@ -267,7 +268,7 @@ class UsageStatsService {
         // Keep a full year of daily stats (fuels the 365-day heatmap)
         const ninetyDaysAgo = new Date();
         ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 365);
-        const cutoffDate = ninetyDaysAgo.toISOString().split('T')[0];
+        const cutoffDate = diaLocal(ninetyDaysAgo);
         stats.dailyStats = stats.dailyStats.filter(d => d.date >= cutoffDate);
 
         // Keep only current month sessions
@@ -287,7 +288,7 @@ class UsageStatsService {
 
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toISOString().split('T')[0];
+        const yesterdayStr = diaLocal(yesterday);
 
         if (stats.lastWatchDate === yesterdayStr) {
             // Watched yesterday, extend streak
@@ -318,7 +319,7 @@ class UsageStatsService {
         for (let i = 6; i >= 0; i--) {
             const date = new Date();
             date.setDate(date.getDate() - i);
-            const dateStr = date.toISOString().split('T')[0];
+            const dateStr = diaLocal(date);
 
             const dayStats = stats.dailyStats.find(d => d.date === dateStr);
             result.push(dayStats || {
