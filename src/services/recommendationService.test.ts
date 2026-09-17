@@ -250,3 +250,103 @@ describe('groupBySeed', () => {
         expect(groups[0].items.map(r => r.item.name)).toEqual(['b1', 'b2', 'b3']);
     });
 });
+
+// ==================== Custo de normalização do título (D052) ====================
+//
+// O conserto do D052 é de CUSTO: o título de um seed não pode ser lido — e
+// portanto normalizado — uma vez por candidato, e o título de um candidato não
+// pode ser lido uma vez por seed. Com os 10 seeds de MAX_SEEDS e o catálogo
+// inteiro isso era ~800 mil `normalizeTitle` (NFD + seis regex) e ~1,5 s de
+// congelamento síncrono ao montar as fileiras da Home. Aqui a conta é feita com
+// um getter em `name`, sem cronômetro — logo sem teste instável no CI.
+
+interface Contador { leituras: number }
+
+function comNomeContado<T extends object>(nome: string, resto: T, contador: Contador): T & { name: string } {
+    return Object.defineProperty({ ...resto }, 'name', {
+        get() { contador.leituras++; return nome; },
+        enumerable: true,
+        configurable: true
+    }) as T & { name: string };
+}
+
+/** Roda um build inteiro e devolve quantas vezes cada lado teve o título lido. */
+function medirLeituras(qtdSeeds: number, qtdCandidatos: number): { seeds: number; candidatos: number } {
+    const contSeeds: Contador = { leituras: 0 };
+    const contCandidatos: Contador = { leituras: 0 };
+
+    const seeds: RecSeed[] = Array.from({ length: qtdSeeds }, (_, i) =>
+        comNomeContado<Omit<RecSeed, 'name'>>(
+            `Franquia ${i}`,
+            { kind: 'vod', recencyRank: i, genres: [] },
+            contSeeds
+        ));
+
+    // Metade casa com um (e só um) seed, para exercitar também o `becauseOf`.
+    const movies: RecMovie[] = Array.from({ length: qtdCandidatos }, (_, i) =>
+        comNomeContado<Omit<RecMovie, 'name'>>(
+            i % 2 === 0 ? `Franquia ${i % qtdSeeds} Parte Dois` : `Título Solto ${i}`,
+            { stream_id: i, stream_icon: 'icon.png' },
+            contCandidatos
+        ));
+
+    buildRecommendations({
+        seeds,
+        movies,
+        series: [],
+        excludeTitles: new Set(),
+        excludeMovieIds: new Set(),
+        excludeSeriesIds: new Set(),
+        maxItems: 5,
+        rng: () => 0.5
+    });
+
+    // Lido ANTES de tocar no resultado: ler `rec.item.name` também contaria.
+    return { seeds: contSeeds.leituras, candidatos: contCandidatos.leituras };
+}
+
+describe('custo de normalização do título (D052)', () => {
+    it('não relê o título do seed uma vez por candidato', () => {
+        const poucos = medirLeituras(3, 20);
+        const muitos = medirLeituras(3, 420);
+        const inclinacao = (muitos.seeds - poucos.seeds) / 400;
+        // A única leitura legítima por candidato é a que grava o `becauseOf`
+        // (aqui, metade deles). Com o defeito a inclinação é 3,5: cada
+        // candidato relia o nome dos TRÊS seeds. O teto é folgado de propósito,
+        // para não quebrar se o `becauseOf` deixar de guardar o nome do seed.
+        expect(inclinacao).toBeLessThanOrEqual(1);
+    });
+
+    it('lê o título de cada candidato exatamente uma vez, com 2 ou com 10 seeds', () => {
+        // O `normalized` que buildRecommendations já calcula é o único.
+        expect(medirLeituras(2, 50).candidatos).toBe(50);
+        expect(medirLeituras(10, 50).candidatos).toBe(50);
+    });
+
+    it('continua creditando a franquia ao seed certo', () => {
+        // Rede de correção: o ganho de custo não pode ser comprado com
+        // resultado errado (tokens desalinhados creditariam o seed errado, ou
+        // fariam o candidato sumir).
+        const seeds: RecSeed[] = [
+            seed({ name: 'Vingadores', recencyRank: 0 }),
+            seed({ name: 'Interestelar', recencyRank: 1 }),
+            seed({ name: 'Batman', recencyRank: 2 })
+        ];
+        const recs = buildRecommendations({
+            seeds,
+            movies: [
+                movie({ stream_id: 1, name: 'Vingadores: Ultimato' }),
+                movie({ stream_id: 2, name: 'Batman Begins' })
+            ],
+            series: [],
+            excludeTitles: new Set(),
+            excludeMovieIds: new Set(),
+            excludeSeriesIds: new Set(),
+            rng: () => 0.5
+        });
+        expect(Object.fromEntries(recs.map(r => [r.item.name, r.becauseOf]))).toEqual({
+            'Vingadores: Ultimato': 'Vingadores',
+            'Batman Begins': 'Batman'
+        });
+    });
+});
