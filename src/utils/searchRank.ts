@@ -3,8 +3,9 @@
  *
  * Matching is diacritics- and case-insensitive, with a scored model that
  * prefers exact > prefix > word-boundary > substring > subsequence (fuzzy)
- * matches. The scoring is O(name length) per candidate, so ranking a few
- * thousand items per keystroke stays cheap (and the input is debounced).
+ * matches. The scoring is O(name length) per candidate. A busca do overlay
+ * (debounced) roda por PAUSA de digitação, e o nome normalizado vem pronto do
+ * cache de sessão — ver `rankItems`/`getNormalizedName`.
  *
  * Also hosts the localStorage-backed "recent searches" helpers used by the
  * overlay's empty state.
@@ -60,8 +61,17 @@ function isSubsequence(q: string, name: string): boolean {
  * Both arguments are normalized internally, so callers may pass raw strings.
  */
 export function scoreMatch(query: string, name: string): number {
-    const q = normalizeForSearch(query);
-    const n = normalizeForSearch(name);
+    return scoreNormalized(normalizeForSearch(query), normalizeForSearch(name));
+}
+
+/**
+ * Núcleo do scoring, com `q` e `n` JÁ normalizados.
+ *
+ * Vive separado de `scoreMatch` porque `rankItems` roda isto uma vez por
+ * título do catálogo: normalizar aqui dentro faria a MESMA query virar NFD +
+ * strip de acentos uma vez por item — dezenas de milhares de vezes por busca.
+ */
+function scoreNormalized(q: string, n: string): number {
     if (q.length === 0 || n.length === 0) return 0;
 
     // Shorter names rank slightly higher (more "exact"-feeling). Bounded so it
@@ -104,11 +114,23 @@ export function rankItems<T>(
     items: readonly T[],
     query: string,
     getName: (item: T) => string,
-    limit: number
+    limit: number,
+    getNormalizedName?: (item: T) => string
 ): T[] {
+    // A query é normalizada UMA vez, aqui fora do laço: ela é a mesma para o
+    // catálogo inteiro. E quem já tem o nome normalizado guardado (o overlay
+    // guarda no cache de sessão) passa `getNormalizedName` e não paga NFD
+    // nenhum por item — sem isso, uma busca re-normalizava o catálogo inteiro.
+    const q = normalizeForSearch(query);
+    // Mesmo resultado de antes (com `q` vazio todo item pontuava 0), sem varrer
+    // o catálogo para descobrir isso.
+    if (q.length === 0) return [];
     const scored: Array<{ item: T; score: number; index: number }> = [];
     for (let i = 0; i < items.length; i++) {
-        const score = scoreMatch(query, getName(items[i]));
+        const n = getNormalizedName
+            ? getNormalizedName(items[i])
+            : normalizeForSearch(getName(items[i]));
+        const score = scoreNormalized(q, n);
         if (score > 0) scored.push({ item: items[i], score, index: i });
     }
     scored.sort((a, b) => (b.score - a.score) || (a.index - b.index));

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
     normalizeForSearch,
     scoreMatch,
@@ -203,3 +203,50 @@ describe('recent searches', () => {
         expect(getRecentSearches()).toEqual(['ok'])
     })
 })
+
+describe('rankItems: custo de normalização', () => {
+    // O invariante NÃO é "o código tem tal linha": é de CUSTO. Quando o catálogo
+    // cresce, só o custo dos NOMES pode crescer junto — a query é UMA por busca.
+    // `normalize('NFD')` é a parte cara de `normalizeForSearch`, então contá-la
+    // mede exatamente o trabalho que o overlay repetia por item.
+    const contarNormalize = (rodar: () => void): number => {
+        const espiao = vi.spyOn(String.prototype, 'normalize')
+        try {
+            rodar()
+            // Ler ANTES do finally: mockRestore também limpa o histórico.
+            return espiao.mock.calls.length
+        } finally {
+            espiao.mockRestore()
+        }
+    }
+
+    const catalogo = (n: number) => Array.from({ length: n }, (_, i) => ({ name: `Star Wars ${i}` }))
+    const pegarNome = (i: { name: string }) => i.name
+
+    it('normaliza a query uma vez por busca, não uma vez por item', () => {
+        const dez = contarNormalize(() => { rankItems(catalogo(10), 'star', pegarNome, 8) })
+        const cem = contarNormalize(() => { rankItems(catalogo(100), 'star', pegarNome, 8) })
+        // 90 títulos a mais = 90 normalizações a mais, e nada além disso.
+        expect(cem - dez).toBe(90)
+    })
+
+    it('não re-normaliza nomes que o chamador já entrega prontos', () => {
+        const itens = Array.from({ length: 100 }, (_, i) => ({
+            name: `Star Wars ${i}`,
+            normalizado: normalizeForSearch(`Star Wars ${i}`)
+        }))
+        const chamadas = contarNormalize(() => {
+            rankItems(itens, 'star', i => i.name, 8, i => i.normalizado)
+        })
+        expect(chamadas).toBe(1)
+    })
+
+    it('ranqueia igual com o nome pré-normalizado e com o nome cru', () => {
+        const nomes = ['Sao Paulo', 'São Paulo FC', 'Ação Total', 'Paulo', 'Outra Coisa']
+        const itens = nomes.map(name => ({ name, normalizado: normalizeForSearch(name) }))
+        const cru = rankItems(itens, 'são paulo', i => i.name, 10).map(i => i.name)
+        const pronto = rankItems(itens, 'são paulo', i => i.name, 10, i => i.normalizado).map(i => i.name)
+        expect(cru.length).toBeGreaterThan(1)
+        expect(pronto).toEqual(cru)
+    })
+});
