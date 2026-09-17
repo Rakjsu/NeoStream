@@ -44,6 +44,13 @@ interface ContentDetailModalProps {
     versions?: { id: string; label: string }[];
     activeVersionId?: string;
     onSelectVersion?: (id: string) => void;
+    /**
+     * 🔇 Há um player por cima desta ficha. A Série continua com a ficha
+     * montada durante a reprodução (zerar `selectedSeries` derrubaria o
+     * `seriesInfo` da página), então quem monta avisa e o trailer sai do ar —
+     * senão ele fica em loop, com som, por baixo do episódio.
+     */
+    suspended?: boolean;
 }
 
 interface SeriesEpisode {
@@ -80,7 +87,7 @@ export function ContentDetailModal({
     contentId,
     contentType,
     contentData,
-    onPlay, versions, activeVersionId, onSelectVersion }: ContentDetailModalProps) {
+    onPlay, versions, activeVersionId, onSelectVersion, suspended = false }: ContentDetailModalProps) {
     const [seriesInfo, setSeriesInfo] = useState<SeriesInfo | null>(null);
     const [tmdbData, setTmdbData] = useState<TMDBSeriesDetails | TMDBMovieDetails | null>(null);
     // 🎬 Coleção (franquia) do filme e títulos parecidos, ambos via TMDB.
@@ -689,7 +696,11 @@ export function ContentDetailModal({
                     overflow: 'hidden'
                 }}>
                     {(() => {
-                        const trailerId = extractYouTubeId(trailerUrl);
+                        // Com player por cima, cai no pôster: desmontar o iframe é o
+                        // único jeito garantido de calar o trailer — o `sendToTrailer`
+                        // é postMessage sem resposta e uma ordem perdida deixaria o
+                        // áudio (e o download do segundo vídeo) rolando para sempre.
+                        const trailerId = suspended ? null : extractYouTubeId(trailerUrl);
                         if (trailerId) {
                             return (
                                 <iframe
@@ -730,7 +741,7 @@ export function ContentDetailModal({
                     }} />
 
                     {/* ⛶ Trailer em tela cheia com 1 clique (ESC volta) */}
-                    {extractYouTubeId(trailerUrl) && (
+                    {!suspended && extractYouTubeId(trailerUrl) && (
                         <button
                             onClick={() => { void trailerFrameRef.current?.requestFullscreen().catch(() => undefined); }}
                             title={t('contentModal', 'trailerFullscreen')}
@@ -758,7 +769,7 @@ export function ContentDetailModal({
                     )}
 
                     {/* Mute / unmute toggle (only when a trailer is playing) */}
-                    {extractYouTubeId(trailerUrl) && (
+                    {!suspended && extractYouTubeId(trailerUrl) && (
                         <button
                             onClick={toggleTrailerSound}
                             title={trailerMuted ? t('contentModal', 'unmute') : t('contentModal', 'mute')}

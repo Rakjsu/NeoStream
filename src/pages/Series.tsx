@@ -854,6 +854,10 @@ export function Series() {
                     onClose={() => { setSelectedSeries(null); setTagsTick(tick => tick + 1); }}
                     contentId={String(selectedSeries.series_id)}
                     contentType="series"
+                    // 🔇 A ficha da Série fica montada durante a reprodução (o
+                    // player troca de episódio sozinho e o `seriesInfo` daqui
+                    // precisa sobreviver), então o trailer é quem sai de cena.
+                    suspended={!!playingSeries}
                     contentData={{
                         name: selectedSeries.name,
                         cover: selectedSeries.cover || selectedSeries.stream_icon,
