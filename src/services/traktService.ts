@@ -170,13 +170,18 @@ async function renovarTokenTrakt(): Promise<string | null> {
             }),
         });
         if (!response.ok) {
-            // Recusa DEFINITIVA (refresh revogado/vencido, secret trocado): só
-            // reconectando — apaga a conexão pra tela parar de mentir. 5xx e 429
-            // são passageiros e o token continua valendo: é a mesma regra do
-            // isTransientHttpStatus do electron/fetchRetry.ts (>=500 || 429), que
-            // o renderer não pode importar. Sem a exceção do 429, um pico de
-            // rate limit do Trakt desconectaria o usuário sem motivo.
-            if (response.status < 500 && response.status !== 429) disconnectTrakt();
+            // SÓ o 401 quer dizer "este refresh não vale mais" — aí a conexão
+            // morreu de fato e apagá-la é o que faz a tela parar de mentir.
+            //
+            // Qualquer outro código mantém a conexão: 429 é o "slow down"
+            // documentado do OAuth do Trakt (e a regra da casa, em
+            // electron/fetchRetry.ts, trata 429 como TRANSITÓRIO), 5xx é o Trakt
+            // fora do ar, e 400 é o que volta se o corpo desta requisição
+            // estiver errado. Esse último importa: o formato do corpo veio da
+            // documentação, não de uma medição contra o Trakt real — com uma
+            // regra mais larga, um erro MEU aqui deslogaria o usuário, e
+            // reconectar é device code na mão, no site.
+            if (response.status === 401) disconnectTrakt();
             return null;
         }
         const data = await response.json() as { access_token?: string; refresh_token?: string };
@@ -213,7 +218,11 @@ async function traktFetch(path: string, clientId: string, access: string, init?:
             Authorization: `Bearer ${bearer}`,
         },
     });
-    const response = await chamar(access);
+    // O `access` que o chamador leu pode estar vencido enquanto o gravado já foi
+    // renovado por outra chamada da mesma rajada — `syncTraktMovieWatched` lê o
+    // token UMA vez e faz duas idas seguidas com o mesmo valor. Usar sempre o que
+    // está gravado AGORA evita queimar um refresh_token por requisição.
+    const response = await chamar(getToken()?.access ?? access);
     if (response.status !== 401) return response;
     const novo = await renovarTokenTraktUmaVez();
     return novo ? chamar(novo) : response;

@@ -4,6 +4,7 @@ import {
     fetchTraktWatchlist,
     isTraktConnected,
     pickSearchHit,
+    syncTraktMovieWatched,
     pickTmdbHitIds,
     splitTitleYear,
     starsToTraktRating,
@@ -167,18 +168,37 @@ describe('renovacao do access token no 401', () => {
         expect(isTraktConnected()).toBe(false);
     });
 
-    // 503 e 429 sao passageiros (a mesma regra do isTransientHttpStatus do
-    // electron/fetchRetry.ts): recusa passageira NAO pode deslogar ninguem —
-    // reconectar no Trakt e device code na mao, no site.
+    // SO o 401 diz "este refresh nao vale mais". Recusa passageira NAO pode
+    // deslogar ninguem — reconectar no Trakt e device code na mao, no site. O
+    // 400 esta na lista de proposito: e o que o Trakt devolve se o corpo desta
+    // requisicao estiver errado, e o formato dele veio da documentacao, nao de
+    // uma medicao — um erro MEU nao pode custar a conexao do usuario.
     it.each([
         ['Trakt fora do ar (5xx)', 503],
         ['limite de requisicoes (429)', 429],
+        ['corpo recusado (400)', 400],
     ])('%s NAO apaga a conexao', async (_nome, status) => {
         dublarFetch(url => (url.includes('/oauth/token') ? { status } : { status: 401 }));
 
         expect(await fetchTraktProfile()).toBe('');
         expect(isTraktConnected()).toBe(true);
         expect(JSON.parse(localStorage.getItem(TOKEN_KEY) ?? '{}').refresh).toBe('refresh-1');
+    });
+
+    it('rajada SEQUENCIAL com o mesmo access gasta UM refresh so', async () => {
+        // `syncTraktMovieWatched` le o token UMA vez e faz duas idas seguidas
+        // (busca o id, depois posta no /sync/history) com o MESMO valor. Sem
+        // reler o token gravado, a segunda ida sairia com o access velho, daria
+        // 401 e queimaria um segundo refresh_token.
+        const chamadas = dublarFetch((url, init) => {
+            if (url.includes('/oauth/token')) return { status: 200, body: { access_token: 'novo', refresh_token: 'refresh-2' } };
+            if (bearerDe(init) !== 'Bearer novo') return { status: 401 };
+            if (url.includes('/search/')) return { status: 200, body: [{ type: 'movie', score: 900, movie: { title: 'Duna', year: 2021, ids: { trakt: 1, slug: 'duna' } } }] };
+            return { status: 200, body: {} };
+        });
+
+        expect(await syncTraktMovieWatched('Duna (2021)')).toBe(true);
+        expect(contar(chamadas, '/oauth/token')).toBe(1);
     });
 
     it('erro que NAO e 401 nem tenta renovar', async () => {
