@@ -6,6 +6,7 @@ import { findMovieVersions } from '../services/movieVersionService';
 import { playbackService } from '../services/playbackService';
 import { shouldSampleProgress } from '../utils/progressSampling';
 import MpvPlayerView from './MpvPlayerView';
+import { useLanguage } from '../services/languageService';
 
 interface MediaItem {
     id?: number | string;
@@ -101,6 +102,11 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isAnimating, setIsAnimating] = useState(true);
+    // 🔁 Contador de tentativas: entra nas deps do efeito 1 para o botão
+    // "tentar de novo" do cartão de erro re-rodar o buildStreamUrl sem
+    // obrigar a pessoa a fechar o player e achar o título de novo na grade.
+    // Não precisa zerar o urlLoadedRef: no caminho de erro ele nunca virou true.
+    const [retryToken, setRetryToken] = useState(0);
     const urlLoadedRef = useRef(false);
     const lastMovieIdRef = useRef<string | number | null>(null);
     const lastEpisodeRef = useRef<string | null>(null);
@@ -118,6 +124,8 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
     // Set when mpv turns out to be missing/broken — falls back to the internal player.
     const [mpvFailed, setMpvFailed] = useState(false);
     const useMpv = mpvRequested && !mpvFailed;
+
+    const { t } = useLanguage();
 
     // Effect 1: Load stream URL (only triggers on movie/episode changes, NOT resumeTime)
     useEffect(() => {
@@ -180,7 +188,7 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
         // caused the effect to churn (cancel + restart the load) on every
         // parent render. buildStreamUrl is intentionally omitted.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [movie, currentEpisode, seriesId, seasonNumber, episodeNumber]);
+    }, [movie, currentEpisode, seriesId, seasonNumber, episodeNumber, retryToken]);
 
     const resumeTime = useMemo(() => {
         if (!streamUrl || loading) return null;
@@ -373,6 +381,19 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
         .error-btn:hover {
             transform: scale(1.05);
         }
+
+        /* .error-screen é column: sem esta linha os dois botões empilham. */
+        .error-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .error-btn-secondary {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+        }
     `;
 
     if (error) {
@@ -384,7 +405,14 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
                     <div className="error-screen">
                         <div className="error-icon">⚠️</div>
                         <p className="error-message">{error}</p>
-                        <button className="error-btn" onClick={onClose}>Fechar</button>
+                        <div className="error-actions">
+                            <button className="error-btn" onClick={() => setRetryToken(n => n + 1)}>
+                                {t('player', 'streamRetry')}
+                            </button>
+                            <button className="error-btn error-btn-secondary" onClick={onClose}>
+                                {t('player', 'close')}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </>
