@@ -270,6 +270,15 @@ export interface PlaylistBackupEntry {
     password: string
     /** Quando a credencial mudou na origem (ausente em backups antigos). */
     credentialsUpdatedAt?: number
+    /**
+     * Tipo da lista. Sem ele o backup só sabia restaurar Xtream: a entrada
+     * renascia SEM type na outra máquina, o `toPublicPlaylist` a mostrava como
+     * 'xtream' e todo o roteamento do main (catálogo, switch, ficha, play,
+     * download, EPG) caía no XtreamClient — a M3U e o portal Stalker voltavam
+     * do backup e nunca mais abriam. Ausente em backups antigos (tratado como
+     * 'xtream', que sempre foi o default).
+     */
+    type?: 'xtream' | 'm3u' | 'stalker'
 }
 
 /** Full playlist entries for the backup file (passwords stay in main until here). */
@@ -279,7 +288,8 @@ export function exportPlaylistsForBackup(): PlaylistBackupEntry[] {
         url: p.url,
         username: p.username,
         password: p.password,
-        ...(p.credentialsUpdatedAt ? { credentialsUpdatedAt: p.credentialsUpdatedAt } : {})
+        ...(p.credentialsUpdatedAt ? { credentialsUpdatedAt: p.credentialsUpdatedAt } : {}),
+        ...(p.type ? { type: p.type } : {})
     }))
 }
 
@@ -314,6 +324,18 @@ export interface MobileAccountEntry {
 }
 
 /**
+ * Lista M3U vinda de FORA (arquivo do celular, backup/sync de outra máquina)
+ * só entra por URL. Quem manda o payload escolhe o caminho, e cadastrar um
+ * caminho de disco aqui abriria, pelo catálogo, um leitor de arquivo no
+ * processo principal: `listaDeDiscoCadastrada` (ipcHandlers.ts) libera a
+ * leitura de QUALQUER caminho que já esteja na lista com type 'm3u'.
+ * Arquivo local entra só pelo diálogo do sistema (playlists:add-m3u-file).
+ */
+function m3uDeForaSemUrl(entry: { url: string; type?: string }): boolean {
+    return entry.type === 'm3u' && !/^https?:\/\//i.test(entry.url.trim())
+}
+
+/**
  * Guarda comum aos dois imports de fora (arquivo do celular e backup de outra
  * máquina). Duas regressões moram aqui:
  *  - sem o ledger, o arquivo reimportava a playlist apagada de propósito em
@@ -342,11 +364,7 @@ export function importMobileAccounts(entries: MobileAccountEntry[]): number {
     let imported = 0
     for (const entry of entries) {
         if (!entry?.url?.trim() || typeof entry.username !== 'string' || typeof entry.password !== 'string') continue
-        // Lista M3U vinda de FORA só entra por URL. Um backup de celular é um
-        // arquivo que o renderer entrega, e aceitar caminho de disco aqui
-        // abriria, pelo catálogo, um leitor de arquivo no processo principal.
-        // Arquivo local entra só pelo diálogo do sistema (playlists:add-m3u-file).
-        if (entry.type === 'm3u' && !/^https?:\/\//i.test(entry.url.trim())) continue
+        if (m3uDeForaSemUrl(entry)) continue
         if (importeBloqueado(playlists, removidas, entry)) continue
         const result = upsertPlaylist(playlists, {
             name: entry.name,
@@ -376,12 +394,20 @@ export function importPlaylistsFromBackup(entries: PlaylistBackupEntry[]): numbe
     let imported = 0
     for (const entry of entries) {
         if (!entry?.url?.trim() || !entry?.username?.trim() || typeof entry.password !== 'string') continue
+        // Mesmo portão do import do celular: o backup também vem de fora.
+        if (m3uDeForaSemUrl(entry)) continue
         if (importeBloqueado(playlists, removidas, entry)) continue
         const result = upsertPlaylist(playlists, {
             name: entry.name,
             url: entry.url,
             username: entry.username,
-            password: entry.password
+            password: entry.password,
+            // Só 'm3u'/'stalker' viajam. 'xtream' já é o default do
+            // `toPublicPlaylist`, e deixar undefined faz o upsert PRESERVAR o
+            // type local (`input.type ?? existing.type`) quando um backup
+            // legado (sem o campo) reencontra uma entrada tipada aqui — sem
+            // isso um arquivo antigo rebaixaria um Stalker que funcionava.
+            type: entry.type === 'm3u' || entry.type === 'stalker' ? entry.type : undefined
         })
         playlists = result.playlists
         imported++

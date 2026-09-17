@@ -2,7 +2,7 @@ import { HashRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'r
 import { getAutoKidsHours, isHourWithinWindow } from './services/watchLimitsService';
 import { catalogRefreshService } from './services/catalogRefreshService';
 import { tvModeService } from './services/tvModeService';
-import { collectBackup, encodePlaylistPassword, sanitizeBackupPlaylists, sanitizeBackupOpenSubtitles, decodePlaylistPassword, type BackupPlaylist, type OpenSubtitlesCreds } from './services/backupService';
+import { collectBackup, sanitizeBackupPlaylists, sanitizeBackupOpenSubtitles, toBackupPlaylist, toPlaylistImport, type BackupPlaylist, type MainPlaylistPayload, type OpenSubtitlesCreds } from './services/backupService';
 import { mergeSyncData } from './services/syncMerge';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Welcome } from './pages/Welcome';
@@ -107,15 +107,10 @@ async function exportPlaylistsForBackup(): Promise<BackupPlaylist[]> {
     try {
         const exported = await window.ipcRenderer.invoke('backup:export-playlists') as {
             success: boolean;
-            playlists?: { name: string; url: string; username: string; password: string }[];
+            playlists?: MainPlaylistPayload[];
         };
         if (exported.success && exported.playlists) {
-            return exported.playlists.map(p => ({
-                name: p.name,
-                url: p.url,
-                username: p.username,
-                passwordB64: encodePlaylistPassword(p.password)
-            }));
+            return exported.playlists.map(toBackupPlaylist);
         }
     } catch { /* export without playlists */ }
     return [];
@@ -174,12 +169,7 @@ if (typeof window !== 'undefined' && window.ipcRenderer) {
                     const playlists = sanitizeBackupPlaylists(parsed.playlists);
                     if (playlists.length > 0) {
                         await window.ipcRenderer.invoke('backup:import-playlists', {
-                            playlists: playlists.map(p => ({
-                                name: p.name,
-                                url: p.url,
-                                username: p.username,
-                                password: decodePlaylistPassword(p.passwordB64)
-                            }))
+                            playlists: playlists.map(toPlaylistImport)
                         }).catch(() => undefined);
                     }
 
