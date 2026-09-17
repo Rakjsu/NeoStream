@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDLNA, type DLNADevice } from '../hooks/useDLNA';
-import { useAirPlay } from '../hooks/useAirPlay';
+import { useAirPlay, type AirPlayDevice } from '../hooks/useAirPlay';
 import { useChromecast, type ChromecastDevice } from '../hooks/useChromecast';
 import { useLanguage } from '../services/languageService';
 import { buildSeasonTailQueue, type CastQueueItem } from '../services/castQueue';
@@ -202,6 +202,30 @@ export function CastDeviceSelector({
         setCasting(false);
     }, [isQueue, queue, tailQueue, tailQueuePromise, contentType, startPosition, effectiveVtt, castToChromecast, onClose, onDeviceSelected, t]);
 
+    // Irmao dos dois de cima. O AirPlay era o unico que chamava o hook cru na
+    // lista, entao escolher uma Apple TV nao mexia em `casting`, nao fechava a
+    // janela, nao avisava do erro e nao pausava o filme no PC.
+    const handleAirplay = useCallback(async (device: AirPlayDevice) => {
+        setCasting(true);
+        setCastError(null);
+
+        const success = await castToAirPlayDevice(device);
+
+        if (success) {
+            onDeviceSelected({
+                id: device.id,
+                name: device.name,
+                type: 'airplay',
+                available: true,
+                cast: () => { }
+            });
+            setTimeout(() => onClose(), 500);
+        } else {
+            setCastError(t('cast', 'failedToTransmit'));
+        }
+        setCasting(false);
+    }, [castToAirPlayDevice, onClose, onDeviceSelected, t]);
+
     // Auto-discover on mount
     useEffect(() => {
         discoverDevices();
@@ -253,7 +277,7 @@ export function CastDeviceSelector({
                 type: 'airplay',
                 available: device.available,
                 source: 'discovered',
-                cast: () => castToAirPlayDevice(device)
+                cast: () => { void handleAirplay(device); }
             });
         });
 
@@ -269,7 +293,7 @@ export function CastDeviceSelector({
         });
 
         return devices;
-    }, [airplayDevices, castToAirPlayDevice, chromecastDevices, dlnaDevices, handleCast, handleChromecast]);
+    }, [airplayDevices, chromecastDevices, dlnaDevices, handleAirplay, handleCast, handleChromecast]);
 
     const handleAddDevice = async () => {
         if (!deviceIP) {

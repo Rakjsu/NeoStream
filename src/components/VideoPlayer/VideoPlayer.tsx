@@ -230,7 +230,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [showDeviceSelector, setShowDeviceSelector] = useState(false);
-    const [castingDevice, setCastingDevice] = useState<{ id: string; name: string; type: 'dlna' | 'chromecast' } | null>(null);
+    const [castingDevice, setCastingDevice] = useState<{ id: string; name: string; type: 'dlna' | 'chromecast' | 'airplay' } | null>(null);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     // Subtitle sync offset (seconds); adjusted from the gear menu in 0.5s steps.
     // Lembrado por conteudo (utils/subtitleSyncPrefs): trocar de episodio faz o
@@ -1985,11 +1985,11 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                         startPosition={state.currentTime || resumeTime || 0}
                         onClose={() => setShowDeviceSelector(false)}
                         onDeviceSelected={(device) => {
-                            if (device.type === 'dlna' || device.type === 'chromecast') {
-                                setCastingDevice({ id: device.id, name: device.name, type: device.type });
-                                // Pause local playback — the TV took over.
-                                if (state.playing) controls.togglePlay();
-                            }
+                            // Os tres tipos entram: o AirPlay ficava de fora e o
+                            // filme seguia tocando no PC junto com a TV.
+                            setCastingDevice({ id: device.id, name: device.name, type: device.type });
+                            // Pause local playback — the TV took over.
+                            if (state.playing) controls.togglePlay();
                         }}
                     />
                 )
