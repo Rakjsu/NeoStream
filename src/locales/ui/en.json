@@ -1212,5 +1212,11 @@
     "traktHint": "The Connect button opens trakt.tv/activate — enter the code shown here and authorize.",
     "onboardingCta": "Set it up now",
     "onboardingDismiss": "Not now"
+  },
+  "errorBoundary": {
+    "title": "Something went wrong on this screen",
+    "hint": "Try again. If it keeps happening, go back home — the rest of the app still works.",
+    "retry": "Try again",
+    "home": "Back to home"
   }
 }

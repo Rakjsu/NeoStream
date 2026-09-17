@@ -1212,5 +1212,11 @@
     "traktHint": "O botão Conectar abre trakt.tv/activate — digite lá o código mostrado aqui e autorize.",
     "onboardingCta": "Configurar agora",
     "onboardingDismiss": "Agora não"
+  },
+  "errorBoundary": {
+    "title": "Algo deu errado nesta tela",
+    "hint": "Tente novamente. Se persistir, volte ao início — o resto do app continua funcionando.",
+    "retry": "Tentar novamente",
+    "home": "Voltar ao início"
   }
 }
