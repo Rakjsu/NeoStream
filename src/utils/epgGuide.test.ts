@@ -16,7 +16,9 @@ import {
     searchPrograms,
     isReplayable,
     isRestartable,
-    replayDurationMinutes
+    replayDurationMinutes,
+    FAVORITES_CATEGORY,
+    guideCategoryStreams
 } from './epgGuide';
 
 // Fixed reference: 2026-06-11T15:47:00Z
@@ -267,5 +269,25 @@ describe('isRestartable', () => {
 
     it('rejects malformed timestamps', () => {
         expect(isRestartable({ start: 'bogus', end: isoAt(NOW + HOUR) }, archive, NOW)).toBe(false);
+    });
+});
+
+describe('guideCategoryStreams', () => {
+    const novela = { stream_id: 1, category_id: 'drama' };
+    const adulto = { stream_id: 2, category_id: 'xxx' };
+    const jornal = { stream_id: 3, category_id: 'news' };
+
+    it('⭐ only lists favorites that survived the page-level parental filter', () => {
+        // A página entrega `streams` SEM o canal adulto (a categoria caiu em
+        // EpgGuide.tsx:257), mas ele continua gravado nos favoritos do perfil.
+        const visiveis = [novela, jornal];
+        expect(guideCategoryStreams(visiveis, FAVORITES_CATEGORY, new Set(['1', '2'])))
+            .toEqual([novela]);
+    });
+
+    it('keeps the category_id filter outside ⭐, and empty favorites means empty grid', () => {
+        const todos = [novela, adulto, jornal];
+        expect(guideCategoryStreams(todos, 'news', new Set(['1']))).toEqual([jornal]);
+        expect(guideCategoryStreams(todos, FAVORITES_CATEGORY, new Set())).toEqual([]);
     });
 });
