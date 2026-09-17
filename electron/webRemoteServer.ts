@@ -553,7 +553,30 @@ function sanitizeGuide(raw: unknown): GuideState {
     return { channels, playingId: String(obj.playingId ?? ''), epg }
 }
 
+/**
+ * Um socket cru que morre não pode derrubar o app.
+ *
+ * `net.Socket` sem listener de 'error' transforma um ECONNRESET/EPIPE em
+ * exceção não capturada. Destruir é a resposta certa para todos os casos que
+ * chegam aqui: ou a recusa já foi escrita, ou o peer sumiu.
+ */
+function protegerSocket(socket: Socket): void {
+    socket.on('error', () => socket.destroy())
+}
+
 function handleUpgrade(request: http.IncomingMessage, socket: Socket): void {
+    // 🧯 PRIMEIRA linha, antes de qualquer write.
+    //
+    // Estes são sockets CRUS (net.Socket), não http.ServerResponse: escrever
+    // num socket que o outro lado já fechou emite 'error' no tick seguinte, e
+    // um EventEmitter que emite 'error' sem listener LANÇA — no processo
+    // principal isso é uncaughtException, e reprodução, DVR e cast caem junto.
+    // Os caminhos de recusa abaixo são justamente os que um peer desleixado
+    // provoca: scanner de LAN que manda o upgrade e fecha, celular
+    // reconectando com PIN velho durante uma rotação, script batendo no teto
+    // de conexões. Um socket que morreu durante a recusa tem de ser no-op.
+    protegerSocket(socket)
+
     const key = request.headers['sec-websocket-key']
     if (typeof key !== 'string') {
         socket.destroy()
@@ -1548,6 +1571,9 @@ function start(): Promise<void> {
             server = http.createServer(guarded)
         }
         server.on('upgrade', (req, socket) => {
+            // Mesma razão do handleUpgrade: o 403 abaixo é um write em socket
+            // cru, e quem foi barrado costuma ser exatamente quem já fechou.
+            protegerSocket(socket as Socket)
             // WebSocket não é submetido a CORS: sem esta checagem, uma aba em
             // evil.com abre ws://<ip>:8974/?pin= e manda comandos (inclusive
             // screenshot da janela do app) assim que acertar o PIN.
