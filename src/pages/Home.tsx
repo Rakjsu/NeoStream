@@ -9,6 +9,7 @@ import { loadHomeRailPrefs, orderedHomeRails } from '../services/homeRailsServic
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { ResumeModal } from '../components/ResumeModal';
 import { profileService } from '../services/profileService';
+import { descreverItemDaHome, useHomeContentGate } from '../hooks/useHomeContentGate';
 import { daysToExpiry, EXPIRY_SNOOZE_KEY, isExpirySnoozed, shouldWarnExpiry } from '../utils/expiryWarning';
 import { indexedDBCache } from '../services/indexedDBCache';
 import { searchMovieByName, searchSeriesByName, isKidsFriendly } from '../services/tmdb';
@@ -61,6 +62,10 @@ interface ContinueWatchingItem {
     // posição no vídeo e nunca serve de data.
     movieProgress?: { currentTime: number; duration: number; progress: number; watchedAt: number };
     hasNewEpisode?: boolean;
+    // A categoria vem junto porque o ⏯️ é uma CÓPIA do item do catálogo: sem
+    // ela o portão parental julga esta fileira de mãos vazias, e o filme
+    // bloqueado volta à Home pela porta de "continuar assistindo".
+    category_id?: string;
 }
 
 interface SeriesEpisode {
@@ -136,15 +141,27 @@ export function Home() {
     }, [allMovies, allSeries]);
 
     // 🎰 Sorteia um filme não visto, com peso pras categorias já assistidas.
+    // ↑ Sobe pra antes da roleta: ela também precisa do portão. Nenhum uso de
+    // `isKidsProfile` entre a posição antiga e esta.
+    const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
+    // 🔒 O MESMO portão das grades de Filmes e Séries. A Home era a única tela
+    // de conteúdo sem nenhum.
+    const passaNoPortao = useHomeContentGate(isKidsProfile);
+
     const spinTheRoulette = useCallback(() => {
         if (allMovies.length === 0) return;
         const watchedIds = new Set(movieProgressService.getWatchedMovies());
-        const byId = new Map(allMovies.map(m => [String(m.stream_id), m] as const));
+        // 🔒 A roleta sorteia DENTRO do portão: ela abria a ficha direto, então
+        // um filme de categoria adulta chegava à tela do perfil infantil pelo
+        // botão "surpresa". O `byId` sai do pool permitido, então categoria
+        // bloqueada também não pesa mais no sorteio.
+        const permitidos = allMovies.filter(m => passaNoPortao(descreverItemDaHome(m, 'movie')));
+        const byId = new Map(permitidos.map(m => [String(m.stream_id), m] as const));
         const watchedCategories = [...watchedIds].map(id => byId.get(id)?.category_id);
         const favored = favoredCategoryIds(watchedCategories);
-        const pool = allMovies.filter(m => !watchedIds.has(String(m.stream_id)));
-        setRouletteItem(spinRoulette(pool.length > 0 ? pool : allMovies, favored, Math.random));
-    }, [allMovies]);
+        const pool = permitidos.filter(m => !watchedIds.has(String(m.stream_id)));
+        setRouletteItem(spinRoulette(pool.length > 0 ? pool : permitidos, favored, Math.random));
+    }, [allMovies, passaNoPortao]);
     const [recommendationGroups, setRecommendationGroups] = useState<RecommendationGroup[]>([]);
     const [isVisible, setIsVisible] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -160,9 +177,6 @@ export function Home() {
         window.addEventListener('neostream-catalog-refresh', onCatalogRefresh);
         return () => window.removeEventListener('neostream-catalog-refresh', onCatalogRefresh);
     }, []);
-
-    // Kids profile state
-    const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
 
     // Language
     const { t } = useLanguage();
@@ -403,6 +417,7 @@ export function Home() {
                     id: seriesId,
                     name: seriesData.name,
                     cover: seriesData.cover,
+                    category_id: seriesData.category_id,
                     progress
                 });
             }
@@ -419,6 +434,7 @@ export function Home() {
                     id: movieId,
                     name: movieData.name,
                     cover: movieData.cover || movieData.stream_icon,
+                    category_id: movieData.category_id,
                     movieProgress: {
                         currentTime: progress.currentTime,
                         duration: progress.duration,
@@ -1100,19 +1116,21 @@ export function Home() {
         // Helper to normalize names (same as indexedDBCache)
         const normalizeName = (name: string) => name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
 
-        const visibleItems = isKidsProfile ? items.filter(item => {
-            const isContinue = type === 'continue';
-            const isSeriesItem = type === 'series' || type === 'recommendations';
+        const visibleItems = items.filter(item => {
+            // Nome, categoria e tipo do item DESTA fileira. A tradução mora no
+            // hook (e é testada lá) porque é ela que decide se o portão julga
+            // com a categoria certa ou com as mãos vazias.
+            const alvo = descreverItemDaHome(item, type);
 
-            // Get name from item
-            const itemName = isContinue ? (item as ContinueWatchingItem).name :
-                isSeriesItem ? (item as SeriesData).name : (item as MovieData).name;
-            const contentType = isContinue ? (item as ContinueWatchingItem).type :
-                (type === 'series' || (type === 'recommendations' && 'series_id' in item) ? 'series' : 'movie');
+            // Oculto descoberto AGORA: o clique acrescenta a chave em
+            // `hiddenItems`, e é isso que faz o card sumir sem recarregar a
+            // Home. O portão abaixo só conhece o que já estava gravado.
+            if (isKidsProfile && hiddenItems.has(`${alvo.kind}_${normalizeName(alvo.name)}`)) return false;
 
-            const itemKey = `${contentType}_${normalizeName(itemName)}`;
-            return !hiddenItems.has(itemKey);
-        }) : items;
+            // 🔒 Portão parental/infantil — o mesmo das grades de Filmes e
+            // Séries. Sem ele estas fileiras saíam do catálogo cru.
+            return passaNoPortao(alvo);
+        });
 
         if (visibleItems.length === 0) return null;
 
@@ -1795,7 +1813,7 @@ export function Home() {
                     {rouletteItem ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                             <div
-                                onClick={() => setSelectedContent({ id: String(rouletteItem.stream_id), type: 'movie', name: rouletteItem.name, cover: rouletteItem.stream_icon || '', rating: rouletteItem.rating })}
+                                onClick={() => void handleContentClick(String(rouletteItem.stream_id), 'movie', rouletteItem.name, rouletteItem.stream_icon || '', rouletteItem.rating)}
                                 style={{ display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(var(--ns-accent-rgb), 0.35)', borderRadius: 12, padding: '12px 18px', maxWidth: 480 }}
                             >
                                 {rouletteItem.stream_icon && (
