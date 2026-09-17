@@ -4,6 +4,69 @@ import { profileService, GUEST_PROFILE_ID } from './profileService';
 describe('perfil convidado', () => {
     beforeEach(() => {
         localStorage.clear();
+        // A sessão de convidado é marcada em sessionStorage, e a guarda de
+        // janela secundária olha o hash — os dois precisam nascer limpos.
+        sessionStorage.clear();
+        window.location.hash = '';
+    });
+
+    it('reabrir o app encerra a sessão de convidado e purga o histórico', async () => {
+        await profileService.createProfile({ name: 'Dono', avatar: 'D' });
+        profileService.startGuestSession();
+        localStorage.setItem('movie_watch_progress_guest', '{"42":100}');
+
+        sessionStorage.clear();      // app fechado: o localStorage fica, o sessionStorage não
+        profileService.initialize(); // boot seguinte
+
+        expect(profileService.getActiveProfile()).toBeNull();
+        expect(profileService.getAllProfiles().some(p => p.id === GUEST_PROFILE_ID)).toBe(false);
+        expect(localStorage.getItem('movie_watch_progress_guest')).toBeNull();
+    });
+
+    it('convidado sozinho: o boot recria o kids-default em vez de tela vazia', () => {
+        profileService.startGuestSession();
+
+        sessionStorage.clear();
+        profileService.initialize();
+
+        expect(profileService.getActiveProfile()).toBeNull();
+        expect(profileService.getAllProfiles().map(p => p.id)).toEqual(['kids-default']);
+    });
+
+    it('reload interno (troca de playlist) mantém a sessão de convidado', () => {
+        profileService.startGuestSession();
+        localStorage.setItem('movie_watch_progress_guest', '{"42":100}');
+
+        profileService.initialize(); // mesmo carregamento: a marca continua lá
+
+        expect(profileService.isGuestActive()).toBe(true);
+        expect(localStorage.getItem('movie_watch_progress_guest')).toBe('{"42":100}');
+    });
+
+    it('abrir o PiP no meio da sessão não encerra o convidado', async () => {
+        await profileService.createProfile({ name: 'Dono', avatar: 'D' });
+        profileService.startGuestSession();
+        localStorage.setItem('movie_watch_progress_guest', '{"42":100}');
+
+        // A janela do PiP carrega o MESMO index.html: browsing context novo,
+        // localStorage compartilhado, sessionStorage zerado — e o boot do App
+        // roda nela também.
+        sessionStorage.clear();
+        window.location.hash = '#/pip?data=%7B%7D';
+        profileService.initialize();
+
+        expect(profileService.isGuestActive()).toBe(true);
+        expect(localStorage.getItem('movie_watch_progress_guest')).toBe('{"42":100}');
+    });
+
+    it('abrir o multi-view no meio da sessão não encerra o convidado', () => {
+        profileService.startGuestSession();
+
+        sessionStorage.clear();
+        window.location.hash = '#/multiview?initial=7';
+        profileService.initialize();
+
+        expect(profileService.isGuestActive()).toBe(true);
     });
 
     it('startGuestSession ativa um perfil convidado transitório', () => {
