@@ -259,23 +259,15 @@ export function Series() {
         [series, sortBy, decade, genreFilter, tagFilter, tagsTick]
     );
 
-    // 🙈 Esconder assistidos: séries onde TODO episódio registrado está
-    // completo (nada pendente pra continuar) saem da grade.
+    // 🙈 Esconder assistidos: só sai da grade a série CONCLUÍDA — todo episódio
+    // que o PROVEDOR tem foi visto até o fim. O critério daqui era "todo
+    // episódio REGISTRADO está completo", e registro só existe pro que foi
+    // aberto: ver o 1º episódio de dez dava 1 de 1 e a série inteira sumia.
+    // Mesmo denominador do selo ✓ e da categoria 🏆 (`isSeriesCompleted`).
     const [hideWatched, setHideWatchedState] = useState(() => localStorage.getItem('neostream_hide_watched') === 'on');
     const watchedSeriesIds = useMemo(() => {
         if (!hideWatched) return new Set<string>();
-        const bySeries = new Map<string, { total: number; completed: number }>();
-        for (const ep of watchProgressService.getEpisodeHistory()) {
-            const entry = bySeries.get(ep.seriesId) || { total: 0, completed: 0 };
-            entry.total += 1;
-            if (ep.completed) entry.completed += 1;
-            bySeries.set(ep.seriesId, entry);
-        }
-        const ids = new Set<string>();
-        for (const [id, entry] of bySeries) {
-            if (entry.total > 0 && entry.completed === entry.total) ids.add(id);
-        }
-        return ids;
+        return watchProgressService.getCompletedSeriesIds();
     }, [hideWatched]);
 
     const filteredSeries = useMemo(() => {
@@ -288,7 +280,11 @@ export function Series() {
             : null;
         return sortedSeries.filter(s => {
             const matchesSearch = fuzzyIncludes(s.name, searchQuery);
-            if (hideWatched && watchedSeriesIds.has(String(s.series_id))) {
+            // A categoria 🏆 É a lista de concluídas: se o 🙈 também as tirasse
+            // daqui, ela abriria vazia sempre que o botão estivesse ligado (e
+            // o botão é o mesmo flag da grade de Filmes, que já poupa a sua
+            // categoria de assistidos — VOD.tsx, `selectedCategory !== 'WATCHED'`).
+            if (hideWatched && selectedCategory !== 'COMPLETED' && watchedSeriesIds.has(String(s.series_id))) {
                 return false;
             }
 
