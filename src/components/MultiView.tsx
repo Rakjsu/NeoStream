@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Hls from 'hls.js';
+import { useKidsWatchGate } from '../hooks/useKidsWatchGate';
 
 export interface MultiViewChannel {
     id: string | number;
@@ -36,6 +37,9 @@ export function MultiView({ channels, initialChannelId, onClose, onDetach }: Mul
     // Mosaic layout: 2x2 (4 tiles), 1 big + 2 (3 tiles) or side by side (2).
     const [layout, setLayout] = useState<'2x2' | '1+2' | 'side'>('2x2');
     const slotCount = layout === '2x2' ? 4 : layout === '1+2' ? 3 : 2;
+    // ⏰ Mesma trava do player interno (limite diário / janela de horário):
+    // cada célula tem hls.js próprio e passava por fora dela.
+    const kidsBlocked = useKidsWatchGate();
 
     // Shrinking the layout can hide the audible tile — fall back to tile 0.
     useEffect(() => {
@@ -133,7 +137,30 @@ export function MultiView({ channels, initialChannelId, onClose, onDetach }: Mul
                 gap: 4,
                 padding: 4
             }}>
-                {slots.slice(0, slotCount).map((channel, i) => (
+                {/* ⏰ Bloqueado: o mosaico nem monta os <video> — o cleanup do tile
+                    destrói o hls.js de cada célula, que é o que corta o áudio. */}
+                {kidsBlocked ? (
+                    <div
+                        data-testid="multiview-kids-gate"
+                        style={{
+                            gridColumn: '1 / -1',
+                            gridRow: '1 / -1',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 10,
+                            textAlign: 'center',
+                            color: 'white'
+                        }}
+                    >
+                        <span style={{ fontSize: 48 }}>⏰</span>
+                        <strong style={{ fontSize: 17 }}>Tempo de tela esgotado</strong>
+                        <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>
+                            O limite de uso deste perfil foi atingido (tempo ou horário).
+                        </span>
+                    </div>
+                ) : slots.slice(0, slotCount).map((channel, i) => (
                     <div
                         key={i}
                         onClick={() => channel && setAudioSlot(i)}
