@@ -6,6 +6,7 @@ import { playlistScopedKey } from './activePlaylistService';
 import { favoritesService } from './favoritesService';
 import { watchProgressService } from './watchProgressService';
 import { languageService } from './languageService';
+import { sortedSeasonKeys } from '../utils/seriesEpisodes';
 
 // Notification types
 export type NotificationType =
@@ -254,34 +255,54 @@ class AppNotificationService {
         return Array.from(seriesMap.values());
     }
 
-    // Fetch series info from API
+    /**
+     * Totais (temporadas/episódios) de uma série, pelo handler do main.
+     *
+     * Era um `fetch()` CRU do renderer para
+     * `${url}/player_api.php?username=…&password=…&action=get_series_info`,
+     * montado com as credenciais lidas por `auth:get-credentials`. Fora da
+     * pilha do main isso (a) ignorava a `certificatePolicy` — provedor com
+     * certificado inválido que o app aceita em todo o resto falhava só aqui,
+     * deixando o sino mudo; (b) só falava Xtream: em M3U/Stalker a URL do
+     * `player_api.php` nem existe, então a checagem nunca funcionou nessas
+     * playlists; e (c) trazia usuário e senha para dentro do renderer sem
+     * necessidade.
+     *
+     * `series:get-info` já resolve os três — axios + `resolveProviderHttpsAgent`
+     * no Xtream, e a mesma forma `{episodes: {...}}` montada da lista em
+     * M3U/Stalker. É o mesmo handler que o ContentDetailModal consome.
+     */
     private async fetchSeriesInfo(seriesId: string): Promise<{ seasons: number; episodes: number; poster: string } | null> {
         try {
-            const result = await window.ipcRenderer.invoke('auth:get-credentials');
-            if (!result.success) return null;
+            const result = await window.ipcRenderer.invoke('series:get-info', { seriesId }) as {
+                success?: boolean;
+                info?: { episodes?: Record<string, unknown[]>; info?: { cover?: string } };
+            };
+            if (!result?.success || !result.info) return null;
 
-            const { url, username, password } = result.credentials;
-            const response = await fetch(
-                `${url}/player_api.php?username=${username}&password=${password}&action=get_series_info&series_id=${seriesId}`
-            );
+            const episodes = result.info.episodes || {};
+            const seasonKeys = sortedSeasonKeys(episodes);
 
-            if (!response.ok) return null;
+            // "Deu certo" sem NENHUMA temporada é o mesmo caso que o
+            // ContentDetailModal já trata como erro: `series_id` posicional da
+            // M3U deslocado (série nova no meio empurra todo mundo), Stalker
+            // sem temporadas, ou painel que responde erro em HTTP 200. Gravar
+            // 0/0 como total conhecido apagaria o baseline e fabricaria um
+            // "🎉 Nova Temporada" falso na rodada seguinte, quando o provedor
+            // voltasse ao normal.
+            if (seasonKeys.length === 0) return null;
 
-            const data = await response.json();
-
-            const episodes = data.episodes || {};
-            const seasonKeys = Object.keys(episodes);
-            const totalSeasons = seasonKeys.length;
             let totalEpisodes = 0;
-
             seasonKeys.forEach(season => {
                 totalEpisodes += (episodes[season] || []).length;
             });
 
             return {
-                seasons: totalSeasons,
+                seasons: seasonKeys.length,
                 episodes: totalEpisodes,
-                poster: data.info?.cover || ''
+                // M3U/Stalker não mandam `info.cover`: o poster cai no do item
+                // monitorado (favorito / continuar assistindo).
+                poster: result.info.info?.cover || ''
             };
         } catch (error) {
             console.error('Error fetching series info:', error);
