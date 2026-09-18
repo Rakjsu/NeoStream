@@ -4,7 +4,6 @@ import { Sidebar } from '../components/Sidebar';
 import { GlobalSearch } from '../components/GlobalSearch';
 import { ShowcaseScreensaver } from '../components/ShowcaseScreensaver';
 import { ShortcutsOverlay } from '../components/ShortcutsOverlay';
-import { useSpatialNavigation } from '../hooks/useSpatialNavigation';
 
 /**
  * Retrospectiva anual. Fica preguiçosa porque só abre uma vez por ano — mas
@@ -29,8 +28,9 @@ export function Dashboard() {
         return () => window.removeEventListener('neostream:open-wrapped', abrir);
     }, []);
 
-    // TV mode phase 2: arrows move focus geometrically, Backspace goes back.
-    useSpatialNavigation();
+    // A navegação por setas do Modo TV NÃO mora mais aqui: montada só neste
+    // layout, ela nascia depois do "Quem está assistindo?", do /welcome e do
+    // /login. Agora sobe junto com o app inteiro, em `RaizDoApp`.
 
     // Tray menu shortcuts (e.g. "⏺ Gravações") navigate the running app.
     useEffect(() => {
