@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '../../services/languageService';
 import { collectBackup, applyBackup, decryptBackup, encryptBackup, isEncryptedBackup, toBackupPlaylist, toPlaylistImport, type BackupPlaylist, type MainPlaylistPayload } from '../../services/backupService';
+import { remapLocalStoragePlaylistScope } from '../../services/playlistIdRemap';
 import { useSaveAnimation } from './useSaveAnimation';
 
 interface BackupFileResult {
@@ -175,9 +176,13 @@ export function BackupSection() {
             // v2 backups also carry saved playlists — restored in the main store.
             if (report.playlists.length > 0) {
                 try {
-                    await window.ipcRenderer.invoke('backup:import-playlists', {
+                    const res = await window.ipcRenderer.invoke('backup:import-playlists', {
                         playlists: report.playlists.map(toPlaylistImport)
-                    });
+                    }) as { idMap?: Record<string, string> } | undefined;
+                    // O `applyBackup` acima já gravou os dados com o id da
+                    // máquina de ORIGEM; só agora sabemos o id daqui. Restore é
+                    // autoritativo, então a chave do arquivo sobrepõe a local.
+                    remapLocalStoragePlaylistScope(res?.idMap ?? {});
                 } catch (error) {
                     console.error('[Backup] Playlist import failed:', error);
                 }

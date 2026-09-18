@@ -1844,8 +1844,8 @@ export function setupIpcHandlers() {
     // Restore playlists from a backup (no provider validation — may be offline).
     ipcMain.handle('backup:import-playlists', (_, { playlists }: { playlists: PlaylistBackupEntry[] }) => {
         try {
-            const imported = importPlaylistsFromBackup(Array.isArray(playlists) ? playlists : [])
-            return { success: true, imported }
+            const { imported, idMap } = importPlaylistsFromBackup(Array.isArray(playlists) ? playlists : [])
+            return { success: true, imported, idMap }
         } catch (error: unknown) {
             log.error('[Backup] Playlist import error:', getErrorMessage(error))
             return { success: false, error: getErrorMessage(error) }
