@@ -73,7 +73,7 @@ function restauraNaOutraMaquina(): number {
     const arquivo = JSON.stringify(collectBackup(exportPlaylistsForBackup().map(toBackupPlaylist)))
     maquinaLimpa()
     const report = applyBackup(JSON.parse(arquivo))
-    return importPlaylistsFromBackup(report.playlists.map(toPlaylistImport))
+    return importPlaylistsFromBackup(report.playlists.map(toPlaylistImport)).imported
 }
 
 /** O que o APP enxerga depois do restore (não o objeto intermediário). */
@@ -104,7 +104,7 @@ describe('backup leva o tipo da lista até a outra máquina', () => {
             playlists: [{ name: 'Legada', url: 'http://old.tv', username: 'u', passwordB64: encodePlaylistPassword('p') }],
         }
         const report = applyBackup(JSON.parse(JSON.stringify(antigo)))
-        expect(importPlaylistsFromBackup(report.playlists.map(toPlaylistImport))).toBe(1)
+        expect(importPlaylistsFromBackup(report.playlists.map(toPlaylistImport)).imported).toBe(1)
         expect(tipos()).toEqual({ 'Legada': 'xtream' })
     })
 

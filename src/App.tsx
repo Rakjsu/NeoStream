@@ -4,6 +4,7 @@ import { catalogRefreshService } from './services/catalogRefreshService';
 import { tvModeService } from './services/tvModeService';
 import { collectBackup, sanitizeBackupPlaylists, sanitizeBackupOpenSubtitles, toBackupPlaylist, toPlaylistImport, type BackupPlaylist, type MainPlaylistPayload, type OpenSubtitlesCreds } from './services/backupService';
 import { mergeSyncData } from './services/syncMerge';
+import { remapPlaylistScopedKeys } from './services/playlistIdRemap';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Welcome } from './pages/Welcome';
 import { Login } from './pages/Login';
@@ -154,24 +155,30 @@ if (typeof window !== 'undefined' && window.ipcRenderer) {
                     };
                     if (parsed?.app !== 'neostream' || parsed.data === null || typeof parsed.data !== 'object') continue;
 
+                    // A IDENTIDADE entra ANTES dos dados: o merge é por CHAVE,
+                    // então `__pl_<idDeLá>` tem de virar `__pl_<idDaqui>` antes
+                    // de encontrar a chave local — remapear DEPOIS do merge já
+                    // teria adotado a chave alheia como dado morto.
+                    let idMap: Record<string, string> = {};
+                    const playlists = sanitizeBackupPlaylists(parsed.playlists);
+                    if (playlists.length > 0) {
+                        const res = await window.ipcRenderer.invoke('backup:import-playlists', {
+                            playlists: playlists.map(toPlaylistImport)
+                        }).catch(() => undefined) as { idMap?: Record<string, string> } | undefined;
+                        idMap = res?.idMap ?? {};
+                    }
+
                     const local: Record<string, string> = {};
                     for (let i = 0; i < localStorage.length; i++) {
                         const key = localStorage.key(i);
                         const value = key === null ? null : localStorage.getItem(key);
                         if (key !== null && value !== null) local[key] = value;
                     }
-                    const result = mergeSyncData(local, parsed.data);
+                    const result = mergeSyncData(local, remapPlaylistScopedKeys(parsed.data, idMap));
                     for (const [key, value] of Object.entries(result.changed)) {
                         localStorage.setItem(key, value);
                     }
                     totalAdded += result.addedItems + result.adoptedKeys;
-
-                    const playlists = sanitizeBackupPlaylists(parsed.playlists);
-                    if (playlists.length > 0) {
-                        await window.ipcRenderer.invoke('backup:import-playlists', {
-                            playlists: playlists.map(toPlaylistImport)
-                        }).catch(() => undefined);
-                    }
 
                     // OpenSubtitles creds: adopt from the other machine only when
                     // we have none (same adopt-if-absent policy as scalar keys).

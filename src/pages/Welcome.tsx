@@ -4,6 +4,7 @@ import { Tv, Plus, Settings, Sparkles, X, Globe, Link2, Archive, ArrowLeft } fro
 import { useLanguage, languageService } from '../services/languageService';
 import { playlistService } from '../services/playlistService';
 import { applyBackup, toPlaylistImport } from '../services/backupService';
+import { remapLocalStoragePlaylistScope } from '../services/playlistIdRemap';
 
 // First-run onboarding: step 1 picks the language, step 2 offers the three
 // ways in (Xtream account, M3U list, restore a backup). The page only renders
@@ -66,9 +67,13 @@ export function Welcome() {
             // Fresh install: nothing to overwrite, apply directly.
             const report = applyBackup(JSON.parse(result.json));
             if (report.playlists.length > 0) {
-                await window.ipcRenderer.invoke('backup:import-playlists', {
+                const res = await window.ipcRenderer.invoke('backup:import-playlists', {
                     playlists: report.playlists.map(toPlaylistImport)
-                }).catch(() => undefined);
+                }).catch(() => undefined) as { idMap?: Record<string, string> } | undefined;
+                // Máquina nova: o `applyBackup` acima gravou os favoritos com o
+                // id da máquina de origem, e a playlist acabou de ganhar id
+                // AQUI. Sem esta linha a tela abre vazia — que é o bug inteiro.
+                remapLocalStoragePlaylistScope(res?.idMap ?? {});
             }
             // v3: the backup carries the OpenSubtitles credentials too.
             if (report.openSubtitles) {

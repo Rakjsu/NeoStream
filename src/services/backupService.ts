@@ -36,6 +36,12 @@ export const BACKUP_APP = 'neostream';
 export type PlaylistKind = 'xtream' | 'm3u' | 'stalker';
 
 export interface BackupPlaylist {
+    /**
+     * Id da playlist na máquina de ORIGEM: é o que permite remapear o escopo
+     * `__pl_<id>` dos favoritos/progresso na entrada (ausente em arquivos v1/v2
+     * antigos, e então nada é remapeado).
+     */
+    id?: string;
     name: string;
     url: string;
     username: string;
@@ -51,6 +57,8 @@ export interface BackupPlaylist {
 
 /** O formato que `backup:export-playlists` devolve e `backup:import-playlists` aceita. */
 export interface MainPlaylistPayload {
+    /** Id no store do main — ida (export) e volta (import) do escopo `__pl_<id>`. */
+    id?: string;
     name: string;
     url: string;
     username: string;
@@ -225,6 +233,9 @@ export function sanitizeBackupPlaylists(raw: unknown): BackupPlaylist[] {
             continue; // corrupted base64 — skip this entry
         }
         result.push({
+            // Sem isto a identidade morria aqui, no meio do caminho: o arquivo
+            // trazia o id e o renderer o jogava fora antes do main.
+            ...(typeof p.id === 'string' && p.id ? { id: p.id } : {}),
             name: typeof p.name === 'string' ? p.name : '',
             url: p.url,
             username: p.username,
@@ -249,6 +260,7 @@ export function sanitizeBackupPlaylists(raw: unknown): BackupPlaylist[] {
  */
 export function toBackupPlaylist(p: MainPlaylistPayload): BackupPlaylist {
     return {
+        ...(p.id ? { id: p.id } : {}),
         name: p.name,
         url: p.url,
         username: p.username,
@@ -259,6 +271,7 @@ export function toBackupPlaylist(p: MainPlaylistPayload): BackupPlaylist {
 
 export function toPlaylistImport(p: BackupPlaylist): MainPlaylistPayload {
     return {
+        ...(p.id ? { id: p.id } : {}),
         name: p.name,
         url: p.url,
         username: p.username,

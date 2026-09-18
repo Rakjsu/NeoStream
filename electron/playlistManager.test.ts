@@ -193,14 +193,14 @@ describe('updateStoredPlaylist (edição por id)', () => {
         expect(carimbo).toBeGreaterThanOrEqual(antes)
         expect(importPlaylistsFromBackup([
             { name: 'X', url: 'http://a.tv', username: 'u', password: 'p1', credentialsUpdatedAt: carimbo - 1 },
-        ])).toBe(0)
+        ]).imported).toBe(0)
         expect(playlists()[0].password).toBe('p2')
     })
 
     it('depois de A→B, o backup trazendo A não a ressuscita como duplicata', () => {
         const a = saveAndActivatePlaylist({ url: 'http://a.tv', username: 'u', password: 'p' })
         updateStoredPlaylist(a.id, { url: 'http://b.tv' })
-        expect(importPlaylistsFromBackup([{ name: 'A', url: 'http://a.tv', username: 'u', password: 'p' }])).toBe(0)
+        expect(importPlaylistsFromBackup([{ name: 'A', url: 'http://a.tv', username: 'u', password: 'p' }]).imported).toBe(0)
         expect(playlists().map(p => p.url)).toEqual(['http://b.tv'])
     })
 
@@ -233,7 +233,7 @@ describe('backup (export/import sem ativar nem validar)', () => {
         expect(exported).toMatchObject({ name: 'Casa', url: 'http://a.tv', username: 'u', password: 'p' })
         expect(typeof exported.credentialsUpdatedAt).toBe('number')
         expect(Object.keys(exported).sort()).toEqual(
-            ['credentialsUpdatedAt', 'name', 'password', 'url', 'username']
+            ['credentialsUpdatedAt', 'id', 'name', 'password', 'url', 'username']
         )
     })
 
@@ -265,7 +265,7 @@ describe('backup (export/import sem ativar nem validar)', () => {
 
     it('importa válidas, pula inválidas e NÃO sobrescreve credencial existente', () => {
         const active = saveAndActivatePlaylist({ url: 'http://ativa.tv', username: 'u', password: 'p' })
-        const imported = importPlaylistsFromBackup([
+        const { imported } = importPlaylistsFromBackup([
             { name: 'Nova', url: 'http://nova.tv', username: 'x', password: 'y' },
             { name: 'Sem url', url: '  ', username: 'x', password: 'y' },
             { name: 'Sem senha', url: 'http://z.tv', username: 'x', password: undefined as unknown as string },
@@ -289,7 +289,7 @@ describe('backup (export/import sem ativar nem validar)', () => {
         removePlaylist(p1.id)
         expect(playlists()).toHaveLength(1)
 
-        const imported = importPlaylistsFromBackup([
+        const { imported } = importPlaylistsFromBackup([
             { name: 'Provedor X', url: 'http://x.tv', username: 'u', password: 'p' },
         ])
         expect(imported).toBe(0)
@@ -307,7 +307,7 @@ describe('backup (export/import sem ativar nem validar)', () => {
     })
 
     it('lote todo inválido → 0 e nenhuma escrita', () => {
-        expect(importPlaylistsFromBackup([{ name: '', url: '', username: '', password: '' }])).toBe(0)
+        expect(importPlaylistsFromBackup([{ name: '', url: '', username: '', password: '' }]).imported).toBe(0)
         expect(playlists()).toHaveLength(0)
     })
 })

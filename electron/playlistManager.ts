@@ -264,6 +264,13 @@ export function deactivatePlaylists() {
 // ---- Backup export/import -------------------------------------------------
 
 export interface PlaylistBackupEntry {
+    /**
+     * Id local na maquina de ORIGEM (ausente em backups anteriores). E ele que
+     * permite ao renderer reescrever o escopo `__pl_<id>` dos favoritos e do
+     * progresso que vieram no arquivo — sem isso o dado chega MORTO na outra
+     * maquina e a tela abre vazia (src/services/playlistIdRemap.ts).
+     */
+    id?: string
     name: string
     url: string
     username: string
@@ -284,6 +291,7 @@ export interface PlaylistBackupEntry {
 /** Full playlist entries for the backup file (passwords stay in main until here). */
 export function exportPlaylistsForBackup(): PlaylistBackupEntry[] {
     return getPlaylists().map(p => ({
+        id: p.id,
         name: p.name,
         url: p.url,
         username: p.username,
@@ -383,20 +391,40 @@ export function importMobileAccounts(entries: MobileAccountEntry[]): number {
     return imported
 }
 
+export interface BackupImportResult {
+    imported: number
+    /** idDoArquivo -> idLocal: com que id o escopo `__pl_<id>` fica NESTA maquina. */
+    idMap: Record<string, string>
+}
+
 /**
  * Import playlists from a backup WITHOUT activating or validating against the
  * provider (the machine may be offline during a restore). Existing entries
  * (same url+username) keep their password unless the backup is provably newer.
+ * Devolve tambem o par {idDoArquivo -> idLocal} de cada playlist RECONHECIDA
+ * aqui: e com ele que o renderer reescreve o escopo `__pl_<id>` dos favoritos
+ * e do progresso que vieram no arquivo (src/services/playlistIdRemap.ts).
  */
-export function importPlaylistsFromBackup(entries: PlaylistBackupEntry[]): number {
+export function importPlaylistsFromBackup(entries: PlaylistBackupEntry[]): BackupImportResult {
     let playlists = getPlaylists()
     const removidas = getRemovedPlaylists()
     let imported = 0
+    const idMap: Record<string, string> = {}
     for (const entry of entries) {
         if (!entry?.url?.trim() || !entry?.username?.trim() || typeof entry.password !== 'string') continue
         // Mesmo portão do import do celular: o backup também vem de fora.
-        if (m3uDeForaSemUrl(entry)) continue
-        if (importeBloqueado(playlists, removidas, entry)) continue
+        if (m3uDeForaSemUrl(entry) || importeBloqueado(playlists, removidas, entry)) {
+            // Recusar o CADASTRO não quer dizer "sem identidade": se a playlist
+            // JÁ mora aqui (o caso comum do sync, e a lista de disco que o
+            // usuário abriu pelo diálogo), o escopo dos favoritos do arquivo
+            // ainda precisa apontar pro id desta máquina. Este ramo não escreve
+            // nada no store. Só a apagada de propósito (tombstone) fica de
+            // fora — não há id local pra ela, e remapear o escopo dela seria
+            // ressuscitá-la pela porta dos fundos.
+            const local = playlists.find(p => p.url === entry.url && p.username === entry.username)
+            if (typeof entry.id === 'string' && entry.id && local) idMap[entry.id] = local.id
+            continue
+        }
         const result = upsertPlaylist(playlists, {
             name: entry.name,
             url: entry.url,
@@ -410,11 +438,12 @@ export function importPlaylistsFromBackup(entries: PlaylistBackupEntry[]): numbe
             type: entry.type === 'm3u' || entry.type === 'stalker' ? entry.type : undefined
         })
         playlists = result.playlists
+        if (typeof entry.id === 'string' && entry.id) idMap[entry.id] = result.entry.id
         imported++
     }
     if (imported > 0) {
         store.set('playlists', playlists)
         log.info('[Playlists] Imported', imported, 'playlist(s) from backup')
     }
-    return imported
+    return { imported, idMap }
 }
