@@ -2,6 +2,7 @@ import { profileService } from './profileService';
 import { playlistScopedKey, hasKnownPlaylistId } from './activePlaylistService';
 import { syncTraktMovieWatched } from './traktService';
 import { readJson } from './storageJsonCache';
+import { syncTombstones, movieProgressTombstoneKey } from './syncTombstones';
 
 export interface MovieProgress {
     movieId: string;
@@ -221,13 +222,30 @@ class MovieProgressService {
 
     // Clear a single movie's progress (active profile)
     clearMovieProgress(movieId: string): void {
-        const filtered = this.getProgress().filter((p) => p.movieId !== movieId);
+        const progress = this.getProgress();
+        const filtered = progress.filter((p) => p.movieId !== movieId);
+        // 🪦 Ledger de remoções: o merge do sync entre máquinas é newest-wins por
+        // item, então sem o carimbo a cópia da outra máquina devolve o filme pra
+        // "Continuar assistindo" no ciclo seguinte. Reassistir depois vence o
+        // carimbo (watchedAt novo), igual aos favoritos. Só carimba se algo saiu
+        // mesmo — senão um clique à toa plantaria uma remoção capaz de apagar
+        // dado fresco do outro PC.
+        if (filtered.length !== progress.length) {
+            syncTombstones.record(this.getStorageKey(), movieProgressTombstoneKey(movieId));
+        }
         this.saveProgress(filtered);
     }
 
     // Clear all movie progress for the active profile
     clearAllProgress(): void {
-        localStorage.removeItem(this.getStorageKey());
+        const key = this.getStorageKey();
+        syncTombstones.recordMany(
+            key,
+            this.getProgress()
+                .filter((p) => p && typeof p.movieId === 'string')
+                .map((p) => movieProgressTombstoneKey(p.movieId)),
+        );
+        localStorage.removeItem(key);
     }
 
     /**

@@ -16,6 +16,28 @@ export function tombstoneItemKey(id: string | number, type?: string): string {
     return `${String(id)}::${type ?? ''}`;
 }
 
+/**
+ * Identidade do progresso de FILME no ledger.
+ *
+ * Progresso não é favorito: não tem `type`, e quem grava (movieProgressService)
+ * e quem lê (syncMerge) moram em arquivos diferentes. O formato tem um dono só,
+ * aqui — se as duas pontas divergirem, o carimbo nunca casa e a remoção volta
+ * atrás em silêncio, que é exatamente o defeito que este ledger existe pra
+ * impedir.
+ */
+export function movieProgressTombstoneKey(movieId: string): string {
+    return tombstoneItemKey(movieId);
+}
+
+/** Identidade do progresso de EPISÓDIO (mesma chave que o merge usa por item). */
+export function episodeProgressTombstoneKey(
+    seriesId: string,
+    seasonNumber: number,
+    episodeNumber: number,
+): string {
+    return tombstoneItemKey(`${seriesId}:${seasonNumber}:${episodeNumber}`);
+}
+
 function load(): TombstoneMap {
     try {
         const raw = localStorage.getItem(TOMBSTONES_KEY);
@@ -50,6 +72,21 @@ export const syncTombstones = {
             const map = pruneTombstones(load(), now);
             if (!map[storageKey]) map[storageKey] = {};
             map[storageKey][itemKey] = now;
+            localStorage.setItem(TOMBSTONES_KEY, JSON.stringify(map));
+        } catch { /* ledger is best-effort */ }
+    },
+
+    /**
+     * Várias remoções numa escrita só (limpar o histórico de uma série inteira).
+     * `record` em laço releria e reescreveria o ledger inteiro por episódio.
+     */
+    recordMany(storageKey: string, itemKeys: string[]): void {
+        if (itemKeys.length === 0) return;
+        try {
+            const now = Date.now();
+            const map = pruneTombstones(load(), now);
+            if (!map[storageKey]) map[storageKey] = {};
+            for (const itemKey of itemKeys) map[storageKey][itemKey] = now;
             localStorage.setItem(TOMBSTONES_KEY, JSON.stringify(map));
         } catch { /* ledger is best-effort */ }
     },
