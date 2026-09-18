@@ -42,3 +42,38 @@ export function pedirAberturaDeFicha(kind: TipoDeFicha, id: string | number): st
     window.dispatchEvent(new Event(GLOBAL_SEARCH_EVENT))
     return rota
 }
+
+/**
+ * 🔒 O outro lado do canal: qual item do catálogo esse id abre — se o gate
+ * deixar.
+ *
+ * A grade só desenha o que passa por `isItemVisible`, e por muito tempo bastou
+ * confiar nela. Só que a grade NÃO é o único emissor de id: a busca global, os
+ * "Parecidos"/filmografia da ficha e o aviso de novos episódios gravam um id
+ * aqui, e a página de destino resolvia esse id na lista CRUA do fetch
+ * (`streams.find(...)` / `series.find(...)`) e chamava o setter da ficha
+ * direto. Esse caminho não via filtro nenhum: um clique num "Parecido" abria a
+ * ficha inteira — sinopse, elenco, botão de Reproduzir — de um título que a
+ * grade esconde por categoria adulta, por classificação vetada em cache ou por
+ * ocultação do perfil infantil.
+ *
+ * Mesmo desenho do `proximoDaFila`: função PURA com o gate injetado. A regra
+ * fica visível e testada, e vale para todo emissor de id — os de hoje e os que
+ * ainda vão existir, porque todos desembocam aqui.
+ *
+ * @param idPedido id que veio no pedido de abertura
+ * @param catalogo a lista CRUA que a página carregou
+ * @param idDoItem como ler o id do item (`stream_id` / `series_id`)
+ * @param visivel o gate de parental/infantil da tela (`isItemVisible`)
+ */
+export function fichaLiberada<T>(
+    idPedido: string,
+    catalogo: readonly T[],
+    idDoItem: (item: T) => string | number,
+    visivel: (item: T) => boolean
+): T | null {
+    // O id do Xtream chega número no catálogo e string no pedido.
+    const achado = catalogo.find(item => String(idDoItem(item)) === idPedido)
+    if (!achado) return null
+    return visivel(achado) ? achado : null
+}

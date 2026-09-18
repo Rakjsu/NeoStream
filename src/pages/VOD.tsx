@@ -25,6 +25,7 @@ import { closeAllPreviews } from '../components/hoverPreviewActions';
 import { useLanguage } from '../services/languageService';
 import { isRecentlyAdded } from '../services/catalogNew';
 import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_OPEN_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
+import { fichaLiberada } from '../services/abrirFicha';
 
 import { asList } from '../utils/catalogPayload';
 interface VODStream {
@@ -143,11 +144,20 @@ export function VOD() {
     // Abre a ficha pendente quando a lista chega (a navegação pode vencer o fetch).
     useEffect(() => {
         if (!pendingOpenId || streams.length === 0) return;
-        const hit = streams.find(stream => String(stream.stream_id) === pendingOpenId);
+        // 🔒 O id vem de FORA da grade (busca global, "Parecidos"/filmografia
+        // da ficha) e `streams` é a lista CRUA: resolver e abrir direto
+        // entregava a ficha de um filme que a grade esconde. Mesmo gate da
+        // grade, mesmo desenho do `proximoDaFila` daqui de cima.
+        const hit = fichaLiberada(pendingOpenId, streams, s => s.stream_id, isItemVisible);
         queueMicrotask(() => {
             setPendingOpenId(null);
             if (hit) setSelectedMovie(hit);
         });
+    // isItemVisible é recriado a cada render e lê estado de parental/perfil que
+    // só muda por troca de perfil ou ajuste — o que remonta esta página. Nas
+    // deps ele reagendaria a abertura a cada render; é o mesmo motivo (e o
+    // mesmo recurso) do filtro da grade logo abaixo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pendingOpenId, streams]);
 
     // Listen for mini player expand event to reopen full player
