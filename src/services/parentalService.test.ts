@@ -15,6 +15,7 @@ beforeEach(() => {
         filterByTMDB: true,
     })
     parentalService.lockSession()
+    parentalService.lockParentalSettings()
 })
 
 describe('parentalService PIN', () => {
@@ -45,6 +46,30 @@ describe('parentalService PIN', () => {
         expect(first.pinHash).not.toBe(second.pinHash)
         // Same PIN still verifies after re-set
         expect(await parentalService.verifyPin('1234')).toBe(true)
+    })
+
+    it('parental settings unlock toggles', () => {
+        expect(parentalService.isParentalSettingsUnlocked()).toBe(false)
+        parentalService.unlockParentalSettings()
+        expect(parentalService.isParentalSettingsUnlocked()).toBe(true)
+        parentalService.lockParentalSettings()
+        expect(parentalService.isParentalSettingsUnlocked()).toBe(false)
+    })
+
+    it('unlocking the settings section does NOT unlock content (separate keys)', () => {
+        // Os nove leitores de isSessionUnlocked() param de filtrar quando ele
+        // liga. Provar o PIN nas Configuracoes nao pode desligar o filtro
+        // adulto do app inteiro pelo resto da sessao.
+        parentalService.setConfig({ enabled: true, maxRating: 'L' })
+        parentalService.unlockParentalSettings()
+        expect(parentalService.isSessionUnlocked()).toBe(false)
+        expect(parentalService.isContentBlocked('18')).toBe(true)
+        expect(parentalService.shouldHideContent('XXX Adultos')).toBe(true)
+    })
+
+    it('unlocking content does NOT open the settings section', () => {
+        parentalService.unlockSession()
+        expect(parentalService.isParentalSettingsUnlocked()).toBe(false)
     })
 
     it('session unlock toggles', () => {

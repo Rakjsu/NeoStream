@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { modoAoTrocarPin, pedeePinAtual, depoisDeVerificar } from './pinParental';
+import { modoAoTrocarPin, pedeePinAtual, precisaProvarPin, depoisDeVerificar } from './pinParental';
 
 describe('modoAoTrocarPin', () => {
     it('com PIN salvo, o botão "Alterar PIN" abre CONFERINDO o atual', () => {
@@ -21,6 +21,25 @@ describe('pedeePinAtual', () => {
     it('definir não pede PIN atual', () => {
         expect(pedeePinAtual('set')).toBe(false);
     });
+
+    it('destravar a seção também confere o PIN atual', () => {
+        expect(pedeePinAtual('destravar')).toBe(true);
+    });
+});
+
+describe('precisaProvarPin', () => {
+    it('com PIN salvo e sessão trancada, a seção inteira fica trancada', () => {
+        expect(precisaProvarPin(true, false)).toBe(true);
+    });
+
+    it('provado o PIN nesta sessão, a seção abre', () => {
+        expect(precisaProvarPin(true, true)).toBe(false);
+    });
+
+    it('sem PIN salvo não há o que provar', () => {
+        expect(precisaProvarPin(false, false)).toBe(false);
+        expect(precisaProvarPin(false, true)).toBe(false);
+    });
 });
 
 describe('depoisDeVerificar', () => {
@@ -32,8 +51,13 @@ describe('depoisDeVerificar', () => {
         expect(depoisDeVerificar('trocar', true)).toBe('definir-novo-pin');
     });
 
-    it('errou é errado nos dois, sem exceção para quem já está nas Configurações', () => {
+    it('acertou vindo de "destravar": abre a seção — e NÃO desliga o parental', () => {
+        expect(depoisDeVerificar('destravar', true)).toBe('destravar-secao');
+    });
+
+    it('errou é errado nos três, sem exceção para quem já está nas Configurações', () => {
         expect(depoisDeVerificar('verify', false)).toBe('pin-incorreto');
         expect(depoisDeVerificar('trocar', false)).toBe('pin-incorreto');
+        expect(depoisDeVerificar('destravar', false)).toBe('pin-incorreto');
     });
 });
