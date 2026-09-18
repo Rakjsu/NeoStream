@@ -290,7 +290,7 @@ export function SeriesDetailPanel({
                             onClick={onClearHistory}
                         >
                             <span className="btn-icon">🗑️</span>
-                            <span>Limpar Histórico</span>
+                            <span>{t('seriesPage', 'clearHistory')}</span>
                         </button>
                     )}
 
