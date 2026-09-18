@@ -221,6 +221,40 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
         }
     };
 
+    /**
+     * 👶 Quem pode ligar/desligar o modo infantil DESTE cartão.
+     *
+     * Era o único campo do perfil sem porta de entrada nenhuma: o tipo
+     * `UpdateProfileData` declarava `isKids`, o `createProfile` já gravava, e
+     * mesmo assim nenhuma tela mandava o campo. Quem já tinha perfis quando o
+     * app nasceu ficava preso ao `kids-default` do primeiro boot — sem
+     * converter ninguém e sem um segundo perfil infantil (dois irmãos).
+     *
+     * Duas recusas, e cada uma tem dono:
+     * • de dentro de um perfil infantil, ninguém mexe nisto — senão a própria
+     *   criança se promove a adulto num clique (mesma régua do botão "pôr na
+     *   lista kids" da LiveTV, escondido quando `isKidsProfile`);
+     * • nunca o perfil EM USO: os portões de conteúdo leem
+     *   `getActiveProfile().isKids` no render (Home, VOD, Séries, LiveTV,
+     *   player), então virar infantil por baixo do app em execução deixaria a
+     *   tela filtrando pelo valor antigo até alguém recarregar.
+     *
+     * A segunda recusa já cobre o convidado de graça: sair da sessão dele
+     * APAGA a entrada da lista (`setActiveProfile`/`clearActiveProfile`), então
+     * o cartão de convidado só existe enquanto ele é o perfil em uso.
+     */
+    const podeAlternarKids = (profile: Profile) =>
+        !activeProfile?.isKids && profile.id !== activeProfile?.id;
+
+    /**
+     * O cartão inteiro troca de perfil no clique, por isso o interruptor
+     * precisa segurar o evento (`stopPropagation` em quem chama).
+     */
+    const alternarKids = async (profile: Profile) => {
+        await profileService.updateProfile(profile.id, { isKids: !profile.isKids });
+        setProfiles(profileService.getAllProfiles());
+    };
+
     const handleSaveEdit = async () => {
         if (editingProfile && editName.trim()) {
             await profileService.updateProfile(editingProfile.id, {
@@ -292,7 +326,16 @@ export function ProfileManager({ onClose }: ProfileManagerProps) {
                                 {/* Name */}
                                 <h3 className="pm-profile-name">
                                     {profile.name}
-                                    {profile.isKids && (
+                                    {podeAlternarKids(profile) ? (
+                                        <button
+                                            type="button"
+                                            className={`pm-kids-badge pm-kids-toggle${profile.isKids ? '' : ' off'}`}
+                                            aria-pressed={profile.isKids === true}
+                                            onClick={(e) => { e.stopPropagation(); void alternarKids(profile); }}
+                                        >
+                                            👶 Kids
+                                        </button>
+                                    ) : profile.isKids && (
                                         <span className="pm-kids-badge">👶 Kids</span>
                                     )}
                                 </h3>
@@ -960,6 +1003,21 @@ const profileManagerStyles = `
     background: linear-gradient(135deg, #ec4899, #db2777);
     color: white;
     vertical-align: middle;
+}
+
+/* O MESMO crachá, agora clicável — aceso = perfil infantil, apagado = comum.
+   Reaproveitar o rótulo que já estava na tela mantém o texto igual nos três
+   idiomas sem inventar chave de tradução nova. */
+.pm-kids-toggle {
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    line-height: inherit;
+}
+
+.pm-kids-toggle.off {
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.55);
 }
 
             /* PIN Indicator */
