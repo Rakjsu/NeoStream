@@ -145,7 +145,11 @@ export function DiagnosticsSection() {
         downloads: { label: t('storage', 'downloads'), clearable: false },
         recordings: { label: t('storage', 'recordings'), clearable: false },
         catalogCache: { label: t('storage', 'catalogCache'), clearable: true },
-        epgCache: { label: t('storage', 'epgCache'), clearable: true }
+        epgCache: { label: t('storage', 'epgCache'), clearable: true },
+        // Rotulo literal de proposito: "Timeshift" e a mesma palavra nos tres
+        // idiomas (locales ui/*.json, chave player.timeshift), e os tres JSONs
+        // estao travados por PR aberto nesta leva.
+        timeshift: { label: 'Timeshift', clearable: true }
     };
 
     const handleExportLog = async () => {
