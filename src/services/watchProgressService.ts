@@ -380,13 +380,40 @@ class WatchProgressService {
         const activeProfile = profileService.getActiveProfile();
         if (!activeProfile) return false;
 
-        const totais = readJson<Record<string, { lastKnownEpisodes?: number }>>(
-            playlistScopedKey(this.TOTAIS_KEY_PREFIX, activeProfile.id), {}
-        );
-        const total = totais[seriesId]?.lastKnownEpisodes ?? 0;
+        const total = this.getTotaisDeEpisodios(activeProfile.id)[seriesId]?.lastKnownEpisodes ?? 0;
         if (!(total > 0)) return false;
 
         return (this.getSeriesProgressIndex().get(seriesId)?.completedCount ?? 0) >= total;
+    }
+
+    /** Totais do provedor, na mesma chave por (perfil, playlist) do progresso. */
+    private getTotaisDeEpisodios(profileId: string): Record<string, { lastKnownEpisodes?: number }> {
+        return readJson<Record<string, { lastKnownEpisodes?: number }>>(
+            playlistScopedKey(this.TOTAIS_KEY_PREFIX, profileId), {}
+        );
+    }
+
+    /**
+     * Ids das séries CONCLUÍDAS entre as que têm algum progresso — o conjunto
+     * que o 🙈 "Esconder assistidos" da grade de Séries tira da tela.
+     *
+     * A grade decidia sozinha, por "todo episódio REGISTRADO está completo".
+     * Só que registro só existe pro episódio que foi ABERTO: ver o 1º de dez
+     * dava 1 de 1 e sumia com a série inteira. Aqui o denominador é o total do
+     * provedor, o mesmo de `isSeriesCompleted` — e os totais são lidos UMA vez
+     * pro histórico inteiro, em vez de uma vez por série.
+     */
+    getCompletedSeriesIds(): Set<string> {
+        const ids = new Set<string>();
+        const activeProfile = profileService.getActiveProfile();
+        if (!activeProfile) return ids;
+
+        const totais = this.getTotaisDeEpisodios(activeProfile.id);
+        for (const [seriesId, resumo] of this.getSeriesProgressIndex()) {
+            const total = totais[seriesId]?.lastKnownEpisodes ?? 0;
+            if (total > 0 && resumo.completedCount >= total) ids.add(seriesId);
+        }
+        return ids;
     }
 
     // Clear progress for a series

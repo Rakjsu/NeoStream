@@ -191,3 +191,110 @@ describe('watchProgressService — série concluída', () => {
         expect(watchProgressService.isSeriesCompleted('s1')).toBe(false);
     });
 });
+/**
+ * 🙈 "Esconder assistidos" na grade de Séries.
+ *
+ * O botão sumia com a série no PRIMEIRO episódio: a grade calculava "assistida"
+ * por fora, como "todo episódio REGISTRADO está completo" — e registro só
+ * existe pro episódio que foi ABERTO, então ver 1 de 10 dava 1 de 1.
+ *
+ * `getCompletedSeriesIds` é o mesmo critério do selo ✓ e da categoria 🏆
+ * (`isSeriesCompleted`), só que para o histórico inteiro e com UMA leitura dos
+ * totais. A outra ponta do invariante — a grade perguntar ao serviço em vez de
+ * refazer a conta — fica em `electron/esconderAssistidosNaGradeDeSeries.test.ts`.
+ */
+describe('watchProgressService — conjunto de séries concluídas (o 🙈 da grade)', () => {
+    /** O mesmo que o vigia de novos episódios grava depois de varrer o provedor. */
+    const gravarTotais = (totais: Record<string, number>, playlist = 'plA') => {
+        localStorage.setItem(
+            `series_episode_data_p1__pl_${playlist}`,
+            JSON.stringify(
+                Object.fromEntries(
+                    Object.entries(totais).map(([id, n]) => [id, { lastKnownEpisodes: n }])
+                )
+            )
+        );
+    };
+
+    beforeEach(() => {
+        localStorage.clear();
+        activeId = 'p1';
+        playlistId = 'plA';
+    });
+
+    it('ver o 1º episódio de dez NÃO tira a série da grade', () => {
+        gravarTotais({ s1: 10 });
+        watchProgressService.markEpisodeWatched('s1', 1, 1);
+
+        expect([...watchProgressService.getCompletedSeriesIds()]).toEqual([]);
+    });
+
+    it('vista até o último episódio, aí sim sai da grade', () => {
+        gravarTotais({ s1: 3 });
+        watchProgressService.markEpisodeWatched('s1', 1, 1);
+        watchProgressService.markEpisodeWatched('s1', 1, 2);
+        watchProgressService.markEpisodeWatched('s1', 1, 3);
+
+        expect([...watchProgressService.getCompletedSeriesIds()]).toEqual(['s1']);
+    });
+
+    it('separa a concluída da que está em andamento na mesma varredura', () => {
+        gravarTotais({ pronta: 2, andando: 5 });
+        watchProgressService.markEpisodeWatched('pronta', 1, 1);
+        watchProgressService.markEpisodeWatched('pronta', 1, 2);
+        watchProgressService.markEpisodeWatched('andando', 1, 1);
+
+        expect([...watchProgressService.getCompletedSeriesIds()]).toEqual(['pronta']);
+    });
+
+    it('episódio deixado pela metade não fecha a série', () => {
+        // O denominador é o total do provedor, mas o numerador só conta
+        // episódio CONCLUÍDO — trocar por "episódios registrados" fecharia aqui.
+        gravarTotais({ s1: 2 });
+        watchProgressService.markEpisodeWatched('s1', 1, 1);
+        watchProgressService.saveVideoTime('s1', 1, 2, 60, 1200);
+
+        expect(watchProgressService.getCompletedSeriesIds().has('s1')).toBe(false);
+    });
+
+    it('sem total conhecido (M3U/Stalker, ou antes da 1ª varredura) nada some', () => {
+        watchProgressService.markEpisodeWatched('s2', 1, 1);
+        expect(watchProgressService.getCompletedSeriesIds().has('s2')).toBe(false);
+
+        gravarTotais({ s2: 0 });
+        expect(watchProgressService.getCompletedSeriesIds().has('s2')).toBe(false);
+    });
+
+    it('o total de uma playlist não esconde a série de mesmo id na outra', () => {
+        // `series_id` do Xtream é um inteiro por provedor e colide entre
+        // playlists — o total da A não pode valer pra série da B.
+        gravarTotais({ s1: 2 }, 'plA');
+
+        playlistId = 'plB';
+        watchProgressService.markEpisodeWatched('s1', 1, 1);
+        watchProgressService.markEpisodeWatched('s1', 1, 2);
+
+        expect(watchProgressService.getCompletedSeriesIds().has('s1')).toBe(false);
+    });
+
+    it('sem perfil ativo não esconde nada', () => {
+        gravarTotais({ s1: 1 });
+        watchProgressService.markEpisodeWatched('s1', 1, 1);
+
+        activeId = null;
+        expect(watchProgressService.getCompletedSeriesIds().size).toBe(0);
+    });
+
+    it('o conjunto bate, série a série, com o critério do selo ✓', () => {
+        gravarTotais({ s1: 2, s2: 2 });
+        watchProgressService.markEpisodeWatched('s1', 1, 1);
+        watchProgressService.markEpisodeWatched('s1', 1, 2);
+        watchProgressService.markEpisodeWatched('s2', 1, 1);
+
+        const ids = watchProgressService.getCompletedSeriesIds();
+        expect(ids.has('s1')).toBe(watchProgressService.isSeriesCompleted('s1'));
+        expect(ids.has('s2')).toBe(watchProgressService.isSeriesCompleted('s2'));
+        expect(ids.has('s1')).toBe(true);
+        expect(ids.has('s2')).toBe(false);
+    });
+});
