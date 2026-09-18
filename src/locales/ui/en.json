@@ -254,7 +254,12 @@
     "castQueued": "{n} episodes queued on {device}",
     "episodeAlreadyDownloading": "Episode {episode} is already downloading",
     "onlyEpisode": "Only Episode {episode}",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "loadingEpisodes": "Loading episodes...",
+    "episodesLoadError": "⚠️ Couldn't load the episodes."
+  },
+  "seriesPage": {
+    "clearHistory": "Clear History"
   },
   "settings": {
     "title": "Settings",
