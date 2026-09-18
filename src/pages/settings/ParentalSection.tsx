@@ -16,7 +16,7 @@ import { kidsWeeklyUsage } from '../../services/statsDashboardHelpers';
 import { diaLocal } from '../../utils/diaLocal';
 import { useLanguage } from '../../services/languageService';
 import { useSaveAnimation } from './useSaveAnimation';
-import { depoisDeVerificar, modoAoTrocarPin, pedeePinAtual, type ModoDoPin } from './pinParental';
+import { depoisDeVerificar, modoAoTrocarPin, pedeePinAtual, precisaProvarPin, type ModoDoPin } from './pinParental';
 
 export function ParentalSection() {
     const [parentalConfig, setParentalConfig] = useState<ParentalConfig>(parentalService.getConfig());
@@ -64,6 +64,25 @@ export function ParentalSection() {
     // poder definir outro. Estado pegajoso: quem abre o modal escolhe o modo
     // explicitamente, sempre — ver pinParental.ts.
     const [pinMode, setPinMode] = useState<ModoDoPin>('set');
+    // 🔒 Destrave da SEÇÃO nesta sessão. Com PIN salvo, nada aqui é editável
+    // até alguém provar o PIN uma vez. Chave PRÓPRIA no sessionStorage: provar
+    // o PIN aqui NÃO destrava o conteúdo adulto do app (parentalService.ts).
+    const [secaoDestravada, setSecaoDestravada] = useState(() => parentalService.isParentalSettingsUnlocked());
+    const trancado = precisaProvarPin(parentalService.hasPin(), secaoDestravada);
+    // O botão do PIN é a única saída da seção trancada — e continua clicável
+    // mesmo com o parental desligado, porque desligar não apaga o PIN.
+    const botaoPinAtivo = parentalConfig.enabled || trancado;
+
+    /**
+     * Envelope dos <select> que GRAVAM na seção. O `disabled` sozinho não
+     * basta neles: um `change` disparado por script atravessa o campo
+     * desabilitado e chega ao React. Nos BOTÕES o `disabled` basta — click em
+     * botão desabilitado o React não despacha.
+     */
+    const seDestravado = (gravar: () => void) => {
+        if (trancado) return;
+        gravar();
+    };
 
     const handleParentalConfigChange = <K extends keyof ParentalConfig>(key: K, value: ParentalConfig[K]) => {
         // When trying to disable parental control, require PIN verification
@@ -73,6 +92,11 @@ export function ParentalSection() {
             setShowPinModal(true);
             return; // Don't change config until PIN is verified
         }
+
+        // Classificação máxima, categorias adultas e filtro TMDB também ficam
+        // trancados. O 'enabled' é a exceção: desligar já pede PIN acima, e
+        // ligar só aperta a restrição.
+        if (key !== 'enabled' && trancado) return;
 
         const newConfig = { ...parentalConfig, [key]: value };
         setParentalConfig(newConfig);
@@ -114,6 +138,15 @@ export function ParentalSection() {
                 setPinError('');
                 return;
             }
+            if (destino === 'destravar-secao') {
+                // Provou o PIN: a seção abre por esta sessão e NADA mais muda.
+                // Em especial o conteúdo adulto continua filtrado.
+                parentalService.unlockParentalSettings();
+                setSecaoDestravada(true);
+                setShowPinModal(false);
+                resetPinModal();
+                return;
+            }
             setParentalConfig(prev => ({ ...prev, enabled: false }));
             parentalService.setConfig({ enabled: false });
             setShowPinModal(false);
@@ -139,6 +172,11 @@ export function ParentalSection() {
             }
             // Save PIN
             await parentalService.setPin(pin);
+            // Quem definiu o PIN provou que é dono dele: a seção abre junto.
+            // Sem isto, o pai que acabou de criar o PIN via a seção inteira
+            // apagar na cara dele e tinha que digitar o mesmo PIN de novo.
+            parentalService.unlockParentalSettings();
+            setSecaoDestravada(true);
             setParentalConfig(parentalService.getConfig());
             setShowPinModal(false);
             resetPinModal();
@@ -192,7 +230,7 @@ export function ParentalSection() {
                             className="setting-select"
                             value={parentalConfig.maxRating}
                             onChange={(e) => handleParentalConfigChange('maxRating', e.target.value as ParentalConfig['maxRating'])}
-                            disabled={!parentalConfig.enabled}
+                            disabled={!parentalConfig.enabled || trancado}
                         >
                             <option value="L">{t('parental', 'free')}</option>
                             <option value="10">10 {t('parental', 'years')}</option>
@@ -214,23 +252,28 @@ export function ParentalSection() {
                             onClick={() => {
                                 resetPinModal();
                                 // Sem isto o modal abria definindo por cima do
-                                // PIN antigo, sem conferir o atual.
-                                setPinMode(modoAoTrocarPin(parentalService.hasPin()));
+                                // PIN antigo, sem conferir o atual. Trancada, a
+                                // MESMA tela de conferência destrava a seção:
+                                // trocar o PIN pediria esse mesmo PIN de todo
+                                // jeito, então não se perde caminho nenhum.
+                                setPinMode(trancado ? 'destravar' : modoAoTrocarPin(parentalService.hasPin()));
                                 setShowPinModal(true);
                             }}
-                            disabled={!parentalConfig.enabled}
+                            disabled={!botaoPinAtivo}
                             style={{
                                 padding: '10px 20px',
-                                background: parentalConfig.enabled ? 'rgba(239, 68, 68, 0.2)' : 'rgba(100, 100, 100, 0.2)',
-                                border: `1px solid ${parentalConfig.enabled ? 'rgba(239, 68, 68, 0.4)' : 'rgba(100, 100, 100, 0.4)'}`,
+                                background: botaoPinAtivo ? 'rgba(239, 68, 68, 0.2)' : 'rgba(100, 100, 100, 0.2)',
+                                border: `1px solid ${botaoPinAtivo ? 'rgba(239, 68, 68, 0.4)' : 'rgba(100, 100, 100, 0.4)'}`,
                                 borderRadius: '10px',
-                                color: parentalConfig.enabled ? '#ef4444' : '#666',
-                                cursor: parentalConfig.enabled ? 'pointer' : 'not-allowed',
+                                color: botaoPinAtivo ? '#ef4444' : '#666',
+                                cursor: botaoPinAtivo ? 'pointer' : 'not-allowed',
                                 fontWeight: 600,
                                 transition: 'all 0.2s'
                             }}
                         >
-                            🔑 {parentalService.hasPin() ? t('parental', 'changePin') : t('parental', 'setPin')} PIN
+                            {trancado
+                                ? '🔓 Desbloquear'
+                                : `🔑 ${parentalService.hasPin() ? t('parental', 'changePin') : t('parental', 'setPin')} PIN`}
                         </button>
                         {saveAnimation === 'parental_pin' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                     </div>
@@ -245,7 +288,7 @@ export function ParentalSection() {
                                 type="checkbox"
                                 checked={parentalConfig.blockAdultCategories}
                                 onChange={(e) => handleParentalConfigChange('blockAdultCategories', e.target.checked)}
-                                disabled={!parentalConfig.enabled}
+                                disabled={!parentalConfig.enabled || trancado}
                             />
                             <span className="toggle-slider"></span>
                         </label>
@@ -262,7 +305,7 @@ export function ParentalSection() {
                                 type="checkbox"
                                 checked={parentalConfig.filterByTMDB}
                                 onChange={(e) => handleParentalConfigChange('filterByTMDB', e.target.checked)}
-                                disabled={!parentalConfig.enabled}
+                                disabled={!parentalConfig.enabled || trancado}
                             />
                             <span className="toggle-slider"></span>
                         </label>
@@ -277,11 +320,14 @@ export function ParentalSection() {
                         <select
                             className="setting-select"
                             value={kidsLimit}
+                            disabled={trancado}
                             onChange={(e) => {
                                 const minutes = Number(e.target.value);
-                                setKidsLimit(minutes);
-                                setKidsDailyLimitMinutes(minutes);
-                                triggerSaveAnimation('parental_kidsLimit');
+                                seDestravado(() => {
+                                    setKidsLimit(minutes);
+                                    setKidsDailyLimitMinutes(minutes);
+                                    triggerSaveAnimation('parental_kidsLimit');
+                                });
                             }}
                         >
                             <option value={0}>{t('parental', 'limitOff')}</option>
@@ -303,10 +349,14 @@ export function ParentalSection() {
                         <select
                             className="setting-select"
                             value={kidsHours}
+                            disabled={trancado}
                             onChange={(e) => {
-                                setKidsHours(e.target.value);
-                                setKidsAllowedHours(valueToWindow(e.target.value));
-                                triggerSaveAnimation('parental_kidsHours');
+                                const valor = e.target.value;
+                                seDestravado(() => {
+                                    setKidsHours(valor);
+                                    setKidsAllowedHours(valueToWindow(valor));
+                                    triggerSaveAnimation('parental_kidsHours');
+                                });
                             }}
                         >
                             <option value="">{t('parental', 'limitOff')}</option>
@@ -326,10 +376,14 @@ export function ParentalSection() {
                         <select
                             className="setting-select"
                             value={autoKids}
+                            disabled={trancado}
                             onChange={(e) => {
-                                setAutoKids(e.target.value);
-                                setAutoKidsHours(valueToWindow(e.target.value));
-                                triggerSaveAnimation('parental_autoKids');
+                                const valor = e.target.value;
+                                seDestravado(() => {
+                                    setAutoKids(valor);
+                                    setAutoKidsHours(valueToWindow(valor));
+                                    triggerSaveAnimation('parental_autoKids');
+                                });
                             }}
                         >
                             <option value="">{t('parental', 'limitOff')}</option>
@@ -354,11 +408,14 @@ export function ParentalSection() {
                                         <select
                                             className="setting-select"
                                             value={profileLimits[profile.id] ?? 0}
+                                            disabled={trancado}
                                             onChange={(e) => {
                                                 const minutes = Number(e.target.value);
-                                                setProfileDailyLimitMinutes(profile.id, minutes);
-                                                setProfileLimits(prev => ({ ...prev, [profile.id]: minutes }));
-                                                triggerSaveAnimation('parental_profileLimit');
+                                                seDestravado(() => {
+                                                    setProfileDailyLimitMinutes(profile.id, minutes);
+                                                    setProfileLimits(prev => ({ ...prev, [profile.id]: minutes }));
+                                                    triggerSaveAnimation('parental_profileLimit');
+                                                });
                                             }}
                                         >
                                             <option value={0}>{t('parental', 'limitOff')}</option>
@@ -405,7 +462,7 @@ export function ParentalSection() {
                             className="check-btn"
                             style={{ width: 'auto', padding: '10px 16px' }}
                             title={t('parental', 'showHiddenAgain')}
-                            disabled={!ocultos}
+                            disabled={!ocultos || trancado}
                             onClick={() => {
                                 void indexedDBCache.clearHiddenItems().then(contarOcultos);
                             }}
@@ -435,6 +492,7 @@ export function ParentalSection() {
                             className="check-btn"
                             style={{ width: 'auto', padding: '10px 16px' }}
                             title={t('parental', 'logClear')}
+                            disabled={trancado}
                             onClick={() => { clearParentalLog(); setLogEntries([]); }}
                         >
                             🗑
@@ -525,11 +583,13 @@ export function ParentalSection() {
                                 WebkitTextFillColor: 'transparent',
                                 backgroundClip: 'text'
                             }}>
-                                {pedeePinAtual(pinMode)
-                                    ? t('parental', 'verifyPin')
-                                    : pinStep === 'enter'
-                                        ? t('parental', 'setPin') + ' PIN'
-                                        : t('parental', 'confirmPin')}
+                                {pinMode === 'destravar'
+                                    ? t('parental', 'pin')
+                                    : pedeePinAtual(pinMode)
+                                        ? t('parental', 'verifyPin')
+                                        : pinStep === 'enter'
+                                            ? t('parental', 'setPin') + ' PIN'
+                                            : t('parental', 'confirmPin')}
                             </h2>
                             <p style={{ color: '#9ca3af', fontSize: '15px', margin: 0 }}>
                                 {pinMode === 'trocar'
@@ -703,7 +763,7 @@ export function ParentalSection() {
                                     e.currentTarget.style.boxShadow = '0 4px 20px rgba(239, 68, 68, 0.4)';
                                 }}
                             >
-                                {pinMode === 'verify'
+                                {pinMode === 'verify' || pinMode === 'destravar'
                                     ? '🔓 Desbloquear'
                                     : pinMode === 'trocar' || pinStep === 'enter'
                                         ? 'Continuar →'
