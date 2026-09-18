@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { indexedDBCache } from '../services/indexedDBCache';
 import { parentalService } from '../services/parentalService';
 import { searchMovieByName, searchSeriesByName, isKidsFriendly } from '../services/tmdb';
+import { useLanguage } from '../services/languageService';
 
 import { asList } from '../utils/catalogPayload';
 import {
@@ -52,6 +53,11 @@ export function useContentFiltering<T>({
     const [checkingItem, setCheckingItem] = useState<string | null>(null);
     const [blockMessage, setBlockMessage] = useState<string | null>(null);
     const [cachedRatings, setCachedRatings] = useState<Map<string, string | null>>(new Map());
+    // O aviso de bloqueio saia em portugues pra quem usa o app em ingles ou
+    // espanhol. A Home ja monta a MESMA frase por
+    // t('home','notAvailableForProfile') (src/pages/Home.tsx) — esta era a
+    // unica copia cravada dela no codigo.
+    const { t } = useLanguage();
 
     const getCachedItem = (name: string) => contentType === 'series'
         ? indexedDBCache.getCachedSeries(name)
@@ -216,7 +222,7 @@ export function useContentFiltering<T>({
                 if (isKidsFriendly(certification)) {
                     onAllowed(item);
                 } else {
-                    setBlockMessage(`"${name}" não está disponível para este perfil`);
+                    setBlockMessage(`"${name}" ${t('home', 'notAvailableForProfile')}`);
                     // Mesma regra: sem classificação, bloqueia agora e pronto.
                     // Gravar o oculto aqui era o que apagava o catálogo do
                     // perfil infantil clique a clique quando faltava a chave
