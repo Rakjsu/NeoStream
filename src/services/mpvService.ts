@@ -6,6 +6,8 @@
  * `mpvEnabled` flag in playbackService (per-profile playback settings).
  */
 
+import { isWatchBlockedNow } from './watchGateService';
+
 export interface MpvTrack {
     id: number;
     type: 'audio' | 'sub';
@@ -79,6 +81,11 @@ class MpvService {
      * geometry follow). Never throws — inspect `success`/`reason`.
      */
     async play(url: string, title?: string, startSeconds?: number): Promise<MpvPlayResult> {
+        // ⏰ O MPV toca num processo FORA do DOM, então nenhum overlay do
+        // renderer o alcança: a trava tem de ser aqui, na única porta de
+        // entrada do `mpv:play`. Recusar devolve o controle ao
+        // `MpvPlayerView`, que cai no player interno — e lá o overlay aparece.
+        if (isWatchBlockedNow()) return { success: false, reason: 'kids-limit' };
         try {
             const result = await window.ipcRenderer.invoke('mpv:play', { url, title, start: startSeconds });
             return result ?? { success: false, reason: 'no-response' };
