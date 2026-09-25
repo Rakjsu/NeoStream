@@ -1502,6 +1502,22 @@ export async function registerCastSubtitleVtt(vtt: string, deviceHost: string): 
     return `http://${getLocalAddressForDevice(deviceHost)}:${port}/cast-sub/${token}.vtt`
 }
 
+/**
+ * Fim de um cast de Chromecast/AirPlay = fim dos links que ele recebeu (o
+ * resgate em loopback embrulhado por `createLanProxyUrlFor`, os segmentos que
+ * a playlist dele gerou e cada legenda de `registerCastSubtitleVtt`). O proxy
+ * escuta em 0.0.0.0: sem isto o link do filme e das legendas seguia valendo
+ * por PROXY_TOKEN_IDLE_TTL_MS para qualquer um na LAN (D201).
+ *
+ * A revogação é por HOST, como a do DLNA: quem chama tem de encerrar a sessão
+ * anterior ANTES de criar os tokens do cast novo, senão um segundo cast para
+ * a MESMA TV revoga os próprios links (o `dlna:cast` faz o mesmo com o
+ * `stopActiveDlnaSession`).
+ */
+export function revokeProxyTokensFor(deviceHost: string): void {
+    revokeDeviceTokens(deviceHost)
+}
+
 // ===== Phone-remote transport for the active DLNA session ====================
 // Mirrors castRemoteControl (Chromecast): the web-remote server tries the
 // Chromecast session first, then this. Plans are pure (dlnaRemoteRouting);

@@ -41,6 +41,7 @@ vi.mock('./dlnaHandlers', () => ({
     isLoopbackUrl: () => false,
     createLanProxyUrlFor: async (url: string) => url,
     registerCastSubtitleVtt: async () => 'http://192.168.0.2/legenda.vtt',
+    revokeProxyTokensFor: () => undefined,
 }))
 
 type Resposta = { success: boolean; devices: { id: string; name: string; host: string; model: string }[] }

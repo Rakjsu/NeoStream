@@ -14,7 +14,7 @@ import { Bonjour, type Browser, type Service } from 'bonjour-service';
 
 import log from './logger'
 import { planAirplayCommand, parseScrub, type AirplayStatusRaw } from './airplayRemoteRouting';
-import { isLoopbackUrl, createLanProxyUrlFor } from './dlnaHandlers'
+import { isLoopbackUrl, createLanProxyUrlFor, revokeProxyTokensFor } from './dlnaHandlers'
 import { getErrorMessage } from './errorMessage';
 
 interface AirPlayDevice {
@@ -190,7 +190,14 @@ export function setupAirPlayHandlers() {
                 throw new Error('Device not found');
             }
 
-            await airplayRequest(device, '/stop');
+            try {
+                await airplayRequest(device, '/stop');
+            } finally {
+                // Os links do proxy da LAN que este aparelho recebeu morrem
+                // mesmo com o /stop falhando (Apple TV desligada): a interface
+                // fecha o controle de qualquer jeito, igual ao dlna:stop (D201).
+                revokeProxyTokensFor(device.host);
+            }
             log.info('[AirPlay] Stopped successfully');
             if (airplaySession?.device.id === deviceId) endAirplaySession('parado pelo app');
 
@@ -391,7 +398,12 @@ export function airplayRemoteControl(action: string, value?: number): boolean {
                 return;
             }
             case 'stop':
-                await airplayRequest(session.device, '/stop');
+                try {
+                    await airplayRequest(session.device, '/stop');
+                } finally {
+                    // Mesmo encerramento local do airplay:stop (D201).
+                    revokeProxyTokensFor(session.device.host);
+                }
                 endAirplaySession('parado pelo controle do celular');
                 return;
             case 'noop':

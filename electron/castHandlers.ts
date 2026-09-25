@@ -10,7 +10,7 @@ import { Bonjour, type Browser, type Service } from 'bonjour-service'
 import log from './logger'
 import { CastSession, type CastMediaInput, type CastMediaMeta } from './castClient'
 import { routeCastCommand } from './castRemoteRouting'
-import { registerCastSubtitleVtt, isLoopbackUrl, createLanProxyUrlFor } from './dlnaHandlers'
+import { registerCastSubtitleVtt, isLoopbackUrl, createLanProxyUrlFor, revokeProxyTokensFor } from './dlnaHandlers'
 import { getErrorMessage } from './errorMessage'
 
 interface CastDevice {
@@ -87,9 +87,45 @@ function deviceFromService(service: Service): CastDevice | null {
     }
 }
 
+/**
+ * Encerra a sessao viva: STOP na TV (close) e os links que ela recebeu do
+ * proxy da LAN revogados (D201) — o resgate em loopback e as legendas ficavam
+ * valendo por 2 h em 0.0.0.0.
+ *
+ * A revogacao e pelo host do aparelho, entao o `cast:play`/`cast:play-queue`
+ * chama isto ANTES de criar os tokens do video novo: com a MESMA TV, revogar
+ * depois apagaria a legenda e o link do proprio cast que esta chegando.
+ */
 function stopActiveSession(): void {
-    activeSession?.close()
+    const session = activeSession
     activeSession = null
+    if (!session) return
+    session.close()
+    revokeProxyTokensFor(session.host)
+}
+
+/** Numera cada cast:play/cast:play-queue que chegou a criar tokens. */
+let castRequestSeq = 0
+
+interface CastRequestTokens { host: string; seq: number }
+
+/** Marca o pedido atual como o dono dos tokens que vem a seguir. */
+function claimCastTokens(host: string): CastRequestTokens {
+    return { host, seq: ++castRequestSeq }
+}
+
+/**
+ * Cast que nao chegou a comecar (LAUNCH/LOAD recusado): a sessao anterior ja
+ * acabou e o cast:stop nao tem sessao nenhuma pra encerrar, entao ninguem
+ * mais revogaria os links que ESTE pedido criou (D201).
+ *
+ * So revoga se nenhum pedido mais novo comecou depois: a revogacao e por
+ * host, e um segundo clique na mesma TV enquanto o primeiro esperava o
+ * LAUNCH (15 s) ja criou os tokens dele — que podem estar tocando.
+ */
+function revokeTokensOfFailedCast(tokens: CastRequestTokens | null): void {
+    if (!tokens || tokens.seq !== castRequestSeq) return
+    revokeProxyTokensFor(tokens.host)
 }
 
 // Remembered volume so the phone's 🔇 can toggle back on.
@@ -184,11 +220,20 @@ export function setupCastHandlers(): void {
         // armado, entao o socket abandonado ainda dispara `attemptReconnect()`
         // ao cair — sessao fantasma voltando sem ninguem no comando.
         let session: CastSession | null = null
+        let tokens: CastRequestTokens | null = null
         try {
             const device = devices.get(String(payload?.deviceId ?? ''))
             if (!device) return { success: false, error: 'Dispositivo não encontrado' }
             let url = String(payload?.url ?? '')
             if (!/^https?:\/\//.test(url)) return { success: false, error: 'URL inválida' }
+
+            // A sessao anterior acaba AQUI, antes dos tokens do cast novo: o
+            // stop revoga pelo host, e com a mesma TV apagaria os links que
+            // vem logo abaixo (D201). Pedido invalido ja voltou acima, sem
+            // derrubar o que estava tocando.
+            stopActiveSession()
+            tokens = claimCastTokens(device.host)
+
             // Loopback sources (rescue transcode) ride the LAN proxy so the
             // device can actually reach them.
             if (isLoopbackUrl(url)) {
@@ -205,7 +250,6 @@ export function setupCastHandlers(): void {
                 }
             }
 
-            stopActiveSession()
             session = new CastSession(device.host, device.name)
             const media: CastMediaInput = {
                 url,
@@ -223,6 +267,7 @@ export function setupCastHandlers(): void {
             return { success: true }
         } catch (error) {
             session?.close() // idempotente: mata heartbeat + socket da tentativa
+            revokeTokensOfFailedCast(tokens)
             log.error('[Cast] play failed:', error)
             return { success: false, error: getErrorMessage(error) }
         }
@@ -232,10 +277,18 @@ export function setupCastHandlers(): void {
         // Mesmo motivo do cast:play: o QUEUE_LOAD tambem vem depois do
         // transporte estar de pe, entao o catch precisa alcancar a sessao.
         let session: CastSession | null = null
+        let tokens: CastRequestTokens | null = null
         try {
             const device = devices.get(String(payload?.deviceId ?? ''))
             if (!device) return { success: false, error: 'Dispositivo não encontrado' }
             const raw = (payload?.items ?? []).filter(i => typeof i?.url === 'string' && /^https?:\/\//.test(i.url))
+            if (raw.length === 0) return { success: false, error: 'Fila vazia' }
+
+            // Mesmo motivo do cast:play: a sessao anterior (e os tokens dela)
+            // acaba antes de as legendas da fila virarem tokens do mesmo host.
+            stopActiveSession()
+            tokens = claimCastTokens(device.host)
+
             const items: CastMediaInput[] = []
             for (const i of raw) {
                 // Each item's optional WebVTT rides the same LAN proxy as the
@@ -261,15 +314,13 @@ export function setupCastHandlers(): void {
                     meta: i.meta && i.meta.contentId ? i.meta : undefined,
                 })
             }
-            if (items.length === 0) return { success: false, error: 'Fila vazia' }
-
-            stopActiveSession()
             session = new CastSession(device.host, device.name)
             await session.startQueue(items)
             activeSession = session
             return { success: true, count: items.length }
         } catch (error) {
             session?.close() // idempotente: mata heartbeat + socket da tentativa
+            revokeTokensOfFailedCast(tokens)
             log.error('[Cast] play-queue failed:', error)
             return { success: false, error: getErrorMessage(error) }
         }
