@@ -6,6 +6,7 @@
 import { profileService } from './profileService';
 import { appNotificationService } from './episodeNotificationService';
 import { languageService } from './languageService';
+import { ehJanelaSecundaria } from '../utils/janelaSecundaria';
 
 export interface ProgramReminder {
     /** Deterministic id derived from channel + program start (see reminderId). */
@@ -133,6 +134,10 @@ class ReminderService {
      * per remaining reminder. Called on app boot and after every add/remove.
      */
     scheduleAll(): void {
+        // PiP/multi-view rodam o boot do App de novo: armar aqui também dava
+        // o "🔔 começou" em dobro (nativo + celular + sintonia automática
+        // dentro do PiP) e as duas janelas disputando o mesmo lembrete (D119).
+        if (ehJanelaSecundaria()) return;
         for (const timer of this.timers.values()) clearTimeout(timer);
         this.timers.clear();
 

@@ -5,6 +5,8 @@
  * Pages that fetch on mount (LiveTV/VOD/Series) are already fresh per visit.
  */
 
+import { ehJanelaSecundaria } from '../utils/janelaSecundaria';
+
 export const CATALOG_REFRESH_EVENT = 'neostream-catalog-refresh';
 
 /** Allowed intervals in hours; 0 = disabled. */
@@ -57,7 +59,11 @@ export const catalogRefreshService = {
 
     /** Start the background clock (idempotent; call once at app boot). */
     start(): void {
-        if (timer) return;
+        // O `start()` marca o boot como refresh recente no storage COMPARTILHADO,
+        // e o tique do relógio grava o mesmo carimbo: cada PiP/multi-view aberto
+        // adiava (ou roubava) o refresh da janela principal, que é a única com
+        // telas a atualizar (D119).
+        if (timer || ehJanelaSecundaria()) return;
         try {
             // Boot counts as fresh — pages just fetched everything.
             localStorage.setItem(LAST_REFRESH_KEY, String(Date.now()));
