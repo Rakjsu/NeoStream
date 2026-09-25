@@ -749,27 +749,6 @@ export function setupDownloadHandlers() {
         }
     });
 
-    // Get files
-    ipcMain.handle('download:get-files', async () => {
-        try {
-            const downloadsPath = getDownloadsPath();
-            const files: { name: string; path: string; size: number; type: string }[] = [];
-
-            for (const type of ['movie', 'series', 'episode']) {
-                const typePath = path.join(downloadsPath, type);
-                if (fs.existsSync(typePath)) {
-                    for (const file of fs.readdirSync(typePath)) {
-                        const fPath = path.join(typePath, file);
-                        files.push({ name: file, path: fPath, size: getFileSizeSync(fPath), type });
-                    }
-                }
-            }
-            return { success: true, files };
-        } catch (error: unknown) {
-            return { success: false, error: getErrorMessage(error) };
-        }
-    });
-
     // Cache image locally
     ipcMain.handle('download:cache-image', async (_, { url, id }) => {
         try {
