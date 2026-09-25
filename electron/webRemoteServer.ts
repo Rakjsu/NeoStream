@@ -26,6 +26,7 @@ import {
     type StoredSelfSignedCert,
 } from './selfSignedCert'
 import { recordingsDir } from './dvrHandlers'
+import { sanitizeGuide, buildGuideMessage, type GuideState } from './webRemoteGuide'
 import {
     buildHandshakeResponse,
     encodeTextFrame,
@@ -157,25 +158,6 @@ interface ClientSocket {
     appVersion?: string
     /** O que o app anunciou saber fazer — vazio no app legado. */
     capabilities?: Set<string>
-}
-
-interface GuideChannel {
-    id: string
-    name: string
-    logo: string
-    /** Número do canal (zap por número na página). */
-    num?: number
-}
-interface GuideEpg {
-    now: string
-    nowStart: string
-    nowEnd: string
-    next: string
-}
-interface GuideState {
-    channels: GuideChannel[]
-    playingId: string
-    epg: GuideEpg | null
 }
 
 // Stable port so the phone's installed PWA / bookmark survives app restarts.
@@ -410,7 +392,7 @@ function stateMessage(): string {
 }
 
 function guideMessage(): string {
-    return JSON.stringify({ type: 'guide', ...(guideState ?? { channels: [], playingId: '', epg: null }) })
+    return buildGuideMessage(guideState)
 }
 
 function broadcast(text: string): void {
@@ -534,31 +516,6 @@ function pushToMobile(message: Record<string, unknown>): Promise<{ delivered: nu
             resolve({ delivered, status })
         })
     })
-}
-
-/** Sanitize the untrusted guide payload coming from the renderer. */
-function sanitizeGuide(raw: unknown): GuideState {
-    const obj = (raw ?? {}) as Record<string, unknown>
-    const rawChannels = Array.isArray(obj.channels) ? obj.channels : []
-    const channels: GuideChannel[] = rawChannels.slice(0, 600).map((c) => {
-        const ch = (c ?? {}) as Record<string, unknown>
-        return {
-            id: String(ch.id ?? ''),
-            name: typeof ch.name === 'string' ? ch.name.slice(0, 160) : '',
-            logo: typeof ch.logo === 'string' ? ch.logo.slice(0, 500) : '',
-            num: Number(ch.num) > 0 ? Number(ch.num) : undefined,
-        }
-    }).filter((c) => c.id && c.name)
-    const rawEpg = obj.epg as Record<string, unknown> | null | undefined
-    const epg: GuideEpg | null = rawEpg && typeof rawEpg === 'object'
-        ? {
-            now: typeof rawEpg.now === 'string' ? rawEpg.now.slice(0, 200) : '',
-            nowStart: typeof rawEpg.nowStart === 'string' ? rawEpg.nowStart : '',
-            nowEnd: typeof rawEpg.nowEnd === 'string' ? rawEpg.nowEnd : '',
-            next: typeof rawEpg.next === 'string' ? rawEpg.next.slice(0, 200) : '',
-        }
-        : null
-    return { channels, playingId: String(obj.playingId ?? ''), epg }
 }
 
 /**
