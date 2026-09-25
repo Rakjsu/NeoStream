@@ -12,6 +12,18 @@ export interface UseSubtitleManagerParams {
     videoRef: React.RefObject<HTMLVideoElement | null>;
 }
 
+/**
+ * A que conteúdo uma legenda carregada pertence. Trocar de episódio nem sempre
+ * remonta o player: quando a URL do próximo sai na hora (arquivo offline), o
+ * AsyncVideoPlayer liga e desliga o "carregando" no mesmo lote do React e o
+ * VideoPlayer só recebe props novas. A legenda que ficou guardada (CC
+ * desligado só esconde) precisa saber de quem é — senão religar o CC no
+ * episódio 2 mostraria a do episódio 1.
+ */
+function chaveDoConteudo(c: { title?: string; tmdbId?: string | number; imdbId?: string; seasonNumber?: number; episodeNumber?: number }): string {
+    return [c.title ?? '', c.tmdbId ?? '', c.imdbId ?? '', c.seasonNumber ?? '', c.episodeNumber ?? ''].join('|');
+}
+
 export function useSubtitleManager({
     title,
     tmdbId,
@@ -32,6 +44,9 @@ export function useSubtitleManager({
     // Nome do arquivo aberto do disco — separado do `subtitleLanguage`, que o
     // menu e o tooltip do CC leem como CÓDIGO de idioma ('pt-BR', 'en').
     const [diskSubtitleName, setDiskSubtitleName] = useState<string | null>(null);
+    // De qual conteúdo é a legenda carregada (ver chaveDoConteudo).
+    const [conteudoDaLegenda, setConteudoDaLegenda] = useState<string | null>(null);
+    const conteudoAtual = chaveDoConteudo({ title, tmdbId, imdbId, seasonNumber, episodeNumber });
     // Initialize session toggle from global config (enabled = setting is ON)
     const [forcedEnabledForSession, setForcedEnabledForSession] = useState(() => {
         try {
@@ -91,6 +106,7 @@ export function useSubtitleManager({
                     setSubtitleUrl(result.url);
                     setSubtitleLanguage(result.language);
                     setVttContent(result.vttContent);
+                    setConteudoDaLegenda(chaveDoConteudo({ title, tmdbId, imdbId, seasonNumber, episodeNumber }));
                     setSubtitlesEnabled(true);
                     setIsForcedSubtitle(true);
                 }
@@ -136,6 +152,7 @@ export function useSubtitleManager({
                     setSubtitleUrl(result.url);
                     setSubtitleLanguage(result.language);
                     setVttContent(result.vttContent);
+                    setConteudoDaLegenda(conteudoAtual);
                     if (result.warning) {
                         setSubtitleWarning(result.warning);
                         setTimeout(() => setSubtitleWarning(null), 5000);
@@ -153,17 +170,13 @@ export function useSubtitleManager({
         }
 
         if (subtitlesEnabled) {
-            // Disable subtitles and cleanup
+            // Só ESCONDE, como o atalho "C" já fazia. A legenda fica carregada:
+            // religar o CC não pode custar outro `/download` na cota diária do
+            // OpenSubtitles do usuário (D008), nem trocar a legenda aberta do
+            // disco por uma baixada. Esquecer de verdade é o "Desligada" do
+            // menu (handleSubtitlesOff).
             setSubtitlesEnabled(false);
             setIsForcedSubtitle(false);
-
-            // Cleanup subtitle blob URL from memory
-            if (subtitleUrl) {
-                cleanupSubtitleUrl(subtitleUrl);
-                setSubtitleUrl(null);
-                setSubtitleLanguage(null);
-                setVttContent(null);
-            }
 
             const video = videoRef.current;
             if (video && video.textTracks.length > 0) {
@@ -172,8 +185,17 @@ export function useSubtitleManager({
                 }
             }
         } else {
-            // Enable subtitles - fetch if not already loaded
-            if (!subtitleUrl && title) {
+            // Enable subtitles - fetch if not already loaded (for THIS content)
+            const legendaDesteConteudo = !!subtitleUrl && conteudoDaLegenda === conteudoAtual;
+            if (!legendaDesteConteudo && title) {
+                if (subtitleUrl) {
+                    // Sobrou a de outro episódio/filme: não serve.
+                    cleanupSubtitleUrl(subtitleUrl);
+                    setSubtitleUrl(null);
+                    setSubtitleLanguage(null);
+                    setVttContent(null);
+                    setDiskSubtitleName(null);
+                }
                 setSubtitleLoading(true);
                 try {
                     const result = await autoFetchSubtitle({
@@ -187,6 +209,7 @@ export function useSubtitleManager({
                         setSubtitleUrl(result.url);
                         setSubtitleLanguage(result.language);
                         setVttContent(result.vttContent);
+                        setConteudoDaLegenda(conteudoAtual);
                         setSubtitlesEnabled(true);
                         // Show warning if using fallback language
                         if (result.warning) {
@@ -236,6 +259,7 @@ export function useSubtitleManager({
                 setSubtitleUrl(result.url);
                 setSubtitleLanguage(result.language);
                 setVttContent(result.vttContent);
+                setConteudoDaLegenda(conteudoAtual);
                 setSubtitlesEnabled(true);
             } else {
                 const motivo = await motivoDeNaoTerLegenda();
@@ -271,6 +295,7 @@ export function useSubtitleManager({
             const blobUrl = URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }));
             setSubtitleUrl(blobUrl);
             setVttContent(vtt);
+            setConteudoDaLegenda(conteudoAtual);
             setSubtitleLanguage(null);
             setDiskSubtitleName(arquivo.name);
             setIsForcedSubtitle(false);
@@ -334,6 +359,7 @@ export function useSubtitleManager({
                     const blobUrl = URL.createObjectURL(blob);
                     setSubtitleUrl(blobUrl);
                     setVttContent(result.vttContent);
+                    setConteudoDaLegenda(conteudoAtual);
                     setSubtitlesEnabled(true);
                     setIsForcedSubtitle(true);
                 } else {
@@ -348,12 +374,23 @@ export function useSubtitleManager({
         }
     };
 
+    // Legenda guardada de OUTRO conteúdo, com o CC desligado, não existe para
+    // quem está de fora: o atalho "C" só alterna a visibilidade quando há
+    // `vttContent`, e ressuscitaria a do episódio anterior.
+    const vttExposto = !subtitlesEnabled && conteudoDaLegenda !== conteudoAtual ? null : vttContent;
+
     return {
         subtitlesEnabled,
         setSubtitlesEnabled,
         subtitleLoading,
         subtitleLanguage,
-        vttContent,
+        vttContent: vttExposto,
+        /**
+         * A legenda que está NA TELA — é ela que vai junto quando o vídeo é
+         * mandado para a TV. Com o CC desligado a legenda continua carregada,
+         * mas quem desligou não quer vê-la na TV.
+         */
+        legendaNaTela: subtitlesEnabled ? vttExposto : null,
         subtitleWarning,
         isForcedSubtitle,
         forcedEnabledForSession,

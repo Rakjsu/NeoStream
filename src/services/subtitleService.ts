@@ -258,6 +258,54 @@ export async function downloadSubtitle(fileId: number): Promise<string | null> {
 }
 
 /**
+ * Legendas já baixadas nesta sessão, por `file_id` do OpenSubtitles.
+ *
+ * Cada `/download` conta na cota diária da conta do PRÓPRIO usuário (a chave e
+ * o login são dele), e a conta gratuita tem poucos por dia. O conteúdo de um
+ * `file_id` não muda, então baixar o mesmo arquivo duas vezes é só cota
+ * queimada: "Desligada" no menu e CC de novo, voltar ao idioma anterior,
+ * reabrir o mesmo filme, pedir a legenda no seletor de cast, buscar de novo
+ * no mpv.
+ *
+ * Guarda a PROMESSA, não só o texto: dois pedidos simultâneos do mesmo arquivo
+ * dividem um download. Falha não fica memorizada — a próxima tentativa baixa.
+ * O limite existe porque uma legenda longa passa de 100 KB.
+ */
+const LEGENDAS_GUARDADAS_MAX = 30;
+const vttPorArquivo = new Map<number, Promise<string | null>>();
+
+async function baixarVttDoArquivo(fileId: number): Promise<string | null> {
+    const link = await downloadSubtitle(fileId);
+    if (!link) return null;
+    return fetchSubtitleContent(link);
+}
+
+function vttDoArquivo(fileId: number): Promise<string | null> {
+    const guardada = vttPorArquivo.get(fileId);
+    if (guardada) {
+        // Mais recente vai para o fim: o limite descarta a mais antiga.
+        vttPorArquivo.delete(fileId);
+        vttPorArquivo.set(fileId, guardada);
+        return guardada;
+    }
+    // downloadSubtitle e fetchSubtitleContent nunca rejeitam (todo erro vira
+    // null), então falhar aqui é devolver null. Só esquece a PRÓPRIA entrada:
+    // se o limite já a descartou e outro pedido do mesmo arquivo tomou o
+    // lugar, esse não é apagado.
+    const pedido: Promise<string | null> = baixarVttDoArquivo(fileId).then((vtt) => {
+        if (!vtt && vttPorArquivo.get(fileId) === pedido) vttPorArquivo.delete(fileId);
+        return vtt;
+    });
+    vttPorArquivo.set(fileId, pedido);
+    while (vttPorArquivo.size > LEGENDAS_GUARDADAS_MAX) {
+        const maisAntiga = vttPorArquivo.keys().next().value;
+        if (maisAntiga === undefined) break;
+        vttPorArquivo.delete(maisAntiga);
+    }
+    return pedido;
+}
+
+/**
  * Convert SRT content to WebVTT format for HTML5 video
  */
 export function srtToVtt(srtContent: string): string {
@@ -573,17 +621,10 @@ export async function autoFetchSubtitle(params: {
         // Get the best subtitle
         const best = sorted[0];
         
-        // Download the subtitle
-        const downloadUrl = await downloadSubtitle(best.fileId);
-        if (!downloadUrl) {
-            console.error('Failed to get download URL');
-            return null;
-        }
-        
-        // Fetch and convert content
-        const vttContent = await fetchSubtitleContent(downloadUrl);
+        // Download the subtitle (uma vez por arquivo — ver vttDoArquivo)
+        const vttContent = await vttDoArquivo(best.fileId);
         if (!vttContent) {
-            console.error('Failed to fetch subtitle content');
+            console.error('Failed to download subtitle content');
             return null;
         }
 
@@ -721,12 +762,8 @@ export async function autoFetchForcedSubtitle(params: {
         
         const best = sorted[0];
         
-        // Download the subtitle
-        const downloadUrl = await downloadSubtitle(best.fileId);
-        if (!downloadUrl) return null;
-
-        // Fetch and convert content
-        const vttContent = await fetchSubtitleContent(downloadUrl);
+        // Download the subtitle (uma vez por arquivo — ver vttDoArquivo)
+        const vttContent = await vttDoArquivo(best.fileId);
         if (!vttContent) return null;
 
         // Log VTT content preview for debugging
