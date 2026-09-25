@@ -40,12 +40,13 @@ function httpsGet(url: string): Promise<{ status: number; body: string; peerCN: 
     return new Promise((resolve, reject) => {
         const req = https.get(url, { rejectUnauthorized: false }, (res) => {
             const cert = (res.socket as import('node:tls').TLSSocket).getPeerCertificate();
+            const cn = cert.subject?.CN;
             let data = '';
             res.on('data', (c) => { data += c; });
             res.on('end', () => resolve({
                 status: res.statusCode ?? 0,
                 body: data,
-                peerCN: cert.subject?.CN ?? '',
+                peerCN: (Array.isArray(cn) ? cn[0] : cn) ?? '',
             }));
         });
         req.on('error', reject);

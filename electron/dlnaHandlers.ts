@@ -6,6 +6,7 @@ import { createRequire } from 'module';
 import { spawn, type ChildProcess } from 'child_process';
 import dgram from 'dgram';
 import http from 'http';
+import type { Readable } from 'stream';
 import os from 'os';
 import { resolveProviderHttpsAgent } from './certificatePolicy';
 import { getErrorMessage } from './errorMessage';
@@ -174,7 +175,7 @@ function getLocalAddressForDevice(deviceHost: string): string {
     const candidates = Object.values(interfaces)
         .flat()
         .filter((address): address is os.NetworkInterfaceInfo =>
-            Boolean(address) && address.family === 'IPv4' && !address.internal
+            address !== undefined && address.family === 'IPv4' && !address.internal
         )
 
     const deviceParts = normalizedDeviceHost.split('.')
@@ -217,6 +218,15 @@ function rewritePlaylist(playlist: string, baseUrl: string, deviceHost: string):
     })
 }
 
+/**
+ * O node-fetch v3 tipa o corpo como NodeJS.ReadableStream (sem destroy), mas
+ * em runtime ele é um stream.Readable — é o destroy() que solta a conexão
+ * com o provedor.
+ */
+function descartarCorpo(body: NodeJS.ReadableStream | null | undefined): void {
+    (body as Readable | null | undefined)?.destroy?.()
+}
+
 async function fetchUpstream(url: string, range?: string) {
     const fetch = (await import('node-fetch')).default
     const headers = {
@@ -242,7 +252,7 @@ async function fetchUpstream(url: string, range?: string) {
         const plan = planUpstreamRedirect(currentUrl, response.status, response.headers.get('location'))
         if (plan.kind === 'stop') return response
 
-        response.body?.destroy?.()
+        descartarCorpo(response.body)
         if (plan.kind === 'block') {
             throw new Error(`Redirecionamento recusado (${plan.reason})`)
         }
@@ -514,7 +524,7 @@ async function ensureProxyServer(): Promise<number> {
                 const totalSize = probe.headers.get('content-range')?.split('/')[1]
                     || probe.headers.get('content-length')
                     || undefined
-                probe.body?.destroy?.()
+                descartarCorpo(probe.body)
                 response.writeHead(200, dlnaHeaders({
                     'Content-Type': getMimeForUrl(upstreamUrl, probe.headers.get('content-type')),
                     'Content-Length': totalSize,
@@ -564,7 +574,7 @@ async function ensureProxyServer(): Promise<number> {
                 beginStream(proxyEntry)
                 response.on('close', () => {
                     // Device hung up; stop pulling from upstream.
-                    upstreamResponse.body?.destroy?.()
+                    descartarCorpo(upstreamResponse.body)
                     endStream(proxyEntry)
                 })
                 upstreamResponse.body.pipe(response)
@@ -729,7 +739,7 @@ function localIPv4Addresses(): string[] {
     return Object.values(os.networkInterfaces())
         .flat()
         .filter((address): address is os.NetworkInterfaceInfo =>
-            Boolean(address) && address.family === 'IPv4' && !address.internal
+            address !== undefined && address.family === 'IPv4' && !address.internal
         )
         .map((address) => address.address)
 }

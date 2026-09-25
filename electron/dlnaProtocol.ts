@@ -68,7 +68,7 @@ export function normalizeDiscoveryHost(host: string): string {
 }
 
 /** Só http:// e https:// — `file:`, `ftp:` e afins nunca são buscados. */
-export function isHttpLocation(location: string | undefined | null): boolean {
+export function isHttpLocation(location: string | undefined | null): location is string {
     if (!location) return false
     try {
         const protocol = new URL(location).protocol

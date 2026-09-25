@@ -212,7 +212,7 @@ describe('cast que falha não deixa conexão presa na TV', () => {
                 deviceId: 'sala._googlecast._tcp.local',
                 url: 'http://prov.tv/filme.mp4',
                 title: 'Filme',
-            }))
+            }) as Promise<unknown>)
         }
 
         expect(tlsFake.sockets).toHaveLength(3)

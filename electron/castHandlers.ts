@@ -289,7 +289,7 @@ export function setupCastHandlers(): void {
     // era o `[0]` do mapa, ou seja, quem o mDNS ouviu primeiro (D097).
     ipcMain.handle('cast:reconnect', async (_e, opts: { deviceId?: string } = {}) => {
         if (activeSession?.isActive) {
-            return { success: true, active: true, deviceName: activeSession.deviceName, ...activeSession.status }
+            return { success: true, active: true, ...activeSession.status }
         }
         await waitForDevices()
         const candidates = opts?.deviceId

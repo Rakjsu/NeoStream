@@ -41,7 +41,7 @@ function recordOverWs(port: number, pin: string, channelId: string, channelName:
         socket.setTimeout(20000, () => { socket.destroy(); reject(new Error('timeout')); });
         let buf = Buffer.alloc(0);
         let upgraded = false;
-        socket.on('data', (chunk) => {
+        socket.on('data', (chunk: Buffer) => {
             buf = Buffer.concat([buf, chunk]);
             if (!upgraded) {
                 const end = buf.indexOf('\r\n\r\n');
@@ -119,7 +119,7 @@ function openWsClient(port: number, pin: string): Promise<{
         });
         let buf = Buffer.alloc(0);
         let upgraded = false;
-        socket.on('data', (chunk) => {
+        socket.on('data', (chunk: Buffer) => {
             buf = Buffer.concat([buf, chunk]);
             if (!upgraded) {
                 const end = buf.indexOf('\r\n\r\n');

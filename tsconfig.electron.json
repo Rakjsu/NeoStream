@@ -1,0 +1,36 @@
+{
+  // Processo principal (electron/, sem os testes). Antes deste projeto o
+  // `tsc -b` do CI só enxergava src/ e vite.config.ts: o main era só
+  // transpilado (o esbuild apaga os tipos) e nunca checado (D144).
+  // Os testes do main e os specs E2E ficam em tsconfig.electron-tests.json.
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.electron.tsbuildinfo",
+    "target": "ES2023",
+    // Sem DOM, de propósito: o main roda em Node. Com a lib DOM,
+    // `new DOMParser()`, `window` ou `localStorage` compilariam aqui e só
+    // estourariam em runtime.
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "types": ["node"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    // Sem `erasableSyntaxOnly`: o main é empacotado pelo esbuild
+    // (vite-plugin-electron), que transpila parameter properties
+    // (`constructor(private readonly x)`), e o main usa esse padrão.
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["electron"],
+  "exclude": ["electron/**/*.test.ts"]
+}
