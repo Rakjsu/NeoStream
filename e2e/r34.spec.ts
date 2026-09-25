@@ -55,7 +55,7 @@ function drillDownSeriesOverWs(port: number, pin: string): Promise<{ series: Ser
         let buf = Buffer.alloc(0);
         let upgraded = false;
         let series: SeriesMsg | null = null;
-        socket.on('data', (chunk) => {
+        socket.on('data', (chunk: Buffer) => {
             buf = Buffer.concat([buf, chunk]);
             if (!upgraded) {
                 const end = buf.indexOf('\r\n\r\n');

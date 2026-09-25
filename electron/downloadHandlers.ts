@@ -428,7 +428,7 @@ function singleDownload(id: string, url: string, filePath: string): Promise<{ su
 
 export function setupDownloadHandlers() {
     // Start download with parallel connections
-    ipcMain.handle('download:start', async (event, { id, url, name, type, seriesName, season, episode }) => {
+    ipcMain.handle('download:start', async (_event, { id, url, name, type, seriesName, season, episode }) => {
         log.info('[Download] Starting parallel download:', { id, name, type, seriesName, season, episode });
         // Declarados FORA do try: o `finally` precisa alcançá-los em todo
         // caminho de saída (erro do provedor, pause, cancelamento).

@@ -77,7 +77,8 @@ describe('generateSelfSignedCert', () => {
                 const socket = tls.connect({ host: '127.0.0.1', port, rejectUnauthorized: false }, () => {
                     const peer = socket.getPeerCertificate()
                     socket.destroy()
-                    resolve(peer.subject?.CN ?? '')
+                    const cn = peer.subject?.CN
+                    resolve((Array.isArray(cn) ? cn[0] : cn) ?? '')
                 })
                 socket.on('error', reject)
             })

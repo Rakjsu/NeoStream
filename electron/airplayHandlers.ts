@@ -185,7 +185,7 @@ export function setupAirPlayHandlers() {
             // Fallback to the tracked session device: a cast can outlive the
             // mDNS record (TV briefly offline in discovery but still playing).
             const device = discoveredDevices.get(deviceId)
-                ?? (airplaySession?.device.id === deviceId ? airplaySession.device : undefined);
+                ?? (airplaySession && airplaySession.device.id === deviceId ? airplaySession.device : undefined);
             if (!device) {
                 throw new Error('Device not found');
             }

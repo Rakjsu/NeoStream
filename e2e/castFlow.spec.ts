@@ -81,7 +81,7 @@ function runCastFlow(port: number, pin: string): Promise<FlowResult> {
         let upgraded = false;
         const got: Partial<FlowResult> = {};
         const done = () => got.devices && got.catalog && got.castResult;
-        socket.on('data', (chunk) => {
+        socket.on('data', (chunk: Buffer) => {
             buf = Buffer.concat([buf, chunk]);
             if (!upgraded) {
                 const end = buf.indexOf('\r\n\r\n');

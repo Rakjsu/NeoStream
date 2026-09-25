@@ -1,6 +1,7 @@
 import { app, ipcMain, shell, dialog, BrowserWindow } from 'electron'
 import { statSync } from 'node:fs'
-import { spawn, type ChildProcessWithoutNullStreams } from 'child_process'
+import { spawn, type ChildProcessByStdio } from 'child_process'
+import type { Readable, Writable } from 'stream'
 import path from 'path'
 import fs from 'fs'
 import log from './logger'
@@ -14,7 +15,8 @@ interface ActiveRecording {
     file: string
     startedAt: number
     seconds: number
-    proc: ChildProcessWithoutNullStreams
+    /** stdin (pra mandar o 'q') e stderr (progresso) em pipe; stdout é 'ignore'. */
+    proc: ChildProcessByStdio<Writable, null, Readable>
     graceTimer?: ReturnType<typeof setTimeout>
 }
 
@@ -141,7 +143,7 @@ export function setupDvrHandlers() {
             const proc = spawn(ffmpeg, buildRecordingArgs(data.url, file), {
                 windowsHide: true,
                 stdio: ['pipe', 'ignore', 'pipe'],
-            }) as ChildProcessWithoutNullStreams
+            })
 
             const id = `rec_${nextId++}`
             const rec: ActiveRecording = { id, channelName: data.channelName, file, startedAt: Date.now(), seconds: 0, proc }
