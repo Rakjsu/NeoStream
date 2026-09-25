@@ -67,6 +67,7 @@ export function AppearanceSection() {
                             <label className="toggle-switch">
                                 <input
                                     type="checkbox"
+                                    aria-label={t('appearance', `rail_${railKey}`)}
                                     checked={!railPrefs.hidden.includes(railKey)}
                                     onChange={() => updateRails(toggleHomeRail(railPrefs, railKey))}
                                 />
@@ -85,6 +86,7 @@ export function AppearanceSection() {
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
+                            aria-label={t('appearance', 'tvMode')}
                             checked={tvMode}
                             onChange={(e) => {
                                 tvModeService.setEnabled(e.target.checked);
@@ -207,6 +209,7 @@ export function AppearanceSection() {
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
+                            aria-label={t('appearance', 'contrast')}
                             checked={theme.contrast}
                             onChange={(e) => setTheme({ contrast: e.target.checked })}
                         />
@@ -223,6 +226,7 @@ export function AppearanceSection() {
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
+                            aria-label={t('appearance', 'reducedMotion')}
                             checked={theme.reducedMotion}
                             onChange={(e) => setTheme({ reducedMotion: e.target.checked })}
                         />

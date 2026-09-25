@@ -44,6 +44,7 @@ export function SearchSection() {
                         <label className="toggle-switch">
                             <input
                                 type="checkbox"
+                                aria-label={option.label}
                                 checked={config[option.key]}
                                 onChange={(e) => handleToggle(option.key, e.target.checked)}
                             />
