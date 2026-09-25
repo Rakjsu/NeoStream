@@ -258,9 +258,6 @@
     "loadingEpisodes": "Loading episodes...",
     "episodesLoadError": "⚠️ Couldn't load the episodes."
   },
-  "seriesPage": {
-    "clearHistory": "Clear History"
-  },
   "settings": {
     "title": "Settings",
     "subtitle": "Customize your experience",

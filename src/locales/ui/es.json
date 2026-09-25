@@ -258,9 +258,6 @@
     "loadingEpisodes": "Cargando episodios...",
     "episodesLoadError": "⚠️ No se pudieron cargar los episodios."
   },
-  "seriesPage": {
-    "clearHistory": "Borrar historial"
-  },
   "notifications": {
     "autoTuneIn": "Cambiando a {channel} en {s}s…",
     "autoTuneNow": "Ver ahora",

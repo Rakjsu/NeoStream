@@ -258,9 +258,6 @@
     "loadingEpisodes": "Carregando episódios...",
     "episodesLoadError": "⚠️ Não foi possível carregar os episódios."
   },
-  "seriesPage": {
-    "clearHistory": "Limpar Histórico"
-  },
   "settings": {
     "title": "Configurações",
     "subtitle": "Personalize sua experiência",
