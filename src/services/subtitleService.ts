@@ -384,6 +384,18 @@ export async function fetchSubtitleContent(url: string): Promise<string | null> 
 }
 
 /**
+ * Por que a legenda veio "diferente do pedido". É DADO, não frase: o serviço
+ * não conhece o idioma da interface, e o texto pronto que ele devolvia chegava
+ * em português para quem usa o app em inglês ou espanhol (#D007). Quem mostra
+ * (useSubtitleManager) monta a frase com o t().
+ */
+export type SubtitleWarning =
+    /** Não havia legenda no idioma preferido; veio a de outro idioma. */
+    | { kind: 'fallbackLanguage'; wanted: string; got: string }
+    /** Só havia legenda forçada de edição especial (Extended/Director's Cut): ignorada. */
+    | { kind: 'specialEditionsOnly' };
+
+/**
  * Auto-fetch best subtitle for a movie/series
  * Uses user's preferred language from settings
  */
@@ -395,7 +407,7 @@ export async function autoFetchSubtitle(params: {
     episode?: number;
     /** Explicit language pick from the player menu — strict, no fallback chain. */
     language?: string;
-}): Promise<{ url: string; language: string; vttContent: string; warning?: string } | null> {
+}): Promise<{ url: string; language: string; vttContent: string; warning?: SubtitleWarning } | null> {
     try {
         // Get user's preferred subtitle language from settings
         const { playbackService } = await import('./playbackService');
@@ -637,8 +649,8 @@ export async function autoFetchSubtitle(params: {
         // Check if we got a fallback language
         const selectedLangNorm = best.language.toLowerCase();
         const isPreferredLang = selectedLangNorm === normalizedPreferredLang;
-        const warning = !isPreferredLang
-            ? `Legenda em ${preferredLang.toUpperCase()} não disponível. Usando ${best.language.toUpperCase()}.`
+        const warning: SubtitleWarning | undefined = !isPreferredLang
+            ? { kind: 'fallbackLanguage', wanted: preferredLang, got: best.language }
             : undefined;
 
         return {
@@ -673,7 +685,7 @@ export async function autoFetchForcedSubtitle(params: {
     imdbId?: string;
     season?: number;
     episode?: number;
-}): Promise<{ url: string; language: string; vttContent: string; warning?: string } | null> {
+}): Promise<{ url: string; language: string; vttContent: string; warning?: SubtitleWarning } | null> {
     try {
         
         // Clean the title
@@ -753,7 +765,7 @@ export async function autoFetchForcedSubtitle(params: {
         // Only use normal versions - reject special editions completely
         if (normalResults.length === 0) {
             if (specialResults.length > 0) {
-                                return { url: '', language: '', vttContent: '', warning: 'Apenas edições especiais (Extended/Director\'s Cut) encontradas - ignorando' };
+                                return { url: '', language: '', vttContent: '', warning: { kind: 'specialEditionsOnly' } };
             }
                         return null;
         }

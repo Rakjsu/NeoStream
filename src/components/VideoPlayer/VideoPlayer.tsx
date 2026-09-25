@@ -1067,7 +1067,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                         <button
                             onClick={exportClip}
                             disabled={clipStatus === 'busy'}
-                            title="Exportar clipe A–B (vai pra pasta de gravações)"
+                            title={t('player', 'exportClip')}
                             style={{ border: 'none', background: 'transparent', cursor: clipStatus === 'busy' ? 'wait' : 'pointer', fontSize: 13, padding: 0 }}
                         >
                             {clipStatus === 'busy' ? '⏳' : clipStatus === 'ok' ? '✅' : clipStatus === 'fail' ? '⚠️' : '✂️'}
@@ -1083,7 +1083,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     background: 'rgba(237, 28, 36, 0.85)', borderRadius: 8,
                     padding: '4px 10px', fontSize: 12, fontWeight: 700, color: 'white'
                 }}>
-                    ✓ Visto no Trakt
+                    {t('player', 'traktWatched')}
                 </div>
             )}
 
@@ -1094,7 +1094,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     background: 'rgba(0,0,0,0.7)', borderRadius: 8, padding: '4px 10px',
                     fontSize: 12, fontWeight: 700, color: 'white'
                 }}>
-                    🔖 Posição marcada
+                    {t('player', 'bookmarkAdded')}
                 </div>
             )}
 
@@ -1108,10 +1108,10 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     borderRadius: 10, padding: 10
                 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: 'white', marginBottom: 8 }}>
-                        🔖 Marcadores <span style={{ opacity: 0.5, fontWeight: 400 }}>(X marca)</span>
+                        🔖 {t('player', 'bookmarks')} <span style={{ opacity: 0.5, fontWeight: 400 }}>{t('player', 'bookmarksHint')}</span>
                     </div>
                     {bookmarkPanel.length === 0 && (
-                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>Nenhum marcador ainda</div>
+                        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{t('player', 'bookmarksEmpty')}</div>
                     )}
                     {bookmarkPanel.map(bookmark => (
                         <div key={bookmark.time} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -1126,7 +1126,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                                     if (!contentId) return;
                                     setBookmarkPanel(bookmarkService.remove(contentId, bookmark.time));
                                 }}
-                                title="Remover marcador"
+                                title={t('player', 'removeBookmark')}
                                 style={{ border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.55)', cursor: 'pointer', fontSize: 12 }}
                             >
                                 ✕
@@ -1537,19 +1537,20 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                         <div className="spinner-ring"></div>
                         <div className="spinner-ring"></div>
                     </div>
-                    <span className="loading-text">Carregando...</span>
+                    <span className="loading-text">{t('common', 'loading')}</span>
                 </div>
             )}
 
             {state.error && (
                 <div className="video-player-error">
-                    <p>⚠️ Erro ao carregar vídeo</p>
+                    <p>⚠️ {t('player', 'errorTitle')}</p>
+                    {/* O useVideoPlayer só grava um texto fixo em state.error (o
+                        evento 'error' do <video> não diz a causa), então o antigo
+                        ramo "HTTP2 / ERR_" nunca acendia: fica uma dica só. */}
                     <p style={{ fontSize: '12px', marginTop: '8px' }}>
-                        {state.error.includes('HTTP2') || state.error.includes('ERR_')
-                            ? 'Erro de conexão com o servidor IPTV. Verifique as credenciais.'
-                            : 'Verifique se as credenciais do servidor IPTV estão corretas.'}
+                        {t('player', 'errorHint')}
                     </p>
-                    {onClose && <button onClick={onClose}>Fechar</button>}
+                    {onClose && <button onClick={onClose}>{t('player', 'close')}</button>}
                 </div>
             )}
 
@@ -1600,8 +1601,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                         <button
                             className="control-btn"
                             onClick={controls.togglePlay}
-                            title={state.playing ? 'Pausar' : 'Reproduzir'}
-                            aria-label={state.playing ? 'Pausar' : 'Reproduzir'}
+                            title={state.playing ? t('player', 'pause') : t('player', 'play')}
+                            aria-label={state.playing ? t('player', 'pause') : t('player', 'play')}
                         >
                             {state.playing ? <Pause size="1em" /> : <Play size="1em" />}
                         </button>
@@ -1614,8 +1615,8 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                             <button
                                 className="control-btn volume-btn"
                                 onClick={controls.toggleMute}
-                                title={state.muted || state.volume === 0 ? 'Ativar som' : 'Silenciar'}
-                                aria-label={state.muted || state.volume === 0 ? 'Ativar som' : 'Silenciar'}
+                                title={state.muted || state.volume === 0 ? t('player', 'unmute') : t('player', 'mute')}
+                                aria-label={state.muted || state.volume === 0 ? t('player', 'unmute') : t('player', 'mute')}
                             >
                                 {state.muted || state.volume === 0 ? (
                                     <VolumeX size="1em" />
@@ -1636,7 +1637,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                                     step="0.01"
                                     value={state.muted ? 0 : state.volume}
                                     onChange={handleVolumeChange}
-                                    aria-label="Volume"
+                                    aria-label={t('player', 'volume')}
                                 />
                             )}
                         </div>
@@ -1871,7 +1872,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                                     }
                                 }
                             }}
-                            title="Picture-in-Picture"
+                            title={t('player', 'pictureInPicture')}
                         >
                             <PictureInPicture2 size={18} />
                         </button>
@@ -1909,7 +1910,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                         <button
                             className="control-btn"
                             onClick={() => setShowDeviceSelector(true)}
-                            title="Cast to Device"
+                            title={t('player', 'castToDevice')}
                             style={{
                                 color: castingDevice ? '#2563eb' : 'white',
                                 opacity: 1
