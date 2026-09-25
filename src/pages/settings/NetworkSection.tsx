@@ -181,6 +181,7 @@ export function NetworkSection() {
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
+                            aria-label={t('network', 'certTitle')}
                             checked={allowInvalidProviderCertificates}
                             onChange={(e) => handleAllowInvalidProviderCertificatesChange(e.target.checked)}
                         />
@@ -223,6 +224,7 @@ export function NetworkSection() {
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
+                            aria-label={t('network', 'webRemoteTitle')}
                             checked={webRemote.enabled}
                             onChange={(e) => void handleWebRemoteToggle(e.target.checked)}
                         />

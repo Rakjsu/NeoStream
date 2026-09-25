@@ -172,6 +172,7 @@ export function PlaybackSection() {
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
+                            aria-label={t('playback', 'groupVersions')}
                             checked={groupVersions}
                             onChange={(e) => {
                                 localStorage.setItem('neostream_group_versions', e.target.checked ? '1' : '0');
@@ -191,6 +192,7 @@ export function PlaybackSection() {
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
+                            aria-label={t('playback', 'resumeOnOpen')}
                             checked={resumeOnOpen}
                             onChange={(e) => {
                                 localStorage.setItem('neostream_resume_on_open', e.target.checked ? '1' : '0');
@@ -210,6 +212,7 @@ export function PlaybackSection() {
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
+                            aria-label={t('playback', 'reminderAutoTune')}
                             checked={reminderAutoTune}
                             onChange={(e) => {
                                 localStorage.setItem('neostream_reminder_autotune', e.target.checked ? '1' : '0');
@@ -248,6 +251,7 @@ export function PlaybackSection() {
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
+                            aria-label={t('playback', 'notifyNewEpisodes')}
                             checked={notifyNewEpisodes}
                             onChange={(e) => {
                                 newEpisodeNotifier.setEnabled(e.target.checked);
@@ -376,6 +380,7 @@ export function PlaybackSection() {
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
+                            aria-label={t('playback', 'forcedSubtitles') || 'Legendas Forçadas'}
                             checked={playbackConfig.forcedSubtitlesEnabled}
                             onChange={(e) => handlePlaybackConfigChange('forcedSubtitlesEnabled', e.target.checked)}
                         />
@@ -393,6 +398,7 @@ export function PlaybackSection() {
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
+                            aria-label={t('playback', 'autoPlayNext')}
                             checked={playbackConfig.autoPlayNextEpisode}
                             onChange={(e) => handlePlaybackConfigChange('autoPlayNextEpisode', e.target.checked)}
                         />
@@ -408,7 +414,7 @@ export function PlaybackSection() {
                         <p>{t('playback', 'skipIntroDesc')}</p>
                     </div>
                     <label className="toggle-switch">
-                        <input type="checkbox" defaultChecked />
+                        <input type="checkbox" defaultChecked aria-label={t('playback', 'skipIntro')} />
                         <span className="toggle-slider"></span>
                     </label>
                 </div>
@@ -422,6 +428,7 @@ export function PlaybackSection() {
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
+                            aria-label={t('playback', 'clickThrough')}
                             checked={playbackConfig.clickThroughEnabled}
                             onChange={(e) => handlePlaybackConfigChange('clickThroughEnabled', e.target.checked)}
                         />
@@ -439,6 +446,7 @@ export function PlaybackSection() {
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
+                            aria-label={t('playback', 'mpvEnabled') || 'Player MPV'}
                             checked={playbackConfig.mpvEnabled}
                             onChange={(e) => handlePlaybackConfigChange('mpvEnabled', e.target.checked)}
                         />

@@ -494,6 +494,24 @@ const settingsStyles = `
     transform: translateX(26px);
 }
 
+/* Foco pelo teclado. O anel global de :focus-visible (index.css) cai no
+   input do interruptor, e esse input e opacity:0 — e opacity apaga o desenho
+   INTEIRO do elemento, contorno junto. Ou seja: quem navega por Tab nao via
+   anel nenhum, nem deslocado. (Por isso tambem nao adianta calar o input com
+   outline:none: nao ha o que calar.) O anel passa a ser desenhado no slider,
+   que e a caixa de 56x30 que a pessoa enxerga.
+   O mesmo vale no Modo TV, que so engrossa o mesmo anel. Nao ha regra para o
+   .gp-focus do controle: useGamepadNavigation filtra candidatos por
+   getBoundingClientRect, e o input 0x0 nunca entra na lista. */
+.toggle-switch input:focus-visible + .toggle-slider {
+    outline: 2px solid var(--ns-accent);
+    outline-offset: 3px;
+}
+
+.tv-mode .toggle-switch input:focus-visible + .toggle-slider {
+    outline-width: 3px;
+}
+
 /* Save Indicator */
 .save-indicator {
     margin-left: 12px;

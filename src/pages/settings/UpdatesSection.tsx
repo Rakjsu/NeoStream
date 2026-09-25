@@ -117,6 +117,7 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
+                            aria-label={t('updates', 'autoInstall')}
                             checked={instalaSozinho && updateConfig.autoInstall}
                             disabled={!instalaSozinho}
                             onChange={(e) => handleUpdateConfigChange('autoInstall', e.target.checked)}
@@ -137,6 +138,7 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
+                            aria-label={t('updates', 'closeToTray')}
                             checked={systemConfig.closeToTray}
                             onChange={(e) => handleSystemConfigChange('closeToTray', e.target.checked)}
                         />
@@ -156,6 +158,7 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
                     <label className="toggle-switch">
                         <input
                             type="checkbox"
+                            aria-label={t('updates', 'openAtLogin')}
                             checked={systemConfig.openAtLogin}
                             onChange={(e) => handleSystemConfigChange('openAtLogin', e.target.checked)}
                         />

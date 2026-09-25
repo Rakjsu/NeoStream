@@ -213,6 +213,7 @@ export function ParentalSection() {
                         <label className="toggle-switch">
                             <input
                                 type="checkbox"
+                                aria-label={t('parental', 'enable')}
                                 checked={parentalConfig.enabled}
                                 onChange={(e) => handleParentalConfigChange('enabled', e.target.checked)}
                             />
@@ -286,6 +287,7 @@ export function ParentalSection() {
                         <label className="toggle-switch">
                             <input
                                 type="checkbox"
+                                aria-label={t('parental', 'blockAdult')}
                                 checked={parentalConfig.blockAdultCategories}
                                 onChange={(e) => handleParentalConfigChange('blockAdultCategories', e.target.checked)}
                                 disabled={!parentalConfig.enabled || trancado}
@@ -303,6 +305,7 @@ export function ParentalSection() {
                         <label className="toggle-switch">
                             <input
                                 type="checkbox"
+                                aria-label={t('parental', 'filterTMDB')}
                                 checked={parentalConfig.filterByTMDB}
                                 onChange={(e) => handleParentalConfigChange('filterByTMDB', e.target.checked)}
                                 disabled={!parentalConfig.enabled || trancado}
