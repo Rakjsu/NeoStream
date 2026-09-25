@@ -97,8 +97,9 @@ export function EpgGuide() {
     // Catch-up/replay playback (timeshift) of an already-aired program
     const [timeshiftPlayback, setTimeshiftPlayback] = useState<{ channel: LiveStream; program: EPGProgram } | null>(null);
     // Small action popover for program blocks: CURRENT program on archive
-    // channels ("watch live" / "watch from start") and FUTURE programs
-    // ("remind me" / "remove reminder").
+    // channels ("watch live" / "watch from start" / "download"), PAST
+    // replayable programs ("watch from start" / "download") and FUTURE
+    // programs ("remind me" / "remove reminder").
     const [programPopover, setProgramPopover] = useState<{
         channel: LiveStream;
         program: EPGProgram;
@@ -921,13 +922,16 @@ export function EpgGuide() {
                                                             anchor: { x: Math.max(rect.left, e.clientX - 110), y: rect.bottom }
                                                         });
                                                     };
+                                                    // Passado replayável também abre o menu: é lá que mora
+                                                    // o ⬇ "Baixar como gravação" (D039). Fora da janela de
+                                                    // arquivo do canal (!replayable) segue sem ação.
                                                     const handleClick = airing
                                                         ? (channel.tv_archive === 1
                                                             ? openPopover
                                                             : () => setPlayingChannel(channel))
-                                                        : future
+                                                        : (future || replayable)
                                                             ? openPopover
-                                                            : (replayable ? () => startReplay(channel, program) : undefined);
+                                                            : undefined;
                                                     return (
                                                         <div
                                                             key={program.id + program.start}
@@ -1022,10 +1026,14 @@ export function EpgGuide() {
             </div>
 
             {/* Program actions: current program on archive channels (live /
-                from start) or future program (set/remove reminder) */}
+                from start / download), past replayable program (from start /
+                download) or future program (reminders / recording) */}
             {programPopover && (() => {
                 const { channel, program } = programPopover;
                 const isFutureProgram = Date.parse(program.start) > now;
+                // Programa que já terminou não tem "ao vivo": o menu dele é só
+                // ▶ do início e ⬇ baixar.
+                const isAiringProgram = isAiringNow(program.start, program.end, now);
                 const popoverReminderId = reminderId(channel.name, program.start);
                 const popoverScheduleId = scheduleId(channel.name, program.start);
                 const actions: ProgramPopoverAction[] = isFutureProgram
@@ -1084,15 +1092,17 @@ export function EpgGuide() {
                             }
                     ]
                     : [
-                        {
-                            key: 'watch-live',
-                            icon: '📡',
-                            label: t('guide', 'watchLive'),
-                            onClick: () => {
-                                setProgramPopover(null);
-                                setPlayingChannel(channel);
-                            }
-                        },
+                        ...(isAiringProgram
+                            ? [{
+                                key: 'watch-live',
+                                icon: '📡',
+                                label: t('guide', 'watchLive'),
+                                onClick: () => {
+                                    setProgramPopover(null);
+                                    setPlayingChannel(channel);
+                                }
+                            }]
+                            : []),
                         {
                             key: 'watch-from-start',
                             icon: '▶',
