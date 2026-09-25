@@ -5,17 +5,28 @@
 // exceto advisories que comprovadamente NÃO se aplicam a este app. Cada
 // exceção fica registrada aqui com o motivo; qualquer HIGH+ nova (fora da
 // lista) continua falhando o CI normalmente.
+//
+// Exceção que parou de aparecer no audit (advisory corrigida ou rebaixada,
+// dependência removida) vira AVISO "exceção obsoleta, remova" — nunca falha o
+// CI (D147). A lógica vive em audit-prod-avaliar.mjs.
+//
+//   node scripts/audit-prod.mjs               roda o `npm audit` e avalia
+//   node scripts/audit-prod.mjs relatorio.json avalia um relatório já salvo
+//                                             (`npm audit --omit=dev --json`),
+//                                             sem rede — é assim que o teste
+//                                             exercita o gate de ponta a ponta
 import { execSync } from 'node:child_process';
+import fs from 'node:fs';
+import { avaliarGate } from './audit-prod-avaliar.mjs';
 
 /** GHSA => por que não se aplica ao NeoStream (SPA Electron). */
 const ALLOWLIST = {
-    // react-router: "RSC Mode CSRF Bypass". Só afeta o modo React Server
-    // Components (RSC). O app é SPA Electron client-side e NÃO usa RSC. Não há
-    // correção na linha 7.x; o fix é só no major v8 (breaking). Reavaliar ao
-    // migrar pro react-router v8.
-    'GHSA-qwww-vcr4-c8h2':
-        'react-router RSC Mode CSRF — app é SPA Electron, não usa React Server Components.',
-
+    // react-router: GHSA-qwww-vcr4-c8h2 ("RSC Mode CSRF Bypass", só o modo
+    // React Server Components, que este SPA não usa) já esteve aqui com o
+    // motivo "não há correção na linha 7.x". Houve: com o lock em 7.18.4 o
+    // `npm audit --omit=dev` não devolve mais nada — a exceção estava morta e
+    // ninguém via, porque o gate só listava as que casavam (D147).
+    //
     // js-yaml (via electron-updater, que lê o latest.yml do feed) já esteve
     // aqui por GHSA-5p4m-2wfm-xmqj, quando o fix "não tinha sido retroportado
     // pro 4.x". Foi: 4.3.1 fecha esse e 4.3.2 fecha o GHSA-2883-xcg3-v3hh que
@@ -34,39 +45,10 @@ function runAudit() {
     }
 }
 
-const report = JSON.parse(runAudit());
-const vulns = report.vulnerabilities || {};
+const relatorioSalvo = process.argv[2];
+const report = JSON.parse(relatorioSalvo ? fs.readFileSync(relatorioSalvo, 'utf-8') : runAudit());
+const { log, erro, codigo } = avaliarGate(report, ALLOWLIST);
 
-const blocking = new Map(); // ghsa -> { title, package }
-const allowedSeen = new Set();
-
-for (const [pkg, info] of Object.entries(vulns)) {
-    if (info.severity !== 'high' && info.severity !== 'critical') continue;
-    for (const via of info.via || []) {
-        // Entradas string em `via` são pacotes transitivos; o objeto da
-        // advisory vem na entrada do pacote de origem, que também varremos.
-        if (typeof via !== 'object' || !via.url) continue;
-        if (via.severity !== 'high' && via.severity !== 'critical') continue;
-        const match = /GHSA-[a-z0-9-]+/i.exec(via.url);
-        if (!match) continue;
-        const ghsa = match[0];
-        if (ALLOWLIST[ghsa]) { allowedSeen.add(ghsa); continue; }
-        blocking.set(ghsa, { title: via.title, package: via.name || pkg });
-    }
-}
-
-for (const ghsa of allowedSeen) {
-    console.log(`⚠️  Ignorado (allowlist): ${ghsa} — ${ALLOWLIST[ghsa]}`);
-}
-
-if (blocking.size > 0) {
-    console.error('\n❌ Vulnerabilidades HIGH+ de produção fora da allowlist:');
-    for (const [ghsa, v] of blocking) {
-        console.error(`   • ${ghsa} (${v.package}): ${v.title}`);
-    }
-    console.error('\nCorrija a dependência ou, se comprovadamente não se aplica ao app,');
-    console.error('adicione o GHSA à ALLOWLIST em scripts/audit-prod.mjs com o motivo.');
-    process.exit(1);
-}
-
-console.log('✅ Audit de produção OK (nenhuma HIGH+ fora da allowlist).');
+for (const linha of log) console.log(linha);
+for (const linha of erro) console.error(linha);
+process.exitCode = codigo;
