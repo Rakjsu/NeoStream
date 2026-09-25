@@ -211,12 +211,14 @@ export function VOD() {
         calculateGrid();
 
         // Recalculate after layout is ready
-        setTimeout(calculateGrid, 200);
+        const recalculo = setTimeout(calculateGrid, 200);
 
         // Listen to window resize
         window.addEventListener('resize', calculateGrid);
 
         return () => {
+            // Sair da página antes dos 200 ms não deixa o recálculo rodar depois.
+            clearTimeout(recalculo);
             window.removeEventListener('resize', calculateGrid);
         };
     }, []);

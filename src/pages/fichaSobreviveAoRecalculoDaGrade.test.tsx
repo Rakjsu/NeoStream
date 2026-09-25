@@ -270,6 +270,35 @@ describe.each([
         expect(fichaAberta()).toBe('Titulo 22')
     })
 
+    it('(f) sair da página antes do recálculo dos 200 ms não deixa o timer rodar depois', async () => {
+        // O setTimeout(calculateGrid, 200) sem clearTimeout rodava com a página
+        // já desmontada — e, no fim de um teste, com o jsdom já desfeito
+        // ("window is not defined" derrubou a CI da main no Linux).
+        let desmontada = false
+        let leiturasDepois = 0
+        Object.defineProperty(window, 'innerWidth', {
+            configurable: true,
+            get: () => { if (desmontada) leiturasDepois++; return 1024 },
+        })
+        container = document.createElement('div')
+        document.body.appendChild(container)
+        root = createRoot(container)
+        await act(async () => {
+            root!.render(
+                <MemoryRouter>
+                    {pagina === 'series' ? <Series /> : <VOD />}
+                </MemoryRouter>
+            )
+        })
+        await act(async () => { root!.unmount() })
+        root = null
+        desmontada = true
+
+        await new Promise(resolve => setTimeout(resolve, 300))
+
+        expect(leiturasDepois).toBe(0)
+    })
+
     it('(d) ficha pedida de outra página (antes de montar) abre na montagem e sobrevive ao resize', async () => {
         sessionStorage.setItem(GLOBAL_SEARCH_TERM_KEY, 'Titulo22')
         sessionStorage.setItem(GLOBAL_SEARCH_OPEN_KEY, JSON.stringify({
