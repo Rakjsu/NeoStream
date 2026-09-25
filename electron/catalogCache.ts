@@ -83,6 +83,26 @@ function cacheDir(): string {
     return path.join(app.getPath('userData'), 'catalog-cache')
 }
 
+function dbPath(): string {
+    return path.join(app.getPath('userData'), 'catalog.db')
+}
+
+/** Backup que a migração pro SQLite deixa da pasta legada (catalogDb.ts). */
+function backupDir(): string {
+    return `${cacheDir()}-backup`
+}
+
+/**
+ * Tudo o que o cache do catálogo pode ocupar em disco, nos DOIS backends:
+ * o catalog.db com o WAL/SHM, a pasta de JSONs (fallback, ou sobra de uma
+ * migração que não conseguiu renomear) e o backup da migração. Não abre o DB
+ * — medir não pode disparar migração. Caminho ausente = 0 pra quem mede.
+ */
+export function catalogCacheDiskPaths(): string[] {
+    const db = dbPath()
+    return [db, `${db}-wal`, `${db}-shm`, cacheDir(), backupDir()]
+}
+
 // 💾 Item 19: backend em SQLite (catalog.db). Lazy: o primeiro acesso abre o
 // DB e migra os JSONs legados (que viram catalog-cache-backup). Qualquer erro
 // → null e TUDO abaixo continua nos JSONs de sempre (rollback automático).
@@ -90,7 +110,7 @@ let sqliteStore: CatalogStore | null | undefined
 function getStore(): CatalogStore | null {
     if (sqliteStore !== undefined) return sqliteStore
     sqliteStore = openCatalogStore(
-        path.join(app.getPath('userData'), 'catalog.db'),
+        dbPath(),
         cacheDir(),
         (message) => log.warn('[CatalogCache]', message),
     )
@@ -107,6 +127,35 @@ export function closeCatalogStore(): void {
     residentPlaylistId = null
     persisted.clear()
     inFlight.clear()
+}
+
+/**
+ * "Limpar" da tela de Armazenamento (#D048). Antes era um `fsp.rm` na pasta
+ * `catalog-cache` — que a migração pro SQLite já tinha renomeado: o botão
+ * respondia sucesso sem apagar nada, e a cópia em memória seguia servindo a
+ * lista "limpa". Agora zera a memória E o disco do backend que estiver ativo
+ * (SQLite: esvazia a tabela e encolhe o arquivo, com o handle aberto — apagar
+ * o catalog.db por baixo dele dá EBUSY no Windows; JSON: apaga a pasta), e
+ * leva junto o backup da migração. Buscas em voo não são canceladas: o que
+ * chegar do provedor depois disso é catálogo novo e entra no cache normalmente.
+ */
+export async function clearCatalogCache(): Promise<void> {
+    try {
+        // Abre o DB se ainda não abriu: o catalog.db de uma sessão anterior
+        // está lá mesmo que nenhuma lista tenha sido pedida nesta.
+        getStore()?.clear()
+        const rmOpts = { recursive: true, force: true, maxRetries: 3, retryDelay: 50 } as const
+        await fsp.rm(cacheDir(), rmOpts)
+        await fsp.rm(backupDir(), rmOpts)
+    } finally {
+        // A memória sai POR ÚLTIMO (e mesmo se o disco falhar): no fallback
+        // JSON, uma leitura durante o `fsp.rm` ainda acharia o arquivo e
+        // repovoaria a memória com a lista velha, que sobreviveria ao "Limpar".
+        memory.clear()
+        persisted.clear()
+        inFlight.clear()
+        residentPlaylistId = null
+    }
 }
 
 function keyOf(playlistId: string, kind: CatalogKind): string {
