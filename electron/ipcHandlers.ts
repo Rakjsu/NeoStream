@@ -1666,7 +1666,13 @@ export function setupIpcHandlers() {
                     timeout: 8000,
                     validateStatus: () => true,
                     responseType: 'stream',
-                    httpsAgent: await resolveProviderHttpsAgent(target.url, target.url)
+                    // Sem 2º argumento de propósito: o provedor de referência
+                    // é o da playlist ATIVA (`auth.url`), o mesmo escopo do
+                    // player. Passar a própria `target.url` fazia qualquer host
+                    // de uma lista M3U virar "o provedor" — e um "Confiar" no
+                    // diálogo desligava o TLS de um domínio alheio pra sempre
+                    // (D132). Fora do provedor a sonda valida o TLS normalmente.
+                    httpsAgent: await resolveProviderHttpsAgent(target.url)
                 })
                 const body = response.data as { destroy?: () => void } | undefined
                 body?.destroy?.()
