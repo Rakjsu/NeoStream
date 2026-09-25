@@ -107,23 +107,13 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-      # 🖼️ Item 42: regressão visual não-bloqueante — compara com e2e/baselines
-      # e reporta no summary; diffs viram artifact. continue-on-error evita
-      # falso-vermelho por flutuação de rendering; endurecer quando estabilizar.
-      - name: Visual regression vs baselines
-        if: always()
-        continue-on-error: true
-        run: bash e2e/visual-diff.sh
-
-      - name: Upload visual diffs
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: visual-diffs
-          path: screenshots/visual-diff/
-          retention-days: 7
-          if-no-files-found: ignore
-
+      # 🖼️ A regressão visual (#D145) mora no próprio Playwright: o
+      # e2e/screenshots.spec.ts compara cada tela com e2e/baselines via
+      # toHaveScreenshot e REPROVA o job. Expected/actual/diff de uma tela que
+      # mudou vão no relatório HTML abaixo. (O passo antigo era um bash com o
+      # compare do ImageMagick: saía 1 em todo run sem gerar um único diff, e
+      # o continue-on-error escondia.)
+      #
       # O relatório HTML importa MAIS quando o job passa: com `retries: 1` o
       # teste que é moeda falha, repete, passa — e só o HTML guarda o
       # error-context da tentativa perdida. Com `if: failure()` esse era
@@ -141,5 +131,5 @@ jobs:
           retention-days: 7
           # Rodando sempre, o passo também pega o job que morreu antes do
           # Playwright (npm ci, vite build): sem isto o upload vazio vira aviso
-          # amarelo — mesmo motivo dos dois passos acima.
+          # amarelo — mesmo motivo do upload das screenshots acima.
           if-no-files-found: ignore
