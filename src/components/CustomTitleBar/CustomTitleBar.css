@@ -3,6 +3,9 @@
     top: 0;
     left: 0;
     right: 0;
+    /* 36px = MPV_TITLEBAR_HEIGHT (electron/mpvProtocol.ts): a janela nativa do
+       mpv começa logo abaixo desta barra. Mudou aqui, muda lá, no inset do
+       .mpv-view-backdrop e no index.css — electron/geometriaDoMpv.test.ts confere. */
     height: 36px;
     background: linear-gradient(180deg, var(--ns-bg-panel) 0%, var(--ns-bg-deep) 100%);
     display: flex;

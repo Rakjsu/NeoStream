@@ -146,6 +146,7 @@ export function parseTrackSelection(data: unknown): number | null {
  * Height (px) of the in-app controls strip reserved at the bottom of the
  * window's client area. The mpv window covers everything above it, so the
  * React controls bar must use the same constant (MpvPlayerView.tsx).
+ * Guarded by electron/geometriaDoMpv.test.ts.
  */
 export const MPV_CONTROLS_HEIGHT = 96
 
@@ -153,7 +154,8 @@ export const MPV_CONTROLS_HEIGHT = 96
  * Top strip (px) left uncovered so the app's frameless-window title bar
  * (CustomTitleBar) stays visible and clickable during playback — it's the
  * only drag/minimize/maximize surface the window has. Must match the height
- * in CustomTitleBar.css and the backdrop top inset in MpvPlayerView.tsx.
+ * in CustomTitleBar.css, the backdrop top inset in MpvPlayerView.tsx and the
+ * body/#root offsets in index.css — guarded by electron/geometriaDoMpv.test.ts.
  */
 export const MPV_TITLEBAR_HEIGHT = 36
 
