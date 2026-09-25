@@ -14,6 +14,9 @@ import {
     type DescritorDeDownload,
 } from './downloadPaths'
 import { getErrorMessage } from './errorMessage';
+// Módulo puro do renderer, lido pelos dois lados de propósito: a URL da capa
+// em cache tem de sair na mesma grafia que a página de Downloads monta.
+import { urlDeArquivoLocal } from '../src/utils/urlDeArquivoLocal';
 
 interface ActiveDownload {
     id: string;
@@ -768,7 +771,7 @@ export function setupDownloadHandlers() {
             // conta o lixo era servido como capa boa para sempre — não há TTL,
             // revalidação nem botão na interface para limpar a pasta.
             if (getFileSizeSync(filePath) > 0) {
-                return { success: true, localPath: `file:///${filePath.replace(/\\/g, '/')}` };
+                return { success: true, localPath: urlDeArquivoLocal(filePath) };
             }
 
             // Download the image
@@ -833,13 +836,13 @@ export function setupDownloadHandlers() {
                             // porque ela so entra por este rename --, o pedido
                             // esta atendido.
                             if (getFileSizeSync(filePath) > 0) {
-                                resolve({ success: true, localPath: `file:///${filePath.replace(/\\/g, '/')}` });
+                                resolve({ success: true, localPath: urlDeArquivoLocal(filePath) });
                                 return;
                             }
                             resolve({ success: false, error: getErrorMessage(err) });
                             return;
                         }
-                        resolve({ success: true, localPath: `file:///${filePath.replace(/\\/g, '/')}` });
+                        resolve({ success: true, localPath: urlDeArquivoLocal(filePath) });
                     });
                     response.pipe(writeStream);
                 };

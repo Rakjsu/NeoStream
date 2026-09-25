@@ -49,10 +49,15 @@ export const EXTENSOES_DE_MIDIA_LOCAL = ['ts', 'mp4', 'mkv', 'avi', 'mov', 'm4v'
  * não serve. Estar DENTRO das nossas pastas e existir no disco é conferido à
  * parte, onde há acesso a disco (mpvPlayer.ts).
  *
- * O renderer monta o `file://` por concatenação, sem codificar
- * (`downloadService.getOfflineFilePath`, a página de Downloads), então o que
- * chega aqui é o caminho literal — nada de `decodeURIComponent`, que
- * estragaria um nome de arquivo com `%` de verdade.
+ * O app monta o `file://` com `urlDeArquivoLocal` (src/utils), sem codificar,
+ * então o que chega aqui é o caminho literal — nada de `decodeURIComponent`,
+ * que estragaria um nome de arquivo com `%` de verdade. As duas funções são
+ * inversas uma da outra; mexer numa sem a outra quebra
+ * electron/mpvTocaArquivoDoDisco.test.ts.
+ *
+ * `file:////x` (quatro barras) continua recusado de propósito: no Windows é a
+ * grafia de UNC. Era o app que montava quatro barras fora do Windows — o
+ * conserto foi na montagem, não afrouxando a guarda.
  */
 export function caminhoDeMidiaNoDisco(url: unknown): string | null {
     if (typeof url !== 'string' || url.length === 0) return null

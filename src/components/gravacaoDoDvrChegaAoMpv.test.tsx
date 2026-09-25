@@ -21,6 +21,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type { MpvStatus } from '../services/mpvService';
+import { urlDeArquivoLocal } from '../utils/urlDeArquivoLocal';
 
 const playMock = vi.fn(async (...args: unknown[]) => { void args; return resultadoDoPlay; });
 let resultadoDoPlay: { success: boolean; reason?: string } = { success: true };
@@ -75,7 +76,7 @@ function gravacaoTocando() {
     return (
         <AsyncVideoPlayer
             movie={{ name: 'Canal 5 - 2026-09-17', stream_id: CAMINHO }}
-            buildStreamUrl={async () => `file:///${CAMINHO.replace(/\\/g, '/')}`}
+            buildStreamUrl={async () => urlDeArquivoLocal(CAMINHO)}
             onClose={() => { }}
             customTitle="Canal 5 - 2026-09-17"
             contentId={`rec-${CAMINHO}`}
