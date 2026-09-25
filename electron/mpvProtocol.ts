@@ -31,6 +31,49 @@ export function pareceLegendaNoDisco(caminho: unknown): boolean {
     return new RegExp(`\\.(${EXTENSOES_DE_LEGENDA.join('|')})$`, 'i').test(caminho)
 }
 
+/**
+ * Extensões de mídia que o app escreve no disco do usuário.
+ *
+ * A gravação do DVR é `.ts` puro (ffmpeg -c copy -> mpegts) e o remux opcional
+ * faz `.mp4`; o download offline guarda o container que o provedor serviu.
+ */
+export const EXTENSOES_DE_MIDIA_LOCAL = ['ts', 'mp4', 'mkv', 'avi', 'mov', 'm4v', 'webm', 'mpg', 'mpeg', 'm2ts'] as const
+
+/**
+ * `file:///C:/x/y.ts` (ou o caminho cru) -> caminho de mídia local. PURO.
+ *
+ * Irmã de `pareceLegendaNoDisco`, e pela mesma razão: o `mpv:play` passou a
+ * aceitar arquivo do disco vindo do renderer, então o main confere a FORMA do
+ * que recebe — absoluto, local (nada de UNC `\\servidor\...`, que faria o mpv
+ * abrir uma conexão de rede) e com extensão de vídeo. Devolve `null` quando
+ * não serve. Estar DENTRO das nossas pastas e existir no disco é conferido à
+ * parte, onde há acesso a disco (mpvPlayer.ts).
+ *
+ * O renderer monta o `file://` por concatenação, sem codificar
+ * (`downloadService.getOfflineFilePath`, a página de Downloads), então o que
+ * chega aqui é o caminho literal — nada de `decodeURIComponent`, que
+ * estragaria um nome de arquivo com `%` de verdade.
+ */
+export function caminhoDeMidiaNoDisco(url: unknown): string | null {
+    if (typeof url !== 'string' || url.length === 0) return null
+    let caminho = url
+    if (/^file:\/\//i.test(caminho)) {
+        const semEsquema = caminho.slice('file://'.length)
+        // `file://servidor/share/x.ts` é UNC: sem a terceira barra, o que vem
+        // depois de `file://` é o NOME DA MÁQUINA.
+        if (!semEsquema.startsWith('/')) return null
+        // No Windows a terceira barra é só separador (`/C:/x`); no Linux e no
+        // macOS ela É a raiz. Comê-la sempre — como faria um
+        // `/^file:\/\/\/(.+)/` — transformaria `/home/rak/a.mp4` no caminho
+        // relativo `home/rak/a.mp4` e mataria o recurso fora do Windows.
+        caminho = /^\/[a-zA-Z]:/.test(semEsquema) ? semEsquema.slice(1) : semEsquema
+    }
+    if (caminho.startsWith('\\\\') || caminho.startsWith('//')) return null
+    if (!/^([a-zA-Z]:[\\/]|\/)/.test(caminho)) return null
+    const temExtensaoDeVideo = new RegExp(`\\.(${EXTENSOES_DE_MIDIA_LOCAL.join('|')})$`, 'i').test(caminho)
+    return temExtensaoDeVideo ? caminho : null
+}
+
 // Matches the User-Agent the app already uses for provider requests
 // (see ipcHandlers.ts / downloadHandlers.ts).
 export const MPV_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
