@@ -16,25 +16,23 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
         autoInstall: false,
         lastCheck: 0
     });
-    const [lastCheckDate, setLastCheckDate] = useState<string>('');
     // 🍎 macOS sem assinatura da Apple: o app não instala sozinho, então
     // "instalar automaticamente" seria uma promessa vazia — o interruptor sai
     // do ar com a explicação no lugar (ver electron/macUpdateSupport.ts).
     const [instalaSozinho, setInstalaSozinho] = useState(true);
     // System behavior (tray + autostart) lives in the MAIN process store.
     const [systemConfig, setSystemConfig] = useState<{ closeToTray: boolean; openAtLogin: boolean }>({ closeToTray: true, openAtLogin: false });
-    const { language, setLanguage, t, languages } = useLanguage();
+    const { language, locale, setLanguage, t, languages } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
 
     const loadUpdateConfig = async () => {
         const config = await updateService.getConfig();
         setUpdateConfig(config);
-
-        if (config.lastCheck) {
-            const date = new Date(config.lastCheck);
-            setLastCheckDate(date.toLocaleString('pt-BR'));
-        }
     };
+
+    // Formatada na renderizacao, no idioma da tela: trocar o idioma com a
+    // secao aberta reformata a data (antes era 'pt-BR' cravado na carga).
+    const lastCheckDate = updateConfig.lastCheck ? new Date(updateConfig.lastCheck).toLocaleString(locale) : '';
 
     useEffect(() => {
         // Deferred: loadUpdateConfig sets state synchronously after the await resolves early.
@@ -125,7 +123,7 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
                         <span className="toggle-slider"></span>
                     </label>
                     {saveAnimation === 'autoInstall' && (
-                        <span className="save-indicator">✓ Salvo</span>
+                        <span className="save-indicator">{t('settings', 'saved')}</span>
                     )}
                 </div>
 
@@ -145,7 +143,7 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
                         <span className="toggle-slider"></span>
                     </label>
                     {saveAnimation === 'closeToTray' && (
-                        <span className="save-indicator">✓ Salvo</span>
+                        <span className="save-indicator">{t('settings', 'saved')}</span>
                     )}
                 </div>
 
@@ -165,7 +163,7 @@ export function UpdatesSection({ checking, setChecking }: UpdatesSectionProps) {
                         <span className="toggle-slider"></span>
                     </label>
                     {saveAnimation === 'openAtLogin' && (
-                        <span className="save-indicator">✓ Salvo</span>
+                        <span className="save-indicator">{t('settings', 'saved')}</span>
                     )}
                 </div>
 

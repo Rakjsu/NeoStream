@@ -19,12 +19,11 @@ const PERSONA_EMOJI: Record<WrappedPersona, string> = {
 const TYPE_EMOJI: Record<string, string> = { movie: '🎬', series: '📺', live: '📡' };
 
 export function WrappedOverlay({ onClose }: { onClose: () => void }) {
-    const { t, language } = useLanguage();
+    const { t, locale } = useLanguage();
     const wrapped: WrappedData = useMemo(() => buildWrapped(usageStatsService.getStats()), []);
     const [slide, setSlide] = useState(0);
 
     const weekdayName = (day: number) => {
-        const locale = { pt: 'pt-BR', en: 'en-US', es: 'es-ES' }[language] ?? 'pt-BR';
         // 2026-06-07 was a Sunday; offset picks the wanted weekday.
         const base = new Date(2026, 5, 7 + day);
         return base.toLocaleDateString(locale, { weekday: 'long' });
