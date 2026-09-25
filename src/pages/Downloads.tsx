@@ -25,8 +25,13 @@ type SeriesGroup = {
     }[]
 };
 
-// DVR auto-sweep runs at most once per app session
+// DVR auto-sweep runs at most once per app session — e só com o painel de
+// Gravações ABERTO (D182): é lá que mora o botão que liga e explica a regra,
+// e é lá que o resultado da varredura aparece.
 let sweptThisSession = false;
+
+/** 🧹 O que a auto-faxina desta sessão fez (D182). */
+interface ResultadoFaxina { apagadas: number; falhas: number; dias: number; erro: string }
 
 export function Downloads() {
     const [downloads, setDownloads] = useState<DownloadItem[]>([]);
@@ -100,6 +105,10 @@ export function Downloads() {
     // 🎞️/📤 conversão e exportação + 🖼️ thumbnails cacheadas por path.
     const [convertingPath, setConvertingPath] = useState<string | null>(null);
     const [dvrMsg, setDvrMsg] = useState('');
+    // 🧹 D182: a faxina apagava arquivos do disco sem dizer uma palavra — nem
+    // quantos saíram, nem quais falharam. Fica na tela até sair da página:
+    // roda uma vez por sessão, então é o único registro de que aconteceu.
+    const [faxina, setFaxina] = useState<ResultadoFaxina | null>(null);
     const [thumbs, setThumbs] = useState<Record<string, string>>({});
 
     useEffect(() => {
@@ -117,18 +126,40 @@ export function Downloads() {
         return () => { cancelled = true; window.clearInterval(timer); };
     }, [showRecordings]);
 
-    const loadRecordings = useCallback(async () => {
+    // `varrer` só vem verdadeiro do efeito do painel ABERTO: a lista também é
+    // lida com o painel fechado (a contagem do botão ⏺), e abrir a página de
+    // Downloads não pode apagar gravação nenhuma (D182).
+    const loadRecordings = useCallback(async (varrer = false) => {
         try {
             const result = await window.ipcRenderer.invoke('dvr:list-files');
             let files: RecordingFile[] = result?.success ? result.files : [];
             // Auto-sweep: delete recordings older than the configured limit (once per session)
-            if (!sweptThisSession) {
+            if (varrer && !sweptThisSession) {
                 sweptThisSession = true;
-                const expired = pickExpiredRecordings(files, getDvrMaxAgeDays(), Date.now(), getProtectedRecordings());
+                const dias = getDvrMaxAgeDays();
+                const expired = pickExpiredRecordings(files, dias, Date.now(), getProtectedRecordings());
                 if (expired.length > 0) {
+                    // O `dvr:delete-file` não LANÇA quando falha — devolve
+                    // `{ success: false, error }` (arquivo em uso, fora da
+                    // pasta). O catch vazio de antes não via nenhuma das duas.
+                    let apagadas = 0;
+                    let falhas = 0;
+                    let erro = '';
                     for (const file of expired) {
-                        try { await window.ipcRenderer.invoke('dvr:delete-file', { path: file.path }); } catch { /* keep going */ }
+                        try {
+                            const res = await window.ipcRenderer.invoke('dvr:delete-file', { path: file.path }) as { success?: boolean; error?: string } | null | undefined;
+                            if (res?.success) {
+                                apagadas++;
+                            } else {
+                                falhas++;
+                                if (!erro) erro = res?.error || '';
+                            }
+                        } catch (err) {
+                            falhas++;
+                            if (!erro) erro = String(err);
+                        }
                     }
+                    setFaxina({ apagadas, falhas, dias, erro });
                     const refreshed = await window.ipcRenderer.invoke('dvr:list-files');
                     files = refreshed?.success ? refreshed.files : files;
                 }
@@ -141,7 +172,7 @@ export function Downloads() {
 
     useEffect(() => {
         queueMicrotask(() => {
-            void loadRecordings();
+            void loadRecordings(showRecordings);
         });
     }, [loadRecordings, showRecordings]);
 
@@ -547,6 +578,18 @@ export function Downloads() {
                         </div>
                         {dvrMsg && (
                             <p style={{ color: 'var(--ns-accent-light)', fontSize: 12, margin: '0 0 8px' }}>{dvrMsg}</p>
+                        )}
+                        {faxina && (
+                            <p role="status" style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, margin: '0 0 8px' }}>
+                                {[
+                                    faxina.apagadas > 0
+                                        ? t('downloads', 'sweepDone').replace('{n}', String(faxina.apagadas)).replace('{d}', String(faxina.dias))
+                                        : '',
+                                    faxina.falhas > 0
+                                        ? t('downloads', 'sweepFailed').replace('{n}', String(faxina.falhas)).replace('{erro}', () => faxina.erro || t('downloads', 'deleteFail'))
+                                        : '',
+                                ].filter(Boolean).join(' · ')}
+                            </p>
                         )}
                         {recordings.length === 0 ? (
                             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13, margin: 0 }}>

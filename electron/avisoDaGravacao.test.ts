@@ -29,18 +29,17 @@ function fonte(): string {
 /**
  * Cada chamada de um canal, com a janela de código que a segue.
  *
- * A faxina automática fica de fora pelo marcador `keep going` DA PRÓPRIA
- * LINHA: ela também chama `dvr:delete-file`, e excluir "por nome" não
- * distinguiria as duas.
+ * A faxina automática entra também (D182): ela era a exceção muda — um
+ * catch vazio ("keep going") que nem via a falha, porque o main devolve
+ * `{ success: false, error }` em vez de lançar. Agora ela conta o que saiu
+ * e o que falhou e mostra no painel pelo `setFaxina`.
  */
 function chamadas(canal: string): string[] {
     const texto = fonte()
     const achadas: string[] = []
     let de = texto.indexOf(`invoke('${canal}'`)
     while (de !== -1) {
-        const fimDaLinha = texto.indexOf('\n', de)
-        const linha = texto.slice(de, fimDaLinha === -1 ? undefined : fimDaLinha)
-        if (!linha.includes('keep going')) achadas.push(texto.slice(de, de + 700))
+        achadas.push(texto.slice(de, de + 700))
         de = texto.indexOf(`invoke('${canal}'`, de + 1)
     }
     return achadas
@@ -52,15 +51,14 @@ describe('a tela de gravações conta quando dá errado', () => {
         // Canal renomeado não pode deixar o guarda virar enfeite.
         expect(usos.length).toBeGreaterThan(0)
         for (const trecho of usos) {
-            expect(trecho).toContain('result?.error')
-            expect(trecho).toContain('setDvrMsg(')
+            expect(/\bres(ult)?\?\.error\b/.test(trecho)).toBe(true)
+            expect(trecho.includes('setDvrMsg(') || trecho.includes('setFaxina(')).toBe(true)
         }
     })
 
-    it('a única chamada sem aviso é a faxina automática', () => {
+    it('nenhuma chamada engole o erro calada — nem a faxina automática (D182)', () => {
         const texto = fonte()
         const semAviso = texto.split('\n').filter(l => l.includes('invoke(\'dvr:') && l.includes('keep going'))
-        expect(semAviso).toHaveLength(1)
-        expect(semAviso[0]).toContain('dvr:delete-file')
+        expect(semAviso).toHaveLength(0)
     })
 })

@@ -990,6 +990,8 @@
     "sweepOff": "🧹 Auto-faxina: desligada",
     "sweepDays": "🧹 Auto-faxina: {n} dias",
     "sweepTooltip": "Exclui automaticamente gravações mais velhas que o limite ao abrir esta página (clique para alternar 15/30/60 dias)",
+    "sweepDone": "🧹 Auto-faxina: {n} gravação(ões) com mais de {d} dias apagada(s)",
+    "sweepFailed": "🧹 Auto-faxina: {n} gravação(ões) vencida(s) não saiu(saíram) do disco ({erro})",
     "renameRec": "Renomear gravação",
     "recProtect": "Proteger da auto-faxina",
     "recUnprotect": "Desproteger",
