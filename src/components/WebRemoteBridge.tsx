@@ -150,6 +150,26 @@ const loadLiveGate = async (): Promise<{ blockedCategoryIds: Set<string>; allowe
     return { blockedCategoryIds, allowedCategoryIds };
 };
 
+/* ------------------------------------------------------------------------ *
+ * 🔎 D106: listas do provedor que a busca do celular reusa por um instante.
+ *
+ * A busca do topo do controle web manda, a cada pausa da digitação,
+ * requestCatalog + requestSeries + requestLiveSearch de uma vez — e cada um
+ * trazia a lista INTEIRA do provedor pelo IPC (clonagem estrutural do acervo
+ * todo) e refazia toLowerCase() em cada nome. As três listas ficam guardadas
+ * por LISTA_DA_BUSCA_TTL_MS, já com o índice de nomes em minúsculas. O GATE
+ * (perfil infantil / parental) NÃO entra aqui: continua relido a cada pedido.
+ * ------------------------------------------------------------------------ */
+
+const LISTA_DA_BUSCA_TTL_MS = 30_000;
+
+type CanalDaBusca = 'streams:get-vod' | 'streams:get-series' | 'streams:get-live';
+
+/** A lista do provedor e, na mesma ordem, o nome de cada item em minúsculas. */
+interface ListaIndexada<T> { itens: T[]; nomes: string[] }
+
+const LISTA_VAZIA: ListaIndexada<never> = { itens: [], nomes: [] };
+
 /** Registro de um download recebido do celular (payload do main, item 12). */
 interface TransferEntry {
     id?: string;
@@ -278,22 +298,53 @@ export function WebRemoteBridge() {
             return passesGate(gate, found.name || '', seriesCategoryIds(found));
         };
 
+        // 🔎 D106: a lista (ou o pedido em voo) de cada catálogo que a busca do
+        // celular consulta. O prazo solta a memória sozinho; falha do IPC não
+        // fica guardada; desmontar desarma tudo.
+        const listasDaBusca = new Map<CanalDaBusca, {
+            lista: Promise<ListaIndexada<unknown>>;
+            prazo: ReturnType<typeof setTimeout>;
+        }>();
+        const esquecerLista = (canal: CanalDaBusca) => {
+            clearTimeout(listasDaBusca.get(canal)?.prazo);
+            listasDaBusca.delete(canal);
+        };
+        const listaDaBusca = <T,>(canal: CanalDaBusca): Promise<ListaIndexada<T>> => {
+            const guardada = listasDaBusca.get(canal);
+            if (guardada) return guardada.lista as Promise<ListaIndexada<T>>;
+            const lista = (window.ipcRenderer.invoke(canal) as Promise<{ success?: boolean; data?: unknown } | null>)
+                .catch(() => null)
+                .then((result): ListaIndexada<unknown> => {
+                    if (!result?.success) {
+                        // Falhou: a próxima busca tenta de novo em vez de herdar o
+                        // vazio — sem derrubar um pedido mais novo do mesmo canal.
+                        if (listasDaBusca.get(canal)?.lista === lista) esquecerLista(canal);
+                        return LISTA_VAZIA;
+                    }
+                    const itens = asList<{ name?: unknown }>(result.data);
+                    return { itens, nomes: itens.map(item => String(item?.name ?? '').toLowerCase()) };
+                });
+            listasDaBusca.set(canal, { lista, prazo: setTimeout(() => listasDaBusca.delete(canal), LISTA_DA_BUSCA_TTL_MS) });
+            return lista as Promise<ListaIndexada<T>>;
+        };
+
         // Push the movie list; with a query, filter the WHOLE catalog server-side
-        // (not just the first 400 the phone happened to load) — streams:get-vod is
-        // main-cached (SWR), so filtering on each keystroke stays cheap.
+        // (not just the first 400 the phone happened to load) — the list comes
+        // from listaDaBusca (D106), so a burst of searches crosses the IPC once.
         const pushCatalog = async (query = '') => {
-            const result = await window.ipcRenderer.invoke('streams:get-vod').catch(() => null) as
-                { success: boolean; data?: VodMovie[] } | null;
+            const acervo = await listaDaBusca<VodMovie>('streams:get-vod');
             // 👶 Só sai daqui o que a grade do desktop mostraria — inclusive no
             // `moviesRef`, que é o que o castMovie do celular consegue resolver.
             const gate = await loadCatalogGate('movie');
-            const movies = (result?.success ? (result.data ?? []) : [])
-                .filter(m => passesGate(gate, m.name || '', toCategoryIds(m.category_id)));
-            const map = new Map<string, VodMovie>();
-            for (const m of movies) map.set(String(m.stream_id), m);
-            moviesRef.current = map;
             const q = query.trim().toLowerCase();
-            const matches = q ? movies.filter(m => (m.name || '').toLowerCase().includes(q)) : movies;
+            const map = new Map<string, VodMovie>();
+            const matches: VodMovie[] = [];
+            acervo.itens.forEach((m, i) => {
+                if (!passesGate(gate, m.name || '', toCategoryIds(m.category_id))) return;
+                map.set(String(m.stream_id), m);
+                if (!q || acervo.nomes[i].includes(q)) matches.push(m);
+            });
+            moviesRef.current = map;
             window.ipcRenderer.send('web-remote:catalog', {
                 query,
                 items: matches.slice(0, 400).map(m => ({
@@ -312,13 +363,12 @@ export function WebRemoteBridge() {
                 window.ipcRenderer.send('web-remote:live-results', { items: [] });
                 return;
             }
-            const res = await window.ipcRenderer.invoke('streams:get-live').catch(() => null) as
-                { success: boolean; data?: LiveChannel[] } | null;
+            const canais = await listaDaBusca<LiveChannel>('streams:get-live');
             // 👶 Mesmo gate da TV ao vivo (categoria adulta fora, perfil
             // infantil só nas categorias infantis).
             const liveGate = await loadLiveGate();
-            const matches = (res?.data ?? []).filter(c =>
-                (c.name || '').toLowerCase().includes(q)
+            const matches = canais.itens.filter((c, i) =>
+                canais.nomes[i].includes(q)
                 && isLiveCategoryVisible(String(c.category_id ?? ''), liveGate));
             window.ipcRenderer.send('web-remote:live-results', {
                 items: matches.slice(0, 100).map(c => ({
@@ -448,13 +498,11 @@ export function WebRemoteBridge() {
         };
 
         const pushSeries = async (query = '') => {
-            const result = await window.ipcRenderer.invoke('streams:get-series').catch(() => null) as
-                { success: boolean; data?: SeriesItem[] } | null;
+            const acervo = await listaDaBusca<SeriesItem>('streams:get-series');
             const gate = await loadCatalogGate('series');
-            const series = (result?.success ? (result.data ?? []) : [])
-                .filter(s => passesGate(gate, s.name || '', seriesCategoryIds(s)));
             const q = query.trim().toLowerCase();
-            const matches = q ? series.filter(s => (s.name || '').toLowerCase().includes(q)) : series;
+            const matches = acervo.itens.filter((s, i) =>
+                (!q || acervo.nomes[i].includes(q)) && passesGate(gate, s.name || '', seriesCategoryIds(s)));
             window.ipcRenderer.send('web-remote:series', {
                 query,
                 items: matches.slice(0, 400).map(s => ({
@@ -927,7 +975,12 @@ export function WebRemoteBridge() {
             })();
         }, 5000);
 
-        return () => { window.ipcRenderer.off('media:control', handler); window.removeEventListener('progress:sample', onLocalProgressSample); clearInterval(historyPoll); };
+        return () => {
+            window.ipcRenderer.off('media:control', handler);
+            window.removeEventListener('progress:sample', onLocalProgressSample);
+            clearInterval(historyPoll);
+            for (const canal of [...listasDaBusca.keys()]) esquecerLista(canal);
+        };
     }, []);
 
     return null;
