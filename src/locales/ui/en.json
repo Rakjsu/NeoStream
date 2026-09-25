@@ -215,6 +215,7 @@
     "markWatched": "Mark as watched",
     "unmarkWatched": "Unmark watched",
     "similarTitle": "Similar to this",
+    "notInCatalog": "Not in your catalog",
     "castTitle": "Cast",
     "trailerFullscreen": "Trailer fullscreen",
     "filmographyOf": "Movies with {name}",
