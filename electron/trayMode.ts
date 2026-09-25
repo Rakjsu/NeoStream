@@ -5,6 +5,8 @@ import log from './logger'
 import { activeRecordingCount } from './dvrHandlers'
 import { closeAction } from './trayClosePolicy'
 import { DEFAULT_HW_ACCEL, normalizeHwAccelMode, type HwAccelMode } from './gpuPolicy'
+import { getAppLanguage, onAppLanguageChange } from './appLanguage'
+import { shellStrings } from './shellStrings'
 
 /**
  * Tray mode: closing the window hides the app to the system tray instead of
@@ -75,25 +77,27 @@ function sendToRenderer(getWin: () => BrowserWindow | null, channel: string, ...
 function buildTrayMenu(getWin: () => BrowserWindow | null) {
     if (!tray) return
     const config = getConfig()
+    // #D120: o menu segue o idioma do app (reconstruído a cada troca).
+    const s = shellStrings(getAppLanguage())
     const title = mediaState.title.length > 34 ? `${mediaState.title.slice(0, 33)}…` : mediaState.title
     const mediaItems: Electron.MenuItemConstructorOptions[] = mediaState.hasMedia
         ? [
             {
-                label: mediaState.playing ? `⏸ Pausar — ${title}` : `▶ Reproduzir — ${title}`,
+                label: mediaState.playing ? `⏸ ${s.pause} — ${title}` : `▶ ${s.play} — ${title}`,
                 click: () => sendToRenderer(getWin, 'media:control', 'togglePlay'),
             },
             {
-                label: '⏹ Parar reprodução',
+                label: `⏹ ${s.trayStopPlayback}`,
                 click: () => sendToRenderer(getWin, 'media:control', 'stop'),
             },
             { type: 'separator' },
         ]
         : []
     tray.setContextMenu(Menu.buildFromTemplate([
-        { label: 'Abrir NeoStream', click: () => showWindow(getWin) },
+        { label: s.trayOpen, click: () => showWindow(getWin) },
         ...mediaItems,
         {
-            label: '⏺ Gravações',
+            label: `⏺ ${s.trayRecordings}`,
             click: () => {
                 showWindow(getWin)
                 sendToRenderer(getWin, 'tray:navigate', '/dashboard/downloads')
@@ -101,20 +105,20 @@ function buildTrayMenu(getWin: () => BrowserWindow | null) {
         },
         { type: 'separator' },
         {
-            label: 'Fechar para a bandeja',
+            label: s.trayCloseToTray,
             type: 'checkbox',
             checked: config.closeToTray,
             click: (item) => { setConfig({ closeToTray: item.checked }) },
         },
         {
-            label: 'Iniciar com o Windows',
+            label: s.trayOpenAtLogin,
             type: 'checkbox',
             checked: config.openAtLogin,
             enabled: app.isPackaged,
             click: (item) => { applyLoginItem(setConfig({ openAtLogin: item.checked })) },
         },
         { type: 'separator' },
-        { label: 'Sair', click: () => { quitting = true; app.quit() } },
+        { label: s.trayQuit, click: () => { quitting = true; app.quit() } },
     ]))
 }
 
@@ -137,6 +141,9 @@ export function setupTrayMode(getWin: () => BrowserWindow | null) {
     }
 
     applyLoginItem(getConfig())
+
+    // #D120: trocou o idioma no app → o menu da bandeja troca junto.
+    onAppLanguageChange(() => buildTrayMenu(getWin))
 
     // Renderer reports player state; the tray menu mirrors it.
     ipcMain.on('media:state', (_e, state: { hasMedia?: boolean; playing?: boolean; title?: string }) => {
@@ -195,20 +202,15 @@ export function attachCloseToTray(win: BrowserWindow) {
         if (action === 'quit') return
         e.preventDefault()
         win.hide()
+        const s = shellStrings(getAppLanguage())
         if (action === 'hold') {
             // Close-to-tray is OFF, but the DVR still has work — tell why we stayed.
-            new Notification({
-                title: 'Gravação protegida',
-                body: 'Há gravação em andamento ou agendada — o NeoStream segue na bandeja até terminar. Use a bandeja para sair de vez.',
-            }).show()
+            new Notification({ title: s.notifyHoldTitle, body: s.notifyHoldBody }).show()
             return
         }
         if (!balloonShown) {
             balloonShown = true
-            new Notification({
-                title: 'NeoStream continua rodando',
-                body: 'Gravações agendadas e lembretes seguem ativos. Use a bandeja para sair de vez.',
-            }).show()
+            new Notification({ title: s.notifyTrayTitle, body: s.notifyTrayBody }).show()
         }
     })
 }
