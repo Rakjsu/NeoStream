@@ -3,6 +3,7 @@ import { User, Lock, Server, LogIn, Tv, ArrowLeft, Play, Film, PlaySquare, Spark
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../services/languageService';
 import { hasTmdbApiKey, setTmdbOnboardingPending } from '../services/tmdbKey';
+import { playlistService } from '../services/playlistService';
 import { classifyXtreamLoginError } from '../services/xtreamLoginError';
 
 /**
@@ -123,7 +124,7 @@ export function Login() {
         // Persist the display name on the playlist saved by auth:login
         if (playlistId) {
             try {
-                await window.ipcRenderer.invoke('playlists:rename', { id: playlistId, name });
+                await playlistService.rename(playlistId, name);
             } catch (err) {
                 console.error('Failed to rename playlist:', err);
             }

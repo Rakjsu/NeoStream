@@ -17,8 +17,8 @@ export function PlaylistsSection() {
     const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [busyId, setBusyId] = useState<string | null>(null);
-    // ✏️ Renomear: o canal `playlists:rename` existe, está na whitelist do
-    // preload e tem teste no main — só não havia como chegar nele pela tela.
+    // ✏️ Renomear: passa pelo `playlistService` como switch/remove/update —
+    // a superfície IPC das playlists mora num arquivo só.
     const [renamingId, setRenamingId] = useState<string | null>(null);
     const [renameDraft, setRenameDraft] = useState('');
 
@@ -26,8 +26,8 @@ export function PlaylistsSection() {
         const nome = renameDraft.trim();
         setRenamingId(null);
         if (!nome || nome === nomeAtual) return;
-        const res = await window.ipcRenderer.invoke('playlists:rename', { id, name: nome })
-            .catch(() => ({ success: false })) as { success?: boolean };
+        const res = await playlistService.rename(id, nome)
+            .catch(() => ({ success: false }));
         if (res?.success) await refresh();
         else setError(t('playlists', 'renameFailed'));
     };
