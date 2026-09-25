@@ -48,20 +48,26 @@
     transform: scale(1.08);
 }
 
-/* Card info (below poster) */
-.card-info {
+/* Card info (below poster)
+   .card-info/.card-title/.card-overlay são nomes genéricos (Downloads,
+   Favoritos e Ver depois usam os mesmos): as regras ficam presas ao card para
+   não vazar para lá. Os valores são os que as grades de Filmes e Séries
+   mostravam de fato — antes vinham das folhas das páginas, que sobrescreviam
+   estas (#D050); o título sem margem embaixo, como em Filmes, deixa o
+   respiro do rodapé igual em cima e embaixo. */
+.hover-preview-card .card-info {
     padding: 14px;
-    background: rgba(0, 0, 0, 0.4);
+    background: linear-gradient(to top, rgba(15, 15, 26, 0.98), rgba(26, 26, 46, 0.9));
 }
 
-.card-title {
+.hover-preview-card .card-title {
     font-size: 14px;
     font-weight: 600;
     color: white;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    margin: 0 0 8px 0;
+    margin: 0;
     transition: color 0.2s ease;
 }
 
@@ -70,7 +76,7 @@
 }
 
 /* Overlay for card */
-.card-overlay {
+.hover-preview-card .card-overlay {
     position: absolute;
     inset: 0;
     background: linear-gradient(to top,
