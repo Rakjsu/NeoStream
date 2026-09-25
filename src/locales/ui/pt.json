@@ -235,6 +235,8 @@
     "downloaded": "Baixado",
     "download": "Baixar",
     "downloadTooltip": "Baixar para assistir offline",
+    "downloadQueued": "Na fila de download",
+    "downloadFailed": "Não deu pra baixar agora. Tente de novo.",
     "mute": "Silenciar",
     "unmute": "Ativar som",
     "removeFromFavorites": "Remover dos Favoritos",

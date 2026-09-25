@@ -81,6 +81,14 @@ interface DownloadProgressItem {
     status?: string;
 }
 
+/**
+ * Estado do botão "Baixar" do FILME (D188). 'queued' = está na fila de
+ * downloads (pendente, pausado ou baixando) mas NÃO terminou — antes isso
+ * aparecia como "Baixado". A série não tem estado: o botão dela sempre abre
+ * o seletor de episódios.
+ */
+type EstadoDoBotaoBaixar = 'idle' | 'queued' | 'downloading' | 'completed';
+
 export function ContentDetailModal({
     isOpen,
     onClose,
@@ -175,7 +183,7 @@ export function ContentDetailModal({
     const [refresh, setRefresh] = useState(0); // Force re-render for button states
     // 📱 Feedback do "tocar no celular" (app pareado no controle web).
     const [mobileMsg, setMobileMsg] = useState('');
-    const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'completed'>('idle');
+    const [downloadStatus, setDownloadStatus] = useState<EstadoDoBotaoBaixar>('idle');
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [showDownloadModal, setShowDownloadModal] = useState(false);
     const [trailerUrl, setTrailerUrl] = useState<string | null>(null);
@@ -190,26 +198,11 @@ export function ContentDetailModal({
     // Lightweight windowing for long episode lists (uniform-height rows).
     const [epScroll, setEpScroll] = useState({ top: 0, height: 0 });
     const modalRef = useRef<HTMLDivElement>(null);
-    // 🧹 Handlers de progresso registrados por cliques em "Baixar". Eles viviam
-    // pra sempre: cada clique somava um par (progress + completed) no emitter
-    // do serviço, e ninguém dava off. Multiplicava o trabalho de TODO evento de
-    // progresso do app, não só o deste modal.
-    const progressHandlersRef = useRef<Array<(item: DownloadProgressItem) => void>>([]);
-
-    const soltarProgresso = (handler: (item: DownloadProgressItem) => void) => {
-        downloadService.off('progress', handler);
-        downloadService.off('completed', handler);
-        progressHandlersRef.current = progressHandlersRef.current.filter(h => h !== handler);
-    };
-
-    useEffect(() => () => {
-        // Fechar o modal no meio do download também solta.
-        progressHandlersRef.current.forEach(handler => {
-            downloadService.off('progress', handler);
-            downloadService.off('completed', handler);
-        });
-        progressHandlersRef.current = [];
-    }, []);
+    // 🧹 Quem solta os ouvintes de cada download que o botão "Baixar" está
+    // acompanhando. Eles viviam pra sempre: cada clique somava ouvintes no
+    // emitter do serviço, e ninguém dava off. Multiplicava o trabalho de TODO
+    // evento de progresso do app, não só o deste modal.
+    const soltaresDoDownloadRef = useRef<Array<() => void>>([]);
     const { t } = useLanguage();
 
     // Mute/unmute the YouTube trailer in place via the IFrame API (no reload).
@@ -389,13 +382,22 @@ export function ContentDetailModal({
         return () => { cancelled = true; };
     }, [isOpen, tmdbData, contentType]);
 
-    // Check if content is already downloaded or in queue
+    // Estado inicial do botão "Baixar". `isMovieInQueue` também é verdade
+    // para pendente/pausado/baixando — só `isDownloaded` vira "Baixado" (D188).
     useEffect(() => {
         if (!isOpen) return;
-        if (contentType === 'movie') {
-            const isAlreadyInQueue = downloadService.isMovieInQueue(contentData.name);
-            queueMicrotask(() => setDownloadStatus(isAlreadyInQueue ? 'completed' : 'idle'));
-        }
+        const status: EstadoDoBotaoBaixar = contentType !== 'movie'
+            ? 'idle'
+            : downloadService.isDownloaded(contentData.name, 'movie')
+                ? 'completed'
+                : downloadService.isMovieInQueue(contentData.name) ? 'queued' : 'idle';
+        queueMicrotask(() => setDownloadStatus(status));
+        // O download acompanhado é DESTE título. Trocar de versão na mesma
+        // ficha (onSelectVersion) ou fechá-la solta os ouvintes — senão o fim
+        // do download de uma versão pintava "Baixado" no botão da outra.
+        return () => {
+            [...soltaresDoDownloadRef.current].forEach(soltar => soltar());
+        };
     }, [isOpen, contentData.name, contentType]);
 
     // Helper function to get clean episode title
@@ -537,6 +539,47 @@ export function ContentDetailModal({
         }
     };
 
+    // 📣 Aviso curto embaixo dos botões (tocar no celular, download). Um timer
+    // só: o timer de um aviso velho não apaga o aviso novo.
+    const avisoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const avisar = (msg: string) => {
+        setMobileMsg(msg);
+        if (avisoTimerRef.current) clearTimeout(avisoTimerRef.current);
+        avisoTimerRef.current = setTimeout(() => setMobileMsg(''), 4000);
+    };
+    useEffect(() => () => {
+        if (avisoTimerRef.current) clearTimeout(avisoTimerRef.current);
+    }, []);
+
+    /**
+     * 📥 Acompanha no botão "Baixar" o download de filme que ele acabou de
+     * pedir (D188). O progresso vira "⏳ X%" e TODO fim tira o botão do
+     * percentual e solta os ouvintes: concluído → "Baixado"; falhou → "Baixar"
+     * de novo, com aviso; pausado → "Na fila"; cancelado ou excluído na tela
+     * de Downloads → "Baixar". Antes só 'progress' e 'completed' eram ouvidos,
+     * e o botão ficava parado no último percentual para sempre.
+     */
+    const acompanharDownload = (downloadId: string) => {
+        const ouvintes: Array<[string, (item: DownloadProgressItem) => void]> = [];
+        const soltar = () => {
+            ouvintes.forEach(([evento, ouvinte]) => downloadService.off(evento, ouvinte));
+            soltaresDoDownloadRef.current = soltaresDoDownloadRef.current.filter(s => s !== soltar);
+        };
+        const ouvir = (evento: string, reagir: (item: DownloadProgressItem) => void) => {
+            const ouvinte = (item: DownloadProgressItem) => { if (item.id === downloadId) reagir(item); };
+            downloadService.on(evento, ouvinte);
+            ouvintes.push([evento, ouvinte]);
+        };
+        const terminar = (status: EstadoDoBotaoBaixar) => { setDownloadStatus(status); soltar(); };
+        ouvir('progress', item => setDownloadProgress(item.progress));
+        ouvir('completed', () => terminar('completed'));
+        ouvir('error', () => { terminar('idle'); avisar(t('contentModal', 'downloadFailed')); });
+        ouvir('paused', () => terminar('queued'));
+        ouvir('cancelled', () => terminar('idle'));
+        ouvir('deleted', () => terminar('idle'));
+        soltaresDoDownloadRef.current.push(soltar);
+    };
+
     const downloadSingleEpisode = async (seasonNum: number, episodeNum: number) => {
         // Check if episode is already in queue
         if (downloadService.isEpisodeInQueue(contentData.name, seasonNum, episodeNum)) {
@@ -549,50 +592,47 @@ export function ContentDetailModal({
         );
         if (!episodeData) return;
 
-        setDownloadStatus('downloading');
+        // O botão "Baixar" da série NÃO muda de estado aqui (D188): ele é só a
+        // porta do seletor. Preso no primeiro episódio ("baixando" desabilitava,
+        // "concluído" fazia o clique voltar sem abrir), obrigava a fechar e
+        // reabrir a ficha para pedir o segundo. O seletor já mostra o que está
+        // na fila (isEpisodeInQueue).
         setShowDownloadModal(false);
 
         try {
             const result = await window.ipcRenderer.invoke('streams:get-series-url', {
                 streamId: episodeData.id,
                 container: episodeData.container_extension || 'mp4'
-            });
+            }) as { success?: boolean; url?: string; error?: string } | undefined;
 
-            if (result?.success) {
-                const download = await downloadService.addDownload(
-                    contentData.name,
-                    'episode',
-                    result.url,
-                    contentData.cover,
-                    {
-                        seriesName: contentData.name,
-                        season: seasonNum,
-                        episode: episodeNum
-                    },
-                    {
-                        plot: (tmdbData as TmdbDetails | null)?.overview || contentData.plot,
-                        rating: contentData.rating || (tmdbData as TmdbDetails | null)?.vote_average?.toFixed(1),
-                        year: contentData.release_date?.split('-')[0],
-                        genres: (tmdbData as TmdbDetails | null)?.genres?.map((g) => g.name)
-                    }
-                );
-
-                const handleProgress = (item: DownloadProgressItem) => {
-                    if (item.id === download.id) {
-                        setDownloadProgress(item.progress);
-                        if (item.status === 'completed') {
-                            setDownloadStatus('completed');
-                            soltarProgresso(handleProgress);
-                        }
-                    }
-                };
-                downloadService.on('progress', handleProgress);
-                downloadService.on('completed', handleProgress);
-                progressHandlersRef.current.push(handleProgress);
+            // `success:false` não cai no catch: sem este ramo o pedido sumia calado.
+            if (!result?.success || !result.url) {
+                console.warn('Download: URL do episódio não resolveu:', result?.error);
+                avisar(t('contentModal', 'downloadFailed'));
+                return;
             }
+
+            await downloadService.addDownload(
+                contentData.name,
+                'episode',
+                result.url,
+                contentData.cover,
+                {
+                    seriesName: contentData.name,
+                    season: seasonNum,
+                    episode: episodeNum
+                },
+                {
+                    plot: (tmdbData as TmdbDetails | null)?.overview || contentData.plot,
+                    rating: contentData.rating || (tmdbData as TmdbDetails | null)?.vote_average?.toFixed(1),
+                    year: contentData.release_date?.split('-')[0],
+                    genres: (tmdbData as TmdbDetails | null)?.genres?.map((g) => g.name)
+                }
+            );
+            avisar(t('contentModal', 'downloadQueued'));
         } catch (err) {
             console.error('Download error:', err);
-            setDownloadStatus('idle');
+            avisar(t('contentModal', 'downloadFailed'));
         }
     };
 
@@ -1224,81 +1264,51 @@ export function ContentDetailModal({
                         {/* Download Button (Movies and Series) */}
                         <button
                             onClick={async () => {
-                                if (downloadStatus === 'completed') return;
-                                if (downloadStatus === 'downloading') return;
-
-                                // For series, open the selection modal
+                                // Série: o botão é a porta do seletor de
+                                // episódios e SEMPRE abre (D188).
                                 if (contentType === 'series') {
                                     setShowDownloadModal(true);
                                     return;
                                 }
+                                // Filme baixado, na fila ou baixando: nada a pedir.
+                                if (downloadStatus !== 'idle') return;
 
-                                // For movies, download directly
                                 setDownloadStatus('downloading');
+                                setDownloadProgress(0);
                                 try {
-                                    let result;
-                                    let downloadName = contentData.name;
-                                    let downloadType: 'movie' | 'episode' = 'movie';
-                                    let seriesInfo = undefined;
+                                    const result = await window.ipcRenderer.invoke('streams:get-vod-url', {
+                                        streamId: contentId,
+                                        container: contentData.container_extension || 'mp4'
+                                    }) as { success?: boolean; url?: string; error?: string } | undefined;
 
-                                    if (contentType === 'movie') {
-                                        // Get movie stream URL
-                                        result = await window.ipcRenderer.invoke('streams:get-vod-url', {
-                                            streamId: contentId,
-                                            container: contentData.container_extension || 'mp4'
-                                        });
-                                    } else {
-                                        // Get series episode stream URL
-                                        const episodeData = episodes.find((ep) => Number(ep.episode_num) === selectedEpisode);
-                                        if (episodeData) {
-                                            result = await window.ipcRenderer.invoke('streams:get-series-url', {
-                                                streamId: episodeData.id,
-                                                container: episodeData.container_extension || 'mp4'
-                                            });
-                                            // Use only the series name for display, store season/episode in seriesInfo
-                                            downloadName = contentData.name;
-                                            downloadType = 'episode';
-                                            seriesInfo = {
-                                                seriesName: contentData.name,
-                                                season: selectedSeason,
-                                                episode: selectedEpisode
-                                            };
+                                    // `success:false` (sem login, filme fora da lista,
+                                    // portal recusando) não cai no catch: sem este ramo
+                                    // o botão ficava em "⏳ 0%", desabilitado, para sempre.
+                                    if (!result?.success || !result.url) {
+                                        console.warn('Download: URL do filme não resolveu:', result?.error);
+                                        setDownloadStatus('idle');
+                                        avisar(t('contentModal', 'downloadFailed'));
+                                        return;
+                                    }
+
+                                    const download = await downloadService.addDownload(
+                                        contentData.name,
+                                        'movie',
+                                        result.url,
+                                        contentData.cover,
+                                        undefined,
+                                        {
+                                            plot: tmdbDetails?.overview || contentData.plot,
+                                            rating: contentData.rating || tmdbDetails?.vote_average?.toFixed(1),
+                                            year: contentData.release_date?.split('-')[0] || tmdbDetails?.release_date?.split('-')[0],
+                                            genres: tmdbDetails?.genres?.map((g) => g.name)
                                         }
-                                    }
-
-                                    if (result?.success) {
-                                        // Start download with metadata
-                                        const download = await downloadService.addDownload(
-                                            downloadName,
-                                            downloadType,
-                                            result.url,
-                                            contentData.cover,
-                                            seriesInfo,
-                                            {
-                                                plot: tmdbDetails?.overview || contentData.plot,
-                                                rating: contentData.rating || tmdbDetails?.vote_average?.toFixed(1),
-                                                year: contentData.release_date?.split('-')[0] || tmdbDetails?.release_date?.split('-')[0],
-                                                genres: tmdbDetails?.genres?.map((g) => g.name)
-                                            }
-                                        );
-
-                                        // Listen for progress
-                                        const handleProgress = (item: DownloadProgressItem) => {
-                                            if (item.id === download.id) {
-                                                setDownloadProgress(item.progress);
-                                                if (item.status === 'completed') {
-                                                    setDownloadStatus('completed');
-                                                    soltarProgresso(handleProgress);
-                                                }
-                                            }
-                                        };
-                                        downloadService.on('progress', handleProgress);
-                                        downloadService.on('completed', handleProgress);
-                                        progressHandlersRef.current.push(handleProgress);
-                                    }
+                                    );
+                                    acompanharDownload(download.id);
                                 } catch (err) {
                                     console.error('Download error:', err);
                                     setDownloadStatus('idle');
+                                    avisar(t('contentModal', 'downloadFailed'));
                                 }
                             }}
                             disabled={downloadStatus === 'downloading'}
@@ -1310,7 +1320,7 @@ export function ContentDetailModal({
                                     : '2px solid rgba(255, 255, 255, 0.2)',
                                 background: downloadStatus === 'completed'
                                     ? 'rgba(6, 182, 212, 0.2)'
-                                    : downloadStatus === 'downloading'
+                                    : downloadStatus === 'downloading' || downloadStatus === 'queued'
                                         ? 'rgba(6, 182, 212, 0.1)'
                                         : 'rgba(255, 255, 255, 0.08)',
                                 color: downloadStatus === 'completed'
@@ -1327,12 +1337,14 @@ export function ContentDetailModal({
                             }}
                             title={downloadStatus === 'completed' ? t('contentModal', 'downloaded') : t('contentModal', 'downloadTooltip')}
                         >
-                            {downloadStatus === 'completed' ? '✓' : downloadStatus === 'downloading' ? '⏳' : '📥'}
+                            {downloadStatus === 'completed' ? '✓' : downloadStatus === 'downloading' || downloadStatus === 'queued' ? '⏳' : '📥'}
                             {downloadStatus === 'completed'
                                 ? t('contentModal', 'downloaded')
                                 : downloadStatus === 'downloading'
                                     ? `${downloadProgress}%`
-                                    : t('contentModal', 'download')
+                                    : downloadStatus === 'queued'
+                                        ? t('contentModal', 'downloadQueued')
+                                        : t('contentModal', 'download')
                             }
                         </button>
 
@@ -1358,8 +1370,7 @@ export function ContentDetailModal({
                                     };
                                 if (!payload) return;
                                 const result = await window.ipcRenderer.invoke('web-remote:play-vod-on-mobile', payload) as { success: boolean; delivered?: number; status?: string };
-                                setMobileMsg(t('common', mobilePushMessageKey(result)));
-                                setTimeout(() => setMobileMsg(''), 4000);
+                                avisar(t('common', mobilePushMessageKey(result)));
                             }}
                             style={{
                                 width: 50,
