@@ -616,6 +616,8 @@
     "speedTest": "Test speed",
     "speedTesting": "Measuring...",
     "speedError": "Could not measure speed (provider did not return enough data)",
+    "speedUnsupportedStalker": "Stalker portals offer nothing to measure speed with. To check whether it responds, use Provider health above.",
+    "speedUnsupportedFile": "The active list is a file on this computer: there is no provider download to measure.",
     "healthError": "Test failed (no active provider?)",
     "healthOnline": "Provider responding normally",
     "healthDegraded": "Provider partially failing",

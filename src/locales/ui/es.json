@@ -616,6 +616,8 @@
     "speedTest": "Probar velocidad",
     "speedTesting": "Midiendo...",
     "speedError": "No se pudo medir la velocidad (el proveedor no devolvió datos suficientes)",
+    "speedUnsupportedStalker": "Los portales Stalker no tienen de dónde medir la velocidad. Para ver si responde, usa la Salud del proveedor, arriba.",
+    "speedUnsupportedFile": "La lista activa es un archivo de este equipo: no hay descarga del proveedor que medir.",
     "healthError": "No se pudo probar (¿sin proveedor activo?)",
     "healthOnline": "Proveedor respondiendo normalmente",
     "healthDegraded": "Proveedor con fallos parciales",
