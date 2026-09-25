@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { movieProgressService } from '../services/movieProgressService';
 import { watchProgressService } from '../services/watchProgressService';
 import { LazyImage } from '../components/LazyImage';
 import { useLanguage } from '../services/languageService';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 interface SeriesData {
     series_id: number | string;
@@ -18,9 +19,8 @@ interface MovieData {
     cover?: string;
 }
 
-interface HistoryEntry {
+interface HistoryEntryBase {
     key: string;
-    kind: 'movie' | 'episode';
     title: string;
     cover?: string;
     watchedAt: number;
@@ -28,9 +28,27 @@ interface HistoryEntry {
     progress?: number;
 }
 
+/**
+ * A linha carrega a identidade que o SERVICO de progresso usa para apagar — o
+ * `key` acima e so de desenho (tem prefixo) e nao serve para isso. Uniao
+ * discriminada de proposito: cada ramo de `kind` ja vem com o seu id
+ * obrigatorio, entao quem apaga nao precisa de uma guarda inalcancavel.
+ */
+type HistoryEntry =
+    | (HistoryEntryBase & { kind: 'movie'; movieId: string })
+    | (HistoryEntryBase & { kind: 'episode'; seriesId: string; seasonNumber: number; episodeNumber: number });
+
 interface DayGroup {
     label: string;
     entries: HistoryEntry[];
+}
+
+/** Le os dois servicos de progresso (localStorage) numa chamada so. */
+function lerHistoricoBruto() {
+    return {
+        filmes: movieProgressService.getHistory(),
+        episodios: watchProgressService.getEpisodeHistory(),
+    };
 }
 
 export function History() {
@@ -39,6 +57,11 @@ export function History() {
 
     // Reference timestamp for the Today/Yesterday groups (stable per mount)
     const [now] = useState(() => Date.now());
+
+    // O historico e lido dos dois servicos de progresso (localStorage), e eles
+    // nao avisam ninguem quando mudam: depois de apagar, quem manda reler e
+    // `recarregar()` logo abaixo.
+    const [confirmarLimpeza, setConfirmarLimpeza] = useState(false);
 
     // Optional metadata (names/posters) resolved from the cached content lists.
     // The progress services don't store posters or series names, so we enrich
@@ -75,10 +98,23 @@ export function History() {
         };
     }, []);
 
+    /**
+     * A LEITURA CRUA dos dois servicos mora no ESTADO, nao num memo.
+     *
+     * Ela esta separada do desenho de proposito: o memo de baixo tambem
+     * depende de `t`, e o `t` do useLanguage e uma funcao NOVA a cada render
+     * — os dois juntos num memo so faziam a releitura acontecer por acidente
+     * (o memo nunca memoiza), e bastava alguem estabilizar o `t` com
+     * useCallback, que e a otimizacao obvia num hook usado no app inteiro, pra
+     * apagar uma linha parar de sumir da tela sem ninguem perceber.
+     */
+    const [brutos, setBrutos] = useState(lerHistoricoBruto);
+    const recarregar = useCallback(() => setBrutos(lerHistoricoBruto()), []);
+
     const entries = useMemo<HistoryEntry[]>(() => {
         const list: HistoryEntry[] = [];
 
-        movieProgressService.getHistory().forEach((movie) => {
+        brutos.filmes.forEach((movie) => {
             const meta = moviesById.get(String(movie.movieId));
             const finished = movie.completed || movie.progress >= 95;
             list.push({
@@ -87,11 +123,12 @@ export function History() {
                 title: meta?.name || movie.movieName,
                 cover: meta?.cover || meta?.stream_icon,
                 watchedAt: movie.watchedAt,
-                progress: finished ? undefined : Math.max(1, Math.round(movie.progress))
+                progress: finished ? undefined : Math.max(1, Math.round(movie.progress)),
+                movieId: String(movie.movieId)
             });
         });
 
-        watchProgressService.getEpisodeHistory().forEach((ep) => {
+        brutos.episodios.forEach((ep) => {
             const meta = seriesById.get(String(ep.seriesId));
             const seriesName = meta?.name || t('history', 'serie');
             const progressPercent = !ep.completed && ep.currentTime && ep.duration
@@ -103,13 +140,16 @@ export function History() {
                 title: `${seriesName} — T${ep.seasonNumber}E${ep.episodeNumber}`,
                 cover: meta?.cover,
                 watchedAt: ep.watchedAt,
-                progress: ep.completed ? undefined : progressPercent
+                progress: ep.completed ? undefined : progressPercent,
+                seriesId: String(ep.seriesId),
+                seasonNumber: ep.seasonNumber,
+                episodeNumber: ep.episodeNumber
             });
         });
 
         list.sort((a, b) => b.watchedAt - a.watchedAt);
         return list;
-    }, [moviesById, seriesById, t]);
+    }, [brutos, moviesById, seriesById, t]);
 
     const dayGroups = useMemo<DayGroup[]>(() => {
         const startOfDay = (timestamp: number) => {
@@ -160,6 +200,36 @@ export function History() {
     const handleEntryClick = (entry: HistoryEntry) => {
         navigate(entry.kind === 'movie' ? '/dashboard/vod' : '/dashboard/series');
     };
+
+    /** Apaga UMA linha, reusando o `clear*` que cada servico ja expunha. */
+    const handleRemoveEntry = (entry: HistoryEntry) => {
+        if (entry.kind === 'movie') {
+            movieProgressService.clearMovieProgress(entry.movieId);
+        } else {
+            watchProgressService.clearEpisodeProgress(entry.seriesId, entry.seasonNumber, entry.episodeNumber);
+        }
+        recarregar();
+    };
+
+    const fecharConfirmacao = useCallback(() => setConfirmarLimpeza(false), []);
+
+    /** Apaga TUDO: os dois `clearAllProgress()` que ja existiam sem chamador. */
+    const handleClearAll = () => {
+        movieProgressService.clearAllProgress();
+        watchProgressService.clearAllProgress();
+        setConfirmarLimpeza(false);
+        recarregar();
+    };
+
+    // Dialogo de verdade, pelo hook que o app ja usa nos outros modais
+    // (CreateProfileModal, UpdateModal, WrappedOverlay): papel, trava de foco,
+    // Esc, devolucao do foco e o `data-overlay="modal"` que a navegacao por
+    // setas e por controle leem para parar de andar pela pagina de tras.
+    const { containerRef, dialogProps } = useDialogA11y({
+        aberto: confirmarLimpeza,
+        aoFechar: fecharConfirmacao,
+        rotulo: `${t('watchLater', 'clearAll')} — ${t('history', 'title')}`,
+    });
 
     const renderPosterPlaceholder = (entry: HistoryEntry) => (
         <div className="history-poster-fallback">
@@ -220,6 +290,15 @@ export function History() {
                             </p>
                         </div>
                     </div>
+
+                    <button
+                        type="button"
+                        className="history-clear-all-btn"
+                        onClick={() => setConfirmarLimpeza(true)}
+                    >
+                        <span aria-hidden="true">🗑️</span>
+                        <span>{t('watchLater', 'clearAll')}</span>
+                    </button>
                 </header>
 
                 {/* Day groups */}
@@ -265,12 +344,61 @@ export function History() {
                                         <div className="history-row-time">
                                             {formatWatchedTime(entry.watchedAt)}
                                         </div>
+
+                                        <button
+                                            type="button"
+                                            className="history-row-remove"
+                                            title={t('playlists', 'remove')}
+                                            aria-label={`${t('playlists', 'remove')}: ${entry.title}`}
+                                            onClick={(event) => {
+                                                // A linha inteira navega; sem isto o X
+                                                // apagava E mandava a pessoa pra outra tela.
+                                                event.stopPropagation();
+                                                handleRemoveEntry(entry);
+                                            }}
+                                        >
+                                            <span aria-hidden="true">✕</span>
+                                        </button>
                                     </div>
                                 ))}
                             </div>
                         </section>
                     ))}
                 </div>
+
+                {confirmarLimpeza && (
+                    <div className="history-confirm-overlay" onClick={fecharConfirmacao}>
+                        <div
+                            className="history-confirm"
+                            ref={containerRef}
+                            {...dialogProps}
+                            onClick={(event) => event.stopPropagation()}
+                        >
+                            <span className="history-confirm-icon" aria-hidden="true">🗑️</span>
+                            <h2>{t('watchLater', 'clearAll')} — {t('history', 'title')}</h2>
+                            <p>{t('profile', 'actionCannotBeUndone')}</p>
+                            <div className="history-confirm-buttons">
+                                {/* Cancelar vem PRIMEIRO no DOM de proposito: e nele
+                                    que a trava de foco pousa ao abrir, nunca no
+                                    botao destrutivo. */}
+                                <button
+                                    type="button"
+                                    className="history-confirm-cancel"
+                                    onClick={fecharConfirmacao}
+                                >
+                                    {t('common', 'cancel')}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="history-confirm-danger"
+                                    onClick={handleClearAll}
+                                >
+                                    {t('watchLater', 'clearAll')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         </>
     );
@@ -359,6 +487,38 @@ const historyStyles = `
     color: rgba(255, 255, 255, 0.5);
     font-size: 14px;
     margin-top: 4px;
+}
+
+/* Limpar tudo */
+.history-clear-all-btn {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    background: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    border-radius: 12px;
+    color: #fca5a5;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+}
+
+.history-clear-all-btn:hover {
+    background: rgba(239, 68, 68, 0.22);
+    border-color: rgba(239, 68, 68, 0.6);
+    color: #fecaca;
+}
+
+.history-clear-all-btn:focus-visible,
+.history-row-remove:focus-visible,
+.history-confirm-cancel:focus-visible,
+.history-confirm-danger:focus-visible {
+    outline: 2px solid var(--ns-accent-light);
+    outline-offset: 2px;
 }
 
 /* Content */
@@ -502,6 +662,113 @@ const historyStyles = `
     font-variant-numeric: tabular-nums;
 }
 
+/* X da linha */
+.history-row-remove {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.55);
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s ease;
+}
+
+.history-row:hover .history-row-remove,
+.history-row-remove:focus-visible {
+    opacity: 1;
+}
+
+.history-row-remove:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.5);
+    color: #fca5a5;
+}
+
+/* Confirmacao de limpar tudo */
+.history-confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+}
+
+.history-confirm {
+    width: 90%;
+    max-width: 440px;
+    padding: 32px;
+    text-align: center;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.5);
+}
+
+.history-confirm:focus-visible {
+    outline: none;
+}
+
+.history-confirm-icon {
+    display: block;
+    font-size: 44px;
+    margin-bottom: 12px;
+}
+
+.history-confirm h2 {
+    margin: 0 0 12px 0;
+    font-size: 22px;
+    font-weight: 700;
+    color: white;
+}
+
+.history-confirm p {
+    margin: 0 0 26px 0;
+    color: #9ca3af;
+    line-height: 1.6;
+}
+
+.history-confirm-buttons {
+    display: flex;
+    gap: 12px;
+}
+
+.history-confirm-cancel,
+.history-confirm-danger {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 20px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.history-confirm-cancel {
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.history-confirm-danger {
+    border: none;
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+    box-shadow: 0 8px 24px rgba(239, 68, 68, 0.3);
+}
+
 /* Empty State */
 .history-empty-state {
     position: relative;
@@ -614,6 +881,11 @@ const historyStyles = `
 
     .history-row-time {
         font-size: 12px;
+    }
+
+    /* Sem hover no toque: o X fica sempre visivel. */
+    .history-row-remove {
+        opacity: 1;
     }
 
     .history-empty-suggestions {
