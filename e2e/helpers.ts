@@ -66,6 +66,8 @@ export async function launchApp(options: {
     serverUrl?: string;
     /** Extra electron-store files to pre-seed: store name (sans .json) → contents. */
     extraStores?: Record<string, object>;
+    /** Switches do Chromium/Electron antes do main.js (ex.: --force-device-scale-factor=1). */
+    electronArgs?: string[];
 } = {}): Promise<LaunchedApp> {
     const userDataDir = mkdtempSync(path.join(tmpdir(), 'neostream-e2e-'));
 
@@ -86,7 +88,7 @@ export async function launchApp(options: {
     }
 
     const app = await electron.launch({
-        args: [MAIN_JS],
+        args: [...(options.electronArgs ?? []), MAIN_JS],
         cwd: ROOT,
         env: {
             ...(process.env as Record<string, string>),

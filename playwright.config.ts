@@ -18,7 +18,19 @@ export default defineConfig({
     forbidOnly: !!process.env.CI,
     // First-load IPC (content fetch over the mock server) can take a moment
     timeout: 60_000,
-    expect: { timeout: 15_000 },
+    expect: {
+        timeout: 15_000,
+        // 🖼️ Regressão visual (e2e/screenshots.spec.ts, #D145): até 1% dos
+        // pixels, com a tolerância por pixel padrão do Playwright (YIQ 0.2).
+        // Medido em 25/09 contra as baselines de 19/07: a Home de outro dia
+        // (data, saudação e relógio diferentes) fica em ~0,3%; as outras
+        // telas abaixo de 0,15%.
+        toHaveScreenshot: { maxDiffPixelRatio: 0.01 },
+    },
+    // As baselines versionadas: `toHaveScreenshot('01-inicio.png')` compara com
+    // e2e/baselines/01-inicio.png. Sem sufixo de plataforma de propósito — o
+    // e2e só roda no windows-latest, que foi quem gravou esses PNGs.
+    snapshotPathTemplate: '{testDir}/baselines/{arg}{ext}',
     // No CI o html também é gerado: o ci.yml sobe playwright-report/ SEMPRE,
     // inclusive quando o job termina verde — que é justamente onde mora o teste
     // que só passou na repetição (retries: 1). Sem este reporter o passo de
