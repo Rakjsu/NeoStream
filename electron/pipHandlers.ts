@@ -210,17 +210,6 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
         return true;
     });
 
-    // Get current PiP state (if open)
-    ipcMain.handle('pip:getState', async () => {
-        if (pipWindow && !pipWindow.isDestroyed() && currentPipContent) {
-            return {
-                isOpen: true,
-                content: currentPipContent
-            };
-        }
-        return { isOpen: false, content: null };
-    });
-
     // Close PiP and return its current state (for resuming in main player)
     ipcMain.handle('pip:close-and-get', async () => {
         let state = { isOpen: false, content: null as PipContent | null };
@@ -316,11 +305,6 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
         return clickThroughMode;
     });
 
-    // Get click-through state
-    ipcMain.handle('pip:getClickThrough', async () => {
-        return clickThroughMode;
-    });
-
     // Register F9 global shortcut
     globalShortcut.register('F9', () => {
         if (pipWindow && !pipWindow.isDestroyed()) {
@@ -340,11 +324,4 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
             if (next) pipWindow.moveTop();
         }
     });
-}
-
-export function closePipWindow() {
-    if (pipWindow && !pipWindow.isDestroyed()) {
-        pipWindow.close();
-        pipWindow = null;
-    }
 }
