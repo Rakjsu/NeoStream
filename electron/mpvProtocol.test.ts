@@ -129,11 +129,6 @@ describe('serializeIpcCommand', () => {
         expect(serializeIpcCommand(['set_property', 'pause', true]))
             .toBe('{"command":["set_property","pause",true]}\n')
     })
-
-    it('includes request_id when given', () => {
-        const line = serializeIpcCommand(['get_property', 'duration'], 7)
-        expect(JSON.parse(line)).toEqual({ command: ['get_property', 'duration'], request_id: 7 })
-    })
 })
 
 describe('buildObserveCommandLines', () => {
@@ -213,7 +208,7 @@ describe('applyIpcMessage', () => {
         const base = createInitialStatus(true)
         expect(applyIpcMessage(base, { event: 'end-file' }).eofReached).toBe(true)
         expect(applyIpcMessage(base, { event: 'client-message' })).toEqual(base)
-        expect(applyIpcMessage(base, { request_id: 1, error: 'success' })).toEqual(base)
+        expect(applyIpcMessage(base, parseIpcLine('{"request_id":1,"error":"success"}')!)).toEqual(base)
     })
 })
 
