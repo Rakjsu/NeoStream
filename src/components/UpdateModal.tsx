@@ -3,7 +3,7 @@ import DOMPurify from 'dompurify';
 import { updateService } from '../services/updateService';
 import type { UpdateInfo, DownloadProgress } from '../types/update';
 import { useDialogA11y } from '../hooks/useDialogA11y';
-import { useLanguage } from '../services/languageService';
+import { useLanguage, languageService } from '../services/languageService';
 
 interface UpdateModalProps {
     isOpen: boolean;
@@ -74,7 +74,7 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
             return;
         }
         if (!result.success) {
-            setError(result.error || 'Erro ao baixar atualização');
+            setError(result.error || languageService.t('updates', 'downloadError'));
             setDownloading(false);
         }
     };
@@ -153,7 +153,7 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
                     </h2>
                     <p style={{ color: '#94a3b8', fontSize: '14px' }}>
                         {instalaSozinho
-                            ? 'Uma nova versão do NeoStream IPTV está pronta para instalação'
+                            ? t('updates', 'readyToInstall')
                             : t('updates', 'manualDownloadHint')}
                     </p>
                 </div>
@@ -170,7 +170,7 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
                 }}>
                     <div style={{ flex: 1 }}>
                         <p style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '4px' }}>
-                            Versão Atual
+                            {t('updates', 'currentVersion')}
                         </p>
                         <p style={{ color: 'white', fontSize: '18px', fontWeight: '600' }}>
                             v{__APP_VERSION__}
@@ -185,7 +185,7 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
                     </div>
                     <div style={{ flex: 1 }}>
                         <p style={{ color: '#94a3b8', fontSize: '12px', marginBottom: '4px' }}>
-                            Nova Versão
+                            {t('updates', 'newVersion')}
                         </p>
                         <p style={{
                             color: '#34d399',
@@ -214,7 +214,7 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
                             marginBottom: '12px',
                             color: 'white'
                         }}>
-                            📝 Novidades:
+                            📝 {t('updates', 'whatsNew')}
                         </h3>
                         <div
                             style={{ color: '#cbd5e1', fontSize: '14px', lineHeight: '1.6' }}
@@ -232,7 +232,7 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
                             marginBottom: '8px'
                         }}>
                             <span style={{ color: '#94a3b8', fontSize: '14px' }}>
-                                Baixando atualização...
+                                {t('updates', 'downloading')}
                             </span>
                             <span style={{ color: '#60a5fa', fontSize: '14px', fontWeight: '600' }}>
                                 {Math.round(progressPercent)}%
@@ -322,7 +322,7 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
                             e.currentTarget.style.background = 'transparent';
                         }}
                     >
-                        Pular Esta Versão
+                        {t('updates', 'skipVersion')}
                     </button>
 
                     <button
@@ -348,7 +348,7 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
                             e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
                         }}
                     >
-                        Depois
+                        {t('updates', 'later')}
                     </button>
 
                     <button
@@ -381,10 +381,10 @@ export function UpdateModal({ isOpen, onClose, updateInfo }: UpdateModalProps) {
                         }}
                     >
                         {downloaded
-                            ? '🚀 Instalar e Reiniciar'
+                            ? `🚀 ${t('updates', 'restartAndInstall')}`
                             : !instalaSozinho
                                 ? `🌐 ${t('updates', 'openReleasePage')}`
-                                : '⬇️ Baixar Agora'}
+                                : `⬇️ ${t('updates', 'downloadNow')}`}
                     </button>
                 </div>
             </div>

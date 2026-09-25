@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLanguage } from '../services/languageService';
+import { useLanguage, languageService } from '../services/languageService';
 import { updateService } from '../services/updateService';
 import { SHOW_UP_TO_DATE_MODAL_EVENT } from './updateNotificationBus';
 import type { UpdateInfo, DownloadProgress } from '../types/update';
@@ -65,7 +65,7 @@ export function UpdateNotification() {
         // Listen for errors
         const cleanupError = updateService.onUpdateError((err) => {
             console.error('Update error:', err);
-            setError(err.message || 'Erro ao atualizar');
+            setError(err.message || languageService.t('updates', 'updateError'));
             setIsDownloading(false);
         });
 
@@ -118,7 +118,7 @@ export function UpdateNotification() {
                     <div className="update-header">
                         <div className="update-icon" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>✓</div>
                         <div>
-                            <h3>Você está atualizado!</h3>
+                            <h3>{t('updates', 'upToDateTitle')}</h3>
                             <p className="version-info" style={{ color: '#10b981' }}>
                                 v{currentVersion || __APP_VERSION__}
                             </p>
@@ -128,13 +128,13 @@ export function UpdateNotification() {
                     <div className="update-content">
                         <div className="download-complete">
                             <span className="success-icon">✓</span>
-                            <span>Você já está usando a versão mais recente do NeoStream!</span>
+                            <span>{t('updates', 'upToDateMessage')}</span>
                         </div>
                     </div>
                     <div className="update-actions">
                         <button className="btn-primary" onClick={handleClose} style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
                             <span>👍</span>
-                            Entendi
+                            {t('updates', 'gotIt')}
                         </button>
                     </div>
                 </div>
@@ -158,7 +158,7 @@ export function UpdateNotification() {
                 <div className="update-header">
                     <div className="update-icon">🚀</div>
                     <div>
-                        <h3>Nova Atualização Disponível!</h3>
+                        <h3>{t('updates', 'newVersionTitle')}</h3>
                         <p className="version-info">
                             v{updateInfo.version}
                         </p>
@@ -176,7 +176,7 @@ export function UpdateNotification() {
                     ) : isDownloading ? (
                         <div className="download-progress">
                             <div className="progress-text">
-                                <span>Baixando atualização...</span>
+                                <span>{t('updates', 'downloading')}</span>
                                 <span>{downloadProgress?.percent?.toFixed(0) || 0}%</span>
                             </div>
                             <div className="progress-bar">
@@ -202,7 +202,7 @@ export function UpdateNotification() {
                     ) : isDownloaded ? (
                         <div className="download-complete">
                             <span className="success-icon">✓</span>
-                            <span>Download concluído! Reinicie para instalar.</span>
+                            <span>{t('updates', 'downloadedRestart')}</span>
                         </div>
                     ) : abriuNoSite ? (
                         <div className="download-complete">
@@ -215,8 +215,7 @@ export function UpdateNotification() {
                         </p>
                     ) : (
                         <p className="update-description">
-                            Uma nova versão do NeoStream está disponível.
-                            Atualize agora para obter as últimas melhorias e correções!
+                            {t('updates', 'newVersionDescription')}
                         </p>
                     )}
                 </div>
@@ -226,25 +225,25 @@ export function UpdateNotification() {
                     {isDownloaded ? (
                         <button className="btn-primary" onClick={handleInstall}>
                             <span>🔄</span>
-                            Reiniciar e Instalar
+                            {t('updates', 'restartAndInstall')}
                         </button>
                     ) : isDownloading ? (
                         <button className="btn-secondary" disabled>
                             <span className="spinner" />
-                            Baixando...
+                            {t('updates', 'downloadingShort')}
                         </button>
                     ) : (
                         <>
                             <button className="btn-primary" onClick={handleDownload}>
                                 <span>{instalaSozinho ? '📥' : '🌐'}</span>
-                                {instalaSozinho ? 'Baixar Agora' : t('updates', 'openReleasePage')}
+                                {instalaSozinho ? t('updates', 'downloadNow') : t('updates', 'openReleasePage')}
                             </button>
                             <button className="btn-secondary" onClick={handleClose}>
                                 <span>⏰</span>
-                                Mais Tarde
+                                {t('updates', 'later')}
                             </button>
                             <button className="btn-skip" onClick={handleSkip}>
-                                Pular esta versão
+                                {t('updates', 'skipVersion')}
                             </button>
                         </>
                     )}
