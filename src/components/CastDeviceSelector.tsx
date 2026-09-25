@@ -87,8 +87,8 @@ export function CastDeviceSelector({
     // recebia o currentTime do player local como posição inicial.
     const chromecast = useChromecast(primaryUrl, primaryTitle, contentType === 'live' || /\.m3u8(\?|$)/.test(primaryUrl), effectiveVtt, castContext);
     const { devices: dlnaDevices, discoverDevices, castToDevice, addDevice, error: dlnaError, isDiscovering } = dlna;
-    const { devices: airplayDevices, castToDevice: castToAirPlayDevice } = airplay;
-    const { devices: chromecastDevices, castToDevice: castToChromecast } = chromecast;
+    const { devices: airplayDevices, castToDevice: castToAirPlayDevice, discoverDevices: discoverAirPlay } = airplay;
+    const { devices: chromecastDevices, castToDevice: castToChromecast, discoverDevices: discoverChromecast } = chromecast;
     const [view, setView] = useState<'list' | 'add'>('list');
     const [deviceName, setDeviceName] = useState('');
     const [deviceIP, setDeviceIP] = useState('');
@@ -236,10 +236,25 @@ export function CastDeviceSelector({
         setCastingDevice(null);
     }, [castToAirPlayDevice, onClose, onDeviceSelected, t]);
 
-    // Auto-discover on mount
+    // Auto-discover on mount. Só o DLNA: useAirPlay e useChromecast já fazem a
+    // própria busca ao montar (setTimeout 0) e seguem num intervalo próprio —
+    // repetir aqui dobraria o IPC na abertura (e o airplay:discover segura 2 s).
     useEffect(() => {
         discoverDevices();
     }, [discoverDevices]);
+
+    // "Buscar na rede" procura nos TRÊS protocolos. O clique só chamava o
+    // discover do DLNA: a Apple TV esperava a volta de 30 s do useAirPlay e o
+    // Chromecast a de 10 s do useChromecast. O ícone segue o `isDiscovering`
+    // do DLNA, a busca mais lenta (SSDP de 5 s). O `cast:discover` só cutuca
+    // o mDNS e devolve o que JÁ está no mapa (castHandlers.ts) — quem responde
+    // ao cutucão chega depois; por isso o Chromecast é relido quando a
+    // varredura DLNA termina, junto com o fim do "Buscando...".
+    const scanNetwork = useCallback(() => {
+        void discoverAirPlay();
+        void discoverChromecast();
+        void discoverDevices().finally(() => { void discoverChromecast(); });
+    }, [discoverDevices, discoverAirPlay, discoverChromecast]);
 
     // Esc closes the picker (keyboard parity with the backdrop click / ✕).
     useEffect(() => {
@@ -371,7 +386,7 @@ export function CastDeviceSelector({
                             {/* Scan Button */}
                             <button
                                 className={`scan-btn ${isDiscovering ? 'scanning' : ''}`}
-                                onClick={() => discoverDevices()}
+                                onClick={scanNetwork}
                                 disabled={isDiscovering}
                             >
                                 <span className="scan-icon">{isDiscovering ? '⏳' : '🔍'}</span>
