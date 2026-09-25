@@ -9,6 +9,8 @@
  *      — per-channel JSON EPG with base64-encoded title/description.
  */
 
+import { nameKey } from './epgIndexProtocol'
+
 export interface ProviderEpgProgram {
     id: string
     start: string
@@ -141,11 +143,38 @@ const ATTR_RE: Record<string, RegExp> = {
     stop: /stop="([^"]+)"/i,
     channel: /channel="([^"]+)"/i,
 }
+
+/**
+ * Blocos <channel> e seus <display-name>. O nome aceita CDATA e entidades
+ * (decodeXmlText), por isso o corpo é `[\s\S]*?` e não `[^<]*`.
+ */
+const CHANNEL_RE = /<channel\b([^>]*)>([\s\S]*?)<\/channel>/gi
+const CHANNEL_ID_RE = /\bid="([^"]*)"/i
+const DISPLAY_NAME_RE = /<display-name[^>]*>([\s\S]*?)<\/display-name>/gi
 const TITLE_RE = /<title[^>]*>([\s\S]*?)<\/title>/i
 const DESC_RE = /<desc[^>]*>([\s\S]*?)<\/desc>/i
 const CATEGORY_RE = /<category[^>]*>([\s\S]*?)<\/category>/i
 
-export interface XmltvIndexResult {
+/** Os blocos <channel> do XMLTV do provedor, lidos junto com a grade (#D036). */
+export interface XmltvChannelNames {
+    /**
+     * `display-name` normalizado (a MESMA `nameKey` do índice de XMLTV em
+     * epgIndexProtocol.ts) -> `channel id`. É o que deixa um canal sem
+     * tvg-id — ou com um tvg-id que o XMLTV do provedor não usa — achar a
+     * grade pelo nome.
+     */
+    nameToId: Map<string, string>
+    /**
+     * Todo `channel id` que o XMLTV declara num <channel>, com ou sem
+     * programa na janela. Um tvg-id daqui é um canal que o provedor CONHECE:
+     * sem grade ele fica sem grade, e o nome não é consultado — senão um
+     * canal regional sem programação herdaria a grade de outro canal com o
+     * mesmo nome.
+     */
+    declaredIds: Set<string>
+}
+
+export interface XmltvIndexResult extends XmltvChannelNames {
     index: Map<string, ProviderEpgProgram[]>
     /**
      * Most common UTC offset (minutes) seen on programme start attributes —
@@ -165,6 +194,8 @@ export function parseXmltvIndex(xml: string, nowMs: number = Date.now()): Map<st
 
 interface XmltvScan {
     index: Map<string, ProviderEpgProgram[]>
+    nameToId: Map<string, string>
+    declaredIds: Set<string>
     offsetCounts: Map<number, number>
     window: XmltvWindow
     /**
@@ -177,9 +208,44 @@ interface XmltvScan {
 function createXmltvScan(nowMs: number): XmltvScan {
     return {
         index: new Map(),
+        nameToId: new Map(),
+        declaredIds: new Set(),
         offsetCounts: new Map(),
         window: buildDefaultWindow(nowMs),
         re: new RegExp(PROGRAMME_RE.source, PROGRAMME_RE.flags),
+    }
+}
+
+/**
+ * Registra os <display-name> dos blocos <channel> que caem em [from, to).
+ *
+ * Varre SÓ o trecho que a fatia de <programme> acabou de atravessar: um
+ * <channel> nunca fica dentro de um <programme>, então cada um cai inteiro
+ * no vão entre dois <programme> — e cada vão pertence a exatamente uma
+ * fatia. Assim a leitura dos canais é linear e fatiada junto com o resto;
+ * um regex global sobre o documento todo congelaria o processo principal
+ * no XMLTV de 120 MB (o mesmo motivo do parse fatiado).
+ *
+ * Primeiro nome vence, como no índice de XMLTV (epgIndexProtocol.ts): o
+ * XMLTV lista o principal antes dos apelidos, e um apelido repetido fica
+ * com o canal que o declarou primeiro.
+ */
+function scanChannelNames(scan: XmltvScan, xml: string, from: number, to: number): void {
+    if (to <= from) return
+    const region = xml.slice(from, to)
+    const channelRe = new RegExp(CHANNEL_RE.source, CHANNEL_RE.flags)
+    let channel: RegExpExecArray | null
+    while ((channel = channelRe.exec(region)) !== null) {
+        const idMatch = CHANNEL_ID_RE.exec(channel[1])
+        const id = idMatch ? decodeXmlText(idMatch[1]) : ''
+        if (!id) continue
+        scan.declaredIds.add(id)
+        const nameRe = new RegExp(DISPLAY_NAME_RE.source, DISPLAY_NAME_RE.flags)
+        let name: RegExpExecArray | null
+        while ((name = nameRe.exec(channel[2])) !== null) {
+            const key = nameKey(decodeXmlText(name[1]))
+            if (key && !scan.nameToId.has(key)) scan.nameToId.set(key, id)
+        }
     }
 }
 
@@ -189,6 +255,7 @@ function createXmltvScan(nowMs: number): XmltvScan {
  */
 function scanXmltvChunk(scan: XmltvScan, xml: string, maxMatches: number): boolean {
     const { index, offsetCounts, window } = scan
+    const from = scan.re.lastIndex
     let seen = 0
     let match: RegExpExecArray | null
     while (seen < maxMatches && (match = scan.re.exec(xml)) !== null) {
@@ -234,7 +301,11 @@ function scanXmltvChunk(scan: XmltvScan, xml: string, maxMatches: number): boole
         if (list) list.push(program)
         else index.set(channelId, [program])
     }
-    return seen === maxMatches
+    const more = seen === maxMatches
+    // Fim do documento: o exec que devolveu null zerou o lastIndex, então o
+    // trecho desta fatia vai até o fim do texto.
+    scanChannelNames(scan, xml, from, more ? scan.re.lastIndex : xml.length)
+    return more
 }
 
 /**
@@ -264,7 +335,7 @@ export function parseXmltvIndexWithMeta(xml: string, nowMs: number = Date.now())
     const scan = createXmltvScan(nowMs)
     scanXmltvChunk(scan, xml, Number.POSITIVE_INFINITY)
     for (const programs of scan.index.values()) programs.sort(compareByStart)
-    return { index: scan.index, utcOffsetMinutes: dominantOffset(scan.offsetCounts) }
+    return scanResult(scan)
 }
 
 /** Blocos <programme> por fatia, e canais ordenados por fatia. */
@@ -308,7 +379,47 @@ export async function parseXmltvIndexWithMetaAsync(
         }
     }
 
-    return { index: scan.index, utcOffsetMinutes: dominantOffset(scan.offsetCounts) }
+    return scanResult(scan)
+}
+
+function scanResult(scan: XmltvScan): XmltvIndexResult {
+    return {
+        index: scan.index,
+        nameToId: scan.nameToId,
+        declaredIds: scan.declaredIds,
+        utcOffsetMinutes: dominantOffset(scan.offsetCounts),
+    }
+}
+
+/**
+ * Programas de um canal no índice do provedor: pelo `channel id` primeiro e,
+ * quando ele falta ou o XMLTV não o conhece, pelo nome (#D036).
+ *
+ * Um id que o XMLTV declara em <channel> NUNCA cai no nome, mesmo sem
+ * programa na janela — ver `declaredIds`. Assim o nome só muda a resposta de
+ * quem antes não tinha resposta nenhuma.
+ *
+ * `null` quando nada casou — nem id nem nome —, para o chamador decidir se
+ * isso quer dizer "o provedor não tem guia deste canal" ou "tente a próxima
+ * fonte". Diferente de `lookupChannel` (epgIndexProtocol.ts), o `channel_id`
+ * devolvido é o id REAL do XMLTV, como o caminho por id sempre devolveu.
+ */
+export function lookupProviderEpgChannel(
+    index: ReadonlyMap<string, ProviderEpgProgram[]>,
+    names: { readonly nameToId: ReadonlyMap<string, string>; readonly declaredIds: ReadonlySet<string> },
+    opts: { channelId?: string; channelName?: string },
+): ProviderEpgProgram[] | null {
+    if (opts.channelId) {
+        const byId = index.get(opts.channelId)
+        if (byId?.length) return byId
+        if (names.declaredIds.has(opts.channelId)) return null
+    }
+    if (!opts.channelName) return null
+    // nameToId nunca guarda a chave vazia (ver scanChannelNames): um nome que
+    // some na nameKey — so tags de qualidade, so espaco — simplesmente nao casa.
+    const id = names.nameToId.get(nameKey(opts.channelName))
+    const byName = id !== undefined ? index.get(id) : undefined
+    return byName?.length ? byName : null
 }
 
 /** Decode a base64 string as UTF-8 text (Xtream get_simple_data_table fields). */

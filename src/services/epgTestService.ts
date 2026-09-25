@@ -20,8 +20,8 @@ export interface EpgTestProgress {
 }
 
 /** O que o `streams:get-live` entrega e o teste precisa: o nome, o id do
- *  stream e o tvg-id. Sem os dois ultimos o EPG do provedor nem e consultado
- *  (epgService.fetchFromProvider). */
+ *  stream e o tvg-id. Sem os dois ultimos o EPG do provedor so tem o nome
+ *  para achar o canal (epgService.fetchFromProvider, #D036). */
 type TestChannel = { name: string; stream_id: number; epg_channel_id?: string };
 
 type TestMode = 'full' | 'continue' | 'retryFailed';
