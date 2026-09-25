@@ -10,6 +10,7 @@
  */
 
 import { STRINGS, type RemoteLang } from './webRemoteStrings'
+import { WS_CLOSE_PIN_ROTATED } from './webRemoteProtocol'
 
 export type { RemoteLang } from './webRemoteStrings'
 
@@ -377,10 +378,18 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
       pinInput.focus();
     }
 
+    // Reconnect backoff: 1.5 s first (a Wi-Fi blip heals fast), doubling up to
+    // 30 s. A fixed 1.5 s loop never gives up and, with a dead PIN, trips the
+    // server's anti brute-force (5 misses → 30 s lock) against this very phone.
+    var RECONNECT_MIN_MS = 1500, RECONNECT_MAX_MS = 30000;
+    var reconnectDelay = RECONNECT_MIN_MS, reconnectTimer = null, reconnectPin = '';
+
     function connect(pin) {
+      clearTimeout(reconnectTimer); reconnectTimer = null;
       var wsScheme = location.protocol === 'https:' ? 'wss://' : 'ws://';
       ws = new WebSocket(wsScheme + location.host + '/?pin=' + encodeURIComponent(pin));
       ws.onopen = function () {
+        reconnectDelay = RECONNECT_MIN_MS;
         localStorage.setItem('neostream_remote_pin', pin);
         pinCard.style.display = 'none';
         connectedEl.style.display = 'flex';
@@ -392,14 +401,25 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
         var savedTab = localStorage.getItem('neostream_remote_tab');
         if (savedTab === 'guide' || savedTab === 'catalog' || savedTab === 'series' || savedTab === 'continue') activateTab(savedTab);
       };
-      ws.onclose = function () {
+      ws.onclose = function (ev) {
+        // The desktop regenerated the PIN ("gerar novo PIN") and closed us with
+        // WS_CLOSE_PIN_ROTATED: the saved code is dead. Reconnecting with it
+        // would spin on "Reconectando…" forever — ask for the new one instead.
+        if (ev.code === ${WS_CLOSE_PIN_ROTATED}) {
+          localStorage.removeItem('neostream_remote_pin');
+          showPinPrompt(L.pinRotated);
+          return;
+        }
         // 1006 with no prior open + wrong PIN → the server refused (401).
         if (connectedEl.style.display === 'none') {
           showPinPrompt(L.pinWrong);
           return;
         }
         statusEl.textContent = L.reconnecting; statusEl.className = 'status off';
-        setTimeout(function () { connect(pin); }, 1500);
+        var delay = reconnectDelay;
+        reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
+        reconnectPin = pin;
+        reconnectTimer = setTimeout(function () { connect(pin); }, delay);
       };
       ws.onmessage = function (ev) {
         try {
@@ -636,6 +656,15 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
       else pinErr.textContent = L.pinLen;
     });
     pinInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') document.getElementById('pin-ok').click(); });
+
+    // Back on screen with a retry pending: try now, from the short delay. With
+    // the phone locked the backoff grows to 30 s, and "unlock the phone and use
+    // the remote" must not wait for it.
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden || !reconnectTimer) return;
+      reconnectDelay = RECONNECT_MIN_MS;
+      connect(reconnectPin);
+    });
 
     // Try the remembered PIN first; prompt only if it fails.
     var saved = localStorage.getItem('neostream_remote_pin');
