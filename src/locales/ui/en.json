@@ -235,6 +235,8 @@
     "downloaded": "Downloaded",
     "download": "Download",
     "downloadTooltip": "Download to watch offline",
+    "downloadQueued": "In download queue",
+    "downloadFailed": "Couldn't download right now. Try again.",
     "mute": "Mute",
     "unmute": "Unmute",
     "removeFromFavorites": "Remove from Favorites",

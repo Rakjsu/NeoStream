@@ -235,6 +235,8 @@
     "downloaded": "Descargado",
     "download": "Descargar",
     "downloadTooltip": "Descargar para ver sin conexión",
+    "downloadQueued": "En la cola de descargas",
+    "downloadFailed": "No se pudo descargar ahora. Inténtalo de nuevo.",
     "mute": "Silenciar",
     "unmute": "Activar sonido",
     "removeFromFavorites": "Quitar de Favoritos",
