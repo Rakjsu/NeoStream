@@ -7,8 +7,7 @@ import { CastDeviceSelector } from '../CastDeviceSelector';
 import { CastControls } from '../CastControls';
 import { formatTime, percentage } from '../../utils/videoHelpers';
 import { usageStatsService } from '../../services/usageStatsService';
-import { profileService } from '../../services/profileService';
-import { effectiveDailyLimitMinutes, isLimitExceeded, getKidsAllowedHours, isHourWithinWindow } from '../../services/watchLimitsService';
+import { useKidsWatchGate } from '../../hooks/useKidsWatchGate';
 import { SubtitleOverlay } from './SubtitleOverlay';
 import { useSubtitleManager } from './useSubtitleManager';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
@@ -27,7 +26,6 @@ import { subtitleSyncPrefs, subtitleSyncKey } from '../../utils/subtitleSyncPref
 import { ForcedSubtitlesMenu } from './ForcedSubtitlesMenu';
 import { ChannelZapOverlay, type PlayerChannel } from './ChannelZapOverlay';
 import { useLanguage } from '../../services/languageService';
-import { diaLocal } from '../../utils/diaLocal';
 import './VideoPlayer.css';
 
 import type { MovieVersion } from '../../services/movieVersionService';
@@ -731,46 +729,10 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         };
     }, [contentId, contentType, title, genre, videoRef]);
 
-    // ⏰ Kids daily screen-time limit: block playback once today's total hits it
-    const [kidsLimitReached, setKidsLimitReached] = useState(false);
-
-    useEffect(() => {
-        const checkKidsLimit = () => {
-            const profile = profileService.getActiveProfile();
-            if (!profile) return;
-            // ⏳ Limite diário efetivo: por perfil (adulto ou kids); kids sem
-            // limite próprio herda o global do parental.
-            const limitMinutes = effectiveDailyLimitMinutes(profile.id, !!profile.isKids);
-            if (limitMinutes > 0) {
-                const today = diaLocal(new Date());
-                const todaySeconds = usageStatsService.getStats().dailyStats.find(d => d.date === today)?.totalSeconds || 0;
-                if (isLimitExceeded(todaySeconds, limitMinutes)) {
-                    setKidsLimitReached(true);
-                    return;
-                }
-            }
-            // 🕗 Janela de horário do perfil kids (fora dela, mesmo bloqueio).
-            if (profile.isKids) {
-                const window = getKidsAllowedHours();
-                if (window && !isHourWithinWindow(new Date().getHours(), window)) {
-                    setKidsLimitReached(true);
-                }
-            }
-        };
-        queueMicrotask(checkKidsLimit);
-        const intervalId = setInterval(checkKidsLimit, 30_000);
-        return () => clearInterval(intervalId);
-    }, []);
-
-    useEffect(() => {
-        if (!kidsLimitReached) return;
-        const video = videoRef.current;
-        if (!video) return;
-        video.pause();
-        const blockPlay = () => video.pause();
-        video.addEventListener('play', blockPlay);
-        return () => video.removeEventListener('play', blockPlay);
-    }, [kidsLimitReached, videoRef]);
+    // ⏰ Limite diário de tela / janela de horário do perfil. A regra mora no
+    // `useKidsWatchGate` porque o PiP, o mosaico, o MPV e o cast precisam da
+    // MESMA decisão — quando ela vivia aqui, todos eles passavam por fora.
+    const kidsLimitReached = useKidsWatchGate(videoRef);
 
 
     // Live TV recording (DVR) — ffmpeg in the main process copies the stream.

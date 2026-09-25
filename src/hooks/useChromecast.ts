@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { isWatchBlockedNow } from '../services/watchGateService';
 
 // Chromecast devices via the main-process castv2 client (castHandlers.ts).
 // Mirrors useAirPlay's surface so CastDeviceSelector treats all cast targets
@@ -64,6 +65,9 @@ export function useChromecast(videoUrl: string, videoTitle: string, isLive = fal
     }, [discoverDevices]);
 
     const castToDevice = useCallback(async (device: ChromecastDevice): Promise<boolean> => {
+        // ⏰ Mandar pra TV é sair do alcance do player: a trava de tempo de
+        // tela / janela de horário vale aqui também.
+        if (isWatchBlockedNow()) return false;
         try {
             const result = await window.ipcRenderer.invoke('cast:play', {
                 deviceId: device.id,

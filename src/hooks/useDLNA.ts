@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { isWatchBlockedNow } from '../services/watchGateService';
 
 export interface DLNADevice {
     id: string;
@@ -174,6 +175,8 @@ export function useDLNA(videoUrl: string, videoTitle: string, subtitleVtt?: stri
     // Cast to device
     const castToDevice = async (device: DLNADevice) => {
         setError(null);
+        // ⏰ Trava de tempo de tela / janela de horário (mesma do player).
+        if (isWatchBlockedNow()) return false;
         try {
             const result = await window.ipcRenderer.invoke('dlna:cast', {
                 deviceId: device.id,

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CastStatus } from './useDLNA';
+import { isWatchBlockedNow } from '../services/watchGateService';
 
 export interface AirPlayDevice {
     id: string;
@@ -69,6 +70,8 @@ export function useAirPlay(videoUrl: string, videoTitle: string) {
     // `{ success: false }`), entao sem este retorno a falha era silencio
     // absoluto: quem chamava nao tinha como saber que nada aconteceu.
     const castToDevice = async (device: AirPlayDevice): Promise<boolean> => {
+        // ⏰ Trava de tempo de tela / janela de horário (mesma do player).
+        if (isWatchBlockedNow()) return false;
         try {
             const result = await window.ipcRenderer.invoke('airplay:cast', {
                 deviceId: device.id,

@@ -13,6 +13,7 @@ import { watchProgressService } from '../services/watchProgressService';
 import { useLanguage } from '../services/languageService';
 import { playbackService } from '../services/playbackService';
 import { shouldSampleProgress } from '../utils/progressSampling';
+import { useKidsWatchGate } from '../hooks/useKidsWatchGate';
 
 interface PipChannel {
     id: string | number;
@@ -123,6 +124,11 @@ export function PipWindow() {
 
     // Initialize HLS only when we have content
     useHls({ src: content?.src || '', videoRef });
+
+    // ⏰ O PiP é uma BrowserWindow própria, com `useHls` próprio: sem isto, a
+    // criança que estourou o limite de tela (ou está fora da janela de
+    // horário) só precisava mandar o vídeo pro PiP pra continuar assistindo.
+    const kidsBlocked = useKidsWatchGate(videoRef);
 
     // Set initial time and auto-play when content changes (including next episode)
     useEffect(() => {
@@ -538,6 +544,32 @@ export function PipWindow() {
                 }}
                 poster={content.poster}
             />
+
+            {/* ⏰ Limite de tela / janela de horário: mesmo bloqueio do player interno.
+                SEM z-index de propósito — a barra de título (arrastar + ✕) e os
+                controles vêm DEPOIS no DOM e precisam continuar por cima, senão
+                a trava tranca a janela do PiP e nem o pai consegue fechá-la. */}
+            {kidsBlocked && (
+                <div
+                    data-testid="pip-kids-gate"
+                    style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background: 'rgba(2, 6, 23, 0.95)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        textAlign: 'center',
+                        padding: 16,
+                    }}
+                >
+                    <span style={{ fontSize: 32 }}>⏰</span>
+                    <strong style={{ color: 'white', fontSize: 14 }}>{t('player', 'kidsLimitTitle')}</strong>
+                    <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>{t('player', 'kidsLimitText')}</span>
+                </div>
+            )}
 
             {/* Title Bar - Draggable zone */}
             <div
