@@ -599,7 +599,6 @@ export function MpvPlayerView({
                 </div>
 
                 <div className="mpv-view-controls" style={{ height: CONTROLS_HEIGHT }}>
-                    {subSearchMsg && <div className="mpv-view-subsearch-msg">{subSearchMsg}</div>}
                     {!isLive && (
                         <input
                             className="mpv-view-seek"
@@ -637,7 +636,15 @@ export function MpvPlayerView({
                             )}
                         </div>
 
-                        <div className="mpv-view-title" title={title}>{title}</div>
+                        {/* O aviso da busca de legenda ocupa o lugar do título
+                            enquanto dura (4 s): é o único espaço livre DENTRO
+                            da faixa. Acima dela é a janela --ontop do mpv, e
+                            mais acima a barra de título do app. */}
+                        <div className="mpv-view-title" title={title}>
+                            {subSearchMsg
+                                ? <span className="mpv-view-subsearch-msg" title={subSearchMsg}>{subSearchMsg}</span>
+                                : title}
+                        </div>
 
                         <div className="mpv-view-controls-right">
                             {audioTracks.length > 1 && (
@@ -802,10 +809,17 @@ const viewStyles = `
         color: white;
     }
 
+    /* Mora no lugar do título, no fluxo da faixa de 96px: sem position. Já foi
+       absolute com top negativo e, sem contentor posicionado, ia parar dentro
+       da barra de título, sobre os botões da janela (D015). */
     .mpv-view-subsearch-msg {
-        position: absolute;
-        top: -34px;
-        right: 16px;
+        display: inline-block;
+        max-width: 100%;
+        box-sizing: border-box;
+        vertical-align: middle;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
         background: rgba(10, 10, 14, 0.9);
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-radius: 8px;
