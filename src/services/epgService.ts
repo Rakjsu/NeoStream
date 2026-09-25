@@ -207,7 +207,7 @@ export const epgService = {
         // existing chain when the provider has nothing for this channel.
         // Providers sometimes ship stale dumps (e.g. ending hours ago), so the
         // provider only wins when it has at least one current/future program.
-        const providerPrograms = await this.fetchFromProvider(epgChannelId, streamId);
+        const providerPrograms = await this.fetchFromProvider(epgChannelId, streamId, channelName);
         const now = Date.now();
         if (providerPrograms.some(p => new Date(p.end).getTime() > now)) {
             return providerPrograms;
@@ -259,16 +259,19 @@ export const epgService = {
 
     // Fetch from the Xtream provider's own EPG via the main process
     // ('epg:provider-channel' answers from an in-memory index, so this is
-    // effectively instant when the provider has an EPG)
-    async fetchFromProvider(epgChannelId: string, streamId?: number): Promise<EPGProgram[]> {
+    // effectively instant when the provider has an EPG). O nome vai junto
+    // (#D036): o main cai no <display-name> do XMLTV do provedor quando o
+    // tvg-id vem vazio ou não existe lá.
+    async fetchFromProvider(epgChannelId: string, streamId?: number, channelName?: string): Promise<EPGProgram[]> {
         try {
-            if (!epgChannelId && streamId === undefined) return [];
+            if (!epgChannelId && streamId === undefined && !channelName) return [];
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const ipcRenderer = (window as any).ipcRenderer;
             if (!ipcRenderer?.invoke) return [];
 
             const result = await ipcRenderer.invoke('epg:provider-channel', {
                 channelId: epgChannelId || '',
+                channelName: channelName || '',
                 streamId
             });
             if (!result?.success || !Array.isArray(result.programs)) return [];

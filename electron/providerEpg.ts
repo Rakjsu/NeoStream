@@ -26,11 +26,12 @@ import {
     buildSimpleDataTableUrl,
     buildXmltvUrl,
     looksLikeXmltv,
+    lookupProviderEpgChannel,
     parseSimpleDataTable,
     parseXmltvIndexWithMetaAsync,
     searchEpgIndex,
 } from './providerEpgProtocol'
-import type { ProviderEpgProgram } from './providerEpgProtocol'
+import type { ProviderEpgProgram, XmltvChannelNames, XmltvIndexResult } from './providerEpgProtocol'
 import { getErrorMessage } from './errorMessage'
 
 const XMLTV_CACHE_KEY_PREFIX = 'provider-xmltv'
@@ -63,6 +64,9 @@ interface Credentials {
 
 let xmltvAvailability: Availability = 'unknown'
 let xmltvIndex: Map<string, ProviderEpgProgram[]> | null = null
+// Os <channel> do MESMO XMLTV do índice acima (nome -> id, ids declarados).
+// Publicados sempre junto com ele, em publishXmltvIndex (#D036).
+let xmltvNames: XmltvChannelNames = { nameToId: new Map(), declaredIds: new Set() }
 // Fim da rodada que produziu o `xmltvIndex` no ar (0 = nunca rodou). A janela
 // podada dentro dele é relativa a ESSE instante — por isso ele tem validade.
 let xmltvIndexedAt = 0
@@ -92,6 +96,7 @@ export function resetProviderEpgState() {
     xmltvGeneration++
     xmltvAvailability = 'unknown'
     xmltvIndex = null
+    xmltvNames = { nameToId: new Map(), declaredIds: new Set() }
     xmltvIndexedAt = 0
     xmltvLoading = null
     providerUtcOffsetMinutes = null
@@ -214,6 +219,17 @@ function markXmltvUnavailable() {
 }
 
 /**
+ * Põe no ar o resultado de uma rodada. Grade e nomes vêm do MESMO documento e
+ * só mudam juntos — o portal Stalker e o XMLTV normal passam os dois por aqui.
+ */
+function publishXmltvIndex(parsed: XmltvIndexResult): void {
+    xmltvIndex = parsed.index
+    xmltvNames = { nameToId: parsed.nameToId, declaredIds: parsed.declaredIds }
+    providerUtcOffsetMinutes = parsed.utcOffsetMinutes
+    xmltvAvailability = 'ready'
+}
+
+/**
  * Availability probe + index build. Uma rodada por vez (promessa única em
  * voo); uma falha definitiva sem índice anterior marca a fonte indisponível
  * para a sessão. O índice publicado vale XMLTV_INDEX_TTL_MS: passado isso a
@@ -268,12 +284,10 @@ function ensureXmltvIndex(): Promise<void> {
                 const parseStart = Date.now()
                 const parsed = await parseXmltvIndexWithMetaAsync(syntheticXml)
                 if (!stillCurrent()) return
-                xmltvIndex = parsed.index
-                providerUtcOffsetMinutes = parsed.utcOffsetMinutes
-                xmltvAvailability = 'ready'
+                publishXmltvIndex(parsed)
                 let programCount = 0
-                for (const programs of xmltvIndex.values()) programCount += programs.length
-                log.info('[Provider EPG] Stalker EPG indexed', xmltvIndex.size, 'channels /', programCount,
+                for (const programs of parsed.index.values()) programCount += programs.length
+                log.info('[Provider EPG] Stalker EPG indexed', parsed.index.size, 'channels /', programCount,
                     'programs in', Date.now() - parseStart, 'ms')
                 return
             }
@@ -323,16 +337,14 @@ function ensureXmltvIndex(): Promise<void> {
                 log.info('[Provider EPG] Índice descartado: a playlist mudou durante a indexação')
                 return
             }
-            xmltvIndex = parsed.index
-            providerUtcOffsetMinutes = parsed.utcOffsetMinutes
-            xmltvAvailability = 'ready'
+            publishXmltvIndex(parsed)
             if (parsed.utcOffsetMinutes !== null) {
                 log.info('[Provider EPG] Provider UTC offset (min):', parsed.utcOffsetMinutes)
             }
 
             let programCount = 0
-            for (const programs of xmltvIndex.values()) programCount += programs.length
-            log.info('[Provider EPG] Indexed', xmltvIndex.size, 'channels /', programCount,
+            for (const programs of parsed.index.values()) programCount += programs.length
+            log.info('[Provider EPG] Indexed', parsed.index.size, 'channels /', programCount,
                 'programs in', Date.now() - parseStart, 'ms')
         } catch (error) {
             if (stillCurrent()) markXmltvUnavailable()
@@ -429,20 +441,28 @@ export function setupProviderEpgHandlers() {
     })
 
     // Programs for one channel, straight from the in-memory index.
-    ipcMain.handle('epg:provider-channel', async (_, args: { channelId?: string; streamId?: number }) => {
+    ipcMain.handle('epg:provider-channel', async (_, args: { channelId?: string; channelName?: string; streamId?: number }) => {
         try {
             const channelId = typeof args?.channelId === 'string' ? args.channelId : ''
+            // #D036: o nome do canal deixa achar a grade pelo <display-name>
+            // quando o tvg-id vem vazio ou o XMLTV do provedor não o usa.
+            const channelName = typeof args?.channelName === 'string' ? args.channelName : ''
             const streamId = typeof args?.streamId === 'number' && Number.isFinite(args.streamId)
                 ? args.streamId
                 : null
 
-            if (channelId) {
+            if (channelId || channelName) {
                 await ensureXmltvIndex()
                 if (xmltvAvailability === 'ready' && xmltvIndex) {
-                    // xmltv is THE provider EPG when present: a channel missing
-                    // from it means the provider has no EPG for it — let the
-                    // renderer fall back to its existing chain.
-                    return { success: true, programs: xmltvIndex.get(channelId) ?? [], source: 'xmltv' }
+                    const programs = lookupProviderEpgChannel(xmltvIndex, xmltvNames, { channelId, channelName })
+                    if (programs) return { success: true, programs, source: 'xmltv' }
+                    // xmltv is THE provider EPG when present: a channel whose
+                    // tvg-id has nothing in it means the provider has no EPG
+                    // for it — let the renderer fall back to its existing
+                    // chain. Sem tvg-id nenhum (só um nome que não casou), o
+                    // endpoint por canal abaixo continua sendo a última chance,
+                    // como era antes.
+                    if (channelId) return { success: true, programs: [], source: 'xmltv' }
                 }
             }
 
