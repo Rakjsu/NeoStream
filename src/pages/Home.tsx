@@ -9,11 +9,12 @@ import { loadHomeRailPrefs, orderedHomeRails } from '../services/homeRailsServic
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { ResumeModal } from '../components/ResumeModal';
 import { profileService } from '../services/profileService';
+import { parentalService } from '../services/parentalService';
 import { descreverItemDaHome, useHomeContentGate } from '../hooks/useHomeContentGate';
 import { useContagemDeCanaisInfantil } from '../hooks/useContagemDeCanaisInfantil';
 import { daysToExpiry, EXPIRY_SNOOZE_KEY, isExpirySnoozed, shouldWarnExpiry } from '../utils/expiryWarning';
 import { indexedDBCache } from '../services/indexedDBCache';
-import { normalizeContentName } from '../services/contentGate';
+import { isContentGateOff, normalizeContentName } from '../services/contentGate';
 import { searchMovieByName, searchSeriesByName, isKidsFriendly } from '../services/tmdb';
 import { infantilPodeAbrir } from '../services/liberacaoInfantil';
 import { getHomeRecommendations, type RecommendationGroup } from '../services/recommendationService';
@@ -666,6 +667,58 @@ export function Home() {
             }
         }
 
+        // Busca a classificação na TMDB e a grava para TODOS os perfis — e o
+        // título que a TMDB classificou como não-infantil fica escondido para
+        // o futuro. Devolve a certificação (ou null quando a TMDB não
+        // classificou: chave vazia, título desconhecido).
+        const buscarEGravarCertificacao = async (): Promise<string | null> => {
+            const tmdbResult = contentType === 'movie'
+                ? await searchMovieByName(name)
+                : await searchSeriesByName(name);
+            if (!tmdbResult || !tmdbResult.certification) return null;
+
+            const genreNames = (tmdbResult.genres || []).map((g: { id: number; name: string }) => g.name);
+            if (contentType === 'movie') {
+                await indexedDBCache.setCacheMovie(name, tmdbResult.certification, genreNames);
+            } else {
+                await indexedDBCache.setCacheSeries(name, tmdbResult.certification, genreNames);
+            }
+            if (!isKidsFriendly(tmdbResult.certification)) {
+                await indexedDBCache.hideItem(contentType, name);
+            }
+            return tmdbResult.certification;
+        };
+
+        // Portão desligado (sem perfil infantil e sem parental valendo — a
+        // mesma regra, dono único em contentGate, que poupa a Home de carregar
+        // o portão): o veredito não decide nada aqui, então abre NA HORA e
+        // aquece a classificação em segundo plano, como o handleItemClick de
+        // useContentFiltering. Antes, todo primeiro clique num pôster ficava
+        // parado numa busca por nome na TMDB cujo resultado era descartado.
+        // O parental é lido no clique, não no render: o PIN pode ter liberado
+        // a sessão depois que a Home montou.
+        const parentalConfig = parentalService.getConfig();
+        const portaoDesligado = isContentGateOff({
+            isKidsProfile,
+            parentalEnabled: parentalConfig.enabled,
+            blockAdultCategories: parentalConfig.blockAdultCategories,
+            sessionUnlocked: parentalService.isSessionUnlocked(),
+        });
+        if (portaoDesligado) {
+            setSelectedContent({ id: contentId, type: contentType, name, cover, rating });
+            void (async () => {
+                const emCache = contentType === 'movie'
+                    ? await indexedDBCache.getCachedMovie(name)
+                    : await indexedDBCache.getCachedSeries(name);
+                if (emCache && emCache.certification) return;
+                await buscarEGravarCertificacao();
+            })().catch(error => {
+                // Aquecimento é melhor-esforço: o modal já abriu.
+                console.warn('[Home] aquecimento da classificação falhou:', error);
+            });
+            return;
+        }
+
         // Check cache first
         const cached = contentType === 'movie'
             ? await indexedDBCache.getCachedMovie(name)
@@ -687,34 +740,15 @@ export function Home() {
         }
 
         try {
-            const tmdbResult = contentType === 'movie'
-                ? await searchMovieByName(name)
-                : await searchSeriesByName(name);
+            const certification = await buscarEGravarCertificacao();
 
-            if (tmdbResult && tmdbResult.certification) {
-                const friendly = isKidsFriendly(tmdbResult.certification);
-                const genreNames = (tmdbResult.genres || []).map((g: { id: number; name: string }) => g.name);
-
-                // Always cache the result
-                if (contentType === 'movie') {
-                    await indexedDBCache.setCacheMovie(name, tmdbResult.certification, genreNames);
-                } else {
-                    await indexedDBCache.setCacheSeries(name, tmdbResult.certification, genreNames);
-                }
-
-                // If not kid-friendly, mark as hidden for future
-                if (!friendly) {
-                    await indexedDBCache.hideItem(contentType, name);
-                }
-
-                // Block for Kids if not appropriate (a liberação do
-                // responsável vale mais que a classificação — D115)
-                if (isKidsProfile && !(await infantilPodeAbrir(contentType, name, tmdbResult.certification))) {
-                    setHiddenItems(prev => new Set([...prev, itemKey]));
-                    setBlockMessage(`"${name}" ${t('home', 'notSuitableForKids')}`);
-                    setTimeout(() => setBlockMessage(null), 3000);
-                    return;
-                }
+            // Block for Kids if not appropriate (a liberação do
+            // responsável vale mais que a classificação — D115)
+            if (certification && isKidsProfile && !(await infantilPodeAbrir(contentType, name, certification))) {
+                setHiddenItems(prev => new Set([...prev, itemKey]));
+                setBlockMessage(`"${name}" ${t('home', 'notSuitableForKids')}`);
+                setTimeout(() => setBlockMessage(null), 3000);
+                return;
             }
 
             // Allow access

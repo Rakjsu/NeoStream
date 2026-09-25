@@ -103,7 +103,9 @@ describe('chave de nome do portão infantil tem dono único (contentGate)', () =
 
     it('a Home monta a chave do clique e do card escondido com o dono', () => {
         const home = fonteDaHome.replace(/\r\n/g, '\n');
-        expect(home.includes("import { normalizeContentName } from '../services/contentGate';")).toBe(true);
+        // A Home importa a chave do DONO — junto com o que mais precisar do
+        // contentGate (o clique usa a regra de portão desligado, #D173).
+        expect(/import \{[^}]*\bnormalizeContentName\b[^}]*\} from '\.\.\/services\/contentGate';/.test(home)).toBe(true);
         expect(home.includes('const itemKey = `${contentType}_${normalizeContentName(name)}`;')).toBe(true);
         expect(home.includes('hiddenItems.has(`${alvo.kind}_${normalizeContentName(alvo.name)}`)')).toBe(true);
     });
