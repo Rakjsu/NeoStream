@@ -631,7 +631,6 @@ export function Series() {
                                     return (
                                         <div
                                             key={s.series_id}
-                                            className={checkingItem === s.name ? 'checking' : ''}
                                             style={{ animationDelay: gridWindow.ready ? '0s' : `${(index % itemsPerPage) * 0.03}s` }}
                                         >
                                             <HoverPreviewCard
@@ -641,6 +640,7 @@ export function Series() {
                                                 title={s.name}
                                                 isNew={isNew}
                                                 qualityBadge={qualityBadgeOf(s.name)}
+                                                checking={checkingItem === s.name}
                                                 onMoreInfo={() => handleSeriesClick(s)}
                                             >
                                                 {/* New episodes badge */}
@@ -1893,29 +1893,5 @@ const seriesStyles = `
         opacity: 0;
         transform: translateX(-50%) translateY(20px);
     }
-}
-
-/* Series card checking state */
-.series-card.checking {
-    opacity: 0.6;
-    pointer-events: none;
-}
-
-.series-card.checking::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 32px;
-    height: 32px;
-    margin: -16px 0 0 -16px;
-    border: 3px solid rgba(255, 255, 255, 0.3);
-    border-top-color: white;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
 }
 `;

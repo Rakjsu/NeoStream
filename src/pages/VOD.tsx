@@ -637,7 +637,6 @@ export function VOD() {
                                     return (
                                         <div
                                             key={stream.stream_id}
-                                            className={checkingItem === stream.name ? 'checking' : ''}
                                             style={{ animationDelay: gridWindow.ready ? '0s' : `${(index % itemsPerPage) * 0.03}s` }}
                                         >
                                             <HoverPreviewCard
@@ -647,6 +646,7 @@ export function VOD() {
                                                 title={stream.name}
                                                 isNew={isNew}
                                                 qualityBadge={qualityBadgeOf(stream.name)}
+                                                checking={checkingItem === stream.name}
                                                 onMoreInfo={() => handleMovieClick(stream)}
                                             >
                                                 {/* Saved Badge */}
@@ -1528,29 +1528,5 @@ const vodStyles = `
         opacity: 0;
         transform: translateX(-50%) translateY(20px);
     }
-}
-
-/* Movie card checking state */
-.movie-card.checking {
-    opacity: 0.6;
-    pointer-events: none;
-}
-
-.movie-card.checking::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 32px;
-    height: 32px;
-    margin: -16px 0 0 -16px;
-    border: 3px solid rgba(255, 255, 255, 0.3);
-    border-top-color: white;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
 }
 `;
