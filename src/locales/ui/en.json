@@ -155,6 +155,7 @@
     "enterIP": "Enter your Smart TV IP",
     "failedToTransmit": "Failed to transmit",
     "errorAddingDevice": "Error adding device",
+    "tvDidNotAnswer": "The TV at {ip} didn't respond. It was saved, but check that it's on and on the same network.",
     "connected": "Connected",
     "discovered": "Discovered",
     "queueHint": "Queue of {n} episodes — Chromecast gets them all; DLNA/AirPlay starts with the first.",

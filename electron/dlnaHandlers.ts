@@ -863,7 +863,66 @@ function createDiscoveredDevice(headers: SsdpHeaders, address: string): DlnaDevi
     }
 }
 
-async function enrichDeviceFromDescription(device: DlnaDevice, server?: string): Promise<DlnaDevice> {
+/** Prazo de cada leitura de descrição na descoberta SSDP (o aparelho já respondeu ao M-SEARCH). */
+const DESCRICAO_TIMEOUT_MS = 10000
+
+/**
+ * Prazo de CADA sonda do cadastro manual por IP. É descoberta em LAN, não
+ * download: uma TV ligada responde a descrição em milissegundos. Com as sondas
+ * em paralelo, este é o pior caso inteiro do "Adicionar TV" (D199) — antes
+ * eram 16-20 sondas de 10 s em fila, ~2,5-3 minutos com a TV desligada.
+ */
+const SONDA_MANUAL_TIMEOUT_MS = 3000
+
+/**
+ * Sinal que aborta no prazo OU quando o sinal-pai abortar (achada a sonda
+ * que vence, as outras param). `setTimeout` comum em vez de
+ * `AbortSignal.timeout`: o relógio precisa ser o mesmo dos outros timers do
+ * main, e `liberar()` desarma tudo assim que a leitura termina.
+ */
+function sinalComPrazo(timeoutMs: number, pai?: AbortSignal): { signal: AbortSignal; liberar: () => void } {
+    const controle = new AbortController()
+    const abortar = () => controle.abort()
+    const relogio = setTimeout(abortar, timeoutMs)
+    if (pai) {
+        if (pai.aborted) controle.abort()
+        else pai.addEventListener('abort', abortar, { once: true })
+    }
+    return {
+        signal: controle.signal,
+        liberar: () => {
+            clearTimeout(relogio)
+            pai?.removeEventListener('abort', abortar)
+        }
+    }
+}
+
+let nodeFetchCarregando: Promise<typeof import('node-fetch').default> | null = null
+
+/**
+ * Um import() só do node-fetch, compartilhado. As leituras de descrição saem
+ * em leque (a descoberta e as sondas do cadastro manual): com um import() por
+ * chamada, o carregador de módulos do vitest entrega o módulo falso só ao
+ * primeiro e o node-fetch DE VERDADE aos outros, que iam à rede no meio do
+ * teste. Um import() compartilhado é o mesmo no app e no teste.
+ */
+function carregarNodeFetch(): Promise<typeof import('node-fetch').default> {
+    nodeFetchCarregando ??= import('node-fetch').then(
+        modulo => modulo.default,
+        (erro: unknown) => {
+            // Falhou o carregamento: a próxima leitura tenta de novo.
+            nodeFetchCarregando = null
+            throw erro
+        }
+    )
+    return nodeFetchCarregando
+}
+
+async function enrichDeviceFromDescription(
+    device: DlnaDevice,
+    server?: string,
+    opcoes: { timeoutMs?: number; signal?: AbortSignal } = {}
+): Promise<DlnaDevice> {
     // Segunda barreira: este fetch é o único que sai para uma URL que o app não
     // montou, então o esquema é conferido aqui também.
     if (!isHttpLocation(device.location)) {
@@ -873,10 +932,11 @@ async function enrichDeviceFromDescription(device: DlnaDevice, server?: string):
         }
     }
 
+    const prazo = sinalComPrazo(opcoes.timeoutMs ?? DESCRICAO_TIMEOUT_MS, opcoes.signal)
     try {
-        const fetch = (await import('node-fetch')).default
+        const fetch = await carregarNodeFetch()
         const response = await fetch(device.location, {
-            signal: AbortSignal.timeout(10000),
+            signal: prazo.signal,
             headers: {
                 'User-Agent': 'NeoStream IPTV DLNA/1.0'
             }
@@ -909,6 +969,8 @@ async function enrichDeviceFromDescription(device: DlnaDevice, server?: string):
             ...device,
             isSamsung: isSamsungDevice(device, server)
         }
+    } finally {
+        prazo.liberar()
     }
 }
 
@@ -938,36 +1000,65 @@ function upsertDiscoveredDevice(device: DlnaDevice) {
     discoveredDevices.set(device.id, device)
 }
 
-async function resolveManualLocation(ip: string, port?: number): Promise<{ location: string; port: number; isSamsung?: boolean }> {
+interface LocalManualResolvido {
+    location: string
+    port: number
+    isSamsung?: boolean
+    /** false = nenhuma sonda respondeu: o endereço salvo é só um palpite. */
+    verified: boolean
+}
+
+// D199: as sondas saíam em DOIS for aninhados com await, uma de cada vez, cada
+// uma com 10 s de prazo. Com o IP errado ou a TV desligada — justamente quem
+// recorre ao cadastro manual — o "Adicionar TV" ficava mudo por minutos e, no
+// fim, salvava o palpite como se a TV tivesse respondido. Agora todas saem
+// JUNTAS (o pior caso é o prazo de uma sonda) e "ninguém respondeu" volta com
+// verified:false para a tela avisar.
+//
+// Quem vence continua sendo a PRIMEIRA NA ORDEM (a porta digitada, depois
+// 9197...), não a mais rápida: a mesma TV costuma publicar mais de uma
+// descrição UPnP (o renderizador numa porta, outros serviços em outra), e a
+// corrida escolheria uma delas ao acaso — salvando um endereço sem
+// AVTransport e trocando o id `manual-IP-porta` a cada cadastro. Numa TV
+// ligada as portas fechadas recusam na hora, então esperar as da frente custa
+// milissegundos; nunca passa do prazo de uma sonda.
+async function resolveManualLocation(ip: string, port?: number): Promise<LocalManualResolvido> {
     const normalizedIp = normalizeHost(ip)
+    const nomeProvisorio = `TV (${normalizedIp})`
     const candidatePorts = Array.from(new Set([port, 9197, 7676, 8001, 8080].filter(Boolean))) as number[]
     const candidatePaths = ['/dmr', '/description.xml', '/DeviceDescription.xml', '/rootDesc.xml']
 
-    for (const candidatePort of candidatePorts) {
-        for (const path of candidatePaths) {
-            const location = `http://${normalizedIp}:${candidatePort}${path}`
-            const enriched = await enrichDeviceFromDescription({
-                id: `manual-${normalizedIp}-${candidatePort}`,
-                name: `TV (${normalizedIp})`,
-                host: normalizedIp,
-                port: candidatePort,
-                location
-            })
+    const desistir = new AbortController()
+    const sondas = candidatePorts.flatMap(candidatePort => candidatePaths.map(async (path): Promise<LocalManualResolvido | null> => {
+        const location = `http://${normalizedIp}:${candidatePort}${path}`
+        const enriched = await enrichDeviceFromDescription({
+            id: `manual-${normalizedIp}-${candidatePort}`,
+            name: nomeProvisorio,
+            host: normalizedIp,
+            port: candidatePort,
+            location
+        }, undefined, { timeoutMs: SONDA_MANUAL_TIMEOUT_MS, signal: desistir.signal })
 
-            if (enriched.manufacturer || enriched.modelName || enriched.name !== `TV (${normalizedIp})`) {
-                return {
-                    location,
-                    port: candidatePort,
-                    isSamsung: enriched.isSamsung
-                }
-            }
+        return enriched.manufacturer || enriched.modelName || enriched.name !== nomeProvisorio
+            ? { location, port: candidatePort, isSamsung: enriched.isSamsung, verified: true }
+            : null
+    }))
+
+    try {
+        for (const sonda of sondas) {
+            const resolvido = await sonda
+            if (resolvido) return resolvido
         }
+    } finally {
+        // Achou (ou ninguém respondeu): as sondas que ainda estão no ar param já.
+        desistir.abort()
     }
 
     const fallbackPort = port || 9197
     return {
         location: `http://${normalizedIp}:${fallbackPort}/dmr`,
-        port: fallbackPort
+        port: fallbackPort,
+        verified: false
     }
 }
 
@@ -1061,6 +1152,9 @@ export function setupDLNAHandlers() {
         try {
             log.info('[DLNA] Adding manual device:', { name, ip, port });
             const resolved = await resolveManualLocation(ip, port)
+            if (!resolved.verified) {
+                log.warn('[DLNA] Manual device did not answer any description probe; saving best guess:', resolved.location)
+            }
 
             const device = {
                 id: `manual-${ip}-${resolved.port}`,
@@ -1087,7 +1181,10 @@ export function setupDLNAHandlers() {
                     port: device.port,
                     location: device.location,
                     isSamsung: device.isSamsung
-                }
+                },
+                // Salvo, mas sem prova de que há uma TV ali (IP errado, TV
+                // desligada ou fora da rede): a tela avisa em vez de fingir.
+                unverified: !resolved.verified
             };
         } catch (error: unknown) {
             log.error('[DLNA] Add device error:', error);
