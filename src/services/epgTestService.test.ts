@@ -123,4 +123,34 @@ describe('epgTestService.startTest — EPG do provedor', () => {
         expect(epgTestService.results?.notWorking.map(c => c.channel)).toEqual([]);
         expect(epgTestService.results?.working.map(c => c.channel)).toEqual(['BR: Globo']);
     });
+
+    // D027: este e o diagnostico que substituiu o antigo epgService.testEPGMappings
+    // (removido). A deteccao de fonte Open-EPG (Portugal / Argentina / USA) que ele
+    // fazia vive aqui — cada ramo precisa continuar chegando ao resultado da tela.
+    it('marca a fonte Open-EPG certa (PT / AR / USA) e o id de cada canal', async () => {
+        vi.mocked(epgService.getOpenEpgPortugalId).mockImplementation(n => (n === 'Canal Um' ? 'um.pt' : null));
+        vi.mocked(epgService.getOpenEpgArgentinaId).mockImplementation(n => (n === 'Canal Dois' ? 'dos.ar' : null));
+        vi.mocked(epgService.getOpenEpgUSAId).mockImplementation(n => (n === 'Canal Tres' ? 'three.us' : null));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).ipcRenderer = {
+            invoke: vi.fn(async () => ({
+                success: true,
+                data: ['Canal Um', 'Canal Dois', 'Canal Tres', 'Canal Quatro']
+                    .map((name, i) => ({ name, stream_id: i + 1, epg_channel_id: '' }))
+            }))
+        };
+
+        await epgTestService.startTest('full');
+
+        const porCanal = Object.fromEntries(
+            (epgTestService.results?.working ?? []).map(c => [c.channel, [c.source, c.epgId, c.country]])
+        );
+        expect(porCanal).toEqual({
+            'Canal Um': ['Open-EPG Portugal', 'um.pt', 'PT'],
+            'Canal Dois': ['Open-EPG Argentina', 'dos.ar', 'ARG'],
+            'Canal Tres': ['Open-EPG USA', 'three.us', 'US'],
+            'Canal Quatro': ['mi.tv / meuguia.tv', 'globo', 'BR']
+        });
+        expect(epgTestService.results?.notWorking).toEqual([]);
+    });
 });
