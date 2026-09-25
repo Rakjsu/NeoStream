@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDLNA, type DLNADevice } from '../hooks/useDLNA';
+import { mensagemDaFalhaDoCastDlna } from '../services/falhaDoCastDlna';
 import { useAirPlay, type AirPlayDevice } from '../hooks/useAirPlay';
 import { useChromecast, type ChromecastDevice } from '../hooks/useChromecast';
 import { useLanguage } from '../services/languageService';
@@ -86,7 +87,7 @@ export function CastDeviceSelector({
     // barra de progresso falsa (o LOAD usa live ? 'LIVE' : 'BUFFERED') e ainda
     // recebia o currentTime do player local como posição inicial.
     const chromecast = useChromecast(primaryUrl, primaryTitle, contentType === 'live' || /\.m3u8(\?|$)/.test(primaryUrl), effectiveVtt, castContext);
-    const { devices: dlnaDevices, discoverDevices, castToDevice, addDevice, error: dlnaError, isDiscovering } = dlna;
+    const { devices: dlnaDevices, discoverDevices, castToDevice, ultimaFalhaDoCast, addDevice, error: dlnaError, isDiscovering } = dlna;
     const { devices: airplayDevices, castToDevice: castToAirPlayDevice, discoverDevices: discoverAirPlay } = airplay;
     const { devices: chromecastDevices, castToDevice: castToChromecast, discoverDevices: discoverChromecast } = chromecast;
     const [view, setView] = useState<'list' | 'add'>('list');
@@ -143,10 +144,12 @@ export function CastDeviceSelector({
             });
             setTimeout(() => onClose(), 500);
         } else {
-            setCastError(dlnaError || t('cast', 'failedToTransmit'));
+            // A falha DESTA tentativa, com o código do main traduzido. O
+            // `dlnaError` da closure é o do render de antes do clique (#D098).
+            setCastError(mensagemDaFalhaDoCastDlna(ultimaFalhaDoCast(), t));
         }
         setCastingDevice(null);
-    }, [castToDevice, dlnaError, onClose, onDeviceSelected, t]);
+    }, [castToDevice, ultimaFalhaDoCast, onClose, onDeviceSelected, t]);
 
     const handleChromecast = useCallback(async (device: ChromecastDevice) => {
         setCastingDevice(device.name);

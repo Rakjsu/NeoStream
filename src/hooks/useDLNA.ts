@@ -1,5 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { isWatchBlockedNow } from '../services/watchGateService';
+import type { FalhaDoCastDlna } from '../services/falhaDoCastDlna';
 
 export interface DLNADevice {
     id: string;
@@ -37,6 +38,11 @@ interface DLNADevicesResult {
 interface DLNACommandResult {
     success: boolean;
     error?: string;
+}
+
+/** dlna:cast: `code` estável quando o main sabe o motivo (#D098). */
+interface DLNACastResult extends DLNACommandResult {
+    code?: string;
 }
 
 interface DLNAAddDeviceResult extends DLNACommandResult {
@@ -105,6 +111,12 @@ export function useDLNA(videoUrl: string, videoTitle: string, subtitleVtt?: stri
     const [isDiscovering, setIsDiscovering] = useState(false);
     const [currentDevice, setCurrentDevice] = useState<DLNADevice | null>(null);
     const [error, setError] = useState<string | null>(null);
+    // A falha do ÚLTIMO dlna:cast, para quem lê logo depois do await (#D098).
+    // Estado só chega no próximo render: o seletor, que lia o `error` da
+    // closure, mostrava o motivo da tentativa ANTERIOR. O `error` acima fica
+    // para a busca e o cadastro.
+    const ultimaFalhaRef = useRef<FalhaDoCastDlna | null>(null);
+    const ultimaFalhaDoCast = useCallback(() => ultimaFalhaRef.current, []);
 
     // Load saved devices
     const loadDevices = useCallback(async () => {
@@ -187,6 +199,7 @@ export function useDLNA(videoUrl: string, videoTitle: string, subtitleVtt?: stri
     // Cast to device
     const castToDevice = async (device: DLNADevice) => {
         setError(null);
+        ultimaFalhaRef.current = null;
         // ⏰ Trava de tempo de tela / janela de horário (mesma do player).
         if (isWatchBlockedNow()) return false;
         try {
@@ -195,7 +208,7 @@ export function useDLNA(videoUrl: string, videoTitle: string, subtitleVtt?: stri
                 url: videoUrl,
                 title: videoTitle,
                 subtitleVtt: subtitleVtt || undefined
-            }) as DLNACommandResult;
+            }) as DLNACastResult;
 
             if (result.success) {
                 setIsCasting(true);
@@ -203,11 +216,14 @@ export function useDLNA(videoUrl: string, videoTitle: string, subtitleVtt?: stri
                 return true;
             }
 
-            setError(result.error || 'Cast failed');
+            // A falha do cast vai SÓ para quem chamou (o seletor traduz o
+            // `code`). No `error` o texto cru do main (PT-BR) ficava na tela:
+            // o aviso cai nele quando o seletor limpa o dele, e isso acontece
+            // ao tentar o Chromecast ou a Apple TV logo depois (#D098).
+            ultimaFalhaRef.current = { code: result.code, error: result.error };
             return false;
         } catch (error: unknown) {
             console.error('DLNA cast error:', error);
-            setError(getErrorMessage(error, 'Cast error'));
             return false;
         }
     };
@@ -235,6 +251,7 @@ export function useDLNA(videoUrl: string, videoTitle: string, subtitleVtt?: stri
         error,
         discoverDevices,
         castToDevice,
+        ultimaFalhaDoCast,
         stopCasting,
         addDevice,
         removeDevice,
