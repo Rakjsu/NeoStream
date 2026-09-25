@@ -360,6 +360,7 @@
     "invalidFile": "Arquivo de backup inválido ou incompatível",
     "confirmImportTitle": "Restaurar backup?",
     "confirmImportMessage": "Os dados atuais (perfis, favoritos, progresso e configurações) serão sobrescritos pelos dados do backup. Esta ação não pode ser desfeita.",
+    "confirmImportKeepsPlaylists": "As playlists deste aparelho que não estão no backup não são apagadas.",
     "confirmImportConfirm": "Restaurar",
     "confirmImportCancel": "Cancelar",
     "importSuccess": "Backup restaurado com sucesso! Reinicie o aplicativo para aplicar todas as alterações.",

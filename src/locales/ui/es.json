@@ -579,6 +579,7 @@
     "invalidFile": "Archivo de copia de seguridad inválido o incompatible",
     "confirmImportTitle": "¿Restaurar copia de seguridad?",
     "confirmImportMessage": "Los datos actuales (perfiles, favoritos, progreso y configuración) serán sobrescritos por los datos de la copia. Esta acción no se puede deshacer.",
+    "confirmImportKeepsPlaylists": "Las playlists de este equipo que no están en la copia no se borran.",
     "confirmImportConfirm": "Restaurar",
     "confirmImportCancel": "Cancelar",
     "importSuccess": "¡Copia restaurada con éxito! Reinicia la aplicación para aplicar todos los cambios.",
