@@ -95,23 +95,27 @@ export function ContentDetailModal({
     const [similar, setSimilar] = useState<TMDBSimilarItem[]>([]);
     const [castList, setCastList] = useState<TMDBCastMember[]>([]);
     const [filmography, setFilmography] = useState<{ name: string; items: TMDBSimilarItem[] } | null>(null);
-    // 🔗 Índice do catálogo (título normalizado → id) pra cruzar Parecidos e
-    // filmografia: só aparece o que EXISTE no app, e clicável abre a ficha.
+    // 🔗 Índice do catálogo (título normalizado → id) pra cruzar Parecidos,
+    // filmografia e franquia: só é clicável o que EXISTE no app, e o clique
+    // abre a ficha.
     const [catalogIndex, setCatalogIndex] = useState<CatalogTitleIndex | null>(null);
     const navigate = useNavigate();
 
     // Carrega o índice quando as seções TMDB aparecem. O índice é cache de
     // MÓDULO (catalogTitleIndex): o modal é remontado a cada ficha aberta, e
     // montá-lo aqui fazia o catálogo INTEIRO atravessar o IPC toda vez.
+    // A franquia conta como seção: sem ela aqui, uma ficha com coleção e sem
+    // nenhum "Parecido" nunca pedia o índice e o rail da coleção não abria nada.
+    const hasCollectionRail = contentType === 'movie' && !!collection && collection.parts.length > 1;
     useEffect(() => {
         if (!isOpen || catalogIndex) return;
-        if (similar.length === 0 && !filmography) return;
+        if (similar.length === 0 && !filmography && !hasCollectionRail) return;
         let cancelled = false;
         void getCatalogTitleIndex()
             .then(index => { if (!cancelled) setCatalogIndex(index); })
             .catch(() => { /* sem índice os rails TMDB só não ficam clicáveis */ });
         return () => { cancelled = true; };
-    }, [isOpen, catalogIndex, similar.length, filmography]);
+    }, [isOpen, catalogIndex, similar.length, filmography, hasCollectionRail]);
 
     // Parecidos: filme cruza com o catálogo de filmes; série com o de séries.
     const similarInCatalog = useMemo(() => {
@@ -129,6 +133,22 @@ export function ContentDetailModal({
             .map(item => ({ item, catalogId: catalogIndex.vod.get(normalizeTitle(item.title)) }))
             .filter((entry): entry is { item: TMDBSimilarItem; catalogId: string } => !!entry.catalogId);
     }, [catalogIndex, filmography]);
+
+    // Franquia: parte da coleção TMDB → id do filme no catálogo (sempre VOD).
+    // Diferente dos Parecidos, as partes que não existem no app continuam no
+    // rail (a franquia inteira dá contexto) — só não abrem nada.
+    const collectionInCatalog = useMemo(() => {
+        const byPart = new Map<number, string>();
+        if (!catalogIndex || !collection) return byPart;
+        for (const part of collection.parts) {
+            const catalogId = catalogIndex.vod.get(normalizeTitle(part.title));
+            if (catalogId) byPart.set(part.id, catalogId);
+        }
+        return byPart;
+    }, [catalogIndex, collection]);
+    // Só dá pra dizer "não está no catálogo" com um índice de filmes de
+    // verdade: provedor fora do ar devolve os Maps vazios (sem erro).
+    const collectionIndexKnown = !!catalogIndex && catalogIndex.vod.size > 0;
 
     // Abre a ficha de outro item do catálogo: fecha este modal e reusa o canal
     // da busca global (a página de destino consome o open-id e abre o modal).
@@ -1472,14 +1492,23 @@ export function ContentDetailModal({
                     </div>
 
                     {/* 🎬 Coleção TMDB (franquia) */}
-                    {contentType === 'movie' && collection && collection.parts.length > 1 && (
+                    {hasCollectionRail && collection && (
                         <div style={{ marginTop: 24 }}>
                             <h3 style={{ color: 'white', fontSize: 15, fontWeight: 700, marginBottom: 10 }}>
                                 🎬 {collection.name}
                             </h3>
                             <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 6 }}>
-                                {collection.parts.map(part => (
-                                    <div key={part.id} style={{ width: 92, flexShrink: 0 }} title={part.title}>
+                                {collection.parts.map(part => {
+                                    const isCurrent = part.id === tmdbDetails?.id;
+                                    const catalogId = collectionInCatalog.get(part.id);
+                                    // Remake de mesmo título ("Halloween" 1978 × 2018) normaliza
+                                    // igual e cai no id DESTA ficha: botão só a reabriria.
+                                    const opensThisSheet = catalogId === contentId;
+                                    // Apagada só quando o índice JÁ respondeu COM filmes e a parte
+                                    // não está nele. Provedor fora do ar devolve o índice vazio
+                                    // (resolvido, não rejeitado): aí não dá pra afirmar nada.
+                                    const missing = !isCurrent && collectionIndexKnown && !catalogId;
+                                    const cardBody = (<>
                                         {part.poster_path ? (
                                             <img
                                                 src={`https://image.tmdb.org/t/p/w185${part.poster_path}`}
@@ -1498,8 +1527,31 @@ export function ContentDetailModal({
                                         <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             {part.title}{part.release_date ? ` (${part.release_date.slice(0, 4)})` : ''}
                                         </p>
-                                    </div>
-                                ))}
+                                    </>);
+                                    // Mesmo par dos Parecidos: existe no app e não é o filme
+                                    // aberto → botão que abre a ficha dele.
+                                    if (catalogId && !isCurrent && !opensThisSheet) {
+                                        return (
+                                            <button
+                                                key={part.id}
+                                                onClick={() => openCatalogItem('vod', catalogId)}
+                                                title={part.title}
+                                                style={{ width: 92, flexShrink: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+                                            >
+                                                {cardBody}
+                                            </button>
+                                        );
+                                    }
+                                    return (
+                                        <div
+                                            key={part.id}
+                                            style={{ width: 92, flexShrink: 0, ...(missing ? { opacity: 0.4 } : {}) }}
+                                            title={missing ? `${part.title} — ${t('contentModal', 'notInCatalog')}` : part.title}
+                                        >
+                                            {cardBody}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
