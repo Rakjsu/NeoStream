@@ -1170,6 +1170,7 @@
     "loading": "Carregando catálogo...",
     "loadError": "Falha ao carregar o catálogo",
     "hint": "↑↓ navegar · Enter abrir · Esc fechar",
+    "personHint": "@nome busca por ator ou diretor",
     "openSearch": "Buscar",
     "recent": "Buscas recentes",
     "clearRecent": "limpar"

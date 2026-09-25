@@ -15,6 +15,7 @@ import {
 } from '../utils/searchRank';
 import { searchConfigService, type SearchConfig } from '../services/searchConfigService';
 import { searchPersonCredits } from '../services/tmdb';
+import { hasTmdbApiKey } from '../services/tmdbKey';
 import { matchCatalogByTitles } from '../services/personSearchHelpers';
 
 /**
@@ -353,6 +354,13 @@ export function GlobalSearch() {
     // Search scope from Settings → Busca, re-read on each open.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `open` forces re-read; config lives outside React
     const searchConfig = useMemo<SearchConfig>(() => searchConfigService.getConfig(), [open]);
+
+    // 🎭 O rodapé ensina o atalho "@nome" (elenco/diretor) só quando ele
+    // responde: sem a chave TMDB do usuário o searchPersonCredits devolve null,
+    // e anunciar ali seria prometer "Nenhum resultado". Relido a cada abertura —
+    // a chave pode ser colada em Configurações → APIs no meio da sessão.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `open` forces re-read; the key lives in localStorage
+    const personSearchAvailable = useMemo(() => hasTmdbApiKey(), [open]);
 
     const groups = useMemo<ResultGroup[]>(() => {
         const trimmed = query.trim();
@@ -756,7 +764,10 @@ export function GlobalSearch() {
                     </div>
 
                     <div className="gsearch-footer">
-                        <span>{t('search', 'hint')}</span>
+                        <span>
+                            {t('search', 'hint')}
+                            {personSearchAvailable && ` · ${t('search', 'personHint')}`}
+                        </span>
                     </div>
                 </div>
             </div>
