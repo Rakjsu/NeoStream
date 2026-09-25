@@ -10,6 +10,7 @@ import { fileURLToPath } from 'url';
 import Store from 'electron-store';
 
 import log from './logger'
+import { boundsVisiveis } from './boundsDaJanela'
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -153,9 +154,7 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
         // 📐 Reabre onde o usuário deixou: bounds salvos ao mover/redimensionar,
         // desde que o ponto ainda caia num monitor conectado.
         const savedBounds = pipStore.get('pipBounds') as { x: number; y: number; width: number; height: number } | undefined;
-        const boundsVisible = savedBounds && screen.getAllDisplays().some(d =>
-            savedBounds.x >= d.bounds.x - 8 && savedBounds.x < d.bounds.x + d.bounds.width &&
-            savedBounds.y >= d.bounds.y - 8 && savedBounds.y < d.bounds.y + d.bounds.height);
+        const boundsVisible = savedBounds && boundsVisiveis(savedBounds, screen.getAllDisplays());
         if (savedBounds && boundsVisible) janela.setBounds(savedBounds);
         const persistBounds = () => {
             if (!janela.isDestroyed()) pipStore.set('pipBounds', janela.getBounds());

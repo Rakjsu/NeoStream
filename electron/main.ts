@@ -1,7 +1,7 @@
 // Keep this first: redirects userData when the Playwright E2E suite is
 // driving the app (no-op otherwise). See electron/e2eUserData.ts.
 import './e2eUserData'
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, screen } from 'electron'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import log from './logger'
@@ -32,6 +32,7 @@ import { setupSyncFolder } from './syncFolder'
 import { setupOutgoingHeaderRewrites } from './outgoingHeaderRewrites'
 import Store from 'electron-store'
 import { gpuSwitchesFor, normalizeHwAccelMode, type HwAccelMode } from './gpuPolicy'
+import { prepararJanelaPrincipal } from './boundsDaJanela'
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url)
@@ -122,9 +123,15 @@ setupNotifyHandlers(() => win)
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 
 function createWindow() {
+    // 📐 Reabre com o tamanho e a posição da última vez (D121) — ver
+    // boundsDaJanela.ts. Arquivo ilegível abre no tamanho de fábrica.
+    const estadoDaJanela = prepararJanelaPrincipal(
+        () => new Store<{ mainBounds?: unknown }>({ name: 'window-state' }),
+        screen,
+        (mensagem, erro) => log.warn(mensagem, erro),
+    )
     win = new BrowserWindow({
-        width: 1200,
-        height: 800,
+        ...estadoDaJanela.bounds,
         icon: path.join(process.env.VITE_PUBLIC || '', 'neostream-logo.png'),
         backgroundColor: '#0f0f23',
         frame: false, // Frameless window for custom title bar
@@ -142,6 +149,9 @@ function createWindow() {
     // WebSocket do "PC controla PC" sem o Origin file:// que o guarda do outro
     // PC recusa. Ver outgoingHeaderRewrites.ts.
     setupOutgoingHeaderRewrites(win.webContents.session, VITE_DEV_SERVER_URL)
+
+    // Grava ao mover/redimensionar/fechar; o próximo boot reabre ali.
+    estadoDaJanela.lembrar(win)
 
     // Prevent any native maximize attempts (Win+Up, etc.)
     win.on('maximize', () => {
