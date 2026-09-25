@@ -534,6 +534,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
         subtitleLoading,
         subtitleLanguage,
         vttContent,
+        legendaNaTela,
         subtitleWarning,
         isForcedSubtitle,
         forcedEnabledForSession,
@@ -1936,7 +1937,7 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                     <CastDeviceSelector
                         videoUrl={src}
                         videoTitle={title || 'Video'}
-                        subtitleVtt={vttContent}
+                        subtitleVtt={legendaNaTela}
                         tmdbId={tmdbId}
                         imdbId={imdbId}
                         contentId={contentId}
