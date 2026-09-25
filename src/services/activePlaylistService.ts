@@ -13,6 +13,8 @@
 
 const MIRROR_KEY = 'neostream_active_playlist_id';
 const FALLBACK = 'default';
+/** O separador do escopo de playlist — o mesmo que `playlistIdRemap` corta. */
+const SCOPE_SEP = '__pl_';
 
 let cachedId: string | null = null;
 
@@ -72,7 +74,29 @@ export function hasKnownPlaylistId(): boolean {
  * divergindo.
  */
 export function playlistScopedKeyFor(base: string, profileId: string, playlistId: string): string {
-    return `${base}_${profileId}__pl_${playlistId}`;
+    return `${base}_${profileId}${SCOPE_SEP}${playlistId}`;
+}
+
+/**
+ * Apaga do localStorage TODO o estado escopado na playlist `playlistId`, de
+ * todos os perfis — qualquer chave que `playlistScopedKeyFor` monta:
+ * favoritos, Minha Lista, progresso, canais ocultos, fila... Quem chama é a
+ * remoção da playlist, depois de o main confirmar: ele limpa só o lado dele
+ * (cache do catálogo, documento M3U, EPG). Sem isto as chaves ficavam no
+ * disco pra sempre (D088).
+ *
+ * Casa o id INTEIRO logo depois do `__pl_` (o id, `createPlaylistId`, não
+ * contém `__pl_`): `pl_x_abc` não leva `pl_x_abcd` nem `xpl_x_abc`, e o
+ * balde `default` da corrida de boot não é de playlist nenhuma.
+ */
+export function purgePlaylistScopedData(playlistId: string): void {
+    const sufixo = `${SCOPE_SEP}${playlistId}`;
+    const doomed: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.endsWith(sufixo)) doomed.push(key);
+    }
+    doomed.forEach(key => localStorage.removeItem(key));
 }
 
 /**

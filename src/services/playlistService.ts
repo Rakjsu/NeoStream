@@ -1,12 +1,13 @@
 import { hasTmdbApiKey, setTmdbOnboardingPending } from './tmdbKey'
+import { purgePlaylistScopedData } from './activePlaylistService'
 
 // Playlist Service - thin renderer wrapper over the playlists:* IPC surface.
 //
-// Data separation (v1): favorites / watch-later / history / watch progress
-// are GLOBAL across playlists (they key by stream ids, which differ per
-// provider — collisions are possible but accepted). Provider-derived caches
-// (content fetch timestamp, EPG test results) are cleared on switch and the
-// app reloads so every page refetches from the new provider.
+// Data separation: favorites / watch-later / watch progress / hidden channels
+// are scoped PER PLAYLIST (`__pl_<id>`, see activePlaylistService.ts) — stream
+// ids differ per provider. Provider-derived caches (content fetch timestamp,
+// EPG test results) are cleared on switch and the app reloads so every page
+// refetches from the new provider.
 
 export interface PlaylistSummary {
     id: string
@@ -55,8 +56,15 @@ export const playlistService = {
         return await window.ipcRenderer.invoke('playlists:switch', { id }) as IpcResult
     },
 
+    /**
+     * Remove a playlist no main e, SÓ se ele confirmar, apaga o estado do
+     * usuário escopado nela (`__pl_<id>`) — D088. Mora aqui, e não na tela,
+     * para que nenhum caminho de remoção esqueça os dados.
+     */
     async remove(id: string): Promise<IpcResult & { loggedOut?: boolean }> {
-        return await window.ipcRenderer.invoke('playlists:remove', { id }) as IpcResult & { loggedOut?: boolean }
+        const result = await window.ipcRenderer.invoke('playlists:remove', { id }) as IpcResult & { loggedOut?: boolean }
+        if (result.success) purgePlaylistScopedData(id)
+        return result
     },
 
     async rename(id: string, name: string): Promise<IpcResult> {

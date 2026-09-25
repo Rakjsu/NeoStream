@@ -54,6 +54,40 @@ export function remapPlaylistScopedKeys(
 }
 
 /**
+ * Tira do mapa de dados de um arquivo do SYNC as chaves escopadas numa
+ * playlist que o ARQUIVO lista e que esta máquina RECUSOU (sem par no
+ * `idMap`) — a apagada aqui de propósito (ledger `removedPlaylists` do main).
+ * Sem isto o `mergeSyncData` adotava `__pl_<idDeLá>` como dado morto; o
+ * arquivo DESTA máquina passava a carregá-lo, e quando a outra também
+ * apagava a playlist recebia de volta as chaves com o id dela. Apagar nas
+ * duas deixava o dado no disco das duas, pra sempre (D088).
+ *
+ * `idMap` ausente = o import não respondeu: recusa e falha não se distinguem,
+ * e tudo passa intacto como antes. Chave de playlist que o arquivo NÃO lista
+ * também passa — não é uma recusa desta máquina.
+ */
+export function semEscopoDasRecusadas(
+    data: Record<string, string>,
+    playlistsDoArquivo: { id?: string }[],
+    idMap: Record<string, string> | null | undefined,
+): Record<string, string> {
+    if (!idMap) return data;
+
+    const recusadas = new Set<string>();
+    for (const { id } of playlistsDoArquivo) {
+        if (id && !Object.prototype.hasOwnProperty.call(idMap, id)) recusadas.add(id);
+    }
+
+    const result: Record<string, string> = {};
+    for (const [key, value] of Object.entries(data)) {
+        const corte = key.lastIndexOf(SEP);
+        if (corte !== -1 && recusadas.has(key.slice(corte + SEP.length))) continue;
+        result[key] = value;
+    }
+    return result;
+}
+
+/**
  * Mesma reescrita, mas sobre o que JÁ foi gravado no localStorage — o caminho
  * do RESTORE (BackupSection e Welcome), onde o `applyBackup` grava os dados
  * antes de as playlists entrarem no processo principal e ganharem id daqui.
