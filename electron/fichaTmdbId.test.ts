@@ -48,11 +48,13 @@ describe('ficha: o tmdb_id do provedor chega ao modal', () => {
         expect(blocoContentData(ler('pages', 'Series.tsx'))).toContain('tmdb_id: selectedSeries.tmdb_id')
     })
 
-    it('o painel de série usa o mesmo id que já busca os títulos de episódio', () => {
-        // Sem este caso, reverter só esta linha deixaria a suíte verde — e é
-        // exatamente onde "sinopse da série A com episódios da série B" volta.
-        const fonte = ler('hooks', 'useSeriesMetadata.ts')
-        expect(fonte).not.toContain('searchSeriesByName(')
-        expect(fonte).toContain('resolveSeriesDetails(selectedSeries.tmdb_id')
+    it('o título do episódio no player sai do mesmo id da série que está tocando', () => {
+        // O painel antigo (e o `useSeriesMetadata` que resolvia a série por
+        // nome pra ele) saiu no #D047; o que sobrou na página é o nome do
+        // episódio tocando — e ele tem que vir do id do provedor, não de busca.
+        const hook = ler('hooks', 'useEpisodeTitle.ts')
+        expect(hook.includes('searchSeriesByName(')).toBe(false)
+        expect(hook.includes('fetchEpisodeDetails(tmdbId')).toBe(true)
+        expect(/useEpisodeTitle\(\s*playingSeries\?\.tmdb_id,/.test(ler('pages', 'Series.tsx'))).toBe(true)
     })
 })

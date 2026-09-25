@@ -3,19 +3,19 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 
 /**
- * 🌐 A coluna de episódios da ficha e o botão de limpar histórico do painel
- * tinham que sair NO IDIOMA DO APP.
+ * 🌐 A coluna de episódios da ficha tinha que sair NO IDIOMA DO APP.
  *
- * Três textos estavam cravados em português dentro do JSX, no meio de vizinhos
- * que já passavam por `t()`:
- *   - `ContentDetailModal`: "Carregando episódios..." e "⚠️ Não foi possível
- *     carregar os episódios." — este último colado num botão que JÁ saía
- *     traduzido (`t('common','retry')`), então o aviso saía metade em
- *     português e metade em inglês na MESMA caixinha;
- *   - `SeriesDetailPanel`: o botão "Limpar Histórico", ao lado do "Ver depois"
- *     que já vinha de `t('contentModal','watchLater')`.
+ * Dois textos estavam cravados em português dentro do JSX, no meio de vizinhos
+ * que já passavam por `t()`: "Carregando episódios..." e "⚠️ Não foi possível
+ * carregar os episódios." — este último colado num botão que JÁ saía
+ * traduzido (`t('common','retry')`), então o aviso saía metade em português e
+ * metade em inglês na MESMA caixinha.
  *
- * Os casos montam os dois componentes DE VERDADE (react-dom/client + act, o
+ * (O botão "Limpar Histórico" do antigo `SeriesDetailPanel` também era coberto
+ * aqui; o painel saiu da tela no #D047 — nascia com `display: none` atrás da
+ * ficha — e levou o botão junto.)
+ *
+ * Os casos montam a ficha DE VERDADE (react-dom/client + act, o
  * padrão de src/components/proximoEpisodioNoMpv.test.tsx), põem o app em
  * inglês/espanhol e leem o texto que aparece na tela. Não há casamento de
  * string sobre o código-fonte: o que se afirma é o que a pessoa lê.
@@ -50,7 +50,6 @@ vi.mock('../services/catalogTitleIndex', () => ({
 
 vi.mock('../services/watchProgressService', () => ({
     watchProgressService: {
-        // Truthy: é o que faz o botão "Limpar Histórico" existir no painel.
         getSeriesProgress: () => ({ lastSeason: 1, lastEpisode: 1 }),
         getLastWatchedEpisode: () => null,
         getEpisodeProgress: () => null,
@@ -104,11 +103,10 @@ vi.mock('../services/profileService', () => ({
 vi.mock('./CastDeviceSelector', () => ({ CastDeviceSelector: () => null }));
 
 import { ContentDetailModal } from './ContentDetailModal';
-import { SeriesDetailPanel } from './SeriesDetailPanel';
 import { languageService } from '../services/languageService';
 
 const CAPA = 'https://exemplo.invalido/capa.jpg';
-const SERIE = { name: 'Série de Teste (2020)', cover: CAPA, series_id: 7, stream_icon: CAPA };
+const SERIE = { name: 'Série de Teste (2020)', cover: CAPA };
 
 /** Espera o dicionário lazy (en/es) terminar de carregar. */
 async function esperarIdioma(secao: string, chave: string, esperado: string) {
@@ -119,7 +117,7 @@ async function esperarIdioma(secao: string, chave: string, esperado: string) {
     throw new Error(`dicionario nao carregou: ${secao}.${chave}`);
 }
 
-describe('textos da ficha e do painel de série saem no idioma do app', () => {
+describe('textos da ficha de série saem no idioma do app', () => {
     let container: HTMLDivElement;
     let root: Root;
     /** Resolve o `series:get-info` do modal — cada caso decide quando e com o quê. */
@@ -176,28 +174,6 @@ describe('textos da ficha e do painel de série saem no idioma do app', () => {
         });
     }
 
-    async function montarPainel() {
-        await act(async () => {
-            root.render(
-                <SeriesDetailPanel
-                    series={SERIE}
-                    tmdbData={null}
-                    loadingTmdb={false}
-                    seriesInfo={null}
-                    selectedSeason={1}
-                    selectedEpisode={1}
-                    getEpisodeTitle={(titulo: string) => titulo}
-                    onSelectSeason={() => { }}
-                    onSelectEpisode={() => { }}
-                    onPlay={() => { }}
-                    onClearHistory={() => { }}
-                    onClose={() => { }}
-                    onRefresh={() => { }}
-                />
-            );
-        });
-    }
-
     it('em INGLES, a coluna de episodios carrega em ingles', async () => {
         languageService.setLanguage('en');
         await esperarIdioma('contentModal', 'loadingEpisodes', 'Loading episodes...');
@@ -238,31 +214,5 @@ describe('textos da ficha e do painel de série saem no idioma do app', () => {
 
         await falharOsEpisodios();
         expect(container.textContent?.includes('⚠️ Não foi possível carregar os episódios.')).toBe(true);
-    });
-
-    it('o botao de limpar historico do painel segue o idioma do app', async () => {
-        languageService.setLanguage('en');
-        await esperarIdioma('seriesPage', 'clearHistory', 'Clear History');
-
-        await montarPainel();
-
-        expect(container.textContent?.includes('Clear History')).toBe(true);
-        expect(container.textContent?.includes('Limpar Histórico')).toBe(false);
-    });
-
-    it('em ESPANHOL, o botao de limpar historico sai em espanhol', async () => {
-        languageService.setLanguage('es');
-        await esperarIdioma('seriesPage', 'clearHistory', 'Borrar historial');
-
-        await montarPainel();
-
-        expect(container.textContent?.includes('Borrar historial')).toBe(true);
-        expect(container.textContent?.includes('Limpar Histórico')).toBe(false);
-    });
-
-    it('em PORTUGUES, o botao de limpar historico continua o mesmo (sem regressao)', async () => {
-        await montarPainel();
-
-        expect(container.textContent?.includes('Limpar Histórico')).toBe(true);
     });
 });

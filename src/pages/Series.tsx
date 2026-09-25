@@ -3,7 +3,6 @@ import { SortSelect } from '../components/SortSelect';
 import { CatalogFilters } from '../components/CatalogFilters';
 import { fuzzyIncludes, matchesFilters, qualityBadgeOf } from '../utils/catalogFilter';
 import { compareCatalogItems, type CatalogSort } from '../utils/catalogSort';
-import { getBackdropUrl } from '../services/tmdb';
 import { watchLaterService } from '../services/watchLater';
 import { favoritesService } from '../services/favoritesService';
 import { newEpisodesService } from '../services/newEpisodesService';
@@ -16,8 +15,7 @@ import { ResumeModal } from '../components/ResumeModal';
 import { ContentDetailModal } from '../components/ContentDetailModal';
 import { idsComTag } from '../services/personalMarksService';
 import { profileService } from '../services/profileService';
-import { SeriesDetailPanel, type SeriesEpisode, type SeriesInfo } from '../components/SeriesDetailPanel';
-import { useSeriesMetadata } from '../hooks/useSeriesMetadata';
+import { useEpisodeTitle } from '../hooks/useEpisodeTitle';
 import { useContentFiltering } from '../hooks/useContentFiltering';
 import { useWindowedGrid } from '../hooks/useWindowedGrid';
 import { HoverPreviewCard } from '../components/HoverPreviewCard';
@@ -49,6 +47,20 @@ interface Series {
     tmdb_id: string;
 }
 
+// Formato do `series:get-info` que a página guarda para o player (URL do
+// episódio, próximo/anterior, título). Morava no antigo `SeriesDetailPanel`,
+// que saiu da tela no #D047; a ficha declara o mesmo formato por conta própria.
+interface SeriesEpisode {
+    id: number | string;
+    episode_num: number | string;
+    title?: string;
+    container_extension?: string;
+}
+
+interface SeriesInfo {
+    episodes?: Record<string, SeriesEpisode[]>;
+}
+
 const CARD_MIN_WIDTH = 180;
 const CARD_GAP = 24;
 
@@ -74,7 +86,6 @@ export function Series() {
     const [selectedSeason, setSelectedSeason] = useState<number>(1);
     const [selectedEpisode, setSelectedEpisode] = useState<number>(1);
     const [seriesInfo, setSeriesInfo] = useState<SeriesInfo | null>(null);
-    const [, setRefresh] = useState(0);
     const [visibleCount, setVisibleCount] = useState(0);
     const [itemsPerPage, setItemsPerPage] = useState(36);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -87,15 +98,21 @@ export function Series() {
         duration: number;
     } | null>(null);
 
-    // Clear history confirmation
-    const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false);
     const isKidsProfile = profileService.getActiveProfile()?.isKids || false;
     const { t } = useLanguage();
     // Congelado por sessão da página (regra de pureza) — base do selo NOVO.
     const [nowMs] = useState(() => Date.now());
 
-    // TMDB metadata + episode title resolution for the selected series
-    const { tmdbData, loadingTmdb, getEpisodeTitle } = useSeriesMetadata(selectedSeries, selectedSeason);
+    // 📺 Nome do episódio que está TOCANDO (título do player). A ficha
+    // (ContentDetailModal) já resolve a série no TMDB e lista os episódios; a
+    // página não mantém uma segunda cópia disso escondida atrás dela (#D047).
+    // Sem série tocando não há `tmdb_id` aqui, e o hook não vai ao TMDB.
+    const playingEpisodeTitle = useEpisodeTitle(
+        playingSeries?.tmdb_id,
+        selectedSeason,
+        selectedEpisode,
+        seriesInfo?.episodes?.[selectedSeason]
+    );
 
     // Kids profile + Parental Control filtering and click-gating
     const {
@@ -526,8 +543,7 @@ export function Series() {
     );
 
     const backdropUrl = selectedSeries ? (
-        tmdbData?.backdrop_path ? getBackdropUrl(tmdbData.backdrop_path) :
-            selectedSeries.cover || fixImageUrl(selectedSeries.stream_icon)
+        selectedSeries.cover || fixImageUrl(selectedSeries.stream_icon)
     ) : null;
 
     return (
@@ -586,32 +602,10 @@ export function Series() {
                 />
 
                 <div className="series-content">
-                    {/* Series Details Panel */}
-                    {selectedSeries && (
-                        <SeriesDetailPanel
-                            series={selectedSeries}
-                            tmdbData={tmdbData}
-                            loadingTmdb={loadingTmdb}
-                            seriesInfo={seriesInfo}
-                            selectedSeason={selectedSeason}
-                            selectedEpisode={selectedEpisode}
-                            getEpisodeTitle={getEpisodeTitle}
-                            onSelectSeason={(season) => {
-                                setSelectedSeason(season);
-                                setSelectedEpisode(1);
-                            }}
-                            onSelectEpisode={setSelectedEpisode}
-                            onPlay={() => handlePlaySeries(selectedSeries)}
-                            onClearHistory={() => setShowClearHistoryConfirm(true)}
-                            onClose={() => setSelectedSeries(null)}
-                            onRefresh={() => setRefresh(r => r + 1)}
-                        />
-                    )}
-
                     {/* Series Grid */}
                     <div
                         ref={scrollContainerRef}
-                        className={`series-scroll-container ${selectedSeries ? 'with-details' : ''}`}
+                        className="series-scroll-container"
                     >
                         {filteredSeries.length === 0 ? (
                             <div className="empty-state">
@@ -785,13 +779,7 @@ export function Series() {
                     }
                     canGoPrevious={selectedEpisode > 1 || selectedSeason > 1}
                     currentEpisode={selectedEpisode}
-                    customTitle={(() => {
-                        const currentEp = seriesInfo?.episodes?.[selectedSeason]?.find(
-                            (ep: SeriesEpisode) => Number(ep.episode_num) === selectedEpisode
-                        );
-                        const episodeName = currentEp ? getEpisodeTitle(currentEp.title || '', selectedEpisode, selectedSeason) : `Episódio ${selectedEpisode}`;
-                        return `${playingSeries.name} - ${episodeName}`;
-                    })()}
+                    customTitle={`${playingSeries.name} - ${playingEpisodeTitle}`}
                 />
             )}
 
@@ -821,36 +809,6 @@ export function Series() {
                         setResumeModalData(null);
                     }}
                 />
-            )}
-
-            {/* Clear History Confirmation Modal */}
-            {showClearHistoryConfirm && selectedSeries && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <h2>Limpar Histórico?</h2>
-                        <p>
-                            Tem certeza que deseja limpar todo o histórico de visualização de <strong>{selectedSeries.name}</strong>? {t('profile', 'actionCannotBeUndone')}
-                        </p>
-                        <div className="modal-buttons">
-                            <button
-                                className="btn btn-secondary"
-                                onClick={() => setShowClearHistoryConfirm(false)}
-                            >
-                                {t('nav', 'cancel')}
-                            </button>
-                            <button
-                                className="btn btn-danger"
-                                onClick={() => {
-                                    watchProgressService.clearSeriesProgress(String(selectedSeries.series_id));
-                                    setShowClearHistoryConfirm(false);
-                                    setRefresh(r => r + 1);
-                                }}
-                            >
-                                Limpar Histórico
-                            </button>
-                        </div>
-                    </div>
-                </div>
             )}
 
             {/* Content Detail Modal */}
