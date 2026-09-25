@@ -8,6 +8,7 @@ import log from './logger'
 import { recordingFilename, buildRecordingArgs, parseFfmpegTime, buildMp4RemuxArgs, buildThumbnailArgs, mp4PathFor, renameTargetName, isSameRecordingFile } from './dvrProtocol'
 import { resolveFfmpegPath } from './ffmpegPath'
 import { getErrorMessage } from './errorMessage'
+import { isInside } from './downloadPaths'
 
 interface ActiveRecording {
     id: string
@@ -76,6 +77,20 @@ let nextId = 1
 
 export function recordingsDir(): string {
     return path.join(app.getPath('videos'), 'NeoStream', 'Gravacoes')
+}
+
+/**
+ * O caminho (já resolvido) está DENTRO da pasta de gravações?
+ *
+ * Tem de ser a regra do `isInside` (separador obrigatório, caixa ignorada no
+ * Windows), não `startsWith(dir)`: `...\NeoStream\Gravacoes Antigas\` e
+ * `...\NeoStream\Gravacoes.bak\` — pastas que o usuário cria ao arquivar —
+ * começam com o mesmo texto e passavam, e o `dvr:rename-file` chegava a MOVER
+ * o arquivo de lá para cá. A raiz em si também fica de fora: nenhum handler
+ * de arquivo opera sobre a pasta.
+ */
+function dentroDasGravacoes(alvo: string): boolean {
+    return isInside(path.resolve(recordingsDir()), alvo)
 }
 
 function broadcast(channel: string, payload: unknown) {
@@ -204,7 +219,7 @@ export function setupDvrHandlers() {
         try {
             const dir = path.resolve(recordingsDir())
             const current = path.resolve(String(data?.path || ''))
-            if (!current.startsWith(dir)) return { success: false, error: 'arquivo fora da pasta de gravações' }
+            if (!dentroDasGravacoes(current)) return { success: false, error: 'arquivo fora da pasta de gravações' }
             const safe = renameTargetName(String(data?.name || ''), current)
             if (!safe) return { success: false, error: 'nome vazio' }
             const target = path.join(dir, safe)
@@ -230,7 +245,7 @@ export function setupDvrHandlers() {
     // Revela a gravação no Explorer (ficha: caminho está no tooltip do nome).
     ipcMain.handle('dvr:show-in-folder', (_e, data: { path?: string }) => {
         const file = path.resolve(String(data?.path || ''))
-        if (!file.startsWith(path.resolve(recordingsDir()))) return { success: false }
+        if (!dentroDasGravacoes(file)) return { success: false }
         shell.showItemInFolder(file)
         return { success: true }
     })
@@ -241,9 +256,8 @@ export function setupDvrHandlers() {
         try {
             const ffmpeg = resolveFfmpegPath()
             if (!ffmpeg) return { success: false, error: 'ffmpeg indisponível' }
-            const dir = path.resolve(recordingsDir())
             const source = path.resolve(String(data?.path || ''))
-            if (!source.startsWith(dir) || !source.toLowerCase().endsWith('.ts')) {
+            if (!dentroDasGravacoes(source) || !source.toLowerCase().endsWith('.ts')) {
                 return { success: false, error: 'gravação inválida' }
             }
             if (Array.from(active.values()).some(r => r.file === source)) {
@@ -272,7 +286,7 @@ export function setupDvrHandlers() {
             if (!ffmpeg) return { success: false }
             const dir = path.resolve(recordingsDir())
             const source = path.resolve(String(data?.path || ''))
-            if (!source.startsWith(dir)) return { success: false }
+            if (!dentroDasGravacoes(source)) return { success: false }
             const thumbsDir = path.join(dir, '.thumbs')
             fs.mkdirSync(thumbsDir, { recursive: true })
             const thumb = path.join(thumbsDir, path.basename(source).replace(/\.(ts|mp4)$/i, '') + '.jpg')
@@ -292,9 +306,8 @@ export function setupDvrHandlers() {
     // 📤 Exporta (copia) a gravação pra um destino escolhido pelo usuário.
     ipcMain.handle('dvr:export-file', async (_e, data: { path?: string }) => {
         try {
-            const dir = path.resolve(recordingsDir())
             const source = path.resolve(String(data?.path || ''))
-            if (!source.startsWith(dir)) return { success: false, error: 'fora da pasta de gravações' }
+            if (!dentroDasGravacoes(source)) return { success: false, error: 'fora da pasta de gravações' }
             const ext = path.extname(source).replace('.', '') || 'ts'
             const result = await dialog.showSaveDialog({
                 title: 'Exportar gravação',
@@ -390,7 +403,7 @@ export function setupDvrHandlers() {
             const dir = recordingsDir()
             const target = path.resolve(String(data?.path || ''))
             // Only files inside the recordings folder can be deleted.
-            if (!target.startsWith(path.resolve(dir) + path.sep)) {
+            if (!dentroDasGravacoes(target)) {
                 return { success: false, error: 'Caminho fora da pasta de gravações' }
             }
             // Never delete a file that is still being written.
