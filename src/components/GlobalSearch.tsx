@@ -504,10 +504,13 @@ export function GlobalSearch() {
     }, [navigate, query]);
 
     // 🎭 Person hit: navega pra página do item filtrada pelo NOME do item
-    // (o termo digitado "@pessoa" não casaria com nada lá).
+    // (o termo digitado "@pessoa" não casaria com nada lá) e, como no
+    // resultado normal, abre a FICHA do item clicado — as duas listas têm a
+    // mesma cara, então o clique tem de fazer a mesma coisa (#D056).
     const activatePerson = useCallback((item: SearchItem) => {
         try {
             sessionStorage.setItem(GLOBAL_SEARCH_TERM_KEY, item.name);
+            sessionStorage.setItem(GLOBAL_SEARCH_OPEN_KEY, JSON.stringify({ kind: item.kind, id: item.id }));
         } catch { /* navigation still works, just unfiltered */ }
         const typed = query.trim();
         if (typed) addRecentSearch(typed);
