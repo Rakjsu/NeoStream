@@ -39,6 +39,18 @@ interface DLNACommandResult {
     error?: string;
 }
 
+interface DLNAAddDeviceResult extends DLNACommandResult {
+    /** Salvo, mas nenhuma sonda de descrição respondeu naquele IP (D199). */
+    unverified?: boolean;
+}
+
+/**
+ * Resultado do cadastro manual: 'added' = a TV respondeu; 'unverified' = foi
+ * salva, mas ninguém respondeu no IP (errado, TV desligada, outra rede);
+ * 'failed' = não foi salva.
+ */
+export type DLNAAddDeviceOutcome = 'added' | 'unverified' | 'failed';
+
 function toDLNADevice(device: DLNADeviceResult, fallbackSource: DLNADevice['source']): DLNADevice {
     return {
         id: device.id,
@@ -129,26 +141,26 @@ export function useDLNA(videoUrl: string, videoTitle: string, subtitleVtt?: stri
     }, []);
 
     // Add manual device
-    const addDevice = async (name: string, ip: string, port: number = 9197) => {
+    const addDevice = async (name: string, ip: string, port: number = 9197): Promise<DLNAAddDeviceOutcome> => {
         setError(null);
         try {
             const result = await window.ipcRenderer.invoke('dlna:add-device', {
                 name,
                 ip,
                 port
-            }) as DLNACommandResult;
+            }) as DLNAAddDeviceResult;
 
             if (result.success) {
                 await loadDevices();
-                return true;
+                return result.unverified ? 'unverified' : 'added';
             }
 
             setError(result.error || 'Failed to add device');
-            return false;
+            return 'failed';
         } catch (error: unknown) {
             console.error('DLNA add device error:', error);
             setError(getErrorMessage(error, 'Add device failed'));
-            return false;
+            return 'failed';
         }
     };
 

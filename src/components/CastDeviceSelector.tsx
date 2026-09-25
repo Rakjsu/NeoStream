@@ -93,6 +93,9 @@ export function CastDeviceSelector({
     const [deviceName, setDeviceName] = useState('');
     const [deviceIP, setDeviceIP] = useState('');
     const [devicePort, setDevicePort] = useState('9197');
+    // Cadastro manual em andamento: as sondas levam até ~3 s com a TV
+    // desligada, e sem isto o botão aceitava cliques repetidos.
+    const [addingDevice, setAddingDevice] = useState(false);
     // Nome do aparelho escolhido enquanto o cast não respondeu (null = ocioso).
     // Era só um booleano, e o único efeito dele na tela era apagar a lista;
     // guardando o NOME dá pra dizer em QUEM o app está tentando conectar.
@@ -326,18 +329,24 @@ export function CastDeviceSelector({
             return;
         }
 
-        const success = await addDevice(
+        setAddingDevice(true);
+        const outcome = await addDevice(
             deviceName || `TV (${deviceIP})`,
             deviceIP,
             parseInt(devicePort) || 9197
-        );
+        ).finally(() => setAddingDevice(false));
 
-        if (success) {
+        if (outcome !== 'failed') {
             setView('list');
             setDeviceName('');
             setDeviceIP('');
             setDevicePort('9197');
-            setCastError(null);
+            // D199: ninguém respondeu naquele IP. A TV foi salva (pode só
+            // estar desligada), mas dizer "deu certo" em silêncio escondia o
+            // IP digitado errado até a hora do cast falhar.
+            setCastError(outcome === 'unverified'
+                ? t('cast', 'tvDidNotAnswer').replace('{ip}', () => deviceIP)
+                : null);
         } else {
             setCastError(dlnaError || t('cast', 'errorAddingDevice'));
         }
@@ -538,7 +547,7 @@ export function CastDeviceSelector({
                                 />
                             </div>
 
-                            <button className="submit-btn" onClick={handleAddDevice}>
+                            <button className="submit-btn" onClick={handleAddDevice} disabled={addingDevice}>
                                 {t('cast', 'addTV')}
                             </button>
 
