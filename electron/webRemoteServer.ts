@@ -58,7 +58,7 @@ import {
     buildDesktopHello,
     parsePushAck,
     isOutdatedMobile,
-    markMobileInHistory,
+    markMobileInPendingHistory,
     MIN_MOBILE_APP_VERSION,
     type MobileHello,
     type PushAckStatus,
@@ -486,8 +486,16 @@ function applyMobileHello(client: ClientSocket, hello: MobileHello): void {
     client.protocolVersion = hello.protocolVersion
     client.appVersion = hello.appVersion
     client.capabilities = new Set(hello.capabilities)
-    const history = (store.get('connectionHistory') as ConnectionEvent[] | undefined) ?? []
-    store.set('connectionHistory', markMobileInHistory(history, client.ip ?? '?', hello.name))
+    // O connect desta conexão ainda está no buffer (flush de ~1 s): marca lá
+    // primeiro; o disco só entra se ela já tiver sido gravada.
+    const marcado = markMobileInPendingHistory(
+        historyBuffer,
+        () => (store.get('connectionHistory') as ConnectionEvent[] | undefined) ?? [],
+        client.ip ?? '?',
+        hello.name,
+    )
+    historyBuffer = marcado.pending
+    if (marcado.stored) store.set('connectionHistory', marcado.stored)
     log.info(`[WebRemote] app mobile conectado: ${hello.name} (v${hello.appVersion || '?'}, protocolo v${hello.protocolVersion})`)
     if (isOutdatedMobile(hello.appVersion)) {
         log.warn(`[WebRemote] app do celular desatualizado (mínimo ${MIN_MOBILE_APP_VERSION}) — sem os gates de tranca/parental no push`)
