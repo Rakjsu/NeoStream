@@ -61,15 +61,17 @@ test('modo TV: toggle aplica a classe e o zoom; desligar remove', async () => {
     const row = page.locator('.setting-item', { hasText: 'Modo TV' });
     await row.locator('.toggle-slider').click();
 
-    await expect.poll(async () => page.evaluate(() => ({
+    // O zoom EFETIVO do body (computed), não o inline: desde o D129 o Modo TV
+    // só publica --ns-tv-zoom e a regra `body { zoom }` do index.css multiplica
+    // pela Escala da interface. Inline venceria a folha e matava a Escala.
+    const estado = () => page.evaluate(() => ({
         cls: document.documentElement.classList.contains('tv-mode'),
-        zoom: (document.body.style as CSSStyleDeclaration & { zoom?: string }).zoom
-    }))).toEqual({ cls: true, zoom: '1.25' });
+        zoom: (getComputedStyle(document.body) as CSSStyleDeclaration & { zoom?: string }).zoom
+    }));
+    await expect.poll(estado).toEqual({ cls: true, zoom: '1.25' });
 
     await row.locator('.toggle-slider').click();
-    await expect.poll(async () => page.evaluate(() =>
-        document.documentElement.classList.contains('tv-mode')
-    )).toBe(false);
+    await expect.poll(estado).toEqual({ cls: false, zoom: '1' });
 });
 
 test('cache SWR: segunda chamada vem do cache e sobrevive ao provedor cair', async () => {

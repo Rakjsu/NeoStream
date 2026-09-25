@@ -87,7 +87,8 @@ body {
 
 
 /* TV mode (10-foot UI): stronger, always-visible focus ring for remote/gamepad
-   navigation. The zoom itself is applied by tvModeService via body.style.zoom. */
+   navigation. The zoom itself is the --ns-tv-zoom factor (tvModeService),
+   multiplied into the body zoom below together with the UI scale. */
 .tv-mode :focus-visible {
     outline: 3px solid var(--ns-accent) !important;
     outline-offset: 2px;
@@ -125,9 +126,12 @@ html[data-motion='reduced'] *::after {
     scroll-behavior: auto !important;
 }
 
-/* 🔠 Escala da interface: zoom pega inclusive os px hardcoded inline. */
+/* 🔠 Escala da interface: zoom pega inclusive os px hardcoded inline.
+   Dono ÚNICO do zoom do body: Escala (--ns-ui-scale, themeService) × Modo TV
+   (--ns-tv-zoom, tvModeService). Ninguém escreve body.style.zoom inline —
+   inline venceria esta regra e o seletor de escala parava de valer (D129). */
 body {
-    zoom: var(--ns-ui-scale, 1);
+    zoom: calc(var(--ns-ui-scale, 1) * var(--ns-tv-zoom, 1));
 }
 
 /* 👶 UI kids: accent verde-vivo com gradiente quente e cantos mais redondos
