@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { autoFetchSubtitle, autoFetchForcedSubtitle, cleanupSubtitleUrl, diskSubtitleToVtt, motivoDeNaoTerLegenda, openSubtitleFileFromDisk } from '../../services/subtitleService';
+import { autoFetchSubtitle, autoFetchForcedSubtitle, cleanupSubtitleUrl, diskSubtitleToVtt, motivoDeNaoTerLegenda, openSubtitleFileFromDisk, type SubtitleWarning } from '../../services/subtitleService';
 import { chaveDaMensagem } from '../../services/motivoDeLegenda';
 import { useLanguage } from '../../services/languageService';
 
@@ -33,6 +33,14 @@ export function useSubtitleManager({
     videoRef
 }: UseSubtitleManagerParams) {
     const { t } = useLanguage();
+
+    /** O serviço devolve o aviso como dado; a frase sai no idioma da interface (#D007). */
+    const textoDoAviso = (aviso: SubtitleWarning): string =>
+        aviso.kind === 'fallbackLanguage'
+            ? t('player', 'subtitleFallbackLanguage')
+                .replace('{wanted}', aviso.wanted.toUpperCase())
+                .replace('{got}', aviso.got.toUpperCase())
+            : t('player', 'subtitleSpecialEditionsOnly');
 
     const [subtitlesEnabled, setSubtitlesEnabled] = useState(false);
     const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
@@ -154,7 +162,7 @@ export function useSubtitleManager({
                     setVttContent(result.vttContent);
                     setConteudoDaLegenda(conteudoAtual);
                     if (result.warning) {
-                        setSubtitleWarning(result.warning);
+                        setSubtitleWarning(textoDoAviso(result.warning));
                         setTimeout(() => setSubtitleWarning(null), 5000);
                     }
                 } else {
@@ -213,7 +221,7 @@ export function useSubtitleManager({
                         setSubtitlesEnabled(true);
                         // Show warning if using fallback language
                         if (result.warning) {
-                            setSubtitleWarning(result.warning);
+                            setSubtitleWarning(textoDoAviso(result.warning));
                             // Clear warning after 5 seconds
                             setTimeout(() => setSubtitleWarning(null), 5000);
                         }
@@ -352,7 +360,7 @@ export function useSubtitleManager({
                 });
                 if (result && result.warning) {
                     // Show warning toast for rejected special editions
-                    setSubtitleWarning(result.warning);
+                    setSubtitleWarning(textoDoAviso(result.warning));
                     setTimeout(() => setSubtitleWarning(null), 4000);
                 } else if (result && result.vttContent) {
                     const blob = new Blob([result.vttContent], { type: 'text/vtt' });

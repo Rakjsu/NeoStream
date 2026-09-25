@@ -100,7 +100,8 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
 }: AsyncVideoPlayerProps<TMovie, TVersion>) {
     const [streamUrl, setStreamUrl] = useState<string>('');
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    // O motivo, não a frase: o texto sai do t() na hora de mostrar (#D007).
+    const [error, setError] = useState<'invalidUrl' | 'loadFailed' | null>(null);
     const [isAnimating, setIsAnimating] = useState(true);
     // 🔁 Contador de tentativas: entra nas deps do efeito 1 para o botão
     // "tentar de novo" do cartão de erro re-rodar o buildStreamUrl sem
@@ -164,7 +165,7 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
                 .then(url => {
                     if (cancelled) return;
                     if (!url) {
-                        setError('Nao foi possivel carregar o video. URL invalida.');
+                        setError('invalidUrl');
                         setLoading(false);
                         return;
                     }
@@ -175,7 +176,7 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
                 .catch((err) => {
                     if (cancelled) return;
                     console.error('Error building stream URL:', err);
-                    setError('Erro ao carregar o video. Tente novamente.');
+                    setError('loadFailed');
                     setLoading(false);
                 });
         });
@@ -423,7 +424,7 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
                     <button className="loading-close-btn" onClick={onClose}>✕</button>
                     <div className="error-screen">
                         <div className="error-icon">⚠️</div>
-                        <p className="error-message">{error}</p>
+                        <p className="error-message">{t('player', error === 'invalidUrl' ? 'streamInvalidUrl' : 'streamLoadFailed')}</p>
                         <div className="error-actions">
                             <button className="error-btn" onClick={() => setRetryToken(n => n + 1)}>
                                 {t('player', 'streamRetry')}
@@ -453,7 +454,7 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
                             <div className="loading-dot"></div>
                             <div className="loading-dot"></div>
                         </div>
-                        <span className="loading-text">Preparando seu vídeo...</span>
+                        <span className="loading-text">{t('player', 'preparingVideo')}</span>
                     </div>
                 </div>
             </>

@@ -65,10 +65,10 @@ export function ForcedSubtitlesMenu({
                     >
                         <div>
                             <div style={{ fontSize: 14, color: 'white', fontWeight: 500 }}>
-                                Legendas Forçadas
+                                {t('player', 'forcedSubtitles')}
                             </div>
                             <div style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.5)', marginTop: 2 }}>
-                                Placas e diálogos estrangeiros
+                                {t('player', 'forcedSubtitlesHint')}
                             </div>
                         </div>
                         <div
