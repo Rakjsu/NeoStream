@@ -29,11 +29,13 @@ const canais = (n: number): Canal[] =>
     Array.from({ length: n }, (_, i) => ({ stream_id: i + 1, name: `Canal ${i + 1}` }));
 
 /** Canal 98 não tem URL (a montagem lança); canal 99 tem URL que não é http. */
-const buildUrl = (c: Canal): Promise<string> => {
-    if (c.stream_id === 98) return Promise.reject(new Error('sem credenciais'));
-    if (c.stream_id === 99) return Promise.resolve('rtmp://prov.tv/live/99');
-    return Promise.resolve(`http://prov.tv/live/${c.stream_id}.ts`);
+const montarUrl = (c: Canal): string => {
+    if (c.stream_id === 98) throw new Error('sem URL');
+    if (c.stream_id === 99) return 'rtmp://prov.tv/live/99';
+    return `http://prov.tv/live/${c.stream_id}.ts`;
 };
+/** Preparada UMA vez por verificação (#D175); o caso Stalker está em `src/pages/sondaDeFavoritosSemCreateLink.test.tsx`. */
+const prepararSonda = (): Promise<typeof montarUrl> => Promise.resolve(montarUrl);
 
 let container: HTMLDivElement;
 let root: Root;
@@ -41,7 +43,7 @@ let invoke: ReturnType<typeof vi.fn>;
 let atual: FavoritesHealthCheck<Canal>;
 
 function Harness({ resetKey, onValor }: { resetKey: string; onValor: (v: FavoritesHealthCheck<Canal>) => void }) {
-    const valor = useFavoritesHealthCheck<Canal>({ resetKey, buildUrl });
+    const valor = useFavoritesHealthCheck<Canal>({ resetKey, prepararSonda });
     useEffect(() => { onValor(valor); });
     return null;
 }

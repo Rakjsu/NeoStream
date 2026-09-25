@@ -10,13 +10,26 @@ export interface FavCheckStream {
     stream_id: string | number;
 }
 
+/**
+ * Monta a URL de sonda de UM canal, sem ir à rede. `null`/`undefined` (ou
+ * lançar) deixa o canal de fora da sonda.
+ */
+export type MontarUrlDaSonda<T extends FavCheckStream> = (stream: T) => string | null | undefined;
+
 interface UseFavoritesHealthCheckOptions<T extends FavCheckStream> {
     /**
      * O "filtro" em que a verificação vale (categoria + busca). Quando ele
      * muda, o resultado deixa de valer: o selo some e o botão volta.
      */
     resetKey: string;
-    buildUrl: (stream: T) => Promise<string | null | undefined>;
+    /**
+     * Chamado UMA vez por verificação (#D175): lê o que for preciso (as
+     * credenciais) e devolve o montador síncrono das URLs — nada de uma ida
+     * ao main por canal. `null` = a fonte não admite sonda (portal Stalker:
+     * a URL só nasce de um `create_link`, que conta no limite de conexões do
+     * portal); aí nada é sondado e o botão avisa. Lançar = a sonda falhou.
+     */
+    prepararSonda: () => Promise<MontarUrlDaSonda<T> | null>;
 }
 
 export interface FavoritesHealthCheck<T extends FavCheckStream> {
@@ -60,6 +73,11 @@ export function favCheckFailedMessage(): string {
     return `✖ ${languageService.t('liveTV', 'favCheckFailed')}`;
 }
 
+/** Rótulo do botão quando a fonte não admite sonda (portal Stalker, #D175). */
+export function favCheckUnavailableMessage(): string {
+    return `ⓘ ${languageService.t('liveTV', 'favCheckUnavailable')}`;
+}
+
 /**
  * 🩺 Verificador de favoritos da TV ao vivo (D028).
  *
@@ -74,7 +92,7 @@ export function favCheckFailedMessage(): string {
  */
 export function useFavoritesHealthCheck<T extends FavCheckStream>({
     resetKey,
-    buildUrl,
+    prepararSonda,
 }: UseFavoritesHealthCheckOptions<T>): FavoritesHealthCheck<T> {
     const [state, setState] = useState<CheckState>(() => ({
         key: resetKey, epoch: 0, busy: false, msg: '', dead: NENHUM,
@@ -103,21 +121,27 @@ export function useFavoritesHealthCheck<T extends FavCheckStream>({
         let msg: string;
         let dead: ReadonlySet<string> | null = null;
         try {
-            const targets: { id: string; url: string }[] = [];
-            for (const stream of list.slice(0, FAV_CHECK_LIMIT)) {
-                try {
-                    const url = await buildUrl(stream);
-                    if (url?.startsWith('http')) targets.push({ id: String(stream.stream_id), url });
-                } catch { /* canal sem URL fica de fora da sonda */ }
-            }
-            const result = await window.ipcRenderer.invoke('diagnostics:probe-urls', { targets }) as {
-                success: boolean; results?: { id: string; alive: boolean }[];
-            };
-            if (result?.success && result.results) {
-                dead = new Set(result.results.filter(r => !r.alive).map(r => r.id));
-                msg = favCheckMessage(dead.size, result.results.length, list.length);
+            const montarUrl = await prepararSonda();
+            if (!montarUrl) {
+                // Fonte sem sonda possível: nada vai pro main e o selo não muda.
+                msg = favCheckUnavailableMessage();
             } else {
-                msg = favCheckFailedMessage();
+                const targets: { id: string; url: string }[] = [];
+                for (const stream of list.slice(0, FAV_CHECK_LIMIT)) {
+                    try {
+                        const url = montarUrl(stream);
+                        if (url?.startsWith('http')) targets.push({ id: String(stream.stream_id), url });
+                    } catch { /* canal sem URL fica de fora da sonda */ }
+                }
+                const result = await window.ipcRenderer.invoke('diagnostics:probe-urls', { targets }) as {
+                    success: boolean; results?: { id: string; alive: boolean }[];
+                };
+                if (result?.success && result.results) {
+                    dead = new Set(result.results.filter(r => !r.alive).map(r => r.id));
+                    msg = favCheckMessage(dead.size, result.results.length, list.length);
+                } else {
+                    msg = favCheckFailedMessage();
+                }
             }
         } catch {
             msg = favCheckFailedMessage();
@@ -136,7 +160,7 @@ export function useFavoritesHealthCheck<T extends FavCheckStream>({
             msgTimer.current = null;
             setState(s => ({ ...s, msg: '' }));
         }, FAV_CHECK_MSG_MS);
-    }, [buildUrl, epoch]);
+    }, [prepararSonda, epoch]);
 
     // Render com filtro trocado: o React descarta este retorno e roda o hook
     // de novo, já com o estado zerado acima, antes de pintar.

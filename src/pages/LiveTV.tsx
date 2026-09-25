@@ -11,7 +11,8 @@ import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { LazyImage } from '../components/LazyImage';
 import { useWindowedGrid } from '../hooks/useWindowedGrid';
-import { useFavoritesHealthCheck, FAV_CHECK_LIMIT } from '../hooks/useFavoritesHealthCheck';
+import { useFavoritesHealthCheck, FAV_CHECK_LIMIT, type MontarUrlDaSonda } from '../hooks/useFavoritesHealthCheck';
+import { ehPortalStalker, urlDoCanalAoVivoSemPortal, type CredenciaisDoProvedor } from '../services/urlDoCanalAoVivo';
 import { epgService } from '../services/epgService';
 import { scheduledRecordingService } from '../services/scheduledRecordingService';
 import { profileService } from '../services/profileService';
@@ -752,24 +753,17 @@ export function LiveTV() {
             const result = await window.ipcRenderer.invoke('auth:get-credentials');
 
             if (result.success) {
-                const { url, username, password } = result.credentials;
-                // M3U playlists carry the play URL on the channel itself
-                // (username sentinel 'm3u'); Xtream keeps the classic URL so
-                // providers that fill direct_source don't change behavior.
-                if (username === 'm3u' && channel.direct_source?.startsWith('http')) {
-                    return channel.direct_source;
-                }
+                // M3U carries the play URL on the channel itself; Xtream keeps
+                // the classic URL (same rule the favorites probe uses — #D175).
+                const semPortal = urlDoCanalAoVivoSemPortal(result.credentials, channel);
+                if (semPortal !== null) return semPortal;
                 // Stalker portals: direct_source carries the raw cmd; the main
                 // process resolves it (create_link) into a playable URL.
-                if (password === 'stalker' && channel.direct_source) {
-                    const link = await window.ipcRenderer.invoke('stalker:create-link', {
-                        cmd: channel.direct_source
-                    }) as { success: boolean; url?: string; error?: string };
-                    if (link.success && link.url) return link.url;
-                    throw new Error(link.error || 'Falha ao resolver o canal Stalker');
-                }
-                const streamUrl = `${url}/live/${username}/${password}/${channel.stream_id}.m3u8`;
-                return streamUrl;
+                const link = await window.ipcRenderer.invoke('stalker:create-link', {
+                    cmd: channel.direct_source
+                }) as { success: boolean; url?: string; error?: string };
+                if (link.success && link.url) return link.url;
+                throw new Error(link.error || 'Falha ao resolver o canal Stalker');
             }
 
             throw new Error('Credenciais não encontradas');
@@ -852,9 +846,21 @@ export function LiveTV() {
     // quem está fora do ar (a sonda roda no main — sem CORS). O resultado vale
     // só pro filtro em que foi feito: trocar categoria ou busca tira o selo
     // "⚠ FORA DO AR" dos cards e devolve o botão (D028).
+    // As credenciais são lidas UMA vez por verificação e as URLs montadas sem
+    // rede; em portal Stalker não há sonda — a URL só nasce de um create_link,
+    // que conta no limite de conexões do portal (#D175).
+    const prepararSondaDosFavoritos = useCallback(async (): Promise<MontarUrlDaSonda<LiveStream> | null> => {
+        const result = await window.ipcRenderer.invoke('auth:get-credentials') as {
+            success: boolean; credentials?: CredenciaisDoProvedor;
+        };
+        const credenciais = result?.success ? result.credentials : undefined;
+        if (!credenciais) throw new Error('Credenciais não encontradas');
+        if (ehPortalStalker(credenciais)) return null;
+        return (channel: LiveStream) => urlDoCanalAoVivoSemPortal(credenciais, channel);
+    }, []);
     const favCheck = useFavoritesHealthCheck<LiveStream>({
         resetKey: `${selectedCategory}\u0000${searchQuery}`,
-        buildUrl: buildLiveStreamUrl,
+        prepararSonda: prepararSondaDosFavoritos,
     });
 
     // Recent already-aired programs of the selected archive channel
