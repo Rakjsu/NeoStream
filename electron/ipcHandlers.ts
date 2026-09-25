@@ -1688,7 +1688,29 @@ export function setupIpcHandlers() {
     // Provider health: probe the active provider's endpoints with timings.
     // Com { speedTest: true } também baixa até 8 MB (ou 5 s) de um endpoint
     // grande do provedor e devolve o throughput real em `speed`.
-    ipcMain.handle('diagnostics:provider-health', async (_evt, opts?: { speedTest?: boolean }) => {
+    //
+    // Portal Stalker não expõe endpoint de volume e lista M3U de arquivo não
+    // passa pela rede: nos dois o velocímetro não tem o que medir. Antes a
+    // tela só recebia `speed: null` — a mesma resposta de "o provedor não
+    // mandou dados" — e pintava um erro vermelho garantido (D204). Agora
+    // { speedSupportOnly: true } responde só se há o que medir, sem tocar a
+    // rede (a aba pergunta ao abrir), e { speedTest: true } nessas playlists
+    // volta aqui mesmo com `speedSupported: false` + o motivo, em vez de
+    // fazer handshake + lista de canais do portal pra devolver null.
+    ipcMain.handle('diagnostics:provider-health', async (_evt, opts?: { speedTest?: boolean; speedSupportOnly?: boolean }) => {
+        // Non-Xtream playlists get type-appropriate checks: the M3U document
+        // itself, or the portal handshake + channel list.
+        const activeId = getActivePlaylistIdPublic()
+        const activeEntry = activeId ? findPlaylist(activeId) : undefined
+        const semVelocimetro: 'stalker' | 'm3u_file' | null = activeEntry?.type === 'stalker'
+            ? 'stalker'
+            : activeEntry?.type === 'm3u' && pareceListaM3uNoDisco(activeEntry.url) ? 'm3u_file' : null
+        if (opts?.speedSupportOnly || (opts?.speedTest && semVelocimetro)) {
+            return semVelocimetro
+                ? { success: true, speed: null, speedSupported: false, speedUnsupportedReason: semVelocimetro }
+                : { success: true, speed: null, speedSupported: true }
+        }
+
         const auth = store.get('auth')
         if (!auth.url || !auth.username || !auth.password) {
             return { success: false, error: 'Not authenticated' }
@@ -1742,11 +1764,6 @@ export function setupIpcHandlers() {
                 return null
             }
         }
-
-        // Non-Xtream playlists get type-appropriate checks: the M3U document
-        // itself, or the portal handshake + channel list.
-        const activeId = getActivePlaylistIdPublic()
-        const activeEntry = activeId ? findPlaylist(activeId) : undefined
 
         if (activeEntry?.type === 'm3u') {
             const startedAt = Date.now()

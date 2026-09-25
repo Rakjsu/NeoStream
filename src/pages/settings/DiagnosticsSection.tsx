@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLanguage } from '../../services/languageService';
 import { diagnosticsService } from '../../services/diagnosticsService';
 import { classifyLatency, overallStatus, LATENCY_COLORS, type ProbeResult } from '../../utils/providerHealth';
@@ -84,6 +84,24 @@ export function DiagnosticsSection() {
     const [speedBusy, setSpeedBusy] = useState(false);
     const [speedResult, setSpeedResult] = useState<{ mbps: number; bytes: number; seconds: number } | null>(null);
     const [speedError, setSpeedError] = useState<string | null>(null);
+    // D204: portal Stalker e lista M3U de arquivo não têm o que medir. Quem
+    // sabe é o main (`speedSupported: false` + motivo); sem perguntar, a tela
+    // oferecia o botão pra todo mundo e respondia com um erro vermelho
+    // garantido. A aba pergunta ao abrir (sem tocar a rede) e o clique
+    // também respeita a resposta, se chegar antes dela.
+    const [speedUnsupported, setSpeedUnsupported] = useState<'stalker' | 'm3u_file' | null>(null);
+    const motivoSemMedida = (motivo?: string) => (motivo === 'm3u_file' ? 'm3u_file' : 'stalker');
+
+    useEffect(() => {
+        let cancelled = false;
+        window.ipcRenderer.invoke('diagnostics:provider-health', { speedSupportOnly: true })
+            .then((result: { success?: boolean; speedSupported?: boolean; speedUnsupportedReason?: string }) => {
+                if (cancelled || !result?.success || result.speedSupported !== false) return;
+                setSpeedUnsupported(motivoSemMedida(result.speedUnsupportedReason));
+            })
+            .catch(() => undefined);
+        return () => { cancelled = true; };
+    }, []);
 
     const handleSpeedTest = async () => {
         setSpeedBusy(true);
@@ -91,8 +109,12 @@ export function DiagnosticsSection() {
         try {
             const result = await window.ipcRenderer.invoke('diagnostics:provider-health', { speedTest: true }) as {
                 success: boolean; speed?: { mbps: number; bytes: number; seconds: number } | null;
+                speedSupported?: boolean; speedUnsupportedReason?: string;
             };
-            if (result.success && result.speed) {
+            if (result.success && result.speedSupported === false) {
+                setSpeedResult(null);
+                setSpeedUnsupported(motivoSemMedida(result.speedUnsupportedReason));
+            } else if (result.success && result.speed) {
                 setSpeedResult(result.speed);
             } else {
                 setSpeedResult(null);
@@ -305,12 +327,19 @@ export function DiagnosticsSection() {
                         {speedError && (
                             <p style={{ color: '#ef4444', marginTop: 8 }}>⚠️ {speedError}</p>
                         )}
+                        {speedUnsupported && (
+                            <p style={{ color: 'rgba(255,255,255,0.6)', marginTop: 8 }}>
+                                ℹ️ {speedUnsupported === 'm3u_file'
+                                    ? t('diagnostics', 'speedUnsupportedFile')
+                                    : t('diagnostics', 'speedUnsupportedStalker')}
+                            </p>
+                        )}
                     </div>
                     <button
                         className="check-btn"
                         style={{ width: 'auto', padding: '14px 24px' }}
                         onClick={handleSpeedTest}
-                        disabled={speedBusy}
+                        disabled={speedBusy || speedUnsupported !== null}
                     >
                         <span>{speedBusy ? '⏳' : '🚀'}</span>
                         <span>{speedBusy ? t('diagnostics', 'speedTesting') : t('diagnostics', 'speedTest')}</span>
