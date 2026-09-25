@@ -654,6 +654,67 @@ function getHostFromLocation(location?: string): string | null {
     }
 }
 
+/**
+ * Prazo do Stop de cortesia mandado a sessao ANTERIOR. Curto de proposito: a
+ * TV velha pode estar desligada ou fora da rede, e o cast novo nao pode ficar
+ * preso nos 10 s do SOAP normal esperando um aparelho que nao responde mais.
+ */
+const PREVIOUS_SESSION_STOP_TIMEOUT_MS = 1500
+
+/**
+ * Encerramento LOCAL de um cast DLNA: sessao esquecida, remux morto e tokens
+ * do aparelho revogados. Era o mesmo bloco copiado em tres lugares
+ * (`dlna:stop`, o `stop` do controle pelo celular e agora o comeco de um
+ * cast novo).
+ *
+ * Matar TODO o `activeTranscodes` e heranca do `dlna:stop` e continua aqui:
+ * esse Set so recebe os ffmpeg da rota /dlna-transcode/, e o unico lugar que
+ * emite token dessa rota e o proprio `dlna:cast` — Chromecast e AirPlay usam
+ * /dlna-proxy/, sem ffmpeg. Ou seja: nao ha remux de outro protocolo pra
+ * matar por engano.
+ */
+function releaseDlnaLocalResources(tokenHost: string): void {
+    castSession = null
+    for (const ffmpeg of activeTranscodes) {
+        try { ffmpeg.kill('SIGKILL') } catch { /* already dead */ }
+    }
+    activeTranscodes.clear()
+    revokeDeviceTokens(tokenHost)
+}
+
+/**
+ * Encerra a sessao DLNA viva antes de outra comecar — o que o `cast:play` do
+ * Chromecast ja faz com `stopActiveSession()`.
+ *
+ * Sem isto, mandar o segundo video para OUTRA TV so sobrescrevia o
+ * `castSession`: a primeira continuava tocando, o ffmpeg dela continuava
+ * puxando o stream e os tokens do proxy daquele aparelho continuavam valendo
+ * — duas TVs e duas conexoes no provedor.
+ *
+ * Duas ressalvas, nesta ordem:
+ *  - o Stop vai com prazo curto e dentro de try/catch: TV desligada nao pode
+ *    derrubar (nem segurar) o cast novo;
+ *  - quando o alvo e o MESMO aparelho, nao ha Stop. O SetAVTransportURI
+ *    seguinte ja troca o que esta tocando, e um Stop no meio so apaga a tela
+ *    (em renderer Samsung ainda convida o 701 na volta). O encerramento local
+ *    acontece assim mesmo, ANTES de o cast novo criar os tokens dele.
+ */
+async function stopActiveDlnaSession(nextDeviceId?: string): Promise<void> {
+    const session = castSession
+    if (!session) return
+
+    if (session.deviceId !== nextDeviceId) {
+        try {
+            await sendAvTransportAction(session.avTransportUrl, 'Stop',
+                '<InstanceID>0</InstanceID>', PREVIOUS_SESSION_STOP_TIMEOUT_MS)
+        } catch (error: unknown) {
+            log.warn('[DLNA] Stop da sessao anterior falhou (TV desligada?):', getErrorMessage(error))
+        }
+    }
+
+    releaseDlnaLocalResources(getHostFromLocation(session.location) || '')
+}
+
 function getPortFromLocation(location?: string): number | undefined {
     if (!location) return undefined
     try {
@@ -1052,6 +1113,13 @@ export function setupDLNAHandlers() {
             const renderingControlUrl = await getServiceControlUrl(location, RENDERING_CONTROL_SERVICE)
                 .catch(() => null);
 
+            // A TV nova ja respondeu a descricao: agora sim o que estava
+            // tocando na outra para aqui (e a conexao dela no provedor fecha
+            // junto). Antes disto o cast novo ainda podia falhar e deixar o
+            // dono sem nada; depois disto viriam os tokens novos, que o
+            // revokeDeviceTokens do mesmo host apagaria por engano.
+            await stopActiveDlnaSession(deviceId);
+
             // Samsung's DLNA player does not decode HLS playlists ("file not
             // supported" on the TV OSD); Xtream live channels are cast as
             // their continuous MPEG-TS variant instead.
@@ -1196,15 +1264,13 @@ export function setupDLNAHandlers() {
                 // Encerramento local mesmo com o SOAP falhando: a interface
                 // fecha o controle de qualquer jeito (o handleStop ignora o
                 // resultado), então sem isto sobrariam ffmpeg vivos e tokens
-                // de acesso válidos. O `finally` é INTERNO de propósito — no
-                // caminho "sem alvo" ele mataria o remux de um Chromecast ou
-                // AirPlay, que compartilham o mesmo proxy de LAN.
-                castSession = null;
-                for (const ffmpeg of activeTranscodes) {
-                    try { ffmpeg.kill('SIGKILL') } catch { /* already dead */ }
-                }
-                activeTranscodes.clear();
-                revokeDeviceTokens(tokenHost);
+                // de acesso válidos. O `finally` é INTERNO de propósito: só
+                // roda quando havia alvo de verdade — sem plano o handler já
+                // lançou lá em cima. (E o remux não é de outro protocolo: só
+                // /dlna-transcode/ entra no `activeTranscodes`, e só o
+                // `dlna:cast` emite token dessa rota — Chromecast e AirPlay
+                // usam /dlna-proxy/, que não roda ffmpeg.)
+                releaseDlnaLocalResources(tokenHost);
             }
 
             return { success: true };
@@ -1403,13 +1469,8 @@ export function dlnaRemoteControl(action: string, value?: number): boolean {
             }
             case 'stop':
                 await sendAvTransportAction(session.avTransportUrl, 'Stop', '<InstanceID>0</InstanceID>')
-                castSession = null
-                // Same teardown as dlna:stop — rescue transcodes die with the cast.
-                for (const ffmpeg of activeTranscodes) {
-                    try { ffmpeg.kill('SIGKILL') } catch { /* already dead */ }
-                }
-                activeTranscodes.clear()
-                revokeDeviceTokens(getHostFromLocation(session.location) || '')
+                // Mesmo encerramento do dlna:stop.
+                releaseDlnaLocalResources(getHostFromLocation(session.location) || '')
                 return
             case 'seekRelative': {
                 const pos = await sendAvTransportAction(session.avTransportUrl, 'GetPositionInfo', '<InstanceID>0</InstanceID>', 5000)
