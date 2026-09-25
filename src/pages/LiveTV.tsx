@@ -11,6 +11,7 @@ import { AnimatedSearchBar } from '../components/AnimatedSearchBar';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { LazyImage } from '../components/LazyImage';
 import { useWindowedGrid } from '../hooks/useWindowedGrid';
+import { useFavoritesHealthCheck, FAV_CHECK_LIMIT } from '../hooks/useFavoritesHealthCheck';
 import { epgService } from '../services/epgService';
 import { scheduledRecordingService } from '../services/scheduledRecordingService';
 import { profileService } from '../services/profileService';
@@ -571,12 +572,6 @@ export function LiveTV() {
         [sortedStreams, groupVariants]
     );
 
-    // 🩺 Verificador de favoritos: sonda os canais da categoria ⭐ e marca
-    // quem está fora do ar (a sonda roda no main — sem CORS).
-    const [favCheckBusy, setFavCheckBusy] = useState(false);
-    const [favCheckMsg, setFavCheckMsg] = useState('');
-    const [deadIds, setDeadIds] = useState<Set<string>>(new Set());
-
     // Em erro a página não publica lista NENHUMA. O `return` da tela de erro
     // esconde a grade, mas hook não para em return: o efeito do guia continua
     // rodando e mandando esta lista pro celular, que resolve o canal só contra
@@ -853,33 +848,14 @@ export function LiveTV() {
         };
     }, [selectedChannel, playingChannel, buildLiveStreamUrl]);
 
-    const checkFavorites = async () => {
-        setFavCheckBusy(true);
-        setFavCheckMsg('');
-        try {
-            const targets: { id: string; url: string }[] = [];
-            for (const stream of filteredStreams.slice(0, 30)) {
-                try {
-                    const url = await buildLiveStreamUrl(stream);
-                    if (url?.startsWith('http')) targets.push({ id: String(stream.stream_id), url });
-                } catch { /* canal sem URL fica de fora da sonda */ }
-            }
-            const result = await window.ipcRenderer.invoke('diagnostics:probe-urls', { targets }) as {
-                success: boolean; results?: { id: string; alive: boolean }[];
-            };
-            if (result.success && result.results) {
-                const dead = new Set(result.results.filter(r => !r.alive).map(r => r.id));
-                setDeadIds(dead);
-                setFavCheckMsg(dead.size === 0
-                    ? `✓ ${result.results.length} no ar`
-                    : `⚠ ${dead.size} de ${result.results.length} fora do ar`);
-            } else {
-                setFavCheckMsg('✖ sonda falhou');
-            }
-        } finally {
-            setFavCheckBusy(false);
-        }
-    };
+    // 🩺 Verificador de favoritos: sonda os canais da categoria ⭐ e marca
+    // quem está fora do ar (a sonda roda no main — sem CORS). O resultado vale
+    // só pro filtro em que foi feito: trocar categoria ou busca tira o selo
+    // "⚠ FORA DO AR" dos cards e devolve o botão (D028).
+    const favCheck = useFavoritesHealthCheck<LiveStream>({
+        resetKey: `${selectedCategory}\u0000${searchQuery}`,
+        buildUrl: buildLiveStreamUrl,
+    });
 
     // Recent already-aired programs of the selected archive channel
     // (newest first, capped at 4) — each gets a ▶ Replay button.
@@ -1260,9 +1236,9 @@ export function LiveTV() {
                 )}
                 {selectedCategory === 'FAVORITES' && (
                     <button
-                        onClick={() => { void checkFavorites(); }}
-                        disabled={favCheckBusy}
-                        title="Sonda os favoritos (até 30) e marca os fora do ar"
+                        onClick={() => { void favCheck.check(filteredStreams); }}
+                        disabled={favCheck.busy}
+                        title={`Sonda os favoritos (até ${FAV_CHECK_LIMIT}) e marca os fora do ar`}
                         style={{
                             padding: '8px 14px',
                             borderRadius: 10,
@@ -1275,7 +1251,7 @@ export function LiveTV() {
                             whiteSpace: 'nowrap',
                         }}
                     >
-                        {favCheckBusy ? '⏳ Verificando…' : favCheckMsg || '🩺 Verificar favoritos'}
+                        {favCheck.busy ? '⏳ Verificando…' : favCheck.msg || '🩺 Verificar favoritos'}
                     </button>
                 )}
                 <button
@@ -2013,7 +1989,7 @@ export function LiveTV() {
                                         }}>
                                             {stream.name}
                                         </p>
-                                        {deadIds.has(String(stream.stream_id)) && (
+                                        {favCheck.deadIds.has(String(stream.stream_id)) && (
                                             <span style={{ color: '#f87171', fontSize: 11, fontWeight: 800 }}>⚠ FORA DO AR</span>
                                         )}
                                     </div>
