@@ -25,6 +25,56 @@ let browser: Browser | null = null
 const devices = new Map<string, CastDevice>()
 let activeSession: CastSession | null = null
 
+// cast:reconnect roda na montagem do indicador global, muitas vezes ANTES de o
+// mDNS ter ouvido alguém. Mapa vazio: cutuca e espera o primeiro 'up' (teto
+// DISCOVERY_WAIT_MS) e mais um respiro pros outros aparelhos da casa (D097).
+const DISCOVERY_WAIT_MS = 5000
+const DISCOVERY_SETTLE_MS = 1500
+const deviceWaiters = new Set<() => void>()
+
+function waitForDevices(): Promise<void> {
+    if (devices.size > 0) return Promise.resolve()
+    browser?.update()
+    return new Promise<void>((resolve) => {
+        const done = () => {
+            clearTimeout(timer)
+            deviceWaiters.delete(done)
+            if (devices.size === 0) { resolve(); return }
+            setTimeout(resolve, DISCOVERY_SETTLE_MS)
+        }
+        const timer = setTimeout(done, DISCOVERY_WAIT_MS)
+        deviceWaiters.add(done)
+    })
+}
+
+/**
+ * Tenta adotar, em paralelo, a sessão do receptor de mídia em cada candidato;
+ * fica com o primeiro que responder. Toda tentativa que não vence é fechada —
+ * inclusive a que ainda vai dar certo depois (senão o socket e o heartbeat
+ * dela ficavam presos num slot de conexão da TV). Fechar não para o que a TV
+ * perdedora está tocando: o close() não faz o STOP chegar lá (preso em
+ * castAttachDesisteNaHora.test.ts).
+ */
+async function attachFirstRunning(candidates: CastDevice[]): Promise<{ device: CastDevice; session: CastSession }> {
+    let winner: CastSession | null = null
+    const attempts = candidates.map(async (device) => {
+        const session = new CastSession(device.host, device.name)
+        try {
+            await session.attach()
+        } catch (error) {
+            session.close() // idempotente: mata heartbeat + socket da tentativa
+            throw error
+        }
+        if (winner && winner !== session) {
+            session.close()
+            throw new Error('outro aparelho respondeu antes')
+        }
+        winner = session
+        return { device, session }
+    })
+    return await Promise.any(attempts)
+}
+
 function deviceFromService(service: Service): CastDevice | null {
     const host = service.addresses?.find(addr => addr.includes('.'))
     if (!host) return null
@@ -107,7 +157,9 @@ export function setupCastHandlers(): void {
         browser = bonjour.find({ type: 'googlecast', protocol: 'tcp' })
         browser.on('up', (service: Service) => {
             const device = deviceFromService(service)
-            if (device) devices.set(device.id, device)
+            if (!device) return
+            devices.set(device.id, device)
+            for (const wake of [...deviceWaiters]) wake()
         })
         browser.on('down', (service: Service) => {
             devices.delete(service.fqdn || '')
@@ -231,27 +283,41 @@ export function setupCastHandlers(): void {
     // Resume control of a cast that's still running after the app restarted:
     // attach to a device that has the Default Media Receiver playing (no LAUNCH,
     // so it never grabs Netflix/YouTube). Best-effort — silent when nothing's on.
+    //
+    // Sem deviceId, experimenta TODOS os aparelhos (em paralelo; o attach
+    // desiste na hora quando a TV diz que não tem receptor de mídia) — antes
+    // era o `[0]` do mapa, ou seja, quem o mDNS ouviu primeiro (D097).
     ipcMain.handle('cast:reconnect', async (_e, opts: { deviceId?: string } = {}) => {
         if (activeSession?.isActive) {
             return { success: true, active: true, deviceName: activeSession.deviceName, ...activeSession.status }
         }
-        const device = opts?.deviceId ? devices.get(String(opts.deviceId)) : [...devices.values()][0]
-        if (!device) return { success: false, error: 'Nenhum dispositivo' }
-        // O caminho mais frequente dos tres: o indicador global chama
-        // cast:reconnect em toda montagem e quase nunca ha algo tocando.
-        let session: CastSession | null = null
+        await waitForDevices()
+        const candidates = opts?.deviceId
+            ? [devices.get(String(opts.deviceId))].filter((d): d is CastDevice => !!d)
+            : [...devices.values()]
+        if (candidates.length === 0) return { success: false, error: 'Nenhum dispositivo' }
+        // O caminho mais frequente: o indicador global chama cast:reconnect
+        // em toda montagem e quase nunca ha algo tocando.
         try {
-            session = new CastSession(device.host, device.name)
-            await session.attach()
+            const { device, session } = await attachFirstRunning(candidates)
+            // Um cast:play/play-queue que terminou enquanto a retomada corria
+            // e o que o usuario pediu agora: nao atropelar.
+            if (activeSession?.isActive) {
+                session.close()
+                return { success: true, active: true, ...activeSession.status }
+            }
             activeSession = session
-            return { success: true, active: true, deviceId: device.id, deviceName: device.name, ...session.status }
+            return { success: true, active: true, deviceId: device.id, ...session.status, deviceName: device.name }
         } catch (error) {
-            session?.close() // idempotente: mata heartbeat + socket da tentativa
-            // NAO e o getErrorMessage: aqui o fallback e o proprio `error`, e o
-            // logger imprime o objeto inteiro. Trocar por String(error) daria
+            // Promise.any rejeita com AggregateError: o motivo util e o de cada aparelho.
+            const reasons = error instanceof AggregateError ? error.errors : [error]
+            const first = reasons[0]
+            // NAO e o getErrorMessage no log: aqui o fallback e o proprio erro, e
+            // o logger imprime o objeto inteiro. Trocar por String(error) daria
             // "[object Object]" no log — menos informacao, nao mais.
-            log.info('[Cast] nada pra retomar em', device.name, '-', error instanceof Error ? error.message : error)
-            return { success: false, error: getErrorMessage(error) }
+            log.info('[Cast] nada pra retomar em', candidates.map(d => d.name).join(', '), '-',
+                reasons.map(r => (r instanceof Error ? r.message : r)))
+            return { success: false, error: getErrorMessage(first) }
         }
     })
 
