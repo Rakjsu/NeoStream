@@ -36,8 +36,24 @@ interface TimeshiftSession {
 
 let session: TimeshiftSession | null = null
 
-function bufferDir(): string {
+/**
+ * Pasta do buffer (~30 min de MPEG-TS, facilmente alguns GB).
+ *
+ * Exportada porque a tela de Armazenamento mede e limpa esta pasta: repetir o
+ * `path.join(userData, 'timeshift')` lá seria uma segunda fonte da verdade
+ * pronta pra sair do lugar.
+ */
+export function timeshiftDir(): string {
     return path.join(app.getPath('userData'), 'timeshift')
+}
+
+/**
+ * Há sessão de timeshift viva? A tela de Armazenamento pergunta antes de
+ * apagar o buffer — com o ffmpeg ainda escrevendo nele, apagar derruba a
+ * reprodução (e no Windows nem apaga: EBUSY no segmento aberto).
+ */
+export function isTimeshiftRunning(): boolean {
+    return session !== null
 }
 
 /**
@@ -95,9 +111,9 @@ export function setupTimeshiftHandlers(): void {
     // estiver na pasta é resíduo de um fechamento que não deu tempo de limpar
     // (queda, kill pela bandeja/instalador, rmSync barrado pelo antivírus).
     // Sem isto o disco só voltaria na próxima vez que o usuário ligasse o ⏪.
-    // O try é do `bufferDir()`: isto roda no corpo do main, antes do
+    // O try é do `timeshiftDir()`: isto roda no corpo do main, antes do
     // whenReady, e uma exceção aqui abortaria a inicialização inteira.
-    try { apagarBuffer(bufferDir()) } catch { /* sem userData: nada a apagar */ }
+    try { apagarBuffer(timeshiftDir()) } catch { /* sem userData: nada a apagar */ }
 
     ipcMain.handle('timeshift:start', async (_, { url }: { url: string }) => {
         try {
@@ -108,7 +124,7 @@ export function setupTimeshiftHandlers(): void {
             if (!ffmpeg) return { success: false, error: 'ffmpeg indisponível' }
 
             stopSession()
-            const dir = bufferDir()
+            const dir = timeshiftDir()
             try { fs.rmSync(dir, { recursive: true, force: true }) } catch { /* primeira vez */ }
             fs.mkdirSync(dir, { recursive: true })
 
