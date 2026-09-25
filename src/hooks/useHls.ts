@@ -66,17 +66,12 @@ export function useHls({ src, videoRef, onStreamError, reloadToken = 0, reportBa
         const tokenMudou = reloadToken !== tokenAplicado.current;
         tokenAplicado.current = reloadToken;
 
-        // Get buffer settings synchronously
         const config = playbackService.getConfig();
-        let bufferSeconds: number;
-        if (config.bufferSize === 'intelligent') {
-            const cached = playbackService.getCachedBufferSeconds();
-            bufferSeconds = cached || 15;
-            // Pre-fetch for future videos silently
-            playbackService.getBufferSeconds().catch(() => undefined);
-        } else {
-            bufferSeconds = parseInt(config.bufferSize, 10);
-        }
+        // A regra do buffer (inteligente → medida recente ou 15 s; fixo → o
+        // número escolhido) mora só no playbackService. Aqui havia uma cópia
+        // dela e ainda uma chamada "pré-aquecendo" um teste de velocidade que
+        // saiu no #409 — uma Promise descartada que não fazia nada (D010).
+        const bufferSeconds = playbackService.getBufferSeconds();
 
 
         // Clean up any existing HLS instance first
