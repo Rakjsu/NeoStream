@@ -522,8 +522,6 @@ export function setupIpcHandlers() {
     // Legacy single `auth` entry → multi-playlist model (one-time, idempotent).
     migratePlaylistsOnStartup()
 
-    ipcMain.handle('ping', () => 'pong')
-
     // Open a URL in the OS browser (never inside the app). Restricted to
     // https so renderer bugs can't shell out to arbitrary protocols.
     ipcMain.handle('shell:open-external', (_e, { url }: { url?: string }) => {

@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import path from 'node:path'
 import {
     buildTimeshiftArgs,
-    bufferedSecondsFromPlaylist,
     resolveTimeshiftFile,
     timeshiftContentType,
 } from './timeshiftBuffer'
@@ -43,11 +42,5 @@ describe('timeshiftBuffer (item 15 — pausar TV ao vivo)', () => {
         expect(resolveTimeshiftFile(root, '/buffer.m3u8', 'a1b2c3')).toBeNull()
         expect(resolveTimeshiftFile(root, '/outro/buffer.m3u8', 'a1b2c3')).toBeNull()
         expect(resolveTimeshiftFile(root, '/a1b2c3/buffer.m3u8', '')).toBeNull()
-    })
-
-    it('bufferedSecondsFromPlaylist soma os EXTINF', () => {
-        const playlist = '#EXTM3U\n#EXTINF:4.000,\nseg0.ts\n#EXTINF:4.200,\nseg1.ts\n#EXTINF:3.800,\nseg2.ts\n'
-        expect(bufferedSecondsFromPlaylist(playlist)).toBe(12)
-        expect(bufferedSecondsFromPlaylist('#EXTM3U\n')).toBe(0)
     })
 })
