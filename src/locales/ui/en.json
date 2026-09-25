@@ -1170,6 +1170,7 @@
     "loading": "Loading catalog...",
     "loadError": "Failed to load catalog",
     "hint": "↑↓ navigate · Enter open · Esc close",
+    "personHint": "@name searches by actor or director",
     "openSearch": "Search",
     "recent": "Recent searches",
     "clearRecent": "clear"
