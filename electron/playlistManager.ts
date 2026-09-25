@@ -397,19 +397,37 @@ export interface BackupImportResult {
     idMap: Record<string, string>
 }
 
+export interface BackupImportOptions {
+    /**
+     * Só o primeiro acesso (card "Restaurar backup" do Welcome) passa isto: se
+     * esta máquina não tem playlist ATIVA, a primeira do arquivo que existe
+     * aqui vira a ativa. Sem isso o restore gravava as listas e o boot — que
+     * decide por `auth:check`, isto é, pelo espelho `auth` da ativa — jogava
+     * o usuário no /login como se o backup não tivesse feito nada (D079).
+     * O sync e o restore das Configurações NÃO passam: um arquivo de fora não
+     * troca a lista de ninguém, nem desfaz um logout.
+     * Não revalida no provedor (a máquina pode estar offline, e o boot comum
+     * também não revalida): é o estado de quem fechou o app logado.
+     */
+    activateIfNone?: boolean
+}
+
 /**
- * Import playlists from a backup WITHOUT activating or validating against the
- * provider (the machine may be offline during a restore). Existing entries
+ * Import playlists from a backup WITHOUT validating against the provider (the
+ * machine may be offline during a restore), and WITHOUT activating unless
+ * `options.activateIfNone` asks for it. Existing entries
  * (same url+username) keep their password unless the backup is provably newer.
  * Devolve tambem o par {idDoArquivo -> idLocal} de cada playlist RECONHECIDA
  * aqui: e com ele que o renderer reescreve o escopo `__pl_<id>` dos favoritos
  * e do progresso que vieram no arquivo (src/services/playlistIdRemap.ts).
  */
-export function importPlaylistsFromBackup(entries: PlaylistBackupEntry[]): BackupImportResult {
+export function importPlaylistsFromBackup(entries: PlaylistBackupEntry[], options: BackupImportOptions = {}): BackupImportResult {
     let playlists = getPlaylists()
     const removidas = getRemovedPlaylists()
     let imported = 0
     const idMap: Record<string, string> = {}
+    // Ids LOCAIS na ordem do arquivo: a candidata a ativar é a primeira.
+    const presentes: string[] = []
     for (const entry of entries) {
         if (!entry?.url?.trim() || !entry?.username?.trim() || typeof entry.password !== 'string') continue
         // Mesmo portão do import do celular: o backup também vem de fora.
@@ -423,6 +441,7 @@ export function importPlaylistsFromBackup(entries: PlaylistBackupEntry[]): Backu
             // ressuscitá-la pela porta dos fundos.
             const local = playlists.find(p => p.url === entry.url && p.username === entry.username)
             if (typeof entry.id === 'string' && entry.id && local) idMap[entry.id] = local.id
+            if (local) presentes.push(local.id)
             continue
         }
         const result = upsertPlaylist(playlists, {
@@ -439,11 +458,17 @@ export function importPlaylistsFromBackup(entries: PlaylistBackupEntry[]): Backu
         })
         playlists = result.playlists
         if (typeof entry.id === 'string' && entry.id) idMap[entry.id] = result.entry.id
+        presentes.push(result.entry.id)
         imported++
     }
     if (imported > 0) {
         store.set('playlists', playlists)
         log.info('[Playlists] Imported', imported, 'playlist(s) from backup')
+    }
+    // Só DEPOIS de gravar: `activatePlaylist` relê a lista do store.
+    if (options.activateIfNone === true && !getActivePlaylist() && presentes.length > 0) {
+        const ativada = activatePlaylist(presentes[0])
+        if (ativada) log.info('[Playlists] First-run restore activated playlist', ativada.id)
     }
     return { imported, idMap }
 }

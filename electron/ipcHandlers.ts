@@ -1842,9 +1842,14 @@ export function setupIpcHandlers() {
     })
 
     // Restore playlists from a backup (no provider validation — may be offline).
-    ipcMain.handle('backup:import-playlists', (_, { playlists }: { playlists: PlaylistBackupEntry[] }) => {
+    // `activateIfNone` só vem do primeiro acesso (Welcome): sem playlist ativa,
+    // a primeira do arquivo vira a ativa — senão o boot cai no /login (D079).
+    ipcMain.handle('backup:import-playlists', (_, { playlists, activateIfNone }: { playlists: PlaylistBackupEntry[]; activateIfNone?: boolean }) => {
         try {
-            const { imported, idMap } = importPlaylistsFromBackup(Array.isArray(playlists) ? playlists : [])
+            const { imported, idMap } = importPlaylistsFromBackup(
+                Array.isArray(playlists) ? playlists : [],
+                { activateIfNone: activateIfNone === true }
+            )
             return { success: true, imported, idMap }
         } catch (error: unknown) {
             log.error('[Backup] Playlist import error:', getErrorMessage(error))
