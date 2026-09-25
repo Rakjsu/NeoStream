@@ -21,6 +21,7 @@ const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { exigirSintaxeDoShell } = require('./check-installer-shell.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const SHELL_DIR = path.join(ROOT, 'installer-shell');
@@ -49,6 +50,13 @@ function run(cmd, args, opts = {}) {
         throw new Error(`${cmd} exited with code ${result.status}`);
     }
 }
+
+// ─── 0. Gate: o JavaScript do shell tem que ao menos parsear (D150) ─────
+// installer-shell/ está no globalIgnores do ESLint e fora de todo tsconfig:
+// nenhuma ferramenta olha pra ele. Roda ANTES de tudo — antes do build do
+// app, de copiar o payload e de reescrever o package.json do shell.
+
+log(`sintaxe OK: ${exigirSintaxeDoShell(SHELL_DIR).join(', ')}`);
 
 // ─── 1. Locate (or build) the silent NSIS payload ───────────────────────
 
