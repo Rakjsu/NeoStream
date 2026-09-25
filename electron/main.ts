@@ -18,6 +18,7 @@ import { setupTransferHandlers } from './transferHandlers'
 import { initializeAutoUpdater } from './autoUpdater'
 import { setupPipHandlers } from './pipHandlers'
 import { setupCertificateErrorHandler } from './certificatePolicy'
+import { setupWindowGuard } from './windowGuard'
 import { setupMpvHandlers } from './mpvPlayer'
 import { setupNotifyHandlers } from './notifyHandlers'
 import { setupDiagnosticsHandlers } from './diagnosticsHandlers'
@@ -90,6 +91,9 @@ app.on('before-quit', () => { teardownCast(); teardownWebRemote(); teardownTimes
 setupDownloadHandlers()
 setupTransferHandlers()
 setupCertificateErrorHandler()
+// Nenhuma janela abre outra nem sai do próprio index.html (D138): tem de
+// vir antes da 1ª janela — vale no web-contents-created. Ver windowGuard.ts.
+setupWindowGuard()
 setupMpvHandlers() // EXPERIMENTAL — MPV PoC
 setupDiagnosticsHandlers()
 setupDvrHandlers()
