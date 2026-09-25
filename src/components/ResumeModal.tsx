@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useLanguage } from '../services/languageService';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 interface ResumeModalProps {
     seriesName: string;
@@ -21,6 +23,12 @@ export function ResumeModal({
     onRestart,
     onCancel
 }: ResumeModalProps) {
+    const { t } = useLanguage();
+    // Aparece em quatro telas (Inicio, Favoritos, Series, Ver depois) e era o
+    // unico aviso bloqueante sem papel de dialogo: o Esc nao fechava, o Tab
+    // andava pela pagina de tras e o leitor de tela nao sabia que ele abriu.
+    // O componente so existe montado quando esta na tela, dai `aberto: true`.
+    const { containerRef, dialogProps } = useDialogA11y({ aberto: true, aoFechar: onCancel, rotulo: t('resume', 'title') });
     const [isVisible, setIsVisible] = useState(false);
     const [progressAnimated, setProgressAnimated] = useState(0);
 
@@ -98,6 +106,8 @@ export function ResumeModal({
             `}</style>
 
             <div
+                ref={containerRef}
+                {...dialogProps}
                 onClick={(e) => e.stopPropagation()}
                 style={{
                     background: 'linear-gradient(145deg, rgba(30, 30, 50, 0.95) 0%, rgba(15, 15, 30, 0.98) 100%)',
@@ -172,7 +182,7 @@ export function ResumeModal({
                         letterSpacing: '-0.02em',
                         animation: 'floatIn 0.5s ease 0.1s both'
                     }}>
-                        Continuar de onde parou?
+                        {t('resume', 'title')}
                     </h2>
 
                     {/* Series info */}
@@ -194,7 +204,9 @@ export function ResumeModal({
                             fontSize: 13,
                             fontWeight: 500
                         }}>
-                            T{seasonNumber} · Episódio {episodeNumber}
+                            {t('resume', 'episodeLine')
+                                .replace('{season}', String(seasonNumber))
+                                .replace('{episode}', String(episodeNumber))}
                         </p>
                     </div>
 
@@ -216,7 +228,7 @@ export function ResumeModal({
                         }}>
                             <div>
                                 <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
-                                    Parou em
+                                    {t('resume', 'stoppedAt')}
                                 </div>
                                 <div style={{ color: 'var(--ns-accent)', fontSize: 18, fontWeight: 700 }}>
                                     {formatTime(currentTime)}
@@ -238,7 +250,7 @@ export function ResumeModal({
                             </div>
                             <div style={{ textAlign: 'right' }}>
                                 <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
-                                    Restante
+                                    {t('resume', 'remaining')}
                                 </div>
                                 <div style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: 18, fontWeight: 700 }}>
                                     {formatTime(remainingTime)}
@@ -333,7 +345,7 @@ export function ResumeModal({
                             }}
                         >
                             <span style={{ fontSize: 20 }}>▶️</span>
-                            Continuar de {formatTime(currentTime)}
+                            {t('resume', 'resumeFrom').replace('{time}', formatTime(currentTime))}
                         </button>
 
                         {/* Restart button - Secondary */}
@@ -366,7 +378,7 @@ export function ResumeModal({
                             }}
                         >
                             <span style={{ fontSize: 18 }}>🔄</span>
-                            Assistir do Início
+                            {t('resume', 'startOver')}
                         </button>
 
                         {/* Cancel link */}
@@ -390,7 +402,7 @@ export function ResumeModal({
                                 e.currentTarget.style.color = 'rgba(255, 255, 255, 0.5)';
                             }}
                         >
-                            Cancelar
+                            {t('common', 'cancel')}
                         </button>
                     </div>
                 </div>

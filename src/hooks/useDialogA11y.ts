@@ -90,6 +90,12 @@ export function useDialogA11y({ aberto, aoFechar, rotulo }: OpcoesDialogo) {
         const aoTeclar = (evento: KeyboardEvent) => {
             if (evento.key === 'Escape' && aoFecharRef.current) {
                 evento.preventDefault();
+                // O Esc e do dialogo de CIMA. Sem isto ele segue viagem ate os
+                // ouvintes de `window` da tela de tras: na pagina Series o aviso
+                // "Continuar de onde parou?" abre por cima da ficha, e o mesmo
+                // Esc fechava as duas. A captura em `document` roda antes de
+                // qualquer ouvinte em bolha, entao parar aqui basta.
+                evento.stopPropagation();
                 aoFecharRef.current();
                 return;
             }

@@ -925,6 +925,14 @@
     "whatToWatch": "What do you want to watch today?",
     "locale": "en-US"
   },
+  "resume": {
+    "title": "Continue where you left off?",
+    "episodeLine": "S{season} · Episode {episode}",
+    "stoppedAt": "Stopped at",
+    "remaining": "Remaining",
+    "resumeFrom": "Resume from {time}",
+    "startOver": "Start over"
+  },
   "watchLater": {
     "castQueue": "Cast queue",
     "traktImport": "⭐ Import Trakt watchlist",
