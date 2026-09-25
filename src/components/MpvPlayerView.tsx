@@ -295,8 +295,12 @@ export function MpvPlayerView({
             }
             setPhase('playing');
             // Volume remembered across sessions (mpv starts each launch at 100).
+            // Sem a chave (perfil novo, primeira vez com o MPV) o getItem devolve
+            // null, e Number(null) === 0: o mpv abria MUDO. Ausência é "nada
+            // salvo", não volume zero — um 0 gravado de propósito segue valendo.
             try {
-                const saved = Number(localStorage.getItem('neostream_mpv_volume'));
+                const raw = localStorage.getItem('neostream_mpv_volume');
+                const saved = raw === null || raw.trim() === '' ? NaN : Number(raw);
                 if (Number.isFinite(saved) && saved >= 0 && saved <= 100 && saved !== 100) {
                     latestRef.current.volume = saved;
                     setVolume(saved);
