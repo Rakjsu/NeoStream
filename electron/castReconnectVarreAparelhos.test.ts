@@ -55,6 +55,7 @@ vi.mock('./dlnaHandlers', () => ({
     isLoopbackUrl: () => false,
     createLanProxyUrlFor: async (url: string) => url,
     registerCastSubtitleVtt: async () => 'http://192.168.0.2/legenda.vtt',
+    revokeProxyTokensFor: () => undefined,
 }))
 vi.mock('./castClient', () => ({
     CastSession: class {

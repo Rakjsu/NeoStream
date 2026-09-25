@@ -119,6 +119,7 @@ vi.mock('./logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.
 vi.mock('./dlnaHandlers', () => ({
     isLoopbackUrl: () => false,
     createLanProxyUrlFor: async (url: string) => url,
+    revokeProxyTokensFor: () => undefined,
 }))
 
 const ID_DA_TV = 'apple-tv-sala._airplay._tcp.local'

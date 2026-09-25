@@ -82,6 +82,7 @@ vi.mock('./dlnaHandlers', () => ({
     isLoopbackUrl: () => false,
     createLanProxyUrlFor: async (url: string) => url,
     registerCastSubtitleVtt: async () => 'http://192.168.0.2/legenda.vtt',
+    revokeProxyTokensFor: () => undefined,
 }))
 
 /** O LAUNCH_TIMEOUT_MS do castClient — a espera que estoura quando a TV cala. */
