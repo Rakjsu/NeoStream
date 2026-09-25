@@ -24,9 +24,30 @@ function overlayOpen(): boolean {
     return !!document.querySelector('.video-player-container, [data-overlay="modal"]');
 }
 
-function sendKey(key: string) {
+/**
+ * O diálogo do useDialogA11y (papel + aria-modal + `data-overlay`) que está
+ * com o foco, se houver.
+ *
+ * O `data-overlay="modal"` do hook põe o controle no modo overlay, onde o A
+ * vira um Enter SINTÉTICO — e tecla sintética não aciona botão (o Chromium só
+ * clica num `<button>` com Enter de verdade) — e as setas vão para ouvintes
+ * que um diálogo não tem. Com o controle na mão, o aviso "Continuar de onde
+ * parou?" só sabia FECHAR. Dentro de um diálogo desses o controle volta a
+ * mover o foco de verdade, mas só entre os elementos DELE, e o A clica.
+ */
+function dialogoComFoco(): HTMLElement | null {
+    const ativo = document.activeElement;
+    if (!(ativo instanceof HTMLElement)) return null;
+    return ativo.closest<HTMLElement>('[role="dialog"][aria-modal="true"][data-overlay="modal"]');
+}
+
+function keyOnFocus(key: string) {
     const ev = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
     (document.activeElement || document.body).dispatchEvent(ev);
+}
+
+function sendKey(key: string) {
+    keyOnFocus(key);
     // Handlers bound to window/document via bubbling get it from the dispatch
     // above; also dispatch on window for listeners attached there directly.
     window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
@@ -37,12 +58,15 @@ function isVisible(el: HTMLElement): boolean {
     return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < window.innerHeight;
 }
 
-/** Move focus to the nearest interactive element in the given direction. */
-function moveFocus(dir: 'up' | 'down' | 'left' | 'right') {
+/**
+ * Move focus to the nearest interactive element in the given direction,
+ * among the ones inside `scope` (the whole page unless a dialog holds focus).
+ */
+function moveFocus(dir: 'up' | 'down' | 'left' | 'right', scope: ParentNode = document) {
     const current = (document.activeElement instanceof HTMLElement && document.activeElement !== document.body)
         ? document.activeElement
         : null;
-    const candidates = Array.from(document.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(isVisible);
+    const candidates = Array.from(scope.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(isVisible);
     if (candidates.length === 0) return;
 
     if (!current || !isVisible(current)) {
@@ -159,7 +183,10 @@ export function useGamepadNavigation() {
         const release = (input: string) => { lastFire[input] = 0; };
 
         const act = (dir: 'up' | 'down' | 'left' | 'right') => {
-            if (overlayOpen()) {
+            const dialogo = dialogoComFoco();
+            if (dialogo) {
+                moveFocus(dir, dialogo);
+            } else if (overlayOpen()) {
                 sendKey(dir === 'up' ? 'ArrowUp' : dir === 'down' ? 'ArrowDown' : dir === 'left' ? 'ArrowLeft' : 'ArrowRight');
             } else {
                 moveFocus(dir);
@@ -192,7 +219,9 @@ export function useGamepadNavigation() {
             // A: select — click the focused element while browsing, Enter in overlays.
             if (b(0)) {
                 fire('a', now, () => {
-                    if (overlayOpen()) {
+                    if (dialogoComFoco()) {
+                        (document.activeElement as HTMLElement).click();
+                    } else if (overlayOpen()) {
                         sendKey('Enter');
                     } else if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) {
                         document.activeElement.click();
@@ -201,7 +230,11 @@ export function useGamepadNavigation() {
             } else release('a');
 
             // B: back.
-            if (b(1)) fire('b', now, () => sendKey('Escape')); else release('b');
+            // Num diálogo, o Esc vai SÓ para quem tem o foco: o diálogo o ouve no
+            // `document` e o para ali. O segundo disparo do sendKey, direto em
+            // `window`, pula o `document` e chegava inteiro na tela de TRÁS — na
+            // página Séries, o B cancelava o aviso E fechava a ficha.
+            if (b(1)) fire('b', now, () => (dialogoComFoco() ? keyOnFocus('Escape') : sendKey('Escape'))); else release('b');
 
             // LB/RB: channel zap (PgUp/PgDn — the live player listens).
             if (b(4)) fire('lb', now, () => sendKey('PageUp')); else release('lb');

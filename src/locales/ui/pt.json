@@ -982,6 +982,14 @@
     "whatToWatch": "O que você quer assistir hoje?",
     "locale": "pt-BR"
   },
+  "resume": {
+    "title": "Continuar de onde parou?",
+    "episodeLine": "T{season} · Episódio {episode}",
+    "stoppedAt": "Parou em",
+    "remaining": "Restante",
+    "resumeFrom": "Continuar de {time}",
+    "startOver": "Assistir do início"
+  },
   "watchLater": {
     "castQueue": "Transmitir fila",
     "traktImport": "⭐ Importar watchlist do Trakt",
