@@ -720,8 +720,6 @@
     "setPin": "Set",
     "blockAdult": "Block Adult Categories",
     "blockAdultDesc": "Automatically hide adult categories",
-    "filterTMDB": "Filter by TMDB",
-    "filterTMDBDesc": "Automatically check rating on TMDB",
     "kidsLimit": "Daily screen-time limit (kids profile)",
     "kidsHours": "Allowed hours (kids profile)",
     "kidsHoursDesc": "Outside this window the player stays blocked on kids profiles",

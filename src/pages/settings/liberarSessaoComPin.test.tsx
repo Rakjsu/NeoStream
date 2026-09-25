@@ -49,7 +49,6 @@ const CONFIG_LIMPA = {
     pinSalt: null,
     maxRating: '18' as const,
     blockAdultCategories: true,
-    filterByTMDB: true,
 };
 
 /** Categoria que o gate esconde quando o parental está valendo. */

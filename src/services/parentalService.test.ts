@@ -12,7 +12,6 @@ beforeEach(() => {
         pinSalt: null,
         maxRating: '18',
         blockAdultCategories: true,
-        filterByTMDB: true,
     })
     parentalService.lockSession()
     parentalService.lockParentalSettings()

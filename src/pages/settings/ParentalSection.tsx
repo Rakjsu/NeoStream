@@ -104,7 +104,7 @@ export function ParentalSection() {
             return; // Don't change config until PIN is verified
         }
 
-        // Classificação máxima, categorias adultas e filtro TMDB também ficam
+        // Classificação máxima e categorias adultas também ficam
         // trancados. O 'enabled' é a exceção: desligar já pede PIN acima, e
         // ligar só aperta a restrição.
         if (key !== 'enabled' && trancado) return;
@@ -368,24 +368,6 @@ export function ParentalSection() {
                             <span className="toggle-slider"></span>
                         </label>
                         {saveAnimation === 'parental_blockAdultCategories' && <span className="save-indicator">{t('settings', 'saved')}</span>}
-                    </div>
-
-                    <div className="setting-item">
-                        <div className="setting-info">
-                            <label>{t('parental', 'filterTMDB')}</label>
-                            <p>{t('parental', 'filterTMDBDesc')}</p>
-                        </div>
-                        <label className="toggle-switch">
-                            <input
-                                type="checkbox"
-                                aria-label={t('parental', 'filterTMDB')}
-                                checked={parentalConfig.filterByTMDB}
-                                onChange={(e) => handleParentalConfigChange('filterByTMDB', e.target.checked)}
-                                disabled={!parentalConfig.enabled || trancado}
-                            />
-                            <span className="toggle-slider"></span>
-                        </label>
-                        {saveAnimation === 'parental_filterByTMDB' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                     </div>
 
                     <div className="setting-item">

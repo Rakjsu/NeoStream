@@ -13,7 +13,6 @@ export interface ParentalConfig {
     pinSalt: string | null;
     maxRating: 'L' | '10' | '12' | '14' | '16' | '18';
     blockAdultCategories: boolean;
-    filterByTMDB: boolean;
 }
 
 const DEFAULT_CONFIG: ParentalConfig = {
@@ -21,14 +20,21 @@ const DEFAULT_CONFIG: ParentalConfig = {
     pinHash: null,
     pinSalt: null,
     maxRating: '18',
-    blockAdultCategories: true,
-    filterByTMDB: true
+    blockAdultCategories: true
 };
 
 const STORAGE_KEY = 'parentalConfig';
 const UNLOCK_KEY = 'parentalUnlocked';
 // Destrave da SEÇÃO de Configurações — chave PRÓPRIA, ver unlockParentalSettings().
 const SETTINGS_UNLOCK_KEY = 'parentalSettingsUnlocked';
+
+/**
+ * Campos que já existiram no blob e não têm mais leitor. `filterByTMDB` era o
+ * interruptor "Filtrar por TMDB": gravado pela tela e lido por ninguém
+ * (#D078). O spread do loadConfig traria a chave de volta pra sempre — e um
+ * backup antigo restaurado também —, então ela é podada ao carregar.
+ */
+const CHAVES_APOSENTADAS = ['filterByTMDB'] as const;
 
 function randomSaltHex(): string {
     const bytes = new Uint8Array(16);
@@ -53,7 +59,11 @@ class ParentalService {
         try {
             const saved = localStorage.getItem(STORAGE_KEY);
             if (saved) {
-                this.config = { ...DEFAULT_CONFIG, ...JSON.parse(saved) };
+                const parsed = JSON.parse(saved) as Record<string, unknown>;
+                const aposentadas = CHAVES_APOSENTADAS.filter(chave => chave in parsed);
+                for (const chave of aposentadas) delete parsed[chave];
+                this.config = { ...DEFAULT_CONFIG, ...parsed } as ParentalConfig;
+                if (aposentadas.length > 0) this.saveConfig();
             }
         } catch (error) {
             console.error('Error loading parental config:', error);

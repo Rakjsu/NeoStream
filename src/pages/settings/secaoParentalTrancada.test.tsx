@@ -42,7 +42,6 @@ const CONFIG_LIMPA = {
     pinSalt: null,
     maxRating: '18' as const,
     blockAdultCategories: true,
-    filterByTMDB: true,
 };
 
 const rotulo = (chave: string) => languageService.t('parental', chave);
@@ -273,7 +272,6 @@ describe('seção de Controle Parental trancada pelo PIN', () => {
         expect(selectDoPerfil('Filho').disabled).toBe(true);
         expect(selectDaLinha('maxRating').disabled).toBe(true);
         expect(checkboxDaLinha('blockAdult').disabled).toBe(true);
-        expect(checkboxDaLinha('filterTMDB').disabled).toBe(true);
         expect(botaoDaLinha('logTitle').disabled).toBe(true);
         expect(botaoDaLinha('hiddenTitles').disabled).toBe(true);
     });
