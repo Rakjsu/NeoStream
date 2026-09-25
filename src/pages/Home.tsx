@@ -61,7 +61,6 @@ interface ContinueWatchingItem {
     // `lastWatchedAt` da série. É o que ordena a fileira; `currentTime` é só
     // posição no vídeo e nunca serve de data.
     movieProgress?: { currentTime: number; duration: number; progress: number; watchedAt: number };
-    hasNewEpisode?: boolean;
     // A categoria vem junto porque o ⏯️ é uma CÓPIA do item do catálogo: sem
     // ela o portão parental julga esta fileira de mãos vazias, e o filme
     // bloqueado volta à Home pela porta de "continuar assistindo".
@@ -118,6 +117,10 @@ export function Home() {
     const [railPrefs] = useState(() => loadHomeRailPrefs());
     const [recentSeries, setRecentSeries] = useState<SeriesData[]>([]);
     const [updatedSeries, setUpdatedSeries] = useState<SeriesData[]>([]);
+    // 📣 Ids de TODAS as séries seguidas com episódio novo (a fileira acima
+    // mostra só as 20 mais recentes). É daqui que o card do continuar lê o
+    // selo "Novo Ep!" — o mesmo cálculo da fileira, sem o corte dela.
+    const [updatedSeriesIds, setUpdatedSeriesIds] = useState<Set<string>>(new Set());
     const [recentMovies, setRecentMovies] = useState<MovieData[]>([]);
     const [allSeries, setAllSeries] = useState<SeriesData[]>([]);
     const [allMovies, setAllMovies] = useState<MovieData[]>([]);
@@ -518,8 +521,10 @@ export function Home() {
                 ...favoritesService.getAll().filter(f => f.type === 'series').map(f => f.id),
                 ...watchProgressService.getContinueWatching().keys()
             ]);
-            const updated = newEpisodesService.getUpdatedSeries(allSeries, followed).slice(0, 20);
+            const allUpdated = newEpisodesService.getUpdatedSeries(allSeries, followed);
+            const updated = allUpdated.slice(0, 20);
             setUpdatedSeries(updated);
+            setUpdatedSeriesIds(new Set(allUpdated.map(u => String(u.series_id))));
             // Opt-in native notification (first computation only primes).
             newEpisodeNotifier.maybeNotify(
                 updated.map(u => ({ id: String(u.series_id), name: u.name })),
@@ -831,6 +836,8 @@ export function Home() {
         const continueItem = item as ContinueWatchingItem;
         const seriesItem = item as SeriesData;
         const movieItem = item as MovieData;
+        // Selo "Novo Ep!": só série (id de filme é outro espaço no provedor).
+        const hasNewEpisode = isContinue && continueItem.type === 'series' && updatedSeriesIds.has(continueItem.id);
 
         const cover = isContinue ? continueItem.cover :
             type === 'series' ? seriesItem.cover :
@@ -1064,7 +1071,7 @@ export function Home() {
                         )}
 
                         {/* New Episode badge */}
-                        {isContinue && continueItem.hasNewEpisode && (
+                        {hasNewEpisode && (
                             <div style={{
                                 position: 'absolute',
                                 top: 8,
