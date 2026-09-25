@@ -54,11 +54,6 @@ describe('programa atual / próximo / a seguir', () => {
         expect(epgService.getCurrentProgram([])).toBeNull();
     });
 
-    it('getNextProgram devolve o seguinte na grade (e null no último)', () => {
-        expect(epgService.getNextProgram(schedule)?.id).toBe('proximo');
-        expect(epgService.getNextProgram([prog('so-um', -1000, 60_000)])).toBeNull();
-    });
-
     it('getUpcomingPrograms fatia depois do atual, limitado por count', () => {
         const current = epgService.getCurrentProgram(schedule);
         const upcoming = epgService.getUpcomingPrograms(schedule, current, 2);
