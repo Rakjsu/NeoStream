@@ -1,6 +1,7 @@
 import type { Profile, ProfilesData, CreateProfileData, UpdateProfileData } from '../types/profile';
 import { syncTombstones, tombstoneItemKey } from './syncTombstones';
 import { logParentalEvent } from './parentalLogService';
+import { parentalService } from './parentalService';
 import { readJson } from './storageJsonCache';
 import { randomSaltHex, hashPinSalgado, hashPinLegado } from './pinCrypto';
 
@@ -134,6 +135,20 @@ export const profileService = {
         profile.lastUsed = new Date().toISOString();
         saveStorageData(data);
 
+        // 🔒 Trocar de perfil TRANCA a liberação parental de CONTEÚDO da sessão.
+        //
+        // `unlockSession()` grava em `sessionStorage`, que sobrevive ao
+        // `window.location.reload()` que o app dá por dentro — inclusive ao
+        // reload de entrar em outro perfil. Sem esta linha, o adulto libera o
+        // conteúdo com o PIN, passa o controle para o perfil infantil e a
+        // liberação ia junto: o gate inteiro (`isParentalActive`) lê essa
+        // mesma chave de sessão, sem olhar quem está usando o app.
+        //
+        // Tranca também ao reentrar no MESMO perfil, de propósito: falhar
+        // FECHADO é o lado certo de um portão parental, e a comparação
+        // `activeProfileId !== profileId` só economizaria uma escrita.
+        parentalService.lockSession();
+
         // Profile-personalized accent: switching profiles re-themes the app —
         // como CAMADA. Chamar `setTheme` aqui reescrevia a cor que o dono
         // escolheu em Aparência, e o perfil SEM cor não restaurava nada: ficava
@@ -156,6 +171,11 @@ export const profileService = {
         }
         data.activeProfileId = null;
         saveStorageData(data);
+        // 🔒 Sair do perfil também tranca a liberação parental de CONTEÚDO
+        // (ver setActiveProfile). A `sessionStorage` sobrevive ao logout: sem
+        // isto, quem entra depois pela tela de perfis — como convidado, que
+        // não passa por setActiveProfile — herdava o catálogo liberado.
+        parentalService.lockSession();
     },
 
     /**
@@ -181,6 +201,9 @@ export const profileService = {
         data.activeProfileId = GUEST_PROFILE_ID;
         saveStorageData(data);
         marcarSessaoConvidado();
+        // 🔒 Entrar como convidado é trocar de perfil, só que por outra porta:
+        // a liberação de conteúdo do dono não vai junto (ver setActiveProfile).
+        parentalService.lockSession();
         return guest;
     },
 

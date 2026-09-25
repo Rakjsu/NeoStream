@@ -25,6 +25,10 @@ describe('pedeePinAtual', () => {
     it('destravar a seção também confere o PIN atual', () => {
         expect(pedeePinAtual('destravar')).toBe(true);
     });
+
+    it('liberar o conteúdo da sessão também confere o PIN atual', () => {
+        expect(pedeePinAtual('liberar')).toBe(true);
+    });
 });
 
 describe('precisaProvarPin', () => {
@@ -55,9 +59,14 @@ describe('depoisDeVerificar', () => {
         expect(depoisDeVerificar('destravar', true)).toBe('destravar-secao');
     });
 
-    it('errou é errado nos três, sem exceção para quem já está nas Configurações', () => {
+    it('acertou vindo de "liberar": libera o CONTEÚDO — não a seção, e não desliga nada', () => {
+        expect(depoisDeVerificar('liberar', true)).toBe('liberar-sessao');
+    });
+
+    it('errou é errado em todos, sem exceção para quem já está nas Configurações', () => {
         expect(depoisDeVerificar('verify', false)).toBe('pin-incorreto');
         expect(depoisDeVerificar('trocar', false)).toBe('pin-incorreto');
         expect(depoisDeVerificar('destravar', false)).toBe('pin-incorreto');
+        expect(depoisDeVerificar('liberar', false)).toBe('pin-incorreto');
     });
 });

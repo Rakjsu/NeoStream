@@ -745,6 +745,10 @@
     "pinCurrentToChange": "Enter your current PIN to change it",
     "pinIncorrect": "Incorrect PIN",
     "pinMismatch": "PINs do not match",
+    "sessionUnlock": "Unlock for this session",
+    "sessionLockAgain": "Lock again",
+    "sessionLockedDesc": "Enter the PIN to see blocked content without turning the control off",
+    "sessionUnlockedDesc": "Unlocked — locks when the app closes, the profile changes or the control is re-enabled",
     "confirm": "Confirm",
     "cancel": "Cancel"
   },
