@@ -14,7 +14,7 @@ export const STRINGS: Record<RemoteLang, Record<string, string>> = {
     pt: {
         htmlLang: 'pt-BR', brandSuffix: 'Controle',
         pinTitle: 'Digite o PIN', pinHint: 'O c\u00f3digo aparece em Configura\u00e7\u00f5es \u2192 Rede no computador',
-        pinConnect: 'Conectar', pinWrong: 'PIN incorreto. Confira o c\u00f3digo no computador.', pinLen: 'O PIN tem 4 d\u00edgitos.',
+        pinConnect: 'Conectar', pinWrong: 'PIN incorreto. Confira o c\u00f3digo no computador.', pinLen: 'O PIN tem 4 d\u00edgitos.', pinRotated: 'O PIN foi trocado no computador. Digite o c\u00f3digo novo.',
         tabControl: 'Controle', tabGuide: 'Guia', tabMovies: 'Filmes', tabSeries: 'S\u00e9ries', tabContinue: 'Continuar',
         castTo: 'Transmitir em', devAuto: 'Autom\u00e1tico (1\u00aa TV)',
         searchAllPh: 'Buscar filmes e s\u00e9ries\u2026', searchPrompt: 'Digite para buscar no acervo.', searching: 'Buscando\u2026', noResults: 'Nenhum resultado.',
@@ -44,7 +44,7 @@ export const STRINGS: Record<RemoteLang, Record<string, string>> = {
     en: {
         htmlLang: 'en', brandSuffix: 'Remote',
         pinTitle: 'Enter the PIN', pinHint: 'The code is shown under Settings \u2192 Network on the computer',
-        pinConnect: 'Connect', pinWrong: 'Wrong PIN. Check the code on the computer.', pinLen: 'The PIN has 4 digits.',
+        pinConnect: 'Connect', pinWrong: 'Wrong PIN. Check the code on the computer.', pinLen: 'The PIN has 4 digits.', pinRotated: 'The PIN was changed on the computer. Enter the new code.',
         tabControl: 'Remote', tabGuide: 'Guide', tabMovies: 'Movies', tabSeries: 'Series', tabContinue: 'Continue',
         castTo: 'Cast to', devAuto: 'Automatic (1st TV)',
         searchAllPh: 'Search movies & series\u2026', searchPrompt: 'Type to search the library.', searching: 'Searching\u2026', noResults: 'No results.',
@@ -74,7 +74,7 @@ export const STRINGS: Record<RemoteLang, Record<string, string>> = {
     es: {
         htmlLang: 'es', brandSuffix: 'Control',
         pinTitle: 'Ingresa el PIN', pinHint: 'El c\u00f3digo aparece en Configuraci\u00f3n \u2192 Red en la computadora',
-        pinConnect: 'Conectar', pinWrong: 'PIN incorrecto. Verifica el c\u00f3digo en la computadora.', pinLen: 'El PIN tiene 4 d\u00edgitos.',
+        pinConnect: 'Conectar', pinWrong: 'PIN incorrecto. Verifica el c\u00f3digo en la computadora.', pinLen: 'El PIN tiene 4 d\u00edgitos.', pinRotated: 'El PIN se cambi\u00f3 en la computadora. Ingresa el c\u00f3digo nuevo.',
         tabControl: 'Control', tabGuide: 'Gu\u00eda', tabMovies: 'Pel\u00edculas', tabSeries: 'Series', tabContinue: 'Continuar',
         castTo: 'Transmitir a', devAuto: 'Autom\u00e1tico (1\u00aa TV)',
         searchAllPh: 'Buscar pel\u00edculas y series\u2026', searchPrompt: 'Escribe para buscar en el cat\u00e1logo.', searching: 'Buscando\u2026', noResults: 'Sin resultados.',
