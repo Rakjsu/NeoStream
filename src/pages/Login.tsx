@@ -52,8 +52,6 @@ export function Login() {
     const navigate = useNavigate();
     const { t } = useLanguage();
     const [step, setStep] = useState<'credentials' | 'playlist-name'>('credentials');
-    const [includeTV, setIncludeTV] = useState(true);
-    const [includeVOD, setIncludeVOD] = useState(true);
     const [loading, setLoading] = useState(false);
     const [loadingCounts, setLoadingCounts] = useState(false);
     const [error, setError] = useState('');
@@ -101,8 +99,6 @@ export function Login() {
             });
 
             if (result.success) {
-                localStorage.setItem('includeTV', includeTV.toString());
-                localStorage.setItem('includeVOD', includeVOD.toString());
                 setPlaylistId(typeof result.playlistId === 'string' ? result.playlistId : null);
                 setStep('playlist-name');
             } else {
@@ -222,30 +218,6 @@ export function Login() {
                                 </div>
                             </div>
 
-                            <div className="login-checkboxes">
-                                <label className="login-checkbox">
-                                    <input
-                                        type="checkbox"
-                                        checked={includeTV}
-                                        onChange={(e) => setIncludeTV(e.target.checked)}
-                                        disabled={loading}
-                                    />
-                                    <span className="login-checkbox-mark" />
-                                    <span>{t('login', 'includeTV')}</span>
-                                </label>
-
-                                <label className="login-checkbox">
-                                    <input
-                                        type="checkbox"
-                                        checked={includeVOD}
-                                        onChange={(e) => setIncludeVOD(e.target.checked)}
-                                        disabled={loading}
-                                    />
-                                    <span className="login-checkbox-mark" />
-                                    <span>{t('login', 'includeVOD')}</span>
-                                </label>
-                            </div>
-
                             <div className="login-buttons">
                                 <button type="button" onClick={handleBack} className="login-btn login-btn-secondary" disabled={loading}>
                                     <ArrowLeft size={18} />
@@ -308,33 +280,27 @@ export function Login() {
                                     </div>
                                 ) : (
                                     <div className="login-stats-items">
-                                        {includeTV && (
-                                            <div className="login-stat login-stat-blue">
-                                                <div className="login-stat-icon">
-                                                    <Tv size={20} />
-                                                </div>
-                                                <div className="login-stat-value">{counts.live}</div>
-                                                <div className="login-stat-label">{t('login', 'channels')}</div>
+                                        <div className="login-stat login-stat-blue">
+                                            <div className="login-stat-icon">
+                                                <Tv size={20} />
                                             </div>
-                                        )}
-                                        {includeVOD && (
-                                            <>
-                                                <div className="login-stat login-stat-purple">
-                                                    <div className="login-stat-icon">
-                                                        <Film size={20} />
-                                                    </div>
-                                                    <div className="login-stat-value">{counts.vod}</div>
-                                                    <div className="login-stat-label">{t('login', 'moviesCount')}</div>
-                                                </div>
-                                                <div className="login-stat login-stat-green">
-                                                    <div className="login-stat-icon">
-                                                        <PlaySquare size={20} />
-                                                    </div>
-                                                    <div className="login-stat-value">{counts.series}</div>
-                                                    <div className="login-stat-label">{t('login', 'seriesCount')}</div>
-                                                </div>
-                                            </>
-                                        )}
+                                            <div className="login-stat-value">{counts.live}</div>
+                                            <div className="login-stat-label">{t('login', 'channels')}</div>
+                                        </div>
+                                        <div className="login-stat login-stat-purple">
+                                            <div className="login-stat-icon">
+                                                <Film size={20} />
+                                            </div>
+                                            <div className="login-stat-value">{counts.vod}</div>
+                                            <div className="login-stat-label">{t('login', 'moviesCount')}</div>
+                                        </div>
+                                        <div className="login-stat login-stat-green">
+                                            <div className="login-stat-icon">
+                                                <PlaySquare size={20} />
+                                            </div>
+                                            <div className="login-stat-value">{counts.series}</div>
+                                            <div className="login-stat-label">{t('login', 'seriesCount')}</div>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -539,49 +505,6 @@ const loginStyles = `
 
 .login-input-wrap input::placeholder {
     color: rgba(255,255,255,0.3);
-}
-
-.login-checkboxes {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding-top: 8px;
-}
-
-.login-checkbox {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    cursor: pointer;
-    color: rgba(255,255,255,0.7);
-    font-size: 14px;
-}
-
-.login-checkbox input {
-    display: none;
-}
-
-.login-checkbox-mark {
-    width: 20px;
-    height: 20px;
-    border: 2px solid rgba(255,255,255,0.2);
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-}
-
-.login-checkbox input:checked + .login-checkbox-mark {
-    background: linear-gradient(135deg, var(--ns-accent-dark) 0%, var(--ns-accent) 100%);
-    border-color: transparent;
-}
-
-.login-checkbox input:checked + .login-checkbox-mark::after {
-    content: '✓';
-    color: white;
-    font-size: 12px;
-    font-weight: 700;
 }
 
 .login-buttons {
