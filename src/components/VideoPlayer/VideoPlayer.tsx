@@ -201,7 +201,9 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
                 if (arg > 0) sleepTimer.start(arg);
                 else sleepTimer.cancel();
             }
-            // 'next'/'previous' are list-level (zap) — ignored by the modal player.
+            // 'next'/'previous' are list-level — ignored by the modal player on
+            // purpose: live zap is LiveTV's, episode/queue skip is
+            // AsyncVideoPlayer's. Handling them here too would skip twice.
         };
         window.ipcRenderer.on('media:control', handler);
         return () => { window.ipcRenderer?.off('media:control', handler); };

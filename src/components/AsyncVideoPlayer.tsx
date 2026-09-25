@@ -208,6 +208,25 @@ function AsyncVideoPlayer<TMovie extends MediaItem, TVersion extends MediaItem =
         return null;
     }, [streamUrl, loading, externalResumeTime, seriesId, seasonNumber, episodeNumber]);
 
+    // 📱 ⏮/⏭ do controle do celular (media:control 'next'/'previous'). Os
+    // dois motores ignoram o comando de propósito — "próximo" é da lista, não
+    // do player — e quem tem a lista é o pai, cujas callbacks passam por aqui.
+    // Um ouvinte só, então, valendo pro player interno E pro mpv, com as
+    // mesmas guardas dos botões da barra. Ao vivo fica de fora: lá o zap é do
+    // LiveTV, e dois consumidores fariam o ⏭ andar duas vezes.
+    useEffect(() => {
+        if (!window.ipcRenderer || contentType === 'live') return;
+        const handler = (_event: unknown, action: unknown) => {
+            if (action === 'next') {
+                if (canGoNext && onNextEpisode) onNextEpisode();
+            } else if (action === 'previous') {
+                if (canGoPrevious && onPreviousEpisode) onPreviousEpisode();
+            }
+        };
+        window.ipcRenderer.on('media:control', handler);
+        return () => { window.ipcRenderer?.off('media:control', handler); };
+    }, [contentType, canGoNext, canGoPrevious, onNextEpisode, onPreviousEpisode]);
+
     // Disable animation after it completes
     useEffect(() => {
         const timer = setTimeout(() => setIsAnimating(false), 800);

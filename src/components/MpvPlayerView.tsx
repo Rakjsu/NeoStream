@@ -560,7 +560,9 @@ export function MpvPlayerView({
             else if (action === 'volumeUp') changeVolume((latestRef.current.volume ?? 100) + VOLUME_STEP);
             else if (action === 'volumeDown') changeVolume((latestRef.current.volume ?? 100) - VOLUME_STEP);
             else if (action === 'seek' && typeof arg === 'number' && !isLive) seekBy(arg);
-            // 'next'/'previous' are list-level (zap); ignored by the modal player.
+            // 'next'/'previous' are list-level; ignored here on purpose: live
+            // zap is LiveTV's, episode/queue skip is AsyncVideoPlayer's.
+            // Handling them here too would skip twice.
         };
         window.ipcRenderer.on('media:control', handler);
         return () => { window.ipcRenderer?.off('media:control', handler); };
