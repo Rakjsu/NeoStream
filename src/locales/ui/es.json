@@ -254,7 +254,12 @@
     "castQueued": "{n} episodios en cola en {device}",
     "episodeAlreadyDownloading": "Episodio {episode} ya está descargando",
     "onlyEpisode": "Solo Episodio {episode}",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "loadingEpisodes": "Cargando episodios...",
+    "episodesLoadError": "⚠️ No se pudieron cargar los episodios."
+  },
+  "seriesPage": {
+    "clearHistory": "Borrar historial"
   },
   "notifications": {
     "autoTuneIn": "Cambiando a {channel} en {s}s…",
