@@ -25,6 +25,7 @@ import { closeAllPreviews } from '../components/hoverPreviewActions';
 import { useLanguage } from '../services/languageService';
 import { isRecentlyAdded } from '../services/catalogNew';
 import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_OPEN_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
+import { fichaLiberada } from '../services/abrirFicha';
 
 import { asList } from '../utils/catalogPayload';
 interface Series {
@@ -161,11 +162,20 @@ export function Series() {
     // Abre a ficha pendente quando a lista chega (a navegação pode vencer o fetch).
     useEffect(() => {
         if (!pendingOpenId || series.length === 0) return;
-        const hit = series.find(item => String(item.series_id) === pendingOpenId);
+        // 🔒 O id vem de FORA da grade (busca global, "Parecidos" da ficha, o
+        // aviso de novos episódios) e `series` é a lista CRUA: resolver e abrir
+        // direto entregava a ficha de uma série que a grade esconde. Mesmo gate
+        // da grade.
+        const hit = fichaLiberada(pendingOpenId, series, s => s.series_id, isItemVisible);
         queueMicrotask(() => {
             setPendingOpenId(null);
             if (hit) setSelectedSeries(hit);
         });
+    // isItemVisible é recriado a cada render e lê estado de parental/perfil que
+    // só muda por troca de perfil ou ajuste — o que remonta esta página. Nas
+    // deps ele reagendaria a abertura a cada render; mesmo recurso que o filtro
+    // da grade usa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pendingOpenId, series]);
 
     // Listen for mini player expand event to reopen full player
