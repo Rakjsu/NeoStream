@@ -8,6 +8,11 @@
  *
  * O `close()` da janela falsa imita essa folga: enfileira o 'closed' em vez de
  * emitir na hora. Sem isso o teste não consegue ver o bug.
+ *
+ * O estado do PiP é lido pelo `pip:close-and-get` — o único canal de leitura
+ * que o preload deixa uma janela chamar (o VideoPlayer usa pra retomar o que
+ * tocava no PiP). O antigo `pip:getState` saiu no #D122: estava fora da
+ * whitelist e nenhuma janela o alcançava.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { BrowserWindow } from 'electron'
@@ -129,17 +134,15 @@ describe('janela PiP', () => {
         expect(estado.criadas).toHaveLength(2)
         expect(estado.criadas[0].fechou).toBe(true)
 
-        // A janela nova continua sendo a do app: o ✕ dela, o "voltar pro app"
-        // e o F9 falam com ela.
-        const situacao = await invocar('pip:getState') as { isOpen: boolean; content: { title: string } | null }
-        expect(situacao.isOpen).toBe(true)
-        expect(situacao.content?.title).toBe('Canal B')
-
-        await invocar('pip:close')
-        expect(estado.criadas[1].fechou).toBe(true)
-
         // E o app não pode se achar sem PiP com um tocando na tela.
         expect(principal.enviados.filter(c => c === 'pip:closed')).toHaveLength(0)
+
+        // A janela nova continua sendo a do app: o "retomar no player", o ✕
+        // dela e o F9 falam com ela.
+        const situacao = await invocar('pip:close-and-get') as { isOpen: boolean; content: { title: string } | null }
+        expect(situacao.isOpen).toBe(true)
+        expect(situacao.content?.title).toBe('Canal B')
+        expect(estado.criadas[1].fechou).toBe(true)
     })
 
     it('fechar pelo ✕ avisa a janela principal e limpa o estado', async () => {
@@ -149,7 +152,7 @@ describe('janela PiP', () => {
 
         expect(estado.criadas[0].fechou).toBe(true)
         expect(principal.enviados).toContain('pip:closed')
-        expect(await invocar('pip:getState')).toEqual({ isOpen: false, content: null })
+        expect(await invocar('pip:close-and-get')).toEqual({ isOpen: false, content: null })
     })
 
     it('janela fechada por fora também avisa e some do estado', async () => {
@@ -158,6 +161,6 @@ describe('janela PiP', () => {
         entregarFechamentos()
 
         expect(principal.enviados).toContain('pip:closed')
-        expect(await invocar('pip:getState')).toEqual({ isOpen: false, content: null })
+        expect(await invocar('pip:close-and-get')).toEqual({ isOpen: false, content: null })
     })
 })
