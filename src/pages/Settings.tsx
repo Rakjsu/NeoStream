@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useLanguage } from '../services/languageService';
-import epgTestService from '../services/epgTestService';
 import { UpdatesSection } from './settings/UpdatesSection';
 import { PlaybackSection } from './settings/PlaybackSection';
 import { AppearanceSection } from './settings/AppearanceSection';
@@ -35,11 +34,6 @@ export function Settings() {
     const [epgCountryFilter, setEpgCountryFilter] = useState<EpgCountryFilter>('all');
     const [epgSearchTerm, setEpgSearchTerm] = useState('');
     const [epgCurrentPage, setEpgCurrentPage] = useState(1);
-
-    // Keep the EPG background service translated even if the EPG section is never opened
-    useEffect(() => {
-        epgTestService.setTranslateFunction(t);
-    }, [t]);
 
     const sections = [
         { id: 'updates', icon: '🔄', label: t('nav', 'updates'), color: '#10b981' },

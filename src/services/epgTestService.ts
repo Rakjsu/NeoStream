@@ -2,6 +2,7 @@
 // This service manages the EPG test in the background, persisting across navigation
 
 import { epgService } from './epgService';
+import { languageService } from './languageService';
 
 export interface EpgTestResult {
     working: { channel: string; source: string; epgId: string; programCount: number; country?: 'BR' | 'ARG' | 'US' | 'PT' }[];
@@ -46,9 +47,6 @@ class EpgTestService {
     // Listeners for React components to subscribe to updates
     private listeners: Set<StateListener> = new Set();
 
-    // Translation function (will be set from React)
-    private translateFn: ((section: string, key: string) => string) | null = null;
-
     private constructor() {
         // Load cached results on initialization
         this.loadFromCache();
@@ -59,22 +57,6 @@ class EpgTestService {
             EpgTestService.instance = new EpgTestService();
         }
         return EpgTestService.instance;
-    }
-
-    // Set translation function from React component
-    setTranslateFunction(fn: (section: string, key: string) => string) {
-        this.translateFn = fn;
-    }
-
-    private t(section: string, key: string): string {
-        if (this.translateFn) {
-            return this.translateFn(section, key);
-        }
-        // Fallback to Portuguese
-        const fallbacks: Record<string, string> = {
-            'noEpgData': 'Sem dados no EPG'
-        };
-        return fallbacks[key] || key;
     }
 
     // Subscribe to state changes
@@ -321,7 +303,11 @@ class EpgTestService {
                             channel: channel.name,
                             source,
                             epgId,
-                            reason: this.t('epg', 'noEpgData'),
+                            // Modulo do renderer: le o idioma direto do singleton
+                            // (D131). Antes dependia de uma tela injetar o `t`
+                            // via setTranslateFunction; sem ela, caia num mapa
+                            // proprio cravado em portugues.
+                            reason: languageService.t('epg', 'noEpgData'),
                             country
                         });
                     }

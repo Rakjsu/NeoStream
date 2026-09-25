@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // epgService is pulled in at module load; stub so importing the test target is
 // side-effect free. pruneOldResults never calls it; startTest does.
@@ -14,6 +14,7 @@ vi.mock('./epgService', () => ({
 
 import { epgService } from './epgService';
 import epgTestService, { type EpgTestResult } from './epgTestService';
+import { languageService } from './languageService';
 
 const KEY = 'epg_test_results';
 const DAY = 24 * 60 * 60 * 1000;
@@ -152,5 +153,68 @@ describe('epgTestService.startTest — EPG do provedor', () => {
             'Canal Quatro': ['mi.tv / meuguia.tv', 'globo', 'BR']
         });
         expect(epgTestService.results?.notWorking).toEqual([]);
+    });
+});
+
+// D131: o motivo "sem dados" vinha de um tradutor que as Configuracoes
+// INJETAVAM no servico (setTranslateFunction). Sem a injecao, o servico caia
+// num mapa proprio cravado em portugues. O servico e modulo do renderer: le o
+// idioma direto do languageService, sem depender de tela nenhuma ter montado.
+describe('epgTestService.startTest — idioma do motivo "sem dados"', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        epgTestService.clearCache();
+        vi.mocked(epgService.getOpenEpgPortugalId).mockReturnValue(null);
+        vi.mocked(epgService.getOpenEpgArgentinaId).mockReturnValue(null);
+        vi.mocked(epgService.getOpenEpgUSAId).mockReturnValue(null);
+        vi.mocked(epgService.getMiTVSlug).mockReturnValue('globo');
+        // Nenhuma fonte tem guia para o canal: ele cai em "sem dados".
+        vi.mocked(epgService.fetchChannelEPG).mockResolvedValue([]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window as any).ipcRenderer = {
+            invoke: vi.fn(async () => ({
+                success: true,
+                data: [{ name: 'BR: Globo', stream_id: 12, epg_channel_id: 'globo.br' }]
+            }))
+        };
+    });
+
+    afterEach(() => {
+        languageService.setLanguage('pt');
+    });
+
+    async function trocarIdioma(lang: 'en' | 'es', esperado: string) {
+        languageService.setLanguage(lang);
+        // O dicionario en/es chega por import() preguicoso: espera a CONDICAO.
+        await vi.waitFor(
+            () => expect(languageService.t('epg', 'noEpgData')).toBe(esperado),
+            { timeout: 5000 }
+        );
+    }
+
+    it('escreve o motivo em ingles sem nenhuma tela ter injetado tradutor', async () => {
+        await trocarIdioma('en', 'No EPG data');
+
+        await epgTestService.startTest('full');
+
+        expect(epgTestService.results?.notWorking.map(c => [c.channel, c.reason])).toEqual([
+            ['BR: Globo', 'No EPG data']
+        ]);
+    });
+
+    it('segue o idioma escolhido tambem em espanhol', async () => {
+        await trocarIdioma('es', 'Sin datos de EPG');
+
+        await epgTestService.startTest('full');
+
+        expect(epgTestService.results?.notWorking.map(c => c.reason)).toEqual(['Sin datos de EPG']);
+    });
+
+    it('em portugues continua "Sem dados no EPG"', async () => {
+        languageService.setLanguage('pt');
+
+        await epgTestService.startTest('full');
+
+        expect(epgTestService.results?.notWorking.map(c => c.reason)).toEqual(['Sem dados no EPG']);
     });
 });
