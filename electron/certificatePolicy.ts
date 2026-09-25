@@ -181,13 +181,6 @@ function canUseProviderCompatibilityForUrl(url: string, candidateProviderUrl?: s
     return getCertificateSettings().allowInvalidProviderCertificates && isProviderUrl(url, candidateProviderUrl)
 }
 
-/** Só há bypass de TLS com sim explícito do dono para aquele domínio. */
-export function canAllowInvalidCertificateForUrl(url: string, candidateProviderUrl?: string): boolean {
-    if (!canUseProviderCompatibilityForUrl(url, candidateProviderUrl)) return false
-    const hostname = getHostname(url)
-    return !!hostname && isTrustedForInvalidCertificate(hostname)
-}
-
 /**
  * Handshake TLS estrito só para classificar o certificado. Sem isto a única
  * forma de saber que o certificado é ruim seria perguntar ANTES de tentar —
