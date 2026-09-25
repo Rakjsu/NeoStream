@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Bell, X, Check, CheckCheck, Download, Tv, AlertCircle, Sparkles } from 'lucide-react';
 import { appNotificationService, type AppNotification } from '../services/episodeNotificationService';
 import { useLanguage } from '../services/languageService';
+import { urlDeArquivoLocal } from '../utils/urlDeArquivoLocal';
 
 interface NotificationsPanelProps {
     onNavigateToSeries?: (seriesId: string) => void;
@@ -150,7 +151,7 @@ export function NotificationsPanel({ onNavigateToSeries, onNavigateToDownloads, 
 
         // If it's a Windows absolute path, convert to file:// URL
         if (/^[A-Za-z]:\\/.test(url)) {
-            return `file:///${url.replace(/\\/g, '/')}`;
+            return urlDeArquivoLocal(url);
         }
 
         // If it's an http/https URL, return as-is

@@ -447,6 +447,17 @@ export function ContentDetailModal({
     useEffect(() => {
         if (!isOpen || contentType !== 'series') return;
         const onKey = (e: KeyboardEvent) => {
+            // 🏷️ A tecla é do campo onde a pessoa está digitando (a tag
+            // pessoal, por exemplo): Enter ali salva a tag e as setas mexem no
+            // cursor/sugestões — não tocam nem trocam o episódio. Mesmo
+            // critério do atalho do player (VideoPlayer/useKeyboardShortcuts).
+            const target = e.target as HTMLElement | null;
+            if (target && (
+                target.tagName === 'INPUT' ||
+                target.tagName === 'TEXTAREA' ||
+                target.tagName === 'SELECT' ||
+                target.isContentEditable
+            )) return;
             const eps = seriesInfo?.episodes?.[selectedSeason] || [];
             if (!eps.length) return;
             const idx = eps.findIndex(ep => Number(ep.episode_num) === selectedEpisode);

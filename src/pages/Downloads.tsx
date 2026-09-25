@@ -6,6 +6,7 @@ import type { DownloadItem, StorageInfo } from '../services/downloadService';
 import { useLanguage } from '../services/languageService';
 import { getDvrMaxAgeDays, getProtectedRecordings, pickExpiredRecordings, recElapsedLabel, renameProtectedRecording, setDvrMaxAgeDays, toggleProtectedRecording } from '../services/dvrSweep';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
+import { urlDeArquivoLocal } from '../utils/urlDeArquivoLocal';
 import { getDvrMaxConcurrent, margemInicialMs, folgaFinalMs, MARGEM_MAXIMA_MIN } from '../services/scheduledRecordingService';
 
 // Type for grouped series
@@ -549,7 +550,7 @@ export function Downloads() {
                                     <div key={rec.path} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, background: 'rgba(0,0,0,0.25)' }}>
                                         {thumbs[rec.path] && !rec.recording ? (
                                             <img
-                                                src={`file:///${thumbs[rec.path].replace(/\\/g, '/')}`}
+                                                src={urlDeArquivoLocal(thumbs[rec.path])}
                                                 alt=""
                                                 style={{ width: 56, height: 32, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }}
                                             />
@@ -1433,7 +1434,7 @@ export function Downloads() {
             {playingRecording && (
                 <AsyncVideoPlayer
                     movie={{ name: playingRecording.name.replace(/\.ts$/i, ''), stream_id: playingRecording.path }}
-                    buildStreamUrl={async () => `file:///${playingRecording.path.replace(/\\/g, '/')}`}
+                    buildStreamUrl={async () => urlDeArquivoLocal(playingRecording.path)}
                     onClose={() => setPlayingRecording(null)}
                     customTitle={playingRecording.name.replace(/\.ts$/i, '')}
                     contentId={`rec-${playingRecording.path}`}

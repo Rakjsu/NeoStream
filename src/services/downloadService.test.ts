@@ -352,3 +352,44 @@ describe('downloadService: excluir/cancelar manda o main limpar as sobras', () =
         await excluirNoMeio('Filme D066 cancelado no meio', true, id => downloadService.cancelDownload(id));
     });
 });
+
+/**
+ * O `file://` do download offline é o que a ficha entrega ao player (e ao
+ * `mpv:play`). Fora do Windows o caminho JÁ começa com `/`: o serviço
+ * montava `file:///${caminho}` e saía `file:////home/...`, que a guarda do
+ * mpv lê como UNC e recusa — o MPV não tocava download offline no Linux nem
+ * no macOS. Strings puras: vale igual no Windows e no ubuntu-latest da CI.
+ */
+describe('downloadService: URL do arquivo offline', () => {
+    it('filme baixado: três barras no POSIX e no Windows', async () => {
+        await downloadService.registerReceived({
+            title: 'Filme Offline POSIX', kind: 'movie', size: 1,
+            filePath: '/home/rak/.config/NeoStream/downloads/movies/Filme Offline 50%.mp4',
+        });
+        await downloadService.registerReceived({
+            title: 'Filme Offline Windows', kind: 'movie', size: 1,
+            filePath: 'C:\\Users\\rak\\NeoStream\\downloads\\movies\\Filme Offline.mp4',
+        });
+
+        expect(downloadService.getOfflineFilePath('Filme Offline POSIX', 'movie'))
+            .toBe('file:///home/rak/.config/NeoStream/downloads/movies/Filme Offline 50%.mp4');
+        expect(downloadService.getOfflineFilePath('Filme Offline Windows', 'movie'))
+            .toBe('file:///C:/Users/rak/NeoStream/downloads/movies/Filme Offline.mp4');
+    });
+
+    it('episódio baixado: três barras no POSIX e no Windows', async () => {
+        await downloadService.registerReceived({
+            title: 'Série Offline · T2E7', kind: 'episode', size: 1, seriesName: 'Série Offline', season: 2, episode: 7,
+            filePath: '/Users/rak/Library/Application Support/NeoStream/downloads/series/Série Offline/T2E7.mkv',
+        });
+        await downloadService.registerReceived({
+            title: 'Série Offline · T2E8', kind: 'episode', size: 1, seriesName: 'Série Offline', season: 2, episode: 8,
+            filePath: 'D:\\NeoStream\\downloads\\series\\Série Offline\\T2E8.mkv',
+        });
+
+        expect(downloadService.getOfflineEpisodePath('Série Offline', 2, 7))
+            .toBe('file:///Users/rak/Library/Application Support/NeoStream/downloads/series/Série Offline/T2E7.mkv');
+        expect(downloadService.getOfflineEpisodePath('Série Offline', 2, 8))
+            .toBe('file:///D:/NeoStream/downloads/series/Série Offline/T2E8.mkv');
+    });
+});

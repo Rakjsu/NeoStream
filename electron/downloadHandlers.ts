@@ -14,6 +14,9 @@ import {
     type DescritorDeDownload,
 } from './downloadPaths'
 import { getErrorMessage } from './errorMessage';
+// Módulo puro do renderer, lido pelos dois lados de propósito: a URL da capa
+// em cache tem de sair na mesma grafia que a página de Downloads monta.
+import { urlDeArquivoLocal } from '../src/utils/urlDeArquivoLocal';
 
 interface ActiveDownload {
     id: string;
@@ -749,27 +752,6 @@ export function setupDownloadHandlers() {
         }
     });
 
-    // Get files
-    ipcMain.handle('download:get-files', async () => {
-        try {
-            const downloadsPath = getDownloadsPath();
-            const files: { name: string; path: string; size: number; type: string }[] = [];
-
-            for (const type of ['movie', 'series', 'episode']) {
-                const typePath = path.join(downloadsPath, type);
-                if (fs.existsSync(typePath)) {
-                    for (const file of fs.readdirSync(typePath)) {
-                        const fPath = path.join(typePath, file);
-                        files.push({ name: file, path: fPath, size: getFileSizeSync(fPath), type });
-                    }
-                }
-            }
-            return { success: true, files };
-        } catch (error: unknown) {
-            return { success: false, error: getErrorMessage(error) };
-        }
-    });
-
     // Cache image locally
     ipcMain.handle('download:cache-image', async (_, { url, id }) => {
         try {
@@ -789,7 +771,7 @@ export function setupDownloadHandlers() {
             // conta o lixo era servido como capa boa para sempre — não há TTL,
             // revalidação nem botão na interface para limpar a pasta.
             if (getFileSizeSync(filePath) > 0) {
-                return { success: true, localPath: `file:///${filePath.replace(/\\/g, '/')}` };
+                return { success: true, localPath: urlDeArquivoLocal(filePath) };
             }
 
             // Download the image
@@ -854,13 +836,13 @@ export function setupDownloadHandlers() {
                             // porque ela so entra por este rename --, o pedido
                             // esta atendido.
                             if (getFileSizeSync(filePath) > 0) {
-                                resolve({ success: true, localPath: `file:///${filePath.replace(/\\/g, '/')}` });
+                                resolve({ success: true, localPath: urlDeArquivoLocal(filePath) });
                                 return;
                             }
                             resolve({ success: false, error: getErrorMessage(err) });
                             return;
                         }
-                        resolve({ success: true, localPath: `file:///${filePath.replace(/\\/g, '/')}` });
+                        resolve({ success: true, localPath: urlDeArquivoLocal(filePath) });
                     });
                     response.pipe(writeStream);
                 };
