@@ -266,6 +266,21 @@ export const profileService = {
             }
         }
 
+        // 👶 Virar infantil (ou deixar de ser). O campo já existia em
+        // `UpdateProfileData` e o `createProfile` já o gravava, mas aqui ele era
+        // descartado em silêncio: `updateProfile(id, { isKids: true })` devolvia
+        // `true` e o perfil continuava adulto — um contrato que mentia.
+        if (updates.isKids !== undefined) {
+            profile.isKids = updates.isKids;
+            // Sair do modo infantil larga a whitelist de canais. Ela é gerida
+            // EM CONJUNTO (`toggleKidsChannel` escreve em todos os perfis kids
+            // de uma vez) e só é lida por `getKidsAllowedChannelIds`, que ignora
+            // quem não é kids: presa num perfil adulto ela fica invisível, para
+            // de receber as remoções do responsável e, no dia em que o perfil
+            // voltasse a ser infantil, ressuscitaria canais já tirados de lá.
+            if (!updates.isKids) delete profile.allowedChannelIds;
+        }
+
         if (updates.preferredQuality !== undefined) {
             profile.preferredQuality = updates.preferredQuality;
         }
