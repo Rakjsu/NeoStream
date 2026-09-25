@@ -6,6 +6,8 @@
 // tray pra espelhar o estado aqui.
 import { app, ipcMain, nativeImage, BrowserWindow } from 'electron'
 import path from 'node:path'
+import { getAppLanguage, onAppLanguageChange } from './appLanguage'
+import { shellStrings } from './shellStrings'
 
 type GetWin = () => BrowserWindow | null
 
@@ -41,23 +43,28 @@ export function setupWinIntegration(getWin: GetWin): void {
     // ⚡ Jump list: clique direito no ícone → atalhos das páginas principais.
     // Cada task relança o exe com --route=...; o single-instance lock do main
     // roteia o argv na instância viva via tray:navigate.
-    try {
-        const exe = process.execPath
-        const tasks: { title: string; route: string }[] = [
-            { title: '📡 TV ao Vivo', route: '/dashboard/live' },
-            { title: '🎬 Filmes', route: '/dashboard/vod' },
-            { title: '📺 Séries', route: '/dashboard/series' },
-            { title: '📥 Baixados', route: '/dashboard/downloads' },
-        ]
-        app.setUserTasks(tasks.map(task => ({
-            program: exe,
-            arguments: `${ROUTE_ARG_PREFIX}${task.route}`,
-            iconPath: exe,
-            iconIndex: 0,
-            title: task.title,
-            description: task.title,
-        })))
-    } catch { /* jump list é opcional */ }
+    // #D120: os títulos seguem o idioma do app e a lista é refeita na troca.
+    const applyJumpList = () => {
+        try {
+            const exe = process.execPath
+            const s = shellStrings(getAppLanguage())
+            const tasks: { title: string; route: string }[] = [
+                { title: `📡 ${s.jumpLive}`, route: '/dashboard/live' },
+                { title: `🎬 ${s.jumpMovies}`, route: '/dashboard/vod' },
+                { title: `📺 ${s.jumpSeries}`, route: '/dashboard/series' },
+                { title: `📥 ${s.jumpDownloads}`, route: '/dashboard/downloads' },
+            ]
+            app.setUserTasks(tasks.map(task => ({
+                program: exe,
+                arguments: `${ROUTE_ARG_PREFIX}${task.route}`,
+                iconPath: exe,
+                iconIndex: 0,
+                title: task.title,
+                description: task.title,
+            })))
+        } catch { /* jump list é opcional */ }
+    }
+    applyJumpList()
 
     // ⏯ Botões na miniatura da taskbar, espelhando o media:state do player.
     const iconFor = (name: string) =>
@@ -78,14 +85,15 @@ export function setupWinIntegration(getWin: GetWin): void {
                 win.setThumbarButtons([])
                 return
             }
+            const s = shellStrings(getAppLanguage())
             win.setThumbarButtons([
                 {
-                    tooltip: playing ? 'Pausar' : 'Reproduzir',
+                    tooltip: playing ? s.pause : s.play,
                     icon: playing ? icons.pause : icons.play,
                     click: () => { win.webContents.send('media:control', 'togglePlay') },
                 },
                 {
-                    tooltip: 'Parar',
+                    tooltip: s.stop,
                     icon: icons.stop,
                     click: () => { win.webContents.send('media:control', 'stop') },
                 },
@@ -96,6 +104,11 @@ export function setupWinIntegration(getWin: GetWin): void {
     ipcMain.on('media:state', (_event, state: { hasMedia?: boolean; playing?: boolean }) => {
         hasMedia = !!state?.hasMedia
         playing = !!state?.playing
+        applyThumbar()
+    })
+
+    onAppLanguageChange(() => {
+        applyJumpList()
         applyThumbar()
     })
 }
