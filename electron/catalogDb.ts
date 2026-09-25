@@ -47,6 +47,12 @@ export interface CatalogStore {
     read(key: string): CatalogEntryRow | null
     write(key: string, entry: CatalogEntryRow): void
     remove(key: string): void
+    /**
+     * Apaga TODAS as chaves e devolve o disco (VACUUM + checkpoint do WAL).
+     * Diferente dos outros métodos, LANÇA em caso de erro: quem chama é o
+     * "Limpar" da tela de Armazenamento, que precisa dizer que não limpou.
+     */
+    clear(): void
     close(): void
 }
 
@@ -149,6 +155,15 @@ export function openCatalogStore(dbPath: string, legacyJsonDir: string, warn: Wa
                 try {
                     removeStmt.run(key)
                 } catch { /* já não existe */ }
+            },
+            clear() {
+                db.exec('DELETE FROM catalog_cache')
+                // DELETE só marca as páginas como livres: o arquivo continuaria
+                // do mesmo tamanho. O VACUUM reescreve o banco enxuto (no WAL,
+                // indo pro -wal) e o checkpoint TRUNCATE devolve essas páginas
+                // pro catalog.db e zera o -wal.
+                db.exec('VACUUM')
+                db.exec('PRAGMA wal_checkpoint(TRUNCATE)')
             },
             close() {
                 try {
