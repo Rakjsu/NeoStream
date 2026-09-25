@@ -2,7 +2,8 @@
  * EXPERIMENTAL — MPV playback engine PoC.
  *
  * Spawns mpv.exe as its own window and controls it via mpv's JSON IPC over
- * a Windows named pipe (--input-ipc-server). No libmpv embedding — that is
+ * a Windows named pipe (--input-ipc-server) — fora do Windows, um socket unix
+ * na pasta temporária (ver buildPipeName). No libmpv embedding — that is
  * a possible hardening phase later (--wid). The pure/testable parts live in
  * mpvProtocol.ts; this module owns the process, the pipe and the ipcMain
  * surface exposed to the renderer.
@@ -192,7 +193,7 @@ export async function resolveMpvPath(forceRefresh = false): Promise<string | nul
         return 'mpv'
     }
 
-    for (const candidate of buildPathCandidates(process.env)) {
+    for (const candidate of buildPathCandidates(process.env, process.platform)) {
         if (existsSync(candidate)) {
             resolvedPathCache = candidate
             return candidate
@@ -401,7 +402,7 @@ export async function launchMpv(
     stopMpv()
 
     instanceCounter += 1
-    const pipeName = buildPipeName(process.pid, instanceCounter)
+    const pipeName = buildPipeName(process.pid, instanceCounter, process.platform, app.getPath('temp'))
     const embedTarget = followWindow && !followWindow.isDestroyed() ? followWindow : null
     const args = buildMpvArgs(pipeName, {
         url: options.url,
@@ -438,6 +439,11 @@ export async function launchMpv(
 
         child.on('exit', (code) => {
             log.info(`[MPV] process exited (code ${code})`)
+            // Fora do Windows o IPC é um arquivo de socket na pasta temporária:
+            // se o mpv não o apagou ao sair (morto, crash), tira aqui.
+            if (process.platform !== 'win32') {
+                try { rmSync(pipeName, { force: true }) } catch { /* já não existe */ }
+            }
             if (session === current) {
                 current.status = { ...current.status, running: false }
                 teardownSession(false)
