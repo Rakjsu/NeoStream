@@ -72,7 +72,6 @@
   "build": {
     "appId": "com.rakjsu.neostream",
     "productName": "NeoStream IPTV",
-    "afterPack": "./build/afterPack.cjs",
     "directories": {
       "output": "release"
     },
