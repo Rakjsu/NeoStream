@@ -168,6 +168,7 @@ export function setupAirPlayHandlers() {
             log.info('[AirPlay] Playing on device');
             // Track the session so the phone remote can drive this device.
             airplaySession = { device, title: String(title ?? ''), playing: true };
+            airplayFirstSilenceAt = 0;
 
             return { success: true };
         } catch (error: unknown) {
@@ -191,7 +192,7 @@ export function setupAirPlayHandlers() {
 
             await airplayRequest(device, '/stop');
             log.info('[AirPlay] Stopped successfully');
-            if (airplaySession?.device.id === deviceId) airplaySession = null;
+            if (airplaySession?.device.id === deviceId) endAirplaySession('parado pelo app');
 
             return { success: true };
         } catch (error: unknown) {
@@ -208,6 +209,11 @@ export function setupAirPlayHandlers() {
         const session = airplaySession;
         if (!session) return { success: true, active: false };
         const snapshot = await getAirplayStatusSnapshot();
+        // O snapshot pode ter DERRUBADO a sessão (o filme acabou na TV, ou a
+        // Apple TV ficou muda tempo demais). Sem esta reconferida o handler
+        // responderia active:true pra sempre e a barrinha do mini-remoto
+        // ficaria presa na tela até reiniciar o app.
+        if (!airplaySession) return { success: true, active: false };
         return {
             success: true,
             active: true,
@@ -259,6 +265,36 @@ export function setupAirPlayHandlers() {
 
 let airplaySession: { device: AirPlayDevice; title: string; playing: boolean } | null = null;
 
+// Quanto tempo o GET /scrub pode ficar mudo antes de darmos a sessão por
+// encerrada. Falha isolada é rotina (seek, Wi-Fi, TV ocupada); ~12 s de
+// silêncio é a Apple TV de volta na tela inicial. Medido em RELÓGIO e não em
+// número de polls porque o mini-remoto do desktop e o controle do celular
+// consultam o MESMO snapshot — contar chamadas cortaria a tolerância pela
+// metade quando os dois estão abertos.
+const AIRPLAY_SILENCE_TO_END_MS = 12000;
+// A Apple TV encerra um tiquinho antes do fim exato (e o /scrub arredonda),
+// então o último segundo já conta como "acabou".
+const AIRPLAY_END_EPSILON_S = 1;
+
+/** Instante da primeira falha da rajada atual de /scrub (0 = sem rajada). */
+let airplayFirstSilenceAt = 0;
+
+/**
+ * O /scrub disse que o filme chegou ao fim? PURA — duration 0 é conteúdo ao
+ * vivo/ainda carregando e nunca termina por aqui.
+ */
+function airplayPlaybackEnded(scrub: { duration: number; position: number }): boolean {
+    return scrub.duration > 0 && scrub.position >= scrub.duration - AIRPLAY_END_EPSILON_S;
+}
+
+/** Zera a sessão rastreada (e o relógio do silêncio) registrando o motivo. */
+function endAirplaySession(motivo: string): void {
+    if (!airplaySession) return;
+    log.info('[AirPlay] sessão encerrada:', motivo);
+    airplaySession = null;
+    airplayFirstSilenceAt = 0;
+}
+
 export function isAirplaySessionActive(): boolean {
     return airplaySession !== null;
 }
@@ -270,18 +306,41 @@ export function isAirplaySessionActive(): boolean {
 export async function getAirplayStatusSnapshot(): Promise<AirplayStatusRaw | null> {
     const session = airplaySession;
     if (!session) return null;
+
+    let scrub: { duration: number; position: number };
     try {
-        const scrub = parseScrub(await airplayGet(session.device, '/scrub'));
-        return {
-            position: scrub.position,
-            duration: scrub.duration,
-            playing: session.playing,
-            title: session.title,
-            deviceName: session.device.name || '',
-        };
+        scrub = parseScrub(await airplayGet(session.device, '/scrub'));
     } catch {
+        // Ninguém mais atende no aparelho. Tolera a rajada curta (seek em
+        // andamento) e desiste depois de AIRPLAY_SILENCE_TO_END_MS.
+        if (airplaySession === session) {
+            const agora = Date.now();
+            if (airplayFirstSilenceAt === 0) airplayFirstSilenceAt = agora;
+            else if (agora - airplayFirstSilenceAt >= AIRPLAY_SILENCE_TO_END_MS) {
+                endAirplaySession('a TV parou de responder o /scrub');
+            }
+        }
         return null;
     }
+
+    if (airplaySession !== session) return null;
+    // A TV voltou a falar: a rajada de silêncio acabou sem matar a sessão.
+    airplayFirstSilenceAt = 0;
+
+    if (airplayPlaybackEnded(scrub)) {
+        // O filme acabou NA TV (ou alguém parou pelo controle dela): daqui em
+        // diante não há sessão nenhuma pra controlar.
+        endAirplaySession('o filme chegou ao fim na TV');
+        return null;
+    }
+
+    return {
+        position: scrub.position,
+        duration: scrub.duration,
+        playing: session.playing,
+        title: session.title,
+        deviceName: session.device.name || '',
+    };
 }
 
 /** GET on the AirPlay control port, returning the response body. */
@@ -333,7 +392,7 @@ export function airplayRemoteControl(action: string, value?: number): boolean {
             }
             case 'stop':
                 await airplayRequest(session.device, '/stop');
-                airplaySession = null;
+                endAirplaySession('parado pelo controle do celular');
                 return;
             case 'noop':
                 return;
