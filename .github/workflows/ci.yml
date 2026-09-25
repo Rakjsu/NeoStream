@@ -10,8 +10,24 @@ on:
     - cron: '0 6 * * 1' # Mondays 06:00 UTC
 
 jobs:
+  # 🐧 Windows E Linux (D146): o app sai para os três sistemas (matriz do
+  # release.yml), mas até aqui o PR só era verificado no Windows. No NTFS um
+  # import com a caixa errada ('./Foo' para foo.ts) e um caminho montado com
+  # barra invertida na mão passam; no Linux quebram. Fora do Windows só
+  # compilava o build.yml, que dispara DEPOIS do merge, e a suíte só rodava no
+  # Linux no portão da release: o erro chegava à main e aparecia na hora de
+  # tagar. O Linux basta para a classe "caixa alta" (o APFS do macOS, como o
+  # NTFS, não diferencia caixa por padrão). O e2e segue só no Windows.
+  # electron/ciAntesDoMergeNoLinux.test.ts amarra este contrato.
   check:
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Cada sistema dá o seu veredito: com o padrão (fail-fast), o Linux
+      # vermelho cancelaria o Windows no meio e o PR ficaria sem saber se o
+      # problema é só de um deles.
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
     steps:
       - uses: actions/checkout@v7
 
@@ -29,7 +45,10 @@ jobs:
       # O gate roda por um script com allowlist explícita (scripts/audit-prod.mjs)
       # para poder ignorar advisories que comprovadamente não se aplicam ao app
       # (ex.: react-router modo RSC, que este SPA não usa) sem afrouxar o resto.
+      # A árvore de produção é a mesma nos dois sistemas: auditar uma vez basta
+      # (e não dobra a chance de um soluço de rede no registry pintar o PR).
       - name: Audit production dependencies
+        if: matrix.os == 'windows-latest'
         run: node scripts/audit-prod.mjs
 
       - name: Typecheck

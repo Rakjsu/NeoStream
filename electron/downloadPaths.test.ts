@@ -9,7 +9,10 @@ import { caminhoDoDownload, resolveDownloadFile, resolveSeriesFolder, sanitizeDo
  * usuário no clique de "excluir série". Estes testes falham sem o confinamento.
  */
 
-const ROOT = path.join('C:', 'Users', 'x', 'AppData', 'neostream', 'downloads')
+// Raiz ABSOLUTA nos dois sistemas: `path.join('C:', ...)` é relativo fora do
+// Windows (vira "<cwd>/C:/Users/..."), e o resolveDownloadFile — que resolve
+// contra a raiz — dava outro caminho no Linux da CI (D146).
+const ROOT = path.resolve(path.sep, 'Users', 'x', 'AppData', 'neostream', 'downloads')
 const SERIES_ROOT = path.resolve(ROOT, 'series')
 
 describe('resolveSeriesFolder', () => {
