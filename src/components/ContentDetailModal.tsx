@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { pedirAberturaDeFicha } from '../services/abrirFicha';
-import { normalizeTitle } from '../services/personSearchHelpers';
+import { resolveCatalogIds } from '../services/personSearchHelpers';
 import { getCatalogTitleIndex, type CatalogTitleIndex } from '../services/catalogTitleIndex';
 import { resolveSeriesDetails, resolveMovieDetails, fetchMovieTrailer, fetchSeriesTrailer, fetchCollection, fetchSimilarByTmdbId, fetchCastByTmdbId, fetchPersonFilmography, type TMDBSeriesDetails, type TMDBMovieDetails, type TMDBCollection, type TMDBSimilarItem, type TMDBCastMember } from '../services/tmdb';
 import { allTags, getMark, setRating, toggleTag } from '../services/personalMarksService';
@@ -118,19 +118,24 @@ export function ContentDetailModal({
     }, [isOpen, catalogIndex, similar.length, filmography, hasCollectionRail]);
 
     // Parecidos: filme cruza com o catálogo de filmes; série com o de séries.
+    // Os três rails usam o mesmo casador (resolveCatalogIds): o provedor lista
+    // "Oppenheimer 2023 Dublado", e igualdade exata deixava o rail vazio. O
+    // ano do TMDB vai junto, pra um remake não abrir a outra obra.
     const similarInCatalog = useMemo(() => {
         if (!catalogIndex) return [];
         const index = contentType === 'movie' ? catalogIndex.vod : catalogIndex.series;
+        const ids = resolveCatalogIds(index, similar);
         return similar
-            .map(item => ({ item, catalogId: index.get(normalizeTitle(item.title)) }))
+            .map((item, i) => ({ item, catalogId: ids[i] }))
             .filter((entry): entry is { item: TMDBSimilarItem; catalogId: string } => !!entry.catalogId);
     }, [catalogIndex, contentType, similar]);
 
     // Filmografia da pessoa: sempre filmes.
     const filmographyInCatalog = useMemo(() => {
         if (!catalogIndex || !filmography) return [];
+        const ids = resolveCatalogIds(catalogIndex.vod, filmography.items);
         return filmography.items
-            .map(item => ({ item, catalogId: catalogIndex.vod.get(normalizeTitle(item.title)) }))
+            .map((item, i) => ({ item, catalogId: ids[i] }))
             .filter((entry): entry is { item: TMDBSimilarItem; catalogId: string } => !!entry.catalogId);
     }, [catalogIndex, filmography]);
 
@@ -140,10 +145,11 @@ export function ContentDetailModal({
     const collectionInCatalog = useMemo(() => {
         const byPart = new Map<number, string>();
         if (!catalogIndex || !collection) return byPart;
-        for (const part of collection.parts) {
-            const catalogId = catalogIndex.vod.get(normalizeTitle(part.title));
+        const ids = resolveCatalogIds(catalogIndex.vod, collection.parts);
+        collection.parts.forEach((part, i) => {
+            const catalogId = ids[i];
             if (catalogId) byPart.set(part.id, catalogId);
-        }
+        });
         return byPart;
     }, [catalogIndex, collection]);
     // Só dá pra dizer "não está no catálogo" com um índice de filmes de
