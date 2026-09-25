@@ -161,7 +161,20 @@ describe('D103: um listener só por sessão (o trailer do YouTube não pode cair
     })
 
     it('a tela avisa o caso que continua sem conserto (HTTPS ligado no outro PC)', () => {
-        const tela = fs.readFileSync(path.join(__dirname, '..', 'src', 'pages', 'settings', 'NetworkSection.tsx'), 'utf8')
-        expect(tela.includes('se o controle está ativado no outro PC (com o HTTPS desligado lá).')).toBe(true)
+        // D100: o aviso saiu do literal em portugues do NetworkSection para a
+        // chave network.peerConnectError dos tres idiomas. O guarda segue a
+        // frase ate onde ela mora agora: a tela consome a chave, e nenhum
+        // idioma pode perder a mencao ao HTTPS do outro PC.
+        const src = path.join(__dirname, '..', 'src')
+        const tela = fs.readFileSync(path.join(src, 'pages', 'settings', 'NetworkSection.tsx'), 'utf8')
+        expect(tela.includes("'peerConnectError'")).toBe(true)
+        for (const idioma of ['pt', 'en', 'es']) {
+            const dicionario = JSON.parse(fs.readFileSync(path.join(src, 'locales', 'ui', `${idioma}.json`), 'utf8')) as
+                { network: Record<string, string> }
+            expect(dicionario.network.peerConnectError.includes('HTTPS'), idioma).toBe(true)
+            if (idioma === 'pt') {
+                expect(dicionario.network.peerConnectError.includes('se o controle está ativado no outro PC (com o HTTPS desligado lá).')).toBe(true)
+            }
+        }
     })
 })
