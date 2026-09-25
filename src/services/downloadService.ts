@@ -5,6 +5,7 @@
 
 import { appNotificationService } from './episodeNotificationService';
 import { lerMaxConexoes, limiteEfetivoDeDownloads } from '../utils/providerConnections';
+import { urlDeArquivoLocal } from '../utils/urlDeArquivoLocal';
 
 /** O que a série ocupa — alimenta o modal de confirmação da exclusão. */
 export function resumoDaSerie(serie: { seriesName: string; seasons: { episodes: DownloadItem[] }[] }): {
@@ -836,9 +837,8 @@ class DownloadService {
             item => item.name === name && item.type === type && item.status === 'completed' && item.filePath
         );
         if (item?.filePath) {
-            // Convert Windows path to file:// URL
-            const normalizedPath = item.filePath.replace(/\\/g, '/');
-            return `file:///${normalizedPath}`;
+            // Caminho nativo -> file:// (Windows e POSIX; o mpv confere a forma).
+            return urlDeArquivoLocal(item.filePath);
         }
         return null;
     }
@@ -855,8 +855,7 @@ class DownloadService {
                 item.filePath
         );
         if (item?.filePath) {
-            const normalizedPath = item.filePath.replace(/\\/g, '/');
-            return `file:///${normalizedPath}`;
+            return urlDeArquivoLocal(item.filePath);
         }
         return null;
     }

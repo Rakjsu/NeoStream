@@ -24,6 +24,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import { caminhoDeMidiaNoDisco } from './mpvProtocol'
+import { urlDeArquivoLocal } from '../src/utils/urlDeArquivoLocal'
 
 type IpcHandler = (event: unknown, ...args: unknown[]) => Promise<unknown>
 type Resultado = { success: boolean; reason?: string }
@@ -82,8 +83,13 @@ vi.mock('node:net', () => {
     return { default: { connect }, connect }
 })
 
-/** `C:\x\y.ts` -> `file:///C:/x/y.ts`, do jeito que o renderer monta (sem codificar). */
-const comoUrlDoRenderer = (arquivo: string) => `file:///${arquivo.replace(/\\/g, '/')}`
+/**
+ * A URL que o app entrega ao `mpv:play`, montada pela MESMA função que a
+ * página de Downloads e o downloadService usam. Uma imitação local (era um
+ * `file:///${...}` escrito aqui) divergia do app sem ninguém ver: no Linux ela
+ * dava `file:////tmp/...` e o teste acusava o mpv, não a montagem.
+ */
+const comoUrlDoRenderer = urlDeArquivoLocal
 
 const tocar = (url: string) =>
     (estado.handlers.get('mpv:play') as IpcHandler)({ sender: {} }, { url, title: 'Um título' }) as Promise<Resultado>
@@ -195,9 +201,10 @@ describe('mpv:play com arquivo do disco', () => {
     })
 
     it('o caminho nativo cru, sem file://, tambem e aceito', async () => {
-        // Três lugares montam o `file:///` na mão (a página de Downloads e os
-        // dois getOffline* do downloadService). A guarda valida a MESMA coisa
-        // nas duas grafias, então trocar uma delas pelo caminho nativo não
+        // Três lugares montam o `file:///` (a página de Downloads e os dois
+        // getOffline* do downloadService, todos via urlDeArquivoLocal). A
+        // guarda valida a MESMA coisa nas duas grafias, então trocar uma
+        // delas pelo caminho nativo não
         // quebra a reprodução — e nem afrouxa nada: o confinamento e o
         // existsSync valem igual (o caso de fora das pastas, acima, entra por
         // esta mesma porta).
@@ -238,9 +245,33 @@ describe('caminhoDeMidiaNoDisco', () => {
         expect(caminhoDeMidiaNoDisco('file:///home/rak/Vídeos/a.mp4')).toBe('/home/rak/Vídeos/a.mp4')
     })
 
+    it('a URL que o app monta volta ao mesmo caminho nas duas famílias', () => {
+        // A pasta temporária desta máquina só exercita UM estilo de caminho;
+        // o outro sai daqui, com strings puras. Era o POSIX que quebrava: o
+        // app montava `file:////home/...` e a guarda (com razão) lia UNC.
+        const posix = '/home/rak/Vídeos/NeoStream/Gravacoes/Canal 5 - 2026-09-17.ts'
+        expect(urlDeArquivoLocal(posix)).toBe('file:///home/rak/Vídeos/NeoStream/Gravacoes/Canal 5 - 2026-09-17.ts')
+        expect(caminhoDeMidiaNoDisco(urlDeArquivoLocal(posix))).toBe(posix)
+
+        const macos = '/Users/rak/Library/Application Support/NeoStream/downloads/Meu Filme.mp4'
+        expect(caminhoDeMidiaNoDisco(urlDeArquivoLocal(macos))).toBe(macos)
+
+        // Nada é codificado de um lado nem decodificado do outro: `%` e
+        // acento chegam iguais ao que está no disco.
+        const windows = 'C:\\Users\\rak\\Videos\\NeoStream\\Gravações\\Promo 50%.ts'
+        expect(urlDeArquivoLocal(windows)).toBe('file:///C:/Users/rak/Videos/NeoStream/Gravações/Promo 50%.ts')
+        expect(caminhoDeMidiaNoDisco(urlDeArquivoLocal(windows))).toBe('C:/Users/rak/Videos/NeoStream/Gravações/Promo 50%.ts')
+    })
+
     it('recusa UNC — o mpv abriria uma conexão de rede', () => {
         expect(caminhoDeMidiaNoDisco('file://servidor/share/a.ts')).toBeNull()
+        // Quatro barras continuam recusadas, de propósito: no Windows
+        // `file:////servidor/share` É a grafia de UNC, e aceitar "comendo uma
+        // barra" daria à guarda duas leituras para a mesma string. Quem
+        // montava quatro barras era o app — consertado na montagem
+        // (urlDeArquivoLocal), não afrouxando aqui.
         expect(caminhoDeMidiaNoDisco('file:////servidor/share/a.ts')).toBeNull()
+        expect(caminhoDeMidiaNoDisco('file:////home/rak/a.ts')).toBeNull()
         expect(caminhoDeMidiaNoDisco('\\\\servidor\\share\\a.ts')).toBeNull()
         // `file://C:/...` tem DUAS barras: o que vem depois delas é o nome da
         // máquina, e "C:" como host não é o disco local.
@@ -254,5 +285,43 @@ describe('caminhoDeMidiaNoDisco', () => {
         expect(caminhoDeMidiaNoDisco('file:///C:/')).toBeNull()
         expect(caminhoDeMidiaNoDisco('')).toBeNull()
         expect(caminhoDeMidiaNoDisco(null)).toBeNull()
+    })
+})
+
+describe('ninguém monta file:// na mão', () => {
+    // Guarda estrutural: os sete pontos que concatenavam
+    // `file:///${caminho.replace(...)}` (Downloads, downloadService,
+    // NotificationsPanel, a capa em cache do downloadHandlers) passaram a
+    // chamar urlDeArquivoLocal. Os de caminho vindo do renderer têm caso
+    // POSIX com strings puras (gravacaoSaiDaTelaComoArquivo, downloadService);
+    // os do main só veem o caminho do sistema em que rodam, então no Windows
+    // é esta guarda que pega a volta da concatenação — em qualquer grafia:
+    // template (`file:///${`) ou soma (`'file:///' +`).
+    const CONCATENA_FILE_URL = /file:\/\/\/?(?:\$\{|['"`]\s*\+)/
+    const RAIZ = path.join(__dirname, '..')
+    const AJUDANTE = path.join(RAIZ, 'src', 'utils', 'urlDeArquivoLocal.ts')
+
+    const fontes = (dir: string): string[] =>
+        fs.readdirSync(dir, { withFileTypes: true }).flatMap(entrada => {
+            const cheio = path.join(dir, entrada.name)
+            if (entrada.isDirectory()) return fontes(cheio)
+            return /\.tsx?$/.test(entrada.name) && !/\.test\.tsx?$/.test(entrada.name) ? [cheio] : []
+        })
+
+    it('só o urlDeArquivoLocal concatena `file://` com um caminho', () => {
+        const culpados = [...fontes(path.join(RAIZ, 'src')), ...fontes(path.join(RAIZ, 'electron'))]
+            .filter(arquivo => arquivo !== AJUDANTE)
+            .filter(arquivo => CONCATENA_FILE_URL.test(fs.readFileSync(arquivo, 'utf-8')))
+            .map(arquivo => path.relative(RAIZ, arquivo))
+        expect(culpados).toEqual([])
+    })
+
+    it('a guarda reconhece as grafias da concatenação', () => {
+        // Sem isto, uma regex quebrada deixaria a lista acima vazia pra sempre.
+        expect(CONCATENA_FILE_URL.test('`file:///${p.replace(/\\\\/g, "/")}`')).toBe(true)
+        expect(CONCATENA_FILE_URL.test("'file:///' + p")).toBe(true)
+        expect(CONCATENA_FILE_URL.test('"file://" + p')).toBe(true)
+        expect(CONCATENA_FILE_URL.test('urlDeArquivoLocal(p)')).toBe(false)
+        expect(CONCATENA_FILE_URL.test("url.startsWith('file://')")).toBe(false)
     })
 })

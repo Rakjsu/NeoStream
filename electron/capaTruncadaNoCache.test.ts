@@ -14,6 +14,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { urlDeArquivoLocal } from '../src/utils/urlDeArquivoLocal'
 
 type IpcHandler = (event: unknown, ...args: unknown[]) => Promise<unknown>
 type CacheResult = { success: boolean; localPath?: string; error?: string }
@@ -125,6 +127,22 @@ describe('cache de capa: nada de arquivo pela metade', () => {
         expect(fs.statSync(path.join(capas(), '42.jpg')).size).toBe(h.IMAGEM.length)
     })
 
+    it('o localPath e a URL do arquivo gravado -- tres barras em qualquer sistema', async () => {
+        // Fora do Windows o caminho JA comeca com `/` e o main montava
+        // `file:////tmp/...` (quatro barras). O oraculo e o `fileURLToPath`
+        // do proprio Node: com quatro barras ele devolve `//tmp/...`, que nao
+        // e o arquivo. No Windows a letra da unidade nunca comeca com `/`.
+        const capa = path.join(capas(), '42.jpg')
+        const baixada = await cachear('42')
+        const doCache = await cachear('42')
+
+        expect(baixada.success && doCache.success).toBe(true)
+        expect(fileURLToPath(baixada.localPath as string), 'capa recem-baixada').toBe(capa)
+        expect(fileURLToPath(doCache.localPath as string), 'atalho do cache').toBe(capa)
+        // E na MESMA grafia que a tela monta para o resto dos arquivos locais.
+        expect(doCache.localPath).toBe(urlDeArquivoLocal(capa))
+    })
+
     it('conexao que morre no meio NAO deixa capa pela metade', async () => {
         h.state.modo = 'metade'
         const r = await cachear('42')
@@ -217,6 +235,8 @@ describe('cache de capa: nada de arquivo pela metade', () => {
         expect(chamadas, 'os dois pedidos tinham que chegar ao rename').toBe(2)
         expect(a.success && b.success, `${a.error ?? ''} ${b.error ?? ''}`).toBe(true)
         expect(a.localPath).toBe(b.localPath)
+        // Um dos dois saiu pelo ramo do EPERM: os dois apontam para a capa.
+        for (const r of [a, b]) expect(fileURLToPath(r.localPath as string)).toBe(path.join(capas(), '42.jpg'))
         await esperar(() => arquivosDeCapa().every(nome => !nome.endsWith('.tmp')), 'sobrou .tmp no disco')
         expect(fs.statSync(path.join(capas(), '42.jpg')).size).toBe(h.IMAGEM.length)
     })
