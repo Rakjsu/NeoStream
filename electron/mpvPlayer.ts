@@ -38,6 +38,11 @@ import log from './logger'
 import { installMpv } from './mpvDownloader'
 import { mpvDownloadSupported } from './mpvDownloaderProtocol'
 import { getErrorMessage } from './errorMessage'
+// A raiz das gravações vem de quem a criou, e a de downloads é a mesma linha
+// que o storageManager já repete pra medir o disco — o par de pastas do app
+// num lugar só.
+import { recordingsDir } from './dvrHandlers'
+import { isInside } from './downloadPaths'
 import {
     applyIpcMessage,
     buildMpvArgs,
@@ -51,6 +56,7 @@ import {
     parseIpcLine,
     serializeIpcCommand,
     pareceLegendaNoDisco,
+    caminhoDeMidiaNoDisco,
     type MpvStatus,
 } from './mpvProtocol'
 
@@ -470,6 +476,42 @@ function getStatusSnapshot(): MpvStatus {
     return { ...session.status, running: session.status.running && !exited }
 }
 
+/**
+ * Pastas de mídia que o app controla — e as ÚNICAS de onde o `mpv:play`
+ * aceita um arquivo do disco.
+ *
+ * A de gravações é a função do DVR, não uma cópia. A de downloads espelha o
+ * `getDownloadsPath` de downloadHandlers.ts (que lá também CRIA a pasta; aqui
+ * só queremos a raiz pra comparar prefixo) — o mesmo par, montado do mesmo
+ * jeito, que o storageManager.ts usa.
+ */
+function pastasDeMidiaLocal(): string[] {
+    return [recordingsDir(), path.join(app.getPath('userData'), 'downloads')]
+}
+
+/**
+ * Gravação do DVR / download offline que o mpv pode abrir — ou null.
+ *
+ * O mpv é o único player do app que decodifica o `.ts` puro do DVR: o player
+ * interno é o Chromium e o hls.js só entra quando a fonte tem `.m3u8`
+ * (useHls.ts). Enquanto este handler recusava tudo o que não fosse http(s), a
+ * reprodução local caía no player interno e o arquivo nunca tocava — uma
+ * capacidade desperdiçada, não uma regressão do MPV.
+ *
+ * Três camadas, e nenhuma confia no renderer: FORMA (mpvProtocol),
+ * CONFINAMENTO nas nossas pastas (`path.resolve` primeiro — é ele que come o
+ * `..` de um `<gravacoes>/../../evil.ts` antes da comparação de prefixo) e
+ * EXISTÊNCIA no disco. Sem as duas últimas, um `file:///C:/Windows/...` vindo
+ * do renderer viraria um processo externo aberto em cima de arquivo alheio.
+ */
+function midiaLocalAceita(url: string): string | null {
+    const candidato = caminhoDeMidiaNoDisco(url)
+    if (!candidato) return null
+    const alvo = path.resolve(candidato)
+    if (!pastasDeMidiaLocal().some(pasta => isInside(path.resolve(pasta), alvo))) return null
+    return existsSync(alvo) ? alvo : null
+}
+
 export function setupMpvHandlers() {
     void varrerLegendasDeExecucoesAnteriores()
 
@@ -483,12 +525,15 @@ export function setupMpvHandlers() {
 
     ipcMain.handle('mpv:play', async (event, payload: { url?: string; title?: string; start?: number }) => {
         const url = typeof payload?.url === 'string' ? payload.url : ''
-        if (!/^https?:\/\//i.test(url)) {
+        // http(s) segue direto; o resto só passa se for arquivo NOSSO no disco.
+        const alvo = /^https?:\/\//i.test(url) ? url : midiaLocalAceita(url)
+        if (!alvo) {
+            if (url) log.warn('[MPV] mpv:play recusou a fonte (nem http(s) nem arquivo nosso no disco)')
             return { success: false, reason: 'invalid-url' }
         }
         log.info(`[MPV] mpv:play requested (${payload?.title ?? 'sem título'})`)
         return launchMpv({
-            url,
+            url: alvo,
             title: typeof payload?.title === 'string' ? payload.title : undefined,
             start: typeof payload?.start === 'number' ? payload.start : undefined,
         }, BrowserWindow.fromWebContents(event.sender))

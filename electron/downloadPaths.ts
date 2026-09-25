@@ -20,8 +20,16 @@ export function sanitizeDownloadName(name: string): string {
     return String(name ?? '').replace(/[<>:"/\\|?*]/g, '_').substring(0, 200)
 }
 
-/** Comparação de prefixo tolerante a caixa no Windows (C:\ vs c:\). */
-function isInside(root: string, target: string): boolean {
+/**
+ * Comparação de prefixo tolerante a caixa no Windows (C:\ vs c:\).
+ *
+ * Exportada porque o confinamento nas pastas do app deixou de ser assunto só
+ * do download: o `mpv:play` usa a MESMA regra pra decidir se um arquivo do
+ * disco é nosso (gravação do DVR ou download) antes de entregá-lo ao processo
+ * externo. Uma segunda cópia da regra é exatamente o que este arquivo existe
+ * pra evitar.
+ */
+export function isInside(root: string, target: string): boolean {
     const prefix = root.endsWith(path.sep) ? root : root + path.sep
     if (path.sep === '\\') {
         return target.toLowerCase().startsWith(prefix.toLowerCase())
