@@ -1218,7 +1218,9 @@ export function setupDLNAHandlers() {
             }
 
             if (!device) {
-                throw new Error('Device not found. Please add it first.');
+                // `code` estavel: a tela traduz; o `error` fica de reserva (#D098).
+                log.warn('[DLNA] Cast: device not found:', deviceId);
+                return { success: false, code: 'device-not-found', error: 'Device not found. Please add it first.' };
             }
 
             const location = device.location || `http://${device.host}:${device.port || 9197}/dmr`;
@@ -1342,14 +1344,20 @@ export function setupDLNAHandlers() {
             log.error('[DLNA] Cast error:', error);
             const message = getErrorMessage(error);
             let friendly = message;
+            // Os textos redigidos para uma pessoa saem com um `code` estavel: a
+            // tela traduz o codigo no idioma escolhido e so usa o `error` (PT-BR)
+            // como reserva quando nao conhece o codigo (#D098).
+            let code: 'hls-refused-704' | 'format-refused-704' | 'timeout' | undefined;
             if (/\b704\b|restrict|format not supported|not implemented/i.test(message)) {
-                friendly = url.includes('.m3u8')
+                code = url.includes('.m3u8') ? 'hls-refused-704' : 'format-refused-704';
+                friendly = code === 'hls-refused-704'
                     ? 'A TV recusou este stream HLS (erro 704). Tente um filme/série (MP4) ou reproduza localmente.'
                     : 'A TV recusou o formato deste vídeo (erro 704). O container pode não ser suportado pela TV (ex.: MKV) — tente outra versão do conteúdo.';
             } else if (/timeout/i.test(message)) {
+                code = 'timeout';
                 friendly = 'Tempo esgotado — verifique se a TV está ligada, na mesma rede e com DLNA habilitado.';
             }
-            return { success: false, error: friendly };
+            return code ? { success: false, code, error: friendly } : { success: false, error: friendly };
         }
     });
 
