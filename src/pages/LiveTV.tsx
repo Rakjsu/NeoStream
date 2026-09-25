@@ -24,6 +24,7 @@ import { useLanguage } from '../services/languageService';
 import { GLOBAL_SEARCH_TERM_KEY, GLOBAL_SEARCH_EVENT } from '../components/GlobalSearch';
 import { MultiView } from '../components/MultiView';
 import { ChannelHoverMiniGuide } from '../components/ChannelHoverMiniGuide';
+import { UpNextList } from '../components/UpNextList';
 import { isReplayable, isRestartable, replayDurationMinutes } from '../utils/epgGuide';
 import { getTimeshiftUrl } from '../services/timeshiftService';
 import { resolveRemoteChannel } from '../services/webRemoteTune';
@@ -1763,36 +1764,7 @@ export function LiveTV() {
                                         </div>
 
                                         {/* Upcoming Programs */}
-                                        {upcomingPrograms.length > 0 && (
-                                            <div>
-                                                <div style={{ fontSize: '13px', color: 'rgba(148, 163, 184, 1)', marginBottom: '14px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                                    {t('liveTV', 'upNext')}
-                                                </div>
-                                                {upcomingPrograms.map((program, index) => (
-                                                    <div
-                                                        key={program.id || index}
-                                                        className="epg-item epg-program-item"
-                                                        style={{
-                                                            marginBottom: '10px',
-                                                            padding: 'clamp(10px, 1.5vw, 14px) clamp(12px, 1.5vw, 16px)',
-                                                            background: 'rgba(255, 255, 255, 0.03)',
-                                                            borderRadius: '10px',
-                                                            border: '1px solid rgba(255, 255, 255, 0.05)',
-                                                            cursor: 'pointer',
-                                                            animationDelay: `${index * 0.1}s`
-                                                        }}
-                                                    >
-                                                        <div style={{ fontSize: 'clamp(12px, 1.2vw, 14px)', color: 'white', fontWeight: '500', marginBottom: '6px' }}>
-                                                            {program.title}
-                                                        </div>
-                                                        <div style={{ fontSize: '12px', color: 'rgba(148, 163, 184, 0.8)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                            <span style={{ opacity: 0.7 }}>🕐</span>
-                                                            {epgService.formatTime(program.start)}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
+                                        <UpNextList programs={upcomingPrograms} heading={t('liveTV', 'upNext')} />
                                     </>
                                 ) : (
                                     <div style={{ textAlign: 'center', padding: '40px 20px', color: 'rgba(148, 163, 184, 0.8)' }}>
