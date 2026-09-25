@@ -306,7 +306,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
     var mvsearchEl = document.getElementById('mvsearch');
     var mvEmptyEl = document.getElementById('mv-empty');
     var ws;
-    var guide = { channels: [], playingId: '', epg: null };
+    var guide = { channels: [], playingId: '', epg: null, total: 0 };
     var filter = '';
     var epgCache = {};   // channelId → { now, nowStart, nowEnd, next }
     var activeRecs = {}; // channelName → recording id (guia marca 🔴)
@@ -432,7 +432,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
             statusEl.className = 'status on';
             updateCastProgress(msg);
           } else if (msg.type === 'guide') {
-            guide = { channels: msg.channels || [], playingId: msg.playingId || '', epg: msg.epg || null };
+            guide = { channels: msg.channels || [], playingId: msg.playingId || '', epg: msg.epg || null, total: Number(msg.total) || 0 };
             renderGuide();
           } else if (msg.type === 'stats') {
             var sl = document.getElementById('statsline');
@@ -717,7 +717,16 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
           + '<button class="chinfo" data-info="' + esc(c.id) + '" title="' + L.programming + '">ⓘ</button></div>'
           + epgHtml + '</div>';
       }
-      chlistEl.innerHTML = html || '<div class="empty">' + L.noChannelFound + '</div>';
+      // D105: o main manda no máximo 600 canais. Se a LiveTV tinha mais, diz
+      // quantos ficaram de fora e aponta a busca do topo (que acha todos) —
+      // inclusive quando a busca desta aba não achou nada entre os 600.
+      var shown = channels.length;
+      var trunc = guide.total > shown
+        ? '<div class="empty" id="guide-trunc">' + esc(L.guideTruncated
+          .replace('{shown}', function () { return String(shown); })
+          .replace('{total}', function () { return String(guide.total); })) + '</div>'
+        : '';
+      chlistEl.innerHTML = (html || '<div class="empty">' + L.noChannelFound + '</div>') + trunc;
     }
 
     chsearchEl.addEventListener('input', function () { filter = chsearchEl.value; renderGuide(); });
