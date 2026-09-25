@@ -132,3 +132,31 @@
     letter-spacing: .5px;
     pointer-events: none;
 }
+
+/* Verificação do controle parental / perfil Kids em andamento (#D049).
+   Mora no card — e não nas páginas — porque Filmes e Séries montam o MESMO
+   HoverPreviewCard; as regras antigas (.movie-card.checking /
+   .series-card.checking) miravam classes que nenhum elemento da grade tem. */
+.hover-preview-card.checking {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.hover-preview-card.checking .preview-poster::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 32px;
+    height: 32px;
+    margin: -16px 0 0 -16px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    z-index: 6;
+    animation: hoverPreviewCardChecking 0.8s linear infinite;
+}
+
+@keyframes hoverPreviewCardChecking {
+    to { transform: rotate(360deg); }
+}

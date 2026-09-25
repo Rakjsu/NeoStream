@@ -18,6 +18,12 @@ interface HoverPreviewCardProps {
     isNew?: boolean;
     /** Selo de qualidade (4K/FHD/HD) extraído do nome do provedor. */
     qualityBadge?: string | null;
+    /**
+     * Verificação do controle parental / perfil Kids em andamento (a página
+     * foi ao IndexedDB/TMDB antes de abrir a ficha). O card esmaece, gira e
+     * não aceita outro clique nem Enter até a verificação terminar.
+     */
+    checking?: boolean;
     onMoreInfo: () => void;
     children?: React.ReactNode;
 }
@@ -34,23 +40,32 @@ function HoverPreviewCardComponent({
     onMoreInfo,
     isNew,
     qualityBadge,
+    checking,
     children
 }: HoverPreviewCardProps) {
     // 🟢 O selo NOVO some no primeiro hover e fica visto pra sempre.
     const [newSeen, setNewSeen] = useState(() => (isNew ? hasSeenNewBadge(type, id) : false));
+    // O `pointer-events: none` do CSS só barra o mouse: o Enter/Espaço passa.
+    // Sem esta guarda, abrir de novo durante a verificação disparava outra
+    // (outra ida ao IndexedDB/TMDB pelo mesmo título).
+    const open = () => {
+        if (checking) return;
+        onMoreInfo();
+    };
     const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
         if (event.key === 'Enter' || event.key === ' ') {
             event.preventDefault(); // Space must not scroll the grid
-            onMoreInfo();
+            open();
         }
     };
     return (
         <div
-            className="hover-preview-card"
+            className={checking ? 'hover-preview-card checking' : 'hover-preview-card'}
             role="button"
             tabIndex={0}
             aria-label={title}
-            onClick={onMoreInfo}
+            aria-busy={checking || undefined}
+            onClick={open}
             onKeyDown={handleKeyDown}
             onMouseEnter={() => {
                 if (isNew && !newSeen) {
