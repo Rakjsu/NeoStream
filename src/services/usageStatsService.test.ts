@@ -98,18 +98,6 @@ describe('usageStatsService', () => {
         expect(kept).toContain('novo');      // 1800s, topo
         expect(kept).not.toContain('c1');    // 1s, poda
     });
-
-    it('formatTime e getMostWatchedType', () => {
-        expect(usageStatsService.formatTime(3661).formatted).toBe('1h 1min');
-        expect(usageStatsService.formatTime(300).formatted).toBe('5min');
-
-        expect(usageStatsService.getMostWatchedType()).toBeNull(); // vazio
-        localStorage.setItem(KEY, JSON.stringify({
-            ...usageStatsService.getStats(),
-            contentBreakdown: { movies: 10, series: 50, live: 20 },
-        }));
-        expect(usageStatsService.getMostWatchedType()).toBe('series');
-    });
 });
 
 describe('o dia é o do calendário local, não o de Greenwich', () => {

@@ -333,41 +333,6 @@ class UsageStatsService {
 
         return result;
     }
-
-    // Format seconds to readable time
-    formatTime(seconds: number): { hours: number; minutes: number; formatted: string } {
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-
-        if (hours > 0) {
-            return { hours, minutes, formatted: `${hours}h ${minutes}min` };
-        }
-        return { hours: 0, minutes, formatted: `${minutes}min` };
-    }
-
-    // Get most watched content type
-    getMostWatchedType(): 'movies' | 'series' | 'live' | null {
-        const stats = this.loadStats();
-        const breakdown = stats.contentBreakdown;
-
-        if (breakdown.movies === 0 && breakdown.series === 0 && breakdown.live === 0) {
-            return null;
-        }
-
-        if (breakdown.movies >= breakdown.series && breakdown.movies >= breakdown.live) {
-            return 'movies';
-        }
-        if (breakdown.series >= breakdown.live) {
-            return 'series';
-        }
-        return 'live';
-    }
-
-    // Clear all stats (for testing/debug)
-    clearStats(): void {
-        const key = this.getStorageKey();
-        localStorage.removeItem(key);
-    }
 }
 
 export const usageStatsService = new UsageStatsService();
