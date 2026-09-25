@@ -20,6 +20,7 @@ import { profileService } from '../services/profileService';
 import { downloadService } from '../services/downloadService';
 import { useContentFiltering } from '../hooks/useContentFiltering';
 import { useWindowedGrid } from '../hooks/useWindowedGrid';
+import { useResetOnFilterChange } from '../hooks/useResetOnFilterChange';
 import { HoverPreviewCard } from '../components/HoverPreviewCard';
 import { closeAllPreviews } from '../components/hoverPreviewActions';
 import { useLanguage } from '../services/languageService';
@@ -107,6 +108,18 @@ export function VOD() {
     useEffect(() => {
         closeAllPreviews();
     }, []);
+
+    // Reset on filter change: busca/categoria fecham a ficha e voltam ao topo;
+    // o recálculo da grade (resize, os 200 ms) só reajusta o visibleCount.
+    // Fica ANTES do efeito do pendingOpenId (ver o hook).
+    useResetOnFilterChange({
+        searchQuery,
+        selectedCategory,
+        itemsPerPage,
+        setVisibleCount,
+        setSelection: setSelectedMovie,
+        scrollRef: scrollContainerRef,
+    });
 
     // Global search term-bridge: consume (read + remove) the term stored by
     // the Ctrl+K overlay, both on mount (cross-page navigation) and on the
@@ -370,16 +383,6 @@ export function VOD() {
     });
     const windowStart = gridWindow.ready ? gridWindow.start : 0;
     const windowEnd = gridWindow.ready ? gridWindow.end : Math.min(visibleCount, filteredStreams.length);
-
-    // Reset on filter change (deferred setState)
-    useEffect(() => {
-        queueMicrotask(() => {
-            setVisibleCount(itemsPerPage);
-            setSelectedMovie(null);
-        });
-        // Back to the top so the window recomputes from row 0.
-        if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
-    }, [searchQuery, selectedCategory, itemsPerPage]);
 
     // Fetch TMDB data
     useEffect(() => {

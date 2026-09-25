@@ -38,9 +38,14 @@ test('filme: clique no card abre o modal com título e botão Assistir; Esc fech
     await expect(page.getByText(GREETING)).toBeVisible();
 
     await page.locator('button.nav-item[title="Filmes"]').click();
-    await expect(page.getByText('Cidade de Deus').first()).toBeVisible();
+    // Card procurado DENTRO da grade de Filmes: a página é lazy e a navegação
+    // é uma transição, então a Home (que também mostra "Cidade de Deus") fica
+    // na tela até o chunk chegar — um getByText solto clicava no card da Home,
+    // o modal dela abria e sumia quando a página nova montava.
+    const grade = page.getByRole('list', { name: 'Filmes' });
+    await expect(grade.getByText('Cidade de Deus').first()).toBeVisible();
 
-    await page.getByText('Cidade de Deus').first().click();
+    await grade.getByText('Cidade de Deus').first().click();
 
     // Modal: title (h2 — the card title is an h4) + primary play button
     await expect(page.locator('h2', { hasText: 'Cidade de Deus' })).toBeVisible();
@@ -56,9 +61,11 @@ test('série: modal lista temporadas e episódios ao lado do hero', async () => 
     await expect(page.getByText(GREETING)).toBeVisible();
 
     await page.locator('button.nav-item[title="Séries"]').click();
-    await expect(page.getByText('Cidade Invisível').first()).toBeVisible();
+    // Dentro da grade de Séries (ver o comentário do teste de filme).
+    const grade = page.getByRole('list', { name: 'Séries' });
+    await expect(grade.getByText('Cidade Invisível').first()).toBeVisible();
 
-    await page.getByText('Cidade Invisível').first().click();
+    await grade.getByText('Cidade Invisível').first().click();
 
     // Episodes column: season tabs + cleaned episode titles from the fixture.
     // Exact match dodges the page's own detail panel, which shows the raw
@@ -83,7 +90,9 @@ test('série: setas do teclado trocam o episódio selecionado', async () => {
     await expect(page.getByText(GREETING)).toBeVisible();
 
     await page.locator('button.nav-item[title="Séries"]').click();
-    await page.getByText('Cidade Invisível').first().click();
+    // Dentro da grade de Séries: sem isso o clique pegava o card da Home que
+    // ainda estava na tela durante a transição pra página lazy.
+    await page.getByRole('list', { name: 'Séries' }).getByText('Cidade Invisível').first().click();
     await expect(page.getByRole('button', { name: /Assistir T1 E1/ })).toBeVisible();
     // Keyboard navigation needs the episode list loaded — wait for a row.
     await expect(page.getByText('Encontro', { exact: true })).toBeVisible();
