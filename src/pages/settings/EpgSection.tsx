@@ -49,7 +49,6 @@ export function EpgSection({
 
     // Subscribe to EPG test service state changes (runs in background even when navigating away)
     useEffect(() => {
-        epgTestService.setTranslateFunction(t);
         const unsubscribe = epgTestService.subscribe(() => {
             setTestingEpg(epgTestService.isRunning);
             setEpgTestProgress(epgTestService.progress);
@@ -57,7 +56,7 @@ export function EpgSection({
             setLastEpgTestDate(epgTestService.lastTestDate);
         });
         return unsubscribe;
-    }, [t]);
+    }, []);
 
     // EPG handlers - delegate to background service
     const handleEpgTest = (mode: 'full' | 'continue' | 'retryFailed' = 'full') => {
