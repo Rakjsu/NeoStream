@@ -3,6 +3,49 @@ import { User, Lock, Server, LogIn, Tv, ArrowLeft, Play, Film, PlaySquare, Spark
 import { useState, useEffect } from 'react';
 import { useLanguage } from '../services/languageService';
 import { hasTmdbApiKey, setTmdbOnboardingPending } from '../services/tmdbKey';
+import { classifyXtreamLoginError } from '../services/xtreamLoginError';
+
+/**
+ * Mensagem de erro do login → texto no idioma do app.
+ *
+ * Antes isto casava 'ENOTFOUND' / 'ECONNREFUSED' / 'timeout' direto na
+ * mensagem — só que o `XtreamClient` do main já tinha REESCRITO esses erros
+ * em português ('Servidor não encontrado: …', 'Conexão recusada: …', 'Tempo
+ * esgotado ao conectar em: …', 'Usuário ou senha incorretos'), e nenhuma
+ * dessas frases contém os tokens. Quem usa o app em inglês ou espanhol levava
+ * a frase em português na cara, e as traduções login.connectionError /
+ * authError / timeoutError — escritas nos três idiomas — quase nunca eram
+ * usadas.
+ *
+ * `reserva` é o que aparece quando nada casa, e continua sendo diferente nos
+ * dois pontos de chamada (a mensagem crua no retorno do IPC, o texto de erro
+ * inesperado no catch), como já era.
+ */
+function textoDoErroDeLogin(
+    mensagem: string,
+    t: (secao: string, chave: string) => string,
+    reserva: string
+): string {
+    switch (classifyXtreamLoginError(mensagem)) {
+        case 'url':
+            return t('login', 'invalidUrl');
+        case 'auth':
+            return t('login', 'authError');
+        case 'timeout':
+            return t('login', 'timeoutError');
+        case 'dns':
+        case 'refused':
+        case 'offline':
+            return t('login', 'connectionError');
+        // O texto do certificado é um GUIA do que fazer (escrito pelo
+        // certificatePolicy); traduzi-lo por código perderia a instrução, e
+        // mostrar cru já era o comportamento de antes.
+        case 'tls':
+            return mensagem;
+        default:
+            return reserva;
+    }
+}
 
 export function Login() {
     const navigate = useNavigate();
@@ -63,33 +106,11 @@ export function Login() {
                 setStep('playlist-name');
             } else {
                 const errorMessage = result.error || t('login', 'unexpectedError');
-                if (errorMessage.includes('Invalid URL') || errorMessage.includes('invalid url')) {
-                    setError(t('login', 'invalidUrl'));
-                } else if (errorMessage.includes('fetch') || errorMessage.includes('ENOTFOUND') || errorMessage.includes('ECONNREFUSED')) {
-                    setError(t('login', 'connectionError'));
-                } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized') || errorMessage.includes('authentication')) {
-                    setError(t('login', 'authError'));
-                } else if (errorMessage.includes('timeout')) {
-                    setError(t('login', 'timeoutError'));
-                } else if (errorMessage.includes('Certificado inválido') || errorMessage.includes('Certificado invalido') || errorMessage.includes('certificate')) {
-                    setError(errorMessage);
-                } else {
-                    setError(errorMessage);
-                }
+                setError(textoDoErroDeLogin(errorMessage, t, errorMessage));
             }
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : '';
-            if (message.includes('Invalid URL') || message.includes('invalid url')) {
-                setError(t('login', 'invalidUrl'));
-            } else if (message.includes('fetch')) {
-                setError(t('login', 'connectionError'));
-            } else if (message.includes('timeout')) {
-                setError(t('login', 'timeoutError'));
-            } else if (message.includes('Certificado inválido') || message.includes('certificate')) {
-                setError(message);
-            } else {
-                setError(t('login', 'unexpectedError'));
-            }
+            setError(textoDoErroDeLogin(message, t, t('login', 'unexpectedError')));
         } finally {
             setLoading(false);
         }
