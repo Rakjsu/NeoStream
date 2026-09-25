@@ -201,6 +201,7 @@
     "favCheckSomeDead": "{dead} de {probed} fuera del aire",
     "favCheckPartial": "{limit} de {total} verificados",
     "favCheckFailed": "la comprobación falló",
+    "favCheckUnavailable": "comprobación no disponible en portales Stalker",
     "groupVariantsHint": "Agrupar las variantes FHD/HD/SD del mismo canal en una sola tarjeta",
     "noChannelsFound": "No se encontraron canales",
     "noChannelsHint": "Intenta buscar otro término",
