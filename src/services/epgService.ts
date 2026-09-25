@@ -694,8 +694,12 @@ export const epgService = {
             return current;
         }
 
-        // Fallback to first program if nothing matches
-        return programs[0];
+        // Nada cobre o agora (buraco na grade): cai no primeiro que AINDA NÃO
+        // TERMINOU. Grade toda vencida → null, e a tela mostra "sem
+        // informação" — cair em programs[0] pintava o programa mais velho da
+        // lista sob "AO VIVO AGORA" com a barra em 100% (D040). Mesmo critério
+        // do needsEpgRefetch: fim ilegível não conta como "ainda no ar".
+        return programs.find(p => new Date(p.end).getTime() > now) ?? null;
     },
 
     // Get upcoming programs (after current)
