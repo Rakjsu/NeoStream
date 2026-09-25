@@ -20,7 +20,7 @@ import { depoisDeVerificar, modoAoTrocarPin, pedeePinAtual, precisaProvarPin, ty
 
 export function ParentalSection() {
     const [parentalConfig, setParentalConfig] = useState<ParentalConfig>(parentalService.getConfig());
-    const { t } = useLanguage();
+    const { t, locale } = useLanguage();
     const { saveAnimation, triggerSaveAnimation } = useSaveAnimation();
     const [kidsLimit, setKidsLimit] = useState(() => getKidsDailyLimitMinutes());
     // D65: janelas de horário, limites por perfil e log parental.
@@ -538,7 +538,7 @@ export function ParentalSection() {
                                 <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 180, overflowY: 'auto' }}>
                                     {logEntries.map((entry, index) => (
                                         <div key={`${entry.ts}-${index}`} style={{ fontSize: 12, color: entry.kind === 'pin_fail' ? '#fca5a5' : 'rgba(255,255,255,0.6)' }}>
-                                            {new Date(entry.ts).toLocaleString('pt-BR')} · {entry.kind === 'pin_fail' ? '❌' : '✅'} {entry.detail}
+                                            {new Date(entry.ts).toLocaleString(locale)} · {entry.kind === 'pin_fail' ? '❌' : '✅'} {entry.detail}
                                         </div>
                                     ))}
                                 </div>

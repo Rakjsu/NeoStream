@@ -22,14 +22,13 @@ import { playlistService } from '../../services/playlistService';
 import { getDailyGoalMinutes, goalProgressPct, setDailyGoalMinutes } from '../../services/watchLimitsService';
 
 const TYPE_COLORS = { movies: '#3b82f6', series: '#10b981', live: '#f59e0b' } as const;
-const LOCALE_BY_LANGUAGE: Record<string, string> = { pt: 'pt-BR', en: 'en-US', es: 'es-ES' };
 
 export function StatsSection() {
     // Load usage stats
     const [usageStats] = useState<UsageStats | null>(() => usageStatsService.getStats());
     const [weeklyStats] = useState<DailyStats[]>(() => usageStatsService.getWeeklyStats());
     const [dailyGoal, setDailyGoal] = useState(() => getDailyGoalMinutes());
-    const { t, language } = useLanguage();
+    const { t, locale } = useLanguage();
 
     const today = diaLocal(new Date());
     const todaySeconds = usageStats?.dailyStats.find(d => d.date === today)?.totalSeconds || 0;
@@ -63,7 +62,7 @@ export function StatsSection() {
                 .catch(() => undefined);
         });
     }, []);
-    const heatmapLocale = LOCALE_BY_LANGUAGE[language] || 'pt-BR';
+    const heatmapLocale = locale;
     // 1º de janeiro de 2023 foi DOMINGO — vira as iniciais no idioma da UI.
     const dayInitials = Array.from({ length: 7 }, (_, index) =>
         new Date(2023, 0, 1 + index).toLocaleDateString(heatmapLocale, { weekday: 'narrow' }));
@@ -80,10 +79,9 @@ export function StatsSection() {
         return `${minutes}min`;
     };
 
-    const getWeekDayLabel = (dateStr: string) => {
-        const date = new Date(dateStr + 'T12:00:00');
-        return ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'][date.getDay()];
-    };
+    // Mesmas iniciais do mapa de habitos, no idioma da tela (antes: a lista
+    // D S T Q Q S S cravada em portugues -- o W de Wednesday virava Q).
+    const getWeekDayLabel = (dateStr: string) => dayInitials[new Date(dateStr + 'T12:00:00').getDay()];
 
     const getMaxWeeklySeconds = () => {
         return Math.max(...weeklyStats.map(d => d.totalSeconds), 1);
@@ -92,7 +90,7 @@ export function StatsSection() {
     const weekdayName = (dayIndex: number) => {
         // 2026-03-01 is a Sunday; offset from it to name any weekday.
         const date = new Date(2026, 2, 1 + dayIndex, 12);
-        return date.toLocaleDateString(LOCALE_BY_LANGUAGE[language] || 'pt-BR', { weekday: 'long' });
+        return date.toLocaleDateString(heatmapLocale, { weekday: 'long' });
     };
 
     const maxMonthlySeconds = Math.max(...monthlyStats.map(d => d.totalSeconds), 1);

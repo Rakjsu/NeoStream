@@ -25,6 +25,16 @@ export const AVAILABLE_LANGUAGES: LanguageOption[] = [
 /** Codigo BCP 47 pro atributo lang do <html> (o leitor de tela le daqui). */
 const LANG_HTML: Record<SupportedLanguage, string> = { pt: 'pt-BR', en: 'en', es: 'es' };
 
+/**
+ * Localidade das DATAS e numeros (Intl / toLocaleString) de cada idioma.
+ *
+ * Nao e a LANG_HTML de cima: la o 'en' cru serve ao leitor de tela, mas aqui
+ * deixaria o formato da data a cargo do sistema. Por isso regiao explicita.
+ * Morava so no StatsSection (e numa copia no WrappedOverlay); o resto das
+ * Configuracoes cravava 'pt-BR' e mostrava 04/03 a quem le em ingles (#D130).
+ */
+const LOCALE_DAS_DATAS: Record<SupportedLanguage, string> = { pt: 'pt-BR', en: 'en-US', es: 'es-ES' };
+
 type TranslationDictionary = Record<string, Record<string, string>>;
 
 // Translation dictionaries (pt is always available; en/es are filled in after lazy load)
@@ -114,6 +124,15 @@ class LanguageService {
 
     getLanguage(): SupportedLanguage {
         return this.currentLanguage;
+    }
+
+    /**
+     * Localidade pra formatar datas no idioma da tela. Sem reserva, igual ao
+     * LANG_HTML: currentLanguage so vira pt/en/es (loadLanguage filtra o que vem
+     * do storage e setLanguage e tipado), e a tabela cobre os tres.
+     */
+    getLocale(): string {
+        return LOCALE_DAS_DATAS[this.currentLanguage];
     }
 
     setLanguage(lang: SupportedLanguage): void {
@@ -211,6 +230,7 @@ export function useLanguage() {
 
     return {
         language: languageService.getLanguage(),
+        locale: languageService.getLocale(),
         setLanguage: (lang: SupportedLanguage) => languageService.setLanguage(lang),
         t: (section: string, key: string) => languageService.t(section, key),
         languages: languageService.getAvailableLanguages(),
