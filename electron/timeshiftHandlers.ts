@@ -18,7 +18,6 @@ import log from './logger'
 import { isAppOwnOrigin } from './localServerGuard'
 import {
     buildTimeshiftArgs,
-    bufferedSecondsFromPlaylist,
     resolveTimeshiftFile,
     timeshiftContentType,
 } from './timeshiftBuffer'
@@ -224,17 +223,6 @@ export function setupTimeshiftHandlers(): void {
     ipcMain.handle('timeshift:stop', async () => {
         stopSession()
         return { success: true }
-    })
-
-    ipcMain.handle('timeshift:status', async () => {
-        if (!session) return { success: true, running: false, bufferedSeconds: 0 }
-        let bufferedSeconds = 0
-        try {
-            bufferedSeconds = bufferedSecondsFromPlaylist(
-                fs.readFileSync(path.join(session.dir, 'buffer.m3u8'), 'utf-8'),
-            )
-        } catch { /* playlist ainda nascendo */ }
-        return { success: true, running: true, bufferedSeconds }
     })
 
     log.info('[Timeshift] IPC handlers initialized')

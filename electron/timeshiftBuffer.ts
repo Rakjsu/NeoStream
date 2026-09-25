@@ -56,13 +56,3 @@ export function resolveTimeshiftFile(rootDir: string, urlPath: string, token: st
     if (!/^[\w.-]+\.(m3u8|ts)$/i.test(name)) return null
     return path.join(rootDir, name)
 }
-
-/** Segundos bufferizados: soma dos #EXTINF da playlist. */
-export function bufferedSecondsFromPlaylist(m3u8Text: string): number {
-    let total = 0
-    for (const match of m3u8Text.matchAll(/#EXTINF:([\d.]+)/g)) {
-        const seconds = Number(match[1])
-        if (Number.isFinite(seconds)) total += seconds
-    }
-    return Math.round(total)
-}
