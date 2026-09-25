@@ -27,6 +27,11 @@ export interface MpvStatus {
     tracks: MpvTrack[];
     audioTrackId: number | null;
     subtitleTrackId: number | null;
+    /**
+     * O main desistiu do pipe de IPC do mpv: o video toca, mas os comandos nao
+     * chegam nele (so o stop, que mata o processo). Opcional: ausente = ok.
+     */
+    ipcFailed?: boolean;
 }
 
 export interface MpvAvailability {

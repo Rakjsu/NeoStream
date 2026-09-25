@@ -536,6 +536,8 @@
     "mpvFullscreen": "Pantalla completa",
     "mpvVolume": "Volumen",
     "mpvLive": "EN VIVO",
+    "mpvNoControl": "MPV no responde: pausa, búsqueda y volumen no disponibles",
+    "mpvUseInternalPlayer": "Usar el reproductor interno",
     "mpvPath": "Ruta de MPV",
     "mpvPathDesc": "Ruta de mpv.exe (deja vacío para detectar automáticamente)",
     "mpvDetect": "Detectar",

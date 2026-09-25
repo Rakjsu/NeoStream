@@ -176,6 +176,7 @@ describe('applyIpcMessage', () => {
             tracks: [],
             audioTrackId: null,
             subtitleTrackId: null,
+            ipcFailed: false,
         })
 
         status = applyIpcMessage(status, { event: 'property-change', name: 'eof-reached', data: true })
