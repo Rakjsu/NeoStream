@@ -722,6 +722,17 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
 
     chsearchEl.addEventListener('input', function () { filter = chsearchEl.value; renderGuide(); });
 
+    // 🎉 Party queue: the same button on every MOVIE row — Filmes tab, top
+    // search and recommended. All three handlers take the tap on it BEFORE
+    // the 📡 (both are .chinfo) and before the row tap.
+    function partyButton(id) {
+      return '<button class="chinfo" data-party="' + esc(id) + '" title="' + L.partyQueue + '">🎉</button>';
+    }
+    function addToParty(btn) {
+      var pid = btn.getAttribute('data-party');
+      if (pid) { sendCmd('partyAdd', null, null, pid); btn.textContent = '✓'; }
+    }
+
     function renderCatalog() {
       if (!movies.length) { mvlistEl.innerHTML = ''; mvEmptyEl.classList.remove('hidden'); mvEmptyEl.textContent = catalogRequested ? L.noMovies : L.loadingMovies; return; }
       mvEmptyEl.classList.add('hidden');
@@ -736,7 +747,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
         var sel = selected[m.id];
         html += '<div class="chitem' + (sel ? ' playing' : '') + '" data-mv="' + esc(m.id) + '">'
           + logo + '<div class="nm">' + (sel ? '✓ ' : '') + esc(m.name) + '</div>'
-          + '<button class="chinfo" data-party="' + esc(m.id) + '" title="Fila da festa">🎉</button>'
+          + partyButton(m.id)
           + '<button class="chinfo" data-cast="' + esc(m.id) + '" title="' + L.castToTv + '">📡</button></div>';
       }
       mvlistEl.innerHTML = html || '<div class="empty">' + L.noMovieFound + '</div>';
@@ -760,7 +771,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
       // 📡 casts just that movie; tapping the rest of the row toggles selection.
       var castBtn = ev.target.closest('.chinfo');
       var partyBtn = ev.target.closest('[data-party]');
-      if (partyBtn) { var pid = partyBtn.getAttribute('data-party'); if (pid) { sendCmd('partyAdd', null, null, pid); partyBtn.textContent = '✓'; } return; }
+      if (partyBtn) { addToParty(partyBtn); return; }
       if (castBtn) { var mid = castBtn.getAttribute('data-cast'); if (mid) sendCmd('castMovie', null, null, mid); return; }
       var row = ev.target.closest('.chitem');
       if (!row) return;
@@ -1011,6 +1022,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
           } else {
             html += '<div class="chitem" data-recmv="' + esc(r.id) + '">'
               + logo + '<div class="nm">' + esc(r.name) + '</div>'
+              + partyButton(r.id)
               + '<button class="chinfo" data-reccast="' + esc(r.id) + '" title="' + L.castToTv + '">📡</button></div>';
           }
         }
@@ -1022,6 +1034,9 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
       if (!ev.target.closest) return;
       // 📡 (or the movie row itself) casts the movie; a series row drills into
       // its episodes, same flow as tapping a series in the Séries tab.
+      // 🎉 first: without it the tap fell through to the row and CAST the movie.
+      var partyBtn = ev.target.closest('[data-party]');
+      if (partyBtn) { addToParty(partyBtn); return; }
       var cast = ev.target.closest('.chinfo');
       if (cast && cast.getAttribute('data-reccast')) { sendCmd('castMovie', null, null, cast.getAttribute('data-reccast')); return; }
       var se = ev.target.closest('[data-recse]');
@@ -1083,6 +1098,7 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
         var logo = m.cover ? '<img src="' + esc(m.cover) + '" onerror="this.style.display=\\'none\\'" alt="">' : '<div class="ph">🎬</div>';
         html += '<div class="chitem" data-srmv="' + esc(m.id) + '">' + logo
           + '<div class="nm">' + esc(m.name) + '</div>'
+          + partyButton(m.id)
           + '<button class="chinfo" data-srcast="' + esc(m.id) + '" title="' + L.castToTv + '">📡</button></div>';
       }
       for (var j = 0; j < srSeries.length; j++) {
@@ -1124,6 +1140,9 @@ export function renderRemotePage(lang?: string, accent?: RemoteAccent): string {
 
     srlistEl.addEventListener('click', function (ev) {
       if (!ev.target.closest) return;
+      // 🎉 first: without it the tap fell through to the row and CAST the movie.
+      var partyBtn = ev.target.closest('[data-party]');
+      if (partyBtn) { addToParty(partyBtn); return; }
       var cast = ev.target.closest('.chinfo');
       if (cast && cast.getAttribute('data-srcast')) { sendCmd('castMovie', null, null, cast.getAttribute('data-srcast')); return; }
       var se = ev.target.closest('[data-srse]');
