@@ -863,9 +863,12 @@ function VideoPlayerImpl<TSwitchContent extends SwitchableContent = SwitchableCo
             const idx = list.findIndex(c => String(c.id) === String(contentId));
             if (idx === -1) return;
             // PageUp = previous channel in the list, PageDown = next (TV-style CH±).
-            const next = e.key === 'PageDown'
-                ? list[Math.min(list.length - 1, idx + 1)]
-                : list[Math.max(0, idx - 1)];
+            // Wraps around at both ends, like the tray / phone next-previous in
+            // LiveTV, the mini player and the PiP (#D029): at the last channel
+            // PgDn used to do nothing while the tray went back to the first.
+            const delta = e.key === 'PageDown' ? 1 : -1;
+            const next = list[(idx + delta + list.length) % list.length];
+            // One-channel list: the neighbour is the channel itself — don't reload it.
             if (next && String(next.id) !== String(contentId)) onSwitchChannel!(next.id);
         };
         document.addEventListener('keydown', onKey);
