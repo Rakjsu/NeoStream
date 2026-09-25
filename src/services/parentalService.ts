@@ -27,6 +27,8 @@ const DEFAULT_CONFIG: ParentalConfig = {
 
 const STORAGE_KEY = 'parentalConfig';
 const UNLOCK_KEY = 'parentalUnlocked';
+// Destrave da SEÇÃO de Configurações — chave PRÓPRIA, ver unlockParentalSettings().
+const SETTINGS_UNLOCK_KEY = 'parentalSettingsUnlocked';
 
 function randomSaltHex(): string {
     const bytes = new Uint8Array(16);
@@ -113,6 +115,31 @@ class ParentalService {
 
     lockSession(): void {
         sessionStorage.removeItem(UNLOCK_KEY);
+    }
+
+    /**
+     * 🔒 Destrave da SEÇÃO de controle parental nas Configurações.
+     *
+     * Chave separada do destrave de CONTEÚDO (unlockSession) de propósito.
+     * O isSessionUnlocked() é lido por nove lugares — isContentBlocked,
+     * shouldHideContent, useContentFiltering, useHomeContentGate, LiveTV,
+     * EpgGuide, GlobalSearch, ShowcaseScreensaver e WebRemoteBridge — e TODOS
+     * param de filtrar quando ele está ligado. Hoje nenhum caminho do app o
+     * liga. Se o botão "Desbloquear" das Configurações ligasse, digitar o PIN
+     * para mexer no limite de tela do filho destravaria o catálogo adulto
+     * inteiro pelo resto da sessão. Provar o PIN nas Configurações abre as
+     * Configurações, e mais nada.
+     */
+    unlockParentalSettings(): void {
+        sessionStorage.setItem(SETTINGS_UNLOCK_KEY, 'true');
+    }
+
+    isParentalSettingsUnlocked(): boolean {
+        return sessionStorage.getItem(SETTINGS_UNLOCK_KEY) === 'true';
+    }
+
+    lockParentalSettings(): void {
+        sessionStorage.removeItem(SETTINGS_UNLOCK_KEY);
     }
 
     // Content filtering
