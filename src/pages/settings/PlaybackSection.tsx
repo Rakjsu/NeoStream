@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { SCREENSAVER_MINUTES_KEY } from '../../components/ShowcaseScreensaver';
 import { catalogRefreshService, REFRESH_INTERVAL_OPTIONS, type RefreshIntervalHours } from '../../services/catalogRefreshService';
 import { newEpisodeNotifier } from '../../services/newEpisodeNotifier';
 import { playbackService } from '../../services/playbackService';
 import type { PlaybackConfig } from '../../services/playbackService';
 import { mpvService } from '../../services/mpvService';
-import type { MpvDownloadProgress } from '../../services/mpvService';
+import type { MpvDownloadProgress, MpvDownloadResult } from '../../services/mpvService';
 import { useLanguage } from '../../services/languageService';
 import { useSaveAnimation } from './useSaveAnimation';
 
@@ -61,7 +61,14 @@ export function PlaybackSection() {
     const [mpvPathInput, setMpvPathInput] = useState('');
     const [mpvDetecting, setMpvDetecting] = useState(false);
     const [mpvResolvedPath, setMpvResolvedPath] = useState<string | null | undefined>(undefined);
-    const [mpvDownload, setMpvDownload] = useState<MpvDownloadState>({ phase: 'idle' });
+    // D014 — o download pode ter comecado numa visita anterior a esta tela (ele
+    // vive no main e no mpvService, nao aqui): nasce ja na barra.
+    const [downloadDaVisitaAnterior] = useState(() => mpvService.getDownloadEmCurso());
+    const [mpvDownload, setMpvDownload] = useState<MpvDownloadState>(() => (
+        downloadDaVisitaAnterior
+            ? { phase: 'downloading', progress: downloadDaVisitaAnterior.progresso }
+            : { phase: 'idle' }
+    ));
     // null = ainda nao sabemos (ou o IPC falhou). Tri-state de proposito: o
     // botao so aparece com `true` (lado seguro) e a dica de Unix so aparece
     // com `false` — senao uma falha de IPC no Windows mandaria a pessoa
@@ -102,14 +109,14 @@ export function PlaybackSection() {
         }
     };
 
-    // EXPERIMENTAL — one-click MPV download (progress streams via mpv:download-progress)
-    const handleMpvDownload = async () => {
-        setMpvDownload({ phase: 'downloading', progress: null });
+    // EXPERIMENTAL — acompanha um download (novo ou ja em curso): a barra via
+    // mpv:download-progress e o desfecho quando ele termina.
+    const acompanharDownload = useCallback(async (resultado: Promise<MpvDownloadResult>) => {
         const unsubscribe = mpvService.onDownloadProgress((progress) => {
             setMpvDownload((prev) => (prev.phase === 'downloading' ? { phase: 'downloading', progress } : prev));
         });
         try {
-            const result = await mpvService.startDownload();
+            const result = await resultado;
             if (result.success && result.path) {
                 setMpvResolvedPath(result.path);
                 setMpvPathInput(result.path);
@@ -128,6 +135,18 @@ export function PlaybackSection() {
         } finally {
             unsubscribe();
         }
+    }, []);
+
+    // D014 — voltou as Configuracoes no meio do download: retoma a barra e o
+    // Cancelar em vez de oferecer "Baixar" de novo.
+    useEffect(() => {
+        if (downloadDaVisitaAnterior) void acompanharDownload(downloadDaVisitaAnterior.resultado);
+    }, [acompanharDownload, downloadDaVisitaAnterior]);
+
+    // EXPERIMENTAL — one-click MPV download (progress streams via mpv:download-progress)
+    const handleMpvDownload = () => {
+        setMpvDownload({ phase: 'downloading', progress: null });
+        void acompanharDownload(mpvService.startDownload());
     };
 
     return (

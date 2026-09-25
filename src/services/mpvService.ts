@@ -58,7 +58,21 @@ export interface MpvDownloadResult {
     reason?: string;
 }
 
+/** Download em curso, como a tela precisa para retomar a barra (D014). */
+export interface MpvDownloadEmCurso {
+    /** Resolve com o resultado final (o mesmo para quem acompanha). */
+    resultado: Promise<MpvDownloadResult>;
+    /** Ultimo progresso conhecido (null antes do primeiro evento). */
+    progresso: MpvDownloadProgress | null;
+}
+
 class MpvService {
+    // D014 — o download (~31 MB) sobrevive a tela: quem sai das Configuracoes
+    // e volta reencontra a barra, nao o botao "Baixar". O servico e singleton,
+    // entao o download em curso mora aqui.
+    private downloadEmCurso: Promise<MpvDownloadResult> | null = null;
+    private ultimoProgresso: MpvDownloadProgress | null = null;
+
     /** Resolved mpv path (configured > PATH > common install dirs) or null. */
     async getAvailability(): Promise<MpvAvailability> {
         try {
@@ -174,14 +188,37 @@ class MpvService {
      * One-click MPV install: download the latest Windows build and persist
      * its path. Resolves with the final result (progress arrives via
      * onDownloadProgress). Never throws — inspect `success`/`reason`.
+     * Com um download ja em curso, devolve o dele (nunca abre um segundo).
      */
-    async startDownload(): Promise<MpvDownloadResult> {
+    startDownload(): Promise<MpvDownloadResult> {
+        // O `.finally` e sempre assincrono: libera a vaga DEPOIS da atribuicao,
+        // mesmo que o pedido falhe antes do primeiro await.
+        this.downloadEmCurso ??= this.pedirDownload().finally(() => {
+            this.downloadEmCurso = null;
+            this.ultimoProgresso = null;
+        });
+        return this.downloadEmCurso;
+    }
+
+    /** O download em curso (para a tela retomar a barra), ou null. */
+    getDownloadEmCurso(): MpvDownloadEmCurso | null {
+        if (!this.downloadEmCurso) return null;
+        return { resultado: this.downloadEmCurso, progresso: this.ultimoProgresso };
+    }
+
+    private async pedirDownload(): Promise<MpvDownloadResult> {
+        let pararDeOuvir = () => { };
         try {
+            pararDeOuvir = this.onDownloadProgress((progress) => {
+                this.ultimoProgresso = progress;
+            });
             const result = await window.ipcRenderer.invoke('mpv:download-start');
             return result ?? { success: false, reason: 'no-response' };
         } catch (error) {
             console.warn('[MPV] download failed:', error);
             return { success: false, reason: 'ipc-error' };
+        } finally {
+            pararDeOuvir();
         }
     }
 

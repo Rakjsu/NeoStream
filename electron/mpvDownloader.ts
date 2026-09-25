@@ -42,7 +42,6 @@ export type MpvInstallFailureReason =
     | 'exe-not-found'
     | 'disk'
     | 'cancelled'
-    | 'in-progress'
     | 'unsupported-platform'
 
 export interface MpvInstallResult {

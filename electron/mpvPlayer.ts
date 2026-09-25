@@ -17,7 +17,8 @@
  *   mpv:set-fullscreen -> { success }            ({ fullscreen: boolean })
  *   mpv:status         -> MpvStatus snapshot (polled by the renderer)
  *   mpv:set-path       -> { path: string | null } (persists to electron-store)
- *   mpv:download-start -> MpvInstallResult (one-click install, see mpvDownloader.ts)
+ *   mpv:download-start -> MpvInstallResult (one-click install, see mpvDownloader.ts;
+ *                         a 2nd call while one runs gets that same result)
  *   mpv:download-cancel-> { success: boolean }
  *   mpv:download-progress (main -> renderer) { percent, transferredMB, totalMB }
  *
@@ -29,14 +30,14 @@
  * via the `geometry` and `window-minimized` properties.
  */
 
-import { app, ipcMain, BrowserWindow, net as electronNet, screen } from 'electron'
+import { app, ipcMain, BrowserWindow, net as electronNet, screen, type WebContents } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { existsSync, rmSync } from 'node:fs'
 import net from 'node:net'
 import path from 'node:path'
 import store from './store'
 import log from './logger'
-import { installMpv } from './mpvDownloader'
+import { installMpv, type MpvInstallResult } from './mpvDownloader'
 import { mpvDownloadSupported } from './mpvDownloaderProtocol'
 import { getErrorMessage } from './errorMessage'
 // A raiz das gravações vem de quem a criou, e a de downloads é a mesma linha
@@ -642,17 +643,14 @@ export function setupMpvHandlers() {
         }
     })
 
-    // EXPERIMENTAL — one-click MPV install. Single in-flight download; the
-    // controller doubles as the guard (null = idle).
+    // EXPERIMENTAL — one-click MPV install. Single in-flight download.
     let downloadController: AbortController | null = null
 
-    ipcMain.handle('mpv:download-start', async (event) => {
-        if (downloadController) {
-            return { success: false, reason: 'in-progress' }
-        }
+    // So a janela principal pede o download, e recarregar mantem o mesmo
+    // WebContents: quem pede de novo continua recebendo o progresso.
+    const baixarMpv = async (sender: WebContents): Promise<MpvInstallResult> => {
         const controller = new AbortController()
         downloadController = controller
-        const sender = event.sender
         try {
             const runInstall = () => installMpv({
                 installDir: path.join(app.getPath('userData'), 'mpv'),
@@ -688,6 +686,19 @@ export function setupMpvHandlers() {
                 downloadController = null
             }
         }
+    }
+
+    // D014 — um 2o pedido com o download rodando (a tela recarregada no meio
+    // dos ~31 MB, por exemplo) recebe o MESMO resultado. Antes ele levava
+    // { reason:'in-progress' }, que a tela nao conhece e mostrava como "Falha
+    // ao baixar o MPV. Verifique sua conexao." com o download indo bem.
+    let downloadEmCurso: Promise<MpvInstallResult> | null = null
+
+    ipcMain.handle('mpv:download-start', (event) => {
+        // O `.finally` e sempre assincrono: libera a vaga DEPOIS da atribuicao,
+        // mesmo que baixarMpv falhe antes do primeiro await.
+        downloadEmCurso ??= baixarMpv(event.sender).finally(() => { downloadEmCurso = null })
+        return downloadEmCurso
     })
 
     ipcMain.handle('mpv:download-cancel', () => {
