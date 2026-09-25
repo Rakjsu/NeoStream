@@ -1075,6 +1075,14 @@ export function setupIpcHandlers() {
             log.info('[EPG IPC] Fetching:', url)
             // Timeout per try + one retry for transient failures (DNS blip, 502).
             const response = await fetchWithRetry(() => fetch(url, { signal: AbortSignal.timeout(15000) }))
+
+            // Mesmo contrato do gêmeo epg:fetch-mitv: 404 de slug, meuguia
+            // fora do ar ou página de erro do CDN é FALHA, não "html".
+            if (!response.ok) {
+                log.info('[EPG IPC] meuguia returned:', response.status)
+                return { success: false, error: `HTTP ${response.status}` }
+            }
+
             // Com teto: `.text()` materializava o corpo inteiro no main (ver httpLimits.ts).
             const html = await readResponseTextWithLimit(response, JSON_MAX_BYTES)
             log.info('[EPG IPC] Response length:', html.length)
