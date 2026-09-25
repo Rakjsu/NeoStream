@@ -133,12 +133,10 @@ async function catalogListHandler(
         }
         const playlistId = getActivePlaylistIdPublic() ?? 'default'
 
-        // M3U playlists: live channels come from the parsed document; the
-        // other catalog kinds are simply empty (phase 1 covers live TV).
+        // Listas M3U: os seis kinds saem do mesmo documento parseado, que
+        // `classifyM3uChannels` (m3uProtocol.ts) divide em live / vod / series.
         const activeEntry = playlistId !== 'default' ? findPlaylist(playlistId) : undefined
         if (activeEntry?.type === 'm3u') {
-            // Phase 3: SxxEyy items in movie/series groups become the series
-            // catalog; the rest of the movie groups stay VOD.
             const result = await cachedCatalogFetch(
                 playlistId,
                 kind,
@@ -658,7 +656,8 @@ export function setupIpcHandlers() {
         }
     })
 
-    // Add an M3U playlist (phase 1: live channels only).
+    // Lista M3U por URL. O catálogo inteiro (canais, filmes e séries) sai
+    // dela — ver o desvio M3U do `catalogListHandler`.
     ipcMain.handle('playlists:add-m3u', async (_, { name, url }) => {
         try {
             // O regex fica, mesmo com o app sabendo ler lista de arquivo: este

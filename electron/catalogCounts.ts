@@ -43,7 +43,7 @@ function quantos(resposta: RespostaDeCatalogo): number {
  * `success: true` é gravado pela tela como se fosse a verdade, e foi assim que
  * a Home passou a mostrar um catálogo vazio que ela mesma tinha acabado de
  * carregar. Lista vazia de verdade continua sendo zero com sucesso — é o caso
- * legítimo do M3U, que na fase 1 só traz canais.
+ * legítimo de uma lista M3U sem nenhum grupo de filmes ou séries.
  */
 export function contagensDoCatalogo(
     live: RespostaDeCatalogo,
