@@ -536,6 +536,8 @@
     "mpvFullscreen": "Fullscreen",
     "mpvVolume": "Volume",
     "mpvLive": "LIVE",
+    "mpvNoControl": "MPV isn't responding: pause, seek and volume unavailable",
+    "mpvUseInternalPlayer": "Use the built-in player",
     "mpvPath": "MPV path",
     "mpvPathDesc": "Path to mpv.exe (leave empty to auto-detect)",
     "mpvDetect": "Detect",

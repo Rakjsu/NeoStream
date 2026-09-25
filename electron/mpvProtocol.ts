@@ -115,12 +115,20 @@ export interface MpvStatus {
     audioTrackId: number | null
     /** Selected subtitle track id (null = subtitles off). */
     subtitleTrackId: number | null
+    /**
+     * O main desistiu de conectar o pipe de IPC (esgotou as tentativas do
+     * connectPipe). O mpv segue tocando, mas pausa, busca, volume, tela cheia
+     * e faixas nao chegam nele — so o Parar (que mata o processo) funciona.
+     * A tela usa isto para avisar e oferecer o player interno (D019).
+     */
+    ipcFailed: boolean
 }
 
 export function createInitialStatus(running = false): MpvStatus {
     return {
         running, timePos: null, duration: null, paused: false, eofReached: false,
-        volume: null, fullscreen: false, tracks: [], audioTrackId: null, subtitleTrackId: null
+        volume: null, fullscreen: false, tracks: [], audioTrackId: null, subtitleTrackId: null,
+        ipcFailed: false,
     }
 }
 

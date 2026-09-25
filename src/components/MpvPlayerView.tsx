@@ -108,6 +108,13 @@ export function MpvPlayerView({
     const [tracks, setTracks] = useState<import('../services/mpvService').MpvTrack[]>([]);
     const [audioTrackId, setAudioTrackId] = useState<number | null>(null);
     const [subtitleTrackId, setSubtitleTrackId] = useState<number | null>(null);
+    /**
+     * O main desistiu do pipe de IPC (D019): o mpv toca, mas nada do que a
+     * faixa manda chega nele. O ref e o que atalhos e controle remoto leem —
+     * sem ele o ⏸ trocava de icone sem o mpv pausar.
+     */
+    const [semControle, setSemControle] = useState(false);
+    const semControleRef = useRef(false);
     /** While the user drags the seek slider, show the drag value instead of polled time. */
     const [seekDrag, setSeekDrag] = useState<number | null>(null);
     // Subtitle sync offset (display only; mpv holds the real sub-delay).
@@ -195,6 +202,19 @@ export function MpvPlayerView({
         onClose();
     }, [persistProgress, onClose]);
 
+    /**
+     * Sem pipe nao ha posicao pra salvar (o tempo nunca chegou). Para o mpv —
+     * o stop nao depende do pipe, mata o processo — e so ENTAO devolve ao
+     * player interno: com o mpv ainda de pe, o player interno abriria uma
+     * segunda conexao na mesma fonte, e ha provedor que so aceita uma.
+     */
+    const usarPlayerInterno = useCallback(async () => {
+        if (closedRef.current) return;
+        closedRef.current = true;
+        await mpvService.stop();
+        onFallback('ipc-failed');
+    }, [onFallback]);
+
     // Launch mpv once on mount; poll status while it runs.
     useEffect(() => {
         let cancelled = false;
@@ -259,6 +279,9 @@ export function MpvPlayerView({
                 setTracks(status.tracks ?? []);
                 setAudioTrackId(status.audioTrackId ?? null);
                 setSubtitleTrackId(status.subtitleTrackId ?? null);
+                const pipeFalhou = status.ipcFailed === true;
+                semControleRef.current = pipeFalhou;
+                setSemControle(pipeFalhou);
                 persistProgress(status.timePos, status.duration);
             }, STATUS_POLL_INTERVAL_MS);
         };
@@ -313,6 +336,7 @@ export function MpvPlayerView({
     }, [contandoTempo, contentId, contentType, title]);
 
     const togglePause = useCallback(() => {
+        if (semControleRef.current) return;
         const next = !latestRef.current.paused;
         latestRef.current.paused = next;
         setPaused(next);
@@ -333,6 +357,7 @@ export function MpvPlayerView({
     }, []);
 
     const changeVolume = useCallback((value: number) => {
+        if (semControleRef.current) return;
         const clamped = Math.round(Math.min(100, Math.max(0, value)));
         if (clamped > 0) lastVolumeBeforeMuteRef.current = clamped;
         latestRef.current.volume = clamped;
@@ -480,6 +505,7 @@ export function MpvPlayerView({
     }, [title, seasonNumber, episodeNumber, t]);
 
     const toggleMute = useCallback(() => {
+        if (semControleRef.current) return;
         const current = latestRef.current.volume ?? 100;
         if (current > 0) {
             lastVolumeBeforeMuteRef.current = current;
@@ -492,6 +518,7 @@ export function MpvPlayerView({
     }, [changeVolume]);
 
     const toggleFullscreen = useCallback(() => {
+        if (semControleRef.current) return;
         const next = !latestRef.current.fullscreen;
         latestRef.current.fullscreen = next;
         setFullscreen(next);
@@ -623,6 +650,7 @@ export function MpvPlayerView({
                             <button
                                 className="mpv-view-btn mpv-view-btn-play"
                                 onClick={togglePause}
+                                disabled={semControle}
                                 title={paused ? (t('playback', 'mpvPlay') || 'Reproduzir') : (t('playback', 'mpvPause') || 'Pausar')}
                             >
                                 {paused ? '▶' : '⏸'}
@@ -641,7 +669,18 @@ export function MpvPlayerView({
                             da faixa. Acima dela é a janela --ontop do mpv, e
                             mais acima a barra de título do app. */}
                         <div className="mpv-view-title" title={title}>
-                            {subSearchMsg
+                            {semControle ? (
+                                // D019: o main esgotou as tentativas do pipe. O
+                                // video segue, mas so o Parar ainda age nele.
+                                <span className="mpv-view-sem-controle" role="alert">
+                                    <span className="mpv-view-subsearch-msg" title={t('playback', 'mpvNoControl')}>
+                                        {t('playback', 'mpvNoControl')}
+                                    </span>
+                                    <button className="mpv-view-btn" onClick={() => void usarPlayerInterno()}>
+                                        {t('playback', 'mpvUseInternalPlayer')}
+                                    </button>
+                                </span>
+                            ) : subSearchMsg
                                 ? <span className="mpv-view-subsearch-msg" title={subSearchMsg}>{subSearchMsg}</span>
                                 : title}
                         </div>
@@ -661,7 +700,7 @@ export function MpvPlayerView({
                                     <button
                                         className="mpv-view-btn"
                                         onClick={() => setShowSubSearch(v => !v)}
-                                        disabled={subSearchBusy}
+                                        disabled={subSearchBusy || semControle}
                                         title={t('player', 'subtitleLanguage')}
                                     >
                                         {subSearchBusy ? '⏳' : '🔍'}💬
@@ -695,6 +734,7 @@ export function MpvPlayerView({
                             <button
                                 className="mpv-view-btn"
                                 onClick={cycleAspect}
+                                disabled={semControle}
                                 title={`${t('player', 'aspectRatio')}: ${ASPECTS[aspectIndex].label}`}
                             >
                                 📐 {ASPECTS[aspectIndex].label}
@@ -734,6 +774,7 @@ export function MpvPlayerView({
                             <button
                                 className="mpv-view-btn"
                                 onClick={toggleMute}
+                                disabled={semControle}
                                 title={t('playback', 'mpvVolume') || 'Volume'}
                             >
                                 {volumeValue <= 0 ? '🔇' : volumeValue < 50 ? '🔉' : '🔊'}
@@ -749,11 +790,13 @@ export function MpvPlayerView({
                                 style={{
                                     background: `linear-gradient(to right, var(--ns-accent) ${volumeValue}%, rgba(255, 255, 255, 0.15) ${volumeValue}%)`
                                 }}
+                                disabled={semControle}
                                 onChange={(e) => changeVolume(Number(e.target.value))}
                             />
                             <button
                                 className="mpv-view-btn"
                                 onClick={toggleFullscreen}
+                                disabled={semControle}
                                 title={t('playback', 'mpvFullscreen') || 'Tela cheia'}
                             >
                                 {fullscreen ? '🗗' : '⛶'}
@@ -981,6 +1024,30 @@ const viewStyles = `
 
     .mpv-view-btn:hover {
         background: rgba(255, 255, 255, 0.14);
+    }
+
+    /* D019: sem pipe, o que depende dele fica apagado (o Parar nao depende). */
+    .mpv-view-btn:disabled,
+    .mpv-view-volume:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
+
+    .mpv-view-sem-controle {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 100%;
+        vertical-align: middle;
+    }
+
+    .mpv-view-sem-controle .mpv-view-subsearch-msg {
+        min-width: 0;
+    }
+
+    .mpv-view-sem-controle .mpv-view-btn {
+        flex-shrink: 0;
+        white-space: nowrap;
     }
 
     .mpv-view-btn-play {

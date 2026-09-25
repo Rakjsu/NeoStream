@@ -358,6 +358,9 @@ function connectPipe(current: MpvSession) {
             if (attempts < PIPE_CONNECT_MAX_ATTEMPTS) {
                 setTimeout(tryConnect, PIPE_CONNECT_RETRY_MS)
             } else {
+                // O mpv segue tocando, mas nenhum controle chega nele: leva a
+                // informacao ate a tela, que avisa e oferece o player interno.
+                current.status = { ...current.status, ipcFailed: true }
                 log.warn('[MPV] could not connect IPC pipe — playback continues without status/control')
             }
         })
