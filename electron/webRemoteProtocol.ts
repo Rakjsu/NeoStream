@@ -571,6 +571,27 @@ export function markMobileInHistory<T extends { ip: string; role: string; event:
     return history
 }
 
+/**
+ * O connect do app ainda está no buffer do histórico (gravado com atraso de
+ * ~1 s) quando o helloMobile chega, milissegundos depois. Marcar só o que está
+ * em disco perdia a conexão atual — a linha ficava "navegador", sem o nome do
+ * celular — e ainda carimbava um connect ANTIGO do mesmo IP. A busca olha
+ * primeiro o buffer (o trecho mais recente) e só cai no disco se a conexão já
+ * foi gravada; o disco só é lido/regravado nesse caso. PURO.
+ */
+export function markMobileInPendingHistory<T extends { ip: string; role: string; event: string; name: string | null }>(
+    pending: T[],
+    readStored: () => T[],
+    ip: string,
+    name: string,
+): { pending: T[]; stored: T[] | null } {
+    const markedPending = markMobileInHistory(pending, ip, name)
+    if (markedPending !== pending) return { pending: markedPending, stored: null }
+    const stored = readStored()
+    const markedStored = markMobileInHistory(stored, ip, name)
+    return { pending, stored: markedStored === stored ? null : markedStored }
+}
+
 /** Desfecho de um push de reprodução, reportado pelo app. */
 export type PushAckStatus = 'played' | 'locked' | 'blocked' | 'notFound'
 
