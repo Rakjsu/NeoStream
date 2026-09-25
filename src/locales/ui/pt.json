@@ -542,6 +542,10 @@
     "pinCurrentToChange": "Digite o PIN atual para poder trocá-lo",
     "pinIncorrect": "PIN incorreto",
     "pinMismatch": "Os PINs não coincidem",
+    "sessionUnlock": "Liberar nesta sessão",
+    "sessionLockAgain": "Trancar de novo",
+    "sessionLockedDesc": "Confira o PIN para ver o conteúdo bloqueado sem desligar o controle",
+    "sessionUnlockedDesc": "Liberado — tranca ao fechar o app, ao trocar de perfil ou ao religar o controle",
     "confirm": "Confirmar",
     "cancel": "Cancelar"
   },

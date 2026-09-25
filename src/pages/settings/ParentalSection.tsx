@@ -61,7 +61,8 @@ export function ParentalSection() {
     const [pinStep, setPinStep] = useState<'enter' | 'confirm'>('enter');
     const [pinError, setPinError] = useState('');
     // 'set' define, 'verify' confere para DESLIGAR, 'trocar' confere para
-    // poder definir outro. Estado pegajoso: quem abre o modal escolhe o modo
+    // poder definir outro, 'destravar' abre a SEÇÃO e 'liberar' abre o
+    // CONTEÚDO desta sessão. Estado pegajoso: quem abre o modal escolhe o modo
     // explicitamente, sempre — ver pinParental.ts.
     const [pinMode, setPinMode] = useState<ModoDoPin>('set');
     // 🔒 Destrave da SEÇÃO nesta sessão. Com PIN salvo, nada aqui é editável
@@ -72,6 +73,16 @@ export function ParentalSection() {
     // O botão do PIN é a única saída da seção trancada — e continua clicável
     // mesmo com o parental desligado, porque desligar não apaga o PIN.
     const botaoPinAtivo = parentalConfig.enabled || trancado;
+    // 🔓 Liberação de CONTEÚDO nesta sessão — a outra chave, a que os leitores
+    // do gate consultam. Espelha `parentalService.isSessionUnlocked()` só para
+    // a tela saber que rótulo mostrar, e por isso NASCE lida de lá: quem
+    // liberou, saiu de Configurações e voltou tem de encontrar o botão
+    // oferecendo TRANCAR, senão não há como re-trancar sem fechar o app.
+    const [sessaoLiberada, setSessaoLiberada] = useState(() => parentalService.isSessionUnlocked());
+    // O botão pede o PIN ele mesmo, com a seção trancada OU destravada: provar
+    // o PIN para a SEÇÃO não vale como prova para o CONTEÚDO. Só faz sentido
+    // com o controle ligado e um PIN salvo para conferir.
+    const botaoLiberarAtivo = parentalConfig.enabled && parentalService.hasPin();
 
     /**
      * Envelope dos <select> que GRAVAM na seção. O `disabled` sozinho não
@@ -97,6 +108,16 @@ export function ParentalSection() {
         // trancados. O 'enabled' é a exceção: desligar já pede PIN acima, e
         // ligar só aperta a restrição.
         if (key !== 'enabled' && trancado) return;
+
+        // 🔒 Religar o controle fecha a liberação de conteúdo que estivesse
+        // valendo. Sem isto o parental voltaria LIGADO E INERTE:
+        // `isParentalActive` é `enabled && !sessionUnlocked`, então a chave de
+        // sessão que ficou de pé anularia o controle recém-religado, sem aviso
+        // nenhum na tela.
+        if (key === 'enabled' && value === true) {
+            parentalService.lockSession();
+            setSessaoLiberada(false);
+        }
 
         const newConfig = { ...parentalConfig, [key]: value };
         setParentalConfig(newConfig);
@@ -145,6 +166,19 @@ export function ParentalSection() {
                 setSecaoDestravada(true);
                 setShowPinModal(false);
                 resetPinModal();
+                return;
+            }
+            if (destino === 'liberar-sessao') {
+                // Provou o PIN para o CONTEÚDO: o gate cai por esta sessão e
+                // NADA mais muda. O controle continua ligado e a seção continua
+                // como estava — trancada, se estava. Morre ao fechar o app
+                // (sessionStorage), ao trocar de perfil (profileService) e ao
+                // religar o controle (acima).
+                parentalService.unlockSession();
+                setSessaoLiberada(true);
+                setShowPinModal(false);
+                resetPinModal();
+                triggerSaveAnimation('parental_sessao');
                 return;
             }
             setParentalConfig(prev => ({ ...prev, enabled: false }));
@@ -276,6 +310,45 @@ export function ParentalSection() {
                                 : `🔑 ${parentalService.hasPin() ? t('parental', 'changePin') : t('parental', 'setPin')} PIN`}
                         </button>
                         {saveAnimation === 'parental_pin' && <span className="save-indicator">{t('settings', 'saved')}</span>}
+                    </div>
+
+                    {/* 🔓 Liberar o conteúdo barrado só nesta sessão.
+                        Fica FORA da tranca da seção de propósito: trancar de
+                        novo só aperta a restrição, e liberar pede o PIN aqui
+                        mesmo — nunca aproveita o destrave da seção. */}
+                    <div className="setting-item">
+                        <div className="setting-info">
+                            <label>{sessaoLiberada ? '🔓' : '🔒'} {sessaoLiberada ? t('parental', 'sessionLockAgain') : t('parental', 'sessionUnlock')}</label>
+                            <p>{sessaoLiberada ? t('parental', 'sessionUnlockedDesc') : t('parental', 'sessionLockedDesc')}</p>
+                        </div>
+                        <button
+                            className="setting-btn"
+                            onClick={() => {
+                                if (sessaoLiberada) {
+                                    parentalService.lockSession();
+                                    setSessaoLiberada(false);
+                                    triggerSaveAnimation('parental_sessao');
+                                    return;
+                                }
+                                resetPinModal();
+                                setPinMode('liberar');
+                                setShowPinModal(true);
+                            }}
+                            disabled={!botaoLiberarAtivo}
+                            style={{
+                                padding: '10px 20px',
+                                background: botaoLiberarAtivo ? 'rgba(34, 197, 94, 0.2)' : 'rgba(100, 100, 100, 0.2)',
+                                border: `1px solid ${botaoLiberarAtivo ? 'rgba(34, 197, 94, 0.4)' : 'rgba(100, 100, 100, 0.4)'}`,
+                                borderRadius: '10px',
+                                color: botaoLiberarAtivo ? '#22c55e' : '#666',
+                                cursor: botaoLiberarAtivo ? 'pointer' : 'not-allowed',
+                                fontWeight: 600,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            {sessaoLiberada ? t('parental', 'sessionLockAgain') : t('parental', 'sessionUnlock')}
+                        </button>
+                        {saveAnimation === 'parental_sessao' && <span className="save-indicator">{t('settings', 'saved')}</span>}
                     </div>
 
                     <div className="setting-item">
@@ -583,7 +656,7 @@ export function ParentalSection() {
                                 WebkitTextFillColor: 'transparent',
                                 backgroundClip: 'text'
                             }}>
-                                {pinMode === 'destravar'
+                                {pinMode === 'destravar' || pinMode === 'liberar'
                                     ? t('parental', 'pin')
                                     : pedeePinAtual(pinMode)
                                         ? t('parental', 'verifyPin')
@@ -763,7 +836,7 @@ export function ParentalSection() {
                                     e.currentTarget.style.boxShadow = '0 4px 20px rgba(239, 68, 68, 0.4)';
                                 }}
                             >
-                                {pinMode === 'verify' || pinMode === 'destravar'
+                                {pinMode === 'verify' || pinMode === 'destravar' || pinMode === 'liberar'
                                     ? '🔓 Desbloquear'
                                     : pinMode === 'trocar' || pinStep === 'enter'
                                         ? 'Continuar →'

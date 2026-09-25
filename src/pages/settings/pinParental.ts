@@ -24,11 +24,27 @@ export type ModoDoPin =
     | 'trocar'
     /** Conferir o PIN atual para DESTRAVAR a seção nesta sessão. */
     | 'destravar'
+    /**
+     * Conferir o PIN atual para LIBERAR o CONTEÚDO só nesta sessão.
+     *
+     * `parentalService.unlockSession()` existia inteiro — doze leitores de
+     * `isSessionUnlocked()` espalhados pelo app dependem dele, e ele é a
+     * válvula do gate inteiro (`isParentalActive` em contentGate) — e NINGUÉM
+     * o chamava. O adulto que ligou o parental e queria ver um título barrado
+     * só tinha a saída de DESLIGAR o controle inteiro e lembrar de religá-lo.
+     *
+     * NÃO é o `destravar`, e os dois nunca se reaproveitam: provar o PIN para
+     * mexer no limite de tela do filho não pode abrir o catálogo adulto, e
+     * liberar o catálogo não pode abrir a seção de Configurações. Cada um tem
+     * a sua chave de sessão no `parentalService` e o seu modo aqui.
+     */
+    | 'liberar'
 
 export type DepoisDeVerificar =
     | 'desligar-parental'
     | 'definir-novo-pin'
     | 'destravar-secao'
+    | 'liberar-sessao'
     | 'pin-incorreto'
 
 /**
@@ -76,7 +92,7 @@ export function pedeePinAtual(modo: ModoDoPin): boolean {
  * seria deixar passar "porque ela já está nas Configurações". Acertou, o
  * destino depende do porquê de estar conferindo.
  *
- * O `switch` cobre os quatro modos e NÃO tem `default`: com um `default` que
+ * O `switch` cobre os cinco modos e NÃO tem `default`: com um `default` que
  * caísse em "desligar-parental", um modo novo derrubaria o controle parental
  * calado. Sem ele, um modo novo quebra o typecheck aqui — que é onde a decisão
  * precisa ser tomada.
@@ -86,6 +102,7 @@ export function depoisDeVerificar(modo: ModoDoPin, acertou: boolean): DepoisDeVe
     switch (modo) {
         case 'trocar': return 'definir-novo-pin'
         case 'destravar': return 'destravar-secao'
+        case 'liberar': return 'liberar-sessao'
         case 'verify': return 'desligar-parental'
         // 'set' não confere PIN atual, então não chega aqui pelo componente.
         case 'set': return 'desligar-parental'
