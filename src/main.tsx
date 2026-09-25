@@ -1,6 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import App from './App.tsx'
+import { RaizDoApp } from './RaizDoApp'
 import { themeService } from './services/themeService'
 import { bootProfiler } from './services/bootProfiler'
 import { reportRendererError } from './services/rendererErrorReport'
@@ -31,5 +31,5 @@ window.addEventListener('unhandledrejection', (event) => {
 // Note: StrictMode was removed because it causes video player issues
 // (double mounting causes video to reinitialize and seek operations to fail)
 createRoot(document.getElementById('root')!).render(
-  <App />,
+  <RaizDoApp />,
 )
