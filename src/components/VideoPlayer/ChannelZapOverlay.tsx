@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { computeListWindow, scrollTopForIndex, scrollTopToCenter } from '../../utils/listWindow';
+import { useLanguage } from '../../services/languageService';
 
 export interface PlayerChannel {
     id: string | number;
@@ -56,10 +57,12 @@ interface ZapRowProps {
     isCurrent: boolean;
     isHighlighted: boolean;
     onSelect: (id: string | number) => void;
+    /** "AO VIVO" já traduzido — string estável, não quebra o memo da linha. */
+    liveLabel: string;
 }
 
 /** Linha memoizada: rolar a lista só reconcilia quem entra/sai da janela. */
-const ZapRow = memo(function ZapRow({ channel, isCurrent, isHighlighted, onSelect }: ZapRowProps) {
+const ZapRow = memo(function ZapRow({ channel, isCurrent, isHighlighted, onSelect, liveLabel }: ZapRowProps) {
     return (
         <div
             data-ch={String(channel.id)}
@@ -97,7 +100,7 @@ const ZapRow = memo(function ZapRow({ channel, isCurrent, isHighlighted, onSelec
                 {channel.num !== undefined && <span style={{ color: 'rgba(255,255,255,0.45)', marginRight: 6 }}>{channel.num}</span>}
                 {channel.name}
             </span>
-            {isCurrent && <span style={{ marginLeft: 'auto', color: 'var(--ns-accent-light)', fontSize: 11, flexShrink: 0 }}>● AO VIVO</span>}
+            {isCurrent && <span style={{ marginLeft: 'auto', color: 'var(--ns-accent-light)', fontSize: 11, flexShrink: 0 }}>● {liveLabel}</span>}
         </div>
     );
 });
@@ -113,6 +116,7 @@ const ZapRow = memo(function ZapRow({ channel, isCurrent, isHighlighted, onSelec
  * enquanto só a fatia visível fica montada.
  */
 export function ChannelZapOverlay({ channels, currentId, visible, onSelect, onClose }: ChannelZapOverlayProps) {
+    const { t } = useLanguage();
     const listRef = useRef<HTMLDivElement>(null);
     const searchRef = useRef<HTMLInputElement>(null);
     // Highlight follows keyboard focus; starts at the playing channel.
@@ -290,11 +294,11 @@ export function ChannelZapOverlay({ channels, currentId, visible, onSelect, onCl
                 .zap-row.kb-focus { outline: 2px solid var(--ns-accent); outline-offset: -2px; }
             `}</style>
             <div style={{ padding: '18px 20px 10px', color: 'white', fontSize: 16, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>📺 Canais</span>
+                <span>📺 {t('liveTV', 'zapChannels')}</span>
                 {hasFavorites && (
                     <button
                         onClick={() => setOnlyFavorites(v => !v)}
-                        title="Só favoritos"
+                        title={t('liveTV', 'onlyFavorites')}
                         style={{
                             padding: '4px 12px',
                             borderRadius: 8,
@@ -316,7 +320,7 @@ export function ChannelZapOverlay({ channels, currentId, visible, onSelect, onCl
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Buscar canal ou número..."
+                    placeholder={t('liveTV', 'zapSearchPlaceholder')}
                     style={{
                         width: '100%',
                         padding: '9px 12px',
@@ -332,7 +336,7 @@ export function ChannelZapOverlay({ channels, currentId, visible, onSelect, onCl
             {recents.length > 0 && !query.trim() && !onlyFavorites && (
                 <div style={{ padding: '0 16px 10px' }}>
                     <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>
-                        ⏱️ Recentes
+                        ⏱️ {t('liveTV', 'recentChannels')}
                     </div>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {recents.map(ch => (
@@ -375,7 +379,7 @@ export function ChannelZapOverlay({ channels, currentId, visible, onSelect, onCl
             <div ref={listRef} style={{ flex: 1, overflowY: 'auto', padding: '0 12px 16px' }}>
                 {filtered.length === 0 && (
                     <div style={{ padding: 16, textAlign: 'center', color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>
-                        Nenhum canal encontrado
+                        {t('liveTV', 'noChannelsFound')}
                     </div>
                 )}
                 {listSlice.topSpacer > 0 && <div style={{ height: listSlice.topSpacer }} />}
@@ -386,6 +390,7 @@ export function ChannelZapOverlay({ channels, currentId, visible, onSelect, onCl
                         isCurrent={isSameId(ch.id, currentId)}
                         isHighlighted={isSameId(ch.id, highlightId)}
                         onSelect={selectChannel}
+                        liveLabel={t('liveTV', 'live')}
                     />
                 ))}
                 {listSlice.bottomSpacer > 0 && <div style={{ height: listSlice.bottomSpacer }} />}

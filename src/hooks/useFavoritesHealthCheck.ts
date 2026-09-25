@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { languageService } from '../services/languageService';
 
 /** Quantos canais a sonda testa por vez (a lista pode ter centenas). */
 export const FAV_CHECK_LIMIT = 30;
@@ -41,14 +42,22 @@ const NENHUM: ReadonlySet<string> = new Set();
  * Texto do botão depois da sonda. Com mais canais do que o limite, diz que
  * só parte da lista (a lista JÁ filtrada pela busca) foi verificada — antes
  * isso ficava só no tooltip.
+ *
+ * Sai no idioma do app (#D025): o texto é montado na hora em que a sonda
+ * termina, fora do render, então lê o `languageService` direto.
  */
 export function favCheckMessage(deadCount: number, probedCount: number, listCount: number): string {
     const base = deadCount === 0
-        ? `✓ ${probedCount} no ar`
-        : `⚠ ${deadCount} de ${probedCount} fora do ar`;
+        ? `✓ ${languageService.t('liveTV', 'favCheckAllAlive').replace('{probed}', String(probedCount))}`
+        : `⚠ ${languageService.t('liveTV', 'favCheckSomeDead').replace('{dead}', String(deadCount)).replace('{probed}', String(probedCount))}`;
     return listCount > FAV_CHECK_LIMIT
-        ? `${base} · ${FAV_CHECK_LIMIT} dos ${listCount} verificados`
+        ? `${base} · ${languageService.t('liveTV', 'favCheckPartial').replace('{limit}', String(FAV_CHECK_LIMIT)).replace('{total}', String(listCount))}`
         : base;
+}
+
+/** Rótulo do botão quando a sonda nem chegou a responder. */
+export function favCheckFailedMessage(): string {
+    return `✖ ${languageService.t('liveTV', 'favCheckFailed')}`;
 }
 
 /**
@@ -108,10 +117,10 @@ export function useFavoritesHealthCheck<T extends FavCheckStream>({
                 dead = new Set(result.results.filter(r => !r.alive).map(r => r.id));
                 msg = favCheckMessage(dead.size, result.results.length, list.length);
             } else {
-                msg = '✖ sonda falhou';
+                msg = favCheckFailedMessage();
             }
         } catch {
-            msg = '✖ sonda falhou';
+            msg = favCheckFailedMessage();
         }
 
         // Uma sonda mais nova já começou (a do filtro novo): esta não mexe
