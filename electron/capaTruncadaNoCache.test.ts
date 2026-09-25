@@ -113,6 +113,8 @@ describe('cache de capa: nada de arquivo pela metade', () => {
     })
 
     afterEach(() => {
+        // Antes do rmSync: um `renameSync` ainda dublado vazaria pro teste seguinte.
+        vi.restoreAllMocks()
         fs.rmSync(h.state.userData, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 })
     })
 
@@ -168,12 +170,70 @@ describe('cache de capa: nada de arquivo pela metade', () => {
     it('dois pedidos SIMULTANEOS da mesma capa nao escrevem no mesmo arquivo', async () => {
         // Dois cards do mesmo item, ou um re-render: com o `.tmp` fixo os dois
         // downloads escreviam no MESMO arquivo e o rename publicava a mistura.
+        //
+        // O desfecho sozinho NAO prova isso: desde que o rename que esbarra
+        // numa capa ja publicada conta como sucesso, o `.tmp` fixo tambem
+        // terminaria verde aqui. Por isso o teste olha ONDE cada pedido
+        // escreveu.
+        const temporarios: string[] = []
+        const criarDeVerdade = fs.createWriteStream.bind(fs)
+        vi.spyOn(fs, 'createWriteStream').mockImplementation(
+            ((alvo: fs.PathLike, opcoes?: Parameters<typeof fs.createWriteStream>[1]) => {
+                temporarios.push(String(alvo))
+                return criarDeVerdade(alvo, opcoes)
+            }) as typeof fs.createWriteStream,
+        )
+
         const [a, b] = await Promise.all([cachear('42'), cachear('42')])
 
+        expect(temporarios.length, 'os dois pedidos tinham que baixar').toBe(2)
+        expect(new Set(temporarios).size, `os dois pedidos escreveram no MESMO temporario: ${temporarios[0]}`).toBe(2)
         expect(a.success && b.success, `${a.error ?? ''} ${b.error ?? ''}`).toBe(true)
         await esperar(() => arquivosDeCapa().every(nome => !nome.endsWith('.tmp')), 'sobrou .tmp no disco')
         // O tamanho denuncia a mistura: dois corpos no mesmo arquivo dobram.
         expect(fs.statSync(path.join(capas(), '42.jpg')).size).toBe(h.IMAGEM.length)
+    })
+
+    it('o rename que esbarra na capa que o OUTRO pedido acabou de publicar ainda e sucesso', async () => {
+        // No runner Windows do CI isto aconteceu de verdade: dois pedidos da
+        // mesma capa terminam juntos, o primeiro publica e o `rename` do
+        // segundo por cima do arquivo recem-criado volta EPERM (o antivirus e
+        // o indexador abrem arquivo novo). A capa ja esta inteira no cache --
+        // o pedido esta atendido, e responder `success:false` fazia a tela
+        // cair no fallback por nada. Aqui o EPERM e FORCADO, para o teste nao
+        // depender da sorte de um runner lento.
+        const renomearDeVerdade = fs.renameSync.bind(fs)
+        let chamadas = 0
+        vi.spyOn(fs, 'renameSync').mockImplementation((de, para) => {
+            chamadas++
+            if (chamadas === 2) {
+                throw Object.assign(new Error(`EPERM: operation not permitted, rename '${String(de)}' -> '${String(para)}'`), { code: 'EPERM' })
+            }
+            return renomearDeVerdade(de, para)
+        })
+
+        const [a, b] = await Promise.all([cachear('42'), cachear('42')])
+
+        expect(chamadas, 'os dois pedidos tinham que chegar ao rename').toBe(2)
+        expect(a.success && b.success, `${a.error ?? ''} ${b.error ?? ''}`).toBe(true)
+        expect(a.localPath).toBe(b.localPath)
+        await esperar(() => arquivosDeCapa().every(nome => !nome.endsWith('.tmp')), 'sobrou .tmp no disco')
+        expect(fs.statSync(path.join(capas(), '42.jpg')).size).toBe(h.IMAGEM.length)
+    })
+
+    it('rename que falha SEM capa nenhuma no destino continua sendo falha', async () => {
+        // O outro lado: EPERM de verdade (pasta sem permissao, disco) com o
+        // destino vazio nao pode virar sucesso -- a tela receberia um caminho
+        // para um arquivo que nao existe.
+        vi.spyOn(fs, 'renameSync').mockImplementation(() => {
+            throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' })
+        })
+
+        const r = await cachear('42')
+
+        expect(r.success).toBe(false)
+        expect(fs.existsSync(path.join(capas(), '42.jpg'))).toBe(false)
+        await esperar(() => arquivosDeCapa().every(nome => !nome.endsWith('.tmp')), 'sobrou .tmp no disco')
     })
 
     it('arquivo de 0 byte ja no disco nao conta como cache', async () => {
