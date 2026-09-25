@@ -581,6 +581,7 @@
     "invalidFile": "Invalid or incompatible backup file",
     "confirmImportTitle": "Restore backup?",
     "confirmImportMessage": "Current data (profiles, favorites, progress and settings) will be overwritten by the backup data. This action cannot be undone.",
+    "confirmImportKeepsPlaylists": "Playlists on this device that are not in the backup are not deleted.",
     "confirmImportConfirm": "Restore",
     "confirmImportCancel": "Cancel",
     "importSuccess": "Backup restored successfully! Restart the app to apply all changes.",

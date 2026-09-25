@@ -403,6 +403,8 @@ export function BackupSection() {
 
                         <p style={{ color: '#9ca3af', textAlign: 'center', lineHeight: 1.6, marginBottom: 28 }}>
                             {t('backup', 'confirmImportMessage')}
+                            {/* D114: o restore não apaga playlist (o import do main só faz upsert) */}
+                            {' '}{t('backup', 'confirmImportKeepsPlaylists')}
                         </p>
 
                         <div style={{ display: 'flex', gap: 12 }}>
