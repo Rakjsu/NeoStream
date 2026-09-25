@@ -694,6 +694,18 @@ export function setupDownloadHandlers() {
                             fs.renameSync(tempPath, filePath);
                         } catch (err: unknown) {
                             limparTmp();
+                            // Outro pedido da MESMA capa (dois cards do mesmo
+                            // item, um re-render) publicou primeiro. No Windows
+                            // o rename por cima de um arquivo recem-criado pode
+                            // voltar EPERM/EACCES/EBUSY: o antivirus e o
+                            // indexador abrem arquivo novo. Se o destino ja tem
+                            // uma capa inteira -- e so chega capa inteira ali,
+                            // porque ela so entra por este rename --, o pedido
+                            // esta atendido.
+                            if (getFileSizeSync(filePath) > 0) {
+                                resolve({ success: true, localPath: `file:///${filePath.replace(/\\/g, '/')}` });
+                                return;
+                            }
                             resolve({ success: false, error: getErrorMessage(err) });
                             return;
                         }
