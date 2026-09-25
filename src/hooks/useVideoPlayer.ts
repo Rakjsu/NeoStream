@@ -95,13 +95,21 @@ export function useVideoPlayer() {
         setState(prev => ({ ...prev, playbackRate: rate }));
     }, []);
 
-    // Event Handlers
+    // Event Handlers — pendurados UMA vez por montagem. Nenhum handler lê
+    // estado por closure (todos leem do próprio `video` ou do `prev`), então
+    // o efeito não depende de nada. Antes dependia de `state.volume`: cada
+    // passo do slider/seta de volume removia e readicionava os 12 ouvintes, e
+    // a limpeza ainda cancelava o debounce do `fullscreenchange` — entrar em
+    // tela cheia e mexer no volume logo em seguida deixava `state.fullscreen`
+    // preso no valor antigo (#D009).
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
 
-        // Initialize video element with saved volume
-        video.volume = state.volume;
+        // Volume salvo aplicado na montagem — o mesmo valor com que o estado
+        // nasceu. Depois disso o elemento é a fonte: `setVolume` grava nele e
+        // o `volumechange` traz o valor de volta pro estado.
+        video.volume = getSavedVolume();
 
         const handlePlay = () => setState(prev => ({ ...prev, playing: true }));
         const handlePause = () => setState(prev => ({ ...prev, playing: false }));
@@ -188,7 +196,7 @@ export function useVideoPlayer() {
             video.removeEventListener('progress', handleProgress);
             document.removeEventListener('fullscreenchange', handleFullscreenChange);
         };
-    }, [state.volume]);
+    }, []);
 
     // Keyboard shortcuts are intentionally NOT registered here: each consumer
     // (VideoPlayer, PipWindow) owns a single document-level listener so the
