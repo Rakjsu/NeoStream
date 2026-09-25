@@ -90,7 +90,12 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
                 preload: path.join(__dirname, 'preload.mjs'),
                 nodeIntegration: false,
                 contextIsolation: true,
-                webSecurity: false,
+                // 🔒 Same-origin ligada, como a principal (main.ts): esta
+                // janela carrega o MESMO index.html e o MESMO preload, e nada
+                // que roda aqui (hls.js, TMDB) deixa de rodar lá com ela
+                // ligada. `false` só desligava a política e ligava
+                // allowRunningInsecureContent nesta janela (#D140).
+                webSecurity: true,
             },
         });
         multiViewWindow.setMenuBarVisibility(false);
@@ -140,7 +145,8 @@ export function setupPipHandlers(mainWin: BrowserWindow) {
                 preload: path.join(__dirname, 'preload.mjs'),
                 nodeIntegration: false,
                 contextIsolation: true,
-                webSecurity: false,
+                // 🔒 Mesmo motivo do multi-view acima (#D140).
+                webSecurity: true,
             },
         });
 
