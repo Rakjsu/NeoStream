@@ -181,3 +181,174 @@ describe('resumoDaSerie', () => {
         expect(resumoDaSerie({ seriesName: 'Vazia', seasons: [] })).toEqual({ nome: 'Vazia', episodios: 0, bytes: 0 });
     });
 });
+
+/**
+ * 🗑️ D066 — excluir/cancelar um download que não terminou deixava os `.partN`
+ * no disco. Do lado do renderer o buraco era duplo: `item.filePath` só existe
+ * no SUCESSO (então o `download:delete-file` nunca rodava), e o
+ * `download:cancel` só ia para o main com status `downloading` — item pausado
+ * ou que falhou nem avisava. E o main, sem o descritor, não tinha como achar
+ * as partes de um download que ele já esqueceu.
+ */
+describe('downloadService: excluir/cancelar manda o main limpar as sobras', () => {
+    function instalarIpc(inicioDoDownload: () => Promise<unknown>) {
+        const invoke = vi.fn(async (canal: string) => {
+            if (canal === 'download:start') return inicioDoDownload();
+            if (canal === 'download:cache-image') return { success: false };
+            return { success: true };
+        });
+        (window as unknown as { ipcRenderer: unknown }).ipcRenderer = { on: vi.fn(), off: vi.fn(), invoke, send: vi.fn() };
+        return invoke;
+    }
+
+    const statusDe = (id: string) => downloadService.getDownloads().find(d => d.id === id)?.status;
+    const canais = (invoke: { mock: { calls: unknown[][] } }) => invoke.mock.calls.map(chamada => chamada[0]);
+
+    it('excluir um download que FALHOU manda o main apagar as partes', async () => {
+        const invoke = instalarIpc(async () => ({ success: false, error: 'provedor caiu' }));
+        const item = await downloadService.addDownload('Filme D066 que falhou', 'movie', 'http://x/d066.mp4', '');
+        await vi.waitFor(() => expect(statusDe(item.id)).toBe('failed'));
+        invoke.mockClear();
+
+        await downloadService.deleteDownload(item.id);
+
+        expect(invoke).toHaveBeenCalledWith('download:cancel', expect.objectContaining({
+            id: item.id, name: 'Filme D066 que falhou', type: 'movie',
+        }));
+        expect(statusDe(item.id)).toBeUndefined();
+    });
+
+    it('excluir um episódio PAUSADO manda série, temporada e episódio', async () => {
+        // O start fica pendurado até a pausa e aí é solto como falha, só para
+        // a fila deste serviço (singleton) não ficar com a vaga presa.
+        let soltarStart: (r: unknown) => void = () => undefined;
+        const invoke = instalarIpc(() => new Promise(resolve => { soltarStart = resolve; }));
+        const item = await downloadService.addDownload('Dark D066', 'episode', 'http://x/dark.mp4', '', {
+            seriesName: 'Dark D066', season: 2, episode: 5,
+        });
+        await vi.waitFor(() => expect(statusDe(item.id)).toBe('downloading'));
+        await downloadService.pauseDownload(item.id);
+        soltarStart({ success: false, error: 'conexão destruída' });
+        await vi.waitFor(() => expect(statusDe(item.id)).toBe('paused'));
+        invoke.mockClear();
+
+        await downloadService.deleteDownload(item.id);
+
+        expect(invoke).toHaveBeenCalledWith('download:cancel', expect.objectContaining({
+            id: item.id, name: 'Dark D066', type: 'episode', seriesName: 'Dark D066', season: 2, episode: 5,
+        }));
+        expect(statusDe(item.id)).toBeUndefined();
+    });
+
+    it('cancelDownload de um item que FALHOU também avisa o main', async () => {
+        const invoke = instalarIpc(async () => ({ success: false, error: 'provedor caiu' }));
+        const item = await downloadService.addDownload('Filme D066 cancelado', 'movie', 'http://x/d066c.mp4', '');
+        await vi.waitFor(() => expect(statusDe(item.id)).toBe('failed'));
+        invoke.mockClear();
+
+        await downloadService.cancelDownload(item.id);
+
+        expect(invoke).toHaveBeenCalledWith('download:cancel', expect.objectContaining({
+            id: item.id, name: 'Filme D066 cancelado', type: 'movie',
+        }));
+        expect(statusDe(item.id)).toBeUndefined();
+    });
+
+    it('excluir um CONCLUÍDO só apaga o arquivo: não pede limpeza de partes ao main', async () => {
+        const invoke = instalarIpc(async () => ({ success: true, filePath: 'C:/d/movies/Pronto D066.mp4', size: 10 }));
+        const item = await downloadService.addDownload('Pronto D066', 'movie', 'http://x/pronto.mp4', '');
+        await vi.waitFor(() => expect(statusDe(item.id)).toBe('completed'));
+        invoke.mockClear();
+
+        await downloadService.deleteDownload(item.id);
+
+        expect(invoke).toHaveBeenCalledWith('download:delete-file', { filePath: 'C:/d/movies/Pronto D066.mp4' });
+        expect(canais(invoke).includes('download:cancel')).toBe(false);
+    });
+
+    /**
+     * Com o conserto, o cancel do main DERRUBA o `download:start` (antes, no
+     * Node de verdade, o start de um paralelo cancelado ficava pendurado). O
+     * catch do processQueue não pode tratar isso como falha: notificaria
+     * "download falhou" e o `saveDownload` poria de volta no IndexedDB o
+     * item que a pessoa acabou de excluir — ele reaparece no próximo boot.
+     *
+     * As duas ordens de chegada existem: a resposta do start pode vir antes
+     * ou depois da resposta do cancel.
+     */
+    async function registroNoBanco(id: string): Promise<unknown> {
+        const db = await new Promise<IDBDatabase>((ok, erro) => {
+            const pedido = indexedDB.open('neostream_downloads', 1);
+            pedido.onsuccess = () => ok(pedido.result);
+            pedido.onerror = () => erro(pedido.error);
+        });
+        try {
+            return await new Promise((ok, erro) => {
+                const pedido = db.transaction('downloads', 'readonly').objectStore('downloads').get(id);
+                pedido.onsuccess = () => ok(pedido.result);
+                pedido.onerror = () => erro(pedido.error);
+            });
+        } finally {
+            db.close();
+        }
+    }
+
+    async function excluirNoMeio(
+        nome: string,
+        startCaiAntesDoCancel: boolean,
+        descartar: (id: string) => Promise<void> = id => downloadService.deleteDownload(id),
+    ) {
+        vi.mocked(appNotificationService.addDownloadNotification).mockClear();
+        // Uma vaga só: o SEGUNDO download só começa quando o catch do
+        // primeiro soltar a vaga — é a condição que o teste espera.
+        downloadService.setMaxConcurrent(1);
+        let soltarStart: (r: unknown) => void = () => undefined;
+        const startsDoSegundo: string[] = [];
+        let soltarSegundo: (r: unknown) => void = () => undefined;
+        const invoke = vi.fn(async (canal: string, dados?: { name?: string }) => {
+            if (canal === 'download:start') {
+                if (dados?.name === nome) return new Promise(resolve => { soltarStart = resolve; });
+                startsDoSegundo.push(String(dados?.name));
+                return new Promise(resolve => { soltarSegundo = resolve; });
+            }
+            if (canal === 'download:cancel' && startCaiAntesDoCancel) {
+                soltarStart({ success: false, error: 'Download cancelado' });
+                await vi.waitFor(() => expect(startsDoSegundo).toHaveLength(1));
+            }
+            if (canal === 'download:cache-image') return { success: false };
+            return { success: true };
+        });
+        (window as unknown as { ipcRenderer: unknown }).ipcRenderer = { on: vi.fn(), off: vi.fn(), invoke, send: vi.fn() };
+        try {
+            const item = await downloadService.addDownload(nome, 'movie', 'http://x/meio.mp4', '');
+            await vi.waitFor(() => expect(statusDe(item.id)).toBe('downloading'));
+            await downloadService.addDownload(`${nome} (o próximo da fila)`, 'movie', 'http://x/prox.mp4', '');
+
+            await descartar(item.id);
+            if (!startCaiAntesDoCancel) soltarStart({ success: false, error: 'Download cancelado' });
+            await vi.waitFor(() => expect(startsDoSegundo).toHaveLength(1));
+
+            const falhas = vi.mocked(appNotificationService.addDownloadNotification).mock.calls
+                .filter(chamada => chamada[0] === 'failed' && chamada[1] === nome);
+            expect(falhas).toEqual([]);
+            expect(statusDe(item.id)).toBeUndefined();
+            expect(await registroNoBanco(item.id)).toBeUndefined();
+        } finally {
+            // Solta a vaga do segundo para o próximo teste (o serviço é singleton).
+            soltarSegundo({ success: true, filePath: 'C:/d/movies/prox.mp4', size: 1 });
+            downloadService.setMaxConcurrent(2);
+        }
+    }
+
+    it('excluir no meio: start derrubado DEPOIS do cancel não vira "falhou" nem volta do banco', async () => {
+        await excluirNoMeio('Filme D066 excluído (start depois)', false);
+    });
+
+    it('excluir no meio: start derrubado ANTES da resposta do cancel também não', async () => {
+        await excluirNoMeio('Filme D066 excluído (start antes)', true);
+    });
+
+    it('cancelDownload no meio segue a mesma regra', async () => {
+        await excluirNoMeio('Filme D066 cancelado no meio', true, id => downloadService.cancelDownload(id));
+    });
+});
