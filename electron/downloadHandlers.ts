@@ -6,7 +6,13 @@ import http from 'http'
 import log from './logger'
 import { juntarPartes } from './juntarPartes'
 import { setTaskbarProgress } from './winIntegration'
-import { resolveDownloadFile, resolveSeriesFolder, sanitizeDownloadName } from './downloadPaths'
+import {
+    caminhoDoDownload,
+    resolveDownloadFile,
+    resolveSeriesFolder,
+    sanitizeDownloadName,
+    type DescritorDeDownload,
+} from './downloadPaths'
 import { getErrorMessage } from './errorMessage';
 
 interface ActiveDownload {
@@ -19,6 +25,17 @@ interface ActiveDownload {
     requests?: http.ClientRequest[];
     /** Timer de progresso do caminho paralelo — pause/cancel também têm que matá-lo. */
     progressInterval?: ReturnType<typeof setInterval> | null;
+    /** Destino final — as partes do caminho paralelo são `<filePath>.partN`. */
+    filePath?: string;
+    /** Streams de escrita dos `.partN`: o cancel fecha antes de apagar. */
+    escritas?: fs.WriteStream[];
+    /** Resposta da conexão única — o cancel corta o socket, não só o arquivo. */
+    resposta?: http.IncomingMessage;
+    /**
+     * O arquivo em `filePath` é DESTE download e está incompleto (conexão
+     * única escrevendo, ou merge em curso): cancelar apaga ele também.
+     */
+    arquivoParcial?: boolean;
 }
 
 const activeDownloads: Map<string, ActiveDownload> = new Map();
@@ -90,6 +107,45 @@ function getFolderSize(folderPath: string): number {
     return totalSize;
 }
 
+/** Destrói o stream e espera o handle do arquivo fechar de verdade. */
+function fecharEscrita(escrita: fs.WriteStream): Promise<void> {
+    return new Promise(resolve => {
+        if (escrita.closed) { resolve(); return; }
+        escrita.once('close', () => resolve());
+        escrita.destroy();
+    });
+}
+
+/**
+ * Apaga as sobras de um download que não terminou: os `<filePath>.partN` do
+ * caminho paralelo e, com `incluirArquivo`, o próprio `filePath` (conexão
+ * única escrevendo nele, ou merge interrompido).
+ *
+ * Tudo passa por `resolveDownloadFile`: o caminho pode ter vindo de um
+ * descritor do renderer, e `type: '..'` apontaria para fora da pasta.
+ */
+function apagarSobras(raiz: string, filePath: string, incluirArquivo: boolean): void {
+    const alvos = Array.from({ length: PARALLEL_CONNECTIONS }, (_, i) => `${filePath}.part${i}`);
+    if (incluirArquivo) alvos.push(filePath);
+    for (const alvo of alvos) {
+        const dentro = resolveDownloadFile(raiz, alvo);
+        if (!dentro) continue;
+        try { fs.unlinkSync(dentro); } catch { /* não existia, ou antivírus segurando: best-effort */ }
+    }
+}
+
+/** O descritor do payload do cancel, se veio inteiro (renderer antigo manda só o id). */
+function descritorValido(payload: Partial<DescritorDeDownload> | undefined): DescritorDeDownload | null {
+    if (!payload || typeof payload.name !== 'string' || typeof payload.type !== 'string') return null;
+    return {
+        name: payload.name,
+        type: payload.type,
+        seriesName: typeof payload.seriesName === 'string' ? payload.seriesName : undefined,
+        season: typeof payload.season === 'number' ? payload.season : undefined,
+        episode: typeof payload.episode === 'number' ? payload.episode : undefined,
+    };
+}
+
 // Show native Windows notification when download completes
 function showDownloadNotification(name: string, filePath: string): void {
     if (Notification.isSupported()) {
@@ -121,7 +177,8 @@ function downloadChunk(
     end: number,
     tempPath: string,
     register?: (req: http.ClientRequest) => void,
-    onBytes?: (bytes: number) => void
+    onBytes?: (bytes: number) => void,
+    onStream?: (escrita: fs.WriteStream) => void
 ): Promise<number> {
     return new Promise((resolve, reject) => {
         // ⏯ Resume real: aproveita o que o .partN já tem — o Range recomeça
@@ -155,7 +212,7 @@ function downloadChunk(
             if (response.statusCode === 301 || response.statusCode === 302) {
                 const redirectUrl = response.headers.location;
                 if (redirectUrl) {
-                    downloadChunk(redirectUrl, start, end, tempPath, register, onBytes).then(resolve).catch(reject);
+                    downloadChunk(redirectUrl, start, end, tempPath, register, onBytes, onStream).then(resolve).catch(reject);
                     return;
                 }
             }
@@ -172,6 +229,7 @@ function downloadChunk(
             }
 
             const writeStream = fs.createWriteStream(tempPath, { flags: already > 0 ? 'a' : 'w', highWaterMark: 128 * 1024 });
+            onStream?.(writeStream);
             let downloaded = 0;
 
             response.on('data', (chunk) => {
@@ -183,6 +241,10 @@ function downloadChunk(
 
             writeStream.on('finish', () => resolve(already + downloaded));
             writeStream.on('error', reject);
+            // O cancel DESTRÓI o stream (fecha o arquivo antes de apagá-lo):
+            // isso não emite 'finish' nem 'error', só 'close'. Depois de um
+            // 'finish' este reject é no-op.
+            writeStream.on('close', () => reject(new Error('Download cancelado')));
         };
 
         const request = protocol.request(options, handleResponse);
@@ -277,7 +339,11 @@ function singleDownload(id: string, url: string, filePath: string): Promise<{ su
 
             const writeStream = fs.createWriteStream(filePath, { highWaterMark: 128 * 1024 });
 
-            activeDownloads.set(id, { id, request: null, stream: writeStream, paused: false, cancelled: false });
+            const entrada: ActiveDownload = {
+                id, request: null, stream: writeStream, paused: false, cancelled: false,
+                filePath, resposta: response, arquivoParcial: true,
+            };
+            activeDownloads.set(id, entrada);
 
             response.on('data', (chunk) => {
                 downloadedBytes += chunk.length;
@@ -302,6 +368,15 @@ function singleDownload(id: string, url: string, filePath: string): Promise<{ su
                 activeDownloads.delete(id);
                 reject(err);
             });
+
+            // Cancelamento: o `download:cancel` destrói este stream. Antes ele
+            // chamava `close()`, que no Node é `end()` — o 'finish' disparava e
+            // o download cancelado voltava como SUCESSO, com o arquivo truncado.
+            // Destruído, só vem 'close'; sem este reject a promessa ficava
+            // pendurada e o renderer perdia a vaga da fila.
+            writeStream.on('close', () => {
+                if (entrada.cancelled) reject(new Error('Download cancelado'));
+            });
         };
 
         const request = protocol.request(options, handleResponse);
@@ -320,30 +395,12 @@ export function setupDownloadHandlers() {
         let entry: ActiveDownload | null = null;
         try {
             const downloadsPath = getDownloadsPath();
-            let filePath: string;
-
-            if (type === 'episode' && seriesName && season !== undefined && episode !== undefined) {
-                // Organize: Series/SeriesName/Temporada X/EpY.mp4
-                const seriesDir = path.join(downloadsPath, 'series', sanitizeFilename(seriesName));
-                const seasonDir = path.join(seriesDir, `Temporada ${season}`);
-                if (!fs.existsSync(seasonDir)) {
-                    fs.mkdirSync(seasonDir, { recursive: true });
-                }
-                filePath = path.join(seasonDir, `Ep${episode}.mp4`);
-            } else if (type === 'movie') {
-                // Movies go in movies folder
-                const movieDir = path.join(downloadsPath, 'movies');
-                if (!fs.existsSync(movieDir)) {
-                    fs.mkdirSync(movieDir, { recursive: true });
-                }
-                filePath = path.join(movieDir, sanitizeFilename(`${name}.mp4`));
-            } else {
-                // Fallback
-                const typeDir = path.join(downloadsPath, type);
-                if (!fs.existsSync(typeDir)) {
-                    fs.mkdirSync(typeDir, { recursive: true });
-                }
-                filePath = path.join(typeDir, sanitizeFilename(`${name}.mp4`));
+            // A mesma regra que o `download:cancel` usa para achar as sobras
+            // de um download que o main já esqueceu (downloadPaths.ts).
+            const filePath = caminhoDoDownload(downloadsPath, { name, type, seriesName, season, episode });
+            const pastaDoArquivo = path.dirname(filePath);
+            if (!fs.existsSync(pastaDoArquivo)) {
+                fs.mkdirSync(pastaDoArquivo, { recursive: true });
             }
 
             // Get file size first
@@ -391,6 +448,7 @@ export function setupDownloadHandlers() {
             // Download all chunks in parallel (registrados pra pause/cancel).
             const parallelEntry: ActiveDownload = {
                 id, request: null, stream: null, paused: false, cancelled: false, requests: [], progressInterval,
+                filePath, escritas: [],
             };
             entry = parallelEntry;
             activeDownloads.set(id, parallelEntry);
@@ -404,7 +462,8 @@ export function setupDownloadHandlers() {
                     // Cada pedaço que chega conta na hora — é isto que faz a
                     // barra andar e o "MB/s" (delta de downloadedBytes no
                     // renderer) existir.
-                    bytes => { totalDownloaded += bytes; }
+                    bytes => { totalDownloaded += bytes; },
+                    escrita => parallelEntry.escritas?.push(escrita)
                 )
             );
 
@@ -419,6 +478,9 @@ export function setupDownloadHandlers() {
             // no catch abaixo, em vez de subir como exceção assíncrona e abrir
             // o diálogo de crash do Electron. Ver juntarPartes.ts.
             log.info('[Download] Merging chunks...');
+            // Daqui até o fim da junção o arquivo final existe pela metade:
+            // um cancel no meio do merge também tem que levá-lo.
+            parallelEntry.arquivoParcial = true;
             await juntarPartes(
                 filePath,
                 Array.from({ length: PARALLEL_CONNECTIONS }, (_, i) => `${filePath}.part${i}`)
@@ -485,8 +547,16 @@ export function setupDownloadHandlers() {
         return { success: false, error: 'Download not found' };
     });
 
-    // Cancel download
-    ipcMain.handle('download:cancel', async (_, { id }) => {
+    // Cancel download — e apaga o que ele deixou no disco (D066).
+    //
+    // O renderer manda, além do id, o descritor do item (nome, tipo, série,
+    // temporada, episódio): um download pausado ou que falhou já saiu de
+    // `activeDownloads` (o `finally` do start limpa a entrada), e só o
+    // descritor diz onde as partes dele estão. A PAUSA continua sem apagar
+    // nada — é dela que o resume do `downloadChunk` depende.
+    ipcMain.handle('download:cancel', async (_, payload: { id: string } & Partial<DescritorDeDownload>) => {
+        const id = payload?.id;
+        const raiz = getDownloadsPath();
         const download = activeDownloads.get(id);
         if (download) {
             download.cancelled = true;
@@ -494,14 +564,31 @@ export function setupDownloadHandlers() {
             for (const req of download.requests ?? []) {
                 try { req.destroy(); } catch { /* já caiu */ }
             }
-            if (download.stream) download.stream.close();
+            try { download.resposta?.destroy(); } catch { /* já caiu */ }
             if (download.progressInterval) {
                 clearInterval(download.progressInterval);
                 download.progressInterval = null;
             }
             activeDownloads.delete(id);
             setTaskbarProgress(null);
+            // Fecha ANTES de apagar: no Windows um arquivo com handle aberto
+            // não sai (ou fica "delete pending" e bloqueia o nome).
+            const escritas = [download.stream, ...(download.escritas ?? [])]
+                .filter((escrita): escrita is fs.WriteStream => escrita !== null);
+            await Promise.all(escritas.map(fecharEscrita));
+            if (download.filePath) apagarSobras(raiz, download.filePath, download.arquivoParcial === true);
             return { success: true };
+        }
+
+        const descritor = descritorValido(payload);
+        if (descritor) {
+            const filePath = caminhoDoDownload(raiz, descritor);
+            // Mesmo destino de um download VIVO (outro id, mesmo nome e tipo):
+            // as partes são dele, não do item que está sendo excluído.
+            const emUso = Array.from(activeDownloads.values()).some(ativo => ativo.filePath === filePath);
+            // Só as partes: o arquivo final, se existir, é de um download
+            // concluído com o mesmo nome — nunca sobra deste.
+            if (!emUso) apagarSobras(raiz, filePath, false);
         }
         return { success: false, error: 'Download not found' };
     });

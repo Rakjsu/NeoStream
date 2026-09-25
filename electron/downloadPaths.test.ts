@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import path from 'path'
-import { resolveDownloadFile, resolveSeriesFolder, sanitizeDownloadName } from './downloadPaths'
+import { caminhoDoDownload, resolveDownloadFile, resolveSeriesFolder, sanitizeDownloadName } from './downloadPaths'
 
 /**
  * 🔒 `download:delete-folder` fazia `path.join(downloads, folderName)` +
@@ -81,5 +81,26 @@ describe('resolveDownloadFile', () => {
     it('entrada vazia é recusada', () => {
         expect(resolveDownloadFile(ROOT, '')).toBeNull()
         expect(resolveDownloadFile(ROOT, null)).toBeNull()
+    })
+})
+
+/**
+ * O `download:start` grava aqui e o `download:cancel` recalcula daqui as
+ * partes de um download que o main já esqueceu (D066): o layout não pode
+ * mudar sem os dois mudarem juntos.
+ */
+describe('caminhoDoDownload', () => {
+    it('episódio: series/<série saneada>/Temporada N/EpM.mp4', () => {
+        expect(caminhoDoDownload(ROOT, { name: 'x', type: 'episode', seriesName: 'Dark: 1', season: 2, episode: 5 }))
+            .toBe(path.join(ROOT, 'series', 'Dark_ 1', 'Temporada 2', 'Ep5.mp4'))
+    })
+
+    it('filme: movies/<nome saneado>.mp4', () => {
+        expect(caminhoDoDownload(ROOT, { name: 'A/B', type: 'movie' })).toBe(path.join(ROOT, 'movies', 'A_B.mp4'))
+    })
+
+    it('episódio sem temporada cai no fallback por tipo', () => {
+        expect(caminhoDoDownload(ROOT, { name: 'Solto', type: 'episode', seriesName: 'Dark' }))
+            .toBe(path.join(ROOT, 'episode', 'Solto.mp4'))
     })
 })

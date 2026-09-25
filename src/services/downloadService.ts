@@ -443,6 +443,14 @@ class DownloadService {
         try {
             await this.downloadFile(item);
         } catch (error: unknown) {
+            // 🗑️ Excluído/cancelado no meio (D066): o main derrubou o start de
+            // propósito. Nada de "falhou" nem de salvar — o put ressuscitaria
+            // no IndexedDB o item que a pessoa acabou de apagar.
+            if (!this.downloads.has(pendingId)) {
+                this.activeDownloads--;
+                this.processQueue();
+                return;
+            }
             // Reler via map alarga o tipo — o TS narrowed pra 'downloading'
             // no set acima e não vê a mutação feita pelo pauseDownload.
             if (this.downloads.get(pendingId)?.status === 'paused') {
@@ -653,21 +661,45 @@ class DownloadService {
         }
     }
 
+    /**
+     * 🗑️ Para o download no main e manda apagar as sobras dele no disco
+     * (os `.partN` do caminho paralelo). Vale para TODO item que não
+     * terminou: pausado e que falhou também deixam partes, e `item.filePath`
+     * só existe no sucesso — o `download:delete-file` nunca as alcançava.
+     * O descritor é o que deixa o main achar as partes de um download que
+     * ele já esqueceu (electron/downloadPaths.ts → caminhoDoDownload).
+     */
+    private async descartarNoMain(item: DownloadItem): Promise<void> {
+        if (item.status === 'completed') return;
+        try {
+            await window.ipcRenderer.invoke('download:cancel', {
+                id: item.id,
+                name: item.name,
+                type: item.type,
+                seriesName: item.seriesName,
+                season: item.season,
+                episode: item.episode,
+            });
+        } catch (e) {
+            console.warn('Failed to cancel download:', e);
+        }
+    }
+
     // Cancel download
     async cancelDownload(id: string): Promise<void> {
         const item = this.downloads.get(id);
         if (item) {
-            if (item.status === 'downloading') {
-                await window.ipcRenderer.invoke('download:cancel', { id });
-            }
+            // Sai do mapa ANTES do cancel: ele derruba o `download:start`, e o
+            // catch do processQueue tem que ver o item como descartado.
+            this.downloads.delete(id);
+            this.queue = this.queue.filter(qId => qId !== id);
+            await this.descartarNoMain(item);
 
             // Remove file if exists
             if (item.filePath) {
                 await window.ipcRenderer.invoke('download:delete-file', { filePath: item.filePath });
             }
 
-            this.downloads.delete(id);
-            this.queue = this.queue.filter(qId => qId !== id);
             await this.deleteDownloadFromDB(id);
             this.emit('cancelled', item);
         }
@@ -677,19 +709,14 @@ class DownloadService {
     async deleteDownload(id: string): Promise<void> {
         const item = this.downloads.get(id);
         if (item) {
-            // Cancel if still downloading or pending
-            if (item.status === 'downloading' || item.status === 'pending' || item.status === 'paused') {
-                try {
-                    await window.ipcRenderer.invoke('download:cancel', { id });
-                } catch (e) {
-                    console.warn('Failed to cancel download:', e);
-                }
-            }
+            // Sai do mapa ANTES do cancel (ver cancelDownload).
+            this.downloads.delete(id);
+            // Qualquer status que não seja concluído (inclusive 'failed').
+            await this.descartarNoMain(item);
             // Delete file if exists
             if (item.filePath) {
                 await window.ipcRenderer.invoke('download:delete-file', { filePath: item.filePath });
             }
-            this.downloads.delete(id);
             await this.deleteDownloadFromDB(id);
             this.emit('deleted', item);
         }

@@ -56,6 +56,38 @@ export function resolveSeriesFolder(downloadsRoot: string, folderName: unknown):
     return isInside(seriesRoot, target) ? target : null
 }
 
+/** O que identifica um download no disco — é o que o renderer tem do item. */
+export interface DescritorDeDownload {
+    name: string
+    type: string
+    seriesName?: string
+    season?: number
+    episode?: number
+}
+
+/**
+ * Onde o `download:start` grava o arquivo final (as partes do caminho
+ * paralelo ficam ao lado, em `<arquivo>.partN`).
+ *
+ * Uma função só para quem CRIA e quem APAGA, pelo mesmo motivo do
+ * `sanitizeDownloadName`: o cancelamento de um download que o main já
+ * esqueceu (pausado, falhou, app reaberto) recalcula o caminho a partir do
+ * descritor — se a regra divergir, a limpeza vira no-op em silêncio.
+ *
+ * Não confina: `type` chega do renderer e `..` sobe de diretório. Quem apaga
+ * passa o resultado por `resolveDownloadFile`.
+ */
+export function caminhoDoDownload(downloadsRoot: string, d: DescritorDeDownload): string {
+    if (d.type === 'episode' && d.seriesName && d.season !== undefined && d.episode !== undefined) {
+        // Series/SeriesName/Temporada X/EpY.mp4
+        return path.join(downloadsRoot, 'series', sanitizeDownloadName(d.seriesName), `Temporada ${d.season}`, `Ep${d.episode}.mp4`)
+    }
+    if (d.type === 'movie') {
+        return path.join(downloadsRoot, 'movies', sanitizeDownloadName(`${d.name}.mp4`))
+    }
+    return path.join(downloadsRoot, d.type, sanitizeDownloadName(`${d.name}.mp4`))
+}
+
 /**
  * Arquivo dentro da pasta de downloads. Aceita caminho absoluto (é o que o
  * renderer guarda), mas só se cair mesmo debaixo da raiz — caminho relativo
