@@ -1,6 +1,7 @@
 import { profileService } from './profileService';
 import { playlistScopedKey, hasKnownPlaylistId } from './activePlaylistService';
 import { readJson } from './storageJsonCache';
+import { syncTombstones, episodeProgressTombstoneKey } from './syncTombstones';
 
 export interface EpisodeProgress {
     seriesId: string;
@@ -360,6 +361,16 @@ class WatchProgressService {
                     p.episodeNumber === episodeNumber &&
                     p.profileId === activeProfile.id)
         );
+        // 🪦 Ledger de remoções: sem o carimbo, "Recomeçar" (e o desmarcar do
+        // ✓) volta atrás no próximo ciclo de sync, porque o merge é newest-wins
+        // por episódio. Marcar de novo grava um watchedAt mais novo e vence o
+        // carimbo.
+        if (filtered.length !== progress.length) {
+            syncTombstones.record(
+                this.getStorageKey(),
+                episodeProgressTombstoneKey(seriesId, seasonNumber, episodeNumber),
+            );
+        }
         this.saveProgress(filtered);
     }
 
@@ -420,12 +431,25 @@ class WatchProgressService {
     clearSeriesProgress(seriesId: string): void {
         const progress = this.getProgress();
         const filtered = progress.filter((p) => p.seriesId !== seriesId);
+        syncTombstones.recordMany(
+            this.getStorageKey(),
+            progress
+                .filter((p) => p && p.seriesId === seriesId)
+                .map((p) => episodeProgressTombstoneKey(p.seriesId, p.seasonNumber, p.episodeNumber)),
+        );
         this.saveProgress(filtered);
     }
 
     // Clear all progress for current profile
     clearAllProgress(): void {
-        localStorage.removeItem(this.getStorageKey());
+        const key = this.getStorageKey();
+        syncTombstones.recordMany(
+            key,
+            this.getProgress()
+                .filter((p) => p && typeof p.seriesId === 'string')
+                .map((p) => episodeProgressTombstoneKey(p.seriesId, p.seasonNumber, p.episodeNumber)),
+        );
+        localStorage.removeItem(key);
     }
 }
 

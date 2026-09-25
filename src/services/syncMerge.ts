@@ -9,10 +9,18 @@
 // (unions / newest-wins per item); everything else is adopted only when
 // missing locally. Deletions propagate through the tombstones ledger
 // (syncTombstones.ts): an item loses to a tombstone NEWER than its addedAt,
-// so a re-add after a deletion still survives.
+// so a re-add after a deletion still survives. Vale para TODA lista mesclada
+// item a item — favoritos, ver-depois, perfis e progresso de filme/episódio
+// (nesse último o carimbo de idade é `watchedAt`, em ms, no lugar de `addedAt`).
 
 import { isSyncKey } from './backupService';
-import { TOMBSTONES_KEY, pruneTombstones, type TombstoneMap } from './syncTombstones';
+import {
+    TOMBSTONES_KEY,
+    pruneTombstones,
+    movieProgressTombstoneKey,
+    episodeProgressTombstoneKey,
+    type TombstoneMap,
+} from './syncTombstones';
 
 export interface SyncMergeResult {
     /** Keys whose merged value differs from the local one (need writing). */
@@ -87,6 +95,22 @@ function unionById<T extends FavoriteLike>(
     return { items, added, removed };
 }
 
+/**
+ * Mesma regra do `isTombstoned`, para as listas que carimbam a idade em
+ * `watchedAt` (ms numéricos) em vez de `addedAt` (ISO): o progresso. Reassistir
+ * DEPOIS de apagar (watchedAt maior que a remoção) sobrevive; empate perde,
+ * igual ao resto do arquivo.
+ */
+function isProgressTombstoned(
+    key: string,
+    watchedAt: unknown,
+    tombs: Record<string, number> | undefined,
+): boolean {
+    const deletedAt = tombs?.[key];
+    if (typeof deletedAt !== 'number') return false;
+    return !(typeof watchedAt === 'number' && Number.isFinite(watchedAt) && watchedAt > deletedAt);
+}
+
 /** Union of two tombstone maps, newest deletion wins per item. */
 export function mergeTombstoneMaps(a: TombstoneMap, b: TombstoneMap): TombstoneMap {
     const merged: TombstoneMap = {};
@@ -105,41 +129,65 @@ export function mergeTombstoneMaps(a: TombstoneMap, b: TombstoneMap): TombstoneM
     return merged;
 }
 
-/** Per-movie newest-wins by watchedAt. */
-function mergeMovieProgress(local: MovieProgressLike[], remote: MovieProgressLike[]): { items: MovieProgressLike[]; added: number } {
+/** Per-movie newest-wins by watchedAt, com o ledger de remoções por cima. */
+function mergeMovieProgress(
+    local: MovieProgressLike[],
+    remote: MovieProgressLike[],
+    tombs?: Record<string, number>,
+): { items: MovieProgressLike[]; added: number; removed: number } {
     const byId = new Map<string, MovieProgressLike>();
+    let removed = 0;
     for (const entry of local) {
-        if (entry && typeof entry.movieId === 'string') byId.set(entry.movieId, entry);
+        if (!entry || typeof entry.movieId !== 'string') continue;
+        if (isProgressTombstoned(movieProgressTombstoneKey(entry.movieId), entry.watchedAt, tombs)) {
+            removed++;
+            continue;
+        }
+        byId.set(entry.movieId, entry);
     }
     let added = 0;
     for (const entry of remote) {
         if (!entry || typeof entry.movieId !== 'string') continue;
+        if (isProgressTombstoned(movieProgressTombstoneKey(entry.movieId), entry.watchedAt, tombs)) continue;
         const current = byId.get(entry.movieId);
         if (!current || (entry.watchedAt ?? 0) > (current.watchedAt ?? 0)) {
             byId.set(entry.movieId, entry);
             added++;
         }
     }
-    return { items: [...byId.values()], added };
+    return { items: [...byId.values()], added, removed };
 }
 
-/** Per-episode newest-wins by watchedAt. */
-function mergeEpisodeProgress(local: EpisodeProgressLike[], remote: EpisodeProgressLike[]): { items: EpisodeProgressLike[]; added: number } {
+/** Per-episode newest-wins by watchedAt, com o ledger de remoções por cima. */
+function mergeEpisodeProgress(
+    local: EpisodeProgressLike[],
+    remote: EpisodeProgressLike[],
+    tombs?: Record<string, number>,
+): { items: EpisodeProgressLike[]; added: number; removed: number } {
     const key = (e: EpisodeProgressLike) => `${e.seriesId}:${e.seasonNumber}:${e.episodeNumber}`;
+    const tombKey = (e: EpisodeProgressLike) =>
+        episodeProgressTombstoneKey(e.seriesId, e.seasonNumber, e.episodeNumber);
     const byKey = new Map<string, EpisodeProgressLike>();
+    let removed = 0;
     for (const entry of local) {
-        if (entry && typeof entry.seriesId === 'string') byKey.set(key(entry), entry);
+        if (!entry || typeof entry.seriesId !== 'string') continue;
+        if (isProgressTombstoned(tombKey(entry), entry.watchedAt, tombs)) {
+            removed++;
+            continue;
+        }
+        byKey.set(key(entry), entry);
     }
     let added = 0;
     for (const entry of remote) {
         if (!entry || typeof entry.seriesId !== 'string') continue;
+        if (isProgressTombstoned(tombKey(entry), entry.watchedAt, tombs)) continue;
         const current = byKey.get(key(entry));
         if (!current || (entry.watchedAt ?? 0) > (current.watchedAt ?? 0)) {
             byKey.set(key(entry), entry);
             added++;
         }
     }
-    return { items: [...byKey.values()], added };
+    return { items: [...byKey.values()], added, removed };
 }
 
 /** Profiles registry: add remote-only profiles; local versions win on conflict. */
@@ -244,9 +292,9 @@ export function mergeSyncData(
         } else if (key.startsWith('neostream_watchlater_') || key === 'watchLater') {
             result = mergeArrayKey<FavoriteLike>(localValue, remoteValue, (a, b) => unionById(a, b, tombstones[key]));
         } else if (key.startsWith('movie_watch_progress')) {
-            result = mergeArrayKey<MovieProgressLike>(localValue, remoteValue, mergeMovieProgress);
+            result = mergeArrayKey<MovieProgressLike>(localValue, remoteValue, (a, b) => mergeMovieProgress(a, b, tombstones[key]));
         } else if (key.startsWith('series_watch_progress')) {
-            result = mergeArrayKey<EpisodeProgressLike>(localValue, remoteValue, mergeEpisodeProgress);
+            result = mergeArrayKey<EpisodeProgressLike>(localValue, remoteValue, (a, b) => mergeEpisodeProgress(a, b, tombstones[key]));
         }
         // Anything else (scalar prefs, parental config, stats...): local wins.
         if (!result || (result.added === 0 && (result.removed ?? 0) === 0)) return;
