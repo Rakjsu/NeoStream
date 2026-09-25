@@ -302,13 +302,11 @@ export function buildMpvArgs(pipeName: string, options: MpvLaunchOptions): strin
 
 /**
  * Serialize one JSON IPC command line (newline-terminated, as mpv expects).
+ * No request_id: the app only fires commands and reads state back through
+ * observe_property events, never a command reply (D018).
  */
-export function serializeIpcCommand(command: ReadonlyArray<string | number | boolean>, requestId?: number): string {
-    const payload: { command: ReadonlyArray<string | number | boolean>; request_id?: number } = { command }
-    if (requestId !== undefined) {
-        payload.request_id = requestId
-    }
-    return JSON.stringify(payload) + '\n'
+export function serializeIpcCommand(command: ReadonlyArray<string | number | boolean>): string {
+    return JSON.stringify({ command }) + '\n'
 }
 
 /**
@@ -319,12 +317,15 @@ export function buildObserveCommandLines(): string[] {
         serializeIpcCommand(['observe_property', index + 1, property]))
 }
 
+/**
+ * The only shape the app reads off the pipe: events. mpv also answers every
+ * command with {"request_id":0,"error":"..."}; those replies are parsed and
+ * deliberately ignored by applyIpcMessage (D018).
+ */
 export interface MpvIpcMessage {
     event?: string
     name?: string
     data?: unknown
-    error?: string
-    request_id?: number
 }
 
 /**
