@@ -1,14 +1,17 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Tv, Plus, Settings, Sparkles, X, Globe, Link2, Archive, ArrowLeft } from 'lucide-react';
+import { Tv, Plus, Settings, Sparkles, X, Globe, Link2, Archive, ArrowLeft, FolderOpen, Server } from 'lucide-react';
 import { useLanguage, languageService } from '../services/languageService';
 import { playlistService } from '../services/playlistService';
 import { applyBackup, toPlaylistImport } from '../services/backupService';
 import { remapLocalStoragePlaylistScope } from '../services/playlistIdRemap';
 
-// First-run onboarding: step 1 picks the language, step 2 offers the three
-// ways in (Xtream account, M3U list, restore a backup). The page only renders
-// while no playlist is configured, so it doubles as the empty state.
+// First-run onboarding: step 1 picks the language, step 2 offers every way in
+// (Xtream account, M3U by URL, M3U file from the computer, Stalker/MAC portal,
+// restore a backup). The page only renders while no playlist is configured, so
+// it doubles as the empty state — and Configurações → Playlists lives under
+// /dashboard, which a fresh install can't reach (D081): a kind of list that
+// is missing HERE simply can't be the first one.
 type WizardStep = 'language' | 'connect';
 
 export function Welcome() {
@@ -16,9 +19,12 @@ export function Welcome() {
     const { t, language } = useLanguage();
     const [showSettings, setShowSettings] = useState(false);
     const [step, setStep] = useState<WizardStep>('language');
-    const [connectMode, setConnectMode] = useState<'menu' | 'm3u'>('menu');
+    const [connectMode, setConnectMode] = useState<'menu' | 'm3u' | 'stalker'>('menu');
     const [m3uName, setM3uName] = useState('');
     const [m3uUrl, setM3uUrl] = useState('');
+    const [stalkerName, setStalkerName] = useState('');
+    const [stalkerUrl, setStalkerUrl] = useState('');
+    const [stalkerMac, setStalkerMac] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
 
@@ -48,6 +54,51 @@ export function Welcome() {
             }
         } catch {
             setError(t('welcome', 'm3uError'));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    /**
+     * Lista .m3u do computador. O caminho nunca passa pelo renderer: o main
+     * abre o diálogo do sistema, cadastra e ATIVA (saveAndActivatePlaylist),
+     * então o reload abaixo já encontra a sessão que o boot procura.
+     */
+    const handleAddM3uFile = async () => {
+        setError('');
+        setBusy(true);
+        try {
+            const result = await playlistService.addM3uFromFile();
+            if (result.success) {
+                playlistService.reloadIntoDashboard(true);
+            } else if (!result.canceled) {
+                setError(result.error || t('welcome', 'm3uError'));
+            }
+        } catch {
+            setError(t('welcome', 'm3uError'));
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    /** Portal Stalker/MAC — o mesmo par URL + MAC de Configurações → Playlists. */
+    const handleAddStalker = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setBusy(true);
+        try {
+            const result = await playlistService.addStalker({
+                name: stalkerName.trim() || undefined,
+                url: stalkerUrl.trim(),
+                mac: stalkerMac.trim()
+            });
+            if (result.success) {
+                playlistService.reloadIntoDashboard(true);
+            } else {
+                setError(result.error || t('welcome', 'stalkerError'));
+            }
+        } catch {
+            setError(t('welcome', 'stalkerError'));
         } finally {
             setBusy(false);
         }
@@ -183,6 +234,33 @@ export function Welcome() {
 
                                 <button
                                     className="welcome-card welcome-card-secondary"
+                                    onClick={() => void handleAddM3uFile()}
+                                    disabled={busy}
+                                >
+                                    <div className="welcome-card-icon">
+                                        <FolderOpen size={24} />
+                                    </div>
+                                    <div className="welcome-card-text">
+                                        <span className="welcome-card-title">{t('welcome', 'connectM3uFile')}</span>
+                                        <span className="welcome-card-desc">{t('welcome', 'connectM3uFileDesc')}</span>
+                                    </div>
+                                </button>
+
+                                <button
+                                    className="welcome-card welcome-card-secondary"
+                                    onClick={() => { setError(''); setConnectMode('stalker'); }}
+                                >
+                                    <div className="welcome-card-icon">
+                                        <Server size={24} />
+                                    </div>
+                                    <div className="welcome-card-text">
+                                        <span className="welcome-card-title">{t('welcome', 'connectStalker')}</span>
+                                        <span className="welcome-card-desc">{t('welcome', 'connectStalkerDesc')}</span>
+                                    </div>
+                                </button>
+
+                                <button
+                                    className="welcome-card welcome-card-secondary"
                                     onClick={() => void handleRestoreBackup()}
                                     disabled={busy}
                                 >
@@ -196,7 +274,7 @@ export function Welcome() {
                                 </button>
 
                                 <button
-                                    className="welcome-card welcome-card-secondary"
+                                    className="welcome-card welcome-card-secondary welcome-card-wide"
                                     onClick={() => setShowSettings(true)}
                                 >
                                     <div className="welcome-card-icon">
@@ -237,6 +315,46 @@ export function Welcome() {
                                     disabled={busy}
                                 />
                                 <button type="submit" className="welcome-continue" disabled={busy || !m3uUrl.trim()}>
+                                    {busy ? t('welcome', 'm3uAdding') : t('welcome', 'm3uAdd')}
+                                </button>
+                            </form>
+                            <button className="welcome-back" onClick={() => { setError(''); setConnectMode('menu'); }}>
+                                <ArrowLeft size={14} /> {t('welcome', 'back')}
+                            </button>
+                        </>
+                    )}
+
+                    {step === 'connect' && connectMode === 'stalker' && (
+                        <>
+                            <div className="welcome-message">
+                                <h2>{t('welcome', 'connectStalker')}</h2>
+                                <p>{t('playlists', 'stalkerHint')}</p>
+                            </div>
+                            <form className="welcome-m3u-form" onSubmit={(e) => void handleAddStalker(e)}>
+                                <input
+                                    type="text"
+                                    placeholder={t('welcome', 'm3uName')}
+                                    value={stalkerName}
+                                    onChange={(e) => setStalkerName(e.target.value)}
+                                    disabled={busy}
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="http://portal.tv/c/"
+                                    value={stalkerUrl}
+                                    onChange={(e) => setStalkerUrl(e.target.value)}
+                                    required
+                                    disabled={busy}
+                                />
+                                <input
+                                    type="text"
+                                    placeholder="00:1A:79:XX:XX:XX"
+                                    value={stalkerMac}
+                                    onChange={(e) => setStalkerMac(e.target.value)}
+                                    required
+                                    disabled={busy}
+                                />
+                                <button type="submit" className="welcome-continue" disabled={busy || !stalkerUrl.trim() || !stalkerMac.trim()}>
                                     {busy ? t('welcome', 'm3uAdding') : t('welcome', 'm3uAdd')}
                                 </button>
                             </form>
@@ -501,7 +619,7 @@ const welcomeStyles = `
     position: relative;
     z-index: 1;
     text-align: center;
-    max-width: 500px;
+    max-width: 560px;
     animation: fadeInUp 0.8s ease;
 }
 
@@ -581,11 +699,29 @@ const welcomeStyles = `
     line-height: 1.6;
 }
 
+/* Seis portas numa coluna só passavam de 1000px de altura: a primária e
+   Configurações ocupam a linha inteira, as quatro do meio vão em duas colunas. */
 .welcome-cards {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    margin-bottom: 40px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 32px;
+}
+
+.welcome-card-primary,
+.welcome-card-wide {
+    grid-column: 1 / -1;
+}
+
+.welcome-cards .welcome-card-secondary:not(.welcome-card-wide) {
+    padding: 16px;
+    gap: 12px;
+}
+
+@media (max-width: 560px) {
+    .welcome-cards {
+        grid-template-columns: 1fr;
+    }
 }
 
 .welcome-card {
