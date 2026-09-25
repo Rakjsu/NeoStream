@@ -245,7 +245,8 @@ describe('agendamentos de outros perfis (D065)', () => {
     });
 
     it('perfil APAGADO não grava: ninguém mais veria nem cancelaria o agendamento', async () => {
-        // `deleteProfile` não limpa os dados do perfil; a chave fica lá.
+        // A chave sobrevive ao perfil quando ele sai pelo tombstone do sync (ou
+        // volta de outra máquina): o `deleteProfile` só limpa a desta máquina.
         perfis('b', 'b');
         guardarNoPerfil('apagado', agendamento({
             channelName: 'Canal Fantasma',

@@ -193,9 +193,11 @@ class ScheduledRecordingService {
     /**
      * Chaves de agenda de todo perfil que ainda EXISTE, mais a do ativo.
      *
-     * Perfil apagado fica de fora de propósito: o `deleteProfile` não limpa os
-     * dados dele, e um agendamento que ninguém mais vê nem consegue cancelar
-     * não pode continuar ligando o ffmpeg sozinho.
+     * Perfil apagado fica de fora de propósito: o `deleteProfile` limpa a
+     * chave dele só NESTA máquina — o perfil que some pelo tombstone do sync
+     * não passa por ele, e o sync adota de novo a chave que a outra máquina
+     * ainda tem. Um agendamento que ninguém mais vê nem consegue cancelar não
+     * pode continuar ligando o ffmpeg sozinho.
      */
     private chavesDeTodosOsPerfis(): string[] {
         const chaves = new Set<string>([this.getStorageKey()]);

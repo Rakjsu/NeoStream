@@ -36,17 +36,36 @@ function saveStorageData(data: ProfilesData): void {
 export const GUEST_PROFILE_ID = 'guest';
 
 /**
- * Wipe every per-profile localStorage key belonging to the guest profile.
- * Matches `<base>_guest` and `<base>_guest__pl_<playlistId>` forms.
+ * A chave é dado do perfil `profileId`? Os dois formatos que o app usa:
+ * `<base>_<id>` (usage_stats, playbackConfig, limite diário, agenda de
+ * gravação…) e `<base>_<id>__pl_<playlistId>` (favoritos, Minha Lista,
+ * progresso — dono do formato: `playlistScopedKeyFor`).
+ *
+ * Compara o texto ANTES do `__pl_`, sem regex: o id vem do storage e do sync,
+ * e um padrão solto como `_<id>(__pl_|$)` casaria o SUFIXO de playlist de
+ * outro perfil — apagar o perfil `default` levaria junto
+ * `neostream_profile_<outro>__pl_default` (`default` é o fallback do id de
+ * playlist em activePlaylistService).
  */
-function purgeGuestData(): void {
-    const pattern = /_guest(__pl_|$)/;
+function chaveDoPerfil(key: string, profileId: string): boolean {
+    const sep = key.indexOf('__pl_');
+    const semPlaylist = sep === -1 ? key : key.slice(0, sep);
+    return semPlaylist.endsWith(`_${profileId}`);
+}
+
+/** Apaga do localStorage toda chave por perfil de `profileId` (ver chaveDoPerfil). */
+function purgeProfileData(profileId: string): void {
     const doomed: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && pattern.test(key)) doomed.push(key);
+        if (key && chaveDoPerfil(key, profileId)) doomed.push(key);
     }
     doomed.forEach(key => localStorage.removeItem(key));
+}
+
+/** Wipe every per-profile localStorage key belonging to the guest profile. */
+function purgeGuestData(): void {
+    purgeProfileData(GUEST_PROFILE_ID);
 }
 
 /**
@@ -344,9 +363,15 @@ export const profileService = {
 
         data.profiles.splice(index, 1);
         saveStorageData(data);
+        // A confirmação promete "o progresso de exibição e os favoritos deste
+        // perfil serão perdidos": sem isto só a entrada saía do registro e
+        // favoritos, progresso, estatísticas, limite diário e agenda de
+        // gravação ficavam órfãos no disco — e voltavam inteiros para um
+        // perfil que reaparecesse com o mesmo id. O perfil ATIVO nunca chega
+        // aqui (guarda acima), então nenhuma tela está lendo essas chaves.
+        purgeProfileData(profileId);
         // Ledger de deleções: sem tombstone o unionById do sync trata o perfil
-        // como "novidade do outro lado" e ele volta no ciclo seguinte, já
-        // religado aos dados antigos (que nunca foram apagados).
+        // como "novidade do outro lado" e ele volta no ciclo seguinte.
         syncTombstones.record(STORAGE_KEY, tombstoneItemKey(profileId));
         return true;
     },
