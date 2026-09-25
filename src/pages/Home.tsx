@@ -10,6 +10,7 @@ import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { ResumeModal } from '../components/ResumeModal';
 import { profileService } from '../services/profileService';
 import { descreverItemDaHome, useHomeContentGate } from '../hooks/useHomeContentGate';
+import { useContagemDeCanaisInfantil } from '../hooks/useContagemDeCanaisInfantil';
 import { daysToExpiry, EXPIRY_SNOOZE_KEY, isExpirySnoozed, shouldWarnExpiry } from '../utils/expiryWarning';
 import { indexedDBCache } from '../services/indexedDBCache';
 import { searchMovieByName, searchSeriesByName, isKidsFriendly } from '../services/tmdb';
@@ -212,11 +213,15 @@ export function Home() {
         setExpiryBanner(null);
     };
 
-    // Filtered counts for Kids profile
-    // For Kids: subtract hidden items from totals
+    // 📺 Canais no perfil infantil: a contagem vem do MESMO portão da grade da
+    // TV ao vivo (#D058). O "desconto" antigo subtraía chaves `live_` de um
+    // conjunto que só recebe `movie_`/`series_` — subtração de zero, e a
+    // criança via o total do provedor. `null` = não deu pra contar ("—").
+    const canaisDoInfantil = useContagemDeCanaisInfantil(isKidsProfile, catalogTick);
+
+    // Filmes e séries no perfil infantil: desconta os itens ocultos.
     const filteredCounts = {
-        live: isKidsProfile ? Math.max(0, counts.live -
-            ([...hiddenItems].filter(key => key.startsWith('live_')).length)) : counts.live,
+        live: isKidsProfile ? canaisDoInfantil.contagem : counts.live,
         vod: isKidsProfile ? Math.max(0, counts.vod -
             ([...hiddenItems].filter(key => key.startsWith('movie_')).length)) : counts.vod,
         series: isKidsProfile ? Math.max(0, counts.series -
@@ -1691,7 +1696,9 @@ export function Home() {
                         }}>
                         <div style={{ fontSize: '28px', marginBottom: '8px' }}>📺</div>
                         <div style={{ fontSize: '24px', fontWeight: '700', color: 'white', marginBottom: '2px' }}>
-                            {loading ? '...' : filteredCounts.live.toLocaleString()}
+                            {loading || (isKidsProfile && canaisDoInfantil.carregando)
+                                ? '...'
+                                : (filteredCounts.live === null ? '—' : filteredCounts.live.toLocaleString())}
                         </div>
                         <div style={{ fontSize: '12px', color: 'rgba(239, 68, 68, 0.9)', fontWeight: '600' }}>
                             {t('home', 'channels')}
