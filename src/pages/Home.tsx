@@ -289,9 +289,7 @@ export function Home() {
                     setRecentMovies(sortedMovies.slice(0, 30));
 
                     setLoading(false);
-                    bootProfiler.mark('homeReady');
-                    bootProfiler.mark('homeReady');
-                setTimeout(() => setIsVisible(true), 100);
+                    setTimeout(() => setIsVisible(true), 100);
                     return;
                 }
 
@@ -343,6 +341,13 @@ export function Home() {
                 console.error('Failed to fetch data:', error);
             } finally {
                 setLoading(false);
+                // ⏱️ Fim do boot (#D057): a marca mora no finally porque ele roda
+                // nos DOIS caminhos — o da rede (o do boot de verdade, com o cache
+                // de módulo vazio) e o do cache quente (depois do `return`), e
+                // também quando o catálogo falha: é o tempo até a Home sair do
+                // "carregando". O `mark` só vale na primeira vez da sessão do
+                // renderer, então remontar a Home não sobrescreve o boot.
+                bootProfiler.mark('homeReady');
                 // Trigger entry animation after a small delay
                 setTimeout(() => setIsVisible(true), 100);
             }
