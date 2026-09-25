@@ -4,7 +4,7 @@ import { XtreamClient } from './xtreamClient'
 import store from './store'
 import { getCertificateSettings, resolveProviderHttpsAgent, registerApprovedProviderUrl, setAllowInvalidProviderCertificates, forgetTrustedCertificateDomains } from './certificatePolicy'
 import { fetchWithRetry, requestWithRetry } from './fetchRetry'
-import { readResponseTextWithLimit, M3U_MAX_BYTES, XMLTV_MAX_BYTES } from './httpLimits'
+import { readResponseTextWithLimit, M3U_MAX_BYTES, XMLTV_MAX_BYTES, JSON_MAX_BYTES } from './httpLimits'
 import { ensureProviderEpgLoaded, getProviderUtcOffsetMinutes, resetProviderEpgState, setupProviderEpgHandlers } from './providerEpg'
 import { formatTimeshiftStart } from './timeshiftProtocol'
 import { getErrorMessage } from './errorMessage'
@@ -1075,7 +1075,8 @@ export function setupIpcHandlers() {
             log.info('[EPG IPC] Fetching:', url)
             // Timeout per try + one retry for transient failures (DNS blip, 502).
             const response = await fetchWithRetry(() => fetch(url, { signal: AbortSignal.timeout(15000) }))
-            const html = await response.text()
+            // Com teto: `.text()` materializava o corpo inteiro no main (ver httpLimits.ts).
+            const html = await readResponseTextWithLimit(response, JSON_MAX_BYTES)
             log.info('[EPG IPC] Response length:', html.length)
             return { success: true, html }
         } catch (error: unknown) {
@@ -1104,7 +1105,8 @@ export function setupIpcHandlers() {
                 return { success: false, error: `HTTP ${response.status}` }
             }
 
-            const html = await response.text()
+            // Com teto: `.text()` materializava o corpo inteiro no main (ver httpLimits.ts).
+            const html = await readResponseTextWithLimit(response, JSON_MAX_BYTES)
             log.info('[EPG IPC] mi.tv Response length:', html.length)
             return { success: true, html }
         } catch (error: unknown) {
