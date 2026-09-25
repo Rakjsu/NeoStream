@@ -47,8 +47,6 @@
     "serverAddress": "Dirección del servidor",
     "username": "Usuario",
     "password": "Contraseña",
-    "includeTV": "Incluir canales de TV",
-    "includeVOD": "Incluir VOD (Películas y Series)",
     "back": "Volver",
     "loginButton": "Iniciar sesión",
     "authenticating": "Autenticando...",

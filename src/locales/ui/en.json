@@ -47,8 +47,6 @@
     "serverAddress": "Server address",
     "username": "Username",
     "password": "Password",
-    "includeTV": "Include TV channels",
-    "includeVOD": "Include VOD (Movies and Series)",
     "back": "Back",
     "loginButton": "Login",
     "authenticating": "Authenticating...",
