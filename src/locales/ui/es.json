@@ -720,8 +720,6 @@
     "setPin": "Definir",
     "blockAdult": "Bloquear Categorías Adultas",
     "blockAdultDesc": "Ocultar automáticamente categorías adultas",
-    "filterTMDB": "Filtrar por TMDB",
-    "filterTMDBDesc": "Verificar clasificación en TMDB automáticamente",
     "kidsLimit": "Límite diario de pantalla (perfil infantil)",
     "kidsHours": "Horario permitido (perfil infantil)",
     "kidsHoursDesc": "Fuera de esta ventana el reproductor queda bloqueado en perfiles infantiles",

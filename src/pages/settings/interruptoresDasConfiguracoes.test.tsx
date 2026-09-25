@@ -218,7 +218,7 @@ describe('D127 — interruptores das Configuracoes', () => {
             }
         }
 
-        expect(total, 'esperava os 30 interruptores das 6 secoes livres').toBe(30)
+        expect(total, 'esperava os 29 interruptores das 6 secoes livres').toBe(29)
         expect(semNome, 'interruptores mudos para o leitor de tela').toEqual([])
         expect(nomeErrado, 'nome anunciado diferente do titulo visivel').toEqual([])
     })
@@ -268,8 +268,9 @@ describe('D127 — interruptores das Configuracoes', () => {
      *
      * Interruptor `disabled` fica de fora: ele nao entra na ordem de
      * tabulacao, nao recebe foco, e anel em controle desligado seria mentira
-     * (hoje sao 3: os dois do Controle dos pais que dependem do "Ativar" e o
-     * "Instalar automaticamente" das Atualizacoes).
+     * (hoje sao 2: o "Bloquear categorias adultas" do Controle dos pais, que
+     * depende do "Ativar", e o "Instalar automaticamente" das Atualizacoes;
+     * o "Filtrar por TMDB" saiu no #D078 -- ninguem lia a opcao).
      */
     it('o anel alcanca TODOS os interruptores das secoes, nao so o primeiro', async () => {
         const folha = await folhaDaTelaDeConfiguracoes()
@@ -295,8 +296,8 @@ describe('D127 — interruptores das Configuracoes', () => {
             }
         }
 
-        expect(total, 'esperava os 30 interruptores das 6 secoes livres').toBe(30)
-        expect(conferidos, 'esperava 27 interruptores focaveis (3 nascem disabled)').toBe(27)
+        expect(total, 'esperava os 29 interruptores das 6 secoes livres').toBe(29)
+        expect(conferidos, 'esperava 27 interruptores focaveis (2 nascem disabled)').toBe(27)
         expect(semAnel, 'interruptores em que o foco nao acende o anel').toEqual([])
     })
 
