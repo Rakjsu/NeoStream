@@ -990,6 +990,8 @@
     "sweepOff": "🧹 Auto-sweep: off",
     "sweepDays": "🧹 Auto-sweep: {n} days",
     "sweepTooltip": "Automatically deletes recordings older than the limit when opening this page (click to cycle 15/30/60 days)",
+    "sweepDone": "🧹 Auto-sweep: deleted {n} recording(s) older than {d} days",
+    "sweepFailed": "🧹 Auto-sweep: {n} expired recording(s) could not be deleted ({erro})",
     "renameRec": "Rename recording",
     "recProtect": "Protect from auto-sweep",
     "recUnprotect": "Unprotect",

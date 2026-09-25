@@ -990,6 +990,8 @@
     "sweepOff": "🧹 Auto-limpieza: apagada",
     "sweepDays": "🧹 Auto-limpieza: {n} días",
     "sweepTooltip": "Elimina automáticamente grabaciones más antiguas que el límite al abrir esta página (clic para alternar 15/30/60 días)",
+    "sweepDone": "🧹 Auto-limpieza: {n} grabación(es) con más de {d} días eliminada(s)",
+    "sweepFailed": "🧹 Auto-limpieza: {n} grabación(es) vencida(s) no se pudo(pudieron) eliminar ({erro})",
     "renameRec": "Renombrar grabación",
     "recProtect": "Proteger de la auto-limpieza",
     "recUnprotect": "Desproteger",
