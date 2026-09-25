@@ -4,7 +4,7 @@
  * A primeira abertura do Guia com lista americana pedia o MESMO XMLTV até
  * quatro vezes: `fetchIndexedChannel` dispara um `epg:get-cached` por arquivo
  * faltante, por canal (`src/services/epgService.ts`), e o guia resolve quatro
- * canais ao mesmo tempo (`MAX_CONCURRENT_EPG`, `src/pages/EpgGuide.tsx`). Com
+ * canais ao mesmo tempo (`MAX_CONCURRENT_EPG`, `src/services/guiaEpgCache.ts`). Com
  * os 10 arquivos do grupo `usa` são 40 downloads e 40 gravações nos MESMOS 10
  * arquivos — inclusive por cima de quem estiver lendo.
  *

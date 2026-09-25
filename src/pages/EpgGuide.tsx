@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import AsyncVideoPlayer from '../components/AsyncVideoPlayer';
 import { LazyImage } from '../components/LazyImage';
-import { epgService } from '../services/epgService';
 import { scanEpgForKeywords } from '../services/epgKeywordAlertService';
 import { profileService } from '../services/profileService';
 import { parentalService } from '../services/parentalService';
@@ -35,7 +34,9 @@ import type { ProgramSearchResult } from '../utils/epgGuide';
 import { getTimeshiftUrl } from '../services/timeshiftService';
 import { reminderService, reminderId } from '../services/reminderService';
 import { scheduledRecordingService, scheduleId } from '../services/scheduledRecordingService';
-import { recordingRuleService, ruleMatches } from '../services/recordingRuleService';
+import { recordingRuleService } from '../services/recordingRuleService';
+import { epgEmCache, loadChannelEpg, snapshotEpgCache } from '../services/guiaEpgCache';
+import { aplicarRegrasDeGravacao, dispararVarreduraEpg, filtrarCanaisPermitidos } from '../services/epgVarreduraRegras';
 
 interface LiveStream {
     num: number;
@@ -68,10 +69,6 @@ interface EPGProgram {
     channel_id: string;
 }
 
-// Same gating patterns LiveTV uses (kids whitelist / parental blocklist)
-const KIDS_ALLOWED_PATTERNS = ['infantil', 'infantis', 'kids', 'criança', '24 horas infantis'];
-const BLOCKED_CATEGORY_PATTERNS = ['adult', 'adulto', '+18', '18+', 'xxx', 'erotic', 'erótico'];
-
 const CHANNEL_COL_WIDTH = 220;
 const ROW_HEIGHT = 64;
 const HEADER_HEIGHT = 40;
@@ -79,54 +76,9 @@ const TIMELINE_WIDTH = WINDOW_HALF_HOURS * PX_PER_HALF_HOUR;
 const GUIDE_OVERSCAN_ROWS = 6;
 /** Janela de coalescência das resoluções de EPG (um setState por leva). */
 const EPG_BATCH_MS = 120;
-const MAX_CONCURRENT_EPG = 4;
 
-// ---------------------------------------------------------------------------
-// Module-level EPG cache + concurrency limiter (persists across page visits)
-// ---------------------------------------------------------------------------
-const epgCache = new Map<string, EPGProgram[]>();
-const epgPending = new Map<string, Promise<EPGProgram[]>>();
-let epgInFlight = 0;
-const epgWaiters: Array<() => void> = [];
-
-async function acquireEpgSlot(): Promise<void> {
-    if (epgInFlight >= MAX_CONCURRENT_EPG) {
-        await new Promise<void>(resolve => epgWaiters.push(resolve));
-    }
-    epgInFlight++;
-}
-
-function releaseEpgSlot(): void {
-    epgInFlight--;
-    const next = epgWaiters.shift();
-    if (next) next();
-}
-
-function loadChannelEpg(channel: LiveStream): Promise<EPGProgram[]> {
-    const key = channel.name;
-    const cached = epgCache.get(key);
-    if (cached) return Promise.resolve(cached);
-
-    let pending = epgPending.get(key);
-    if (!pending) {
-        pending = (async () => {
-            await acquireEpgSlot();
-            try {
-                const programs = await epgService.fetchChannelEPG(channel.epg_channel_id || '', channel.name, channel.stream_id);
-                epgCache.set(key, programs);
-                return programs;
-            } catch {
-                epgCache.set(key, []);
-                return [];
-            } finally {
-                releaseEpgSlot();
-                epgPending.delete(key);
-            }
-        })();
-        epgPending.set(key, pending);
-    }
-    return pending;
-}
+// Cache de EPG por canal + limitador de concorrência: services/guiaEpgCache
+// (compartilhados com a varredura em segundo plano das regras e alertas).
 
 export function EpgGuide() {
     const [streams, setStreams] = useState<LiveStream[]>([]);
@@ -209,30 +161,12 @@ export function EpgGuide() {
     useEffect(() => scheduledRecordingService.subscribe(() => setScheduleVersion(v => v + 1)), []);
 
     // 🔁 Agenda automaticamente os programas futuros da grade que casam com
-    // alguma regra de gravação (dedupe pelo scheduleId).
+    // alguma regra de gravação (dedupe pelo scheduleId). A grade é só o que já
+    // está carregado aqui — quem cobre o resto dos canais, com o Guia fechado,
+    // é a varredura em segundo plano (services/epgVarreduraRegras).
     useEffect(() => {
-        const rules = recordingRuleService.list();
-        if (rules.length === 0) return;
-        const nowMs = Date.now();
-        const scheduled = new Set(scheduledRecordingService.list().map(s => s.id));
-        for (const stream of streams) {
-            const programs = epgByChannel[stream.name];
-            if (!programs) continue;
-            for (const program of programs) {
-                if (Date.parse(program.start) <= nowMs) continue;
-                const id = scheduleId(stream.name, program.start);
-                if (scheduled.has(id)) continue;
-                if (!ruleMatches(rules, program.title, stream.name)) continue;
-                scheduledRecordingService.add({
-                    channelName: stream.name,
-                    streamId: stream.stream_id,
-                    title: program.title,
-                    startIso: program.start,
-                    endIso: program.end
-                });
-                scheduled.add(id);
-            }
-        }
+        void rulesVersion; // dependência: reaplicar quando a lista de regras muda
+        aplicarRegrasDeGravacao(streams, name => epgByChannel[name]);
     }, [streams, epgByChannel, rulesVersion]);
     const scheduleIds = useMemo(() => {
         void scheduleVersion;
@@ -261,17 +195,12 @@ export function EpgGuide() {
                 const parentalConfig = parentalService.getConfig();
                 const blockParental = parentalConfig.enabled && parentalConfig.blockAdultCategories && !parentalService.isSessionUnlocked();
 
-                const allowedCategories = allCategories.filter(cat => {
-                    const lowerName = cat.category_name.toLowerCase();
-                    if (blockParental && BLOCKED_CATEGORY_PATTERNS.some(p => lowerName.includes(p))) return false;
-                    if (isKidsProfile && !KIDS_ALLOWED_PATTERNS.some(p => lowerName.includes(p))) return false;
-                    return true;
-                });
-                const allowedIds = new Set(allowedCategories.map(c => c.category_id));
-
-                const allowedStreams = (streamsResult.data || []).filter(
-                    (s: LiveStream) => allowedIds.has(s.category_id)
+                const { categorias: allowedCategories, streams: allowedStreams } = filtrarCanaisPermitidos(
+                    (streamsResult.data || []) as LiveStream[],
+                    allCategories,
+                    { bloquearAdulto: blockParental, perfilInfantil: isKidsProfile }
                 );
+                const allowedIds = new Set(allowedCategories.map(c => c.category_id));
 
                 setCategories(allowedCategories);
                 setStreams(allowedStreams);
@@ -379,7 +308,7 @@ export function EpgGuide() {
     useEffect(() => {
         let cancelled = false;
         for (const channel of renderedStreams) {
-            const cached = epgCache.get(channel.name);
+            const cached = epgEmCache(channel.name);
             if (cached) {
                 if (epgByChannel[channel.name] === undefined) publishEpg(channel.name, cached);
                 continue;
@@ -414,7 +343,7 @@ export function EpgGuide() {
     // Search over everything already fetched (module cache + this page's state)
     const searchResults = useMemo<ProgramSearchResult[]>(() => {
         if (!searchQuery.trim()) return [];
-        const merged = new Map<string, EPGProgram[]>(epgCache);
+        const merged = new Map<string, EPGProgram[]>(snapshotEpgCache());
         for (const [name, programs] of Object.entries(epgByChannel)) {
             if (programs) merged.set(name, programs);
         }
@@ -689,6 +618,9 @@ export function EpgGuide() {
                                                 setRulePattern('');
                                                 setRuleChannel('');
                                                 setRulesVersion(v => v + 1);
+                                                // A grade só cobre as linhas carregadas; a
+                                                // varredura cobre o resto dos canais.
+                                                void dispararVarreduraEpg();
                                             }
                                         }}
                                         style={{ padding: '9px 14px', borderRadius: 8, border: '1px solid rgba(var(--ns-accent-rgb), 0.5)', background: 'rgba(var(--ns-accent-rgb), 0.2)', color: 'white', fontSize: 14, cursor: 'pointer' }}
