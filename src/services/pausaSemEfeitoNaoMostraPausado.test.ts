@@ -48,4 +48,26 @@ describe('downloadService.pauseDownload respeita a resposta do main', () => {
         await vi.waitFor(() => expect(statusDe(item.id)).toBe('completed'));
         downloadService.off('paused', pausado);
     });
+
+    it('pausa aceita pelo main vira ⏸ e emite \'paused\' — é esse evento que redesenha a tela (D180)', async () => {
+        const ipc = instalarIpc({ success: true });
+        // A tela relê o serviço DENTRO do ouvinte: o status tem que já estar
+        // 'paused' no instante do evento (o item é o mesmo objeto, então olhar
+        // o argumento depois não prova nada).
+        const noEvento: { id: string; status: string }[] = [];
+        const pausado = (i: { id: string }) => { noEvento.push({ id: i.id, status: statusDe(i.id) ?? '' }); };
+        downloadService.on('paused', pausado);
+        const item = await downloadService.addDownload('Filme D180 pausado', 'movie', 'http://x/d180.mp4', '');
+        await vi.waitFor(() => expect(statusDe(item.id)).toBe('downloading'));
+
+        await downloadService.pauseDownload(item.id);
+
+        expect(statusDe(item.id)).toBe('paused');
+        expect(noEvento).toEqual([{ id: item.id, status: 'paused' }]);
+
+        downloadService.off('paused', pausado);
+        // O main derruba o start da pausa: soltá-lo devolve a vaga da fila
+        // (o serviço é singleton).
+        ipc.soltar({ success: false, error: 'conexão destruída' });
+    });
 });

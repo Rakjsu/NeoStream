@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AgendaPanel } from '../components/AgendaPanel';
-import { Download, Trash2, Play, FolderOpen, HardDrive, Film, Tv, AlertTriangle, X, RefreshCw } from 'lucide-react';
+import { Download, Trash2, Play, Pause, FolderOpen, HardDrive, Film, Tv, AlertTriangle, X, RefreshCw } from 'lucide-react';
 import { downloadService, resumoDaSerie } from '../services/downloadService';
 import type { DownloadItem, StorageInfo } from '../services/downloadService';
 import { useLanguage } from '../services/languageService';
@@ -226,6 +226,10 @@ export function Downloads() {
         const handleDiskChange = () => { loadData(); void loadStorage(); };
         downloadService.on('added', handleDiskChange);
         downloadService.on('progress', handleUpdate);
+        // ⏸ O pausar muda o status no próprio item e depois o main para de
+        // mandar progresso: sem ouvir o 'paused', o card e o modal da série
+        // seguiam desenhando "baixando" (D180).
+        downloadService.on('paused', handleUpdate);
         downloadService.on('completed', handleDiskChange);
         downloadService.on('deleted', handleDiskChange);
         downloadService.on('cancelled', handleDiskChange);
@@ -233,6 +237,7 @@ export function Downloads() {
         return () => {
             downloadService.off('added', handleDiskChange);
             downloadService.off('progress', handleUpdate);
+            downloadService.off('paused', handleUpdate);
             downloadService.off('completed', handleDiskChange);
             downloadService.off('deleted', handleDiskChange);
             downloadService.off('cancelled', handleDiskChange);
@@ -327,8 +332,11 @@ export function Downloads() {
     };
 
     const handleResumeDownload = async (item: DownloadItem) => {
-        // Try to resume or restart the download
         await downloadService.resumeDownload(item.id);
+        // O retomar só devolve o item à fila ('pending') e não emite nada
+        // até a fila andar: sem recarregar, o botão seguia dizendo "Retomar"
+        // para um item que já estava na fila (D180).
+        loadData();
     };
 
     // Play movie in system default player
@@ -1185,74 +1193,27 @@ export function Downloads() {
                                     })}
                             </div>
 
-                            {/* Play Button - only show if selected episode is completed */}
+                            {/* Ação do episódio selecionado — um ramo por estado (D180).
+                                Antes tudo que não era 'completed' caía no mesmo ramo: com o
+                                episódio BAIXANDO o modal dizia "ainda não foi baixado" e o
+                                botão laranja executava um bloco vazio; com 'pending' o
+                                "Aguardando na fila..." seguia com cara de clicável. */}
                             {(() => {
                                 const selectedEp = seriesModal.series.seasons
                                     .find(s => s.season === seriesModal.selectedSeason)?.episodes
                                     .find(ep => ep.episode === seriesModal.selectedEpisode);
-                                const isSelectedCompleted = selectedEp?.status === 'completed';
+                                const status = selectedEp?.status;
 
-                                return isSelectedCompleted ? (
-                                    <button
-                                        onClick={() => {
-                                            if (selectedEp) handlePlayOfflineEpisode(selectedEp);
-                                        }}
-                                        style={{
-                                            width: '100%',
-                                            padding: '14px 28px',
-                                            borderRadius: 12,
-                                            border: 'none',
-                                            background: 'linear-gradient(135deg, #10b981, #059669)',
-                                            color: 'white',
-                                            fontSize: 16,
-                                            fontWeight: 600,
-                                            cursor: 'pointer',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            gap: 10,
-                                            transition: 'all 0.2s',
-                                            boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)'
-                                        }}
-                                    >
-                                        <Play size={20} fill="white" />
-                                        {t('downloads', 'watchEpisode')} {seriesModal.selectedEpisode}
-                                    </button>
-                                ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                                        <div style={{
-                                            width: '100%',
-                                            padding: '12px 20px',
-                                            borderRadius: 12,
-                                            background: 'rgba(245, 158, 11, 0.2)',
-                                            border: '1px solid rgba(245, 158, 11, 0.4)',
-                                            color: '#fcd34d',
-                                            fontSize: 14,
-                                            textAlign: 'center'
-                                        }}>
-                                            ⏳ {t('downloads', 'episode')} {seriesModal.selectedEpisode} {t('downloads', 'episodeNotDownloaded')}
-                                        </div>
+                                if (selectedEp && status === 'completed') {
+                                    return (
                                         <button
-                                            className="resume-download-btn"
-                                            onClick={async () => {
-                                                if (selectedEp) {
-                                                    // Check if episode is paused/failed - then resume
-                                                    if (selectedEp.status === 'paused' || selectedEp.status === 'failed') {
-                                                        await downloadService.resumeDownload(selectedEp.id);
-                                                    } else if (selectedEp.status === 'pending') {
-                                                        // Already pending, just process queue
-                                                                                                            } else {
-                                                        // Not in queue - need to start fresh download
-                                                        // This shouldn't happen as cards only show downloaded eps
-                                                                                                            }
-                                                }
-                                            }}
+                                            onClick={() => { void handlePlayOfflineEpisode(selectedEp); }}
                                             style={{
                                                 width: '100%',
                                                 padding: '14px 28px',
                                                 borderRadius: 12,
                                                 border: 'none',
-                                                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                                                background: 'linear-gradient(135deg, #10b981, #059669)',
                                                 color: 'white',
                                                 fontSize: 16,
                                                 fontWeight: 600,
@@ -1262,12 +1223,90 @@ export function Downloads() {
                                                 justifyContent: 'center',
                                                 gap: 10,
                                                 transition: 'all 0.2s',
-                                                boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)'
+                                                boxShadow: '0 4px 15px rgba(16, 185, 129, 0.4)'
                                             }}
                                         >
-                                            <RefreshCw size={20} className="spin-icon" />
-                                            {selectedEp?.status === 'pending' ? t('downloads', 'waitingInQueue') : t('downloads', 'resumeDownload')}
+                                            <Play size={20} fill="white" />
+                                            {t('downloads', 'watchEpisode')} {seriesModal.selectedEpisode}
                                         </button>
+                                    );
+                                }
+
+                                const baixando = status === 'downloading';
+                                const naFila = status === 'pending';
+                                const retomavel = status === 'paused' || status === 'failed';
+
+                                return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                        <div style={{
+                                            width: '100%',
+                                            padding: '12px 20px',
+                                            borderRadius: 12,
+                                            background: baixando ? 'rgba(59, 130, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)',
+                                            border: baixando ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid rgba(245, 158, 11, 0.4)',
+                                            color: baixando ? '#93c5fd' : '#fcd34d',
+                                            fontSize: 14,
+                                            textAlign: 'center'
+                                        }}>
+                                            {baixando
+                                                ? <>↓ {t('downloads', 'episode')} {seriesModal.selectedEpisode} · {t('downloads', 'downloading')} {selectedEp?.progress || 0}%</>
+                                                : <>⏳ {t('downloads', 'episode')} {seriesModal.selectedEpisode} {t('downloads', 'episodeNotDownloaded')}</>}
+                                        </div>
+                                        {/* O mesmo ⏸ do card; o modal troca de ramo no evento 'paused'. */}
+                                        {selectedEp && baixando && (
+                                            <button
+                                                className="pause-download-btn"
+                                                onClick={() => { void downloadService.pauseDownload(selectedEp.id); }}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '14px 28px',
+                                                    borderRadius: 12,
+                                                    border: 'none',
+                                                    background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+                                                    color: 'white',
+                                                    fontSize: 16,
+                                                    fontWeight: 600,
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: 10,
+                                                    transition: 'all 0.2s',
+                                                    boxShadow: '0 4px 15px rgba(59, 130, 246, 0.4)'
+                                                }}
+                                            >
+                                                <Pause size={20} fill="white" />
+                                                {t('downloads', 'pauseDownload')}
+                                            </button>
+                                        )}
+                                        {selectedEp && (naFila || retomavel) && (
+                                            <button
+                                                className="resume-download-btn"
+                                                disabled={naFila}
+                                                onClick={() => { void handleResumeDownload(selectedEp); }}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '14px 28px',
+                                                    borderRadius: 12,
+                                                    border: 'none',
+                                                    background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                                                    color: 'white',
+                                                    fontSize: 16,
+                                                    fontWeight: 600,
+                                                    cursor: naFila ? 'default' : 'pointer',
+                                                    opacity: naFila ? 0.6 : 1,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: 10,
+                                                    transition: 'all 0.2s',
+                                                    boxShadow: '0 4px 15px rgba(245, 158, 11, 0.4)'
+                                                }}
+                                            >
+                                                <RefreshCw size={20} className="spin-icon" />
+                                                {naFila ? t('downloads', 'waitingInQueue') : t('downloads', 'resumeDownload')}
+                                            </button>
+                                        )}
                                     </div>
                                 );
                             })()}
@@ -1506,13 +1545,18 @@ const downloadsStyles = `
     animation: downloadArrow 0.8s ease-in-out infinite;
 }
 
-.resume-download-btn:hover .spin-icon {
+.resume-download-btn:not(:disabled):hover .spin-icon {
     animation: spin 1s linear infinite;
 }
 
-.resume-download-btn:hover {
+.resume-download-btn:not(:disabled):hover {
     transform: scale(1.02);
     box-shadow: 0 6px 20px rgba(245, 158, 11, 0.5) !important;
+}
+
+.pause-download-btn:hover {
+    transform: scale(1.02);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5) !important;
 }
 
 .header-icon {
