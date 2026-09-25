@@ -17,6 +17,7 @@ import { getErrorMessage } from './errorMessage';
 
 interface ActiveDownload {
     id: string;
+    /** Conexão única, ou o HEAD enquanto o download ainda escolhe o caminho: a pausa derruba. */
     request: http.ClientRequest | null;
     stream: fs.WriteStream | null;
     paused: boolean;
@@ -259,7 +260,11 @@ function downloadChunk(
 }
 
 // Get file size with HEAD request
-function getFileSize(url: string): Promise<{ size: number; supportsRange: boolean }> {
+//
+// `register` entrega a request ao chamador: um HEAD que o provedor segura é a
+// primeira coisa que a PAUSA tem que conseguir derrubar (D179). Destruída,
+// ela cai no `on('error')` abaixo e resolve como "sem tamanho".
+function getFileSize(url: string, register?: (req: http.ClientRequest) => void): Promise<{ size: number; supportsRange: boolean }> {
     return new Promise((resolve, reject) => {
         const parsedUrl = new URL(url);
         const protocol = url.startsWith('https') ? https : http;
@@ -279,7 +284,7 @@ function getFileSize(url: string): Promise<{ size: number; supportsRange: boolea
             if (response.statusCode === 301 || response.statusCode === 302) {
                 const redirectUrl = response.headers.location;
                 if (redirectUrl) {
-                    getFileSize(redirectUrl).then(resolve).catch(reject);
+                    getFileSize(redirectUrl, register).then(resolve).catch(reject);
                     return;
                 }
             }
@@ -291,6 +296,7 @@ function getFileSize(url: string): Promise<{ size: number; supportsRange: boolea
         };
 
         const request = protocol.request(options, handleResponse);
+        register?.(request);
         request.on('error', () => resolve({ size: 0, supportsRange: false }));
         request.on('timeout', () => {
             request.destroy();
@@ -320,17 +326,35 @@ function singleDownload(id: string, url: string, filePath: string): Promise<{ su
             }
         };
 
+        // ⏸ A entrada nasce JUNTO com a request (D179). Ela era criada só
+        // quando a resposta chegava, com `request: null` e sem `requests[]`:
+        // o `download:pause` não achava nada para derrubar neste caminho e o
+        // filme seguia baixando em velocidade cheia com a tela mostrando ⏸.
+        const entrada: ActiveDownload = {
+            id, request: null, stream: null, paused: false, cancelled: false, filePath,
+        };
+        activeDownloads.set(id, entrada);
+        /** Só remove a PRÓPRIA entrada: o resume reusa o id. */
+        const soltarEntrada = () => {
+            if (activeDownloads.get(id) === entrada) activeDownloads.delete(id);
+        };
+        const falhar = (erro: Error) => {
+            soltarEntrada();
+            reject(erro);
+        };
+
         const handleResponse = (response: http.IncomingMessage) => {
             if (response.statusCode === 301 || response.statusCode === 302) {
                 const redirectUrl = response.headers.location;
                 if (redirectUrl) {
+                    // A chamada do redirect registra a entrada DELA no mesmo id.
                     singleDownload(id, redirectUrl, filePath).then(resolve).catch(reject);
                     return;
                 }
             }
 
             if (response.statusCode !== 200) {
-                reject(new Error(`HTTP Error: ${response.statusCode}`));
+                falhar(new Error(`HTTP Error: ${response.statusCode}`));
                 return;
             }
 
@@ -338,12 +362,9 @@ function singleDownload(id: string, url: string, filePath: string): Promise<{ su
             let downloadedBytes = 0;
 
             const writeStream = fs.createWriteStream(filePath, { highWaterMark: 128 * 1024 });
-
-            const entrada: ActiveDownload = {
-                id, request: null, stream: writeStream, paused: false, cancelled: false,
-                filePath, resposta: response, arquivoParcial: true,
-            };
-            activeDownloads.set(id, entrada);
+            entrada.stream = writeStream;
+            entrada.resposta = response;
+            entrada.arquivoParcial = true;
 
             response.on('data', (chunk) => {
                 downloadedBytes += chunk.length;
@@ -360,13 +381,12 @@ function singleDownload(id: string, url: string, filePath: string): Promise<{ su
             response.pipe(writeStream);
 
             writeStream.on('finish', () => {
-                activeDownloads.delete(id);
+                soltarEntrada();
                 resolve({ success: true, filePath, size: totalBytes });
             });
 
             writeStream.on('error', (err) => {
-                activeDownloads.delete(id);
-                reject(err);
+                falhar(err);
             });
 
             // Cancelamento: o `download:cancel` destrói este stream. Antes ele
@@ -374,13 +394,31 @@ function singleDownload(id: string, url: string, filePath: string): Promise<{ su
             // o download cancelado voltava como SUCESSO, com o arquivo truncado.
             // Destruído, só vem 'close'; sem este reject a promessa ficava
             // pendurada e o renderer perdia a vaga da fila.
+            //
+            // A pausa também destrói o stream (D179). Sem Range não existe
+            // resume — retomar abre este arquivo de novo com 'w', do zero —, e
+            // o pedaço gravado tem o NOME do arquivo final: fica no disco sem
+            // servir pra nada e sem nenhum descritor que o ache depois. Sai
+            // aqui, a menos que outro download (o próprio resume) já esteja
+            // usando o mesmo destino.
             writeStream.on('close', () => {
-                if (entrada.cancelled) reject(new Error('Download cancelado'));
+                if (entrada.cancelled) {
+                    reject(new Error('Download cancelado'));
+                    return;
+                }
+                if (!entrada.paused) return;
+                soltarEntrada();
+                const emUso = Array.from(activeDownloads.values()).some(ativo => ativo.filePath === filePath);
+                if (!emUso) {
+                    try { fs.unlinkSync(filePath); } catch { /* best-effort */ }
+                }
+                reject(new Error('Download pausado'));
             });
         };
 
         const request = protocol.request(options, handleResponse);
-        request.on('error', reject);
+        entrada.request = request;
+        request.on('error', falhar);
         request.end();
     });
 }
@@ -403,8 +441,22 @@ export function setupDownloadHandlers() {
                 fs.mkdirSync(pastaDoArquivo, { recursive: true });
             }
 
+            // ⏸ O main passa a conhecer o download desde o HEAD (D179). Antes
+            // não havia entrada até a resposta chegar: pausar ou cancelar
+            // nessa janela devolvia "Download not found" e o download seguia
+            // mesmo assim. O caminho escolhido abaixo registra a entrada
+            // dele por cima desta.
+            const preparo: ActiveDownload = {
+                id, request: null, stream: null, paused: false, cancelled: false, filePath,
+            };
+            entry = preparo;
+            activeDownloads.set(id, preparo);
+
             // Get file size first
-            const fileInfo = await getFileSize(url);
+            const fileInfo = await getFileSize(url, req => { preparo.request = req; });
+            if (preparo.paused || preparo.cancelled) {
+                return { success: false, error: preparo.cancelled ? 'Download cancelado' : 'Download pausado' };
+            }
             const { size: totalBytes, supportsRange } = fileInfo;
             log.info('[Download] File info:', { totalBytes, supportsRange });
 
@@ -534,6 +586,18 @@ export function setupDownloadHandlers() {
             if (download.request) download.request.destroy();
             for (const req of download.requests ?? []) {
                 try { req.destroy(); } catch { /* já caiu */ }
+            }
+            // ⏸ Fecha os arquivos (D179). Com a resposta já entregue, destruir
+            // a request NÃO avisa o stream de escrita — no Node real não vem
+            // 'error', 'finish' nem 'close' —, então o `download:start` do
+            // pausado ficava pendurado para sempre e o renderer nunca devolvia
+            // a vaga da fila. Fechado, o 'close' solta a promessa. As partes
+            // ficam: o que já foi gravado é um prefixo contínuo e o resume do
+            // `downloadChunk` recomeça do tamanho delas. Sem `await` de
+            // propósito: esta resposta tem que chegar ao renderer ANTES da
+            // falha do start, senão ele lê a pausa como erro do provedor.
+            for (const escrita of [download.stream, ...(download.escritas ?? [])]) {
+                if (escrita) escrita.destroy();
             }
             // Redundante com o `finally` do download:start, mas cobre o caso de
             // um chunk que nunca chegou a registrar sua request e só cai no

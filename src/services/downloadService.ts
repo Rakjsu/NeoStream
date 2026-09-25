@@ -590,7 +590,12 @@ class DownloadService {
     async pauseDownload(id: string): Promise<void> {
         const item = this.downloads.get(id);
         if (item && item.status === 'downloading') {
-            await window.ipcRenderer.invoke('download:pause', { id });
+            // ⏸ Só vira "pausado" se o main pausou alguma coisa (D179). Com
+            // "Download not found" o main não tinha o que parar — marcar ⏸
+            // mesmo assim era mostrar pausado um download que seguia (ou já
+            // tinha terminado) do outro lado.
+            const resultado = await window.ipcRenderer.invoke('download:pause', { id }) as { success?: boolean } | undefined;
+            if (!resultado?.success) return;
             item.status = 'paused';
             this.emit('paused', item);
             await this.saveDownload(item);

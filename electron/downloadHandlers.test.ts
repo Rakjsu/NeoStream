@@ -484,8 +484,8 @@ describe('download:cancel — as sobras de um download que não terminou saem do
         // O resume depende delas — a pausa não pode ter apagado nada.
         expect(partes()).toHaveLength(4)
 
-        // No Node real o start do pausado segue pendurado (nada fecha os
-        // arquivos): o main ainda conhece a entrada, e o cancel vai por ela.
+        // A pausa fecha os arquivos (D179), mas o 'close' ainda não veio:
+        // o main ainda conhece a entrada, e o cancel vai por ela.
         expect(await invoke('download:cancel', { id: 'dl-pausado', ...descritor })).toEqual({ success: true })
 
         expect(partes()).toEqual([])
