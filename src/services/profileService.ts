@@ -33,6 +33,31 @@ function saveStorageData(data: ProfilesData): void {
     }
 }
 
+/**
+ * Campos que já existiram no perfil e não têm mais leitor. `preferredQuality`
+ * era a "qualidade preferida da TV ao vivo": o player ao vivo gravava a cada
+ * troca de qualidade e ninguém lia (#D174). Perfil salvo por versão antiga —
+ * e backup antigo restaurado, ou perfil adotado do sync de outra máquina —
+ * ainda traz a chave, então ela é podada no boot (`initialize`), como o
+ * `filterByTMDB` do parental (#D078).
+ */
+const CHAVES_APOSENTADAS = ['preferredQuality'] as const;
+
+/** Tira as chaves aposentadas de todos os perfis; só grava se tirou alguma. */
+function podarChavesAposentadas(): void {
+    const data = getStorageData();
+    let podou = false;
+    for (const perfil of data.profiles as unknown as Record<string, unknown>[]) {
+        for (const chave of CHAVES_APOSENTADAS) {
+            if (chave in perfil) {
+                delete perfil[chave];
+                podou = true;
+            }
+        }
+    }
+    if (podou) saveStorageData(data);
+}
+
 export const GUEST_PROFILE_ID = 'guest';
 
 /**
@@ -323,29 +348,12 @@ export const profileService = {
             if (!updates.isKids) delete profile.allowedChannelIds;
         }
 
-        if (updates.preferredQuality !== undefined) {
-            profile.preferredQuality = updates.preferredQuality;
-        }
-
         if (updates.accentColor !== undefined) {
             profile.accentColor = updates.accentColor;
         }
 
         saveStorageData(data);
         return true;
-    },
-
-    // Get preferred quality for active profile
-    getPreferredQuality(): '4k' | 'fhd' | 'hd' | 'sd' | 'auto' {
-        const profile = this.getActiveProfile();
-        return profile?.preferredQuality || 'auto';
-    },
-
-    // Set preferred quality for active profile
-    async setPreferredQuality(quality: '4k' | 'fhd' | 'hd' | 'sd' | 'auto'): Promise<boolean> {
-        const profile = this.getActiveProfile();
-        if (!profile) return false;
-        return this.updateProfile(profile.id, { preferredQuality: quality });
     },
 
     // Delete profile
@@ -495,6 +503,7 @@ export const profileService = {
         }
 
         this.migrateExistingData();
+        podarChavesAposentadas();
 
         // Create default Kids profile if no profiles exist
         const data = getStorageData();

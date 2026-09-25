@@ -35,7 +35,6 @@ export interface Profile {
     /** 👶 Whitelist de canais pra perfis kids — vazia/ausente = sem restrição por canal. */
     allowedChannelIds?: string[];
     isGuest?: boolean; // Temporary guest profile — data wiped when the session ends
-    preferredQuality?: '4k' | 'fhd' | 'hd' | 'sd' | 'auto'; // Preferred quality for live TV
     /** Theme accent preset id (themeService AccentId) applied when this profile activates. */
     accentColor?: string;
     watchLater: WatchLaterItem[];
@@ -62,6 +61,5 @@ export interface UpdateProfileData {
     avatar?: string;
     pin?: string | null; // null to remove PIN
     isKids?: boolean;
-    preferredQuality?: '4k' | 'fhd' | 'hd' | 'sd' | 'auto';
     accentColor?: string;
 }
