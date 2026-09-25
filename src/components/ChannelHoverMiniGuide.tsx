@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { epgService } from '../services/epgService';
+import { useLanguage } from '../services/languageService';
 
 interface GuideEntry {
     title: string;
@@ -21,6 +22,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 
 /** 📋 Mini-guia flutuante do hover: programa atual + 2 próximos do canal. */
 export function ChannelHoverMiniGuide({ streamId, epgChannelId, channelName, x, y }: ChannelHoverMiniGuideProps) {
+    const { t } = useLanguage();
     const [entries, setEntries] = useState<GuideEntry[] | null>(() => {
         const hit = guideCache.get(String(streamId));
         return hit && Date.now() - hit.ts < CACHE_TTL_MS ? hit.entries : null;
@@ -68,10 +70,10 @@ export function ChannelHoverMiniGuide({ streamId, epgChannelId, channelName, x, 
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.5)'
         }}>
             {entries === null && (
-                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>Carregando guia…</div>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>{t('guide', 'loading')}</div>
             )}
             {entries?.length === 0 && (
-                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>Sem programação disponível</div>
+                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>{t('liveTV', 'noScheduleInfo')}</div>
             )}
             {(entries ?? []).map((entry, index) => (
                 <div
@@ -84,7 +86,7 @@ export function ChannelHoverMiniGuide({ streamId, epgChannelId, channelName, x, 
                         fontWeight: entry.isNow ? 700 : 500,
                         color: entry.isNow ? 'var(--ns-accent-light)' : 'rgba(148, 163, 184, 0.9)'
                     }}>
-                        {entry.isNow ? '▶ Agora' : epgService.formatTime(entry.start)}
+                        {entry.isNow ? `▶ ${t('guide', 'now')}` : epgService.formatTime(entry.start)}
                     </span>
                     <span style={{
                         fontSize: 12,

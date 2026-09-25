@@ -1200,7 +1200,7 @@ export function LiveTV() {
             }}>
                 <button
                     onClick={() => setShowMultiView(true)}
-                    title="Multi-view: assista até 4 canais ao mesmo tempo"
+                    title={t('liveTV', 'multiViewHint')}
                     style={{
                         padding: '9px 16px',
                         borderRadius: 12,
@@ -1213,7 +1213,7 @@ export function LiveTV() {
                         whiteSpace: 'nowrap',
                     }}
                 >
-                    🔲 Multi-view
+                    🔲 {t('liveTV', 'multiView')}
                 </button>
                 {favoriteChannelIds.size > 0 && (
                     <button
@@ -1238,7 +1238,7 @@ export function LiveTV() {
                     <button
                         onClick={() => { void favCheck.check(filteredStreams); }}
                         disabled={favCheck.busy}
-                        title={`Sonda os favoritos (até ${FAV_CHECK_LIMIT}) e marca os fora do ar`}
+                        title={t('liveTV', 'favCheckHint').replace('{n}', String(FAV_CHECK_LIMIT))}
                         style={{
                             padding: '8px 14px',
                             borderRadius: 10,
@@ -1251,7 +1251,7 @@ export function LiveTV() {
                             whiteSpace: 'nowrap',
                         }}
                     >
-                        {favCheck.busy ? '⏳ Verificando…' : favCheck.msg || '🩺 Verificar favoritos'}
+                        {favCheck.busy ? `⏳ ${t('liveTV', 'favChecking')}` : favCheck.msg || `🩺 ${t('liveTV', 'favCheck')}`}
                     </button>
                 )}
                 <button
@@ -1261,7 +1261,7 @@ export function LiveTV() {
                         if (next) localStorage.removeItem('neostream_group_variants');
                         else localStorage.setItem('neostream_group_variants', 'off');
                     }}
-                    title="Agrupar variantes FHD/HD/SD do mesmo canal num card só"
+                    title={t('liveTV', 'groupVariantsHint')}
                     style={{
                         padding: '8px 14px',
                         borderRadius: 10,
@@ -1873,8 +1873,8 @@ export function LiveTV() {
                     {filteredStreams.length === 0 ? (
                         <div style={{ textAlign: 'center', padding: '60px 20px' }}>
                             <div style={{ fontSize: '64px', marginBottom: '16px', opacity: 0.5 }}>📺</div>
-                            <p style={{ fontSize: '18px', color: 'rgba(156, 163, 175, 1)', fontWeight: '500' }}>Nenhum canal encontrado</p>
-                            <p style={{ fontSize: '14px', color: 'rgba(107, 114, 128, 1)', marginTop: '8px' }}>Tente buscar por outro termo</p>
+                            <p style={{ fontSize: '18px', color: 'rgba(156, 163, 175, 1)', fontWeight: '500' }}>{t('liveTV', 'noChannelsFound')}</p>
+                            <p style={{ fontSize: '14px', color: 'rgba(107, 114, 128, 1)', marginTop: '8px' }}>{t('liveTV', 'noChannelsHint')}</p>
                         </div>
                     ) : (
                         <div ref={gridRef} className="channels-grid" style={{ animation: 'fadeInScale 0.5s ease-out' }}>
@@ -1990,7 +1990,7 @@ export function LiveTV() {
                                             {stream.name}
                                         </p>
                                         {favCheck.deadIds.has(String(stream.stream_id)) && (
-                                            <span style={{ color: '#f87171', fontSize: 11, fontWeight: 800 }}>⚠ FORA DO AR</span>
+                                            <span style={{ color: '#f87171', fontSize: 11, fontWeight: 800 }}>⚠ {t('liveTV', 'offAir')}</span>
                                         )}
                                     </div>
                                     {!isKidsProfile && hasKidsProfiles && (
@@ -2000,7 +2000,7 @@ export function LiveTV() {
                                                 profileService.toggleKidsChannel(String(stream.stream_id));
                                                 setKidsAllowedChannelIds(profileService.getKidsAllowedChannelIds());
                                             }}
-                                            title="Permitir/remover este canal nos perfis infantis"
+                                            title={t('liveTV', 'kidsToggleHint')}
                                             style={{
                                                 flexShrink: 0,
                                                 width: 26,
