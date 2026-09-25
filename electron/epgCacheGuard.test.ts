@@ -60,14 +60,15 @@ describe('cacheKeyValido', () => {
 describe('todo caminho do cache do EPG passa pela guarda', () => {
     const FONTE = fs.readFileSync(path.join(__dirname, 'ipcHandlers.ts'), 'utf-8')
 
-    it('os 5 caminhos montados com o cacheKey continuam sendo 5', () => {
-        // epgFileStatus (.xml e .meta.json), epg:get-cached (.xml e
-        // .meta.json) e epg:get-cache-info (.meta.json).
-        expect([...FONTE.matchAll(/\$\{cacheKey\}\./g)]).toHaveLength(5)
+    it('os 4 caminhos montados com o cacheKey continuam sendo 4', () => {
+        // epgFileStatus (.xml e .meta.json) e epg:get-cached (.xml e
+        // .meta.json). O epg:get-cache-info saiu no #D038: nenhuma tela o
+        // alcançava.
+        expect([...FONTE.matchAll(/\$\{cacheKey\}\./g)]).toHaveLength(4)
     })
 
-    it('e os 3 handlers que recebem o cacheKey recusam chave torta', () => {
-        // epgFileStatus, epg:get-cached, epg:get-cache-info.
-        expect([...FONTE.matchAll(/cacheKeyValido\(/g)]).toHaveLength(3)
+    it('e os 2 handlers que recebem o cacheKey recusam chave torta', () => {
+        // epgFileStatus e epg:get-cached.
+        expect([...FONTE.matchAll(/cacheKeyValido\(/g)]).toHaveLength(2)
     })
 })

@@ -1191,34 +1191,6 @@ export function setupIpcHandlers() {
         }
     })
 
-    // Get EPG cache info (for UI display)
-    ipcMain.handle('epg:get-cache-info', async (_, cacheKey: string) => {
-        // Hoje inalcançável (fora da allowlist do preload, sem chamador), mas
-        // o padrão vale para todo caminho que interpola o cacheKey.
-        if (!cacheKeyValido(cacheKey)) return { success: false, error: 'cacheKey inválido' }
-        try {
-            const fs = await import('fs/promises')
-            const path = await import('path')
-            const { app } = await import('electron')
-
-            const cacheDir = path.join(app.getPath('userData'), 'epg_cache')
-            const metaFile = path.join(cacheDir, `${cacheKey}.meta.json`)
-
-            const metaContent = await fs.readFile(metaFile, 'utf-8')
-            const meta = JSON.parse(metaContent)
-
-            return {
-                success: true,
-                info: {
-                    lastUpdate: new Date(meta.timestamp).toISOString(),
-                    age: Date.now() - meta.timestamp,
-                    size: meta.size
-                }
-            }
-        } catch (error: unknown) {
-            return { success: false, error: getErrorMessage(error) }
-        }
-    })
     ipcMain.handle('streams:get-vod-url', async (_, { streamId, container }) => {
         try {
             const auth = store.get('auth')
