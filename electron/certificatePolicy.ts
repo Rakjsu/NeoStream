@@ -55,13 +55,62 @@ export interface CertificateSettings {
     trustedInvalidCertDomains: string[]
 }
 
-export function getCertificateSettings(): CertificateSettings {
+/**
+ * Espelho em memória do que a política lê do config.json.
+ *
+ * `store.get` do electron-store (conf) NÃO tem cache: cada chamada é um
+ * `readFileSync` + `JSON.parse` do config.json INTEIRO, na thread do main. O
+ * `onHeadersReceived` do fim do arquivo roda em TODA resposta do Chromium —
+ * cada capa do catálogo, cada segmento HLS, cada fetch do renderer — e cada
+ * uma custava de 2 a 5 dessas leituras só para decidir o CORS.
+ *
+ * O espelho cai a cada escrita no store: `onDidAnyChange` dispara em qualquer
+ * set/delete/reset desta instância, venha ela daqui, do playlistManager
+ * trocando o `auth` ou do mpv gravando o caminho dele — então nunca serve um
+ * valor velho, e ninguém precisa lembrar de invalidar nada. Só uma escrita
+ * FORA desta instância (outro processo, arquivo editado à mão) passaria
+ * despercebida — hoje não existe nenhuma; se um dia existir, o store precisa
+ * de `watch: true`. Store sem `onDidAnyChange` (os falsos dos testes) fica
+ * sem espelho e lê sempre.
+ */
+let certificateSettingsMirror: CertificateSettings | null = null
+let providerHostnameMirror: { hostname: string | null } | null = null
+/** Um ouvinte só, pela vida do processo: assinar de novo a cada leitura vazaria. */
+let storeMirrorWired = false
+
+function canMirrorStore(): boolean {
+    if (!storeMirrorWired && typeof store.onDidAnyChange === 'function') {
+        store.onDidAnyChange(() => {
+            certificateSettingsMirror = null
+            providerHostnameMirror = null
+        })
+        storeMirrorWired = true
+    }
+    return storeMirrorWired
+}
+
+/** Leitura interna: devolve o próprio espelho — quem chama aqui só consulta. */
+function readCertificateSettings(): CertificateSettings {
+    if (certificateSettingsMirror) return certificateSettingsMirror
+    const mirror = canMirrorStore()
     const settings = store.get('settings') || {}
-    return {
+    const fresh: CertificateSettings = {
         allowInvalidProviderCertificates:
             settings.allowInvalidProviderCertificates ?? DEFAULT_ALLOW_INVALID_PROVIDER_CERTIFICATES,
         approvedProviderHosts: settings.approvedProviderHosts || [],
         trustedInvalidCertDomains: settings.trustedInvalidCertDomains || []
+    }
+    if (mirror) certificateSettingsMirror = fresh
+    return fresh
+}
+
+/** Cópia: quem está fora do módulo não consegue mexer no espelho. */
+export function getCertificateSettings(): CertificateSettings {
+    const settings = readCertificateSettings()
+    return {
+        ...settings,
+        approvedProviderHosts: [...settings.approvedProviderHosts],
+        trustedInvalidCertDomains: [...settings.trustedInvalidCertDomains]
     }
 }
 
@@ -124,8 +173,12 @@ function getProviderHostname(candidateProviderUrl?: string): string | null {
         return getHostname(candidateProviderUrl)
     }
 
+    if (providerHostnameMirror) return providerHostnameMirror.hostname
+    const mirror = canMirrorStore()
     const auth = store.get('auth')
-    return auth.url ? getHostname(auth.url) : null
+    const hostname = auth.url ? getHostname(auth.url) : null
+    if (mirror) providerHostnameMirror = { hostname }
+    return hostname
 }
 
 export function isProviderUrl(url: string, candidateProviderUrl?: string): boolean {
@@ -138,7 +191,7 @@ export function isProviderUrl(url: string, candidateProviderUrl?: string): boole
     // Cache de hosts já reconhecidos (suporta multi-playlist: um host aprovado
     // enquanto outra lista estava ativa continua valendo). Ele NÃO desliga TLS
     // sozinho — isso agora exige o consentimento por domínio, abaixo.
-    const approvedHosts = getCertificateSettings().approvedProviderHosts
+    const approvedHosts = readCertificateSettings().approvedProviderHosts
     if (approvedHosts.includes(requestHostname)) return true
 
     return isSameRegistrableDomain(requestHostname, providerHostname)
@@ -148,7 +201,7 @@ export function registerApprovedProviderUrl(url: string, candidateProviderUrl?: 
     const requestHostname = getHostname(url)
     if (!requestHostname || !isProviderUrl(url, candidateProviderUrl)) return false
 
-    const settings = getCertificateSettings()
+    const settings = readCertificateSettings()
     if (!settings.approvedProviderHosts.includes(requestHostname)) {
         setApprovedProviderHosts([...settings.approvedProviderHosts, requestHostname])
     }
@@ -167,7 +220,7 @@ function getTrustScope(hostname: string): string {
 function isTrustedForInvalidCertificate(hostname: string): boolean {
     const scope = getTrustScope(hostname)
     if (!scope) return false
-    const trusted = getCertificateSettings().trustedInvalidCertDomains
+    const trusted = readCertificateSettings().trustedInvalidCertDomains
     return trusted.includes(scope)
 }
 
@@ -178,7 +231,7 @@ function isTrustedForInvalidCertificate(hostname: string): boolean {
  * de provedores com certificado PERFEITAMENTE válido, sem ganho de segurança.
  */
 function canUseProviderCompatibilityForUrl(url: string, candidateProviderUrl?: string): boolean {
-    return getCertificateSettings().allowInvalidProviderCertificates && isProviderUrl(url, candidateProviderUrl)
+    return readCertificateSettings().allowInvalidProviderCertificates && isProviderUrl(url, candidateProviderUrl)
 }
 
 /**
