@@ -5,6 +5,7 @@
  */
 
 import { isExpired, KIDS_FILTER_CACHE_TTL_MS } from './cacheExpiry';
+import { normalizeContentName } from './contentGate';
 
 const DB_NAME = 'iptv_kids_filter';
 const DB_VERSION = 1;
@@ -62,10 +63,11 @@ async function openDB(): Promise<IDBDatabase> {
     });
 }
 
-// Normalize name for consistent keys
-function normalizeName(name: string): string {
-    return name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
-}
+// Chave de nome dos stores. É a MESMA que o portão (contentGate) consulta:
+// o que `hideItem` grava aqui é o que `isItemVisibleUnderGate` procura lá.
+// Uma cópia local do corpo deixaria o bloqueio infantil rachar no dia em que
+// só um dos lados mudasse (D059) — por isso a regra tem um dono só.
+const normalizeName = normalizeContentName;
 
 // Read a cache entry, treating expired/legacy records as misses (and
 // deleting them opportunistically so the store doesn't grow forever).

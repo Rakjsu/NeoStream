@@ -13,6 +13,7 @@ import { descreverItemDaHome, useHomeContentGate } from '../hooks/useHomeContent
 import { useContagemDeCanaisInfantil } from '../hooks/useContagemDeCanaisInfantil';
 import { daysToExpiry, EXPIRY_SNOOZE_KEY, isExpirySnoozed, shouldWarnExpiry } from '../utils/expiryWarning';
 import { indexedDBCache } from '../services/indexedDBCache';
+import { normalizeContentName } from '../services/contentGate';
 import { searchMovieByName, searchSeriesByName, isKidsFriendly } from '../services/tmdb';
 import { getHomeRecommendations, type RecommendationGroup } from '../services/recommendationService';
 import { newEpisodesService } from '../services/newEpisodesService';
@@ -643,9 +644,8 @@ export function Home() {
         cover: string,
         rating?: string
     ) => {
-        // Use normalized name for key (same as IndexedDB)
-        const normalizeName = (n: string) => n.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
-        const itemKey = `${contentType}_${normalizeName(name)}`;
+        // Mesma chave que o IndexedDB grava: dono único em contentGate.
+        const itemKey = `${contentType}_${normalizeContentName(name)}`;
 
         // Check if already hidden
         if (isKidsProfile && hiddenItems.has(itemKey)) {
@@ -1129,10 +1129,8 @@ export function Home() {
         sectionIndex?: number;
     }) => {
 
-        // Filter out hidden items for Kids profile
-        // Helper to normalize names (same as indexedDBCache)
-        const normalizeName = (name: string) => name.toLowerCase().trim().replace(/[^a-z0-9\s]/gi, '').replace(/\s+/g, ' ');
-
+        // Filter out hidden items for Kids profile (chave: normalizeContentName,
+        // a mesma do indexedDBCache e do portão).
         const visibleItems = items.filter(item => {
             // Nome, categoria e tipo do item DESTA fileira. A tradução mora no
             // hook (e é testada lá) porque é ela que decide se o portão julga
@@ -1142,7 +1140,7 @@ export function Home() {
             // Oculto descoberto AGORA: o clique acrescenta a chave em
             // `hiddenItems`, e é isso que faz o card sumir sem recarregar a
             // Home. O portão abaixo só conhece o que já estava gravado.
-            if (isKidsProfile && hiddenItems.has(`${alvo.kind}_${normalizeName(alvo.name)}`)) return false;
+            if (isKidsProfile && hiddenItems.has(`${alvo.kind}_${normalizeContentName(alvo.name)}`)) return false;
 
             // 🔒 Portão parental/infantil — o mesmo das grades de Filmes e
             // Séries. Sem ele estas fileiras saíam do catálogo cru.
