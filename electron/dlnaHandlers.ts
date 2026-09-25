@@ -36,6 +36,12 @@ import {
     rewritePlaylistUris,
 } from './dlnaProtocol';
 import { planDlnaCommand, planDlnaStop, clampVolume, stepVolume, muteTarget, type DlnaStatusRaw } from './dlnaRemoteRouting';
+import {
+    novoRelogioDoFimDlna,
+    marcarComandoDlna,
+    registrarObservacaoDlna,
+    type ObservacaoDlna,
+} from './dlnaFimDaSessao';
 import { isAllowedHost } from './localServerGuard';
 import {
     MAX_PROXY_REDIRECTS,
@@ -81,6 +87,8 @@ interface CastSession {
     title: string
 }
 let castSession: CastSession | null = null;
+// Relogio que decide quando a sessao acabou SOZINHA na TV (dlnaFimDaSessao).
+let fimDaSessaoDlna = novoRelogioDoFimDlna(0);
 
 const discoveredDevices: Map<string, DlnaDevice> = new Map();
 let manualDevices: DlnaDevice[] = [];
@@ -1228,6 +1236,9 @@ export function setupDLNAHandlers() {
                 renderingControlUrl,
                 title: title || 'Video'
             };
+            // O inicio do cast abre a carencia: a TV ainda esta carregando e
+            // pode dizer STOPPED/NO_MEDIA por alguns segundos.
+            fimDaSessaoDlna = novoRelogioDoFimDlna(Date.now());
 
             return { success: true };
         } catch (error: unknown) {
@@ -1303,6 +1314,7 @@ export function setupDLNAHandlers() {
     ipcMain.handle('dlna:pause', async () => {
         try {
             const session = requireSession();
+            marcarComandoNaSessaoDlna();
             await sendAvTransportAction(session.avTransportUrl, 'Pause', '<InstanceID>0</InstanceID>');
             return { success: true };
         } catch (error: unknown) {
@@ -1313,6 +1325,7 @@ export function setupDLNAHandlers() {
     ipcMain.handle('dlna:resume', async () => {
         try {
             const session = requireSession();
+            marcarComandoNaSessaoDlna();
             await sendAvTransportAction(session.avTransportUrl, 'Play', '<InstanceID>0</InstanceID><Speed>1</Speed>');
             return { success: true };
         } catch (error: unknown) {
@@ -1323,6 +1336,7 @@ export function setupDLNAHandlers() {
     ipcMain.handle('dlna:seek', async (_, { seconds }) => {
         try {
             const session = requireSession();
+            marcarComandoNaSessaoDlna();
             const target = formatUpnpTime(Number(seconds) || 0);
             await sendAvTransportAction(session.avTransportUrl, 'Seek',
                 `<InstanceID>0</InstanceID><Unit>REL_TIME</Unit><Target>${target}</Target>`);
@@ -1349,6 +1363,11 @@ export function setupDLNAHandlers() {
         try {
             const session = requireSession();
             const status = await fetchDlnaSessionStatus(session);
+            // A propria consulta pode ter ENCERRADO a sessao (o filme acabou
+            // na TV, ou ela ficou muda tempo demais). Responder "sem sessao"
+            // na mesma chamada faz o CastControls fechar na hora, em vez de
+            // mostrar mais um STOPPED de uma sessao que ja nao existe.
+            if (!castSession) throw new Error('No active cast session');
             return { success: true, deviceId: session.deviceId, ...status };
         } catch (error: unknown) {
             return { success: false, error: getErrorMessage(error) };
@@ -1398,12 +1417,49 @@ export function isDlnaSessionActive(): boolean {
     return castSession !== null
 }
 
+/** Play/pausa/seek na sessao viva: reabre a carencia do fim automatico. */
+function marcarComandoNaSessaoDlna(): void {
+    fimDaSessaoDlna = marcarComandoDlna(Date.now())
+}
+
+/**
+ * Registra uma consulta de status da sessao e, se a TV ja terminou (STOPPED/
+ * NO_MEDIA continuo) ou sumiu (SOAP falhando), faz o mesmo encerramento local
+ * do `dlna:stop` — sem mandar Stop: a TV ja esta parada ou nao responde.
+ *
+ * E o main quem tem a evidencia (as respostas SOAP): o renderer fechava so a
+ * UI e a sessao ficava viva aqui pra sempre, sequestrando o controle do
+ * celular. Resposta atrasada de uma sessao que ja foi trocada nao conta — nem
+ * durante o carregamento de um cast novo pra MESMA TV, quando derrubar os
+ * tokens daquele host apagaria os do video que esta chegando.
+ *
+ * `inicio` e o instante em que a consulta COMECOU (ver dlnaFimDaSessao).
+ */
+function observarSessaoDlna(session: CastSession, observacao: ObservacaoDlna, inicio: number): void {
+    if (castSession !== session) return
+    const { relogio, encerrar } = registrarObservacaoDlna(fimDaSessaoDlna, observacao, inicio)
+    fimDaSessaoDlna = relogio
+    if (!encerrar) return
+    log.info('[DLNA] sessao encerrada sozinha:', encerrar === 'parada'
+        ? 'a TV terminou/parou o video'
+        : 'a TV parou de responder')
+    releaseDlnaLocalResources(getHostFromLocation(session.location) || '')
+}
+
 /** Transport state + position + volume of one session (three SOAP calls). */
 async function fetchDlnaSessionStatus(session: CastSession): Promise<DlnaStatusRaw> {
-    const [transportInfo, positionInfo] = await Promise.all([
-        sendAvTransportAction(session.avTransportUrl, 'GetTransportInfo', '<InstanceID>0</InstanceID>', 5000),
-        sendAvTransportAction(session.avTransportUrl, 'GetPositionInfo', '<InstanceID>0</InstanceID>', 5000),
-    ])
+    const inicio = Date.now()
+    let transportInfo: string
+    let positionInfo: string
+    try {
+        [transportInfo, positionInfo] = await Promise.all([
+            sendAvTransportAction(session.avTransportUrl, 'GetTransportInfo', '<InstanceID>0</InstanceID>', 5000),
+            sendAvTransportAction(session.avTransportUrl, 'GetPositionInfo', '<InstanceID>0</InstanceID>', 5000),
+        ])
+    } catch (error: unknown) {
+        observarSessaoDlna(session, { tipo: 'falha' }, inicio)
+        throw error
+    }
     let volume: number | null = null
     if (session.renderingControlUrl) {
         try {
@@ -1415,7 +1471,7 @@ async function fetchDlnaSessionStatus(session: CastSession): Promise<DlnaStatusR
             // Volume is best-effort; some renderers refuse GetVolume.
         }
     }
-    return {
+    const status: DlnaStatusRaw = {
         title: session.title,
         deviceName: session.deviceName,
         state: getXmlTagValue(transportInfo, 'CurrentTransportState') || 'UNKNOWN',
@@ -1423,6 +1479,8 @@ async function fetchDlnaSessionStatus(session: CastSession): Promise<DlnaStatusR
         duration: parseUpnpTime(getXmlTagValue(positionInfo, 'TrackDuration')),
         volume,
     }
+    observarSessaoDlna(session, { tipo: 'estado', estado: status.state }, inicio)
+    return status
 }
 
 /**
@@ -1433,7 +1491,9 @@ export async function getDlnaStatusSnapshot(): Promise<DlnaStatusRaw | null> {
     const session = castSession
     if (!session) return null
     try {
-        return await fetchDlnaSessionStatus(session)
+        const status = await fetchDlnaSessionStatus(session)
+        // A consulta pode ter encerrado a sessao (filme acabou na TV).
+        return castSession === session ? status : null
     } catch {
         return null
     }
@@ -1464,6 +1524,8 @@ export function dlnaRemoteControl(action: string, value?: number): boolean {
     if (!session) return false
     const plan = planDlnaCommand(action, value)
     if (!plan) return false
+    // Play/pausa e seek pelo celular tambem fazem a TV passar por STOPPED.
+    if (plan.kind === 'toggle' || plan.kind === 'seekRelative') marcarComandoNaSessaoDlna()
 
     const run = async () => {
         switch (plan.kind) {
