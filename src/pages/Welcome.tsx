@@ -68,7 +68,12 @@ export function Welcome() {
             const report = applyBackup(JSON.parse(result.json));
             if (report.playlists.length > 0) {
                 const res = await window.ipcRenderer.invoke('backup:import-playlists', {
-                    playlists: report.playlists.map(toPlaylistImport)
+                    playlists: report.playlists.map(toPlaylistImport),
+                    // Primeiro acesso: nenhuma playlist ativa ainda. Sem pedir
+                    // pro main ativar a primeira do arquivo, as listas eram
+                    // gravadas e o boot (que decide por `auth:check`) jogava o
+                    // usuário no /login como se nada tivesse acontecido (D079).
+                    activateIfNone: true
                 }).catch(() => undefined) as { idMap?: Record<string, string> } | undefined;
                 // Máquina nova: o `applyBackup` acima gravou os favoritos com o
                 // id da máquina de origem, e a playlist acabou de ganhar id
