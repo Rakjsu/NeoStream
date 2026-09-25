@@ -10,7 +10,7 @@ import {
 } from '../../services/watchLimitsService';
 import { profileService } from '../../services/profileService';
 import { listParentalLog, clearParentalLog, type ParentalLogEntry } from '../../services/parentalLogService';
-import { indexedDBCache } from '../../services/indexedDBCache';
+import { indexedDBCache, type EntradaOculta } from '../../services/indexedDBCache';
 import { hasTmdbApiKey } from '../../services/tmdbKey';
 import { kidsWeeklyUsage } from '../../services/statsDashboardHelpers';
 import { diaLocal } from '../../utils/diaLocal';
@@ -38,14 +38,21 @@ export function ParentalSection() {
     // 🙈 Títulos que o filtro infantil escondeu do catálogo. A lista é global
     // (vale para todos os perfis) e, até agora, não tinha saída nenhuma.
     const [ocultos, setOcultos] = useState<number | null>(null);
+    // D115: a lista título a título. A TMDB é consultada por nome e às vezes
+    // casa o título errado; o "Mostrar todos" sozinho não resolvia, porque a
+    // classificação errada continua em cache e o título sumia de novo no
+    // primeiro clique da criança. Aqui o responsável libera UM título.
+    const [entradasOcultas, setEntradasOcultas] = useState<EntradaOculta[]>([]);
     const temChaveTmdb = hasTmdbApiKey();
 
     const contarOcultos = async () => {
-        const [filmes, series] = await Promise.all([
+        const [filmes, series, entradas] = await Promise.all([
             indexedDBCache.getHiddenItems('movie'),
-            indexedDBCache.getHiddenItems('series')
+            indexedDBCache.getHiddenItems('series'),
+            indexedDBCache.listHiddenEntries()
         ]);
         setOcultos(filmes.length + series.length);
+        setEntradasOcultas(entradas);
     };
 
     useEffect(() => {
@@ -70,6 +77,15 @@ export function ParentalSection() {
     // o PIN aqui NÃO destrava o conteúdo adulto do app (parentalService.ts).
     const [secaoDestravada, setSecaoDestravada] = useState(() => parentalService.isParentalSettingsUnlocked());
     const trancado = precisaProvarPin(parentalService.hasPin(), secaoDestravada);
+
+    const alternarLiberacao = (entrada: EntradaOculta) => {
+        // Liberar é afrouxar o filtro infantil: com a seção trancada, nada.
+        if (trancado) return;
+        const acao = entrada.liberado
+            ? indexedDBCache.revogarLiberacao(entrada.type, entrada.name)
+            : indexedDBCache.liberarItem(entrada.type, entrada.name);
+        void acao.then(contarOcultos);
+    };
     // O botão do PIN é a única saída da seção trancada — e continua clicável
     // mesmo com o parental desligado, porque desligar não apaga o PIN.
     const botaoPinAtivo = parentalConfig.enabled || trancado;
@@ -528,6 +544,38 @@ export function ParentalSection() {
                             👁 {t('parental', 'showHiddenAgain')}
                         </button>
                     </div>
+
+                    {/* 🙈 Título a título: liberar o que a TMDB escondeu por engano (D115) */}
+                    {entradasOcultas.length > 0 && (
+                        <div className="setting-item" style={{ alignItems: 'flex-start' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, width: '100%', maxHeight: 220, overflowY: 'auto' }}>
+                                {entradasOcultas.map(entrada => (
+                                    <div
+                                        key={`${entrada.type}_${entrada.name}`}
+                                        data-titulo-oculto={entrada.titulo}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 10 }}
+                                    >
+                                        <span aria-hidden="true">{entrada.type === 'movie' ? '🎬' : '📺'}</span>
+                                        <span style={{ flex: 1, minWidth: 0, color: 'rgba(255,255,255,0.85)', fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {entrada.titulo}
+                                        </span>
+                                        {entrada.liberado && (
+                                            <span style={{ fontSize: 12, color: '#22c55e' }}>{t('parental', 'releasedTag')}</span>
+                                        )}
+                                        <button
+                                            className="check-btn"
+                                            style={{ width: 'auto', padding: '6px 12px', fontSize: 12 }}
+                                            title={entrada.liberado ? undefined : t('parental', 'releaseTitleDesc')}
+                                            disabled={trancado}
+                                            onClick={() => alternarLiberacao(entrada)}
+                                        >
+                                            {entrada.liberado ? t('parental', 'undoRelease') : t('parental', 'releaseTitle')}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* 📜 Log parental (verificações de PIN) */}
                     <div className="setting-item" style={{ alignItems: 'flex-start' }}>

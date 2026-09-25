@@ -129,8 +129,10 @@ export function useHomeContentGate(isKidsProfile: boolean): (item: ItemDaHome) =
                 const [hiddenMovie, hiddenSeries, ratingsMovie, ratingsSeries] = await Promise.all([
                     state.isKidsProfile ? semErro(indexedDBCache.getHiddenItems('movie'), [] as string[]) : Promise.resolve([] as string[]),
                     state.isKidsProfile ? semErro(indexedDBCache.getHiddenItems('series'), [] as string[]) : Promise.resolve([] as string[]),
-                    semErro(indexedDBCache.getAllCachedMovies(), new Map<string, string | null>()),
-                    semErro(indexedDBCache.getAllCachedSeries(), new Map<string, string | null>()),
+                    // Perfil infantil: o liberado pelo responsável não é
+                    // escondido pela classificação errada da TMDB (D115).
+                    semErro(indexedDBCache.getAllCachedMovies({ ignorarLiberados: state.isKidsProfile }), new Map<string, string | null>()),
+                    semErro(indexedDBCache.getAllCachedSeries({ ignorarLiberados: state.isKidsProfile }), new Map<string, string | null>()),
                 ]);
 
                 if (cancelado) return;
