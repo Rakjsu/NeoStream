@@ -144,10 +144,14 @@ class PlaybackService {
     }
 
     /**
-     * Get the actual buffer size in seconds based on settings
-     * For 'intelligent' mode, this performs speed test and calculates optimal buffer
+     * Buffer, em segundos, que o player deve usar AGORA.
+     *
+     * Sincrono de proposito: nao ha mais nada a esperar. O teste de velocidade
+     * que justificava a Promise saiu no #409; no modo inteligente a banda vem
+     * do proprio hls.js (reportMeasuredBandwidth) e aqui so se le a ultima
+     * medida. E a UNICA copia desta regra — o useHls le daqui.
      */
-    async getBufferSeconds(): Promise<number> {
+    getBufferSeconds(): number {
         if (this.config.bufferSize === 'intelligent') {
             // Sem medida ainda: 15s ate o player informar a banda real.
             return this.getCachedBufferSeconds() ?? 15;
@@ -155,10 +159,6 @@ class PlaybackService {
         return parseInt(this.config.bufferSize, 10);
     }
 
-    /**
-     * Test connection speed and recommend buffer size
-     * Returns buffer size in seconds
-     */
     /**
      * Banda REAL, informada pelo player quando o hls.js tem estimativa propria.
      *

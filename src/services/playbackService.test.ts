@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { playbackService, apenasCamposConhecidos } from './playbackService';
+import { apenasCamposConhecidos } from './playbackService';
+
+type Servico = typeof import('./playbackService')['playbackService'];
 
 /**
  * O "buffer inteligente" media LATÊNCIA ATÉ A GOOGLE e apresentava como banda:
@@ -11,12 +13,18 @@ import { playbackService, apenasCamposConhecidos } from './playbackService';
  * recusado, e por quanto tempo uma medida vale.
  */
 describe('playbackService: banda medida → buffer', () => {
-    beforeEach(() => {
+    let playbackService: Servico;
+
+    beforeEach(async () => {
         localStorage.clear();
-        playbackService.setConfig({ bufferSize: 'intelligent' });
-        // Zera a medida entre os casos: o serviço é singleton.
-        playbackService.reportMeasuredBandwidth(Number.NaN);
         vi.useRealTimers();
+        // Um serviço NOVO por caso, como no app recém-aberto. O singleton não
+        // tem como esquecer uma medida (reportMeasuredBandwidth(NaN) é recusado
+        // de propósito), então os casos "sem medida" só passavam pela ORDEM do
+        // arquivo — embaralhados, falhavam.
+        vi.resetModules();
+        ({ playbackService } = await import('./playbackService'));
+        playbackService.setConfig({ bufferSize: 'intelligent' });
     });
     afterEach(() => vi.useRealTimers());
 
@@ -64,14 +72,27 @@ describe('playbackService: banda medida → buffer', () => {
         expect(playbackService.getCachedBufferSeconds()).toBeNull();
     });
 
-    it('sem medida, o buffer cai no padrão de 15s', async () => {
-        await expect(playbackService.getBufferSeconds()).resolves.toBe(15);
+    it('sem medida, o buffer cai no padrão de 15s', () => {
+        expect(playbackService.getBufferSeconds()).toBe(15);
     });
 
-    it('buffer fixo ignora a medida', async () => {
+    it('com medida recente, o buffer segue a medida', () => {
+        playbackService.reportMeasuredBandwidth(60);
+        expect(playbackService.getBufferSeconds()).toBe(5);
+    });
+
+    it('buffer fixo ignora a medida', () => {
         playbackService.setConfig({ bufferSize: '10' });
         playbackService.reportMeasuredBandwidth(60);
-        await expect(playbackService.getBufferSeconds()).resolves.toBe(10);
+        expect(playbackService.getBufferSeconds()).toBe(10);
+    });
+
+    // D010: não há mais nada a esperar (o teste de velocidade saiu no #409).
+    // Uma Promise aqui só convidava o useHls a "pré-aquecer" algo inexistente.
+    it('é síncrono: devolve o número, não uma Promise', () => {
+        const valor: unknown = playbackService.getBufferSeconds();
+        expect(valor instanceof Promise).toBe(false);
+        expect(typeof valor).toBe('number');
     });
 
     // "Analisando conexão…" era mentira: ninguém analisava nada até a
