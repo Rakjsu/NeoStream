@@ -66,6 +66,14 @@ function ProgramReminderBridge() {
     return () => window.ipcRenderer.off('notify:clicked', handleNotifyClicked);
   }, [navigate]);
 
+  // 🔁🔎 Regras de gravação automática e alertas por palavra-chave: varredura
+  // própria do EPG, desacoplada da rolagem do Guia (boot atrasado + ciclo).
+  // Import dinâmico: o serviço puxa o epgService e os mapas de EPG, que não
+  // pertencem ao pacote inicial.
+  useEffect(() => {
+    void import('./services/epgVarreduraRegras').then(({ iniciarVarreduraEpg }) => iniciarVarreduraEpg());
+  }, []);
+
   return null;
 }
 

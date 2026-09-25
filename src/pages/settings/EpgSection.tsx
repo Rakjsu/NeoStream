@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import { useLanguage } from '../../services/languageService';
 import { epgService } from '../../services/epgService';
 import { addKeyword, listKeywords, removeKeyword } from '../../services/epgKeywordAlertService';
+import { dispararVarreduraEpg } from '../../services/epgVarreduraRegras';
 import epgTestService, { type EpgTestResult, type EpgTestProgress } from '../../services/epgTestService';
 
 export type EpgResultsFilter = 'all' | 'working' | 'notWorking';
@@ -225,6 +226,9 @@ export function EpgSection({
                             if (e.key === 'Enter' && keywordInput.trim()) {
                                 setKeywords(addKeyword(keywordInput));
                                 setKeywordInput('');
+                                // Varre já — sem isso o termo novo só valia para as
+                                // linhas que alguém rolasse no Guia.
+                                void dispararVarreduraEpg();
                             }
                         }}
                         style={{ padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.06)', color: '#fff', fontSize: 13, width: 220 }}
