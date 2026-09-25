@@ -342,6 +342,42 @@ export function setVolumePayload(requestId: number, level: number): string {
     })
 }
 
+/** Tira (ou põe) o mudo do receptor: SET_VOLUME só com `muted`, como o protocolo pede. */
+export function setMutedPayload(requestId: number, muted: boolean): string {
+    return JSON.stringify({ type: 'SET_VOLUME', requestId, volume: { muted } })
+}
+
+export interface ReceiverVolume {
+    /** 0..1, o nível que a TV guarda (mesmo quando está muda). */
+    level: number
+    muted: boolean
+    /** `controlType: 'fixed'`: o aparelho não aceita volume do remetente. */
+    fixed: boolean
+}
+
+/**
+ * 🔊 O volume que o Chromecast anuncia em TODO RECEIVER_STATUS (na conexão, no
+ * LAUNCH, no GET_STATUS do attach e sempre que alguém mexe pelo controle da TV
+ * ou pelo Google Home). Sem isto o app só conhecia o volume que ELE mesmo
+ * mandou — o slider nem aparecia, e o ± do celular partia de um 0.5 chutado.
+ * Devolve null quando o payload não é um RECEIVER_STATUS com `volume.level`.
+ */
+export function extractReceiverVolume(receiverStatusJson: unknown): ReceiverVolume | null {
+    if (receiverStatusJson === null || typeof receiverStatusJson !== 'object') return null
+    const p = receiverStatusJson as { type?: unknown; status?: unknown }
+    if (p.type !== 'RECEIVER_STATUS') return null
+    if (p.status === null || typeof p.status !== 'object') return null
+    const volume = (p.status as { volume?: unknown }).volume
+    if (volume === null || typeof volume !== 'object') return null
+    const v = volume as { level?: unknown; muted?: unknown; controlType?: unknown }
+    if (typeof v.level !== 'number' || !Number.isFinite(v.level)) return null
+    return {
+        level: Math.min(1, Math.max(0, v.level)),
+        muted: v.muted === true,
+        fixed: v.controlType === 'fixed',
+    }
+}
+
 /** currentTime/duration out of a MEDIA_STATUS, or null when absent. */
 export function extractMediaTimes(mediaStatusJson: unknown): { currentTime: number | null; duration: number | null } | null {
     if (mediaStatusJson === null || typeof mediaStatusJson !== 'object') return null

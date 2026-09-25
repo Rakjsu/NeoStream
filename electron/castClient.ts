@@ -36,6 +36,8 @@ import {
     getMediaStatusPayload,
     getReceiverStatusPayload,
     setVolumePayload,
+    setMutedPayload,
+    extractReceiverVolume,
     extractMediaTimes,
     extractQueueItems,
     extractCurrentItemId,
@@ -96,6 +98,9 @@ export class CastSession {
     private currentTime: number | null = null
     private duration: number | null = null
     private volumeLevel: number | null = null
+    // Estado que a própria TV anuncia no RECEIVER_STATUS (ver handleMessage).
+    private receiverMuted = false
+    private volumeFixed = false
     private queueItems: QueueItemStatus[] = []
     private currentItemId: number | null = null
     private closed = false
@@ -220,8 +225,22 @@ export class CastSession {
 
     /** Receiver-level volume (0..1). */
     setVolume(level: number): void {
-        this.send(CAST_RECEIVER_ID, NS_RECEIVER, setVolumePayload(this.requestId++, level))
-        this.volumeLevel = Math.min(1, Math.max(0, level))
+        // Aparelho de volume fixo ignora SET_VOLUME: não inventar um nível.
+        if (this.volumeFixed) return
+        const clamped = Math.min(1, Math.max(0, level))
+        // TV muda pelo controle e o pedido é 0 ("-" do celular, slider no
+        // fim): ela já está calada. Mandar level 0 apagaria o nível que ela
+        // guarda para quando alguém tirar o mudo pelo controle.
+        if (this.receiverMuted && clamped === 0) return
+        this.send(CAST_RECEIVER_ID, NS_RECEIVER, setVolumePayload(this.requestId++, clamped))
+        // Mudo pelo controle da TV: o slider mostra 0, então subir o slider
+        // tem que tirar o mudo também — só o nível deixaria a TV calada. O
+        // protocolo quer `level` e `muted` em SET_VOLUME separados.
+        if (this.receiverMuted) {
+            this.send(CAST_RECEIVER_ID, NS_RECEIVER, setMutedPayload(this.requestId++, false))
+            this.receiverMuted = false
+        }
+        this.volumeLevel = clamped
     }
 
     private send(destinationId: string, namespace: string, payloadUtf8: string): void {
@@ -242,6 +261,14 @@ export class CastSession {
             return
         }
         if (message.namespace === NS_RECEIVER) {
+            // Volume real da TV (D200): antes só o nosso próprio setVolume
+            // escrevia volumeLevel, e o slider do CastControls nunca aparecia.
+            const volume = extractReceiverVolume(payload)
+            if (volume) {
+                this.receiverMuted = volume.muted
+                this.volumeFixed = volume.fixed
+                this.volumeLevel = volume.fixed ? null : volume.muted ? 0 : volume.level
+            }
             this.notifyReceiverStatus(message)
             return
         }
