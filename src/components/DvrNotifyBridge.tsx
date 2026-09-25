@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { languageService } from '../services/languageService';
+import { ehJanelaSecundaria } from '../utils/janelaSecundaria';
 
 /**
  * Native "recording finished" notification. The main process broadcasts
@@ -7,9 +8,15 @@ import { languageService } from '../services/languageService';
  * or the stream ending); this always-mounted bridge turns it into a Windows
  * notification — essential in tray mode, where the app window is hidden.
  * Clicking it opens the Downloads page (where the Gravações list lives).
+ *
+ * O 'dvr:stopped' é BROADCAST (todas as BrowserWindows), e o PiP e o
+ * multi-view montam o App inteiro — esta ponte inclusive. Sem a guarda,
+ * cada janela aberta virava mais uma notificação e mais um espelho no
+ * celular (D119). O player da janela segue ouvindo o evento por conta própria.
  */
 export function DvrNotifyBridge() {
     useEffect(() => {
+        if (ehJanelaSecundaria()) return;
         const handler = (_event: unknown, raw: unknown) => {
             const payload = (raw ?? {}) as { file?: string; seconds?: number; error?: string };
             if (payload.error) return; // ffmpeg failures already surface in the player UI

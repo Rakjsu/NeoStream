@@ -15,6 +15,7 @@ import { appNotificationService } from './episodeNotificationService';
 import { computeDelay } from './reminderService';
 import { espacoParaGravacao } from './dvrSweep';
 import { languageService } from './languageService';
+import { ehJanelaSecundaria } from '../utils/janelaSecundaria';
 
 export interface ScheduledRecording {
     /** Deterministic id derived from channel + program start (see scheduleId). */
@@ -307,6 +308,11 @@ class ScheduledRecordingService {
      * descarta os agendamentos cujo programa já acabou.
      */
     init(): void {
+        // PiP/multi-view rodam o boot do App de novo. Duas janelas armando a
+        // mesma agenda = dois fire() juntos: os dois perguntam `dvr:active`
+        // antes de o outro subir, nenhum vê nada, e saem DOIS ffmpeg no mesmo
+        // canal (e dois "Gravação concluída" no fim). A principal cuida (D119).
+        if (ehJanelaSecundaria()) return;
         const now = Date.now();
         const vivos = new Map<string, ScheduledRecording>();
         const encerrados = new Map<string, ScheduledRecording>();
