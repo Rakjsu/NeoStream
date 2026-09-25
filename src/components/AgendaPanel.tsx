@@ -21,7 +21,12 @@ export function AgendaPanel() {
         return () => clearInterval(interval);
     }, []);
 
-    const entries = now === 0 ? [] : buildAgenda(reminderService.list(), scheduledRecordingService.list(), now);
+    const entries = now === 0 ? [] : buildAgenda(
+        reminderService.list(),
+        scheduledRecordingService.list(),
+        now,
+        scheduledRecordingService.listarDaMaquina()
+    );
     const groups = groupAgendaByDay(entries, now);
 
     const cancel = useCallback((entry: AgendaEntry) => {

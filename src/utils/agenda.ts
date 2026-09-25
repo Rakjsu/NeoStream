@@ -24,11 +24,19 @@ export interface AgendaEntry {
     emConflito?: boolean;
 }
 
-/** Merge + sort; drops entries already finished (reminders: already started). */
+/**
+ * Merge + sort; drops entries already finished (reminders: already started).
+ *
+ * `concorrentes` é contra quem se mede a vaga de gravação simultânea. A agenda
+ * mostrada é a do perfil, mas a vaga é da MÁQUINA: o agendamento de outro
+ * perfil também liga o ffmpeg e ocupa lugar (D065) — medir só contra a agenda
+ * do perfil diria "cabe" para uma gravação que vai ficar de fora.
+ */
 export function buildAgenda(
     reminders: ProgramReminder[],
     recordings: ScheduledRecording[],
-    nowMs: number
+    nowMs: number,
+    concorrentes: ScheduledRecording[] = recordings
 ): AgendaEntry[] {
     const entries: AgendaEntry[] = [];
 
@@ -61,7 +69,7 @@ export function buildAgenda(
         });
     }
 
-    return marcarConflitos(entries, recordings).sort((a, b) => a.startMs - b.startMs);
+    return marcarConflitos(entries, concorrentes).sort((a, b) => a.startMs - b.startMs);
 }
 
 /**

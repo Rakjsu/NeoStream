@@ -3,6 +3,12 @@
 // automatically (dvr:start at program start, dvr:stop at its end), while the
 // app is running. Mirrors reminderService: per-profile localStorage +
 // setTimeout timers rehydrated on boot.
+//
+// A AGENDA é por perfil (cada um vê e cancela só o que agendou), mas GRAVAR é
+// ação da máquina: um ffmpeg só no main, `dvr:active` global. Por isso o boot
+// arma os agendamentos de TODOS os perfis — trocar de perfil recarrega o
+// renderer, e ler só o do ativo deixava o jogo das 22h do outro perfil sem
+// timer e uma gravação dele já no ar sem ninguém pra parar (D065).
 
 import { profileService } from './profileService';
 import { appNotificationService } from './episodeNotificationService';
@@ -175,14 +181,31 @@ class ScheduledRecordingService {
     private activeRecIds = new Map<string, string>();
     private listeners: ScheduleCallback[] = [];
 
-    private getStorageKey(): string {
-        const activeProfile = profileService.getActiveProfile();
-        return `${STORAGE_KEY_PREFIX}_${activeProfile?.id ?? 'default'}`;
+    private chaveDoPerfil(perfilId: string): string {
+        return `${STORAGE_KEY_PREFIX}_${perfilId}`;
     }
 
-    list(): ScheduledRecording[] {
+    private getStorageKey(): string {
+        const activeProfile = profileService.getActiveProfile();
+        return this.chaveDoPerfil(activeProfile?.id ?? 'default');
+    }
+
+    /**
+     * Chaves de agenda de todo perfil que ainda EXISTE, mais a do ativo.
+     *
+     * Perfil apagado fica de fora de propósito: o `deleteProfile` não limpa os
+     * dados dele, e um agendamento que ninguém mais vê nem consegue cancelar
+     * não pode continuar ligando o ffmpeg sozinho.
+     */
+    private chavesDeTodosOsPerfis(): string[] {
+        const chaves = new Set<string>([this.getStorageKey()]);
+        profileService.getAllProfiles().forEach(p => chaves.add(this.chaveDoPerfil(p.id)));
+        return [...chaves];
+    }
+
+    private lerChave(chave: string): ScheduledRecording[] {
         try {
-            const data = localStorage.getItem(this.getStorageKey());
+            const data = localStorage.getItem(chave);
             if (!data) return [];
             const parsed = JSON.parse(data);
             return Array.isArray(parsed) ? parsed : [];
@@ -191,12 +214,54 @@ class ScheduledRecordingService {
         }
     }
 
-    private save(schedules: ScheduledRecording[]): void {
+    private gravarChave(chave: string, schedules: ScheduledRecording[]): void {
         try {
-            localStorage.setItem(this.getStorageKey(), JSON.stringify(schedules));
+            localStorage.setItem(chave, JSON.stringify(schedules));
         } catch { /* best-effort */ }
+    }
+
+    /** Agenda do perfil ATIVO — o que a UI mostra e deixa cancelar. */
+    list(): ScheduledRecording[] {
+        return this.lerChave(this.getStorageKey());
+    }
+
+    private save(schedules: ScheduledRecording[]): void {
+        this.gravarChave(this.getStorageKey(), schedules);
         this.listeners.forEach(cb => cb(schedules));
-        this.pushCountToMain(schedules.length);
+        this.pushCountToMain(this.listarDaMaquina().length);
+    }
+
+    /**
+     * Tudo que esta MÁQUINA vai gravar: a agenda de todos os perfis, sem
+     * repetir o programa que dois perfis agendaram (o id é canal + início).
+     *
+     * É a conta que importa para o que é global — a vaga de gravação
+     * simultânea e o app preso na bandeja. A agenda que a pessoa vê e cancela
+     * continua sendo a do perfil dela (`list()`).
+     */
+    listarDaMaquina(): ScheduledRecording[] {
+        const porId = new Map<string, ScheduledRecording>();
+        for (const chave of this.chavesDeTodosOsPerfis()) {
+            this.lerChave(chave).forEach(s => { if (!porId.has(s.id)) porId.set(s.id, s); });
+        }
+        return [...porId.values()];
+    }
+
+    /**
+     * Tira o agendamento da agenda de TODO perfil que o tenha — é o que o
+     * timer faz quando a gravação acaba (ou o programa já passou). Usar a
+     * chave do perfil ativo aqui apagaria o item errado (ou nenhum) quando
+     * quem agendou foi outro perfil.
+     */
+    private descartar(id: string): void {
+        for (const chave of this.chavesDeTodosOsPerfis()) {
+            const lista = this.lerChave(chave);
+            const resto = lista.filter(s => s.id !== id);
+            if (resto.length !== lista.length) this.gravarChave(chave, resto);
+        }
+        const atual = this.list();
+        this.listeners.forEach(cb => cb(atual));
+        this.pushCountToMain(this.listarDaMaquina().length);
     }
 
     /** Mirror the pending count into main so closing the window can hold the app. */
@@ -222,6 +287,9 @@ class ScheduledRecordingService {
 
     remove(id: string): void {
         this.save(this.list().filter(s => s.id !== id));
+        // O id é canal + início, não perfil: se OUTRO perfil agendou o mesmo
+        // programa, ele continua querendo a gravação — timer e ffmpeg ficam.
+        if (this.listarDaMaquina().some(s => s.id === id)) return;
         const startTimer = this.startTimers.get(id);
         if (startTimer) { clearTimeout(startTimer); this.startTimers.delete(id); }
         const stopTimer = this.stopTimers.get(id);
@@ -234,20 +302,32 @@ class ScheduledRecordingService {
         }
     }
 
-    /** Rehydrate timers on boot; prune schedules whose program already ended. */
+    /**
+     * Rehydrate timers on boot — de TODOS os perfis, não só do ativo — e
+     * descarta os agendamentos cujo programa já acabou.
+     */
     init(): void {
-        const all = this.list();
         const now = Date.now();
-        const alive = all.filter(s => !isScheduleExpired(s.endIso, now));
-        const encerrados = all.filter(s => isScheduleExpired(s.endIso, now));
-        if (alive.length !== all.length) this.save(alive);
+        const vivos = new Map<string, ScheduledRecording>();
+        const encerrados = new Map<string, ScheduledRecording>();
+        for (const chave of this.chavesDeTodosOsPerfis()) {
+            const all = this.lerChave(chave);
+            const alive = all.filter(s => !isScheduleExpired(s.endIso, now));
+            all.forEach(s => (alive.includes(s) ? vivos : encerrados).set(s.id, s));
+            // Sem avisar listeners: o único assinante (EpgGuide) é rota lazy e
+            // só assina depois do boot. A contagem pro main sai uma vez, no fim.
+            if (alive.length !== all.length) this.gravarChave(chave, alive);
+        }
+        // Mesmo programa vivo num perfil e vencido noutro (EPG atualizou o fim):
+        // vale o vivo — parar "o órfão" derrubaria a gravação que ele quer.
+        vivos.forEach((_rec, id) => encerrados.delete(id));
         // Um agendamento já encerrado ainda pode ter gravação VIVA no main: se o
         // renderer recarregou dentro da janela do END_PADDING, o stopTimer morreu
         // junto e o ffmpeg ficou sem ninguém pra parar. Encerra antes de
         // descartar — senão grava até o disco encher.
         encerrados.forEach(rec => void this.stopOrphanRecording(rec));
-        alive.forEach(s => this.arm(s));
-        this.pushCountToMain(alive.length);
+        vivos.forEach(s => this.arm(s));
+        this.pushCountToMain(vivos.size);
     }
 
     /** Encerra no main uma gravação deste agendamento que tenha ficado órfã. */
@@ -290,7 +370,7 @@ class ScheduledRecordingService {
 
         // Program already over (slept laptop, long downtime) → drop silently.
         if (isScheduleExpired(rec.endIso, Date.now())) {
-            this.save(this.list().filter(s => s.id !== rec.id));
+            this.descartar(rec.id);
             return;
         }
         // 🚦 Fila: com o limite de gravações simultâneas atingido, re-tenta a
@@ -354,7 +434,7 @@ class ScheduledRecordingService {
                 }, RETRY_DELAY_MS));
                 return;
             }
-            this.save(this.list().filter(s => s.id !== rec.id));
+            this.descartar(rec.id);
             appNotificationService.addNotification({
                 type: 'dvr_recording',
                 title: '⚠️ Falha na gravação agendada',
@@ -404,7 +484,7 @@ class ScheduledRecordingService {
             const recId = this.activeRecIds.get(rec.id);
             this.activeRecIds.delete(rec.id);
             if (recId) await window.ipcRenderer.invoke('dvr:stop', { id: recId });
-            this.save(this.list().filter(s => s.id !== rec.id));
+            this.descartar(rec.id);
             appNotificationService.addNotification({
                 type: 'dvr_recording',
                 title: '⏺ Gravação concluída',
