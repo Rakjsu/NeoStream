@@ -837,7 +837,18 @@
     "certTrusted": "Certificado inválido autorizado por você em:",
     "certRevoke": "Revogar autorizações",
     "peerTitle": "Controlar outro NeoStream",
-    "peerDesc": "Conecte no controle remoto de outro PC da rede (endereço e PIN mostrados nas Configurações dele) e comande a reprodução daqui."
+    "peerDesc": "Conecte no controle remoto de outro PC da rede (endereço e PIN mostrados nas Configurações dele) e comande a reprodução daqui.",
+    "title": "Rede e certificados",
+    "desc": "Controle de compatibilidade para provedores IPTV com TLS ou CORS antigo ou mal configurado.",
+    "peerConnect": "Conectar",
+    "peerConnectError": "Não conectou — confira endereço, PIN e se o controle está ativado no outro PC (com o HTTPS desligado lá).",
+    "peerInvalidAddress": "Endereço inválido.",
+    "peerPrevious": "Anterior",
+    "peerPlayPause": "Reproduzir / pausar",
+    "peerStop": "Parar",
+    "peerNext": "Próximo",
+    "peerVolumeDown": "Diminuir volume",
+    "peerVolumeUp": "Aumentar volume"
   },
   "welcome": {
     "stepLanguageTitle": "Bem-vindo ao NeoStream",

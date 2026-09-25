@@ -30,7 +30,9 @@ export function NetworkSection() {
     const [peerPin, setPeerPin] = useState('');
     const [peerSocket, setPeerSocket] = useState<WebSocket | null>(null);
     const [peerState, setPeerState] = useState<RemotePeerState | null>(null);
-    const [peerError, setPeerError] = useState<string | null>(null);
+    // Guarda QUAL erro, nao o texto: o texto sai do t() na hora de desenhar,
+    // entao trocar o idioma com o erro na tela troca a frase junto.
+    const [peerError, setPeerError] = useState<'connect' | 'address' | null>(null);
     const connectPeer = () => {
         setPeerError(null);
         try {
@@ -40,10 +42,10 @@ export function NetworkSection() {
                 const state = parsePeerState(String(event.data));
                 if (state) setPeerState(state);
             };
-            socket.onerror = () => setPeerError('Não conectou — confira endereço, PIN e se o controle está ativado no outro PC (com o HTTPS desligado lá).');
+            socket.onerror = () => setPeerError('connect');
             socket.onclose = () => { setPeerSocket(null); setPeerState(null); };
         } catch {
-            setPeerError('Endereço inválido.');
+            setPeerError('address');
         }
     };
     const disconnectPeer = () => { peerSocket?.close(); };
@@ -167,8 +169,8 @@ export function NetworkSection() {
             <div className="section-header">
                 <div className="section-icon" style={{ background: 'linear-gradient(135deg, #14b8a6, #0f766e)' }}>🔐</div>
                 <div>
-                    <h2>Rede e certificados</h2>
-                    <p>Controle de compatibilidade para provedores IPTV com TLS ou CORS antigo ou mal configurado.</p>
+                    <h2>{t('network', 'title')}</h2>
+                    <p>{t('network', 'desc')}</p>
                 </div>
             </div>
 
@@ -357,24 +359,40 @@ export function NetworkSection() {
                             disabled={!peerSocket && (!peerAddr.trim() || peerPin.trim().length < 4)}
                             style={{ padding: '8px 14px', borderRadius: 8, border: 'none', cursor: 'pointer', fontWeight: 700, background: peerSocket ? 'rgba(239,68,68,0.7)' : 'var(--ns-accent)', color: 'white' }}
                         >
-                            {peerSocket ? 'Desconectar' : 'Conectar'}
+                            {peerSocket ? t('network', 'devicesDisconnect') : t('network', 'peerConnect')}
                         </button>
                     </div>
-                    {peerError && <p style={{ color: '#fca5a5', fontSize: 12, margin: 0 }}>{peerError}</p>}
+                    {peerError && (
+                        <p style={{ color: '#fca5a5', fontSize: 12, margin: 0 }}>
+                            {t('network', peerError === 'address' ? 'peerInvalidAddress' : 'peerConnectError')}
+                        </p>
+                    )}
                     {peerSocket && (
                         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 12, opacity: 0.8 }}>
-                                🟢 {peerState?.casting ? `Transmitindo: ${peerState.castTitle || '…'}`
+                                🟢 {peerState?.casting ? `${t('cast', 'casting')}: ${peerState.castTitle || '…'}`
                                     : peerState?.title ? `${peerState.playing ? '▶' : '⏸'} ${peerState.title}` : t('cast', 'connected')}
                             </span>
-                            {(['previous', 'togglePlay', 'stop', 'next', 'volumeDown', 'volumeUp'] as const).map(action => (
+                            {/* O id da acao e o PROTOCOLO (vai no {action} do WS);
+                                o nome do botao e texto de tela. Antes o title
+                                mostrava o id cru ("togglePlay") em qualquer
+                                idioma, e era o unico nome de um botao so de emoji. */}
+                            {([
+                                ['previous', '⏮', t('network', 'peerPrevious')],
+                                ['togglePlay', '⏯', t('network', 'peerPlayPause')],
+                                ['stop', '⏹', t('network', 'peerStop')],
+                                ['next', '⏭', t('network', 'peerNext')],
+                                ['volumeDown', '🔉', t('network', 'peerVolumeDown')],
+                                ['volumeUp', '🔊', t('network', 'peerVolumeUp')],
+                            ] as const).map(([action, icone, nome]) => (
                                 <button
                                     key={action}
                                     onClick={() => sendPeerCommand(peerSocket, action)}
-                                    title={action}
+                                    title={nome}
+                                    aria-label={nome}
                                     style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(255,255,255,0.08)', color: 'white', cursor: 'pointer' }}
                                 >
-                                    {action === 'previous' ? '⏮' : action === 'togglePlay' ? '⏯' : action === 'stop' ? '⏹' : action === 'next' ? '⏭' : action === 'volumeDown' ? '🔉' : '🔊'}
+                                    {icone}
                                 </button>
                             ))}
                         </div>

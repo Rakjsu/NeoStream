@@ -385,7 +385,18 @@
     "certTrusted": "Invalid certificate allowed by you on:",
     "certRevoke": "Revoke permissions",
     "peerTitle": "Control another NeoStream",
-    "peerDesc": "Connect to the web remote of another PC on your network (address and PIN are shown in that PC's Settings) and drive playback from here."
+    "peerDesc": "Connect to the web remote of another PC on your network (address and PIN are shown in that PC's Settings) and drive playback from here.",
+    "title": "Network and certificates",
+    "desc": "Compatibility controls for IPTV providers with old or misconfigured TLS or CORS.",
+    "peerConnect": "Connect",
+    "peerConnectError": "Couldn't connect — check the address, the PIN and that the remote is turned on in the other PC (with HTTPS off there).",
+    "peerInvalidAddress": "Invalid address.",
+    "peerPrevious": "Previous",
+    "peerPlayPause": "Play / pause",
+    "peerStop": "Stop",
+    "peerNext": "Next",
+    "peerVolumeDown": "Volume down",
+    "peerVolumeUp": "Volume up"
   },
   "welcome": {
     "stepLanguageTitle": "Welcome to NeoStream",
