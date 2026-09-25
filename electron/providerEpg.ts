@@ -415,16 +415,6 @@ async function fetchSimpleDataTable(streamId: number, channelId: string): Promis
 }
 
 export function setupProviderEpgHandlers() {
-    // Is the provider's own EPG usable this session? (Triggers the probe.)
-    ipcMain.handle('epg:provider-available', async () => {
-        try {
-            await ensureXmltvIndex()
-            return { success: true, available: xmltvAvailability === 'ready' }
-        } catch (error) {
-            return { success: false, error: getErrorMessage(error) }
-        }
-    })
-
     // Program search for the global search overlay (title, airing/upcoming).
     ipcMain.handle('epg:provider-search', async (_, args: { query?: string }) => {
         try {
