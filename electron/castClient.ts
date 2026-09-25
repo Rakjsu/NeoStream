@@ -5,7 +5,8 @@
  * model every cast sender uses) → CONNECT to receiver-0 → LAUNCH the Default
  * Media Receiver → CONNECT to the app's transportId → LOAD the media URL.
  * Heartbeat PINGs every 5s keep the session alive; PLAY/PAUSE/STOP/SEEK ride
- * the media namespace with the mediaSessionId from MEDIA_STATUS.
+ * the media namespace with the mediaSessionId from MEDIA_STATUS. A TV that goes
+ * silent past PEER_TIMEOUT_MS gets its socket dropped (see connectTransport).
  */
 
 import tls from 'node:tls'
@@ -50,6 +51,12 @@ import {
 } from './castProtocol'
 
 const HEARTBEAT_MS = 5000
+// Sem NENHUM byte da TV por 3 heartbeats, a conexão é dada como morta (D198).
+// Qualquer byte conta — não só PONG: há receptor que responde o PING com
+// MEDIA_STATUS/RECEIVER_STATUS, e um detector estreito derrubaria sessão viva.
+// (O socket.setTimeout do Node não serve: a escrita do PING também zera o
+// relógio de ociosidade dele, então ele nunca dispararia.)
+const PEER_TIMEOUT_MS = HEARTBEAT_MS * 3
 const LAUNCH_TIMEOUT_MS = 15000
 // A resposta ao GET_STATUS chega na hora; o teto só cobre o aparelho mudo.
 // Curto porque o cast:reconnect tenta TODOS os aparelhos da rede (D097).
@@ -366,8 +373,11 @@ export class CastSession {
         })
         const socket = this.socket!
         socket.setTimeout(0)
+        // Último sinal de vida DESTE socket (qualquer byte vindo da TV).
+        let lastSeenAt = Date.now()
 
         socket.on('data', (chunk: Buffer) => {
+            lastSeenAt = Date.now()
             const glued = new Uint8Array(this.buffer.length + chunk.length)
             glued.set(this.buffer, 0)
             glued.set(chunk, this.buffer.length)
@@ -403,6 +413,15 @@ export class CastSession {
         this.send(CAST_RECEIVER_ID, NS_CONNECTION, connectPayload())
         if (this.heartbeatTimer) clearInterval(this.heartbeatTimer)
         this.heartbeatTimer = setInterval(() => {
+            // Chromecast tirado da tomada / Wi-Fi que sumiu: o socket fica meio
+            // aberto, o write do PING não falha e o 'close' pode levar minutos
+            // — o app seguia "transmitindo" pra uma TV desligada. Derrubar aqui
+            // faz o 'close' acima cair no caminho de reconexão que já existe.
+            if (Date.now() - lastSeenAt > PEER_TIMEOUT_MS) {
+                log.warn('[Cast]', this.deviceName, `não responde há mais de ${PEER_TIMEOUT_MS / 1000} s — derrubando a conexão`)
+                socket.destroy()
+                return
+            }
             this.send(CAST_RECEIVER_ID, NS_HEARTBEAT, pingPayload())
         }, HEARTBEAT_MS)
     }
