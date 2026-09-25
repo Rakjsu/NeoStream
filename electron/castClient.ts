@@ -51,6 +51,9 @@ import {
 
 const HEARTBEAT_MS = 5000
 const LAUNCH_TIMEOUT_MS = 15000
+// A resposta ao GET_STATUS chega na hora; o teto só cobre o aparelho mudo.
+// Curto porque o cast:reconnect tenta TODOS os aparelhos da rede (D097).
+const ATTACH_TIMEOUT_MS = 5000
 
 export interface CastMediaInput {
     url: string
@@ -504,10 +507,21 @@ export class CastSession {
         })
     }
 
-    /** Espera o RECEIVER_STATUS que traz o RECEPTOR DE MÍDIA, capturando transportId. */
-    private waitForReceiver(errorMsg: string): Promise<void> {
+    /**
+     * Espera o RECEIVER_STATUS que traz o RECEPTOR DE MÍDIA, capturando transportId.
+     *
+     * `failWhenAbsent` é o modo do attach: ali não se lança nada, então o
+     * primeiro RECEIVER_STATUS sem o CC1AD845 JÁ é a resposta ("não tem o que
+     * adotar") — esperar o teto inteiro só prendia o slot de conexão da TV e
+     * atrasava a retomada (D097). No LAUNCH o primeiro status pode ser de ANTES
+     * de o receptor subir, então lá continua esperando.
+     */
+    private waitForReceiver(
+        errorMsg: string,
+        { failWhenAbsent = false, timeoutMs = LAUNCH_TIMEOUT_MS }: { failWhenAbsent?: boolean; timeoutMs?: number } = {},
+    ): Promise<void> {
         return new Promise<void>((resolve, reject) => {
-            const timer = setTimeout(() => { this.receiverStatusListeners.delete(onData); reject(new Error(errorMsg)) }, LAUNCH_TIMEOUT_MS)
+            const timer = setTimeout(() => { this.receiverStatusListeners.delete(onData); reject(new Error(errorMsg)) }, timeoutMs)
             const onData = (message: CastMessage) => {
                 let payload: unknown
                 try { payload = JSON.parse(message.payloadUtf8) } catch { return }
@@ -516,7 +530,13 @@ export class CastSession {
                 // RECEIVER_STATUS espontâneo (troca de app, mexida no volume) e
                 // o transportId do app errado levava o LOAD embora.
                 const app = findApp(payload, CAST_MEDIA_APP_ID)
-                if (!app) return
+                if (!app) {
+                    if (!failWhenAbsent) return
+                    clearTimeout(timer)
+                    this.receiverStatusListeners.delete(onData)
+                    reject(new Error(errorMsg))
+                    return
+                }
                 this.transportId = app.transportId
                 this.sessionId = app.sessionId
                 clearTimeout(timer)
@@ -543,7 +563,7 @@ export class CastSession {
      */
     async attach(): Promise<void> {
         await this.connectTransport()
-        const attached = this.waitForReceiver('nenhuma sessão de mídia ativa no dispositivo')
+        const attached = this.waitForReceiver('nenhuma sessão de mídia ativa no dispositivo', { failWhenAbsent: true, timeoutMs: ATTACH_TIMEOUT_MS })
         this.send(CAST_RECEIVER_ID, NS_RECEIVER, getReceiverStatusPayload(this.requestId++))
         await attached
         // Join the running app's virtual connection and pull its media status.
