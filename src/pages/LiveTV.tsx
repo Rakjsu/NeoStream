@@ -2059,24 +2059,11 @@ export function LiveTV() {
                         channelList={playerChannelList}
                         onSwitchChannel={switchPlayingChannel}
                         liveQualityVariants={playingQualityVariants}
-                        onSwitchQuality={(channel: LiveStream) => {
-                            setPlayingChannel(channel);
-                            // Save quality preference based on selected variant
-                            const variants = getChannelQualityVariants(channel);
-                            const selectedVariant = variants.find(v => v.channel.stream_id === channel.stream_id);
-                            if (selectedVariant) {
-                                const label = selectedVariant.label.toLowerCase();
-                                if (label.includes('4k') || label.includes('uhd')) {
-                                    profileService.setPreferredQuality('4k');
-                                } else if (label.includes('fhd') || label.includes('1080')) {
-                                    profileService.setPreferredQuality('fhd');
-                                } else if (label.includes('hd') || label.includes('720')) {
-                                    profileService.setPreferredQuality('hd');
-                                } else if (label.includes('sd') || label.includes('480')) {
-                                    profileService.setPreferredQuality('sd');
-                                }
-                            }
-                        }}
+                        // Trocar a qualidade so troca o canal que toca. Isto
+                        // gravava uma "qualidade preferida" no perfil que
+                        // ninguem lia (#D174): o representante do grupo de
+                        // variantes continua sendo a melhor qualidade.
+                        onSwitchQuality={(channel: LiveStream) => setPlayingChannel(channel)}
                     />
                 )
             }

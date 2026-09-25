@@ -11,9 +11,10 @@ export interface PlaybackConfig {
     bufferSize: 'intelligent' | '5' | '10' | '15' | '30';
     // Não há `audioCodec` nem `quality` aqui: eram campos gravados, com valor
     // padrão e tudo, que NINGUÉM lia — nem tela para escolher existia. O codec
-    // que o app de fato respeita é o de vídeo (`useHls.ts`), e a qualidade
-    // preferida mora em outro lugar, com outros valores
-    // (`profileService.setPreferredQuality`: 4k/fhd/hd/sd/auto).
+    // que o app de fato respeita é o de vídeo (`useHls.ts`). Qualidade
+    // preferida não existe em lugar nenhum: na TV ao vivo o representante de
+    // um grupo de variantes é sempre a melhor qualidade (`groupChannelVariants`)
+    // e a troca é feita no player, canal a canal (#D174).
     videoCodec: 'auto' | 'h264' | 'h265' | 'vp9';
     autoPlayNextEpisode: boolean;
     subtitleLanguage: 'pt-br' | 'pt' | 'en' | 'es';
