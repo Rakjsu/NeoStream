@@ -89,6 +89,25 @@ interface DownloadProgressItem {
  */
 type EstadoDoBotaoBaixar = 'idle' | 'queued' | 'downloading' | 'completed';
 
+/**
+ * 📂 Episódios já pedidos que ainda não chegaram à fila do downloadService
+ * (a URL ainda está sendo resolvida, ou o "Baixar temporada" ainda não chegou
+ * neles). Sem isto o seletor reaberto no meio da temporada oferecia de novo o
+ * que já estava a caminho — e o segundo clique enfileirava o mesmo episódio
+ * duas vezes (D190). Fica no MÓDULO, não num ref: o pedido da temporada
+ * sobrevive a fechar e reabrir a ficha, e a ficha reaberta é outra instância.
+ */
+const episodiosACaminho = new Set<string>();
+const chaveDoEpisodio = (serie: string, temporada: number, episodio: number) =>
+    JSON.stringify([serie, temporada, episodio]);
+/**
+ * Folga entre um episódio e o próximo no "Baixar temporada". Não tirar sem
+ * antes consertar o `generateId` do downloadService (nome + Date.now(), sem
+ * temporada/episódio): dois episódios no mesmo milissegundo colidem e o
+ * segundo é descartado calado.
+ */
+const INTERVALO_DA_TEMPORADA_MS = 2000;
+
 export function ContentDetailModal({
     isOpen,
     onClose,
@@ -580,25 +599,21 @@ export function ContentDetailModal({
         soltaresDoDownloadRef.current.push(soltar);
     };
 
-    const downloadSingleEpisode = async (seasonNum: number, episodeNum: number) => {
-        // Check if episode is already in queue
-        if (downloadService.isEpisodeInQueue(contentData.name, seasonNum, episodeNum)) {
-            setShowDownloadModal(false);
-            return; // Already downloading or downloaded
-        }
+    /** Na fila do serviço OU já pedido e a caminho dela (D190). */
+    const episodioJaPedido = (seasonNum: number, episodeNum: number) =>
+        downloadService.isEpisodeInQueue(contentData.name, seasonNum, episodeNum)
+        || episodiosACaminho.has(chaveDoEpisodio(contentData.name, seasonNum, episodeNum));
 
+    /**
+     * Resolve a URL e põe UM episódio na fila. Não mexe na tela: o "Baixar
+     * temporada" chama isto de episódio em episódio, inclusive depois de a
+     * ficha fechar. Devolve se o episódio entrou na fila; nunca rejeita.
+     */
+    const enfileirarEpisodio = async (seasonNum: number, episodeNum: number): Promise<boolean> => {
         const episodeData = seriesInfo?.episodes?.[seasonNum]?.find(
             (ep) => Number(ep.episode_num) === episodeNum
         );
-        if (!episodeData) return;
-
-        // O botão "Baixar" da série NÃO muda de estado aqui (D188): ele é só a
-        // porta do seletor. Preso no primeiro episódio ("baixando" desabilitava,
-        // "concluído" fazia o clique voltar sem abrir), obrigava a fechar e
-        // reabrir a ficha para pedir o segundo. O seletor já mostra o que está
-        // na fila (isEpisodeInQueue).
-        setShowDownloadModal(false);
-
+        if (!episodeData) return false;
         try {
             const result = await window.ipcRenderer.invoke('streams:get-series-url', {
                 streamId: episodeData.id,
@@ -608,8 +623,7 @@ export function ContentDetailModal({
             // `success:false` não cai no catch: sem este ramo o pedido sumia calado.
             if (!result?.success || !result.url) {
                 console.warn('Download: URL do episódio não resolveu:', result?.error);
-                avisar(t('contentModal', 'downloadFailed'));
-                return;
+                return false;
             }
 
             await downloadService.addDownload(
@@ -629,11 +643,57 @@ export function ContentDetailModal({
                     genres: (tmdbData as TmdbDetails | null)?.genres?.map((g) => g.name)
                 }
             );
-            avisar(t('contentModal', 'downloadQueued'));
+            return true;
         } catch (err) {
             console.error('Download error:', err);
-            avisar(t('contentModal', 'downloadFailed'));
+            return false;
         }
+    };
+
+    const downloadSingleEpisode = async (seasonNum: number, episodeNum: number) => {
+        // O botão "Baixar" da série NÃO muda de estado aqui (D188): ele é só a
+        // porta do seletor. Preso no primeiro episódio ("baixando" desabilitava,
+        // "concluído" fazia o clique voltar sem abrir), obrigava a fechar e
+        // reabrir a ficha para pedir o segundo. O seletor já mostra o que está
+        // na fila e o que está a caminho dela (episodioJaPedido).
+        setShowDownloadModal(false);
+        if (episodioJaPedido(seasonNum, episodeNum)) return;
+
+        const chave = chaveDoEpisodio(contentData.name, seasonNum, episodeNum);
+        episodiosACaminho.add(chave);
+        const entrou = await enfileirarEpisodio(seasonNum, episodeNum);
+        episodiosACaminho.delete(chave);
+        avisar(t('contentModal', entrou ? 'downloadQueued' : 'downloadFailed'));
+    };
+
+    /**
+     * 📂 "Baixar temporada": põe os episódios na fila um depois do outro, com
+     * folga entre eles (D190). É UM laço, não uma cascata de setTimeout que
+     * chamava o clique avulso: cada volta dela fechava o seletor (quem o
+     * reabria via-o sumir de 2 em 2 s) e trocava o aviso. Todos os episódios
+     * pedidos ficam "a caminho" desde o clique, então o seletor reaberto não
+     * os oferece de novo; o que falha sai na hora e volta a ser oferecido.
+     * Fechar a ficha NÃO cancela: a pessoa pediu a temporada inteira.
+     * `pedidos` vem do seletor, já sem o que está na fila ou a caminho.
+     */
+    const baixarTemporada = async (seasonNum: number, pedidos: number[]) => {
+        setShowDownloadModal(false);
+        const nome = contentData.name;
+        const chaves = pedidos.map((ep) => chaveDoEpisodio(nome, seasonNum, ep));
+        chaves.forEach((chave) => episodiosACaminho.add(chave));
+        let entraram = 0;
+        let falharam = 0;
+        for (let i = 0; i < pedidos.length; i++) {
+            if (i > 0) await new Promise<void>((resolve) => setTimeout(resolve, INTERVALO_DA_TEMPORADA_MS));
+            // Pode ter entrado na fila por outro caminho enquanto esperava
+            // (ex.: retomado na tela de Downloads com a ficha já fechada).
+            const entrou = downloadService.isEpisodeInQueue(nome, seasonNum, pedidos[i])
+                || await enfileirarEpisodio(seasonNum, pedidos[i]);
+            episodiosACaminho.delete(chaves[i]);
+            if (!entrou) falharam++;
+            else if (++entraram === 1) avisar(t('contentModal', 'downloadQueued'));
+        }
+        if (falharam > 0) avisar(t('contentModal', 'downloadFailed'));
     };
 
     // Per-episode watch state for the selected season, computed once per
@@ -1714,7 +1774,7 @@ export function ContentDetailModal({
                             {(() => {
                                 const allEps = seriesInfo?.episodes?.[selectedSeason] || [];
                                 const remainingEps = allEps.filter((ep) =>
-                                    !downloadService.isEpisodeInQueue(contentData.name, selectedSeason, Number(ep.episode_num))
+                                    !episodioJaPedido(selectedSeason, Number(ep.episode_num))
                                 );
                                 const downloadedCount = allEps.length - remainingEps.length;
 
@@ -1738,12 +1798,7 @@ export function ContentDetailModal({
                                 return (
                                     <button
                                         onClick={() => {
-                                            remainingEps.forEach((ep, idx: number) => {
-                                                setTimeout(() => {
-                                                    downloadSingleEpisode(selectedSeason, Number(ep.episode_num));
-                                                }, idx * 2000);
-                                            });
-                                            setShowDownloadModal(false);
+                                            void baixarTemporada(selectedSeason, remainingEps.map((ep) => Number(ep.episode_num)));
                                         }}
                                         style={{
                                             padding: '14px 24px',
@@ -1763,7 +1818,7 @@ export function ContentDetailModal({
                                 );
                             })()}
 
-                            {downloadService.isEpisodeInQueue(contentData.name, selectedSeason, selectedEpisode) ? (
+                            {episodioJaPedido(selectedSeason, selectedEpisode) ? (
                                 <div style={{
                                     padding: '14px 24px',
                                     borderRadius: 12,
