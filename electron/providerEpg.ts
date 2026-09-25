@@ -1,10 +1,13 @@
 /**
  * Xtream provider EPG — main process side.
  *
- * Downloads {server}/xmltv.php once per session (24h file cache, same
- * mechanism/dir as 'epg:get-cached'), parses it ONCE into an in-memory
- * Map<epg_channel_id, programs> and answers per-channel lookups instantly
- * over IPC. When the provider has no xmltv.php (404/HTML/empty), it is
+ * Downloads {server}/xmltv.php (24h file cache, same mechanism/dir as
+ * 'epg:get-cached'), parses it into an in-memory Map<epg_channel_id,
+ * programs> and answers per-channel lookups instantly over IPC. O índice é
+ * podado para uma janela em volta do "agora" do parse, então ele VENCE:
+ * passado XMLTV_INDEX_TTL_MS a próxima consulta reindexa — do cache em disco,
+ * sem download novo enquanto ele estiver dentro das 24h dele.
+ * When the provider has no xmltv.php (404/HTML/empty), it is
  * marked unavailable for the session — no retry storms — and per-channel
  * get_simple_data_table is tried as the secondary provider source.
  *
@@ -33,6 +36,18 @@ import { getErrorMessage } from './errorMessage'
 const XMLTV_CACHE_KEY_PREFIX = 'provider-xmltv'
 const XMLTV_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const SIMPLE_TABLE_TTL_MS = 60 * 60 * 1000
+/**
+ * Idade máxima do índice em memória antes de reindexar.
+ *
+ * O índice é PODADO no instante do parse para [agora-24h, agora+48h]
+ * (PROVIDER_EPG_*_WINDOW_MS em providerEpgProtocol.ts) e o Guia oferece até
+ * agora+36h (WINDOW_MAX_OFFSET_MS em src/utils/epgGuide.ts). Num PC de sala
+ * que fica dias ligado, 12h depois do boot a borda futura do Guia já cai fora
+ * do índice e o pulo de dia mostra tela vazia. Reindexar a cada 6h mantém
+ * sempre >= 42h à frente, e dentro das 24h do cache em disco a reindexação é
+ * leitura de arquivo + parse — não vira tempestade de download.
+ */
+const XMLTV_INDEX_TTL_MS = 6 * 60 * 60 * 1000
 const FETCH_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     'Accept': 'application/xml, text/xml, application/json, */*'
@@ -48,6 +63,9 @@ interface Credentials {
 
 let xmltvAvailability: Availability = 'unknown'
 let xmltvIndex: Map<string, ProviderEpgProgram[]> | null = null
+// Fim da rodada que produziu o `xmltvIndex` no ar (0 = nunca rodou). A janela
+// podada dentro dele é relativa a ESSE instante — por isso ele tem validade.
+let xmltvIndexedAt = 0
 let xmltvLoading: Promise<void> | null = null
 // Carimbo da rodada de indexação. O download e o parse cedem o event loop, e
 // uma troca de playlist no meio deles invalida tudo: sem esta checagem, a
@@ -74,6 +92,7 @@ export function resetProviderEpgState() {
     xmltvGeneration++
     xmltvAvailability = 'unknown'
     xmltvIndex = null
+    xmltvIndexedAt = 0
     xmltvLoading = null
     providerUtcOffsetMinutes = null
     simpleTableAvailable = true
@@ -176,13 +195,35 @@ async function readStaleCache(fs: typeof import('fs/promises'), cacheFile: strin
     }
 }
 
+/** O índice publicado já passou da validade da janela que ele cobre? */
+function xmltvIndexIsStale(): boolean {
+    // Só um índice PUBLICADO envelhece — em 'unavailable'/'unknown' não há
+    // janela podada para vencer, e reabrir o probe ali seria a tempestade de
+    // retry que o módulo evita de propósito.
+    return xmltvAvailability === 'ready' && Date.now() - xmltvIndexedAt >= XMLTV_INDEX_TTL_MS
+}
+
 /**
- * Availability probe + index build. Runs the download/parse at most once per
- * session (single in-flight promise); a definitive failure marks the source
- * unavailable for the rest of the session.
+ * Rodada que terminou sem publicar índice novo. Quando já existe um índice no
+ * ar (isto é uma REINDEXAÇÃO, não o probe do boot), mantê-lo é melhor que
+ * ficar sem guia nenhum: a próxima tentativa fica para o próximo TTL.
+ */
+function markXmltvUnavailable() {
+    if (xmltvIndex) return
+    xmltvAvailability = 'unavailable'
+}
+
+/**
+ * Availability probe + index build. Uma rodada por vez (promessa única em
+ * voo); uma falha definitiva sem índice anterior marca a fonte indisponível
+ * para a sessão. O índice publicado vale XMLTV_INDEX_TTL_MS: passado isso a
+ * próxima chamada reindexa, porque a janela podada dentro dele envelhece
+ * junto. Durante a reindexação a disponibilidade CONTINUA 'ready' — nada de
+ * voltar para 'unknown', que deixaria o índice vivo porém invisível para os
+ * handlers se a rodada nova não chegasse a publicar.
  */
 function ensureXmltvIndex(): Promise<void> {
-    if (xmltvAvailability !== 'unknown') return Promise.resolve()
+    if (xmltvAvailability !== 'unknown' && !xmltvIndexIsStale()) return Promise.resolve()
     if (xmltvLoading) return xmltvLoading
 
     // Carimbo desta rodada: se resetProviderEpgState() rodar enquanto ela
@@ -221,7 +262,7 @@ function ensureXmltvIndex(): Promise<void> {
                     log.info('[Provider EPG] Stalker portal EPG unavailable:', getErrorMessage(error))
                 }
                 if (!syntheticXml || !looksLikeXmltv(syntheticXml)) {
-                    if (stillCurrent()) xmltvAvailability = 'unavailable'
+                    if (stillCurrent()) markXmltvUnavailable()
                     return
                 }
                 const parseStart = Date.now()
@@ -262,7 +303,7 @@ function ensureXmltvIndex(): Promise<void> {
                     }).then(r => String(r.data ?? '')).catch(() => '')
                 const { urlTvg } = parseM3uHeader(head)
                 if (!urlTvg) {
-                    if (stillCurrent()) xmltvAvailability = 'unavailable'
+                    if (stillCurrent()) markXmltvUnavailable()
                     log.info('[Provider EPG] M3U playlist has no url-tvg — provider EPG disabled')
                     return
                 }
@@ -271,7 +312,7 @@ function ensureXmltvIndex(): Promise<void> {
             const xml = await fetchXmltvWithCache(url)
 
             if (!xml || !looksLikeXmltv(xml)) {
-                if (stillCurrent()) xmltvAvailability = 'unavailable'
+                if (stillCurrent()) markXmltvUnavailable()
                 log.info('[Provider EPG] Provider xmltv unavailable (empty/404/HTML), disabled for this session')
                 return
             }
@@ -294,14 +335,21 @@ function ensureXmltvIndex(): Promise<void> {
             log.info('[Provider EPG] Indexed', xmltvIndex.size, 'channels /', programCount,
                 'programs in', Date.now() - parseStart, 'ms')
         } catch (error) {
-            if (stillCurrent()) xmltvAvailability = 'unavailable'
+            if (stillCurrent()) markXmltvUnavailable()
             log.error('[Provider EPG] xmltv probe error:', getErrorMessage(error))
         }
     })().finally(() => {
         // Só solta a própria promessa: um reset no meio já zerou xmltvLoading e
         // pode ter uma rodada NOVA em voo — nulificá-la aqui faria a próxima
         // chamada disparar um terceiro download/parse em paralelo.
-        if (stillCurrent()) xmltvLoading = null
+        if (!stillCurrent()) return
+        xmltvLoading = null
+        // Único lugar que carimba a idade do índice: o FIM da rodada. Tanto
+        // faz ela ter publicado índice novo ou não — quando não publicou (sem
+        // credencial, download falhou, provedor sem xmltv), o índice velho
+        // segue no ar e vale até o próximo TTL. Sem este carimbo, a próxima
+        // chamada de EPG dispararia outra rodada, e a seguinte também.
+        xmltvIndexedAt = Date.now()
     })
 
     xmltvLoading = loading
