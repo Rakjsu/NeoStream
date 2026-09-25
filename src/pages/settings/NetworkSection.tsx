@@ -40,7 +40,7 @@ export function NetworkSection() {
                 const state = parsePeerState(String(event.data));
                 if (state) setPeerState(state);
             };
-            socket.onerror = () => setPeerError('Não conectou — confira endereço, PIN e se o controle está ativado no outro PC.');
+            socket.onerror = () => setPeerError('Não conectou — confira endereço, PIN e se o controle está ativado no outro PC (com o HTTPS desligado lá).');
             socket.onclose = () => { setPeerSocket(null); setPeerState(null); };
         } catch {
             setPeerError('Endereço inválido.');

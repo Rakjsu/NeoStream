@@ -28,7 +28,7 @@ import { setupWinIntegration, routeFromArgv } from './winIntegration'
 import { setupStorageManager } from './storageManager'
 import { setupAutoBackup } from './autoBackup'
 import { setupSyncFolder } from './syncFolder'
-import { setupYouTubeEmbedFix } from './youtubeEmbedFix'
+import { setupOutgoingHeaderRewrites } from './outgoingHeaderRewrites'
 import Store from 'electron-store'
 import { gpuSwitchesFor, normalizeHwAccelMode, type HwAccelMode } from './gpuPolicy'
 
@@ -133,10 +133,11 @@ function createWindow() {
         },
     })
 
-    // YouTube trailer embeds throw "Erro 153" from the packaged file:// origin
-    // because they lack a valid Referer/Origin. Inject one for YouTube hosts so
-    // both the "Ver Trailer" modal and the hover preview play inline.
-    setupYouTubeEmbedFix(win.webContents.session)
+    // Listener ÚNICO de cabeçalhos de saída (o Electron só guarda um por
+    // sessão): Referer do trailer do YouTube (senão "Erro 153" no file://) e o
+    // WebSocket do "PC controla PC" sem o Origin file:// que o guarda do outro
+    // PC recusa. Ver outgoingHeaderRewrites.ts.
+    setupOutgoingHeaderRewrites(win.webContents.session, VITE_DEV_SERVER_URL)
 
     // Prevent any native maximize attempts (Win+Up, etc.)
     win.on('maximize', () => {

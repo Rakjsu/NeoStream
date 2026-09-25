@@ -1,5 +1,3 @@
-import type { Session } from 'electron'
-
 /**
  * YouTube trailer embeds fail with "Erro 153" (and, if you naively spoof the
  * referer to youtube.com, "Erro 152 — vídeo não disponível") when the app is
@@ -50,9 +48,8 @@ export function withEmbedderReferer(headers: Record<string, string>): Record<str
     return { ...headers, Referer: `${EMBEDDER_ORIGIN}/` }
 }
 
-/** Install the referer rewrite on a session's webRequest (embed doc only). */
-export function setupYouTubeEmbedFix(session: Session): void {
-    session.webRequest.onBeforeSendHeaders({ urls: YOUTUBE_EMBED_URL_FILTER }, (details, callback) => {
-        callback({ requestHeaders: withEmbedderReferer(details.requestHeaders as Record<string, string>) })
-    })
-}
+/*
+ * O listener da sessão NÃO mora mais aqui: o Electron guarda um único
+ * onBeforeSendHeaders por sessão, então esta reescrita é instalada junto com
+ * as outras em outgoingHeaderRewrites.ts (setupOutgoingHeaderRewrites).
+ */
