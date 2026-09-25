@@ -97,7 +97,8 @@ export function ShowcaseScreensaver() {
                     ? window.ipcRenderer.invoke('categories:get-vod') as Promise<{ success?: boolean; data?: { category_id: string; category_name: string }[] }>
                     : Promise.resolve({ success: true, data: [] }),
                 isKidsProfile ? indexedDBCache.getHiddenItems('movie') : Promise.resolve([] as string[]),
-                indexedDBCache.getAllCachedMovies()
+                // Liberado pelo responsável no infantil não some por classificação (D115).
+                indexedDBCache.getAllCachedMovies({ ignorarLiberados: isKidsProfile })
             ]);
             if (cancelled || !result?.success || !Array.isArray(result.data)) return;
 

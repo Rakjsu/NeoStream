@@ -15,6 +15,7 @@ import { daysToExpiry, EXPIRY_SNOOZE_KEY, isExpirySnoozed, shouldWarnExpiry } fr
 import { indexedDBCache } from '../services/indexedDBCache';
 import { normalizeContentName } from '../services/contentGate';
 import { searchMovieByName, searchSeriesByName, isKidsFriendly } from '../services/tmdb';
+import { infantilPodeAbrir } from '../services/liberacaoInfantil';
 import { getHomeRecommendations, type RecommendationGroup } from '../services/recommendationService';
 import { newEpisodesService } from '../services/newEpisodesService';
 import { newEpisodeNotifier } from '../services/newEpisodeNotifier';
@@ -671,8 +672,8 @@ export function Home() {
             : await indexedDBCache.getCachedSeries(name);
 
         if (cached && cached.certification) {
-            const friendly = isKidsFriendly(cached.certification);
-            if (isKidsProfile && !friendly) {
+            // Classificação infantil OU liberado pelo responsável (D115).
+            if (isKidsProfile && !(await infantilPodeAbrir(contentType, name, cached.certification))) {
                 // Block and hide
                 await indexedDBCache.hideItem(contentType, name);
                 setHiddenItems(prev => new Set([...prev, itemKey]));
@@ -706,8 +707,9 @@ export function Home() {
                     await indexedDBCache.hideItem(contentType, name);
                 }
 
-                // Block for Kids if not appropriate
-                if (isKidsProfile && !friendly) {
+                // Block for Kids if not appropriate (a liberação do
+                // responsável vale mais que a classificação — D115)
+                if (isKidsProfile && !(await infantilPodeAbrir(contentType, name, tmdbResult.certification))) {
                     setHiddenItems(prev => new Set([...prev, itemKey]));
                     setBlockMessage(`"${name}" ${t('home', 'notSuitableForKids')}`);
                     setTimeout(() => setBlockMessage(null), 3000);

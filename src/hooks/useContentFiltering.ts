@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { indexedDBCache } from '../services/indexedDBCache';
 import { parentalService } from '../services/parentalService';
 import { searchMovieByName, searchSeriesByName, isKidsFriendly } from '../services/tmdb';
+import { infantilPodeAbrir } from '../services/liberacaoInfantil';
 import { useLanguage } from '../services/languageService';
 
 import { asList } from '../utils/catalogPayload';
@@ -83,13 +84,17 @@ export function useContentFiltering<T>({
     // Load cached ratings for parental control filtering
     useEffect(() => {
         const loadCachedRatings = async () => {
+            // No perfil infantil, o título liberado pelo responsável sai do
+            // mapa: a classificação dele é o engano da TMDB, e o filtro de
+            // classificação do parental o esconderia da grade mesmo liberado.
+            const opcoes = { ignorarLiberados: isKidsProfile };
             const ratings = contentType === 'series'
-                ? await indexedDBCache.getAllCachedSeries()
-                : await indexedDBCache.getAllCachedMovies();
+                ? await indexedDBCache.getAllCachedSeries(opcoes)
+                : await indexedDBCache.getAllCachedMovies(opcoes);
             setCachedRatings(ratings);
         };
         loadCachedRatings();
-    }, [items, contentType]);
+    }, [items, contentType, isKidsProfile]);
 
     // Fetch blocked category IDs for Kids profile OR Parental Control
     useEffect(() => {
@@ -219,7 +224,8 @@ export function useContentFiltering<T>({
 
             // Check Kids profile restriction
             if (isKidsProfile) {
-                if (isKidsFriendly(certification)) {
+                // Classificação infantil OU liberado pelo responsável (D115).
+                if (await infantilPodeAbrir(contentType, name, certification)) {
                     onAllowed(item);
                 } else {
                     setBlockMessage(`"${name}" ${t('home', 'notAvailableForProfile')}`);

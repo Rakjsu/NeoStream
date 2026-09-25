@@ -110,9 +110,12 @@ const loadCatalogGate = async (kind: GateKind): Promise<CatalogGate> => {
         gate.hiddenNames = new Set(await indexedDBCache.getHiddenItems(kind).catch(() => [] as string[]));
     }
     if (isParentalActive(state)) {
+        // Perfil infantil: o título liberado pelo responsável não é
+        // escondido pela classificação errada da TMDB (D115) — igual à TV.
+        const opcoes = { ignorarLiberados: state.isKidsProfile };
         gate.cachedRatings = await (kind === 'series'
-            ? indexedDBCache.getAllCachedSeries()
-            : indexedDBCache.getAllCachedMovies()
+            ? indexedDBCache.getAllCachedSeries(opcoes)
+            : indexedDBCache.getAllCachedMovies(opcoes)
         ).catch(() => new Map<string, string | null>());
     }
     return gate;
