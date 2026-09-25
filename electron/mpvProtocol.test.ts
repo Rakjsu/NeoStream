@@ -26,7 +26,11 @@ import {
 
 describe('buildPipeName', () => {
     it('builds a Windows named pipe path scoped by pid and instance', () => {
-        expect(buildPipeName(1234, 2)).toBe('\\\\.\\pipe\\neostream-mpv-1234-2')
+        expect(buildPipeName(1234, 2, 'win32', 'C:\\Temp')).toBe('\\\\.\\pipe\\neostream-mpv-1234-2')
+    })
+
+    it('outside Windows builds an absolute unix socket path in the temp dir', () => {
+        expect(buildPipeName(1234, 2, 'darwin', '/tmp')).toBe('/tmp/neostream-mpv-1234-2.sock')
     })
 })
 
@@ -234,7 +238,7 @@ describe('buildPathCandidates', () => {
         const candidates = buildPathCandidates({
             ProgramFiles: 'C:\\Program Files',
             USERPROFILE: 'C:\\Users\\test',
-        })
+        }, 'win32')
 
         expect(candidates).toContain('C:\\Program Files\\mpv\\mpv.exe')
         expect(candidates).toContain('C:\\Users\\test\\scoop\\shims\\mpv.exe')
@@ -248,7 +252,7 @@ describe('buildPathCandidates', () => {
             'ProgramFiles(x86)': 'C:\\Program Files (x86)',
             LOCALAPPDATA: 'C:\\Users\\test\\AppData\\Local',
             ChocolateyInstall: 'D:\\choco',
-        })
+        }, 'win32')
 
         expect(candidates).toContain('C:\\Program Files (x86)\\mpv\\mpv.exe')
         expect(candidates).toContain('C:\\Users\\test\\AppData\\Local\\Programs\\mpv\\mpv.exe')

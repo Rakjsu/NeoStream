@@ -9,6 +9,8 @@
  * Protocol reference: https://mpv.io/manual/stable/#json-ipc
  */
 
+import path from 'node:path'
+
 export const MPV_WINDOW_TITLE = 'NeoStream MPV'
 
 /** Extensões de legenda que o mpv abre direto do disco, sem conversão nossa. */
@@ -201,11 +203,39 @@ export function formatMpvGeometry(geometry: MpvGeometry): string {
 }
 
 /**
- * Named pipe path for the mpv --input-ipc-server option (Windows).
- * `instance` disambiguates successive launches within the same app session.
+ * Teto do caminho de um socket unix. O `sun_path` do macOS tem 104 bytes (o do
+ * Linux, 108) CONTANDO o NUL do fim; passou disso, o `bind` do mpv falha e o
+ * IPC não sobe. Folga de uns bytes pra não morar no limite.
  */
-export function buildPipeName(pid: number, instance: number): string {
-    return `\\\\.\\pipe\\neostream-mpv-${pid}-${instance}`
+export const MAX_UNIX_SOCKET_PATH = 100
+
+/**
+ * Endereço do --input-ipc-server do mpv. PURO: a plataforma e a pasta
+ * temporária entram como parâmetro (o main passa `process.platform` e
+ * `app.getPath('temp')`).
+ *
+ * - Windows: named pipe `\\.\pipe\neostream-mpv-<pid>-<n>`.
+ * - Fora do Windows: socket unix com caminho ABSOLUTO na pasta temporária.
+ *   O nome de named pipe lá vira um arquivo RELATIVO ao cwd do mpv (o spawn
+ *   não passa cwd) — no app do macOS aberto pelo Finder o cwd é `/`, onde o
+ *   mpv não pode criar nada: o vídeo tocava e os controles ficavam mudos, sem
+ *   aviso nenhum. Pasta temporária vazia, relativa ou comprida demais pro
+ *   `sun_path` cai em `/tmp` (existe no mac e no Linux).
+ *
+ * `instance` separa lançamentos seguidos na mesma sessão do app.
+ */
+export function buildPipeName(
+    pid: number,
+    instance: number,
+    platform: NodeJS.Platform,
+    tempDir: string,
+): string {
+    const nome = `neostream-mpv-${pid}-${instance}`
+    if (platform === 'win32') return `\\\\.\\pipe\\${nome}`
+    const arquivo = `${nome}.sock`
+    const naTemp = path.posix.isAbsolute(tempDir) ? path.posix.join(tempDir, arquivo) : ''
+    if (naTemp && Buffer.byteLength(naTemp, 'utf8') <= MAX_UNIX_SOCKET_PATH) return naTemp
+    return path.posix.join('/tmp', arquivo)
 }
 
 export interface MpvLaunchOptions {
@@ -368,13 +398,38 @@ export interface MpvPathEnv {
     LOCALAPPDATA?: string
     USERPROFILE?: string
     ChocolateyInstall?: string
+    HOME?: string
 }
 
 /**
- * Well-known Windows install locations to probe when mpv isn't configured
- * and isn't on PATH (manual install, scoop shim, chocolatey shim).
+ * Onde o mpv costuma morar no mac e no Linux. Precisa existir porque o app do
+ * macOS aberto pelo Finder herda um PATH mínimo (`/usr/bin:/bin:/usr/sbin:/sbin`):
+ * o `mpv` do Homebrew não aparece na sondagem do PATH, e quem seguiu a dica
+ * "brew install mpv" da tela de Configurações ficava com "mpv não encontrado".
  */
-export function buildPathCandidates(env: MpvPathEnv): string[] {
+export const UNIX_MPV_CANDIDATES = [
+    '/opt/homebrew/bin/mpv', // Homebrew em Apple Silicon
+    '/usr/local/bin/mpv', // Homebrew em Intel / instalação manual
+    '/opt/local/bin/mpv', // MacPorts
+    '/Applications/mpv.app/Contents/MacOS/mpv', // app baixado do mpv.io
+    '/usr/bin/mpv', // apt / dnf / pacman
+    '/snap/bin/mpv', // snap
+] as const
+
+/**
+ * Locais conhecidos pra procurar o mpv quando ele não está configurado nem no
+ * PATH. No Windows: instalação manual, shim do scoop e do chocolatey. Fora
+ * dele: os de UNIX_MPV_CANDIDATES (+ o ~/Applications do usuário no mac).
+ */
+export function buildPathCandidates(env: MpvPathEnv, platform: NodeJS.Platform): string[] {
+    if (platform !== 'win32') {
+        const candidates: string[] = [...UNIX_MPV_CANDIDATES]
+        if (platform === 'darwin' && env.HOME && path.posix.isAbsolute(env.HOME)) {
+            candidates.push(path.posix.join(env.HOME, 'Applications/mpv.app/Contents/MacOS/mpv'))
+        }
+        return candidates
+    }
+
     const candidates: string[] = []
 
     if (env.ProgramFiles) candidates.push(`${env.ProgramFiles}\\mpv\\mpv.exe`)
