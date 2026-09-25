@@ -53,6 +53,7 @@ const tlsFake = await vi.hoisted(async () => {
 vi.mock('tls', () => ({ default: { connect: tlsFake.connect } }))
 
 import store from './store'
+import * as certificatePolicy from './certificatePolicy'
 import {
     getCertificateSettings,
     setAllowInvalidProviderCertificates,
@@ -60,7 +61,6 @@ import {
     isProviderUrl,
     registerApprovedProviderUrl,
     resolveProviderHttpsAgent,
-    canAllowInvalidCertificateForUrl,
     isTlsCertificateError,
     getInvalidCertificateGuidance,
 } from './certificatePolicy'
@@ -146,7 +146,28 @@ describe('registerApprovedProviderUrl (aprendizado dos hosts do provedor)', () =
 describe('bypass de TLS exige consentimento explícito por domínio', () => {
     it('🔒 sem consentimento salvo, host do provedor NÃO ganha agent permissivo', async () => {
         await expect(resolveProviderHttpsAgent('https://provider.example.com/movie/9.mp4')).resolves.toBeUndefined()
-        expect(canAllowInvalidCertificateForUrl('https://provider.example.com/movie/9.mp4')).toBe(false)
+        // Nada foi gravado como confiável: o próximo pedido também não ganha bypass.
+        expect(getCertificateSettings().trustedInvalidCertDomains).toEqual([])
+    })
+
+    it('🔒 (#D136) o único portão de bypass exportado é o resolveProviderHttpsAgent', () => {
+        // Havia um `canAllowInvalidCertificateForUrl` exportado, síncrono, sem
+        // consumidor nenhum: pulava a sonda TLS e o aviso ao dono, e o nome
+        // dizia "eu sou o portão". Quem escrever o próximo caminho de rede tem de
+        // achar só o portão de verdade. A superfície fica cravada: export novo
+        // aqui tem de ser olhado de propósito (e não pode ser outro atalho de
+        // bypass, com o nome que for).
+        expect(Object.keys(certificatePolicy).sort()).toEqual([
+            'forgetTrustedCertificateDomains',
+            'getCertificateSettings',
+            'getInvalidCertificateGuidance',
+            'isProviderUrl',
+            'isTlsCertificateError',
+            'registerApprovedProviderUrl',
+            'resolveProviderHttpsAgent',
+            'setAllowInvalidProviderCertificates',
+            'setupCertificateErrorHandler',
+        ])
     })
 
     it('com o domínio autorizado pelo dono, o agent permissivo volta', async () => {
